@@ -35,15 +35,6 @@ Future<void> main() async {
     return;
   }
 
-  // On web we keep the default hash strategy so GitHub Pages can host the
-  // SPA without a 404 redirect dance — every deep link resolves under the
-  // single index.html. On desktop the endpoint resolver still depends on
-  // the Aspire-injected env var; web reads the page origin.
-  if (kIsWeb) {
-    // Hash strategy is the Flutter default for web — leaving it explicit
-    // here as documentation, since GH Pages does not serve a SPA fallback.
-  }
-
   final (host, port, secure) = resolveKernelEndpoint();
   DigitalBrainTelemetry.instance.logger.info(
     'kernel endpoint resolved',

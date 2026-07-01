@@ -302,7 +302,7 @@ Widget _text(BuildContext c, DataSource s) {
 }
 
 Widget _imgFallback(BuildContext c) => Container(
-  color: DigitalBrainColors.bg2,
+  color: DigitalBrainColors.obsidianSlate,
   alignment: Alignment.center,
   child: const Icon(
     Icons.image_outlined,
@@ -576,7 +576,7 @@ Widget _metric(BuildContext c, DataSource s) {
   return Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: DigitalBrainColors.panel,
+      color: DigitalBrainColors.panelGlass,
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: DigitalBrainColors.hairline),
     ),
@@ -1233,7 +1233,7 @@ Widget _taskRow(BuildContext c, DataSource s) {
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     decoration: BoxDecoration(
       gradient: LinearGradient(
-        colors: [statusTone.withValues(alpha: 0.10), DigitalBrainColors.panel],
+        colors: [statusTone.withValues(alpha: 0.10), DigitalBrainColors.panelGlass],
       ),
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: statusTone.withValues(alpha: 0.20)),
@@ -2596,7 +2596,7 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: DigitalBrainColors.bg1,
+        color: DigitalBrainColors.obsidian,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: DigitalBrainColors.hairline),
       ),
@@ -3173,7 +3173,7 @@ class _PromptInputBodyState extends State<_PromptInputBody> {
               color: DigitalBrainColors.inkLow,
             ),
             filled: true,
-            fillColor: DigitalBrainColors.bg1,
+            fillColor: DigitalBrainColors.obsidian,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: DigitalBrainColors.hairline),
@@ -3402,7 +3402,7 @@ class _StateEditorBodyState extends State<_StateEditorBody> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: DigitalBrainColors.bg1,
+        color: DigitalBrainColors.obsidian,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: DigitalBrainColors.hairline),
       ),
@@ -3476,7 +3476,7 @@ class _StateEditorBodyState extends State<_StateEditorBody> {
                       child: Container(
                         height: 36,
                         decoration: BoxDecoration(
-                          color: DigitalBrainColors.panel,
+                          color: DigitalBrainColors.panelGlass,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: DigitalBrainColors.hairline,
@@ -3694,7 +3694,7 @@ class _SynapseRowWidgetState extends State<_SynapseRowWidget> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: DigitalBrainColors.bg1,
+        color: DigitalBrainColors.obsidian,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: DigitalBrainColors.hairline),
       ),
@@ -3771,7 +3771,7 @@ class _SynapseRowWidgetState extends State<_SynapseRowWidget> {
             const Divider(color: DigitalBrainColors.hairline, height: 1),
             Container(
               padding: const EdgeInsets.all(12),
-              color: DigitalBrainColors.panel,
+              color: DigitalBrainColors.panelGlass,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -3806,7 +3806,7 @@ class _SynapseRowWidgetState extends State<_SynapseRowWidget> {
                             child: Container(
                               height: 32,
                               decoration: BoxDecoration(
-                                color: DigitalBrainColors.bg1,
+                                color: DigitalBrainColors.obsidian,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
                                   color: DigitalBrainColors.hairline,
@@ -3916,7 +3916,7 @@ class _SynapseCompactReferenceWidgetState
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: DigitalBrainColors.bg1.withValues(alpha: 0.5),
+        color: DigitalBrainColors.obsidian.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: DigitalBrainColors.hairline),
       ),
@@ -3974,7 +3974,7 @@ class _SynapseCompactReferenceWidgetState
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: DigitalBrainColors.bg2,
+                    color: DigitalBrainColors.obsidianSlate,
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(color: DigitalBrainColors.hairline),
                   ),
@@ -4003,7 +4003,7 @@ Widget _telemetryPanel(BuildContext c, DataSource s) {
   return Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: DigitalBrainColors.bg1,
+      color: DigitalBrainColors.obsidian,
       borderRadius: BorderRadius.circular(10),
       border: Border.all(color: DigitalBrainColors.hairline),
     ),
@@ -4187,7 +4187,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
         width: 24,
         height: 24,
         decoration: BoxDecoration(
-          color: DigitalBrainColors.panel,
+          color: DigitalBrainColors.panelGlass,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(color: DigitalBrainColors.hairlineStrong),
         ),
@@ -4205,7 +4205,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: DigitalBrainColors.bg1,
+        color: DigitalBrainColors.obsidian,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: DigitalBrainColors.hairline),
       ),
@@ -4385,7 +4385,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
                   alpha: 0.4,
                 ),
                 inactiveThumbColor: DigitalBrainColors.inkLow,
-                inactiveTrackColor: DigitalBrainColors.panel,
+                inactiveTrackColor: DigitalBrainColors.panelGlass,
                 onChanged: (val) {
                   _updateSettings(replaceSpheresWithIcons: val);
                 },
@@ -4411,7 +4411,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
                   alpha: 0.4,
                 ),
                 inactiveThumbColor: DigitalBrainColors.inkLow,
-                inactiveTrackColor: DigitalBrainColors.panel,
+                inactiveTrackColor: DigitalBrainColors.panelGlass,
                 onChanged: (val) {
                   _updateSettings(showSynapses: val);
                 },
@@ -4437,7 +4437,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
                   alpha: 0.4,
                 ),
                 inactiveThumbColor: DigitalBrainColors.inkLow,
-                inactiveTrackColor: DigitalBrainColors.panel,
+                inactiveTrackColor: DigitalBrainColors.panelGlass,
                 onChanged: (val) {
                   _updateSettings(localAiMode: val);
                 },
@@ -4454,7 +4454,7 @@ Widget _simulationsTab(BuildContext c, DataSource s) {
   return Container(
     padding: const EdgeInsets.all(24),
     decoration: BoxDecoration(
-      color: DigitalBrainColors.panel,
+      color: DigitalBrainColors.panelGlass,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: DigitalBrainColors.hairline),
     ),
@@ -4706,7 +4706,7 @@ class _ScenariosTabBodyState extends State<_ScenariosTabBody> {
 
               return Container(
                 decoration: BoxDecoration(
-                  color: DigitalBrainColors.panel,
+                  color: DigitalBrainColors.panelGlass,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: borderCol),
                 ),
@@ -4810,7 +4810,7 @@ class _ScenariosTabBodyState extends State<_ScenariosTabBody> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: DigitalBrainColors.bg1,
+                        color: DigitalBrainColors.obsidian,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: DigitalBrainColors.hairline),
                       ),
@@ -4970,7 +4970,7 @@ class _ScenariosTabBodyState extends State<_ScenariosTabBody> {
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('Add Scenario to Suite'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: DigitalBrainColors.panel,
+                    backgroundColor: DigitalBrainColors.panelGlass,
                     foregroundColor: DigitalBrainColors.ink,
                     side: const BorderSide(color: DigitalBrainColors.hairline),
                   ),
@@ -5124,7 +5124,7 @@ class _NeuronDebuggerTabBodyState extends State<_NeuronDebuggerTabBody>
                             ? DigitalBrainColors.rose.withValues(
                                 alpha: 0.15 * scale,
                               )
-                            : DigitalBrainColors.panel,
+                            : DigitalBrainColors.panelGlass,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: _voiceActive
@@ -5169,7 +5169,7 @@ class _NeuronDebuggerTabBodyState extends State<_NeuronDebuggerTabBody>
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: DigitalBrainColors.bg2,
+              color: DigitalBrainColors.obsidianSlate,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: DigitalBrainColors.hairlineStrong),
             ),
@@ -5308,7 +5308,7 @@ Widget _loadingCard(BuildContext c, DataSource s) {
   return Container(
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      color: DigitalBrainColors.panel,
+      color: DigitalBrainColors.panelGlass,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: DigitalBrainColors.hairline),
     ),
@@ -5323,12 +5323,12 @@ Widget _loadingCard(BuildContext c, DataSource s) {
               ? CircularProgressIndicator(
                   value: progress,
                   color: color,
-                  backgroundColor: DigitalBrainColors.bg2,
+                  backgroundColor: DigitalBrainColors.obsidianSlate,
                   strokeWidth: 3.5,
                 )
               : CircularProgressIndicator(
                   color: color,
-                  backgroundColor: DigitalBrainColors.bg2,
+                  backgroundColor: DigitalBrainColors.obsidianSlate,
                   strokeWidth: 3.5,
                 ),
         ),
@@ -5381,7 +5381,7 @@ Widget _loadingCard(BuildContext c, DataSource s) {
             child: LinearProgressIndicator(
               value: progress,
               color: color,
-              backgroundColor: DigitalBrainColors.bg2,
+              backgroundColor: DigitalBrainColors.obsidianSlate,
               minHeight: 4,
             ),
           ),

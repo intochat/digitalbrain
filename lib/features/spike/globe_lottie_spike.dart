@@ -8,11 +8,6 @@ import 'package:flutter_earth_globe/point_connection.dart';
 import 'package:flutter_earth_globe/point_connection_style.dart';
 import 'package:lottie/lottie.dart';
 
-/// Slice 0 throwaway de-risk page (docs/redesign/05-ROADMAP.md).
-///
-/// Renders a shader-based [FlutterEarthGlobe] (needs `--wasm`) and a network
-/// [Lottie] animation side by side to confirm they coexist under one renderer
-/// on the `flutter-web` resource. Delete after the renderer decision is made.
 class GlobeLottieSpike extends StatefulWidget {
   const GlobeLottieSpike({super.key});
 
@@ -23,8 +18,6 @@ class GlobeLottieSpike extends StatefulWidget {
 class _GlobeLottieSpikeState extends State<GlobeLottieSpike> {
   late final FlutterEarthGlobeController _globe;
 
-  // 1x1 deep-blue PNG, stretched as an equirectangular surface. Avoids any
-  // asset dependency for the spike — we only care that the shader path runs.
   static final _surface = MemoryImage(
     base64Decode(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',

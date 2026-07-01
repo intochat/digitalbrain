@@ -645,7 +645,7 @@ class _FlatRoutePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final r = _mapRect(size);
     final rr = RRect.fromRectAndRadius(r, const Radius.circular(12));
-    canvas.drawRRect(rr, Paint()..color = DigitalBrainColors.bg2);
+    canvas.drawRRect(rr, Paint()..color = DigitalBrainColors.obsidianSlate);
     canvas.drawRRect(
       rr,
       Paint()
@@ -709,7 +709,7 @@ class _FlatRoutePainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1
-          ..color = DigitalBrainColors.bg0,
+          ..color = DigitalBrainColors.pitchBlack,
       );
       if (p.label.isNotEmpty) {
         final tp = TextPainter(

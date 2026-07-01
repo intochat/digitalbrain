@@ -2,19 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// DigitalBrain visual language — editorial-cinematic dark.
-///
-/// Type: Fraunces (display, italic accents), Manrope (body),
-/// JetBrains Mono (code). Palette is near-pure black surfaces with indigo
-/// signal lines, gold for "you / creator" moments, deep teal reserved for
-/// spec-card chrome only.
 class DigitalBrainColors {
   const DigitalBrainColors._();
 
-  static const bg0 = Color(0xFF000000); // Pure deep pitch black
-  static const bg1 = Color(0xFF070708); // Obsidian black surfaces
-  static const bg2 = Color(0xFF0A0A0C); // Obsidian slate details
-  static const panel = Color(0x06FFFFFF); // 3% translucent milk glass overlay
+  static const pitchBlack = Color(0xFF000000);
+  static const obsidian = Color(0xFF070708);
+  static const obsidianSlate = Color(0xFF0A0A0C);
+  static const panelGlass = Color(0x06FFFFFF);
 
   static Color glassBg([double alpha = 0.04]) => const Color(0xFFFFFFFF).withValues(alpha: alpha);
 
@@ -22,8 +16,8 @@ class DigitalBrainColors {
     return HSLColor.fromAHSL(alpha, hue, saturation, lightness).toColor();
   }
 
-  static Color get spaceGlassOverlay => const Color(0x0CFFFFFF); // 5% white overlay
-  static Color get spaceGlassLight => const Color(0x08FFFFFF); // 3% white overlay
+  static Color get spaceGlassOverlay => const Color(0x0CFFFFFF);
+  static Color get spaceGlassLight => const Color(0x08FFFFFF);
 
   static final glassBorderGradient = LinearGradient(
     begin: Alignment.topLeft,
@@ -124,10 +118,10 @@ ThemeData buildDigitalBrainTheme() {
     onSecondary: Color(0xFF09090B),
     tertiary: DigitalBrainColors.gold,
     onTertiary: Color(0xFF09090B),
-    surface: DigitalBrainColors.bg0,
+    surface: DigitalBrainColors.pitchBlack,
     onSurface: DigitalBrainColors.ink,
-    surfaceContainerHighest: DigitalBrainColors.bg2,
-    surfaceContainerHigh: DigitalBrainColors.bg1,
+    surfaceContainerHighest: DigitalBrainColors.obsidianSlate,
+    surfaceContainerHigh: DigitalBrainColors.obsidian,
     onSurfaceVariant: DigitalBrainColors.inkMid,
     outline: DigitalBrainColors.hairlineStrong,
     outlineVariant: DigitalBrainColors.hairline,
@@ -138,8 +132,8 @@ ThemeData buildDigitalBrainTheme() {
   final base = ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
-    scaffoldBackgroundColor: DigitalBrainColors.bg0,
-    canvasColor: DigitalBrainColors.bg0,
+    scaffoldBackgroundColor: DigitalBrainColors.pitchBlack,
+    canvasColor: DigitalBrainColors.pitchBlack,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     splashFactory: InkSparkle.splashFactory,
     pageTransitionsTheme: const PageTransitionsTheme(builders: {

@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:simple_icons/simple_icons.dart';
 import 'package:digitalbrain_flutter/theme/digitalbrain_theme.dart';
 
-/// A premium, flat geometric vector logo widget in the Microsoft Fluent aesthetic.
-/// Replaces plain emojis and low-quality placeholders with high-fidelity brand icons via SimpleIcons.
-/// Automatically resolves parent fallback namespaces for hierarchical neuron IDs.
 class NeuronVectorLogo extends StatelessWidget {
   const NeuronVectorLogo({
     required this.neuronId,
@@ -74,7 +71,6 @@ class NeuronVectorLogo extends StatelessWidget {
       );
     }
 
-    // Fallback to legacy categories or custom painters
     final category = resolveCategory(neuronId);
     return SizedBox(
       width: size,
@@ -85,9 +81,6 @@ class NeuronVectorLogo extends StatelessWidget {
     );
   }
 
-  /// Traverses hierarchical namespaces and resolves them to core categories.
-  /// This implements the required parent-fallback logo mapping:
-  /// e.g. "DB.Gmail.Incoming" matches "gmail", falling back to parent "DB.Gmail" and finally "DB".
   static String resolveCategory(String id) {
     final normalized = id.toLowerCase();
     
@@ -102,7 +95,6 @@ class NeuronVectorLogo extends StatelessWidget {
     if (normalized.contains('csharp') || normalized.contains('c#') || normalized.contains('csharpfile')) return 'csharp';
     if (normalized.contains('digitalbrain') || normalized.contains('brand')) return 'brand';
     
-    // Default fallback to digitalbrain brand logo style
     return 'default';
   }
 }
@@ -147,12 +139,10 @@ class LogoPainter extends CustomPainter {
     }
   }
 
-  // 1. DigitalBrain Logo: Stylized 2D Geometric Brain Lobe
   void _paintBrandBrain(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
     
-    // Left Hemisphere - Indigo/Purple Gradient
     final leftPaint = Paint()
       ..shader = LinearGradient(
         colors: [
@@ -165,7 +155,6 @@ class LogoPainter extends CustomPainter {
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
-    // Right Hemisphere - Indigo/Teal Gradient
     final rightPaint = Paint()
       ..shader = LinearGradient(
         colors: [
@@ -188,14 +177,12 @@ class LogoPainter extends CustomPainter {
       ..color = overrideColor ?? Colors.white
       ..style = PaintingStyle.fill;
 
-    // Left Hemisphere geometry: layered overlapping organic circles forming a clean brain silhouette
     final leftPath = Path()
       ..addOval(Rect.fromLTWH(w * 0.08, h * 0.22, w * 0.35, h * 0.35))
       ..addOval(Rect.fromLTWH(w * 0.16, h * 0.12, w * 0.35, h * 0.38))
       ..addOval(Rect.fromLTWH(w * 0.14, h * 0.44, w * 0.32, h * 0.32))
       ..addOval(Rect.fromLTWH(w * 0.22, h * 0.50, w * 0.28, h * 0.30));
 
-    // Right Hemisphere geometry
     final rightPath = Path()
       ..addOval(Rect.fromLTWH(w * 0.57, h * 0.22, w * 0.35, h * 0.35))
       ..addOval(Rect.fromLTWH(w * 0.49, h * 0.12, w * 0.35, h * 0.38))
@@ -205,19 +192,16 @@ class LogoPainter extends CustomPainter {
     canvas.drawPath(leftPath, leftPaint);
     canvas.drawPath(rightPath, rightPaint);
 
-    // Draw central connecting synapatic bridge lines
     canvas.drawLine(Offset(cx - w * 0.12, cy - h * 0.05), Offset(cx + w * 0.12, cy - h * 0.05), connectorPaint);
     canvas.drawLine(Offset(cx - w * 0.15, cy + h * 0.10), Offset(cx + w * 0.15, cy + h * 0.10), connectorPaint);
     canvas.drawLine(Offset(cx - w * 0.08, cy + h * 0.22), Offset(cx + w * 0.08, cy + h * 0.22), connectorPaint);
 
-    // Draw tiny glowing synaptic nodes
     canvas.drawCircle(Offset(cx - w * 0.12, cy - h * 0.05), w * 0.05, dotPaint);
     canvas.drawCircle(Offset(cx + w * 0.12, cy - h * 0.05), w * 0.05, dotPaint);
     canvas.drawCircle(Offset(cx - w * 0.15, cy + h * 0.10), w * 0.05, dotPaint);
     canvas.drawCircle(Offset(cx + w * 0.15, cy + h * 0.10), w * 0.05, dotPaint);
   }
 
-  // 2. Creator Spark: Concentric AI starburst nodes
   void _paintCreatorSpark(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -231,16 +215,14 @@ class LogoPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final path = Path();
-    // A beautiful 4-point geometric star/spark
-    path.moveTo(cx, h * 0.1); // top
-    path.quadraticBezierTo(cx + w * 0.05, cy - h * 0.05, w * 0.9, cy); // right
-    path.quadraticBezierTo(cx + w * 0.05, cy + h * 0.05, cx, h * 0.9); // bottom
-    path.quadraticBezierTo(cx - w * 0.05, cy + h * 0.05, w * 0.1, cy); // left
-    path.quadraticBezierTo(cx - w * 0.05, cy - h * 0.05, cx, h * 0.1); // close
+    path.moveTo(cx, h * 0.1);
+    path.quadraticBezierTo(cx + w * 0.05, cy - h * 0.05, w * 0.9, cy);
+    path.quadraticBezierTo(cx + w * 0.05, cy + h * 0.05, cx, h * 0.9);
+    path.quadraticBezierTo(cx - w * 0.05, cy + h * 0.05, w * 0.1, cy);
+    path.quadraticBezierTo(cx - w * 0.05, cy - h * 0.05, cx, h * 0.1);
 
     canvas.drawPath(path, paint);
 
-    // Draw central spark circle
     canvas.drawCircle(
       Offset(cx, cy),
       w * 0.15,
@@ -248,7 +230,6 @@ class LogoPainter extends CustomPainter {
     );
   }
 
-  // 3. Identity Shield: Modern angular flat safety guard
   void _paintIdentityShield(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -261,7 +242,6 @@ class LogoPainter extends CustomPainter {
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    // Shield path
     final path = Path()
       ..moveTo(w * 0.15, h * 0.15)
       ..lineTo(w * 0.85, h * 0.15)
@@ -272,7 +252,6 @@ class LogoPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Draw inner key ring outline in white
     final innerPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.8)
       ..style = PaintingStyle.stroke
@@ -285,7 +264,6 @@ class LogoPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(cx - w * 0.03, cy + h * 0.1, w * 0.06, h * 0.15), bodyPaint);
   }
 
-  // 4. Travel Plane: Layered paper-plane delta triangles
   void _paintTravelPlane(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -306,14 +284,12 @@ class LogoPainter extends CustomPainter {
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    // Left folded wing
     final leftPath = Path()
       ..moveTo(cx, h * 0.1)
       ..lineTo(w * 0.15, h * 0.7)
       ..lineTo(cx, h * 0.55)
       ..close();
 
-    // Right folded wing
     final rightPath = Path()
       ..moveTo(cx, h * 0.1)
       ..lineTo(w * 0.85, h * 0.7)
@@ -323,7 +299,6 @@ class LogoPainter extends CustomPainter {
     canvas.drawPath(leftPath, paint1);
     canvas.drawPath(rightPath, paint2);
 
-    // Under-body shadow
     final shadowPaint = Paint()..color = Colors.black.withValues(alpha: 0.15);
     final shadowPath = Path()
       ..moveTo(cx, h * 0.55)
@@ -333,7 +308,6 @@ class LogoPainter extends CustomPainter {
     canvas.drawPath(shadowPath, shadowPaint);
   }
 
-  // 5. Gmail Envelope: Red translucent overlapping triangular sheets
   void _paintGmailEnvelope(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -346,14 +320,12 @@ class LogoPainter extends CustomPainter {
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    // Draw main envelope rectangle
     canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.1, h * 0.2, w * 0.8, h * 0.6), Radius.circular(w * 0.08)), bgPaint);
 
     final flapPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
 
-    // Upper flap
     final flapPath = Path()
       ..moveTo(w * 0.1, h * 0.2)
       ..lineTo(cx, h * 0.55)
@@ -361,7 +333,6 @@ class LogoPainter extends CustomPainter {
       ..close();
     canvas.drawPath(flapPath, flapPaint);
 
-    // Dynamic clean envelope folds
     final foldPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.15)
       ..style = PaintingStyle.fill;
@@ -373,7 +344,6 @@ class LogoPainter extends CustomPainter {
     canvas.drawPath(foldPath, foldPaint);
   }
 
-  // 6. AI Silicon Chip: Emerald green glowing microcircuit
   void _paintAiChip(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -386,7 +356,6 @@ class LogoPainter extends CustomPainter {
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    // Microchip body
     canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.2, h * 0.2, w * 0.6, h * 0.6), Radius.circular(w * 0.1)), chipPaint);
 
     final pinPaint = Paint()
@@ -395,22 +364,17 @@ class LogoPainter extends CustomPainter {
       ..strokeWidth = w * 0.05
       ..strokeCap = StrokeCap.round;
 
-    // Draw microchip pins around it
-    // Left pins
     canvas.drawLine(Offset(w * 0.08, h * 0.35), Offset(w * 0.20, h * 0.35), pinPaint);
     canvas.drawLine(Offset(w * 0.08, h * 0.50), Offset(w * 0.20, h * 0.50), pinPaint);
     canvas.drawLine(Offset(w * 0.08, h * 0.65), Offset(w * 0.20, h * 0.65), pinPaint);
 
-    // Right pins
     canvas.drawLine(Offset(w * 0.80, h * 0.35), Offset(w * 0.92, h * 0.35), pinPaint);
     canvas.drawLine(Offset(w * 0.80, h * 0.50), Offset(w * 0.92, h * 0.50), pinPaint);
     canvas.drawLine(Offset(w * 0.80, h * 0.65), Offset(w * 0.92, h * 0.65), pinPaint);
 
-    // Center glow
     canvas.drawCircle(Offset(cx, cy), w * 0.12, Paint()..color = Colors.white);
   }
 
-  // 7. SQLite stacked cylinder disks
   void _paintSqliteDb(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -423,7 +387,6 @@ class LogoPainter extends CustomPainter {
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    // Draw stacked cylinders
     final rect1 = Rect.fromLTWH(w * 0.15, h * 0.18, w * 0.7, h * 0.25);
     final rect2 = Rect.fromLTWH(w * 0.15, h * 0.40, w * 0.7, h * 0.25);
     final rect3 = Rect.fromLTWH(w * 0.15, h * 0.62, w * 0.7, h * 0.25);
@@ -442,7 +405,6 @@ class LogoPainter extends CustomPainter {
     canvas.drawOval(r, borderPaint);
   }
 
-  // 8. TaskManager Checklist Grid
   void _paintTaskManagerClipboard(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -455,10 +417,8 @@ class LogoPainter extends CustomPainter {
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    // Clipboard base
     canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.15, h * 0.15, w * 0.7, h * 0.7), Radius.circular(w * 0.08)), bgPaint);
 
-    // Inner paper lines
     final linePaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.8)
       ..style = PaintingStyle.stroke
@@ -469,7 +429,6 @@ class LogoPainter extends CustomPainter {
     canvas.drawLine(Offset(w * 0.35, h * 0.55), Offset(w * 0.7, h * 0.55), linePaint);
     canvas.drawLine(Offset(w * 0.35, h * 0.7), Offset(w * 0.65, h * 0.7), linePaint);
 
-    // Checkmarks
     final checkPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
@@ -478,7 +437,6 @@ class LogoPainter extends CustomPainter {
     canvas.drawCircle(Offset(w * 0.26, h * 0.7), w * 0.04, checkPaint);
   }
 
-  // 9. Geometric branching flow lines (git branching)
   void _paintGithubOcto(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -493,7 +451,6 @@ class LogoPainter extends CustomPainter {
 
     canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.1, h * 0.1, w * 0.8, h * 0.8), Radius.circular(w * 0.12)), paint);
 
-    // Geometric branching flow lines (git branching)
     final gitPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.85)
       ..style = PaintingStyle.stroke
@@ -504,21 +461,17 @@ class LogoPainter extends CustomPainter {
       ..color = DigitalBrainColors.tealSoft
       ..style = PaintingStyle.fill;
 
-    // Left vertical line
     canvas.drawLine(Offset(w * 0.35, h * 0.25), Offset(w * 0.35, h * 0.75), gitPaint);
-    // Branch split curving to the right
     final branchPath = Path()
       ..moveTo(w * 0.35, h * 0.5)
       ..quadraticBezierTo(w * 0.5, h * 0.5, w * 0.65, h * 0.35);
     canvas.drawPath(branchPath, gitPaint);
 
-    // Draw circular commits (nodes)
     canvas.drawCircle(Offset(w * 0.35, h * 0.3), w * 0.07, nodePaint);
     canvas.drawCircle(Offset(w * 0.35, h * 0.7), w * 0.07, nodePaint);
     canvas.drawCircle(Offset(w * 0.65, h * 0.35), w * 0.07, Paint()..color = DigitalBrainColors.violetSoft);
   }
 
-  // 10. C# Hexagon: Deep purple hexagon with modern geometric C# glyph
   void _paintCSharpHex(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
@@ -547,13 +500,11 @@ class LogoPainter extends CustomPainter {
     hexPath.close();
     canvas.drawPath(hexPath, paint);
 
-    // Draw elegant 'C' glyph in geometric white lines
     final textPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = w * 0.07;
 
-    // Draw a stylized arc representing 'C'
     canvas.drawArc(
       Rect.fromLTWH(cx - w * 0.22, cy - h * 0.22, w * 0.36, h * 0.44),
       3 * math.pi / 4,
@@ -562,7 +513,6 @@ class LogoPainter extends CustomPainter {
       textPaint,
     );
 
-    // Draw stylized tiny '#' in C#
     final sharpPaint = Paint()
       ..color = DigitalBrainColors.tealSoft
       ..style = PaintingStyle.stroke

@@ -54,3 +54,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Agent / superpowers trash (cleanup to keep thin like old projects)
+.superpowers/
+sdd/

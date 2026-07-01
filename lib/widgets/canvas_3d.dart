@@ -92,7 +92,7 @@ class _Canvas3DWidgetState extends State<Canvas3DWidget> with SingleTickerProvid
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: DigitalBrainColors.panel,
+        color: DigitalBrainColors.panelGlass,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: DigitalBrainColors.hairline),
       ),
