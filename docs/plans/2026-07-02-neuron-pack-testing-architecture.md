@@ -1018,7 +1018,9 @@ registration at build time instead."
 
 ### Task 9: `Neuron.cs` — swap broadcast subscription + publish to Orleans `AddBroadcastChannel`
 
-**Files:**
+**OUTCOME: attempted, reverted, no code change landed.** Empirical testing found `AddBroadcastChannel`/`[ImplicitChannelSubscription]` is key-partitioned (delivers only to grain activations whose own key matches the channel's key), not the global fan-out this task's premise assumed — it never reaches the arbitrarily-keyed grains this system actually broadcasts to, and it has no way to feed the non-grain `SignalEgressStreamSubscriber` that also consumes the same stream. 4 of 5 broadcast-dependent test files failed under the swap; all 5 pass on the original mechanism, which was kept unchanged. Full details and evidence: design spec §2.2 (corrected) and `.superpowers/sdd/progress.md`'s Task 9 entry. The steps below are kept in the plan as a historical record of what was attempted, not as remaining work — do not execute them.
+
+**Original file list (not touched, kept for the record):**
 - Modify: `DigitalBrain.Kernel/Neuron.cs`
 - Modify: `DigitalBrain.Kernel/Program.cs` (silo builder registration)
 - Modify: `DigitalBrain.TestKit/NeuronTestSiloConfigurator.cs` (same registration for tests)
@@ -1151,42 +1153,14 @@ git -C brain commit -m "refactor(kernel): replace hand-rolled broadcast subscrip
 
 ### Task 10: Re-target the 3-replica cluster spec at the new broadcast mechanism
 
-**Files:**
-- Modify: `DigitalBrain.Tests/Authoring/DriverProbePack/DriverProbeClusterBroadcast.feature` (Gherkin text unchanged — this task proves the same spec now exercises the new code path)
-
-**Interfaces:**
-- Consumes: Task 4's cluster vocabulary, Task 9's `AddBroadcastChannel` implementation.
-- Produces: nothing new — this is the closing verification task tying A and B together, per the design spec's explicit intent that cluster-interaction proof and the broadcast mechanism swap validate each other.
-
-- [ ] **Step 1: Run the existing 3-replica scenario against the new mechanism**
-
-Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~DriverProbeClusterBroadcast"`
-Expected: PASS — the same Gherkin from Task 4, unmodified, now proving Task 9's `AddBroadcastChannel`-based mechanism fans out correctly across 3 real silos, not just the mechanism that existed when Task 4 was written.
-
-- [ ] **Step 2: If it fails, diagnose against Task 9's implementation specifically**
-
-If Step 1 fails where Task 4's original run passed, the regression is in Task 9's swap, not the vocabulary — re-check `Neuron.cs`'s `OnSubscribed`/`Broadcast` implementation and the `AddBroadcastChannel` registration in `NeuronTestSiloConfigurator.cs` before touching the feature file or driver.
-
-- [ ] **Step 3: Run the complete full suite one final time**
-
-Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj && aspire doctor`
-Expected: full green, matching this plan's opening baseline count, plus a clean `aspire doctor`.
-
-- [ ] **Step 4: Commit (if Step 2's diagnosis required any fix)**
-
-```bash
-git -C brain add -A
-git -C brain commit -m "test(specs): confirm 3-replica broadcast spec passes against AddBroadcastChannel"
-```
-
-If Step 1 passed cleanly with no changes needed, there is nothing to commit — note this explicitly in the task report rather than creating an empty commit.
+**OUTCOME: no remaining work.** This task's entire purpose was verifying Task 9's `AddBroadcastChannel` swap against the 3-silo scenario Task 4 built. Since Task 9 found that swap doesn't fit and reverted (no mechanism change landed), there is nothing new to re-target — Task 4's own scenario already proves the (unchanged) mechanism works correctly at 3 silos, and it already passed as part of Task 4's own review. No code, no commit, no action needed. Kept in the plan as a historical record only.
 
 ---
 
 ## Self-Review
 
-**Spec coverage:** §2.1 (Driver Pattern + vocabulary) → Tasks 2-3; §2.1's boilerplate-deletion claim → Task 5; §2.2 (BroadcastChannel) → Tasks 9-10; §2.3 (CapabilityGate allowlist + tier consistency + gate-as-spec) → Tasks 6-7; §2.4 (JournalJsonContext deletion, spike-gated) → Tasks 1, 8; §3 sequencing → task order matches exactly (D spike, A, C, D-impl, B). No spec section without a task.
+**Spec coverage:** §2.1 (Driver Pattern + vocabulary) → Tasks 2-3; §2.1's boilerplate-deletion claim → Task 5; §2.2 (cluster interaction — BroadcastChannel attempted, empirically reverted, existing mechanism kept) → Tasks 4 (delivered), 9 (investigation, correctly concluded no), 10 (superseded by 9's finding); §2.3 (CapabilityGate allowlist + tier consistency + gate-as-spec) → Tasks 6-7; §2.4 (JournalJsonContext deletion, spike-gated) → Tasks 1, 8; §3 sequencing → task order matches exactly (D spike, A, C, D-impl, B). No spec section without a task. **Post-execution note:** §2.2/Tasks 9-10 originally read as committed code changes; both the spec and this plan were corrected after Task 9's empirical finding rather than left describing work that didn't actually land — see each section's "OUTCOME" note above.
 
-**Placeholder scan:** the one intentionally incomplete code block is `NativeFormatSiloConfigurator.Configure` in Task 1, Step 2 — this is the plan's own declared exception (an investigation task whose purpose is discovering that exact code), not an oversight. Task 9's broadcast-channel-provider accessor name (`this.GetBroadcastChannelProvider`) is flagged inline as needing a one-line confirmation against Orleans' grain-side extension API during implementation, following the same naming convention as the codebase's existing `this.GetStreamProvider` — a reasonable, narrow, explicitly-flagged uncertainty rather than a silent guess.
+**Placeholder scan:** the one intentionally incomplete code block is `NativeFormatSiloConfigurator.Configure` in Task 1, Step 2 — this is the plan's own declared exception (an investigation task whose purpose is discovering that exact code), not an oversight. Task 9's broadcast-channel-provider accessor name (`this.GetBroadcastChannelProvider`) is flagged inline as needing a one-line confirmation against Orleans' grain-side extension API during implementation, following the same naming convention as the codebase's existing `this.GetStreamProvider` — a reasonable, narrow, explicitly-flagged uncertainty rather than a silent guess. (This never got exercised, since Task 9 found the whole approach doesn't fit before reaching that specific line.)
 
 **Type consistency:** `INeuronTestHost`/`PackSpecDriver` signatures introduced in Task 2 are used identically in Tasks 3, 4, 5, 7 — `Grain<TGrain>`, `FireAsync<T>`, `PublishPackAsync`, `InstallPackAsync`, `FireSynapseAtPackAsync`, `AssertEmittedAsync` never change shape after Task 2. `PackSpecSteps` (introduced Task 3) is extended, never redefined, in Tasks 4 and 7.
