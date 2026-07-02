@@ -223,15 +223,17 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
 }
 
 // N+1 reactivity proof: two packs (TelegramResponderNeuron + KeywordWatcherNeuron) both react to ONE
-// TelegramMessageReceived broadcast — proving N+1 handler count with no silo restart.
+// TelegramMessageReceived broadcast — proving N+1 handler count with no silo restart. Scoped to "n1", not
+// "e2e", for the same reason TelegramReactiveLoopSteps above is scoped to "reactiveloop": "e2e" is also on
+// the sibling "Full reactive loop" scenario, and a shared tag would spin up this binding class's TestCluster
+// for that scenario too even though none of its steps match.
 [Binding]
-[Collection("telegram-n1-reactivity-host")]
-public sealed class TelegramN1ReactivitySteps : IAsyncDisposable
+public sealed class TelegramN1ReactivitySteps : NeuronTestBase
 {
-    private static IPackConfigStore SharedN1ConfigStore = null!;
+    // Shared so the in-cluster grains and the out-of-cluster GatewayService read/write the same backing store.
+    private IPackConfigStore _configStore = null!;
 
-    private readonly TestCluster _cluster;
-    private readonly SignalEgressBus _egressBus;
+    private readonly SignalEgressBus _egressBus = new();
     private const string ResponderPackName = "TelegramResponderNeuron";
     private const string WatcherPackName   = "KeywordWatcherNeuron";
     private const string N1Scope           = "n1-reactivity-user";
@@ -240,28 +242,39 @@ public sealed class TelegramN1ReactivitySteps : IAsyncDisposable
     private readonly List<Signal> _collectedSignals = new();
     private SignalEgressBus.Subscription? _egressSubscription;
 
-    public TelegramN1ReactivitySteps()
+    [BeforeScenario("n1")]
+    public Task BeforeScenarioAsync()
     {
         var configServices = new ServiceCollection();
         configServices.AddDataProtection().UseEphemeralDataProtectionProvider();
         configServices.AddSingleton<IPackConfigBackingStore>(new InMemoryPackConfigBackingStore());
         configServices.AddSingleton<IPackConfigStore, PackConfigStore>();
-        SharedN1ConfigStore = configServices.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
+        _configStore = configServices.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
 
-        _egressBus = new SignalEgressBus();
-        TelegramN1SiloConfig.SharedEgressBus = _egressBus;
-
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<TelegramN1SiloConfig>();
-        _cluster = builder.Build();
-        _cluster.DeployAsync().GetAwaiter().GetResult();
+        return InitializeAsync();
     }
 
-    public async ValueTask DisposeAsync()
+    [AfterScenario("n1")]
+    public Task AfterScenarioAsync()
     {
         _egressSubscription?.Dispose();
-        await _cluster.StopAllSilosAsync();
+        return DisposeAsync();
     }
+
+    // NeuronTestSiloConfigurator (DigitalBrain.TestKit/NeuronTestSiloConfigurator.cs) already wires the
+    // shared journal/embodiment/streams plumbing that the deleted TelegramN1SiloConfig hand-rolled. Only the
+    // Telegram-specific extras go here: a deterministic global IChatClient (NeuronTestSiloConfigurator's
+    // IScopedChatClientFactory is a no-op, so LlmResponderNeuron falls back to this global client), and this
+    // scenario's own SignalEgressBus/IPackConfigStore instances — registered after (so they win last-
+    // registration-wins resolution over) NeuronTestSiloConfigurator's own SignalEgressBus, so the silo's
+    // SignalEgressStreamSubscriber and this class's _egressSubscription observe the same bus.
+    protected override void ConfigureSilo(ISiloBuilder builder) => builder
+        .ConfigureServices(services =>
+        {
+            services.AddSingleton<IChatClient, AnswerPrefixChatClient>();
+            services.AddSingleton(_egressBus);
+            services.AddSingleton(_configStore);
+        });
 
     [Given(@"I provide the Telegram configuration token ""(.*)"", provider ""(.*)"", key ""(.*)""")]
     public async Task GivenN1TelegramConfig(string token, string provider, string key)
@@ -277,13 +290,13 @@ public sealed class TelegramN1ReactivitySteps : IAsyncDisposable
         var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
 
         var gateway = new GatewayService(
-            _cluster.GrainFactory,
+            Cluster.GrainFactory,
             new ConfigurationBuilder().Build(),
             new HomeFeedBus(),
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance,
-            SharedN1ConfigStore);
+            _configStore);
 
         await gateway.Send(new SynapseEnvelope
         {
@@ -295,7 +308,7 @@ public sealed class TelegramN1ReactivitySteps : IAsyncDisposable
     [Given(@"both the Telegram responder and the keyword watcher are installed")]
     public async Task GivenBothPacksAreInstalled()
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-n1-proof");
+        var market = Grain<IMarketplaceNeuron>("market-n1-proof");
 
         await market.FireAsync(new PublishToMarketplace(
             ResponderPackName, "1.0", Code: MarketplaceSeeds.TelegramResponderPackCode,
@@ -311,7 +324,7 @@ public sealed class TelegramN1ReactivitySteps : IAsyncDisposable
     [Given(@"the LLM responder is active and the egress bus is watching ""(.*)"" and ""(.*)""")]
     public async Task GivenResponderActiveAndEgressWatchingTwo(string type1, string type2)
     {
-        var responder = _cluster.GrainFactory.GetGrain<ILlmResponderNeuron>("n1-llm-responder");
+        var responder = Grain<ILlmResponderNeuron>("n1-llm-responder");
         await responder.GetTimelineAsync();
 
         _egressSubscription = _egressBus.Subscribe(new[] { type1, type2 });
@@ -332,7 +345,7 @@ public sealed class TelegramN1ReactivitySteps : IAsyncDisposable
     [When(@"a Telegram message with text ""(.*)"" is ingested for chat (\d+)")]
     public async Task WhenATelegramMessageIsIngestedForChat(string text, int chatId)
     {
-        var ingress = _cluster.GrainFactory.GetGrain<IIngressNeuron>("n1-ingress");
+        var ingress = Grain<IIngressNeuron>("n1-ingress");
         await ingress.IngestAsync("TelegramMessageReceived",
             new Dictionary<string, object?> { ["chatId"] = chatId, ["text"] = text });
     }
@@ -382,39 +395,4 @@ public sealed class TelegramN1ReactivitySteps : IAsyncDisposable
         }
         return null;
     }
-
-    private sealed class TelegramN1SiloConfig : ISiloConfigurator
-    {
-        public static SignalEgressBus SharedEgressBus { get; set; } = new();
-
-        public void Configure(ISiloBuilder siloBuilder) => siloBuilder
-            .AddMemoryGrainStorageAsDefault()
-            .AddMemoryStreams("Default")
-            .AddMemoryStreams("HomeFeed")
-            .AddMemoryStreams("DigitalBrainTimeline")
-            .AddMemoryGrainStorage("PubSubStore")
-            .ConfigureServices(services =>
-            {
-                services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddScoped<NeuronJournals>();
-                services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
-                services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-                services.AddSingleton<HomeFeedBus>();
-                services.AddSingleton<IChatClient, AnswerPrefixChatClient>();
-                services.AddSingleton(SharedEgressBus);
-                services.AddSignalEgressStreamSubscriber();
-                services.AddSingleton(SharedN1ConfigStore);
-                services.AddSingleton<IConfiguration>(
-                    new ConfigurationBuilder()
-                        .AddInMemoryCollection(new Dictionary<string, string?>
-                        {
-                            ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
-                        })
-                        .Build());
-            });
-    }
 }
-
-[CollectionDefinition("telegram-n1-reactivity-host", DisableParallelization = true)]
-public sealed class TelegramN1ReactivityHostCollection;
