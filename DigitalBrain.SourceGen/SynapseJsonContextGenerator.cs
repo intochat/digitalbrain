@@ -79,15 +79,6 @@ public sealed class SynapseJsonContextGenerator : IIncrementalGenerator
         source.AppendLine("    };");
         source.AppendLine();
 
-        // Deliberately separate from Options (below): Options.TypeInfoResolver is `this`, so resolving
-        // through Options for nested property types (e.g. NeuronId inside Synapse) would loop back into
-        // this type's own gated GetTypeInfo. ReflectionOptions is un-gated, self-contained, and derived
-        // per-instance from Options so a caller-supplied naming policy / converters are still honored
-        // instead of silently ignored (this context isn't only ever used via Default).
-        source.AppendLine("    private JsonSerializerOptions? _reflectionOptions;");
-        source.AppendLine("    private JsonSerializerOptions ReflectionOptions =>");
-        source.AppendLine("        _reflectionOptions ??= new JsonSerializerOptions(Options) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };");
-        source.AppendLine();
         source.AppendLine("    private static readonly JsonSerializerOptions DefaultOptions = new();");
         source.AppendLine();
         source.AppendLine("    public static JournalJsonContext Default { get; } = new(new JsonSerializerOptions(DefaultOptions));");
@@ -95,14 +86,34 @@ public sealed class SynapseJsonContextGenerator : IIncrementalGenerator
         // Every construction path gets its own fresh JsonSerializerOptions instance - a JsonSerializerOptions
         // can only ever be bound to one JsonSerializerContext, so two contexts must never share the same
         // DefaultOptions reference (which a plain `base(null)` relying on GeneratedSerializerOptions would do).
-        source.AppendLine("    public JournalJsonContext() : base(new JsonSerializerOptions(DefaultOptions)) { }");
+        source.AppendLine("    public JournalJsonContext() : this(null) { }");
         source.AppendLine();
-        source.AppendLine("    public JournalJsonContext(JsonSerializerOptions? options) : base(options ?? new JsonSerializerOptions(DefaultOptions)) { }");
+        // Passing options to base(...) immediately encapsulates/locks it (JsonSerializerOptions throws
+        // InvalidOperationException on any further mutation after that point - confirmed empirically), so
+        // the reflection-based TypeInfoResolver must be assigned BEFORE the base call, not in the
+        // constructor body. `this` isn't available yet at that point, so it can't be gated to
+        // KnownSynapseTypes the way the parameterless GetTypeInfo(Type) override below is - acceptable
+        // because this context is only ever used standalone (UseJsonJournalFormat(Default)), never chained
+        // with sibling resolvers that would need it to defer on non-Synapse types.
+        source.AppendLine("    public JournalJsonContext(JsonSerializerOptions? options) : base(PrepareOptions(options ?? new JsonSerializerOptions(DefaultOptions)))");
+        source.AppendLine("    {");
+        source.AppendLine("    }");
+        source.AppendLine();
+        source.AppendLine("    private static JsonSerializerOptions PrepareOptions(JsonSerializerOptions options)");
+        source.AppendLine("    {");
+        source.AppendLine("        options.TypeInfoResolver = new DefaultJsonTypeInfoResolver();");
+        source.AppendLine("        return options;");
+        source.AppendLine("    }");
         source.AppendLine();
         source.AppendLine("    protected override JsonSerializerOptions? GeneratedSerializerOptions { get; } = DefaultOptions;");
         source.AppendLine();
+        // Resolve through Options itself (whose TypeInfoResolver is the plain DefaultJsonTypeInfoResolver
+        // set in PrepareOptions) rather than a separate resolver instance: the returned JsonTypeInfo must
+        // be bound to Options - the resolver-chain contract requires JsonTypeInfo.Options to equal the
+        // options argument the chain was invoked with, or callers like Orleans.Journaling throw
+        // ResolverTypeInfoOptionsNotCompatible.
         source.AppendLine("    public override JsonTypeInfo? GetTypeInfo(Type type) =>");
-        source.AppendLine("        KnownSynapseTypes.Contains(type) && ReflectionOptions.TryGetTypeInfo(type, out var typeInfo) ? typeInfo : null;");
+        source.AppendLine("        KnownSynapseTypes.Contains(type) ? Options.GetTypeInfo(type) : null;");
         source.AppendLine();
 
         source.AppendLine(string.Join("\n\n", displayNames.Select(static name =>

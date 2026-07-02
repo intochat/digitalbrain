@@ -132,7 +132,7 @@ public static class DigitalBrainBuilderExtensions
     }
 
     /// <summary>
-    /// Flutter as marketplace pack + Aspire integration. Call from AppHost or brain.cs-driven launcher when the Flutter pack (DigitalBrain.UI.AspireFlutter) is installed.
+    /// Flutter as marketplace pack + Aspire integration. Call from AppHost when the Flutter pack (DigitalBrain.UI.AspireFlutter) is installed.
     /// Starts Flutter (windows or web-server) wired to brain for live surfaces/RfwCards. Enables full packing/distribution/reuse of the UI client as a NeuroPack.
     /// </summary>
     public static IResourceBuilder<ExecutableResource> AddFlutterClient(

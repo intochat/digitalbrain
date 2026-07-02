@@ -2,11 +2,8 @@ using Aspire.Hosting.DigitalBrain;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// brain.cs : thin C# for "dotnet run brain.cs" (fast packed launcher).
-// Just uses IAspireNeuron to start Aspire project.
-// Integrations (Telegram, Flutter) packed as marketplace NeuroPacks - no logic inside brain.cs .
+// Integrations (Telegram, Flutter) packed as marketplace NeuroPacks - no logic inside this AppHost.
 // Pack provides the Aspire bits (see AddFlutterClient).
-// Run via the QuickTest setup or equivalent that supports dotnet run brain.cs .
 
 // Experiences emit UiSurface (AuthButtonSurface etc) for sdk/flutter_demo + Telegram skeleton.
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
@@ -28,10 +25,6 @@ var internalServiceKey = builder.AddParameter(
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);  // Provides kernel cool features out of box (marketplace, surfaces, journals, 3 replicas HA, LLM for built-ins) via the Aspire package.
 kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
-
-var startUi = builder.AddProject<Projects.DigitalBrain_Cli>("start-ui")
-    .WithReference(ctx.OrleansClient)
-    .WithExplicitStart();
 
 // Default Windows Flutter thin client on local `aspire run` (P0 item 1+12).
 // Full UI logic remains in marketplace NeuroPack. Uses shared dev default helper (extracted to Aspire ext; pack can override later).

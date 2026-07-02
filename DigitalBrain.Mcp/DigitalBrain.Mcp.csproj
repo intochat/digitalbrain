@@ -23,7 +23,7 @@
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
 
-    <!-- Orleans Client like DigitalBrain.Cli -->
+    <!-- Orleans Client -->
     <PackageReference Include="Aspire.Azure.Data.Tables" />
     <PackageReference Include="Aspire.StackExchange.Redis" />
     <PackageReference Include="Microsoft.Orleans.Client" />

@@ -86,7 +86,6 @@ Solution `Brain.slnx` lists 29 projects plus the Flutter client folder reference
 | `DigitalBrain.Aspire` | Hosting SDK: `AddDigitalBrain`, `WireKernelSilo`, `WithMcp`, `WithOrleansDashboard`, `AddFlutterClient`, `WireTelegramTransport` — all in `DigitalBrainBuilderExtensions.cs`. Not itself an Aspire project resource (`IsAspireProjectResource=false`). |
 | `DigitalBrain.Gateway` | Thin/legacy HTTP entry point; Orleans client + clustering only. Gated behind `DIGITALBRAIN_ENABLE_DIAGNOSTIC_GATEWAY` in the AppHost — the kernel hosts the product gRPC/surface gateway by default now. |
 | `DigitalBrain.Mcp` / `DigitalBrain.Mcp.Tools` | MCP server (`Mcp`, an `Exe`, co-hosted on the kernel's Kestrel) exposing neuron tools defined in `Mcp.Tools` (`DigitalBrainMutationTools.cs`, `DigitalBrainReadTools.cs`) — `Mcp.Tools` references only `Core`. |
-| `DigitalBrain.Cli` | Spectre.Console TUI, `start-ui` resource, `.WithExplicitStart()` — not auto-started with the rest of the graph. |
 | `DigitalBrain.Telegram` | Pure shared library: transport-internal synapses (`TelegramMessageReceived`, `TelegramReplyRequested` — explicitly *not* journaled through the kernel) and `TelegramResponderNeuron`, a pure `IPackBehavior` pack. Fully self-contained — never derives from `Neuron`. |
 | `DigitalBrain.Telegram.Transport` | The actual ASP.NET Core webhook host — `/webhook` POST ingress, `/health`, gRPC-clients the kernel gateway. Deployed as its own container app (see 1.6). |
 | `DigitalBrain.TestKit` | `IDigitalBrain` facade over a real Orleans `TestCluster`, depends on Core + Kernel + every real-grain ino below. Gives each isolated ino's `.Tests` sibling a zero-boilerplate way to spin a cluster and resolve grains without depending on `DigitalBrain.Tests`. |
@@ -163,8 +162,7 @@ volume) running the configured model. `WireKernelSilo` (lines 104-132) wires the
 Orleans/clustering/grain-state/journal/LLM, adds `grpc` + `web` endpoints,
 `WithExternalHttpEndpoints()`, and **`WithReplicas(ctx.KernelReplicas)`** — default **3 replicas**
 (`DigitalBrainOptions.KernelReplicas`, line 210), overridable via `DIGITALBRAIN_KERNEL_REPLICAS`.
-`start-ui` (`DigitalBrain.Cli`) is added with `.WithExplicitStart()`. Flutter client and MCP/Telegram
-are conditional:
+Flutter client and MCP/Telegram are conditional:
 
 - **Flutter**: only added if `app/pubspec.yaml` resolves on disk (`ResolveFlutterAppPath`,
   AppHost.cs:41-87) — `ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows")`, which runs
@@ -301,11 +299,11 @@ Two projects split transport from logic:
 
 Hosting split (per `docs/specs/2026-07-01-distribution-and-bundles.md` §8.3, and confirmed live in
 `brain/deploy/Program.cs`): the transport is **never** co-hosted in the kernel and never run from
-`brain.cs` in prod — those would couple public ingress and channel scaling to the kernel's rolling
-restarts. Prod IaC (`brain/deploy`, Pulumi C#) provisions a separate `digitalbrain-telegram`
+the dev AppHost in prod — those would couple public ingress and channel scaling to the kernel's
+rolling restarts. Prod IaC (`brain/deploy`, Pulumi C#) provisions a separate `digitalbrain-telegram`
 ContainerApp with external HTTP ingress, alongside the `digitalbrain-jobs` kernel container app, Azure
-OpenAI (`gpt-4o-mini`), storage, and observability. `brain.cs --telegram` (lines 34-43: checks
-`args.Any(a => a.Contains("telegram"))`) adds the same transport project as an Aspire resource and
+OpenAI (`gpt-4o-mini`), storage, and observability. `DIGITALBRAIN_ENABLE_TELEGRAM=true aspire run`
+(`NeuroOSPrototype.AppHost/AppHost.cs`) adds the same transport project as an Aspire resource and
 calls `WireTelegramTransport` — a dev-only mirror of the identical wiring, not a separate code path.
 
 ### 1.8 LLM integration: the `AskLlm` / `Signal` indirection
@@ -357,13 +355,15 @@ for Orleans clustering/journal.
 
 ### 1.10 Known gaps / regressions
 
-- **`start.cs` is missing from the repo but still referenced.** `AppHost.cs`, `brain.cs`, and
-  `samples/QuickTest/QuickTest.csproj` (line 28, linking it as `<Compile Include="..\..\start.cs" />`)
-  all reference it as "the fast in-memory path (INO + tasks + marketplace + UiSurfaces)," and
-  `QuickTest.csproj:30` even claims "Canonical start.cs is at framework/start.cs" — a stale path. The
-  file does not exist anywhere under `E:\digitalbraintech` (confirmed via filesystem search); `git log
-  --all -- start.cs` shows it existed historically but was deleted at some point without removing the
-  references. **`samples/QuickTest` would fail to build today** if this compile-item is hit.
+- **Resolved (2026-07-03): `brain.cs`/`start.cs`/`samples/QuickTest` removed.** `brain.cs` never
+  actually compiled standalone (`dotnet run brain.cs` fails with `CS0246` — no `#:sdk`/`#:package`
+  directives resolve `Aspire.Hosting`/`DigitalBrain.Aspire`); it was written assuming `samples/QuickTest`
+  would link it into a real project the way it once linked `start.cs`, but that wiring step was never
+  done, and `start.cs` itself was deleted without anyone finishing brain.cs's wiring or noticing
+  QuickTest no longer built at all (`CS5001`, no source files left). All three were deleted rather than
+  repaired. The supported fast local-dev path is `aspire run` from `brain/` (`NeuroOSPrototype.AppHost`),
+  which already has an equivalent-or-better resource graph (kernel, default Windows Flutter client,
+  MCP, optional gateway/Telegram via env vars) than brain.cs ever reached.
 - **A pre-existing E2E fixture bug is deferred, not fixed**: `CONTINUITY.md` documents that
   `DigitalBrainAppHostFixture.InitializeAsync` still waits on a resource literally named `"silo"` — a
   leftover from the Silo→Kernel rename — causing a 5-minute hang; the workaround is excluding that E2E

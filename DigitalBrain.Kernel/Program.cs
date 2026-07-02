@@ -15,7 +15,7 @@ using Orleans.Journaling.Json;
 
 // Prototype silo host for DigitalBrain.
 // Aspire-hosted path: env vars ConnectionStrings__clustering / grainstate / journal are injected by Aspire.
-// Fast path (samples/QuickTest -- kernel): none of those env vars present → localhost clustering + in-memory journals.
+// Fast path (dotnet run --project DigitalBrain.Kernel): none of those env vars present → localhost clustering + in-memory journals.
 
 #pragma warning disable ORLEANSEXP005
 

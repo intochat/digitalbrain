@@ -5,10 +5,8 @@
       "args": [
         "run",
         "--project",
-        "samples/QuickTest",
-        "--no-launch-profile",
-        "--",
-        "--mcp"
+        "DigitalBrain.Mcp",
+        "--no-launch-profile"
       ],
       "env": {
         "DOTNET_ENVIRONMENT": "Development"
