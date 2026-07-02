@@ -20,10 +20,10 @@ public sealed class PackSpecSteps : NeuronTestBase
     private PackSpecDriver? _driver;
     private PackSpecDriver Driver => _driver ??= new PackSpecDriver(new HostAdapter(this));
 
-    [BeforeScenario]
+    [BeforeScenario("packspec")]
     public Task BeforeScenarioAsync() => InitializeAsync();
 
-    [AfterScenario]
+    [AfterScenario("packspec")]
     public Task AfterScenarioAsync() => DisposeAsync();
 
     [Given(@"a pack ""(.*)"" version ""(.*)"" with source from ""(.*)""")]
