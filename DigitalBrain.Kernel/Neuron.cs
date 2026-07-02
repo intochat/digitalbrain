@@ -135,12 +135,27 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             await existing[i].UnsubscribeAsync();
     }
 
+    // Broadcast reception mirrors DeliverAsync's point-to-point contract: record the observed synapse
+    // in the incoming journal first (so GetIncomingTimelineAsync reflects everything this neuron has
+    // witnessed, not just what it had a declared handler for), then dispatch to it if applicable.
+    protected Task RecordBroadcastReceivedAsync(Synapse synapse)
+    {
+        AddToJournal(ref _incomingSynapses, "in-journal", synapse);
+        return WriteJournalStateAsync();
+    }
+
     // Default broadcast reception: dispatch only synapse types this neuron statically declares IHandle<T> for.
     // Dynamic hosts override to filter through their own runtime manifest instead.
-    public virtual Task OnNextAsync(Synapse item, StreamSequenceToken? token = null) =>
+    protected Task DispatchBroadcastIfHandledAsync(Synapse item) =>
         SynapseDispatch.HandledTypes(GetType()).Contains(item.GetType())
             ? SynapseDispatch.DispatchAsync(this, Logger, Self, item)
             : Task.CompletedTask;
+
+    public virtual async Task OnNextAsync(Synapse item, StreamSequenceToken? token = null)
+    {
+        await RecordBroadcastReceivedAsync(item);
+        await DispatchBroadcastIfHandledAsync(item);
+    }
 
     public Task OnCompletedAsync() => Task.CompletedTask;
 
