@@ -13,7 +13,7 @@
 - No `app/` (Flutter) changes — this plan is entirely `brain/` backend/test architecture.
 - No new grain-type creation path — all new neuron behavior remains pack-only (`IPackBehavior`).
 - Every existing seeded pack in `MarketplaceSeeds.cs` must still compile and install successfully after Task 6 (CapabilityGate allowlist) — this is a hard regression gate, not a judgment call.
-- Task 1 (spike) gates Task 8's exact approach: if `JournaledStateManagerOptions.JournalFormatKey = "orleans-binary"` (or equivalent) doesn't eliminate the need for JSON type registration within the spike's bounded investigation, Task 8 falls back to the Roslyn source-generator alternative documented in that task.
+- **Task 8 direction locked (post-Task-1, user decision):** Task 1's spike confirmed `JournaledStateManagerOptions.JournalFormatKey = "orleans-binary"` technically works (verified via a real write + forced-reactivation + read round-trip, zero manual type registration) — but also surfaced that Microsoft's own Orleans.Journaling docs frame `"orleans-binary"` as the legacy/compat format, with documented migration guidance pointing *toward* JSON, not away from it. Given that, Task 8 uses the **Roslyn incremental source generator on JSON format** (originally documented as the "fallback") as its one and only approach — not `orleans-binary`. This stays aligned with the framework's stated direction while still deleting the manual-registration pain that motivated this task in the first place. Task 1's spike code/finding remains valuable prior art (proves the round-trip mechanics) even though its specific format choice isn't what ships.
 - Full `dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj` must pass after every task before moving to the next — no batching failures forward.
 
 ---
@@ -875,47 +875,22 @@ git -C brain commit -m "security(foundry): document/fix Tier-2 gate consistency;
 
 ---
 
-### Task 8: Delete `JournalJsonContext` (or install the source-generator fallback)
+### Task 8: Auto-generate `JournalJsonContext` via a Roslyn incremental generator
+
+**Direction locked post-Task-1 (see Global Constraints):** Task 1's spike confirmed `orleans-binary` format technically works, but Microsoft's own docs call it legacy/compat with migration guidance pointing toward JSON. This task stays on JSON — the format the framework is steering toward — and eliminates the manual-registration pain by generating the list instead of hand-maintaining it. `Program.cs`'s `UseJsonJournalFormat(...)` call is unchanged; only how `JournalJsonContext` itself comes to exist changes (generated, not hand-written).
 
 **Files:**
-- Delete (primary path) or keep-and-generate (fallback path): `DigitalBrain.Kernel/JournalJsonContext.cs`
-- Modify: `DigitalBrain.Kernel/Program.cs:177-179`
-- Create (fallback path only): `DigitalBrain.SourceGen/SynapseJsonContextGenerator.cs`
+- Delete: `DigitalBrain.Kernel/JournalJsonContext.cs` (hand-written version — its content is now generated)
+- Create: `DigitalBrain.SourceGen/DigitalBrain.SourceGen.csproj` (new Roslyn analyzer project)
+- Create: `DigitalBrain.SourceGen/SynapseJsonContextGenerator.cs`
+- Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` (reference `DigitalBrain.SourceGen` as an analyzer)
+- Test: `DigitalBrain.Tests/SourceGen/SynapseJsonContextGeneratorTests.cs`
 
 **Interfaces:**
-- Consumes: Task 1's spike finding (`DigitalBrain.Tests/Spikes/README.md`).
-- Produces: no change to any Synapse type's public shape — this task is purely about the journal's serialization wiring.
+- Consumes: nothing from Task 1 directly (its round-trip test mechanics remain useful prior art, but this task doesn't call into `DigitalBrain.Tests/Spikes/`).
+- Produces: no change to any `Synapse` type's public shape, no change to `Program.cs`'s `UseJsonJournalFormat(DigitalBrain.Kernel.JournalJsonContext.Default)` call — `JournalJsonContext` keeps the exact same name and shape, only its origin (generated vs. hand-written) changes, so no caller anywhere needs to change.
 
-- [ ] **Step 1: Read the spike's recorded finding**
-
-Read `DigitalBrain.Tests/Spikes/README.md` (Task 1, Step 4). If it says PASS (native format confirmed), continue with Steps 2-4 below. If FAIL, skip to Step 5 (fallback).
-
-- [ ] **Step 2 (primary path): Reconfigure `Program.cs` to use the native format**
-
-```csharp
-// DigitalBrain.Kernel/Program.cs — replace lines 177-179
-siloBuilder.AddAzureBlobJournalStorage(options =>
-    options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
-    // .UseJsonJournalFormat(DigitalBrain.Kernel.JournalJsonContext.Default) deleted —
-    // replaced by whatever exact configuration Task 1's spike confirmed (e.g. setting
-    // JournaledStateManagerOptions.JournalFormatKey, or an equivalent fluent call this
-    // task's implementer copies verbatim from the spike's working NativeFormatSiloConfigurator).
-```
-
-- [ ] **Step 3 (primary path): Delete `JournalJsonContext.cs` and its references**
-
-```bash
-git -C brain rm DigitalBrain.Kernel/JournalJsonContext.cs
-```
-
-Grep for any remaining reference (`grep -rn "JournalJsonContext" brain/`) and remove them — expect only `Program.cs` (already handled in Step 2).
-
-- [ ] **Step 4 (primary path): Run the full journal-dependent test suite**
-
-Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~PackConfigStoreTests|FullyQualifiedName~HandlerGrowthTests|FullyQualifiedName~PackSpecDriverTests"`
-Expected: PASS — no serialization regressions. Then run the full suite (`dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`) to confirm no other breakage, then skip to Step 8 (commit).
-
-- [ ] **Step 5 (fallback path — only if Step 1 found FAIL): Write the failing generator test**
+- [ ] **Step 1: Write the failing generator test**
 
 ```csharp
 // DigitalBrain.Tests/SourceGen/SynapseJsonContextGeneratorTests.cs
@@ -930,12 +905,12 @@ public void Generator_Emits_JsonSerializable_For_Every_Synapse_Subtype_In_Compil
 }
 ```
 
-- [ ] **Step 6 (fallback path): Run to verify it fails**
+- [ ] **Step 2: Run to verify it fails**
 
 Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "Generator_Emits_JsonSerializable"`
-Expected: FAIL — `SynapseJsonContextGenerator` doesn't exist yet.
+Expected: FAIL — `SynapseJsonContextGenerator` doesn't exist yet (project doesn't even exist yet either — create the empty `DigitalBrain.SourceGen` project first if needed to get a compile error rather than a missing-project error).
 
-- [ ] **Step 7 (fallback path): Implement the incremental generator**
+- [ ] **Step 3: Implement the incremental generator**
 
 ```csharp
 // DigitalBrain.SourceGen/SynapseJsonContextGenerator.cs
@@ -982,18 +957,61 @@ public sealed class SynapseJsonContextGenerator : IIncrementalGenerator
 }
 ```
 
-Delete the hand-written `JournalJsonContext.cs` (its content is now generated) and reference `DigitalBrain.SourceGen` as an analyzer project from `DigitalBrain.Kernel.csproj`.
+Delete the hand-written `DigitalBrain.Kernel/JournalJsonContext.cs` (its content is now generated at build time) and reference `DigitalBrain.SourceGen` as an analyzer project from `DigitalBrain.Kernel.csproj`:
 
-- [ ] **Step 8: Run full suite, then commit**
+```xml
+<!-- Addition to DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -->
+<ItemGroup>
+  <ProjectReference Include="..\DigitalBrain.SourceGen\DigitalBrain.SourceGen.csproj"
+                     OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+</ItemGroup>
+```
+
+- [ ] **Step 4: Run to verify the generator test passes**
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "Generator_Emits_JsonSerializable"`
+Expected: PASS.
+
+- [ ] **Step 5: Confirm the generated `JournalJsonContext` actually contains every real `Synapse` subtype**
+
+```csharp
+// Addition to DigitalBrain.Tests/SourceGen/SynapseJsonContextGeneratorTests.cs
+[Fact]
+public void Generated_Context_Covers_Every_Concrete_Synapse_Subtype_In_DigitalBrain_Core()
+{
+    var synapseSubtypes = typeof(DigitalBrain.Core.Synapse).Assembly.GetTypes()
+        .Where(t => typeof(DigitalBrain.Core.Synapse).IsAssignableFrom(t) && !t.IsAbstract);
+
+    foreach (var type in synapseSubtypes)
+    {
+        var typeInfo = DigitalBrain.Kernel.JournalJsonContext.Default.GetTypeInfo(type);
+        Assert.NotNull(typeInfo); // throws/fails per-type if the generator missed one
+    }
+}
+```
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "Generated_Context_Covers_Every_Concrete_Synapse_Subtype"`
+Expected: PASS — this is the direct regression check replacing the old "did someone remember to add the line" failure mode with a build-time guarantee.
+
+- [ ] **Step 6: Run the full journal-dependent test suite, then the full suite**
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~PackConfigStoreTests|FullyQualifiedName~HandlerGrowthTests|FullyQualifiedName~PackSpecDriverTests"`
+Expected: PASS — no serialization regressions.
 
 Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`
-Expected: same pass count as the Task 7 baseline.
+Expected: same pass count as the Task 7 baseline plus this task's new tests, 0 failed.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git -C brain add -A
-git -C brain commit -m "refactor(journal): delete JournalJsonContext, use Orleans.Journaling native format"
-# or, on the fallback path:
-git -C brain commit -m "refactor(journal): auto-generate JournalJsonContext via Roslyn incremental generator"
+git -C brain commit -m "refactor(journal): auto-generate JournalJsonContext via Roslyn incremental generator
+
+Manual per-type registration already caused one real bug (a missed
+Synapse subtype). Orleans.Journaling's orleans-binary format would
+also solve this but Microsoft documents it as legacy/compat with
+migration guidance toward JSON - staying on JSON, generating the
+registration at build time instead."
 ```
 
 ---
