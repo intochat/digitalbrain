@@ -117,6 +117,11 @@ file sealed class NativeFormatSiloConfigurator : ISiloConfigurator
 Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "JournalFormatSpikeTests"`
 Expected: PASS if native format works without JSON registration; a compile or runtime error naming what's missing otherwise.
 
+- [ ] **Step 3b: Run the full suite (Global Constraints requires this after every task)**
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`
+Expected: 252 passed, 6 skipped, 0 failed, 258 total (this plan's recorded baseline) — the new spike test adds one passing case; nothing else should change.
+
 - [ ] **Step 4: Record the finding**
 
 Write `DigitalBrain.Tests/Spikes/README.md`:
@@ -266,6 +271,11 @@ public sealed class PackSpecDriver(INeuronTestHost host)
 Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "PublishInstallFire_RoundTrips_A_Minimal_Pack"`
 Expected: PASS.
 
+- [ ] **Step 4b: Run the full suite (Global Constraints requires this after every task)**
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`
+Expected: prior total + 1 new passing test, 0 failed.
+
 - [ ] **Step 5: Commit**
 
 ```bash
@@ -386,6 +396,11 @@ public sealed class PackSpecSteps : NeuronTestBase, IAsyncLifetime
 Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~DriverProbePack"`
 Expected: PASS.
 
+- [ ] **Step 5b: Run the full suite (Global Constraints requires this after every task)**
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`
+Expected: prior total + this task's new scenario, 0 failed.
+
 - [ ] **Step 6: Commit**
 
 ```bash
@@ -496,6 +511,11 @@ public interface INeuronTestHost
 
 Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~DriverProbeClusterBroadcast"`
 Expected: PASS — proves a 3-silo `TestCluster` (Orleans' own `TestClusterBuilder`, verified against Microsoft's documented pattern) correctly fans out a broadcast today, via the *existing* `IsBroadcast`/stream mechanism (this task doesn't touch Task 9's `AddBroadcastChannel` swap — it proves the vocabulary works against current behavior first, so Task 10 has a known-good baseline to re-target after Task 9 lands).
+
+- [ ] **Step 4b: Run the full suite (Global Constraints requires this after every task)**
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`
+Expected: prior total + this task's new scenario, 0 failed.
 
 - [ ] **Step 5: Commit**
 
@@ -725,6 +745,11 @@ public static IEnumerable<object[]> AllSeededPackCodes() =>
 Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~Every_Seeded_Pack_Compiles_Clean"`
 Expected: PASS for every pack in `MarketplaceSeeds.LocalUiPacks`. If any fails, widen `AllowedNamespacePrefixes` for exactly what that pack legitimately needs (not a blanket reversion) and re-run.
 
+- [ ] **Step 5b: Run the full suite (Global Constraints requires this after every task; this task touches production security code, so this run matters more than most)**
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`
+Expected: prior total + this task's new tests, 0 failed. A failure anywhere (not just in `CapabilityGateTests`) means some other pack's compile path was affected by the allowlist flip — do not proceed to Task 7 until this is green.
+
 - [ ] **Step 6: Commit**
 
 ```bash
@@ -835,6 +860,11 @@ Add `private string? _pendingSource;` as a field on `PackSpecSteps`.
 
 Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~CapabilityGate.feature"`
 Expected: PASS.
+
+- [ ] **Step 5b: Run the full suite (Global Constraints requires this after every task)**
+
+Run: `cd brain && dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`
+Expected: prior total + this task's new scenarios, 0 failed.
 
 - [ ] **Step 6: Commit**
 
