@@ -10,30 +10,47 @@
 
 One job: go to the marketplace, install the Telegram bot, paste a token, it works — no AppHost restart, no env vars. Everything else (Flutter Mini App, chat-driven authoring of neurons/synapses) is cut from this spec. Those ideas aren't wrong, they're just not now — see §4.
 
-## 1. What's actually broken (unchanged from the fuller audit)
+## 1. What's actually broken (corrected after direct code verification — see §1.1)
 
-The backend config plumbing (`PackConfigStore`, the `GetPackConfig` RPC, the generic `ConfigurationProvided` synapse, `TelegramReplyDispatcher.PullConfigAndApplyAsync`) is real and already covered by tests. Two concrete gaps stop it from working end to end:
+The backend is already fully wired and working, verified by direct reading (not delegated research) of every hop in the chain:
 
-1. **No production publish.** `MarketplaceNeuron.HandleAsync(ListPublished)` (`DigitalBrain.Kernel/MarketplaceNeuron.cs:192-198`) calls `InstallFromMarketplace("DigitalBrain.Telegram.Responder", ...)`, but nothing publishes that pack outside test code (`DigitalBrain.Tests/Steps/TelegramReactiveLoopSteps.cs:67-71`). Install silently no-ops.
-2. **No UI shows the form.** `GeneratedNeuron.EmitConfigFormIfRequiredAsync` (`DigitalBrain.Kernel/GeneratedNeuron.cs:88-99`) correctly emits a `ConfigFormSurface` (`Kind == "pack-config-form"`) after install — its submit button already round-trips a working `ConfigurationProvided` synapse. Nothing in `app/lib/.../forui_app_shell.dart` navigates to or renders a surface of that kind.
+- `DigitalBrain.Telegram.Responder` (v1.0.0) **is** in `MarketplaceSeeds.LocalUiPacks` (`DigitalBrain.Core/MarketplaceSeeds.cs:177-184`) — it is not excluded.
+- `MarketplaceNeuron.EnsureCache()` (`DigitalBrain.Kernel/MarketplaceNeuron.cs:195-215`) seeds every `LocalUiPacks` entry into `_publishedCache` via `MaterializeManifest`, which embodies the pack and pulls its real `GetBundleManifest()` (`BundleTier.Channel`, `[Telegram]`). Telegram.Responder is published, findable, and correctly tiered.
+- `IsPreinstalledLocalPack` (`DigitalBrain.Core/UiSurfaces.cs:1456-1460`) only auto-marks `DigitalBrain.UI*`/`DigitalBrain.Experience*` packs as pre-installed — `DigitalBrain.Telegram.Responder` matches neither prefix, so it correctly shows as a normal, tappable "Install" tile.
+- The generic Install dispatch (`GatewayService.Send`, `DigitalBrain.Kernel/Gateway/GatewayService.cs:50-65`) reads `packName`/`version` from whatever the client sends — no hardcoded pack name or version anywhere in this path.
+- On install, `GeneratedNeuron.DispatchSynapse` (`DigitalBrain.Kernel/GeneratedNeuron.cs:41-44`) embodies the pack and calls `EmitConfigFormIfRequiredAsync()` (lines 88-99), which builds a `ConfigFormSurface` (`Kind == "pack-config-form"`) and **broadcasts it to `HomeFeedBus`** — the exact stream `WatchHomeFeed` (and therefore the Flutter client) is subscribed to. Its submit button already round-trips a working `ConfigurationProvided` synapse, handled correctly by `GatewayService.Send` (lines 69+) and persisted by `PackConfigStore`.
 
-Today the only way the bot works at all is `Telegram__BotToken` injected as an Aspire env var — bypassing the pack/config system entirely. That's not the marketplace flow.
+**The one real, verified bug:** `app/lib/shell/forui_app_shell.dart`'s `_onCard` (lines 136-201) stores any arriving surface in `_surfacesByKind[kind]` (line 187) but only ever auto-switches the visible body (`_selectedTarget`) for one hardcoded case — the UI Kit Gallery (lines 191-199, `isGallery` check). A `pack-config-form` surface lands in the map and **just sits there**, never displayed, because nothing sets `_selectedTarget = 'pack-config-form'`. This is the entire gap.
 
-## 2. Fix — one slice, minimal surface area
+Today the only way the bot actually responds is `Telegram__BotToken` injected as an Aspire env var — not because install is broken, but because a user has no way to ever *see* the form that install correctly triggers.
 
-**Backend:** publish `DigitalBrain.Telegram.Responder` for real at kernel startup, same mechanism already used to publish other seeded packs. That's the whole backend change — everything downstream of a successful install already works and is tested.
+### 1.1 Correction note
 
-**Frontend:** teach the shell to recognize a `pack-config-form` surface arriving on the home-feed stream and render it via the existing generic `ui:*` tree renderer (already proven correct by `config_form_tree_test.dart` — it has no caller today, that's the entire gap). No new screen, no new "Channels" concept: the Telegram pack shows up as a normal tile in the existing marketplace list, tap installs it like any other pack, and the form that arrives after install is simply displayed instead of dropped.
+An earlier draft of this spec (based on delegated sub-agent research) claimed the Telegram pack was never published in production and required a new backend publish call. Direct verification while writing the implementation plan disproved this — `LocalUiPacks` already includes it. Lesson: sub-agent research is a starting point, not a citation to build a plan on without spot-checking the exact lines it claims — see the corresponding memory note for the broader takeaway.
 
-**Sequencing note:** `spec/marketplace-cleanup` (not yet implemented) is about to fix the exact same category of bug for a different surface kind (`ExperienceUsed{action:open}` → hop-start content). Whoever implements this should check whether that fix already generalizes to `pack-config-form` and reuse it, rather than writing a second parallel surface-routing mechanism. One mechanism, not two — this is the specific thing to avoid re-thrashing on.
+## 2. Fix — one change, one file
+
+**Frontend only.** Add a `pack-config-form` auto-switch to `_onCard`, structurally identical to the existing gallery auto-switch it sits next to:
+
+```dart
+final isConfigForm = kind == 'pack-config-form';
+if (isConfigForm) {
+  _selectedTarget = kind;
+}
+```
+
+Once `_selectedTarget == 'pack-config-form'`, the existing generic body-rendering path in `build()` (`forui_app_shell.dart:337-344`) already renders it correctly via `_renderEnvelope` + the generic `ui:*` tree renderer — no new branch needed there, because `'pack-config-form'` doesn't match any of the existing `effectiveTarget.contains(...)` special cases (gallery/market/install), so it falls through to the plain default render. Verified this rendering path is already correct and tested by `app/test/features/experience/config_form_tree_test.dart` — it just has no caller today.
+
+**No backend change.** Everything described in §1 already works.
+
+**Sequencing note:** `spec/marketplace-cleanup` (not yet implemented) is about to fix a related-but-distinct bug — the `ExperienceUsed{action:open}` → hop-start bridge for content bundles, also in `forui_app_shell.dart`'s surface-routing area. Worth a glance for whoever implements this to keep the two auto-switch mechanisms consistent in shape, but they are separate surface kinds and neither blocks the other.
 
 **Feedback on success:** reuse the existing `PackConfigured` synapse the dispatcher already emits/handles — a plain toast/snackbar is enough ("Connected as @yourbot"). No bespoke status card.
 
 ## 3. Testing
 
-- A test publishing the pack at startup and asserting `InstallFromMarketplace` actually succeeds (fails today — write first).
-- A Flutter widget test: a `pack-config-form` surface arriving over the home-feed stream results in the form being rendered, not dropped.
-- One integration test covering install → submit `ConfigurationProvided` → `PullConfigAndApplyAsync` rebuilds the bot client → `PackConfigured` observed by the client.
+- A Flutter widget test on `_ForuiAppShellState`: a `pack-config-form` `RfwCardEnvelope` arriving via `_onCard` results in `_selectedTarget == 'pack-config-form'` and the form tree being rendered — fails today (no auto-switch exists), passes once the fix lands.
+- Existing coverage already proves the rest of the chain and does not need new tests: `PackConfigStoreTests.cs`/`PackConfigPullTests.cs` (persistence), `ConfigFormSteps.cs` (form emission + submit round-trip), `config_form_tree_test.dart` (tree rendering correctness).
 
 ```
 dotnet build Brain.slnx
