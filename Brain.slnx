@@ -14,6 +14,7 @@
   <Project Path="DigitalBrain.Context/DigitalBrain.Context.csproj" />
   <Project Path="DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj" />
   <Project Path="DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  <Project Path="DigitalBrain.SourceGen/DigitalBrain.SourceGen.csproj" />
   <Project Path="DigitalBrain.Developer/DigitalBrain.Developer.csproj" />
   <Project Path="DigitalBrain.Developer.Tests/DigitalBrain.Developer.Tests.csproj" />
   <Project Path="DigitalBrain.Experience.PersonalAssistant/DigitalBrain.Experience.PersonalAssistant.csproj" />

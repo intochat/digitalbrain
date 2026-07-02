@@ -18,4 +18,8 @@ public interface INeuron : IGrainWithStringKey
     ValueTask<Checkpoint> CreateCheckpointAsync();
     Task<NeuronId> BranchAsync(Checkpoint checkpoint);
     Task RestoreCheckpointAsync(Checkpoint checkpoint);
+
+    // Identifies which silo currently hosts this activation, so callers (tests, ops tooling) can prove
+    // cross-silo placement/delivery instead of assuming it.
+    Task<string> GetSiloIdentityAsync();
 }

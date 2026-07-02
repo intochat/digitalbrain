@@ -11,7 +11,7 @@ Feature: Pack config form on install (Slice 2 - config-driven experience)
 		When I submit configuration for the pack with token "tok-123", provider "openai", key "sk-secret"
 		Then the pack config store returns token "tok-123", provider "openai", key "sk-secret"
 
-	@distribution @e2e
+	@distribution @e2e @reactiveloop
 	Scenario: Full reactive loop - an inbound message round-trips through the pack and the stubbed LLM to an egress reply
 		Given the Telegram responder experience is installed
 		Then the install emits a config form whose tree contains the fields "telegram_token", "llm_provider", "llm_key"
