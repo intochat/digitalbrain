@@ -17,14 +17,40 @@ namespace DigitalBrain.Tests.Steps;
 [Binding]
 public sealed class PackSpecSteps : NeuronTestBase
 {
+    private readonly bool _wantsThreeSilos;
     private PackSpecDriver? _driver;
     private PackSpecDriver Driver => _driver ??= new PackSpecDriver(new HostAdapter(this));
+
+    public PackSpecSteps(ScenarioContext scenarioContext) =>
+        _wantsThreeSilos = scenarioContext.ScenarioInfo.Tags.Contains("cluster");
+
+    protected override short InitialSilosCount => (short)(_wantsThreeSilos ? 3 : 1);
 
     [BeforeScenario("packspec")]
     public Task BeforeScenarioAsync() => InitializeAsync();
 
     [AfterScenario("packspec")]
     public Task AfterScenarioAsync() => DisposeAsync();
+
+    [Given(@"the cluster has 3 replicas")]
+    public void GivenTheClusterHasThreeReplicas()
+    {
+        // InitialSilosCount was already resolved from the @cluster tag and consumed by
+        // NeuronTestBase.InitializeAsync() in the [BeforeScenario("packspec")] hook, before any step
+        // ran — this step exists for Gherkin readability, but it does assert against the TestCluster's
+        // actual deployed silo count (not just the configured value) so a wiring regression that
+        // silently deploys 1 silo instead of 3 fails here rather than passing vacuously.
+        Assert.Equal(3, InitialSilosCount);
+        Assert.Equal(3, Cluster.Silos.Count);
+    }
+
+    [When(@"a broadcast synapse ""DemoMessageSynapse"" with text ""(.*)"" is fired")]
+    public async Task WhenABroadcastSynapseIsFired(string text) =>
+        await Driver.BroadcastAsync(new DemoMessageSynapse(text) with { IsBroadcast = true });
+
+    [Then(@"pack ""(.*)"" observes the broadcast on another silo")]
+    public async Task ThenPackObservesTheBroadcastOnAnotherSilo(string packName) =>
+        await Driver.AssertBroadcastObservedAsync(packName);
 
     [Given(@"a pack ""(.*)"" version ""(.*)"" with source from ""(.*)""")]
     public async Task GivenAPackWithSourceFrom(string name, string version, string sourceFileName)

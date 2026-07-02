@@ -15,11 +15,13 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
     public override async Task OnNextAsync(Synapse item, Orleans.Streams.StreamSequenceToken? token = null)
     {
+        await RecordBroadcastReceivedAsync(item);
+
         EnsureEmbodied();
         if (await TryDispatchEmbodiedAsync(item))
             return;
 
-        await base.OnNextAsync(item, token);
+        await DispatchBroadcastIfHandledAsync(item);
     }
 
     public override Task OnDeactivateAsync(Orleans.DeactivationReason reason, CancellationToken cancellationToken)
