@@ -83,7 +83,7 @@ Requirements we questioned and their verdict:
 
 - **"We need a `Bundle` type."** → *Dumb as stated.* A new first-class type means a whole new install/trust/version/test rail to build and prove. **Deleted** in favor of `NeuroPack` + a manifest. The pack rail already compiles, signs, embodies, and proves N+1.
 - **"The marketplace must be open to the public for v1."** → *Dumb.* Open publishing forces the untrusted-code-sandbox problem, which is the single hardest thing in the system. **Deleted** for v1 → trusted-publisher gate.
-- **"Telegram should run from `brain.cs` in prod / or be co-hosted in the kernel."** → *Dumb.* Co-hosting puts public ingress on the silo and couples channel I/O to kernel scaling and rolling restarts; `brain.cs` is a dev launcher, not a prod host. **Resolved** → separate stateless channel app.
+- **"Telegram should run from the dev AppHost in prod / or be co-hosted in the kernel."** → *Dumb.* Co-hosting puts public ingress on the silo and couples channel I/O to kernel scaling and rolling restarts; the dev AppHost is a dev launcher, not a prod host. **Resolved** → separate stateless channel app.
 - **"Each bundle needs its own branded bot."** → *Premature.* With a handful of trusted creators, N branded bots is multiplexing work with no v1 payoff. **Deferred** → single platform bot + deep-link routing.
 
 ### Step 2 — Delete the part or process
@@ -215,7 +215,7 @@ This already exists in skeleton and must become the blessed, documented path:
 
 ### 6.3 Authoring surfaces
 
-- **C# authoring (v1):** the canonical path — typed C#, file-based launchers (`start.cs`, `brain.cs`), the test harness above.
+- **C# authoring (v1):** the canonical path — typed C#, the dev AppHost (`aspire run`), the test harness above.
 - **In-app authoring (later):** the MCP tools (`run_closed_loop`, `ask_ino`, `publish_to_marketplace`) and Foundry already let a bundle be generated and published from inside a brain. This is how non-C# creators eventually author — Phase 2 territory, but the rails exist.
 
 ---
@@ -276,11 +276,11 @@ The existing `DigitalBrain.Telegram.Transport` ASP.NET service stays a thin pipe
 
 ### 8.3 Hosting — resolving the controversy
 
-The question was: *in prod, does Aspire deploy the bot as a new app service, or does it run from `brain.cs`?* The answer:
+The question was: *in prod, does Aspire deploy the bot as a new app service, or does it run from the dev AppHost?* The answer:
 
-> **Neither co-hosted in the kernel nor run from `brain.cs` in prod. The Telegram transport is a first-class, separately-deployed, stateless ACA channel app.** `brain.cs --telegram` is the *dev mirror only* — it runs the identical transport locally so you develop against the real wiring.
+> **Neither co-hosted in the kernel nor run from the dev AppHost in prod. The Telegram transport is a first-class, separately-deployed, stateless ACA channel app.** `DIGITALBRAIN_ENABLE_TELEGRAM=true aspire run` is the *dev mirror only* — it runs the identical transport locally so you develop against the real wiring.
 
-Rationale: a channel transport has a public ingress, a different scaling profile, and must survive kernel rolling restarts. Co-hosting violates all three; `brain.cs` is a launcher, not a host. Keeping it a separate stateless app means it scales independently, can boot no-op without a token, and pulls its token from the pack config store after configuration — exactly the current transport behavior, now promoted to a deployed prod resource.
+Rationale: a channel transport has a public ingress, a different scaling profile, and must survive kernel rolling restarts. Co-hosting violates all three; the dev AppHost is a launcher, not a host. Keeping it a separate stateless app means it scales independently, can boot no-op without a token, and pulls its token from the pack config store after configuration — exactly the current transport behavior, now promoted to a deployed prod resource.
 
 ---
 
@@ -288,13 +288,13 @@ Rationale: a channel transport has a public ingress, a different scaling profile
 
 ### 9.1 Two environments, one resource graph
 
-| Resource | Dev (Aspire `aspire run` / `brain.cs`) | Prod (ACA via Pulumi) |
+| Resource | Dev (Aspire `aspire run`) | Prod (ACA via Pulumi) |
 |---|---|---|
 | **Kernel** | `DigitalBrain.Kernel` ×3 HA replicas | Container App, 1–5 replicas, external ingress (HTTP/gRPC) |
 | **LLM** | Ollama (Qwen 2.5-coder) container | Azure OpenAI (`gpt-4o-mini`) |
 | **Storage** | Azurite (clustering/grainstate/journal) | Azure Storage (Tables + Blobs) |
 | **Web/Flutter** | `flutter run -d windows` executable | Static web bundle on GitHub Pages (`digitalbrain.tech`) |
-| **Telegram** | `brain.cs --telegram` (dev mirror) | **Separate stateless ACA channel app** (new in this spec) |
+| **Telegram** | `DIGITALBRAIN_ENABLE_TELEGRAM=true aspire run` (dev mirror) | **Separate stateless ACA channel app** (new in this spec) |
 | **MCP** | co-hosted on kernel Kestrel | internal-only |
 | **Observability** | OTel → Aspire dashboard | OTel → App Insights / Log Analytics |
 
