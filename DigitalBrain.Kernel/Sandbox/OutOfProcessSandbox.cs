@@ -25,6 +25,9 @@ public sealed class OutOfProcessSandbox : ISandboxedExecutor
             FoundryCompilation.TpaReferences(),
             new CSharpCompilationOptions(OutputKind.ConsoleApplication, optimizationLevel: OptimizationLevel.Release));
 
+        // Defense-in-depth, not a substitute for the process boundary below: same gate as the in-process
+        // executor, applied before this source ever gets emitted to disk. See Foundry/README.md's Safety
+        // section for why this tier is both gated and OS-isolated rather than one or the other.
         var violations = CapabilityGate.FindViolations(compilation);
         if (violations.Count > 0)
             return new SandboxResult(false, "", "capability gate rejected: " + string.Join(", ", violations));
