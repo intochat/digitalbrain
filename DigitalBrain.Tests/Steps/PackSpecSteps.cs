@@ -22,6 +22,7 @@ public sealed class PackSpecSteps : NeuronTestBase
     private PackSpecDriver Driver => _driver ??= new PackSpecDriver(new HostAdapter(this));
     private string? _pendingSource;
     private IReadOnlyList<string>? _lastViolations;
+    private string? _crossSiloBroadcasterKey;
 
     public PackSpecSteps(ScenarioContext scenarioContext) =>
         _wantsThreeSilos = scenarioContext.ScenarioInfo.Tags.Contains("cluster");
@@ -46,9 +47,13 @@ public sealed class PackSpecSteps : NeuronTestBase
         Assert.Equal(3, Cluster.Silos.Count);
     }
 
-    [When(@"a broadcast synapse ""DemoMessageSynapse"" with text ""(.*)"" is fired")]
-    public async Task WhenABroadcastSynapseIsFired(string text) =>
-        await Driver.BroadcastAsync(new DemoMessageSynapse(text) with { IsBroadcast = true });
+    [Given(@"a demo neuron is activated on a different silo than pack ""(.*)""")]
+    public async Task GivenADemoNeuronIsActivatedOnADifferentSiloThanPack(string packName) =>
+        _crossSiloBroadcasterKey = await Driver.ActivateBroadcasterOnDifferentSiloAsync(packName);
+
+    [When(@"the demo neuron broadcasts synapse ""DemoMessageSynapse"" with text ""(.*)""")]
+    public async Task WhenTheDemoNeuronBroadcastsSynapse(string text) =>
+        await Driver.BroadcastFromAsync(_crossSiloBroadcasterKey!, new DemoMessageSynapse(text) with { IsBroadcast = true });
 
     [Then(@"pack ""(.*)"" observes the broadcast on another silo")]
     public async Task ThenPackObservesTheBroadcastOnAnotherSilo(string packName) =>
