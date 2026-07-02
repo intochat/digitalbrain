@@ -20,6 +20,8 @@ public sealed class PackSpecSteps : NeuronTestBase
     private readonly bool _wantsThreeSilos;
     private PackSpecDriver? _driver;
     private PackSpecDriver Driver => _driver ??= new PackSpecDriver(new HostAdapter(this));
+    private string? _pendingSource;
+    private IReadOnlyList<string>? _lastViolations;
 
     public PackSpecSteps(ScenarioContext scenarioContext) =>
         _wantsThreeSilos = scenarioContext.ScenarioInfo.Tags.Contains("cluster");
@@ -73,6 +75,39 @@ public sealed class PackSpecSteps : NeuronTestBase
     [Then(@"pack ""(.*)"" emits ""(.*)""")]
     public async Task ThenPackEmits(string name, string expectedOutput) =>
         await Driver.AssertEmittedAsync(name, expectedOutput);
+
+    [Given(@"a pack source that calls ""(.*)""")]
+    public void GivenAPackSourceThatCalls(string apiCall) => _pendingSource = apiCall switch
+    {
+        "System.Net.Http.HttpClient" => """
+            using System.Net.Http;
+            public sealed class NetProbe : DigitalBrain.Core.IPackBehavior
+            {
+                public string Respond(string input) { var c = new HttpClient(); return input; }
+            }
+            """,
+        _ => throw new NotSupportedException($"Unknown probe API '{apiCall}'.")
+    };
+
+    [Given(@"a pack source that only uses collections and LINQ")]
+    public void GivenAPackSourceUsingCollectionsAndLinq() => _pendingSource = """
+        using System.Collections.Generic;
+        using System.Linq;
+        public sealed class LinqProbe : DigitalBrain.Core.IPackBehavior
+        {
+            public string Respond(string input) => new List<string> { input }.First();
+        }
+        """;
+
+    [When(@"the pack is compiled")]
+    public void WhenThePackIsCompiled() => _lastViolations = Driver.CheckCompilation(_pendingSource!);
+
+    [Then(@"compilation is rejected with violation ""(.*)""")]
+    public void ThenCompilationIsRejectedWithViolation(string expectedPrefix) =>
+        Assert.Contains(_lastViolations!, v => v.StartsWith(expectedPrefix, StringComparison.Ordinal));
+
+    [Then(@"compilation is accepted")]
+    public void ThenCompilationIsAccepted() => Assert.Empty(_lastViolations!);
 
     private sealed class HostAdapter(PackSpecSteps owner) : INeuronTestHost
     {

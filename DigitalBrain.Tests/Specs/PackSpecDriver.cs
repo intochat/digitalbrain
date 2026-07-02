@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Foundry;
 using Xunit;
 
 namespace DigitalBrain.Tests.Specs;
@@ -59,5 +60,14 @@ public sealed class PackSpecDriver(INeuronTestHost host)
     {
         var emissions = await GetEmissionsAsync(packName);
         Assert.Contains(emissions, e => e.Pack == packName && e.Output == expectedOutput);
+    }
+
+    // Same compile call PackAlcEmbodier.Embody uses for real published packs (assembly name + the
+    // IPackBehavior-carrying assembly as an extra reference) — this exercises the production compile
+    // path, not a reimplementation of it, so a CapabilityGate regression here means real embodiment breaks too.
+    public IReadOnlyList<string> CheckCompilation(string code)
+    {
+        var compilation = FoundryCompilation.CreateWith("spec_" + Guid.NewGuid().ToString("N"), code, typeof(IPackBehavior).Assembly);
+        return CapabilityGate.FindViolations(compilation);
     }
 }
