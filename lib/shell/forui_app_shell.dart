@@ -25,6 +25,16 @@ class ForuiAppShell extends StatefulWidget {
   State<ForuiAppShell> createState() => _ForuiAppShellState();
 }
 
+/// Surface kinds that should immediately become the visible shell body the moment
+/// they arrive over the home-feed stream, mirroring the existing gallery auto-switch
+/// a few lines below. Returns the `_selectedTarget` to switch to, or null if [kind]
+/// shouldn't trigger an auto-switch. A plain top-level function (not a method) so it's
+/// unit-testable without pumping the full widget tree or mocking the gRPC connection.
+String? autoSwitchTargetForKind(String kind) {
+  if (kind == 'pack-config-form') return kind;
+  return null;
+}
+
 class _ForuiAppShellState extends State<ForuiAppShell> {
   final RfwRuntimeHost _rfwHost = RfwRuntimeHost();
   dynamic _channel;
@@ -186,6 +196,14 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
       } else if (kind.isNotEmpty) {
         _surfacesByKind[kind] = envelope;
         _feedStatus = null;
+      }
+
+      // Auto-switch to a pack's config form the moment it's emitted post-install
+      // (e.g. Telegram bot token + LLM provider/key), instead of leaving it sitting
+      // unseen in _surfacesByKind.
+      final autoSwitchTarget = autoSwitchTargetForKind(kind);
+      if (autoSwitchTarget != null) {
+        _selectedTarget = autoSwitchTarget;
       }
     });
   }
