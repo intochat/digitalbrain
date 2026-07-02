@@ -26,8 +26,33 @@ public sealed class PackSpecDriver(INeuronTestHost host)
     public Task FireSynapseAtPackAsync(string packName, Synapse synapse) =>
         host.Grain<IGeneratedNeuron>(GeneratedKeyFor(packName)).FireAsync(synapse).AsTask();
 
-    public Task BroadcastAsync<T>(T synapse) where T : Synapse =>
-        host.Grain<IGeneratedNeuron>(GeneratedKeyFor("DriverProbePack")).FireAsync(synapse).AsTask();
+    // Finds (and activates) an IDemoNeuron whose activation lands on a different silo than the named
+    // pack's already-activated grain, so a subsequent broadcast from it is real proof of cross-silo
+    // delivery rather than a same-grain loopback. Bounded trial rather than forcing placement: Orleans'
+    // default placement strategy distributes distinctly-keyed grains across silos, so with 3 silos in
+    // the cluster the odds of exhausting every attempt on the pack's own silo are negligible. Any
+    // rejected same-silo candidates stay activated for the rest of the scenario (harmless here — nothing
+    // asserts on total activation/subscriber count), but a future scenario relying on that count should
+    // route through a helper that deactivates them instead of assuming this method leaves none behind.
+    public async Task<string> ActivateBroadcasterOnDifferentSiloAsync(string packName)
+    {
+        var packSilo = await host.Grain<IGeneratedNeuron>(GeneratedKeyFor(packName)).GetSiloIdentityAsync();
+
+        const int maxAttempts = 12;
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            var key = $"cross-silo-broadcaster-{attempt}";
+            var broadcasterSilo = await host.Grain<IDemoNeuron>(key).GetSiloIdentityAsync();
+            if (broadcasterSilo != packSilo)
+                return key;
+        }
+
+        throw new InvalidOperationException(
+            $"Could not activate a demo neuron on a different silo than pack '{packName}' (silo '{packSilo}') after {maxAttempts} attempts.");
+    }
+
+    public Task BroadcastFromAsync<T>(string broadcasterKey, T synapse) where T : Synapse =>
+        host.Grain<IDemoNeuron>(broadcasterKey).FireAsync(synapse).AsTask();
 
     public async Task AssertBroadcastObservedAsync(string packName)
     {

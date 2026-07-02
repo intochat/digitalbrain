@@ -211,6 +211,10 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     public Task<IReadOnlyList<Synapse>> GetTimelineForCorrelationAsync(string correlationId) =>
         GetCausalLineageAsync(correlationId);
 
+    public Task<string> GetSiloIdentityAsync() => Task.FromResult(
+        GrainContext.Address.SiloAddress?.ToString()
+            ?? throw new InvalidOperationException($"SiloAddress unavailable for activated grain {Self}."));
+
     public async ValueTask<Checkpoint> CreateCheckpointAsync()
     {
         // Dedup by the stable SynapseId (a synapse fired then self-delivered appears in both journals as the

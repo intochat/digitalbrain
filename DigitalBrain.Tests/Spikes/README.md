@@ -90,6 +90,8 @@ Passed!  - Failed: 0, Passed: 1, Skipped: 0, Total: 1, Duration: 973 ms - Digita
 
 ## Decision
 
+**SUPERSEDED — user chose JSON + Roslyn source-generator instead; see the plan's Global Constraints and Task 8.**
+
 Task 8 proceeds with **native-format deletion of `JournalJsonContext`**: switch production's
 `AddAzureBlobJournalStorage(...)` wiring from `.UseJsonJournalFormat(JournalJsonContext.Default)` to
 `.ConfigureServices(s => s.Configure<JournaledStateManagerOptions>(o => o.JournalFormatKey = "orleans-binary"))`,

@@ -38,3 +38,14 @@ compile, run, and durably load real C# at runtime.
   plain `dotnet build` of a temp project referencing the whole Kernel). That path's safety
   net is verify-build plus checkpoint/rollback, not the gate; wiring `CapabilityGate` into
   Tier-2 deploy source remains planned hardening.
+- **`CapabilityGate` allowlist breadth + reflection bypass — known, not a security boundary:**
+  the allowlist is the full `System.` namespace minus 6 explicit exclusions (`System.Net.`,
+  `System.IO.`, `System.Diagnostics.Process.`, `System.Reflection.Emit.`,
+  `System.Runtime.InteropServices.`, `System.Runtime.Loader.`) — much broader than "primitives/
+  collections/LINQ." Worse, `System.Type.GetType(...)` + `System.Activator.CreateInstance(...)`
+  (also `System.Reflection.Assembly.Load`) are themselves inside the broad `System.` allowance
+  and not excluded, so a pack can reflectively construct/invoke any of the explicitly-banned
+  APIs above via a string-keyed type name with zero statically-resolvable symbol reference —
+  confirmed empirically, not theoretical. `CapabilityGate` today is a guardrail against
+  accidental misuse, not a defense against adversarial/untrusted code. See
+  `docs/specs/2026-07-02-capability-gate-hardening-followup.md` for the tracked follow-up.

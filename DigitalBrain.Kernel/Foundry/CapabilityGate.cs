@@ -4,6 +4,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace DigitalBrain.Kernel.Foundry;
 
+// SCOPE: allows the FULL "System." namespace minus the 6 exclusions below, not just "primitives/
+// collections/LINQ" as earlier design notes implied. CONFIRMED BYPASS: Type.GetType + Activator.CreateInstance
+// sit inside that broad "System." allowance and aren't excluded, so reflection reaches any nominally-banned
+// API with zero statically-resolvable symbol reference. This is a guardrail against accidental misuse, not a
+// security boundary — see docs/specs/2026-07-02-capability-gate-hardening-followup.md for the tracked fix.
 public static class CapabilityGate
 {
     private static readonly string[] AllowedNamespacePrefixes =
