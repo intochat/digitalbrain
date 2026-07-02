@@ -192,11 +192,13 @@ namespace DigitalBrain.Tests.Features
             "bed LLM to an egress reply")]
         [global::Xunit.TraitAttribute("Category", "distribution")]
         [global::Xunit.TraitAttribute("Category", "e2e")]
+        [global::Xunit.TraitAttribute("Category", "reactiveloop")]
         public async global::System.Threading.Tasks.Task FullReactiveLoop_AnInboundMessageRound_TripsThroughThePackAndTheStubbedLLMToAnEgressReply()
         {
             string[] tagsOfScenario = new string[] {
                     "distribution",
-                    "e2e"};
+                    "e2e",
+                    "reactiveloop"};
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "1";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Full reactive loop - an inbound message round-trips through the pack and the stub" +

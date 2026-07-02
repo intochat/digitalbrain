@@ -24,47 +24,64 @@ namespace DigitalBrain.Tests.Steps;
 // End-to-end proof of the full Telegram reactive loop over a real TestCluster, LLM stubbed:
 // Send("TelegramMessageReceived") -> embodied responder pack -> AskLlm (broadcast) ->
 // LlmResponderNeuron (fake IChatClient -> "ANSWER:hi") -> Signal("TelegramReplyRequested") -> egress bus.
+//
+// Reqnroll owns construction of [Binding] classes via its own per-scenario DI container, so this class
+// can't rely on xUnit to drive NeuronTestBase's IAsyncLifetime the way NeuronTestBase's own [Fact]-based
+// consumers do (see PackSpecSteps.cs for the full rationale). [BeforeScenario]/[AfterScenario] forward
+// into NeuronTestBase.InitializeAsync()/DisposeAsync() instead. Scoped to "reactiveloop", not "e2e" —
+// "e2e" is also on the sibling N+1 scenario below, and a shared tag would spin up this binding class's
+// TestCluster for that scenario too even though none of its steps match.
 [Binding]
-[Collection("telegram-reactive-loop-host")]
-public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
+public sealed class TelegramReactiveLoopSteps : NeuronTestBase
 {
     // Shared so the in-cluster grains and the out-of-cluster GatewayService read/write the same backing store.
-    private static IPackConfigStore SharedConfigStore = null!;
+    private IPackConfigStore _configStore = null!;
 
-    private readonly TestCluster _cluster;
-    private readonly SignalEgressBus _egressBus;
+    private readonly SignalEgressBus _egressBus = new();
     private const string PackName = "TelegramResponderNeuron";
     private const string Scope = "telegram-loop-user";
 
     private SignalEgressBus.Subscription? _egressSubscription;
 
-    public TelegramReactiveLoopSteps()
+    [BeforeScenario("reactiveloop")]
+    public Task BeforeScenarioAsync()
     {
         var configServices = new ServiceCollection();
         configServices.AddDataProtection().UseEphemeralDataProtectionProvider();
         configServices.AddSingleton<IPackConfigBackingStore>(new InMemoryPackConfigBackingStore());
         configServices.AddSingleton<IPackConfigStore, PackConfigStore>();
-        SharedConfigStore = configServices.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
+        _configStore = configServices.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
 
-        _egressBus = new SignalEgressBus();
-        TelegramReactiveLoopSiloConfig.SharedEgressBus = _egressBus;
-
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<TelegramReactiveLoopSiloConfig>();
-        _cluster = builder.Build();
-        _cluster.DeployAsync().GetAwaiter().GetResult();
+        return InitializeAsync();
     }
 
-    public async ValueTask DisposeAsync()
+    [AfterScenario("reactiveloop")]
+    public Task AfterScenarioAsync()
     {
         _egressSubscription?.Dispose();
-        await _cluster.StopAllSilosAsync();
+        return DisposeAsync();
     }
+
+    // NeuronTestSiloConfigurator (DigitalBrain.TestKit/NeuronTestSiloConfigurator.cs) already wires the
+    // shared journal/embodiment/streams plumbing that the deleted TelegramReactiveLoopSiloConfig
+    // hand-rolled. Only the Telegram-specific extras go here: a deterministic global IChatClient
+    // (NeuronTestSiloConfigurator's IScopedChatClientFactory is a no-op, so LlmResponderNeuron falls
+    // back to this global client), and this scenario's own SignalEgressBus/IPackConfigStore instances —
+    // registered after (so they win last-registration-wins resolution over) NeuronTestSiloConfigurator's
+    // own SignalEgressBus, so the silo's SignalEgressStreamSubscriber and this class's _egressSubscription
+    // observe the same bus.
+    protected override void ConfigureSilo(ISiloBuilder builder) => builder
+        .ConfigureServices(services =>
+        {
+            services.AddSingleton<IChatClient, AnswerPrefixChatClient>();
+            services.AddSingleton(_egressBus);
+            services.AddSingleton(_configStore);
+        });
 
     [Given(@"the Telegram responder experience is installed")]
     public async Task GivenTheTelegramResponderExperienceIsInstalled()
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-telegram-loop");
+        var market = Grain<IMarketplaceNeuron>("market-telegram-loop");
         await market.FireAsync(new PublishToMarketplace(
             PackName, "1.0", Code: MarketplaceSeeds.TelegramResponderPackCode,
             OwnerId: "tester", IsPrivate: false, CommissionRate: 0.0));
@@ -74,7 +91,7 @@ public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
     [Then(@"the install emits a config form whose tree contains the fields ""(.*)"", ""(.*)"", ""(.*)""")]
     public async Task ThenTheInstallEmitsAConfigForm(string field1, string field2, string field3)
     {
-        var gen = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("generated-" + PackName.ToLowerInvariant());
+        var gen = Grain<IGeneratedNeuron>("generated-" + PackName.ToLowerInvariant());
 
         UiSurface? form = null;
         for (var attempt = 0; attempt < 40 && form is null; attempt++)
@@ -106,13 +123,13 @@ public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
         var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
 
         var gateway = new GatewayService(
-            _cluster.GrainFactory,
+            Cluster.GrainFactory,
             new ConfigurationBuilder().Build(),
             new HomeFeedBus(),
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance,
-            SharedConfigStore);
+            _configStore);
 
         await gateway.Send(new SynapseEnvelope
         {
@@ -120,7 +137,7 @@ public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
             Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
 
-        var stored = await SharedConfigStore.GetAsync(Scope, PackName);
+        var stored = await _configStore.GetAsync(Scope, PackName);
         Assert.Equal(token, stored["telegram_token"]);
     }
 
@@ -129,7 +146,7 @@ public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
     {
         // Activate the responder so it subscribes to the timeline before the AskLlm broadcast arrives.
         // Production will need a startup activation of LlmResponderNeuron (slice-5 / Program.cs concern).
-        var responder = _cluster.GrainFactory.GetGrain<ILlmResponderNeuron>("telegram-loop-responder");
+        var responder = Grain<ILlmResponderNeuron>("telegram-loop-responder");
         await responder.GetTimelineAsync();
 
         _egressSubscription = _egressBus.Subscribe(new[] { replyType });
@@ -139,7 +156,7 @@ public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
     public async Task WhenATelegramMessageArrives(int chatId, string text)
     {
         // Mirrors the generic Send -> IngressNeuron path: broadcast a named Signal on the timeline.
-        var ingress = _cluster.GrainFactory.GetGrain<IIngressNeuron>("telegram-loop-ingress");
+        var ingress = Grain<IIngressNeuron>("telegram-loop-ingress");
         await ingress.IngestAsync("TelegramMessageReceived",
             new Dictionary<string, object?> { ["chatId"] = chatId, ["text"] = text });
     }
@@ -147,7 +164,7 @@ public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
     [Then(@"the embodied pack emits an AskLlm for ""(.*)""")]
     public async Task ThenTheEmbodiedPackEmitsAnAskLlm(string prompt)
     {
-        var gen = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("generated-" + PackName.ToLowerInvariant());
+        var gen = Grain<IGeneratedNeuron>("generated-" + PackName.ToLowerInvariant());
 
         AskLlm? ask = null;
         for (var attempt = 0; attempt < 40 && ask is null; attempt++)
@@ -203,42 +220,7 @@ public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
             foreach (var descendant in FindNodes(child))
                 yield return descendant;
     }
-
-    private sealed class TelegramReactiveLoopSiloConfig : ISiloConfigurator
-    {
-        public static SignalEgressBus SharedEgressBus { get; set; } = new();
-
-        public void Configure(ISiloBuilder siloBuilder) => siloBuilder
-            .AddMemoryGrainStorageAsDefault()
-            .AddMemoryStreams("Default")
-            .AddMemoryStreams("HomeFeed")
-            .AddMemoryStreams("DigitalBrainTimeline")
-            .AddMemoryGrainStorage("PubSubStore")
-            .ConfigureServices(services =>
-            {
-                services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddScoped<NeuronJournals>();
-                services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
-                services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-                services.AddSingleton<HomeFeedBus>();
-                services.AddSingleton<IChatClient, AnswerPrefixChatClient>();
-                services.AddSingleton(SharedEgressBus);
-                services.AddSignalEgressStreamSubscriber();
-                services.AddSingleton(SharedConfigStore);
-                services.AddSingleton<IConfiguration>(
-                    new ConfigurationBuilder()
-                        .AddInMemoryCollection(new Dictionary<string, string?>
-                        {
-                            ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
-                        })
-                        .Build());
-            });
-    }
 }
-
-[CollectionDefinition("telegram-reactive-loop-host", DisableParallelization = true)]
-public sealed class TelegramReactiveLoopHostCollection;
 
 // N+1 reactivity proof: two packs (TelegramResponderNeuron + KeywordWatcherNeuron) both react to ONE
 // TelegramMessageReceived broadcast — proving N+1 handler count with no silo restart.
