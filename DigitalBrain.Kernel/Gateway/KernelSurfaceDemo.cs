@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Trust;
+using DigitalBrain.Core.Ui;
 
 namespace DigitalBrain.Kernel.Gateway;
 

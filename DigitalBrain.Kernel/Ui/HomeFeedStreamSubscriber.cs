@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Ui;
 using Orleans.Streams;
 
 namespace DigitalBrain.Kernel.Ui;

@@ -155,7 +155,8 @@ public static class NeuronUiKit
 }
 
 // Curated UI-kit vocabulary (Slice 0). Each node is a thin ForUI cover on the client.
-public static class Ui
+// Named UiKitVocabulary (not Ui) to avoid colliding with the DigitalBrain.Core.Ui namespace.
+public static class UiKitVocabulary
 {
     public const string Screen = "ui:Screen";
     public const string Text = "ui:Text";

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
+using DigitalBrain.Core.Ui;
 using Orleans.Streams;
 
 namespace DigitalBrain.Kernel.Ui;

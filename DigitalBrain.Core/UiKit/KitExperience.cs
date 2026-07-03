@@ -51,7 +51,7 @@ public abstract class KitExperience : IPackBehavior
     private static UiWidgetTree BuildScreen(UiHop hop, IReadOnlyDictionary<string, string> state, string id)
     {
         var children = hop.Factories.Select(factory => Inject(factory(state), id)).ToList();
-        return new UiWidgetTree(Ui.Screen, new Dictionary<string, object?>(), children);
+        return new UiWidgetTree(UiKitVocabulary.Screen, new Dictionary<string, object?>(), children);
     }
 
     // Any action-bearing node (carries eventName) must know pack + experienceId so the client can route the ExperienceStep.

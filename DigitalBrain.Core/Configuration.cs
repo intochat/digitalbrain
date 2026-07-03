@@ -20,7 +20,7 @@ public static class ConfigFormSurface
     public static UiSurface Build(string packName, IReadOnlyList<PackConfigField> fields, string? emitter = null)
     {
         var fieldNodes = fields.Select(ToNode).ToList();
-        fieldNodes.Add(new UiWidgetTree(Ui.Button, new Dictionary<string, object?>
+        fieldNodes.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
         {
             ["label"] = "Save",
             ["eventName"] = nameof(ConfigurationProvided),
@@ -29,9 +29,9 @@ public static class ConfigFormSurface
         }));
 
         var tree = new UiWidgetTree(
-            Ui.Screen,
+            UiKitVocabulary.Screen,
             new Dictionary<string, object?> { ["title"] = packName + " configuration" },
-            new List<UiWidgetTree> { new(Ui.Column, new Dictionary<string, object?>(), fieldNodes) });
+            new List<UiWidgetTree> { new(UiKitVocabulary.Column, new Dictionary<string, object?>(), fieldNodes) });
 
         return new UiSurface(Kind, new Dictionary<string, object?>
         {
@@ -49,13 +49,13 @@ public static class ConfigFormSurface
     {
         if (field.Kind == PackConfigFieldKind.Choice)
         {
-            return new UiWidgetTree(Ui.Select, FieldProps(field, extra: props =>
+            return new UiWidgetTree(UiKitVocabulary.Select, FieldProps(field, extra: props =>
             {
                 if (field.Choices is not null) props["items"] = field.Choices;
             }));
         }
 
-        return new UiWidgetTree(Ui.TextField, FieldProps(field, extra: props =>
+        return new UiWidgetTree(UiKitVocabulary.TextField, FieldProps(field, extra: props =>
         {
             if (field.Kind == PackConfigFieldKind.Secret) props["secret"] = true;
         }));

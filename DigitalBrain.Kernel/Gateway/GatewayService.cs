@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Auth;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Runtime.Grpc;
