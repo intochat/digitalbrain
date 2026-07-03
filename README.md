@@ -7,8 +7,8 @@ The web client lives at [digitalbrain.tech](https://digitalbrain.tech) and talks
 ## What lives here
 
 - `DigitalBrain.Core` — pure protocol: `INeuron`, `Synapse`, `IHandle<T>`, `UiSurface`/`UiWidgetTree`, `NeuronId`/`TaskId`, and shared runtime messages.
-- `DigitalBrain.Pack.Contracts` — executable pack contracts: `IPackBehavior`, `PackManifest`, pack config schema, pack trust helpers, and `KitExperience` authoring helpers.
-- `DigitalBrain.Marketplace.Contracts` — marketplace pack projection helpers for marketplace and installed-bundle UI surfaces.
+- `DigitalBrain.Pack.Contracts` — executable pack contracts: `IPackBehavior`, `NeuroPack`, `PackManifest`, bundle manifest/config schema, pack trust helpers, and `KitExperience` authoring helpers.
+- `DigitalBrain.Marketplace.Contracts` — marketplace neuron commands/events plus projection helpers for marketplace and installed-bundle UI surfaces.
 - `DigitalBrain.SeedPacks` — local marketplace seed catalog and embedded built-in pack source.
 - `DigitalBrain.Kernel` — the runtime (Orleans + services): base `Neuron`, embodiment (`Foundry`/`PackAlcEmbodier`), LLM, economics (Stripe + ECDSA), context/memory (hybrid + Qdrant), server-driven UI (UiSurface emission + bidirectional `UiGateway`), self-update/HA rolling.
 - `DigitalBrain.Aspire` — hosting SDK (`AddDigitalBrain`, `WireKernelSilo`, `AddFlutterClient`...).
@@ -58,7 +58,7 @@ See `Brain.slnx`, `aspire.config.json`, `Directory.Packages.props` (Aspire 13.4.
 See `docs/SYSTEM_DESIGN.md` for the current architecture and `CONTINUITY.md` for recent history.
 
 - Grammar lives in `DigitalBrain.Core/UiSurfaces.cs` (`NeuronUiKit`, `Ui`, `UiWidgetTree`, `UiSurface.ForWidgetTree`...).
-- Experiences: `KitExperience` + fluent `UiExperience` live in `DigitalBrain.Pack.Contracts` (packs author multi-hop UIs in pure C# while Core keeps only the reusable UI schema).
+- Experiences: `KitExperience` + fluent `UiExperience` live in `DigitalBrain.Pack.Contracts` (packs author multi-hop UIs in pure C# while Core keeps only the reusable UI schema and marketplace contracts live outside Core).
 - Emission examples: `UserSessionNeuron` (app-shell), `SystemNeurons`, Core live-data helpers, and marketplace projections in `DigitalBrain.Marketplace.Contracts`.
 - Wire: `HomeFeedBus` + `UiSurfaceRfwBridge` + bidirectional `UiGatewayService`.
 - Client: `rfw_host/` (host + `UiSurfaceTreeRenderer`) + `ui_kit/` (thin ForUI impl of `ui:` vocab) + ForUI shell. Thin host only.

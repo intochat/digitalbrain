@@ -16,9 +16,9 @@ public record BundleDependency(
     [property: Id(0)] string PackName,
     [property: Id(1)] string MinVersion);
 
-// Product-level metadata a bundle declares in code (single source of truth). The next slice materializes
-// this into the marketplace catalog at publish so discovery can facet by tier/channel without recompiling.
-// PackManifest stays separate — it carries dispatch (HandledSynapseTypes) and config requirements.
+// Product-level metadata a bundle declares in code (single source of truth). Marketplace catalog
+// materialization facets by tier/channel without forcing the primitive Core assembly to know packs.
+// PackManifest stays separate: it carries dispatch (HandledSynapseTypes) and config requirements.
 [GenerateSerializer]
 public record BundleManifest(
     [property: Id(0)] BundleTier Tier,

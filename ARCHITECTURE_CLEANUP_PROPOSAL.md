@@ -17,6 +17,7 @@ Done:
 - Moved concrete marketplace seeds from `DigitalBrain.Core` into `DigitalBrain.SeedPacks`.
 - Started Phase 2 by moving executable pack contracts, pack config schema/surface helper, trust helpers, and `KitExperience`/`UiExperience` authoring helpers from `DigitalBrain.Core` into `DigitalBrain.Pack.Contracts`.
 - Continued Phase 2 by moving `NeuroPack` marketplace and installed-bundle UI projection helpers from `DigitalBrain.Core` into `DigitalBrain.Marketplace.Contracts`.
+- Continued Phase 2 by moving `NeuroPack` and bundle manifests into `DigitalBrain.Pack.Contracts`, and marketplace commands/events/interfaces into `DigitalBrain.Marketplace.Contracts`.
 - Added architecture guard tests that keep `DigitalBrain.Core` free of runtime, host, integration, and pack-contract assembly references.
 - Renamed product-level Silo restart/deploy language to Kernel while preserving Orleans technical terms.
 - Renamed `DigitalBrain.Tests/UnitTest1.cs` to `DigitalBrain.Tests/Kernel/NeuronTests.cs`.
@@ -26,7 +27,7 @@ Still left:
 - Continue splitting `DigitalBrain.Core` into smaller primitive/runtime/pack/UI/system contract packages.
 - Split `DigitalBrain.Kernel` into runtime modules and make the host a composition root.
 - Make integration project names match ownership boundaries, especially interface-only projects.
-- Move remaining marketplace contracts, demo/sample UI leakage, and UI schema out of Core and gateway paths.
+- Move demo/sample UI leakage and UI schema out of Core and gateway paths.
 - Split the central test project into explicit feedback-speed lanes.
 - Expand deployment beyond the current one-kernel-image MVP if Telegram transport and MCP need independent images.
 - Add architecture guard tests for module dependency direction.
@@ -293,7 +294,7 @@ Split by stability and dependency direction:
 
 - `DigitalBrain.Primitives`: `Synapse`, `SynapseType`, `NeuronId`, `TaskId`, causal metadata.
 - `DigitalBrain.Runtime.Contracts`: `INeuron`, `IHandle<T>`, checkpoint/branch contracts.
-- `DigitalBrain.Pack.Contracts`: `IPackBehavior`, `PackManifest`, config field schema, trust primitives. `BundleManifest` and marketplace projection types remain in Core until the UI/marketplace surface split removes their Core callers.
+- `DigitalBrain.Pack.Contracts`: `IPackBehavior`, `NeuroPack`, `BundleManifest`, `PackManifest`, config field schema, trust primitives.
 - `DigitalBrain.Ui.Contracts`: `UiSurface`, `UiWidgetTree`, UI action schema.
 - `DigitalBrain.System.Contracts`: runtime management and self-update contracts.
 - Domain-specific contract packages only when a domain is genuinely shared outside Kernel.
@@ -552,7 +553,7 @@ Tasks:
 
 1. Move executable pack contracts, pack config, and pack trust helpers into `DigitalBrain.Pack.Contracts`. Current slice done.
 2. Move UI schema from `DigitalBrain.Core` into `DigitalBrain.Ui.Contracts`.
-3. Continue moving remaining marketplace contracts out of Core now that `NeuroPack` UI projections live in `DigitalBrain.Marketplace.Contracts`.
+3. Move remaining marketplace contracts out of Core now that `NeuroPack` UI projections live in `DigitalBrain.Marketplace.Contracts`. Current slice done.
 4. Move demo/test contracts out of Core.
 5. Move seed pack code out of Core.
 6. Keep compatibility type-forwarding only if packaging requires it.

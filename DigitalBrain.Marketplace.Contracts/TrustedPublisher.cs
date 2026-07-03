@@ -1,5 +1,3 @@
-using DigitalBrain.Core;
-
 namespace DigitalBrain.Core.Trust;
 
 // Built-in trusted-publisher identity for first-party seeds and the kernel pack only. Lets secure-by-default
