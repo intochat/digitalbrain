@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
+using DigitalBrain.Core.Ui;
 using DigitalBrain.Marketplace.Contracts;
 using System.Reflection;
 
@@ -45,6 +46,17 @@ public class CoreBoundaryTests
     }
 
     [Fact]
+    public void Ui_Contracts_Depend_On_Core_Not_The_Other_Way_Around()
+    {
+        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+        var uiContractsAssemblyName = typeof(UiSurface).Assembly.GetName().Name!;
+        var references = UiContractsReferenceNames();
+
+        Assert.Contains(coreAssemblyName, references);
+        Assert.DoesNotContain(uiContractsAssemblyName, CoreReferenceNames());
+    }
+
+    [Fact]
     public void Pack_Contracts_Own_NeuroPack_And_Bundle_Manifest()
     {
         Assert.Equal("DigitalBrain.Pack.Contracts", typeof(NeuroPack).Assembly.GetName().Name);
@@ -63,7 +75,45 @@ public class CoreBoundaryTests
     }
 
     [Fact]
-    public void Core_Live_Data_Does_Not_Expose_NeuroPack_Projection_Methods()
+    public void Ui_Contracts_Do_Not_Reference_Runtime_Host_Integration_Or_Marketplace_Packages()
+    {
+        var references = UiContractsReferenceNames();
+        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+
+        var unexpectedDigitalBrainReferences = references
+            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
+                !string.Equals(name, coreAssemblyName, StringComparison.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(unexpectedDigitalBrainReferences);
+
+        var offenders = references
+            .Where(name => ForbiddenRuntimeHostOrIntegrationPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void Ui_Contracts_Own_Ui_Schema_Types()
+    {
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(UiSurface).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(UiWidgetTree).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(NeuronUiKit).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(UiKitVocabulary).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(ChartSpec).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(GraphicSpec).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(AuthButtonSurface).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(ListSurface).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(TableSurface).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(IdeSurface).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(RfwCard).Assembly.GetName().Name);
+    }
+
+    [Fact]
+    public void Ui_Surface_Live_Data_Does_Not_Expose_NeuroPack_Projection_Methods()
     {
         var offenders = typeof(UiSurfaceLiveData)
             .GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
@@ -76,19 +126,22 @@ public class CoreBoundaryTests
     }
 
     [Fact]
-    public void Marketplace_Contracts_Depend_On_Core_And_Pack_Contracts_Not_Runtime_Host_Or_Integrations()
+    public void Marketplace_Contracts_Depend_On_Core_Pack_And_Ui_Contracts_Not_Runtime_Host_Or_Integrations()
     {
         var references = MarketplaceContractsReferenceNames();
         var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
         var packContractsAssemblyName = typeof(IPackBehavior).Assembly.GetName().Name!;
+        var uiContractsAssemblyName = typeof(UiSurface).Assembly.GetName().Name!;
 
         Assert.Contains(coreAssemblyName, references);
         Assert.Contains(packContractsAssemblyName, references);
+        Assert.Contains(uiContractsAssemblyName, references);
 
         var unexpectedDigitalBrainReferences = references
             .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
                 !string.Equals(name, coreAssemblyName, StringComparison.Ordinal) &&
-                !string.Equals(name, packContractsAssemblyName, StringComparison.Ordinal))
+                !string.Equals(name, packContractsAssemblyName, StringComparison.Ordinal) &&
+                !string.Equals(name, uiContractsAssemblyName, StringComparison.Ordinal))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
@@ -119,6 +172,8 @@ public class CoreBoundaryTests
     private static string[] PackContractsReferenceNames() => ReferenceNames(typeof(IPackBehavior).Assembly);
 
     private static string[] MarketplaceContractsReferenceNames() => ReferenceNames(typeof(MarketplaceUiSurfaces).Assembly);
+
+    private static string[] UiContractsReferenceNames() => ReferenceNames(typeof(UiSurface).Assembly);
 
     private static bool MethodSignatureContains(MethodInfo method, Type type) =>
         TypeContains(method.ReturnType, type) ||

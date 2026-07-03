@@ -44,6 +44,7 @@
     <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.SeedPacks\DigitalBrain.SeedPacks.csproj" />
     <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <!-- For E2E collection fixture: boot the real Aspire AppHost model (alias to avoid Program type clash with the kernel host) -->
     <ProjectReference Include="..\NeuroOSPrototype.AppHost\NeuroOSPrototype.AppHost.csproj" Aliases="AppHostProject" />
   </ItemGroup>

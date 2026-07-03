@@ -6,7 +6,8 @@ The web client lives at [digitalbrain.tech](https://digitalbrain.tech) and talks
 
 ## What lives here
 
-- `DigitalBrain.Core` — pure protocol: `INeuron`, `Synapse`, `IHandle<T>`, `UiSurface`/`UiWidgetTree`, `NeuronId`/`TaskId`, and shared runtime messages.
+- `DigitalBrain.Core` — pure protocol: `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, and shared runtime messages.
+- `DigitalBrain.Ui.Contracts` — server-driven UI contracts: `UiSurface`, `UiWidgetTree`, `RfwCard`, UI vocabularies, typed surface records, chart specs, and UI-facing neuron contracts.
 - `DigitalBrain.Pack.Contracts` — executable pack contracts: `IPackBehavior`, `NeuroPack`, `PackManifest`, bundle manifest/config schema, pack trust helpers, and `KitExperience` authoring helpers.
 - `DigitalBrain.Marketplace.Contracts` — marketplace neuron commands/events plus projection helpers for marketplace and installed-bundle UI surfaces.
 - `DigitalBrain.SeedPacks` — local marketplace seed catalog and embedded built-in pack source.
@@ -23,7 +24,7 @@ See `Brain.slnx`, `aspire.config.json`, `Directory.Packages.props` (Aspire 13.4.
 - **Neuron** = Orleans grain (`IGrainWithStringKey` implementing `INeuron` + `IHandle<>` for the synapses it consumes).
 - **Synapse** = broadcast or point-to-point message (`[GenerateSerializer] record : Synapse`). Carries `SynapseId` + causation lineage via `Stamp(...)`.
 - **NeuroPack** = signed (ECDSA-nistP256) C# code. Compiled in collectible ALC, embodied as running behavior. Marketplace install reaches N+1 handlers without restart.
-- **UI** = `UiSurface : Synapse` (or `RfwCard`). Neurons emit `UiWidgetTree` using the official kit (`NeuronUiKit`, `Ui`). Client is thin (ForUI + RFW host/renderer). Shell, nav, content, experiences all come from neurons.
+- **UI** = `UiSurface : Synapse` (or `RfwCard`) from `DigitalBrain.Ui.Contracts`. Neurons emit `UiWidgetTree` using the official kit (`NeuronUiKit`, `UiKitVocabulary`). Client is thin (ForUI + RFW host/renderer). Shell, nav, content, experiences all come from neurons.
 
 ## Working in this repo (AGENTS.md loop)
 
@@ -57,9 +58,9 @@ See `Brain.slnx`, `aspire.config.json`, `Directory.Packages.props` (Aspire 13.4.
 
 See `docs/SYSTEM_DESIGN.md` for the current architecture and `CONTINUITY.md` for recent history.
 
-- Grammar lives in `DigitalBrain.Core/UiSurfaces.cs` (`NeuronUiKit`, `Ui`, `UiWidgetTree`, `UiSurface.ForWidgetTree`...).
-- Experiences: `KitExperience` + fluent `UiExperience` live in `DigitalBrain.Pack.Contracts` (packs author multi-hop UIs in pure C# while Core keeps only the reusable UI schema and marketplace contracts live outside Core).
-- Emission examples: `UserSessionNeuron` (app-shell), `SystemNeurons`, Core live-data helpers, and marketplace projections in `DigitalBrain.Marketplace.Contracts`.
+- Grammar lives in `DigitalBrain.Ui.Contracts/UiSurfaces.cs` (`NeuronUiKit`, `UiKitVocabulary`, `UiWidgetTree`, `UiSurface.ForWidgetTree`...).
+- Experiences: `KitExperience` + fluent `UiExperience` live in `DigitalBrain.Pack.Contracts` (packs author multi-hop UIs in pure C# while Core stays out of the UI schema and marketplace contracts stay outside Core).
+- Emission examples: `UserSessionNeuron` (app-shell), `SystemNeurons`, UI contract live-data helpers, and marketplace projections in `DigitalBrain.Marketplace.Contracts`.
 - Wire: `HomeFeedBus` + `UiSurfaceRfwBridge` + bidirectional `UiGatewayService`.
 - Client: `rfw_host/` (host + `UiSurfaceTreeRenderer`) + `ui_kit/` (thin ForUI impl of `ui:` vocab) + ForUI shell. Thin host only.
 
@@ -72,6 +73,7 @@ From `brain/`:
 aspire doctor
 # targeted work
 dotnet build DigitalBrain.Core/DigitalBrain.Core.csproj
+dotnet build DigitalBrain.Ui.Contracts/DigitalBrain.Ui.Contracts.csproj
 dotnet test --filter "UiSurface|KitExperience"
 ```
 

@@ -5,16 +5,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
-    <PackageId>DigitalBrain.Marketplace.Contracts</PackageId>
+    <PackageId>DigitalBrain.Ui.Contracts</PackageId>
     <Version>0.1.0</Version>
-    <Description>Marketplace projection contracts and UI surface builders for DigitalBrain packs.</Description>
+    <Description>Server-driven UI payload contracts, widget-tree schema, RFW card payloads, and UI-facing neuron contracts for DigitalBrain.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Core.Abstractions" />
     <PackageReference Include="Microsoft.Orleans.Serialization" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
   </ItemGroup>
 </Project>

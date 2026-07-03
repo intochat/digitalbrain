@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.UiKit\DigitalBrain.UiKit.csproj" />
     <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
