@@ -5,7 +5,7 @@ namespace DigitalBrain.Kernel.Market;
 public interface IMarketDataNeuron : INeuron, IHandle<Signal> { }
 
 [GrainType("digitalbrain.market-data")]
-public class MarketDataNeuron(ILogger<MarketDataNeuron> logger, NeuronJournals journals, IMarketDataApiClient client)
+public sealed class MarketDataNeuron(ILogger<MarketDataNeuron> logger, NeuronJournals journals, IMarketDataApiClient client)
     : Neuron(logger, journals), IMarketDataNeuron
 {
     public async Task HandleAsync(Signal signal)
