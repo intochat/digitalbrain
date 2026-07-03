@@ -1,4 +1,3 @@
-using DigitalBrain.Core.Distribution;
 using DigitalBrain.Core.Sdk;
 
 namespace DigitalBrain.Core;
@@ -31,15 +30,6 @@ public record Synapse(
 }
 
 [GenerateSerializer]
-public record FilterMarketplace(
-    [property: Id(0)] string? Tier = null,
-    [property: Id(1)] string? Channel = null
-) : Synapse(nameof(FilterMarketplace), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record ListPublished() : Synapse(nameof(ListPublished), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
 public record CreateNeuronRequest(string Description, string Language = "csharp") : Synapse(nameof(CreateNeuronRequest), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
@@ -65,8 +55,6 @@ public record ExperienceUsed(
 public interface ICompiler : INeuron, IHandle<CreateNeuronRequest> { }
 
 public interface IAspireNeuron : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
-
-public interface IMarketplaceNeuron : INeuron, IHandle<PublishToMarketplace>, IHandle<InstallFromMarketplace>, IHandle<ListPublished>, IHandle<FilterMarketplace>;
 
 // Thin common marker for channel neurons (Telegram, Flutter UI, etc.) per item 13.
 // Allows discovery and shared patterns (e.g. CorrelationId/CausationId for reply context across channels).
@@ -154,17 +142,6 @@ public interface IUserGrain : IGrainWithStringKey
 [GenerateSerializer]
 public record UserProfile(UserId Id, string DisplayName, IReadOnlyList<string> Roles);
 
-// Remote client contract for the private marketplace service (new repo).
-// Kernel's MarketplaceNeuron becomes a thin proxy when RemoteMarketplaceBaseUrl is configured.
-// This keeps local stub mode for security/air-gapped while enabling cloud pay-go distribution.
-public interface IRemoteMarketplaceClient
-{
-    Task PublishAsync(PublishToMarketplace cmd);
-    Task InstallAsync(InstallFromMarketplace cmd);
-    Task<PublishedList> ListAsync();
-    // Security policy, user entitlement queries etc. added as the private service is built.
-}
-
 public interface IMetaOptimizerNeuron : INeuron, IHandle<NeuronTelemetry>, IHandle<WiringOptimizationProposed> { }
 
 public interface IGeneratedNeuron : INeuron { }
@@ -188,7 +165,7 @@ public interface ISoftwareEngineeringTeam : INeuron, IHandle<CreateSimpleApp> { 
 
 public interface ISoftware20Team : ISoftwareEngineeringTeam { }
 
-public interface IInoNeuron : INeuron, IHandle<InoRequest>
+public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataIngested>
 {
     Task<string> AskAsync(string prompt);
 }
@@ -213,68 +190,6 @@ public interface IDemoNeuron : INeuron
 {
     Task<string> GetLastMessageAsync();
 }
-
-// === Real Marketplace Pack Model (core to fixing the blocker) ===
-// A NeuroPack is the distributable unit: metadata + code + ownership + monetization info.
-// This enables private marketplace + commissions.
-[GenerateSerializer]
-public record NeuroPack(
-    [property: Id(0)] string Name,
-    [property: Id(1)] string Version,
-    [property: Id(2)] string OwnerId = "anonymous",
-    [property: Id(3)] bool IsPrivate = false,
-    [property: Id(4)] double CommissionRate = 0.10, // 10% default commission taken by marketplace
-    [property: Id(5)] string Code = "",
-    [property: Id(6)] string Description = "",
-    // Trust chain: author's ECDSA public key (SPKI, base64) + signature over Name|Version|Hash(Code)|PubKey.
-    // Empty = unsigned. Signed via PackSignatureVerifier.SignPack at publish, verified at install.
-    [property: Id(7)] string AuthorPublicKeyBase64 = "",
-    [property: Id(8)] string SignatureBase64 = "",
-    // Economics: price in the marketplace currency. 0 = free. Premium (>0) packs require a license at install.
-    [property: Id(9)] decimal Price = 0m,
-    [property: Id(10)] BundleManifest? Manifest = null
-);
-
-// Richer publish/install commands that carry full pack data for real marketplace behavior.
-// Old simple constructors still work via defaults for minimal compat during transition.
-[GenerateSerializer]
-public record PublishToMarketplace(
-    string PackName,
-    string Version,
-    string Code = "",
-    string OwnerId = "anonymous",
-    bool IsPrivate = false,
-    double CommissionRate = 0.10,
-    string Description = "",
-    string AuthorPublicKeyBase64 = "",
-    string SignatureBase64 = "",
-    decimal Price = 0m
-) : Synapse(nameof(PublishToMarketplace), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record InstallFromMarketplace(
-    string PackName, 
-    string Version, 
-    string BuyerId = "anonymous",
-    string? SessionId = null
-) : Synapse(nameof(InstallFromMarketplace), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record NeuroPackInstalled(NeuroPack Pack) : Synapse(nameof(NeuroPackInstalled), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record PublishedList(IReadOnlyList<NeuroPack> Packs) : Synapse(nameof(PublishedList), DateTimeOffset.UtcNow);
-
-// Commission event - fired on successful install to support marketplace economics
-[GenerateSerializer]
-public record CommissionTaken(
-    string PackName, 
-    string Version, 
-    string BuyerId, 
-    string SellerId, 
-    double CommissionRate, 
-    double CommissionAmount
-) : Synapse(nameof(CommissionTaken), default);  // Timestamp set by Stamp() on Fire path for consistent lineage.
 
 // Dual journal checkpoints + branching for simulation / time travel.
 [GenerateSerializer]

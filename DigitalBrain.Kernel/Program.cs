@@ -218,6 +218,35 @@ if (serveWebBundle)
 app.MapGrpcService<DigitalBrain.Kernel.Gateway.GatewayService>();
 app.MapGrpcService<DigitalBrain.Kernel.Gateway.UiGatewayService>();
 
+// Chat file-attachment upload: client posts the raw xlsx bytes as multipart/form-data (field "file"), server
+// parses and routes to InoNeuron so the reply arrives on the same WatchHomeFeed stream as a chat surface.
+app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
+{
+    if (!request.HasFormContentType)
+        return Results.BadRequest("Expected multipart/form-data.");
+
+    var form = await request.ReadFormAsync();
+    var file = form.Files.GetFile("file");
+    if (file is null || file.Length == 0)
+        return Results.BadRequest("No file uploaded.");
+
+    var sessionId = form["sessionId"].FirstOrDefault();
+
+    using var fileStream = new MemoryStream();
+    await file.CopyToAsync(fileStream);
+    var dataset = DigitalBrain.Kernel.TabularData.TabularDataParser.Parse(fileStream.ToArray());
+
+    var ino = grains.GetGrain<IInoNeuron>("ino-main");
+    await ino.FireAsync(new TabularDataIngested(
+        file.FileName,
+        System.Text.Json.JsonSerializer.Serialize(dataset.Headers),
+        System.Text.Json.JsonSerializer.Serialize(dataset.Rows),
+        System.Text.Json.JsonSerializer.Serialize(dataset.ColumnStats),
+        sessionId));
+
+    return Results.Ok();
+});
+
 if (!isAspireHosted)
 {
     app.MapMcp().RequireHost("*:8081");

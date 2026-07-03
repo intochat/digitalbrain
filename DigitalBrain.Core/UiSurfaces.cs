@@ -193,6 +193,7 @@ public static class UiKitVocabulary
     public const string Dialog = "ui:Dialog";
     public const string Sheet = "ui:Sheet";
     public const string Toast = "ui:Toast";
+    public const string Table = "ui:Table";
 }
 
 [GenerateSerializer]
@@ -474,13 +475,13 @@ public static class UiSurfaceSamples
                         ["description"] = "Trusted ForUI primitive pack for DigitalBrain surfaces."
                     }
                 },
-                ["installAction"] = SynapseAction("install-pack", "Install", nameof(InstallFromMarketplace), new Dictionary<string, object?>
+                ["installAction"] = SynapseAction("install-pack", "Install", "InstallFromMarketplace", new Dictionary<string, object?>
                 {
                     ["version"] = "0.1.0",
                     ["buyerId"] = "anonymous",
                     ["userId"] = "anonymous"
                 }),
-                ["updateAction"] = SynapseAction("update-pack", "Update", nameof(InstallFromMarketplace), new Dictionary<string, object?>
+                ["updateAction"] = SynapseAction("update-pack", "Update", "InstallFromMarketplace", new Dictionary<string, object?>
                 {
                     ["version"] = "0.1.0",
                     ["buyerId"] = "anonymous",
@@ -564,7 +565,7 @@ public static class UiSurfaceSamples
                 },
                 ["filters"] = new Dictionary<string, object?>
                 {
-                    ["types"] = new[] { nameof(DemoMessageSynapse), nameof(InoResponse), nameof(PublishedList) }
+                    ["types"] = new[] { nameof(DemoMessageSynapse), nameof(InoResponse) }
                 }
             }));
 
@@ -926,8 +927,6 @@ public static class UiSurfaceLiveData
     private static string TitleFor(Synapse synapse) =>
         synapse switch
         {
-            PublishedList list => $"{list.Packs.Count} published packs",
-            NeuroPackInstalled installed => "Installed " + installed.Pack.Name,
             ClusterActivity activity => $"{activity.NodeId}: {activity.Activity}",
             ThreeDGraphUpdate update => "Graph update: " + update.GraphId,
             DataChartGenerated generated => "Chart generated: " + generated.RequestId,

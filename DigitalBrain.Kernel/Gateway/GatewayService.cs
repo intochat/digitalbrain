@@ -112,9 +112,13 @@ public sealed class GatewayService(
 
             if (request.TypeName == nameof(InoRequest) || request.TypeName.Contains("InoRequest", StringComparison.OrdinalIgnoreCase))
             {
+                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
+                var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
+                var prompt = p.TryGetValue("prompt", out var pr) ? pr?.ToString() ?? "" : "";
+                var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
+
                 var ino = grains.GetGrain<IInoNeuron>("ino-main");
-                // minimal: treat as demo for now or parse prompt; real would use props
-                await ino.FireAsync(new DemoMessageSynapse("UI action: " + request.TypeName));
+                await ino.FireAsync(new InoRequest(prompt, sessionId));
                 return request;
             }
 
