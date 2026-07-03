@@ -21,6 +21,9 @@ dependencies:
   clock: ^1.1.2
   record: ^6.1.2
   path_provider: ^2.1.5
+  # Attach-file fallback for dropping an Excel/CSV into chat (no drag-and-drop package yet).
+  # Pinned to 8.x (latest compatible) — markdraw ^0.2.0 constrains file_picker to ^8.0.0.
+  file_picker: ^8.3.7
   google_fonts: ^6.2.1
   url_launcher: ^6.3.0
   # Server-driven UI: render Creator-emitted widget documents at runtime

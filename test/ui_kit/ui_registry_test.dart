@@ -7,14 +7,12 @@ import 'package:digitalbrain_flutter/ui_kit/ui_text.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_button.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_panel.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_screen.dart';
+import 'package:digitalbrain_flutter/ui_kit/ui_table.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_text_field.dart';
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
-  builder: (_, w) => FTheme(
-    data: FThemes.neutral.light.touch,
-    child: w!,
-  ),
+  builder: (_, w) => FTheme(data: FThemes.neutral.light.touch, child: w!),
   home: Scaffold(body: child),
 );
 
@@ -23,7 +21,13 @@ Widget _noop(Map<String, Object?> _) => const SizedBox.shrink();
 void main() {
   group('buildUiNode', () {
     test('returns SizedBox.shrink for unknown type', () {
-      final result = buildUiNode('unknown:widget', {}, [], (n, a) {}, buildChild: _noop);
+      final result = buildUiNode(
+        'unknown:widget',
+        {},
+        [],
+        (n, a) {},
+        buildChild: _noop,
+      );
       expect(result, isA<SizedBox>());
     });
 
@@ -93,6 +97,49 @@ void main() {
       expect(node, isA<UiKitTextField>());
     });
 
+    test('maps ui:table to UiKitTable with parsed columns and rows', () {
+      final node = buildUiNode(
+        'ui:table',
+        {
+          'columns': ['Month', 'Revenue'],
+          'rows': [
+            ['Jan', '12000'],
+            ['Feb', '14500'],
+          ],
+        },
+        [],
+        (_, _) {},
+        buildChild: _noop,
+      );
+      expect(node, isA<UiKitTable>());
+      final table = node as UiKitTable;
+      expect(table.columns, ['Month', 'Revenue']);
+      expect(table.rows, [
+        ['Jan', '12000'],
+        ['Feb', '14500'],
+      ]);
+    });
+
+    testWidgets('ui:table renders header and row cells', (tester) async {
+      final node = buildUiNode(
+        'ui:table',
+        {
+          'columns': ['Month', 'Revenue'],
+          'rows': [
+            ['Jan', '12000'],
+          ],
+        },
+        [],
+        (_, _) {},
+        buildChild: _noop,
+      );
+
+      await tester.pumpWidget(_wrap(node));
+      expect(find.text('Month'), findsOneWidget);
+      expect(find.text('Jan'), findsOneWidget);
+      expect(find.text('12000'), findsOneWidget);
+    });
+
     testWidgets('ui:text renders correctly in widget tree', (tester) async {
       final node = buildUiNode(
         'ui:text',
@@ -106,26 +153,29 @@ void main() {
       expect(find.text('Registry text'), findsOneWidget);
     });
 
-    testWidgets('UiSurfaceTreeRenderer routes ui:Screen+ui:Text through buildUiNode', (tester) async {
-      final tree = <String, Object?>{
-        'Type': 'ui:Screen',
-        'Props': <String, Object?>{},
-        'Children': [
-          <String, Object?>{
-            'Type': 'ui:Text',
-            'Props': <String, Object?>{'text': 'Hello from ui:Text'},
-            'Children': <Object?>[],
-          },
-        ],
-      };
+    testWidgets(
+      'UiSurfaceTreeRenderer routes ui:Screen+ui:Text through buildUiNode',
+      (tester) async {
+        final tree = <String, Object?>{
+          'Type': 'ui:Screen',
+          'Props': <String, Object?>{},
+          'Children': [
+            <String, Object?>{
+              'Type': 'ui:Text',
+              'Props': <String, Object?>{'text': 'Hello from ui:Text'},
+              'Children': <Object?>[],
+            },
+          ],
+        };
 
-      final renderer = UiSurfaceTreeRenderer();
-      final rfwHost = RfwRuntimeHost();
-      final widget = renderer.build(tree, (_, _) {}, rfwHost: rfwHost);
+        final renderer = UiSurfaceTreeRenderer();
+        final rfwHost = RfwRuntimeHost();
+        final widget = renderer.build(tree, (_, _) {}, rfwHost: rfwHost);
 
-      await tester.pumpWidget(_wrap(widget));
-      expect(find.text('Hello from ui:Text'), findsOneWidget);
-    });
+        await tester.pumpWidget(_wrap(widget));
+        expect(find.text('Hello from ui:Text'), findsOneWidget);
+      },
+    );
 
     testWidgets('ui:button fires event with correct payload', (tester) async {
       Map<String, Object?>? capturedArgs;
