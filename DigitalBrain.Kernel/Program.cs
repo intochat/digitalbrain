@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
 using Orleans.Configuration;
 using Orleans.Journaling;
-using Orleans.Journaling.Json;
 
 // Prototype silo host for DigitalBrain.
 // Aspire-hosted path: env vars ConnectionStrings__clustering / grainstate / journal are injected by Aspire.
@@ -174,9 +173,16 @@ builder.UseOrleans(siloBuilder =>
             options.ConfigureTableServiceClient(builder.Configuration.GetConnectionString("clustering")!));
         siloBuilder.AddAzureBlobGrainStorage("Default", options =>
             options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("grainstate")!));
+        // Native ("orleans-binary") journal format, not UseJsonJournalFormat: a spike
+        // (DigitalBrain.Tests/Spikes/JournalFormatSpikeTests.cs) proved native round-trips every Synapse
+        // subtype through a real grain deactivation/reactivation with zero manual type registration, while
+        // Orleans.Journaling.Json (still preview/experimental) throws ResolverTypeInfoOptionsNotCompatible
+        // the moment it's actually exercised against Azure Blob storage - the exact untested scenario the
+        // spike's own caveats flagged as a risk. See DigitalBrain.Tests/Spikes/README.md for the full record.
         siloBuilder.AddAzureBlobJournalStorage(options =>
-            options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("journal")!))
-            .UseJsonJournalFormat(DigitalBrain.Kernel.JournalJsonContext.Default);
+            options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
+        siloBuilder.ConfigureServices(services =>
+            services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary"));
     }
 
     siloBuilder.AddMemoryStreams("HomeFeed");

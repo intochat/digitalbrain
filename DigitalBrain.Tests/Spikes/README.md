@@ -90,13 +90,25 @@ Passed!  - Failed: 0, Passed: 1, Skipped: 0, Total: 1, Duration: 973 ms - Digita
 
 ## Decision
 
-**SUPERSEDED — user chose JSON + Roslyn source-generator instead; see the plan's Global Constraints and Task 8.**
-
-Task 8 proceeds with **native-format deletion of `JournalJsonContext`**: switch production's
-`AddAzureBlobJournalStorage(...)` wiring from `.UseJsonJournalFormat(JournalJsonContext.Default)` to
-`.ConfigureServices(s => s.Configure<JournaledStateManagerOptions>(o => o.JournalFormatKey = "orleans-binary"))`,
-then delete `DigitalBrain.Kernel/JournalJsonContext.cs` and its dedicated coverage test
-(`DigitalBrain.Tests/Protocol/JournalJsonContextTests.cs`).
+**RESOLVED (2026-07-03): reverted to native format — this spike's original recommendation.** Task 8
+(2026-07-02) initially superseded this in favor of JSON + a Roslyn source-generator
+(`DigitalBrain.SourceGen/SynapseJsonContextGenerator.cs`, `DigitalBrain.Kernel/JournalJsonContext`,
+generated). Exactly the risk flagged below ("Task 8 should still do one real run against Azurite/Azure
+Blob storage... this spike deliberately avoided that dependency for speed") materialized the first time
+`aspire run` actually exercised it: grain activation failed cluster-wide with
+`System.InvalidOperationException: The IJsonTypeInfoResolver returned a JsonTypeInfo instance whose
+JsonSerializerOptions setting does not match the provided argument` from
+`Orleans.Journaling.Json.JsonTypeInfoHelpers.GetTypeInfo<T>` — a mismatch between our
+`JournalJsonContext`'s own captured `Options` and whatever `JsonSerializerOptions` Orleans' internal
+resolver-chain plumbing actually invokes it with. Several attempts to fix this from the context side
+(combining resolvers pre/post the base constructor, gating vs. not gating `GetTypeInfo`) fixed the
+context's own unit tests but never the live Orleans path — the mismatch is inside
+`Orleans.Journaling.Json` (still preview/experimental, `ORLEANSEXP005`), not something fixable from our
+side. Reverted: `AddAzureBlobJournalStorage(...)` now pairs with
+`siloBuilder.ConfigureServices(s => s.Configure<JournaledStateManagerOptions>(o => o.JournalFormatKey =
+"orleans-binary"))` instead of `.UseJsonJournalFormat(...)`. `DigitalBrain.SourceGen`, the generated
+`JournalJsonContext`, and their dedicated tests were deleted entirely (proven unnecessary — see "Result"
+above: zero manual type registration needed either way).
 
 ## Caveats for Task 8 to carry forward
 

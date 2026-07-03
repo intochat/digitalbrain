@@ -42,7 +42,6 @@
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp.Tools\DigitalBrain.Mcp.Tools.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
-    <ProjectReference Include="..\DigitalBrain.SourceGen\DigitalBrain.SourceGen.csproj" />
     <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
     <!-- For E2E collection fixture: boot the real Aspire AppHost model (alias to avoid Program type clash with silo/gateway) -->
     <ProjectReference Include="..\NeuroOSPrototype.AppHost\NeuroOSPrototype.AppHost.csproj" Aliases="AppHostProject" />

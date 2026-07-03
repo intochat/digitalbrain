@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using DigitalBrain.Core.Config;
 using Microsoft.AspNetCore.DataProtection;
 
@@ -17,8 +18,16 @@ public static class PackConfigServices
             .SetApplicationName("DigitalBrain.PackConfig");
 
         if (blobsForKeyRing is not null)
-            dp.PersistKeysToAzureBlobStorage(
-                blobsForKeyRing.GetBlobContainerClient("pack-config").GetBlobClient("dp-keys/keys.xml"));
+        {
+            var container = blobsForKeyRing.GetBlobContainerClient("pack-config");
+            // Unlike AzureBlobPackConfigBackingStore.SaveAsync (which ensure-creates this same container
+            // lazily on first pack-config write), DataProtection's AzureBlobXmlRepository uploads the key
+            // ring directly with no such check and throws ContainerNotFound on a fresh Azurite/Storage
+            // account - fails the first grain activation that needs a protector, before anything ever
+            // wrote a pack config.
+            container.CreateIfNotExists(PublicAccessType.None);
+            dp.PersistKeysToAzureBlobStorage(container.GetBlobClient("dp-keys/keys.xml"));
+        }
 
         services.AddSingleton<IPackConfigBackingStore>(sp =>
         {
