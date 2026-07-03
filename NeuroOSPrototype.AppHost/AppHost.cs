@@ -8,7 +8,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Experiences emit UiSurface (AuthButtonSurface etc) for sdk/flutter_demo + Telegram skeleton.
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
-    options.LlmModel = "qwen2.5-coder:1.5b";
+    options.WithLLM<Qwen25Coder1_5B>();
+    // options.WithLLM<Gpt4oMini>(); // switch to Azure OpenAI when ready (needs azure-openai-endpoint/-key parameters)
     options.UseLocalMarketplace = true;
 })
 .WithOrleansDashboard(8080)
@@ -57,12 +58,10 @@ if (IsEnabled("DIGITALBRAIN_ENABLE_TELEGRAM"))
 kernel.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
 kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
-// Inject Ollama LLM config so AddDigitalBrainChat registers IChatClient in the Aspire-hosted kernel.
-// Cloud path: override DigitalBrain__Llm__Provider=azureopenai via DIGITALBRAIN_ENV or appsettings.
-kernel.WithEnvironment("DigitalBrain__Llm__Provider", "ollama");
-kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
-kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
-    ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
+// LLM env vars (Provider/Model/OllamaEndpoint/AzureOpenAI*) are already wired from typed
+// config by ctx.WireKernelSilo(kernel) above — driven by options.WithLLM<TModel>(). Do not
+// re-set them here; a second WithEnvironment call for the same key wins last and would
+// silently override the typed selection.
 if (ctx.EnableOrleansDashboard)
 {
     kernel.WithEnvironment("ORLEANS_DASHBOARD_PORT", (ctx.OrleansDashboardPort ?? 8080).ToString());
