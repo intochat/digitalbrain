@@ -25,4 +25,4 @@ $env:AZURE_STORAGE_ACCOUNT = 'digitalbrainstprod'
 dotnet run --project DigitalBrain.Deploy.csproj -- up --stack dev -- --image-tag sp1
 ```
 
-The project is intentionally outside Brain.slnx.
+The project is included in `Brain.slnx` under `/deploy/`.

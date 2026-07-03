@@ -55,8 +55,10 @@ public static class DigitalBrainBuilderExtensions
         var resource = new DigitalBrainResource(name);
         var db = builder.AddResource(resource);
 
-        var llmModel = options.LlmModel ?? "qwen2.5-coder:1.5b";
         var llmProvider = options.LlmProvider;
+        var llmModel = options.LlmModel ?? (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase)
+            ? "gpt-4o-mini"
+            : "qwen2.5-coder:1.5b");
 
         IResourceBuilder<ParameterResource>? azureOpenAIEndpoint = null;
         IResourceBuilder<ParameterResource>? azureOpenAIKey = null;
@@ -75,10 +77,14 @@ public static class DigitalBrainBuilderExtensions
             .WithClustering(clusteringTable)
             .WithGrainStorage("Default", grainBlobs);
 
+        // Ollama always runs as the offline fallback (per DEMO-PLAN), independent of the chosen primary
+        // provider — it must pull its own real model tag, never the primary provider's model/deployment
+        // name (e.g. an azureopenai deployment name like "gpt-4o-mini" is not a pullable Ollama tag).
+        const string ollamaFallbackModel = "qwen2.5-coder:1.5b";
         var ollama = builder.AddOllama("ollama")
             .WithGPUSupport()
             .WithDataVolume();
-        var qwen = ollama.AddModel("qwen", llmModel);
+        var qwen = ollama.AddModel("qwen", ollamaFallbackModel);
 
         return new DigitalBrainContext
         {

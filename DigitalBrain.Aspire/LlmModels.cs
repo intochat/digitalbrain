@@ -2,6 +2,10 @@ namespace DigitalBrain.Aspire;
 
 // Typed model marker for AddDigitalBrain's WithLLM<TModel>() — replaces raw provider/model strings
 // with a compile-time-checked choice. Add a new sealed class per supported model/provider pair.
+// For azureopenai models, Id is sent to Azure as the deployment name (not the base model name) —
+// Azure OpenAI resolves by deployment, an arbitrary user-chosen alias (see deploy/Program.cs's
+// ChatDeploymentName = "chat"). If your Azure deployment isn't literally named the model id below,
+// override it after WithLLM<TModel>() via options.LlmModel = "your-deployment-name".
 public abstract class LlmModel
 {
     public abstract string Provider { get; }
