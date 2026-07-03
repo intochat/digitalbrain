@@ -1,6 +1,8 @@
 using DigitalBrain.Core.Config;
-using Salesforce.Common;
 using Salesforce.Force;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace DigitalBrain.Salesforce;
 
@@ -9,7 +11,10 @@ public static class SalesforceClientFactory
     public const string PackName = "salesforce";
     public const string DefaultScope = "default";
     public const string DefaultLoginUrl = "https://login.salesforce.com";
-    public const string DefaultApiVersion = "v36.0";
+    public const string DefaultApiVersion = "v60.0";
+    public const string DefaultCallbackPath = "/salesforce-callback";
+    public const string DefaultRedirectUri = "http://localhost:8081" + DefaultCallbackPath;
+    public const string DefaultOAuthScope = "api refresh_token";
 
     public const string ClientIdKey = "client_id";
     public const string ClientSecretKey = "client_secret";
@@ -18,6 +23,17 @@ public static class SalesforceClientFactory
     public const string SecurityTokenKey = "security_token";
     public const string LoginUrlKey = "login_url";
     public const string ApiVersionKey = "api_version";
+    public const string AccessTokenKey = "access_token";
+    public const string RefreshTokenKey = "refresh_token";
+    public const string InstanceUrlKey = "instance_url";
+    public const string RedirectUriKey = "redirect_uri";
+    public const string OAuthStateKey = "oauth_state";
+    public const string OAuthScopeKey = "oauth_scope";
+    public const string OAuthCodeVerifierKey = "oauth_code_verifier";
+    public const string AuthenticationFailureMessage =
+        "Salesforce authentication failed. Check the connected app client ID/secret, username, password, security token, and login URL, then save the credentials again.";
+    public const string MissingConnectedAppConfigMessage =
+        "Salesforce OAuth is not configured. Configure the Connected App Client ID and Client Secret in Aspire parameters (salesforce-client-id and salesforce-client-secret) or save them in the Salesforce credentials form, then try Login via Salesforce again.";
 
     public static async Task<SalesforceApiClient> CreateApiClientAsync(
         IPackConfigStore store,
@@ -29,30 +45,148 @@ public static class SalesforceClientFactory
 
     public static async Task<ForceClient> CreateForceClientAsync(IReadOnlyDictionary<string, string> values)
     {
+        var apiVersion = NormalizeApiVersion(Optional(values, ApiVersionKey, DefaultApiVersion));
+
+        if (HasOAuthCredential(values))
+            return await CreateOAuthForceClientAsync(values, apiVersion).ConfigureAwait(false);
+
         var clientId = Required(values, ClientIdKey);
         var clientSecret = Required(values, ClientSecretKey);
         var username = Required(values, UsernameKey);
         var password = Required(values, PasswordKey);
         var passwordWithToken = password + Optional(values, SecurityTokenKey);
         var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
-        var apiVersion = NormalizeApiVersion(Optional(values, ApiVersionKey, DefaultApiVersion));
+        var tokenEndpoint = TokenEndpoint(loginUrl);
 
-        using var auth = new AuthenticationClient(apiVersion);
-        await auth.UsernamePasswordAsync(
-            clientId,
-            clientSecret,
-            username,
-            passwordWithToken,
-            TokenEndpoint(loginUrl)).ConfigureAwait(false);
+        var token = await RequestTokenAsync(tokenEndpoint, new Dictionary<string, string>
+            {
+                ["grant_type"] = "password",
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret,
+                ["username"] = username,
+                ["password"] = passwordWithToken
+            })
+            .ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.InstanceUrl))
+        {
+            throw new InvalidOperationException(
+                "Salesforce authentication response did not include access_token and instance_url.");
+        }
 
-        return new ForceClient(auth.InstanceUrl, auth.AccessToken, auth.ApiVersion);
+        return new ForceClient(token.InstanceUrl, token.AccessToken, apiVersion);
+    }
+
+    public static bool HasUsableCredential(IReadOnlyDictionary<string, string> values) =>
+        HasOAuthCredential(values) || HasPasswordCredential(values);
+
+    public static bool HasPasswordCredential(IReadOnlyDictionary<string, string> values) =>
+        HasValue(values, ClientIdKey) &&
+        HasValue(values, ClientSecretKey) &&
+        HasValue(values, UsernameKey) &&
+        HasValue(values, PasswordKey);
+
+    public static bool HasOAuthCredential(IReadOnlyDictionary<string, string> values) =>
+        (HasValue(values, AccessTokenKey) && HasValue(values, InstanceUrlKey)) ||
+        (HasValue(values, RefreshTokenKey) && HasValue(values, ClientIdKey) && HasValue(values, ClientSecretKey));
+
+    public static bool HasConnectedAppConfig(IReadOnlyDictionary<string, string> values) =>
+        HasValue(values, ClientIdKey) && HasValue(values, ClientSecretKey);
+
+    public static string CreateAuthorizationUrl(
+        IReadOnlyDictionary<string, string> values,
+        string redirectUri,
+        string state,
+        string? codeChallenge = null)
+    {
+        RequireConnectedAppConfig(values);
+        var clientId = Required(values, ClientIdKey);
+        var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
+        var scope = Optional(values, OAuthScopeKey, DefaultOAuthScope);
+
+        var query = new Dictionary<string, string>
+        {
+            ["response_type"] = "code",
+            ["client_id"] = clientId,
+            ["redirect_uri"] = string.IsNullOrWhiteSpace(redirectUri) ? DefaultRedirectUri : redirectUri,
+            ["scope"] = scope,
+            ["state"] = state
+        };
+        if (!string.IsNullOrWhiteSpace(codeChallenge))
+        {
+            query["code_challenge"] = codeChallenge;
+            query["code_challenge_method"] = "S256";
+        }
+
+        return AuthorizationEndpoint(loginUrl) + "?" + QueryString(query);
+    }
+
+    public static async Task<IReadOnlyDictionary<string, string>> ExchangeAuthorizationCodeAsync(
+        IReadOnlyDictionary<string, string> values,
+        string code,
+        string redirectUri)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            throw new InvalidOperationException("Salesforce authorization callback did not include a code.");
+
+        var clientId = Required(values, ClientIdKey);
+        var clientSecret = Required(values, ClientSecretKey);
+        var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
+        var effectiveRedirectUri = string.IsNullOrWhiteSpace(redirectUri)
+            ? Optional(values, RedirectUriKey, DefaultRedirectUri)
+            : redirectUri;
+
+        var form = new Dictionary<string, string>
+            {
+                ["grant_type"] = "authorization_code",
+                ["code"] = code,
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret,
+                ["redirect_uri"] = effectiveRedirectUri
+            };
+        if (values.TryGetValue(OAuthCodeVerifierKey, out var codeVerifier) &&
+            !string.IsNullOrWhiteSpace(codeVerifier))
+        {
+            form["code_verifier"] = codeVerifier.Trim();
+        }
+
+        var token = await RequestTokenAsync(TokenEndpoint(loginUrl), form)
+            .ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.InstanceUrl))
+        {
+            throw new InvalidOperationException(
+                "Salesforce authorization response did not include access_token and instance_url.");
+        }
+
+        var result = new Dictionary<string, string>
+        {
+            [AccessTokenKey] = token.AccessToken,
+            [InstanceUrlKey] = token.InstanceUrl,
+            [RedirectUriKey] = effectiveRedirectUri
+        };
+        if (!string.IsNullOrWhiteSpace(token.RefreshToken))
+            result[RefreshTokenKey] = token.RefreshToken;
+        if (!string.IsNullOrWhiteSpace(token.IssuedAt))
+            result["issued_at"] = token.IssuedAt;
+        if (!string.IsNullOrWhiteSpace(token.Scope))
+            result[OAuthScopeKey] = token.Scope;
+
+        return result;
+    }
+
+    public static string AuthorizationEndpoint(string loginUrlOrEndpoint)
+    {
+        var value = NormalizeLoginUrlOrEndpoint(loginUrlOrEndpoint);
+
+        if (value.EndsWith("/services/oauth2/authorize", StringComparison.OrdinalIgnoreCase))
+            return value;
+
+        return value.TrimEnd('/') + "/services/oauth2/authorize";
     }
 
     public static string TokenEndpoint(string loginUrlOrEndpoint)
     {
-        var value = string.IsNullOrWhiteSpace(loginUrlOrEndpoint)
-            ? DefaultLoginUrl
-            : loginUrlOrEndpoint.Trim();
+        var value = NormalizeLoginUrlOrEndpoint(loginUrlOrEndpoint);
 
         if (value.EndsWith("/services/oauth2/token", StringComparison.OrdinalIgnoreCase))
             return value;
@@ -60,10 +194,42 @@ public static class SalesforceClientFactory
         return value.TrimEnd('/') + "/services/oauth2/token";
     }
 
+    public static string CreatePkceCodeVerifier() =>
+        Base64Url(RandomNumberGenerator.GetBytes(32));
+
+    public static string CreatePkceCodeChallenge(string codeVerifier)
+    {
+        if (string.IsNullOrWhiteSpace(codeVerifier))
+            throw new ArgumentException("PKCE code verifier is required.", nameof(codeVerifier));
+
+        return Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier.Trim())));
+    }
+
     private static string NormalizeApiVersion(string value)
     {
         var trimmed = value.Trim();
         return trimmed.StartsWith('v') ? trimmed : "v" + trimmed;
+    }
+
+    private static string NormalizeLoginUrlOrEndpoint(string loginUrlOrEndpoint)
+    {
+        if (string.IsNullOrWhiteSpace(loginUrlOrEndpoint))
+            return DefaultLoginUrl;
+
+        var value = loginUrlOrEndpoint.Trim();
+        if (value.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            return value;
+        }
+
+        if (value.StartsWith("//", StringComparison.Ordinal))
+            return "https:" + value;
+
+        if (value.StartsWith("/", StringComparison.Ordinal))
+            return DefaultLoginUrl.TrimEnd('/') + value;
+
+        return "https://" + value;
     }
 
     private static string Required(IReadOnlyDictionary<string, string> values, string key)
@@ -83,4 +249,149 @@ public static class SalesforceClientFactory
         values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value.Trim()
             : fallback;
+
+    private static async Task<ForceClient> CreateOAuthForceClientAsync(
+        IReadOnlyDictionary<string, string> values,
+        string apiVersion)
+    {
+        if (HasValue(values, RefreshTokenKey) && HasConnectedAppConfig(values))
+        {
+            var clientId = Required(values, ClientIdKey);
+            var clientSecret = Required(values, ClientSecretKey);
+            var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
+            var token = await RequestTokenAsync(TokenEndpoint(loginUrl), new Dictionary<string, string>
+                {
+                    ["grant_type"] = "refresh_token",
+                    ["refresh_token"] = Required(values, RefreshTokenKey),
+                    ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret
+                })
+                .ConfigureAwait(false);
+
+            var instanceUrl = string.IsNullOrWhiteSpace(token.InstanceUrl)
+                ? Optional(values, InstanceUrlKey)
+                : token.InstanceUrl;
+            if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(instanceUrl))
+            {
+                throw new InvalidOperationException(
+                    "Salesforce refresh-token response did not include access_token and instance_url.");
+            }
+
+            return new ForceClient(instanceUrl, token.AccessToken, apiVersion);
+        }
+
+        if (HasValue(values, AccessTokenKey) && HasValue(values, InstanceUrlKey))
+            return new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion);
+
+        if (HasValue(values, RefreshTokenKey))
+            RequireConnectedAppConfig(values);
+
+        return new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion);
+    }
+
+    private static void RequireConnectedAppConfig(IReadOnlyDictionary<string, string> values)
+    {
+        if (!HasConnectedAppConfig(values))
+            throw new InvalidOperationException(MissingConnectedAppConfigMessage);
+    }
+
+    private static async Task<SalesforceTokenResponse> RequestTokenAsync(
+        string tokenEndpoint,
+        IReadOnlyDictionary<string, string> form)
+    {
+        using var http = new HttpClient();
+        using var content = new FormUrlEncodedContent(form);
+
+        HttpResponseMessage response;
+        string responseBody;
+        try
+        {
+            response = await http.PostAsync(tokenEndpoint, content).ConfigureAwait(false);
+            responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException(AuthenticationFailureMessage + " " + ex.Message, ex);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(AuthenticationFailureMessage + " " + SalesforceErrorDetails(responseBody));
+
+            return ParseTokenResponse(responseBody);
+        }
+    }
+
+    private static SalesforceTokenResponse ParseTokenResponse(string responseBody)
+    {
+        JsonElement root;
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            root = document.RootElement.Clone();
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Salesforce authentication response was not valid JSON.", ex);
+        }
+
+        return new SalesforceTokenResponse(
+            GetString(root, "access_token"),
+            GetString(root, "instance_url"),
+            GetString(root, "refresh_token"),
+            GetString(root, "issued_at"),
+            GetString(root, "scope"));
+    }
+
+    private static string SalesforceErrorDetails(string responseBody)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            var root = document.RootElement;
+            var error = GetString(root, "error");
+            var description = GetString(root, "error_description");
+            if (!string.IsNullOrWhiteSpace(error) && !string.IsNullOrWhiteSpace(description))
+                return $"Salesforce returned {error}: {description}";
+            if (!string.IsNullOrWhiteSpace(error))
+                return $"Salesforce returned {error}.";
+            if (!string.IsNullOrWhiteSpace(description))
+                return $"Salesforce returned: {description}";
+        }
+        catch (JsonException)
+        {
+            // Fall through to sanitized raw body.
+        }
+
+        var trimmed = responseBody.Trim();
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? "Salesforce returned no error details."
+            : "Salesforce returned: " + trimmed;
+    }
+
+    private static string GetString(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var element) && element.ValueKind == JsonValueKind.String
+            ? element.GetString() ?? string.Empty
+            : string.Empty;
+
+    private static bool HasValue(IReadOnlyDictionary<string, string> values, string key) =>
+        values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
+
+    private static string QueryString(IReadOnlyDictionary<string, string> values) =>
+        string.Join("&", values.Select(kv =>
+            Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(kv.Value)));
+
+    private static string Base64Url(byte[] bytes) =>
+        Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+    private sealed record SalesforceTokenResponse(
+        string AccessToken,
+        string InstanceUrl,
+        string RefreshToken,
+        string IssuedAt,
+        string Scope);
 }

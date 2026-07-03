@@ -17,13 +17,53 @@ internal static class SalesforceAuthSurfaces
         new(SalesforceClientFactory.ApiVersionKey, "API Version (optional, e.g. v60.0)", PackConfigFieldKind.Text)
     ];
 
-    public static UiSurface CredentialForm(string emitter, string? sessionId = null)
+    public static UiSurface CredentialForm(string emitter, string? sessionId = null, string? message = null)
     {
         var surface = ConfigFormSurface.Build(SalesforceClientFactory.PackName, Fields, emitter);
+        var tree = AssertTree(surface.Props["tree"]);
+        var content = tree.Children?.FirstOrDefault();
+        if (content is not null)
+        {
+            var children = new List<UiWidgetTree>();
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                children.Add(new(UiKitVocabulary.Text, new Dictionary<string, object?>
+                {
+                    ["text"] = message.Trim(),
+                    ["role"] = "alert"
+                }));
+            }
+
+            var oauthButtonProps = new Dictionary<string, object?>
+            {
+                ["label"] = "Login via Salesforce",
+                ["icon"] = "salesforce",
+                ["eventName"] = SalesforceSignals.AuthRequested,
+                ["synapseType"] = SalesforceSignals.AuthRequested,
+                ["pack"] = SalesforceClientFactory.PackName,
+                ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath
+            };
+            if (!string.IsNullOrWhiteSpace(sessionId))
+                oauthButtonProps["sessionId"] = sessionId;
+
+            children.Add(new(UiKitVocabulary.Button, oauthButtonProps));
+            children.Add(new(UiKitVocabulary.Divider, new Dictionary<string, object?>()));
+            children.AddRange(content.Children ?? []);
+
+            tree = tree with
+            {
+                Children =
+                [
+                    content with { Children = children }
+                ]
+            };
+        }
+
         var props = new Dictionary<string, object?>(surface.Props)
         {
             [UiSurfaceKeys.Title] = "Salesforce credentials",
-            ["role"] = "assistant"
+            ["role"] = "assistant",
+            ["tree"] = tree
         };
 
         if (!string.IsNullOrWhiteSpace(sessionId))
@@ -31,4 +71,8 @@ internal static class SalesforceAuthSurfaces
 
         return surface with { Props = props };
     }
+
+    private static UiWidgetTree AssertTree(object? value) =>
+        value as UiWidgetTree
+        ?? throw new InvalidOperationException("Salesforce credential form did not contain a widget tree.");
 }

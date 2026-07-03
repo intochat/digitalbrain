@@ -30,6 +30,8 @@ public static class GoogleSignals
 public static class SalesforceSignals
 {
     public const string AuthRequested = "SalesforceAuthRequested";
+    public const string AuthUrl = "SalesforceAuthUrl";
+    public const string AuthCompleted = "SalesforceAuthCompleted";
     public const string QueryRequested = "SalesforceQueryRequested";
     public const string QueryResultsReady = "SalesforceQueryResultsReady";
 }

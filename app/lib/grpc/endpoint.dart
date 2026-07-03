@@ -57,6 +57,23 @@ import 'package:digitalbrain_flutter/telemetry/platform_env.dart';
   );
 }
 
+String resolveKernelCallbackUrl(String path) {
+  final normalizedPath = path.startsWith('/') ? path : '/$path';
+  try {
+    final (host, port, secure) = resolveKernelUploadEndpoint();
+    return Uri(
+      scheme: secure ? 'https' : 'http',
+      host: host,
+      port: port,
+      path: normalizedPath,
+    ).toString();
+  } catch (_) {
+    return Uri.parse(
+      'http://localhost:8081',
+    ).replace(path: normalizedPath).toString();
+  }
+}
+
 String? resolveAspireKernelUrl({
   String? grpcUrl,
   String? httpsUrl,

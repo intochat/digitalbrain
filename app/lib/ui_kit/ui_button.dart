@@ -12,6 +12,7 @@ class UiKitButton extends StatelessWidget {
   final String eventName;
   final String synapseType;
   final String icon;
+  final Map<String, Object?> eventProps;
   final RemoteEventHandler onEvent;
 
   const UiKitButton({
@@ -22,6 +23,7 @@ class UiKitButton extends StatelessWidget {
     required this.onEvent,
     this.synapseType = 'ExperienceStep',
     this.icon = '',
+    this.eventProps = const {},
     super.key,
   });
 
@@ -34,9 +36,10 @@ class UiKitButton extends StatelessWidget {
         onEvent('press', {
           'synapseType': synapseType,
           'props': {
-            'pack': pack,
-            'experienceId': experienceId,
-            'eventName': eventName,
+            ...eventProps,
+            if (pack.isNotEmpty) 'pack': pack,
+            if (experienceId.isNotEmpty) 'experienceId': experienceId,
+            if (eventName.isNotEmpty) 'eventName': eventName,
             ...capturedValues,
           },
         });

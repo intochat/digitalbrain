@@ -77,6 +77,7 @@ Widget buildUiNode(
         experienceId: s('experienceId'),
         eventName: s('eventName'),
         icon: s('icon'),
+        eventProps: _buttonEventProps(props),
         // synapseType lets config-form buttons emit ConfigurationProvided instead of the default ExperienceStep.
         synapseType: props['synapseType']?.toString().isNotEmpty == true
             ? props['synapseType']!.toString()
@@ -222,4 +223,12 @@ Widget buildUiNode(
     default:
       return const SizedBox.shrink();
   }
+}
+
+Map<String, Object?> _buttonEventProps(Map<String, Object?> props) {
+  const visualKeys = {'label', 'icon', 'synapseType'};
+  return {
+    for (final entry in props.entries)
+      if (!visualKeys.contains(entry.key)) entry.key: entry.value,
+  };
 }

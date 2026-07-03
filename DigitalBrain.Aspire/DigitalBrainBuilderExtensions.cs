@@ -41,6 +41,8 @@ public sealed class DigitalBrainContext
 
 public static class DigitalBrainBuilderExtensions
 {
+    public const int DefaultKernelWebPort = 51014;
+
     public static DigitalBrainContext AddDigitalBrain(
         this IDistributedApplicationBuilder builder,
         [ResourceName] string name = "digitalbrain",
@@ -135,7 +137,12 @@ public static class DigitalBrainBuilderExtensions
             .WithReference(ctx.JournalBlobs)
             .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm)
             .WithEndpoint(name: "grpc", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
-            .WithEndpoint(name: "web", scheme: "http", env: "DIGITALBRAIN_WEB_PORT", isProxied: true)
+            .WithEndpoint(
+                name: "web",
+                scheme: "http",
+                port: KernelWebPort(ctx.ApplicationBuilder),
+                env: "DIGITALBRAIN_WEB_PORT",
+                isProxied: true)
             .WithExternalHttpEndpoints()
             .WithReplicas(ctx.KernelReplicas);
 
@@ -164,6 +171,16 @@ public static class DigitalBrainBuilderExtensions
         }
 
         return kernel;
+    }
+
+    public static int KernelWebPort(IDistributedApplicationBuilder builder)
+    {
+        var configured = builder.Configuration["DigitalBrain:Kernel:WebPort"]
+            ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_KERNEL_WEB_PORT");
+
+        return int.TryParse(configured, out var port) && port > 0
+            ? port
+            : DefaultKernelWebPort;
     }
 
     /// <summary>

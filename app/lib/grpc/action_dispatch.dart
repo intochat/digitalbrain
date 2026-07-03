@@ -1,11 +1,13 @@
 import 'dart:convert';
 
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
+import 'package:digitalbrain_flutter/grpc/endpoint.dart';
 
 const _metaKeys = {
   'actionId',
   'label',
   'synapseType',
+  'type',
   'target',
   'targetSurfaceKind',
   'path',
@@ -17,7 +19,10 @@ const _metaKeys = {
 /// actions must travel as a unary `Send`, never the bidirectional `EngageUiSession`.
 /// The unary `Send` handlers read action props at the TOP LEVEL of the payload, so
 /// the flattened props become the payload directly.
-gw.SynapseEnvelope? buildActionEnvelope(String name, Map<String, Object?> args) {
+gw.SynapseEnvelope? buildActionEnvelope(
+  String name,
+  Map<String, Object?> args,
+) {
   if (name != 'press' && name != 'select' && name != 'action') return null;
 
   final rawAction = args['action'];
@@ -34,12 +39,48 @@ gw.SynapseEnvelope? buildActionEnvelope(String name, Map<String, Object?> args) 
             if (!_metaKeys.contains(entry.key)) entry.key: entry.value,
         };
 
+  final resolvedProps = Map<String, Object?>.of(props);
+  final callbackPath = resolvedProps['callbackPath']?.toString().trim();
+  final redirectUri = resolvedProps['redirect_uri']?.toString().trim();
+  if (callbackPath != null &&
+      callbackPath.isNotEmpty &&
+      (redirectUri == null || redirectUri.isEmpty)) {
+    resolvedProps['redirect_uri'] = resolveKernelCallbackUrl(callbackPath);
+  }
+
   final stringProps = <String, String>{
-    for (final entry in props.entries) entry.key: entry.value?.toString() ?? '',
+    for (final entry in resolvedProps.entries)
+      entry.key: entry.value?.toString() ?? '',
   };
 
   return gw.SynapseEnvelope()
     ..correlationId = (action['actionId'] as String?) ?? synapseType
     ..typeName = synapseType
     ..payload = utf8.encode(jsonEncode(stringProps));
+}
+
+/// Builds the unary `Send` envelope for a floating-panel event.
+///
+/// Panel bodies can emit the same action-shaped events as the shell/chat UI, but
+/// some older panel surfaces still use a plain `type` property. Prefer the
+/// shared action dispatcher so nested `props` are flattened consistently, then
+/// fall back to the legacy typed payload shape for those older surfaces.
+gw.SynapseEnvelope? buildPanelEventEnvelope(
+  String panelId,
+  String name,
+  Map<String, Object?> args,
+) {
+  final actionEnvelope = buildActionEnvelope(name, args);
+  if (actionEnvelope != null) return actionEnvelope;
+
+  var type = args['type']?.toString();
+  if (type == null || type.isEmpty) return null;
+
+  if (type == 'cancelTask') type = 'CancelTask';
+
+  final payload = Map<String, Object?>.of(args)..remove('type');
+  return gw.SynapseEnvelope()
+    ..correlationId = panelId
+    ..typeName = type
+    ..payload = utf8.encode(jsonEncode(payload));
 }

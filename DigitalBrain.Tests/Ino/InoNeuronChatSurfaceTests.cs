@@ -84,6 +84,12 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
             .ToList();
         Assert.Contains(fields, field => Equals(field["name"], SalesforceClientFactory.ClientIdKey));
         Assert.Contains(fields, field => Equals(field["name"], SalesforceClientFactory.PasswordKey) && Equals(field["secret"], true));
+
+        var button = FindNodes(tree).Single(node =>
+            node.Type == UiKitVocabulary.Button &&
+            Equals(node.Props["synapseType"], SalesforceSignals.AuthRequested));
+        Assert.Equal("Login via Salesforce", button.Props["label"]);
+        Assert.Equal(SalesforceClientFactory.DefaultCallbackPath, button.Props["callbackPath"]);
     }
 
     private static UiWidgetTree? FindNode(UiWidgetTree tree, string type)
@@ -220,6 +226,86 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
                 Collect(child);
         }
     }
+}
+
+public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBase
+{
+    protected override void ConfigureSilo(ISiloBuilder builder) =>
+        builder.ConfigureServices(services =>
+        {
+            services.AddPackConfigStore(blobsForKeyRing: null);
+            services.AddSingleton<ISalesforceApiClient, FailingSalesforceApiClient>();
+        });
+
+    [Fact]
+    public async Task SalesforceIntent_WithInvalidCredential_Renders_Clear_Error_And_Credential_Form()
+    {
+        var config = Grain<ISalesforceConfigWriter>("salesforce-config-writer");
+        await config.StoreSalesforceCredentialAsync();
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("Show my salesforce accounts", "session-salesforce-invalid"));
+
+        var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
+        Assert.Contains("Salesforce authentication failed", response.Response);
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
+        Assert.Contains(surfaces, surface =>
+            surface.Kind == UiSurface.WidgetTreeKind &&
+            Equals(surface.Props["sessionId"], "session-salesforce-invalid") &&
+            surface.Props.TryGetValue("tree", out var tree) &&
+            tree is UiWidgetTree widgetTree &&
+            FlattenText(widgetTree).Contains("Salesforce authentication failed"));
+        Assert.Contains(surfaces, surface =>
+            surface.Kind == ConfigFormSurface.Kind &&
+            Equals(surface.Props["pack"], SalesforceClientFactory.PackName) &&
+            Equals(surface.Props["sessionId"], "session-salesforce-invalid"));
+    }
+
+    private static string FlattenText(UiWidgetTree tree)
+    {
+        var values = new List<string>();
+        Collect(tree);
+        return string.Join("\n", values);
+
+        void Collect(UiWidgetTree node)
+        {
+            if (node.Props.TryGetValue("text", out var text) && text is not null)
+                values.Add(text.ToString()!);
+
+            foreach (var child in node.Children ?? [])
+                Collect(child);
+        }
+    }
+}
+
+public interface ISalesforceConfigWriter : INeuron
+{
+    Task StoreSalesforceCredentialAsync();
+}
+
+[GrainType("digitalbrain.test.salesforce-config-writer")]
+public sealed class SalesforceConfigWriter(Microsoft.Extensions.Logging.ILogger<SalesforceConfigWriter> logger, NeuronJournals journals)
+    : Neuron(logger, journals), ISalesforceConfigWriter
+{
+    public Task StoreSalesforceCredentialAsync() =>
+        ServiceProvider.GetRequiredService<IPackConfigStore>().SetAsync("default", SalesforceClientFactory.PackName, new Dictionary<string, string>
+        {
+            [SalesforceClientFactory.ClientIdKey] = "client-id",
+            [SalesforceClientFactory.ClientSecretKey] = "client-secret",
+            [SalesforceClientFactory.UsernameKey] = "user@example.com",
+            [SalesforceClientFactory.PasswordKey] = "password",
+        });
+}
+
+internal sealed class FailingSalesforceApiClient : ISalesforceApiClient
+{
+    public Task<string[]> QueryAsync(string soql, CancellationToken ct) =>
+        throw new InvalidOperationException(SalesforceClientFactory.AuthenticationFailureMessage);
+
+    public Task<string[]> ListAccountsAsync(int maxResults, CancellationToken ct) =>
+        throw new InvalidOperationException(SalesforceClientFactory.AuthenticationFailureMessage);
 }
 
 public interface IGoogleConfigWriter : INeuron

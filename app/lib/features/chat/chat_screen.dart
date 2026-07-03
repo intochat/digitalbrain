@@ -102,7 +102,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .watchHomeFeed(gw.WatchHomeFeedRequest())
           .listen(_onCard, onError: _onFeedError);
       final authSub = client
-          .watchSynapses(googleAuthUrlWatchRequest())
+          .watchSynapses(authUrlWatchRequest())
           .listen(_onAuthSignal, onError: _onAuthSignalError);
       setState(() {
         _client = client;
@@ -116,17 +116,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onAuthSignal(gw.SynapseEnvelope envelope) {
-    openGoogleAuthUrlFromEnvelope(envelope).then(
-      (opened) {
-        if (!opened) debugPrint('Ignored malformed Google auth URL signal.');
-      },
-      onError: (Object error) =>
-          debugPrint('Google auth URL launch failed: $error'),
-    );
+    openAuthUrlFromEnvelope(envelope).then((opened) {
+      if (!opened) debugPrint('Ignored malformed auth URL signal.');
+    }, onError: (Object error) => debugPrint('Auth URL launch failed: $error'));
   }
 
   void _onAuthSignalError(Object error) {
-    debugPrint('Google auth signal stream failed: $error');
+    debugPrint('Auth signal stream failed: $error');
   }
 
   void _onFeedError(Object error) {
