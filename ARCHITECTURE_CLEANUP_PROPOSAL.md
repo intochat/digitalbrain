@@ -16,6 +16,7 @@ Done:
 - Updated CI and deploy to test `Brain.slnx` with `-p:SkipFlutterBuild=true`.
 - Moved concrete marketplace seeds from `DigitalBrain.Core` into `DigitalBrain.SeedPacks`.
 - Started Phase 2 by moving executable pack contracts, pack config schema/surface helper, trust helpers, and `KitExperience`/`UiExperience` authoring helpers from `DigitalBrain.Core` into `DigitalBrain.Pack.Contracts`.
+- Continued Phase 2 by moving `NeuroPack` marketplace and installed-bundle UI projection helpers from `DigitalBrain.Core` into `DigitalBrain.Marketplace.Contracts`.
 - Added architecture guard tests that keep `DigitalBrain.Core` free of runtime, host, integration, and pack-contract assembly references.
 - Renamed product-level Silo restart/deploy language to Kernel while preserving Orleans technical terms.
 - Renamed `DigitalBrain.Tests/UnitTest1.cs` to `DigitalBrain.Tests/Kernel/NeuronTests.cs`.
@@ -25,7 +26,7 @@ Still left:
 - Continue splitting `DigitalBrain.Core` into smaller primitive/runtime/pack/UI/system contract packages.
 - Split `DigitalBrain.Kernel` into runtime modules and make the host a composition root.
 - Make integration project names match ownership boundaries, especially interface-only projects.
-- Move remaining marketplace projection, demo/sample UI leakage, and UI schema out of Core and gateway paths.
+- Move remaining marketplace contracts, demo/sample UI leakage, and UI schema out of Core and gateway paths.
 - Split the central test project into explicit feedback-speed lanes.
 - Expand deployment beyond the current one-kernel-image MVP if Telegram transport and MCP need independent images.
 - Add architecture guard tests for module dependency direction.
@@ -551,7 +552,7 @@ Tasks:
 
 1. Move executable pack contracts, pack config, and pack trust helpers into `DigitalBrain.Pack.Contracts`. Current slice done.
 2. Move UI schema from `DigitalBrain.Core` into `DigitalBrain.Ui.Contracts`.
-3. Move remaining marketplace projection contracts into `DigitalBrain.Pack.Contracts` once Core UI callers are split.
+3. Continue moving remaining marketplace contracts out of Core now that `NeuroPack` UI projections live in `DigitalBrain.Marketplace.Contracts`.
 4. Move demo/test contracts out of Core.
 5. Move seed pack code out of Core.
 6. Keep compatibility type-forwarding only if packaging requires it.

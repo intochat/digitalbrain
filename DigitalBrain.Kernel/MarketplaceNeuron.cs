@@ -3,6 +3,7 @@ using DigitalBrain.Core.Economics;
 using DigitalBrain.Core.Trust;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Marketplace.Contracts;
 using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel;
 
@@ -36,7 +37,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         var published = _publishedCache!.Values.ToList();
-        var listSurface = UiSurfaceLiveData.MarketplaceListFromPacks(published, published);
+        var listSurface = MarketplaceUiSurfaces.MarketplaceListFromPacks(published, published);
         await FireAsync(listSurface);
         if (bus != null)
         {
@@ -148,7 +149,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 
         var pub = new List<NeuroPack> { pack };
         var inst = new List<NeuroPack> { pack };
-        var refInst = UiSurfaceLiveData.InstalledBundlesFromPacks(pub, inst, cmd.BuyerId, cmd.SessionId);
+        var refInst = MarketplaceUiSurfaces.InstalledBundlesFromPacks(pub, inst, cmd.BuyerId, cmd.SessionId);
         await FireAsync(refInst);
         var bus2 = ServiceProvider.GetService<HomeFeedBus>();
         if (bus2 != null)
@@ -180,7 +181,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
     public async Task HandleAsync(FilterMarketplace cmd)
     {
         var published = GetPublishedPacks();
-        var surface = UiSurfaceLiveData.MarketplaceTreeSurface(
+        var surface = MarketplaceUiSurfaces.MarketplaceTreeSurface(
             published, Array.Empty<NeuroPack>(), cmd.Tier, cmd.Channel, Self.Value);
         await FireAsync(surface);
 
