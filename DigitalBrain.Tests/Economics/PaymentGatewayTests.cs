@@ -1,6 +1,8 @@
 using System.Text.Json;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Economics;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Economics;
 
 namespace DigitalBrain.Tests.Economics;
 

@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;

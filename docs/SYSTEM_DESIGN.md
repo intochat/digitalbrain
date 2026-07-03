@@ -77,14 +77,13 @@ The stale docs at `docs/superpowers/specs/2026-06-30-telegram-llm-experience-des
 
 ### 1.3 Project graph
 
-Solution `Brain.slnx` lists 29 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
+Solution `Brain.slnx` lists 28 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
 
 | Project | Purpose |
 |---|---|
 | `DigitalBrain.Core` | Pure protocol layer — `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, `IPackBehavior`, checkpoint/trust/UI-surface contracts, marketplace seeds. Only depends on `Microsoft.Orleans.Core.Abstractions`/`Serialization`. Kept dependency-light so `Mcp.Tools` can reference only this. Zero references to any specific integration/vendor type (Google, Gmail, Winget, Git, Roslyn, Flutter UI, Telegram chat, Context grain, …) — only generic `*Signals` string-constant registries, which are name registries, not type contracts. |
 | `DigitalBrain.Kernel` | The Orleans runtime (formerly "Silo"). `Microsoft.NET.Sdk.Web`, container-packaged. Subfolders: `Auth, Awesome, Company, Config, Context, Economics, Foundry, Gateway, Generated, Ino, Kernel, Llm, Marketplace, Protos, Sandbox, Sdk, Ui`. Owns embodiment (Foundry/Sandbox), LLM (Microsoft.Extensions.AI + Ollama/Azure OpenAI), Economics (Stripe + ECDSA licenses), Context (Qdrant), server-driven UI (`Ui`/`Protos`, bidirectional gRPC `UiGateway`), HA self-update. References every isolated ino project below for their interfaces/logic, and hosts the concrete `Neuron`-derived grain classes for Windows/Developer/Context/UiKit/Telegram.Channel/Google (see §1.3a). |
 | `DigitalBrain.Aspire` | Hosting SDK: `AddDigitalBrain`, `WireKernelSilo`, `WithMcp`, `WithOrleansDashboard`, `AddFlutterClient`, `WireTelegramTransport` — all in `DigitalBrainBuilderExtensions.cs`. Not itself an Aspire project resource (`IsAspireProjectResource=false`). |
-| `DigitalBrain.Gateway` | Thin/legacy HTTP entry point; Orleans client + clustering only. Gated behind `DIGITALBRAIN_ENABLE_DIAGNOSTIC_GATEWAY` in the AppHost — the kernel hosts the product gRPC/surface gateway by default now. |
 | `DigitalBrain.Mcp` / `DigitalBrain.Mcp.Tools` | MCP server (`Mcp`, an `Exe`, co-hosted on the kernel's Kestrel) exposing neuron tools defined in `Mcp.Tools` (`DigitalBrainMutationTools.cs`, `DigitalBrainReadTools.cs`) — `Mcp.Tools` references only `Core`. |
 | `DigitalBrain.Telegram` | Pure shared library: transport-internal synapses (`TelegramMessageReceived`, `TelegramReplyRequested` — explicitly *not* journaled through the kernel) and `TelegramResponderNeuron`, a pure `IPackBehavior` pack. Fully self-contained — never derives from `Neuron`. |
 | `DigitalBrain.Telegram.Transport` | The actual ASP.NET Core webhook host — `/webhook` POST ingress, `/health`, gRPC-clients the kernel gateway. Deployed as its own container app (see 1.6). |
@@ -171,8 +170,6 @@ Flutter client and MCP/Telegram are conditional:
   client + LLM.
 - **Telegram**: gated by env `DIGITALBRAIN_ENABLE_TELEGRAM` — adds `DigitalBrain.Telegram.Transport`
   as `telegram-bot`, wired via `ctx.WireTelegramTransport(...)`.
-- **Legacy diagnostic gateway**: gated by `DIGITALBRAIN_ENABLE_DIAGNOSTIC_GATEWAY`, off by default.
-
 All six extension methods (`AddDigitalBrain`, `WireKernelSilo`, `WithMcp`, `WithOrleansDashboard`,
 `AddFlutterClient`, `WireTelegramTransport`) live in `DigitalBrainBuilderExtensions.cs` and are real,
 not aspirational.
@@ -363,7 +360,7 @@ for Orleans clustering/journal.
   QuickTest no longer built at all (`CS5001`, no source files left). All three were deleted rather than
   repaired. The supported fast local-dev path is `aspire run` from `brain/` (`NeuroOSPrototype.AppHost`),
   which already has an equivalent-or-better resource graph (kernel, default Windows Flutter client,
-  MCP, optional gateway/Telegram via env vars) than brain.cs ever reached.
+  MCP, optional Telegram via env vars) than brain.cs ever reached.
 - **A pre-existing E2E fixture bug is deferred, not fixed**: `CONTINUITY.md` documents that
   `DigitalBrainAppHostFixture.InitializeAsync` still waits on a resource literally named `"silo"` — a
   leftover from the Silo→Kernel rename — causing a 5-minute hang; the workaround is excluding that E2E

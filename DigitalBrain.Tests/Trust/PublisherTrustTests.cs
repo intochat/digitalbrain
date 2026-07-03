@@ -5,7 +5,7 @@ namespace DigitalBrain.Tests.Trust;
 
 public class PublisherTrustTests
 {
-    private static NeuroPack Pack(string code = "public class P : DigitalBrain.Core.IPackBehavior { public string Respond(string i) => i; }")
+    private static NeuroPack Pack(string code = "public class P : DigitalBrain.Core.Distribution.IPackBehavior { public string Respond(string i) => i; }")
         => new("p", "1.0.0", Code: code);
 
     [Fact]

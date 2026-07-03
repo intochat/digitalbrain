@@ -100,18 +100,12 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
         await App.ResourceNotifications.WaitForResourceHealthyAsync("kernel", startupCts.Token);
 
         // Browser nav target: the kernel "web" endpoint (static bundle + gRPC-Web).
-        // The standalone gateway remains an optional diagnostic resource for legacy smoke tests.
         string webUrl = "https://localhost:8080";
-        try { webUrl = App.GetEndpoint("kernel", "web").ToString(); }
-        catch
-        {
-            try { webUrl = App.GetEndpoint("gateway", "https").ToString(); }
-            catch { try { webUrl = App.GetEndpoint("gateway", "http").ToString(); } catch { } }
-        }
+        try { webUrl = App.GetEndpoint("kernel", "web").ToString(); } catch { }
         GatewayHttpsUrl = webUrl;
 
         // Native-gRPC target: the kernel "grpc" endpoint (Http2). Falls back to the web URL only
-        // if "grpc" is unavailable (legacy gateway smoke tests).
+        // if "grpc" is unavailable.
         string grpcUrl = webUrl;
         try { grpcUrl = App.GetEndpoint("kernel", "grpc").ToString(); } catch { }
         GrpcUrl = grpcUrl;

@@ -57,6 +57,7 @@ public sealed class SkillPackSynthesizer
 using System;
 using System.Collections.Generic;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 
 public sealed class {{className}} : IPackBehavior
 {

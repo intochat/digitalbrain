@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 

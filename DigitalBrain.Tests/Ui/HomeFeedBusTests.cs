@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core.Ui;
+using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Ui;
 

@@ -91,8 +91,8 @@ builder.Services.AddHttpClient<DigitalBrain.Kernel.Market.IMarketDataApiClient, 
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
-    .WithTools<DigitalBrain.Mcp.Tools.DigitalBrainReadTools>();
-builder.Services.AddSingleton<DigitalBrain.Mcp.Tools.DigitalBrainReadTools>();
+    .WithTools<DigitalBrain.Mcp.DigitalBrainReadTools>();
+builder.Services.AddSingleton<DigitalBrain.Mcp.DigitalBrainReadTools>();
 
 if (isAspireHosted)
 {

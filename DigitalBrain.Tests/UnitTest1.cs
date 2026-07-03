@@ -171,7 +171,7 @@ public class NeuronTests : NeuronTestBase
         // E2E: signed/unsigned ok in transition -> marketplace install -> embody via ALC -> use fires real IPackBehavior.Respond (not LLM fallback) -> PackEmission in journal.
         // Validates the keystone chain from the review gap.
         const string packCode = """
-            public sealed class Uppercaser : DigitalBrain.Core.IPackBehavior
+            public sealed class Uppercaser : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) => (input ?? string.Empty).ToUpperInvariant();
             }
@@ -368,7 +368,7 @@ public class NeuronTests : NeuronTestBase
     {
         var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();
         var code = """
-            public sealed class EchoPack : DigitalBrain.Core.IPackBehavior
+            public sealed class EchoPack : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) => "ECHO:" + input;
             }
@@ -395,7 +395,7 @@ public class NeuronTests : NeuronTestBase
     public async Task Installed_Pack_Handles_Typed_Synapse_And_Preserves_Causation()
     {
         const string code = """
-            public sealed class TypedDispatchPack : DigitalBrain.Core.IPackBehavior
+            public sealed class TypedDispatchPack : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) => "fallback:" + input;
 
@@ -407,7 +407,7 @@ public class NeuronTests : NeuronTestBase
                     var message = (DigitalBrain.Core.DemoMessageSynapse)synapse;
                     return new DigitalBrain.Core.Synapse[]
                     {
-                        new DigitalBrain.Core.PackEmission("spoofed-pack-name", message.Text, "typed:" + message.Text)
+                        new DigitalBrain.Core.Distribution.PackEmission("spoofed-pack-name", message.Text, "typed:" + message.Text)
                     };
                 }
             }
@@ -435,7 +435,7 @@ public class NeuronTests : NeuronTestBase
     public async Task Installed_Pack_Handles_Typed_Synapse_And_Emits_Journaled_UiSurface()
     {
         const string code = """
-            public sealed class SurfacePack : DigitalBrain.Core.IPackBehavior
+            public sealed class SurfacePack : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) => "fallback:" + input;
 

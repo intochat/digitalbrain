@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Foundry;
 using Microsoft.Extensions.AI;
 using Microsoft.CodeAnalysis;

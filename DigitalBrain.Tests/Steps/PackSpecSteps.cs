@@ -86,7 +86,7 @@ public sealed class PackSpecSteps : NeuronTestBase
     {
         "System.Net.Http.HttpClient" => """
             using System.Net.Http;
-            public sealed class NetProbe : DigitalBrain.Core.IPackBehavior
+            public sealed class NetProbe : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) { var c = new HttpClient(); return input; }
             }
@@ -98,7 +98,7 @@ public sealed class PackSpecSteps : NeuronTestBase
     public void GivenAPackSourceUsingCollectionsAndLinq() => _pendingSource = """
         using System.Collections.Generic;
         using System.Linq;
-        public sealed class LinqProbe : DigitalBrain.Core.IPackBehavior
+        public sealed class LinqProbe : DigitalBrain.Core.Distribution.IPackBehavior
         {
             public string Respond(string input) => new List<string> { input }.First();
         }

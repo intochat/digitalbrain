@@ -9,8 +9,7 @@ The web client lives at [digitalbrain.tech](https://digitalbrain.tech) and talks
 - `DigitalBrain.Core` — pure protocol: `INeuron`, `Synapse`, `IHandle<T>`, `UiSurface`/`UiWidgetTree`, `NeuronId`/`TaskId`, `IPackBehavior`, marketplace seeds.
 - `DigitalBrain.Kernel` — the runtime (Orleans + services): base `Neuron`, embodiment (`Foundry`/`PackAlcEmbodier`), LLM, economics (Stripe + ECDSA), context/memory (hybrid + Qdrant), server-driven UI (UiSurface emission + bidirectional `UiGateway`), self-update/HA rolling.
 - `DigitalBrain.Aspire` — hosting SDK (`AddDigitalBrain`, `WireKernelSilo`, `AddFlutterClient`...).
-- `NeuroOSPrototype.AppHost` — the Aspire model (3× kernel replicas, Ollama, Azurite, gateway, MCP, flutter-ui).
-- `DigitalBrain.Gateway` — ASP.NET entry + gRPC.
+- `NeuroOSPrototype.AppHost` — the Aspire model (3× kernel replicas, Ollama, Azurite, MCP, flutter-ui).
 - `DigitalBrain.Mcp(.Tools)` — internal MCP server (neuron tools).
 - Tests (Reqnroll BDD over real `TestCluster` + Aspire E2E).
 
@@ -79,7 +78,7 @@ flutter pub get
 flutter run -d chrome   # or windows
 ```
 
-Full stack (kernels + Ollama + gateway + flutter):
+Full stack (kernels + Ollama + MCP + flutter):
 ```sh
 aspire run
 ```

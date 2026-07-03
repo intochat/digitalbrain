@@ -1,5 +1,5 @@
 using System.Reflection;
-using DigitalBrain.Mcp.Tools;
+using DigitalBrain.Mcp;
 using ModelContextProtocol.Server;
 
 namespace DigitalBrain.Tests.Mcp;

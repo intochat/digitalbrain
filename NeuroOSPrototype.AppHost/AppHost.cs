@@ -54,15 +54,6 @@ if (IsEnabled("DIGITALBRAIN_ENABLE_TELEGRAM"))
     ctx.WireTelegramTransport(telegramTransport, kernel, telegramBotToken, internalServiceKey);
 }
 
-if (IsEnabled("DIGITALBRAIN_ENABLE_DIAGNOSTIC_GATEWAY"))
-{
-    // Optional legacy diagnostic gateway. The kernel hosts the product gRPC/surface gateway by default.
-    builder.AddProject<Projects.DigitalBrain_Gateway>("gateway")
-        .WithReference(ctx.OrleansClient)
-        .WithReference(ctx.ClusteringTable)
-        .WithExternalHttpEndpoints();
-}
-
 kernel.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
 kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 

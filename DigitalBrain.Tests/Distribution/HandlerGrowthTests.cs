@@ -10,7 +10,7 @@ public class HandlerGrowthTests : NeuronTestBase
     public async Task Installing_A_Pack_Adds_Exactly_One_Responder_To_A_Previously_Unhandled_Synapse()
     {
         const string packCode = """
-            public sealed class Echoer : DigitalBrain.Core.IPackBehavior
+            public sealed class Echoer : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) => "echo:" + (input ?? string.Empty);
             }
