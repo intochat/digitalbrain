@@ -156,15 +156,52 @@ named "sample.xlsx" correctly in run 1) but cannot reliably reason over the inje
 ### Root causes (diagnosed, not yet fixed — out of this phase's scope to change unilaterally)
 
 1. **Beats 2 & 4 — this environment is running Ollama `qwen2.5-coder:1.5b`, not Azure OpenAI.**
-   Confirmed two ways: the live `aspire` resource graph shows every kernel replica referencing
-   only the `qwen` Ollama model resource — no Azure OpenAI resource exists in the graph at all —
-   and the actual reply content/quality matches a small code-completion model struggling with
-   general chat and RAG-style reasoning, not gpt-4o-mini. This directly contradicts decision
-   **D-DEMO-1** in DEMO-PLAN.md ("Ollama qwen2.5-coder:1.5b is too weak/slow... Default: wire
-   the demo scope to Azure OpenAI gpt-4o-mini"). **This is very likely the fix for both Beat 2
-   and Beat 4** — a proper instruction-tuned model should both converse coherently and actually
-   use injected context correctly. `AppHost.cs`'s LLM wiring is the repo owner's active
-   workstream (per `CLAUDE.md`) — this needs their action, not a change made here.
+   Confirmed with hard trace evidence from a real Flutter-client chat request (trace
+   `f5089ee6a8304f8d8d8e0d210ed50fcf`, `POST /digitalbrain.DigitalBrainGateway/Send`,
+   `https://localhost:17171/traces/detail/f5089ee6a8304f8d8d8e0d210ed50fcf`): every
+   `InoNeuron.ReasonWithLlmAsync` LLM span in the trace (`chat qwen2.5-coder:1.5b`, spans
+   `44c5a0102d69fd36`, `5095936ef3813a9b`, `4ac4e37095f3f509`) has `gen_ai.provider.name: ollama`
+   and `destination: qwen`, hitting `http://localhost:58336/api/chat` — the Ollama container's
+   endpoint. No Azure OpenAI span appears anywhere in the trace. The live resource graph
+   corroborates this at the config level: all three `kernel-*` replicas expose the env var key
+   `DigitalBrain__Llm__Provider` but no `DigitalBrain__Llm__AzureOpenAIEndpoint` /
+   `DigitalBrain__Llm__AzureOpenAIKey` key at all, and no Azure OpenAI resource exists in the
+   graph.
+
+   Root cause is now pinned to exact lines, not inferred from behavior:
+   - `NeuroOSPrototype.AppHost/AppHost.cs:9-13` calls `builder.AddDigitalBrain("digitalbrain",
+     options => { options.LlmModel = "qwen2.5-coder:1.5b"; ... })` — it never calls
+     `options.WithLLM<Gpt4oMini>()`, so `DigitalBrainOptions.LlmProvider` (default `"ollama"`,
+     `DigitalBrainBuilderExtensions.cs:290`) is never switched to `"azureopenai"`. Because
+     `ctx.LlmProvider` stays `"ollama"`, `AddDigitalBrain`'s own `azureOpenAIEndpoint`/
+     `azureOpenAIKey` parameters are never created (`DigitalBrainBuilderExtensions.cs:65-68`),
+     so `ctx.AzureOpenAIEndpoint`/`AzureOpenAIKey` are `null` and the
+     `DigitalBrain__Llm__AzureOpenAI*` env vars never get added to the kernel resource
+     (`DigitalBrainBuilderExtensions.cs:153-160`) — exactly matching what the resource graph
+     shows.
+   - Independently, and this is the "3 hardcoded lines" flagged in an earlier session:
+     `AppHost.cs:60-65` **redundantly re-sets** `DigitalBrain__Llm__Provider` to the literal
+     `"ollama"` (and re-sets `Model`/`OllamaEndpoint`) on the same `kernel` resource builder,
+     *after* `ctx.WireKernelSilo(kernel)` already set those same three env vars correctly from
+     `ctx.LlmProvider`/`ctx.LlmModel` inside `DigitalBrainBuilderExtensions.cs:148-151`. Aspire
+     resolves `WithEnvironment` callbacks for the same key in call order, last-wins — so even if
+     someone opts into `.WithLLM<Gpt4oMini>()` in `AppHost.cs`'s options lambda, these trailing
+     lines would silently stomp `Provider` back to `"ollama"` (as the comment at line 61 itself
+     half-acknowledges: "Cloud path: override ... via DIGITALBRAIN_ENV or appsettings" — but that
+     override path doesn't exist; `WithEnvironment` here is a hardcoded literal, not conditional).
+   - On the consumption side, `DigitalBrain.Kernel/Llm/DigitalBrainChat.cs:12-20` reads
+     `config["DigitalBrain:Llm:Provider"]` (bound from `DigitalBrain__Llm__Provider`) and takes
+     the Ollama branch whenever it isn't exactly `"azureopenai"` — so the resolved `"ollama"`
+     value from either cause above is sufficient by itself to explain the trace.
+
+   Both causes point at `AppHost.cs`, confirmed as the repo owner's active workstream (per
+   `CLAUDE.md`) — not changed here. To actually get gpt-4o-mini per **D-DEMO-1**, the owner needs
+   to (a) add `.WithLLM<Gpt4oMini>()` to the `AddDigitalBrain(...)` options lambda at
+   `AppHost.cs:9-13`, AND (b) delete or make conditional the hardcoded
+   `kernel.WithEnvironment("DigitalBrain__Llm__Provider", "ollama")` block at `AppHost.cs:60-65`
+   (or reorder it before `WireKernelSilo`, though deleting it is simpler since `WireKernelSilo`
+   already does this correctly from typed config). Fixing only one of the two leaves the other
+   silently overriding it.
 2. **Beat 5 — `CoinGeckoApiClient` sends no `User-Agent` header.** Registered in `Program.cs` as
    a bare `AddHttpClient<IMarketDataApiClient, CoinGeckoApiClient>()` with zero configuration.
    CoinGecko's public API is known to 403 requests without a browser-like `User-Agent` (anti-bot
