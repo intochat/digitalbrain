@@ -45,6 +45,13 @@ public class CoreBoundaryTests
     }
 
     [Fact]
+    public void Pack_Contracts_Own_NeuroPack_And_Bundle_Manifest()
+    {
+        Assert.Equal("DigitalBrain.Pack.Contracts", typeof(NeuroPack).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Pack.Contracts", typeof(BundleManifest).Assembly.GetName().Name);
+    }
+
+    [Fact]
     public void Core_Does_Not_Reference_Runtime_Host_Or_Integration_Packages()
     {
         var offenders = CoreReferenceNames()
@@ -69,16 +76,19 @@ public class CoreBoundaryTests
     }
 
     [Fact]
-    public void Marketplace_Contracts_Depend_On_Core_Not_Runtime_Host_Or_Integrations()
+    public void Marketplace_Contracts_Depend_On_Core_And_Pack_Contracts_Not_Runtime_Host_Or_Integrations()
     {
         var references = MarketplaceContractsReferenceNames();
         var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+        var packContractsAssemblyName = typeof(IPackBehavior).Assembly.GetName().Name!;
 
         Assert.Contains(coreAssemblyName, references);
+        Assert.Contains(packContractsAssemblyName, references);
 
         var unexpectedDigitalBrainReferences = references
             .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
-                !string.Equals(name, coreAssemblyName, StringComparison.Ordinal))
+                !string.Equals(name, coreAssemblyName, StringComparison.Ordinal) &&
+                !string.Equals(name, packContractsAssemblyName, StringComparison.Ordinal))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
@@ -90,6 +100,18 @@ public class CoreBoundaryTests
             .ToArray();
 
         Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void Core_Does_Not_Own_Marketplace_Pack_Contracts()
+    {
+        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+        var marketplaceContractsAssemblyName = typeof(MarketplaceUiSurfaces).Assembly.GetName().Name!;
+
+        Assert.Equal(marketplaceContractsAssemblyName, typeof(PublishToMarketplace).Assembly.GetName().Name);
+        Assert.Equal(marketplaceContractsAssemblyName, typeof(InstallFromMarketplace).Assembly.GetName().Name);
+        Assert.Equal(marketplaceContractsAssemblyName, typeof(PublishedList).Assembly.GetName().Name);
+        Assert.NotEqual(coreAssemblyName, typeof(NeuroPack).Assembly.GetName().Name);
     }
 
     private static string[] CoreReferenceNames() => ReferenceNames(typeof(Synapse).Assembly);
