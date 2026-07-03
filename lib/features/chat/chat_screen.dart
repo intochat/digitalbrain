@@ -18,7 +18,14 @@ import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
 /// via the existing UiSurfaceTreeRenderer, so anything a neuron can express as a tree
 /// (plain text now, a dropped Excel's ui:Table later) renders with no new client code.
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({
+    super.key,
+    DigitalBrainGatewayClient Function()? debugClientFactory,
+  }) : _debugClientFactory = debugClientFactory;
+
+  /// Test-only seam: lets a widget test force a deterministic connection failure
+  /// instead of dialing the real kernel over gRPC.
+  final DigitalBrainGatewayClient Function()? _debugClientFactory;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -63,23 +70,23 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  DigitalBrainGatewayClient _buildRealClient() {
+    final (host, port, secure) = resolveKernelEndpoint();
+    final channel = createKernelChannel(host: host, port: port, secure: secure);
+    _channel = channel;
+    return DigitalBrainGatewayClient(
+      channel,
+      interceptors: kernelInterceptors(),
+    );
+  }
+
   void _connect() {
     try {
-      final (host, port, secure) = resolveKernelEndpoint();
-      final channel = createKernelChannel(
-        host: host,
-        port: port,
-        secure: secure,
-      );
-      final client = DigitalBrainGatewayClient(
-        channel,
-        interceptors: kernelInterceptors(),
-      );
+      final client = widget._debugClientFactory?.call() ?? _buildRealClient();
       final sub = client
           .watchHomeFeed(gw.WatchHomeFeedRequest())
           .listen(_onCard, onError: _onFeedError);
       setState(() {
-        _channel = channel;
         _client = client;
         _feedSub = sub;
         _connectionError = null;
@@ -245,7 +252,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           child: SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: FCircularProgress(
+                              size: FCircularProgressSizeVariant.xs,
+                            ),
                           ),
                         ),
                       );
@@ -317,14 +326,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: TextField(
-                  controller: _input,
-                  decoration: const InputDecoration(
-                    hintText: 'Ask INO anything, or attach an .xlsx...',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onSubmitted: (_) => _send(),
+                child: FTextField(
+                  control: FTextFieldControl.managed(controller: _input),
+                  hint: 'Ask INO anything, or attach an .xlsx...',
+                  onSubmit: (_) => _send(),
                 ),
               ),
               const SizedBox(width: 8),
