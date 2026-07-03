@@ -92,17 +92,6 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
             [SalesforceClientFactory.OAuthStateKey] = state,
             [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier
         });
-        logger.LogWarning(
-            "DIAG StartOAuthAsync stored pending state={StatePrefix}... verifierLen={VerifierLen} verifierPrefix={VerifierPrefix}...",
-            state[..8], codeVerifier.Length, codeVerifier[..8]);
-
-        var readBack = await store.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
-        logger.LogWarning(
-            "DIAG StartOAuthAsync immediate read-back keys=[{Keys}] hasState={HasState} hasVerifier={HasVerifier}",
-            string.Join(",", readBack.Keys),
-            readBack.ContainsKey(SalesforceClientFactory.OAuthStateKey),
-            readBack.ContainsKey(SalesforceClientFactory.OAuthCodeVerifierKey));
-
         await Broadcast(new Signal(SalesforceSignals.AuthUrl, new Dictionary<string, object?>
         {
             ["provider"] = "salesforce",
