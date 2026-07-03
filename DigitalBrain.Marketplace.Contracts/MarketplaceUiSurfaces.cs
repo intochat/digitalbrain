@@ -44,7 +44,7 @@ public static class MarketplaceUiSurfaces
                     ["userId"] = userId,
                     ["sessionId"] = sessionId,
                     ["packs"] = packs,
-                    ["installAction"] = UiSurfaceSamples.SynapseAction(
+                    ["installAction"] = UiSurfaceActions.SynapseAction(
                         "install-pack",
                         "Install",
                         nameof(InstallFromMarketplace),
@@ -54,7 +54,7 @@ public static class MarketplaceUiSurfaces
                             ["userId"] = userId,
                             ["sessionId"] = sessionId
                         }),
-                    ["updateAction"] = UiSurfaceSamples.SynapseAction(
+                    ["updateAction"] = UiSurfaceActions.SynapseAction(
                         "update-pack",
                         "Update",
                         nameof(InstallFromMarketplace),
@@ -287,7 +287,7 @@ public static class MarketplaceUiSurfaces
                 "Open Workbench",
                 "app",
                 "Launch the main DigitalBrain workbench.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "open-workbench",
                     "Open",
                     nameof(InoRequest),
@@ -307,7 +307,7 @@ public static class MarketplaceUiSurfaces
                 "Cluster Graph",
                 "experience",
                 "Open the live cluster graph experience.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "open-cluster-graph",
                     "Open",
                     nameof(InoRequest),
@@ -327,7 +327,7 @@ public static class MarketplaceUiSurfaces
                 "Create Surface",
                 "experience",
                 "Start a generated UI surface workflow.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "create-surface",
                     "Create",
                     nameof(InoRequest),
@@ -347,7 +347,7 @@ public static class MarketplaceUiSurfaces
                 "Restart UI Client",
                 "app",
                 "Restart the Aspire-hosted Flutter UI client.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "restart-flutter-ui",
                     "Restart",
                     nameof(RestartResource),
@@ -366,7 +366,7 @@ public static class MarketplaceUiSurfaces
                 "Gmail Insights",
                 "experience",
                 "Retrieve the last 100 Gmail messages, summarize them locally, and visualize message categories.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "gmail-last-100-chart",
                     "Run",
                     nameof(ExperienceUsed),
@@ -387,7 +387,7 @@ public static class MarketplaceUiSurfaces
                 "Run Closed Loop",
                 "experience",
                 "Run the installed closed-loop experience.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "run-" + ExperienceSlug(pack, "closed-loop"),
                     "Run",
                     nameof(ClosedLoopRequest),
@@ -407,7 +407,7 @@ public static class MarketplaceUiSurfaces
                 "Run self-test",
                 "experience",
                 "Execute pack self-test scenario.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "dummy-self-test",
                     "Run self-test",
                     nameof(ExperienceUsed),
@@ -420,7 +420,7 @@ public static class MarketplaceUiSurfaces
                 "Emit test surface",
                 "app",
                 "Pack responds by emitting a live UI surface for the main area.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "dummy-emit-surface",
                     "Emit test surface",
                     nameof(ExperienceUsed),
@@ -436,7 +436,7 @@ public static class MarketplaceUiSurfaces
                 "Run",
                 "experience",
                 "Execute the installed pack's Respond behavior.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "run-" + ExperienceSlug(pack, "experience"),
                     "Run",
                     nameof(ExperienceUsed),
@@ -449,7 +449,7 @@ public static class MarketplaceUiSurfaces
                 "Emit demo surface",
                 "app",
                 "Trigger pack scenario that emits a live UI surface into the main area.",
-                UiSurfaceSamples.SynapseAction(
+                UiSurfaceActions.SynapseAction(
                     "emit-" + ExperienceSlug(pack, "surface"),
                     "Emit surface",
                     nameof(ExperienceUsed),

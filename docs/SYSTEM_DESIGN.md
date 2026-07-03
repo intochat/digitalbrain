@@ -77,12 +77,13 @@ The stale docs at `docs/superpowers/specs/2026-06-30-telegram-llm-experience-des
 
 ### 1.3 Project graph
 
-Solution `Brain.slnx` lists 30 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
+Solution `Brain.slnx` lists 31 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
 
 | Project | Purpose |
 |---|---|
 | `DigitalBrain.Core` | Protocol layer — `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, checkpoint contracts, and shared runtime messages. Only depends on `Microsoft.Orleans.Core.Abstractions`/`Serialization`. Guard tests assert it has zero references to other `DigitalBrain.*` assemblies and no runtime/host/integration packages. |
-| `DigitalBrain.Ui.Contracts` | Server-driven UI contract layer — `UiSurface`, `UiWidgetTree`, `RfwCard`, UI vocabularies, chart specs, typed surface records, UI sample/live-data helpers, and UI-facing neuron contracts. References Core primitives; Core does not reference this project. |
+| `DigitalBrain.Ui.Contracts` | Server-driven UI contract layer — `UiSurface`, `UiWidgetTree`, `RfwCard`, UI vocabularies, chart specs, typed surface records, generic action descriptors, and UI-facing neuron contracts. References Core primitives; Core does not reference this project. |
+| `DigitalBrain.Ui.Runtime` | Runtime/sample UI projection helpers — `UiSurfaceSamples` and `UiSurfaceLiveData`. References only Core primitives plus UI contracts so samples/live-data builders do not accumulate in the schema assembly. |
 | `DigitalBrain.Pack.Contracts` | Executable pack contract layer — `IPackBehavior`, `PackManifest`, pack config fields, `PackEmission`, trust helpers, `ConfigurationProvided`/`ConfigFormSurface`, and `KitExperience`/`UiExperience`. References Core and UI contracts; Core does not reference this project. |
 | `DigitalBrain.SeedPacks` | Seed catalog assembly. Owns `MarketplaceSeeds` and embeds seed pack source such as `PersonalAssistantNeuron.cs` so concrete marketplace seed content no longer lives in `DigitalBrain.Core`. |
 | `DigitalBrain.Kernel` | The Orleans runtime (formerly "Silo"). `Microsoft.NET.Sdk.Web`, container-packaged. Subfolders: `Auth, Awesome, Company, Config, Context, Economics, Foundry, Gateway, Generated, Ino, Kernel, Llm, Marketplace, Protos, Sandbox, Sdk, Ui`. Owns embodiment (Foundry/Sandbox), LLM (Microsoft.Extensions.AI + Ollama/Azure OpenAI), Economics (Stripe + ECDSA licenses), Context (Qdrant), server-driven UI (`Ui`/`Protos`, bidirectional gRPC `UiGateway`), HA self-update. References every isolated ino project below for their interfaces/logic, and hosts the concrete `Neuron`-derived grain classes for Windows/Developer/Context/UiKit/Telegram.Channel/Google (see §1.3a). |

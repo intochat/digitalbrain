@@ -13,6 +13,7 @@
     <Project Path="DigitalBrain.Pack.Contracts/DigitalBrain.Pack.Contracts.csproj" />
     <Project Path="DigitalBrain.SeedPacks/DigitalBrain.SeedPacks.csproj" />
     <Project Path="DigitalBrain.Ui.Contracts/DigitalBrain.Ui.Contracts.csproj" />
+    <Project Path="DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj" />
   </Folder>
   <Folder Name="/integrations/">
     <Project Path="DigitalBrain.Context/DigitalBrain.Context.csproj" />
