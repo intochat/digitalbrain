@@ -51,9 +51,9 @@ public sealed class XBitcoinTelegramDemoSteps : NeuronTestBase
             OwnerId: "tester", IsPrivate: false, CommissionRate: 0.0));
         await market.FireAsync(new InstallFromMarketplace(PackName, "1.0.0", BuyerId: "xbitcoin-demo-user"));
 
-        // Force MarketDataNeuron to activate/subscribe before the broadcast chain reaches it (same
-        // requirement as LlmResponderNeuron in TelegramReactiveLoopSteps — production startup
-        // activation is a pre-existing, accepted gap, not introduced by this task).
+        // Force MarketDataNeuron to activate/subscribe before the broadcast chain reaches it in this
+        // test (tests don't run the ApplicationStarted lifecycle hook). Production activation is wired
+        // in Program.cs's startup warmup, mirroring ILlmResponderNeuron's identical requirement.
         var marketData = Grain<IMarketDataNeuron>("market-data-main");
         await marketData.GetTimelineAsync();
     }

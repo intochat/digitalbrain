@@ -6,6 +6,7 @@ using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
+using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Ui;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
@@ -252,6 +253,11 @@ if (grainFactory != null)
                 // chain (e.g. the Telegram experience) would silently never fire in production. GetTimelineAsync
                 // is idempotent — a no-op if the grain is already active.
                 await grainFactory.GetGrain<ILlmResponderNeuron>(ILlmResponderNeuron.SingletonKey).GetTimelineAsync();
+
+                // MarketDataNeuron has the same activate-before-broadcast requirement as ILlmResponderNeuron
+                // above: it's an IHandle<Signal> grain that filters Signal("CheckBitcoinPrice") off the
+                // timeline, so it must be activated before that broadcast arrives or it never fires.
+                await grainFactory.GetGrain<IMarketDataNeuron>("market-data-main").GetTimelineAsync();
             }
             catch (Exception ex)
             {

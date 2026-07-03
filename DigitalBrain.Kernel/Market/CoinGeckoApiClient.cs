@@ -13,6 +13,6 @@ public sealed class CoinGeckoApiClient(HttpClient httpClient) : IMarketDataApiCl
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
         var usd = doc.RootElement.GetProperty("bitcoin").GetProperty("usd").GetDecimal();
-        return "$" + usd.ToString("N2");
+        return "$" + usd.ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
     }
 }
