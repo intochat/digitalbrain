@@ -4,6 +4,31 @@ Date: 2026-07-03
 
 Scope: the `brain/` repository. The parent repository also contains `Projects/`, `app/`, `marketplace/`, and other historical material, but this proposal treats `brain/` as the product/runtime repo and only calls out parent-level coupling where it affects `brain`.
 
+Implementation note, 2026-07-03: the repo was cleaned up and then consolidated back to one canonical `Brain.slnx`. CI and deploy use that same solution with `-p:SkipFlutterBuild=true`, so the Flutter bridge remains visible for local development without requiring `../app` on GitHub runners.
+
+## Current Implementation Status
+
+Done:
+
+- Removed duplicated `.claude/skills` and trimmed `.agents/skills` to repo-local Aspire guidance.
+- Removed skill eval fixtures, phantom ignored-only project directories, local build artifacts, and stale `docs/specs` / `docs/plans`.
+- Made `Brain.slnx` the single canonical solution with `src`, `integrations`, `hosts`, `tests`, `deploy`, and `clients` folders.
+- Updated CI and deploy to test `Brain.slnx` with `-p:SkipFlutterBuild=true`.
+- Moved concrete marketplace seeds from `DigitalBrain.Core` into `DigitalBrain.SeedPacks`.
+- Renamed product-level Silo restart/deploy language to Kernel while preserving Orleans technical terms.
+- Renamed `DigitalBrain.Tests/UnitTest1.cs` to `DigitalBrain.Tests/Kernel/NeuronTests.cs`.
+
+Still left:
+
+- Split `DigitalBrain.Core` into smaller primitive/runtime/pack/UI/system contract packages.
+- Split `DigitalBrain.Kernel` into runtime modules and make the host a composition root.
+- Make integration project names match ownership boundaries, especially interface-only projects.
+- Move remaining demo/sample UI leakage out of Core and gateway paths.
+- Split the central test project into explicit feedback-speed lanes.
+- Expand deployment beyond the current one-kernel-image MVP if Telegram transport and MCP need independent images.
+- Add architecture guard tests for Core and module dependency direction.
+- Clean existing nullable/obsolete API warnings.
+
 ## Executive Summary
 
 The core architecture has a strong idea: a .NET Aspire + Orleans runtime where neurons are grains, synapses are immutable messages, and packs extend behavior at runtime. That idea is coherent and worth keeping.
@@ -11,7 +36,7 @@ The core architecture has a strong idea: a .NET Aspire + Orleans runtime where n
 The repo structure around it is not coherent enough. The biggest problems are:
 
 - Tooling and agent skill caches dominate the tracked repository: `.agents` has 378 tracked files and `.claude` has 366 tracked files. That is more tracked files than `DigitalBrain.Kernel` and `DigitalBrain.Tests` combined.
-- `Brain.slnx` is not the true CI entry point because it references `../app/Flutter.proj`, which CI does not check out. CI works around this by testing `DigitalBrain.Tests/DigitalBrain.Tests.csproj` directly.
+- `Brain.slnx` is now the canonical entry point. It references `../app/Flutter.proj`, and headless automation passes `SkipFlutterBuild=true` so CI does not need the sibling app checkout.
 - `DigitalBrain.Kernel` is doing too much. It is the Orleans host, gateway, UI backend, pack embodiment runtime, marketplace, LLM adapter, Google/Windows/Developer grain host, economics engine, self-update workflow, and code-foundry executor.
 - `DigitalBrain.Core` is called the stable protocol layer, but it already contains many product, demo, UI, marketplace, LLM, authoring, task, DB, charting, and self-update contracts.
 - Several top-level project-looking folders contain only build outputs (`DigitalBrain.Contracts`, `DigitalBrain.Sdk`, `DigitalBrain.SourceGen`). They are ignored, but they confuse humans and tooling.
@@ -24,18 +49,19 @@ Recommended first move: do a deletion and boundary pass before adding any more f
 
 ### Solution Shape
 
-`Brain.slnx` currently includes:
+`Brain.slnx` now includes:
 
-- Flutter via `../app/Flutter.proj` under a `Clients` solution folder (`Brain.slnx:2-7`).
+- Flutter via `../app/Flutter.proj` under a `clients` solution folder.
 - Main product projects (`DigitalBrain.Core`, `DigitalBrain.Kernel`, `DigitalBrain.Aspire`, `DigitalBrain.Mcp`, integrations, tests).
-- AppHost and ServiceDefaults (`Brain.slnx:33-34`).
+- AppHost and ServiceDefaults.
+- Deployment project under `/deploy/`.
 
-CI avoids building the solution because the sibling Flutter project is unavailable on GitHub runners:
+CI no longer bypasses the solution. It builds/tests the canonical solution while skipping Flutter work on headless runners:
 
-- `.github/workflows/ci.yml` runs `dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj`.
-- The workflow comment says `Brain.slnx` pulls in `../app/Flutter.proj`, so building the whole solution cannot work in headless CI.
+- `.github/workflows/ci.yml` runs `dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualifiedName!~E2E"`.
+- `.github/workflows/deploy.yml` uses the same test lane before publishing the kernel image.
 
-That means `Brain.slnx` is not the canonical architecture boundary. It is a local convenience file.
+That means `Brain.slnx` is now the canonical architecture boundary again. The remaining risk is that the Flutter bridge must keep honoring `SkipFlutterBuild=true` in CI.
 
 ### Tracked Repository Noise
 
@@ -207,29 +233,29 @@ Expected result:
 - Hundreds of tracked files removed.
 - `rg`, file explorers, metrics, and reviews stop being dominated by tool caches.
 
-### 2. Create CI-safe and full solutions
+### 2. Keep one canonical CI-safe solution
 
 Priority: P0
 
 Current state:
 
 - `Brain.slnx` includes `../app/Flutter.proj`.
-- CI bypasses `Brain.slnx` and tests `DigitalBrain.Tests.csproj` directly.
+- CI and deploy now invoke `Brain.slnx` directly with `-p:SkipFlutterBuild=true`.
+- `Brain.CI.slnx` and `Brain.Full.slnx` were intentionally retired after the repository was consolidated back to one solution.
 
 Recommendation:
 
-Create explicit solution files:
+Keep `Brain.slnx` as the only authoritative solution file:
 
-- `Brain.CI.slnx`: all .NET source/test projects required by headless CI, no sibling `../app`.
-- `Brain.Full.slnx`: local developer solution including Flutter client integration.
-- Optional `Brain.Runtime.slnx`: runtime-only build graph without E2E and app projects.
-
-Then update CI to build/test `Brain.CI.slnx`, not a single test project.
+- Include all product, integration, host, test, deploy, and local Flutter bridge projects in `Brain.slnx`.
+- Use `-p:SkipFlutterBuild=true` for headless automation.
+- Keep the Flutter bridge project strict about honoring `SkipFlutterBuild` so CI remains independent of `../app`.
+- Optional future split: add focused `.slnf` filters or test category lanes, not competing canonical solution files.
 
 Expected result:
 
 - The solution architecture becomes inspectable and enforceable.
-- CI validates all included projects instead of relying on transitive coverage through the test project.
+- CI validates all included projects instead of relying on transitive coverage through one test project.
 
 ### 3. Delete empty project-output directories
 
@@ -504,15 +530,16 @@ Goal: make build architecture explicit.
 
 Tasks:
 
-1. Add `Brain.CI.slnx`.
-2. Add `Brain.Full.slnx` or rename existing `Brain.slnx` to make local-only intent explicit.
-3. Update CI to build/test the CI solution.
-4. Add solution folders that reflect target architecture (`src`, `integrations`, `hosts`, `tests`, `deploy`), even before physical moves.
+1. Keep `Brain.slnx` as the one canonical solution.
+2. Include local Flutter through `../app/Flutter.proj`.
+3. Include deploy under `/deploy/`.
+4. Update CI/deploy to build/test `Brain.slnx` with `-p:SkipFlutterBuild=true`.
+5. Add solution folders that reflect target architecture (`src`, `integrations`, `hosts`, `tests`, `deploy`), even before physical moves.
 
 Validation:
 
-- `dotnet build Brain.CI.slnx`
-- `dotnet test Brain.CI.slnx --filter "FullyQualifiedName!~E2E"` or equivalent
+- `dotnet build Brain.slnx -p:SkipFlutterBuild=true`
+- `dotnet test Brain.slnx -p:SkipFlutterBuild=true --filter "FullyQualifiedName!~E2E"` or equivalent
 
 ### Phase 2: Core Boundary Pass
 
@@ -573,7 +600,7 @@ Use these rules to stop the repo from regressing:
 
 1. No new product code under `.agents`, `.claude`, `.superpowers`, `bin`, `obj`, or `TestResults`.
 2. No new project-looking folder without a `.csproj` or a README explaining why it exists.
-3. `Brain.CI.slnx` must be buildable on a clean CI checkout.
+3. `Brain.slnx` must be buildable on a clean CI checkout with `-p:SkipFlutterBuild=true`.
 4. `DigitalBrain.Core` cannot take dependencies on feature domains, demos, transport-specific behavior, gateway concerns, or concrete seed packs.
 5. `DigitalBrain.Kernel.Host` should compose modules, not implement features.
 6. New integration work must define whether it is:
@@ -594,6 +621,6 @@ A good first PR should be deletion-heavy and behavior-preserving:
 3. Delete ignored-only `DigitalBrain.Contracts`, `DigitalBrain.Sdk`, `DigitalBrain.SourceGen`.
 4. Delete stale docs/specs/plans or mark them active.
 5. Rename `DigitalBrain.Tests/UnitTest1.cs`.
-6. Add `Brain.CI.slnx` and update CI to use it.
+6. Make `Brain.slnx` the single canonical solution and update CI to use it with `-p:SkipFlutterBuild=true`.
 
 This should produce a much cleaner repository without forcing risky runtime changes. Only after that should Core/Kernel splitting begin.

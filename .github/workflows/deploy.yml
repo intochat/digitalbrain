@@ -30,7 +30,7 @@ jobs:
           dotnet-version: '11.0.x'
 
       - name: Run tests
-        run: dotnet test Brain.CI.slnx -c Release --filter "FullyQualifiedName!~E2E"
+        run: dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualifiedName!~E2E"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
