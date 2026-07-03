@@ -39,6 +39,19 @@ const WatchHomeFeedRequest$json = {
 final $typed_data.Uint8List watchHomeFeedRequestDescriptor =
     $convert.base64Decode('ChRXYXRjaEhvbWVGZWVkUmVxdWVzdA==');
 
+@$core.Deprecated('Use watchSynapsesRequestDescriptor instead')
+const WatchSynapsesRequest$json = {
+  '1': 'WatchSynapsesRequest',
+  '2': [
+    {'1': 'type_filter', '3': 1, '4': 3, '5': 9, '10': 'typeFilter'},
+  ],
+};
+
+/// Descriptor for `WatchSynapsesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List watchSynapsesRequestDescriptor =
+    $convert.base64Decode(
+        'ChVXYXRjaFN5bmFwc2VzUmVxdWVzdBIfCgt0eXBlX2ZpbHRlchgBIAMoCVIKdHlwZUZpbHRlcg==');
+
 @$core.Deprecated('Use rfwCardEnvelopeDescriptor instead')
 const RfwCardEnvelope$json = {
   '1': 'RfwCardEnvelope',

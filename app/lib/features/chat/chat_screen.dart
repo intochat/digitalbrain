@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
+import 'package:cross_file/cross_file.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
@@ -9,7 +12,9 @@ import 'package:http/http.dart' as http;
 
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pbgrpc.dart';
+import 'package:digitalbrain_flutter/grpc/action_dispatch.dart';
 import 'package:digitalbrain_flutter/grpc/endpoint.dart';
+import 'package:digitalbrain_flutter/grpc/google_auth_flow.dart';
 import 'package:digitalbrain_flutter/grpc/grpc_channel.dart';
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
 
@@ -43,6 +48,13 @@ class _ChatMessage {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const Set<String> _supportedUploadExtensions = {
+    'xlsx',
+    'db',
+    'sqlite',
+    'sqlite3',
+  };
+
   final String _sessionId = 'chat-${Random().nextInt(1 << 31)}';
   final RfwRuntimeHost _rfwHost = RfwRuntimeHost();
   final TextEditingController _input = TextEditingController();
@@ -52,8 +64,10 @@ class _ChatScreenState extends State<ChatScreen> {
   dynamic _channel;
   DigitalBrainGatewayClient? _client;
   StreamSubscription<gw.RfwCardEnvelope>? _feedSub;
+  StreamSubscription<gw.SynapseEnvelope>? _authSignalSub;
   String? _connectionError;
   bool _sending = false;
+  bool _draggingFile = false;
 
   @override
   void initState() {
@@ -64,6 +78,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _feedSub?.cancel();
+    _authSignalSub?.cancel();
     _channel?.shutdown();
     _input.dispose();
     _scroll.dispose();
@@ -86,14 +101,32 @@ class _ChatScreenState extends State<ChatScreen> {
       final sub = client
           .watchHomeFeed(gw.WatchHomeFeedRequest())
           .listen(_onCard, onError: _onFeedError);
+      final authSub = client
+          .watchSynapses(googleAuthUrlWatchRequest())
+          .listen(_onAuthSignal, onError: _onAuthSignalError);
       setState(() {
         _client = client;
         _feedSub = sub;
+        _authSignalSub = authSub;
         _connectionError = null;
       });
     } catch (error) {
       setState(() => _connectionError = 'Could not reach the kernel: $error');
     }
+  }
+
+  void _onAuthSignal(gw.SynapseEnvelope envelope) {
+    openGoogleAuthUrlFromEnvelope(envelope).then(
+      (opened) {
+        if (!opened) debugPrint('Ignored malformed Google auth URL signal.');
+      },
+      onError: (Object error) =>
+          debugPrint('Google auth URL launch failed: $error'),
+    );
+  }
+
+  void _onAuthSignalError(Object error) {
+    debugPrint('Google auth signal stream failed: $error');
   }
 
   void _onFeedError(Object error) {
@@ -149,13 +182,26 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _attachFile() async {
+  void _handleSurfaceEvent(String name, Map<String, Object?> args) {
+    final envelope = buildActionEnvelope(name, args);
     final client = _client;
-    if (client == null || _sending) return;
+    if (envelope == null || client == null) return;
+
+    client.send(envelope).catchError((Object error) {
+      if (!mounted) return null;
+      setState(() {
+        _connectionError = 'Failed to dispatch action: $error';
+      });
+      return null;
+    });
+  }
+
+  Future<void> _attachFile() async {
+    if (_client == null || _sending) return;
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx', 'db', 'sqlite', 'sqlite3'],
+      allowedExtensions: _supportedUploadExtensions.toList(),
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;
@@ -163,8 +209,42 @@ class _ChatScreenState extends State<ChatScreen> {
     final bytes = file.bytes;
     if (bytes == null) return;
 
+    await _uploadAttachment(fileName: file.name, bytes: bytes);
+  }
+
+  Future<void> _handleDroppedFiles(List<XFile> files) async {
+    if (!mounted) return;
+    setState(() => _draggingFile = false);
+    if (_client == null || _sending || files.isEmpty) return;
+
+    final file = files.first;
+    try {
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      await _uploadAttachment(fileName: file.name, bytes: bytes);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _connectionError = 'Failed to read ${file.name}: $error';
+      });
+    }
+  }
+
+  Future<void> _uploadAttachment({
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    if (_client == null || _sending) return;
+    if (!_isSupportedUploadName(fileName)) {
+      setState(() {
+        _connectionError = 'Unsupported upload type: $fileName';
+      });
+      return;
+    }
+
     setState(() {
-      _messages.add(_ChatMessage.user('\u{1F4CE} Attached ${file.name}'));
+      _connectionError = null;
+      _messages.add(_ChatMessage.user('\u{1F4CE} Attached $fileName'));
       _sending = true;
     });
     _scrollToEnd();
@@ -180,7 +260,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final request = http.MultipartRequest('POST', uri)
         ..fields['sessionId'] = _sessionId
         ..files.add(
-          http.MultipartFile.fromBytes('file', bytes, filename: file.name),
+          http.MultipartFile.fromBytes('file', bytes, filename: fileName),
         );
       final response = await request.send();
       if (response.statusCode >= 400) {
@@ -190,9 +270,21 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _connectionError = 'Failed to upload ${file.name}: $error';
+        _connectionError = 'Failed to upload $fileName: $error';
       });
     }
+  }
+
+  bool _isSupportedUploadName(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    if (dot < 0 || dot == fileName.length - 1) return false;
+    final extension = fileName.substring(dot + 1).toLowerCase();
+    return _supportedUploadExtensions.contains(extension);
+  }
+
+  void _setDraggingFile(bool value) {
+    if (!mounted || _draggingFile == value) return;
+    setState(() => _draggingFile = value);
   }
 
   void _scrollToEnd() {
@@ -225,92 +317,140 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         Expanded(
-          child: _messages.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Text(
-                      "I'm your DigitalBrain. Ask me anything, drop an Excel "
-                      'file, or ask for the Bitcoin price.',
-                      textAlign: TextAlign.center,
-                      style: t.typography.sm.copyWith(
-                        color: t.colors.mutedForeground,
+          child: DropTarget(
+            onDragDone: (detail) => _handleDroppedFiles(detail.files),
+            onDragEntered: (_) => _setDraggingFile(true),
+            onDragExited: (_) => _setDraggingFile(false),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _messages.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              "I'm your DigitalBrain. Ask me anything, drop an Excel "
+                              'file, or ask for the Bitcoin price.',
+                              textAlign: TextAlign.center,
+                              style: t.typography.sm.copyWith(
+                                color: t.colors.mutedForeground,
+                              ),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scroll,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _messages.length + (_sending ? 1 : 0),
+                          itemBuilder: (context, i) {
+                            if (i >= _messages.length) {
+                              return const Padding(
+                                padding: EdgeInsets.only(bottom: 12),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: FCircularProgress(
+                                      size: FCircularProgressSizeVariant.xs,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            final m = _messages[i];
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: 12,
+                                left: m.isUser ? 48 : 0,
+                                right: m.isUser ? 0 : 48,
+                              ),
+                              child: Align(
+                                alignment: m.isUser
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: m.isUser
+                                    ? Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: t.colors.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          m.text!,
+                                          style: t.typography.md.copyWith(
+                                            color: t.colors.primaryForeground,
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: t.colors.card,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          border: Border.all(
+                                            color: t.colors.border,
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        child: renderer.build(
+                                          m.tree!,
+                                          _handleSurfaceEvent,
+                                          rfwHost: _rfwHost,
+                                          onNavSelected: (_) {},
+                                        ),
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                if (_draggingFile)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: t.colors.primary.withValues(alpha: 0.08),
+                          border: Border.all(
+                            color: t.colors.primary,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.upload_file,
+                                color: t.colors.primary,
+                                size: 36,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Drop file to upload',
+                                style: t.typography.sm.copyWith(
+                                  color: t.colors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                )
-              : ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _messages.length + (_sending ? 1 : 0),
-                  itemBuilder: (context, i) {
-                    if (i >= _messages.length) {
-                      return const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: FCircularProgress(
-                              size: FCircularProgressSizeVariant.xs,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    final m = _messages[i];
-                    return Padding(
-                      padding: EdgeInsets.only(
-                        bottom: 12,
-                        left: m.isUser ? 48 : 0,
-                        right: m.isUser ? 0 : 48,
-                      ),
-                      child: Align(
-                        alignment: m.isUser
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: m.isUser
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: t.colors.primary,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Text(
-                                  m.text!,
-                                  style: t.typography.md.copyWith(
-                                    color: t.colors.primaryForeground,
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: t.colors.card,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: t.colors.border,
-                                    width: 0.5,
-                                  ),
-                                ),
-                                child: renderer.build(
-                                  m.tree!,
-                                  (name, args) {},
-                                  rfwHost: _rfwHost,
-                                  onNavSelected: (_) {},
-                                ),
-                              ),
-                      ),
-                    );
-                  },
-                ),
+              ],
+            ),
+          ),
         ),
         Container(
           padding: const EdgeInsets.all(12),

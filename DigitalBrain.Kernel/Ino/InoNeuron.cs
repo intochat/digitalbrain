@@ -1,8 +1,10 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Config;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Core.UiKit;
+using DigitalBrain.Google;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.UiKit;
@@ -14,9 +16,12 @@ namespace DigitalBrain.Kernel.Ino;
 // Uses dual journals as primary memory (recent + full history), spawns KernelTasks for actions,
 // can drive checkpoints/branches for planning. Context is multi-scale via recency + LLM summary.
 [GrainType("ino.personal.v1")]
-public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron
+public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron, IHandle<Signal>
 {
     private sealed record ReplyPlan(string VisibleReply, IReadOnlyList<string> TaskDescriptions, string? BranchDescription);
+    private sealed record GmailMessageSummary(string Id, string Body);
+
+    private InoRequest? _pendingGmailRequest;
 
     public override async Task OnActivateAsync(CancellationToken ct)
     {
@@ -67,6 +72,12 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             }
         }
 
+        if (IsGmailIntent(req.Prompt))
+        {
+            await HandleGmailIntentAsync(req);
+            return;
+        }
+
         var ctx = await BuildContextAsync(req.Prompt);
         var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx);
         var replyPlan = BuildReplyPlan(req.Prompt, rawReply);
@@ -88,6 +99,21 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private static bool IsBitcoinPriceIntent(string prompt) =>
         prompt.Contains("bitcoin", StringComparison.OrdinalIgnoreCase) &&
         prompt.Contains("price", StringComparison.OrdinalIgnoreCase);
+
+    public async Task HandleAsync(Signal signal)
+    {
+        if (signal.Name != GoogleSignals.AuthCompleted)
+            return;
+
+        var pending = _pendingGmailRequest
+            ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => IsGmailIntent(r.Prompt));
+
+        if (pending is null || !await HasGoogleCredentialAsync())
+            return;
+
+        _pendingGmailRequest = null;
+        await FetchRecentGmailAsync(pending);
+    }
 
     public async Task HandleAsync(TabularDataIngested ingested)
     {
@@ -166,6 +192,146 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             ["tree"] = new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = reply }),
             [UiSurfaceKeys.Title] = "INO",
+            ["role"] = "assistant",
+        };
+        if (sessionId is not null) props["sessionId"] = sessionId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
+    private async Task HandleGmailIntentAsync(InoRequest req)
+    {
+        if (!await HasGoogleCredentialAsync())
+        {
+            _pendingGmailRequest = req;
+            var reply = "Google authentication is required to read Gmail.";
+            await FireAsync(new InoResponse(req.Prompt, reply, []));
+            await DeliverGoogleAuthSurfaceAsync(req.SessionId);
+            return;
+        }
+
+        await FetchRecentGmailAsync(req);
+    }
+
+    private async Task<bool> HasGoogleCredentialAsync()
+    {
+        var store = ServiceProvider.GetService<IPackConfigStore>();
+        if (store is null)
+            return false;
+
+        try
+        {
+            var values = await store.GetAsync("default", "google");
+            return HasValue(values, "client_id") &&
+                   HasValue(values, "client_secret") &&
+                   HasValue(values, "refresh_token");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Google credential check failed.");
+            return false;
+        }
+
+        static bool HasValue(IReadOnlyDictionary<string, string> values, string key) =>
+            values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
+    }
+
+    private async Task DeliverGoogleAuthSurfaceAsync(string? sessionId)
+    {
+        var tree = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), new List<UiWidgetTree>
+        {
+            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "Connect Google to let INO read your recent Gmail messages."
+            }),
+            new(UiKitVocabulary.Button, new Dictionary<string, object?>
+            {
+                ["label"] = "Authenticate Google",
+                ["icon"] = "gmail",
+                ["synapseType"] = GoogleSignals.AuthRequested
+            })
+        });
+
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = tree,
+            [UiSurfaceKeys.Title] = "Google",
+            [UiSurfaceKeys.SurfaceId] = "surface.google-auth.gmail",
+            ["role"] = "assistant",
+            ["surfaceKind"] = UiSurfaceKinds.AuthButton,
+        };
+        if (sessionId is not null) props["sessionId"] = sessionId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
+    private async Task FetchRecentGmailAsync(InoRequest req)
+    {
+        var maxResults = GmailResultCount(req.Prompt);
+        await Broadcast(new Signal(GoogleSignals.GmailFetchRequested, new Dictionary<string, object?>
+        {
+            ["prompt"] = req.Prompt,
+            ["sessionId"] = req.SessionId,
+            ["maxResults"] = maxResults
+        }));
+
+        var gmail = GrainFactory.GetGrain<IGmailNeuron>("gmail-main");
+        var ids = await gmail.ListMessagesAsync("", maxResults);
+        var summaries = new List<GmailMessageSummary>();
+
+        foreach (var id in ids.Take(maxResults))
+        {
+            var body = await gmail.ReadMessageAsync(id);
+            summaries.Add(new GmailMessageSummary(id, body));
+        }
+
+        await Broadcast(new Signal(GoogleSignals.GmailMessagesReady, new Dictionary<string, object?>
+        {
+            ["sessionId"] = req.SessionId,
+            ["count"] = summaries.Count,
+            ["messageIds"] = string.Join(",", summaries.Select(m => m.Id))
+        }));
+
+        var reply = GmailReplyText(summaries);
+        await FireAsync(new InoResponse(req.Prompt, reply, []));
+        await DeliverGmailMessagesSurfaceAsync(summaries, req.SessionId);
+    }
+
+    private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? sessionId)
+    {
+        var children = new List<UiWidgetTree>
+        {
+            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Recent Gmail" })
+        };
+
+        if (messages.Count == 0)
+        {
+            children.Add(new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "No recent Gmail messages were returned."
+            }));
+        }
+        else
+        {
+            for (var i = 0; i < messages.Count; i++)
+            {
+                var message = messages[i];
+                children.Add(new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?>
+                {
+                    ["text"] = $"{i + 1}. {TrimForSurface(message.Body)}"
+                }));
+            }
+        }
+
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), children),
+            [UiSurfaceKeys.Title] = "Gmail",
+            [UiSurfaceKeys.SurfaceId] = "surface.gmail.recent",
             ["role"] = "assistant",
         };
         if (sessionId is not null) props["sessionId"] = sessionId;
@@ -258,6 +424,31 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                p.Contains("show db");
     }
 
+    private static bool IsGmailIntent(string prompt) =>
+        GmailIntentRegex().IsMatch(prompt);
+
+    private static int GmailResultCount(string prompt)
+    {
+        var p = prompt.ToLowerInvariant();
+        return p.Contains("last") || p.Contains("latest") || p.Contains("most recent") ? 1 : 5;
+    }
+
+    private static string GmailReplyText(IReadOnlyList<GmailMessageSummary> messages)
+    {
+        if (messages.Count == 0)
+            return "No recent Gmail messages were returned.";
+
+        var title = messages.Count == 1 ? "Latest Gmail message:" : "Recent Gmail messages:";
+        var lines = messages.Select((m, i) => $"{i + 1}. {TrimForSurface(m.Body)}");
+        return title + Environment.NewLine + string.Join(Environment.NewLine, lines);
+    }
+
+    private static string TrimForSurface(string value)
+    {
+        var text = Regex.Replace(value.Trim(), @"\s+", " ");
+        return text.Length <= 280 ? text : text[..277] + "...";
+    }
+
     private static bool IsTwoObjectRelationIntent(string prompt)
     {
         var p = prompt.ToLowerInvariant();
@@ -284,6 +475,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private static Regex DatabasePathRegex() =>
         new(@"(?:""[^""]+\.(?:db|sqlite|sqlite3)""|'[^']+\.(?:db|sqlite|sqlite3)'|[A-Za-z]:\\[^\s""']+\.(?:db|sqlite|sqlite3))",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static Regex GmailIntentRegex() =>
+        new(@"\b(gmail|email|e-mail|mailbox|inbox)\b",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static string SchemaReplyText(DbSchemaInspected inspected) =>

@@ -8,6 +8,7 @@ import 'package:digitalbrain_flutter/ui_kit/ui_text.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_text_field.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_button.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_panel.dart';
+import 'package:digitalbrain_flutter/widgets/neuron_vector_logo.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
   builder: (_, w) => FTheme(
@@ -155,6 +156,24 @@ void main() {
         ),
       );
       expect(find.text('Go'), findsOneWidget);
+    });
+
+    testWidgets('renders optional brand icon', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          UiKitButton(
+            label: 'Authenticate Google',
+            icon: 'gmail',
+            pack: 'p',
+            experienceId: 'e',
+            eventName: 'n',
+            onEvent: (_, _) {},
+          ),
+        ),
+      );
+
+      expect(find.text('Authenticate Google'), findsOneWidget);
+      expect(find.byType(NeuronVectorLogo), findsOneWidget);
     });
   });
 

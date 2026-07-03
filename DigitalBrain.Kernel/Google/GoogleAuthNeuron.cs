@@ -29,6 +29,10 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
             "https://www.googleapis.com/auth/gmail.readonly",
             "https://www.googleapis.com/auth/gmail.modify");
 
-        await FireAsync(new Signal(GoogleSignals.AuthUrl, new Dictionary<string, object?> { ["url"] = url }));
+        await Broadcast(new Signal(GoogleSignals.AuthUrl, new Dictionary<string, object?>
+        {
+            ["provider"] = "google",
+            ["url"] = url
+        }));
     }
 }

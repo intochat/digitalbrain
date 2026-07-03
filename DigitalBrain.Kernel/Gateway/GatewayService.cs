@@ -2,6 +2,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Demo.Runtime;
+using DigitalBrain.Google;
 using DigitalBrain.Kernel.Auth;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Runtime.Grpc;
@@ -65,6 +66,27 @@ public sealed class GatewayService(
                 var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
                 if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId; // fallback
                 await market.FireAsync(new InstallFromMarketplace(packName, ver, string.IsNullOrWhiteSpace(buyer) ? "anonymous" : buyer, sessionId));
+                return request;
+            }
+
+            if (request.TypeName == GoogleSignals.AuthRequested || request.TypeName.Contains(GoogleSignals.AuthRequested, StringComparison.OrdinalIgnoreCase))
+            {
+                var auth = grains.GetGrain<IGoogleAuthNeuron>("google-auth-main");
+                var signal = new Signal(GoogleSignals.AuthRequested, PayloadProps(request))
+                {
+                    Receiver = new NeuronId("google-auth-main")
+                };
+                await auth.DeliverAsync(signal);
+                return request;
+            }
+
+            if (request.TypeName == GoogleSignals.AuthCompleted || request.TypeName.Contains(GoogleSignals.AuthCompleted, StringComparison.OrdinalIgnoreCase))
+            {
+                var key = string.IsNullOrWhiteSpace(request.CorrelationId)
+                    ? "google-auth-completed"
+                    : request.CorrelationId;
+                var authCompletedIngress = grains.GetGrain<IIngressNeuron>(key);
+                await authCompletedIngress.IngestAsync(GoogleSignals.AuthCompleted, PayloadProps(request));
                 return request;
             }
 
@@ -304,6 +326,16 @@ public sealed class GatewayService(
             result[key] = value is System.Text.Json.JsonElement el ? UnwrapElement(el) : value;
         }
         return result;
+    }
+
+    private static Dictionary<string, object?> PayloadProps(SynapseEnvelope request)
+    {
+        var payloadJson = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
+        if (string.IsNullOrWhiteSpace(payloadJson))
+            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        var raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? new();
+        return NormalizeJsonProps(raw);
     }
 
     private static object? UnwrapElement(System.Text.Json.JsonElement el) => el.ValueKind switch

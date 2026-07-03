@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Demo.Runtime;
+using DigitalBrain.Google;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Foundry;
@@ -137,6 +138,27 @@ public class GatewayServiceTests : NeuronTestBase
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         Assert.Equal(UiKitVocabulary.Text, tree.Type);
         Assert.Contains("$42,123.45", tree.Props["text"]!.ToString());
+    }
+
+    [Fact]
+    public async Task Send_GoogleAuthRequested_Routes_To_GoogleAuthNeuron()
+    {
+        var svc = NewService();
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = GoogleSignals.AuthRequested,
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                sessionId = "chat-session-gmail"
+            }))
+        }, TestContext());
+
+        var auth = Grain<IGoogleAuthNeuron>("google-auth-main");
+        var timeline = await auth.GetOutgoingTimelineAsync();
+        var authUrl = Assert.Single(timeline.OfType<Signal>(), signal => signal.Name == GoogleSignals.AuthUrl);
+        Assert.Equal("google", authUrl.Props["provider"]);
+        Assert.Contains("accounts.google.com", authUrl.Props["url"]!.ToString());
     }
 
     [Fact]
