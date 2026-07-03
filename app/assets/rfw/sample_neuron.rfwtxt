@@ -1,0 +1,54 @@
+import digitalbrain;
+
+widget root = AdaptiveContainer(
+  compact: Panel(
+    padding: 16.0,
+    child: VStack(
+      gap: 12.0,
+      children: [
+        HStack(
+          gap: 12.0,
+          cross: "center",
+          children: [
+            Avatar(initials: data.initials, tone: data.tone, size: 40.0),
+            VStack(
+              cross: "start",
+              gap: 4.0,
+              children: [
+                Text(text: data.title, variant: "title"),
+                Text(text: data.subtitle, variant: "dim"),
+              ],
+            ),
+          ],
+        ),
+        Divider(),
+        Button(label: "Close", onTap: event "closeSurface" { }),
+      ],
+    ),
+  ),
+  medium: Panel(
+    padding: 24.0,
+    child: VStack(
+      gap: 16.0,
+      children: [
+        HStack(
+          gap: 24.0,
+          cross: "center",
+          children: [
+            Avatar(initials: data.initials, tone: data.tone, size: 56.0),
+            VStack(
+              cross: "start",
+              gap: 6.0,
+              children: [
+                Text(text: data.title, variant: "title"),
+                Text(text: data.subtitle, variant: "dim"),
+              ],
+            ),
+          ],
+        ),
+        Divider(),
+        Button(label: "Close", onTap: event "closeSurface" { }),
+      ],
+    ),
+  ),
+);

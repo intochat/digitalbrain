@@ -260,10 +260,9 @@ public static class DigitalBrainBuilderExtensions
         var appHostDir = b.AppHostDirectory;
         var candidates = new[]
         {
-            System.IO.Path.GetFullPath(System.IO.Path.Combine(appHostDir, "..", "..", "app")),
             System.IO.Path.GetFullPath(System.IO.Path.Combine(appHostDir, "..", "app")),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "app")),
             System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "..", "app")),
-            System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "..", "..", "app")),
         };
 
         foreach (var c in candidates)

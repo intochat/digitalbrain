@@ -77,7 +77,7 @@ The stale docs at `docs/superpowers/specs/2026-06-30-telegram-llm-experience-des
 
 ### 1.3 Project graph
 
-Solution `Brain.slnx` lists 33 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
+Solution `Brain.slnx` lists 33 projects plus the in-repo Flutter client project (`app/Flutter.proj`).
 
 | Project | Purpose |
 |---|---|
@@ -169,7 +169,7 @@ Orleans/clustering/grain-state/journal/LLM, adds `grpc` + `web` endpoints,
 (`DigitalBrainOptions.KernelReplicas`, line 210), overridable via `DIGITALBRAIN_KERNEL_REPLICAS`.
 Flutter client and MCP/Telegram are conditional:
 
-- **Flutter**: only added if `app/pubspec.yaml` resolves on disk (`ResolveFlutterAppPath`,
+- **Flutter**: only added if `app/pubspec.yaml` resolves on disk (`ResolveDevFlutterAppPath`,
   AppHost.cs:41-87) — `ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows")`, which runs
   `flutter run -d windows` as an executable resource.
 - **MCP**: gated by `ctx.EnableMcp` (default true) — adds `DigitalBrain.Mcp` referencing the Orleans

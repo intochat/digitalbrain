@@ -2,9 +2,9 @@
 
 Date: 2026-07-03
 
-Scope: the `brain/` repository. The parent repository also contains `Projects/`, `app/`, `marketplace/`, and other historical material, but this proposal treats `brain/` as the product/runtime repo and only calls out parent-level coupling where it affects `brain`.
+Scope: the `brain/` repository. The Flutter client now lives in `brain/app`, so `Brain.slnx` is the single product/runtime entry point; sibling parent folders are historical material unless explicitly referenced.
 
-Implementation note, 2026-07-03: the repo was cleaned up and then consolidated back to one canonical `Brain.slnx`. CI and deploy use that same solution with `-p:SkipFlutterBuild=true`, so the Flutter bridge remains visible for local development without requiring `../app` on GitHub runners.
+Implementation note, 2026-07-03: the repo was cleaned up and then consolidated back to one canonical `Brain.slnx`. CI and deploy use that same solution with `-p:SkipFlutterBuild=true`, so the Flutter bridge remains visible without running Flutter in headless .NET jobs.
 
 ## Current Implementation Status
 
@@ -22,6 +22,7 @@ Done:
 - Continued Phase 2 by moving UI sample/live-data builders into `DigitalBrain.Ui.Runtime`, which references only Core plus UI contracts and keeps `DigitalBrain.Ui.Contracts` schema-oriented.
 - Continued Phase 2 by moving `DemoMessageSynapse` and `IDemoNeuron` into `DigitalBrain.Demo.Contracts`, preserving the `DigitalBrain.Core` namespace for source compatibility while keeping stable Core out of demo/test protocols.
 - Continued Phase 2 by moving the surface demo pack source and live observability graph helper into `DigitalBrain.Demo.Runtime`, keeping richer demo runtime behavior out of Kernel gateway source while preserving the existing `DigitalBrain.Kernel.SurfaceDemoRequested` wire string.
+- Imported the Flutter client into `brain/app`, moved its GitHub Pages workflow to the root workflow folder, and updated `Brain.slnx` to reference `app/Flutter.proj`.
 - Added architecture guard tests that keep `DigitalBrain.Core` free of runtime, host, integration, pack-contract, and UI-contract assembly references.
 - Renamed product-level Silo restart/deploy language to Kernel while preserving Orleans technical terms.
 - Renamed `DigitalBrain.Tests/UnitTest1.cs` to `DigitalBrain.Tests/Kernel/NeuronTests.cs`.
@@ -44,7 +45,7 @@ The core architecture has a strong idea: a .NET Aspire + Orleans runtime where n
 The repo structure around it is not coherent enough. The biggest problems are:
 
 - Tooling and agent skill caches dominate the tracked repository: `.agents` has 378 tracked files and `.claude` has 366 tracked files. That is more tracked files than `DigitalBrain.Kernel` and `DigitalBrain.Tests` combined.
-- `Brain.slnx` is now the canonical entry point. It references `../app/Flutter.proj`, and headless automation passes `SkipFlutterBuild=true` so CI does not need the sibling app checkout.
+- `Brain.slnx` is now the canonical entry point. It references `app/Flutter.proj`, and headless automation passes `SkipFlutterBuild=true` so CI does not run Flutter in .NET-only jobs.
 - `DigitalBrain.Kernel` is doing too much. It is the Orleans host, gateway, UI backend, pack embodiment runtime, marketplace, LLM adapter, Google/Windows/Developer grain host, economics engine, self-update workflow, and code-foundry executor.
 - `DigitalBrain.Core` is called the stable protocol layer, but it still contains many product, LLM, authoring, task, DB, charting, and self-update contracts.
 - Several top-level project-looking folders contain only build outputs (`DigitalBrain.Contracts`, `DigitalBrain.Sdk`, `DigitalBrain.SourceGen`). They are ignored, but they confuse humans and tooling.
@@ -59,7 +60,7 @@ Recommended first move: do a deletion and boundary pass before adding any more f
 
 `Brain.slnx` now includes:
 
-- Flutter via `../app/Flutter.proj` under a `clients` solution folder.
+- Flutter via `app/Flutter.proj` under a `clients` solution folder.
 - Main product projects (`DigitalBrain.Core`, `DigitalBrain.Demo.Contracts`, `DigitalBrain.Demo.Runtime`, `DigitalBrain.Ui.Contracts`, `DigitalBrain.Ui.Runtime`, `DigitalBrain.Kernel`, `DigitalBrain.Aspire`, `DigitalBrain.Mcp`, integrations, tests).
 - AppHost and ServiceDefaults.
 - Deployment project under `/deploy/`.
@@ -69,7 +70,7 @@ CI no longer bypasses the solution. It builds/tests the canonical solution while
 - `.github/workflows/ci.yml` runs `dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualifiedName!~E2E"`.
 - `.github/workflows/deploy.yml` uses the same test lane before publishing the kernel image.
 
-That means `Brain.slnx` is now the canonical architecture boundary again. The remaining risk is that the Flutter bridge must keep honoring `SkipFlutterBuild=true` in CI.
+That means `Brain.slnx` is now the canonical architecture boundary again. The remaining risk is that the Flutter bridge must keep honoring `SkipFlutterBuild=true` in .NET-only CI.
 
 ### Tracked Repository Noise
 
@@ -249,7 +250,7 @@ Priority: P0
 
 Current state:
 
-- `Brain.slnx` includes `../app/Flutter.proj`.
+- `Brain.slnx` includes `app/Flutter.proj`.
 - CI and deploy now invoke `Brain.slnx` directly with `-p:SkipFlutterBuild=true`.
 - `Brain.CI.slnx` and `Brain.Full.slnx` were intentionally retired after the repository was consolidated back to one solution.
 
@@ -259,7 +260,7 @@ Keep `Brain.slnx` as the only authoritative solution file:
 
 - Include all product, integration, host, test, deploy, and local Flutter bridge projects in `Brain.slnx`.
 - Use `-p:SkipFlutterBuild=true` for headless automation.
-- Keep the Flutter bridge project strict about honoring `SkipFlutterBuild` so CI remains independent of `../app`.
+- Keep the Flutter bridge project strict about honoring `SkipFlutterBuild` so .NET-only CI remains independent of Flutter tooling.
 - Optional future split: add focused `.slnf` filters or test category lanes, not competing canonical solution files.
 
 Expected result:
@@ -542,7 +543,7 @@ Goal: make build architecture explicit.
 Tasks:
 
 1. Keep `Brain.slnx` as the one canonical solution.
-2. Include local Flutter through `../app/Flutter.proj`.
+2. Include local Flutter through `app/Flutter.proj`.
 3. Include deploy under `/deploy/`.
 4. Update CI/deploy to build/test `Brain.slnx` with `-p:SkipFlutterBuild=true`.
 5. Add solution folders that reflect target architecture (`src`, `integrations`, `hosts`, `tests`, `deploy`), even before physical moves.

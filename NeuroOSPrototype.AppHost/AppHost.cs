@@ -29,7 +29,9 @@ kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
 
 // Default Windows Flutter thin client on local `aspire run` (P0 item 1+12).
 // Full UI logic remains in marketplace NeuroPack. Uses shared dev default helper (extracted to Aspire ext; pack can override later).
-var flutter = ctx.AddDefaultDevFlutterClient(kernel) ?? throw new InvalidOperationException("Flutter app path not resolved for default windows client. Ensure 'app' folder with pubspec.yaml is sibling or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+var flutter = ctx.AddDefaultDevFlutterClient(kernel)
+    ?? throw new InvalidOperationException(
+        "Flutter app path not resolved for default windows client. Ensure brain/app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
 
 if (ctx.EnableMcp)
 {

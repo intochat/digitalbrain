@@ -77,10 +77,10 @@ booting a fresh cluster:
 
 ```sh
 cd brain
-DIGITALBRAIN_WEBROOT=$(pwd)/../app/build/web dotnet run --project DigitalBrain.Kernel
+DIGITALBRAIN_WEBROOT=$(pwd)/app/build/web dotnet run --project DigitalBrain.Kernel
 ```
 
-(PowerShell: `$env:DIGITALBRAIN_WEBROOT = (Resolve-Path ../app/build/web); dotnet run --project DigitalBrain.Kernel`)
+(PowerShell: `$env:DIGITALBRAIN_WEBROOT = (Resolve-Path app/build/web); dotnet run --project DigitalBrain.Kernel`)
 
 Leave it running. Render tests probe `http://localhost:8081` at startup; if it responds, they
 attach directly (a few seconds) instead of booting a fresh Aspire stack. If nothing is listening

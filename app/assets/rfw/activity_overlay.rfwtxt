@@ -1,0 +1,1408 @@
+import digitalbrain;
+
+widget root = AdaptiveContainer(
+  compact: Panel(
+    padding: 16.0,
+    child: VStack(
+      gap: 12.0,
+      children: [
+        HStack(
+          between: true,
+          children: [
+            Text(text: data.title, variant: "title"),
+            ...for x in data.hasActivity:
+              Badge(text: "LIVE", tone: "rose"),
+          ],
+        ),
+        
+        Divider(),
+
+        ...for x in data.isSettings:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Database Path", value: data.dbPath),
+              KeyValue(label: "Sync Loop", value: data.syncInterval),
+              Divider(),
+              LlmSettingsPanel(
+                model: data.modelWeights,
+                temperature: data.temperature,
+                maxAttempts: data.maxAttempts,
+                onChange: event "updateLlmSettings" { }
+              ),
+              Divider(),
+              Text(text: data.epicNote, variant: "dim"),
+            ],
+          ),
+
+        ...for x in data.isMarketplace:
+          VStack(
+            gap: 8.0,
+            children: [
+              Text(text: data.commissionNote, variant: "dim"),
+              Divider(),
+              ...for bundle in data.bundles:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: bundle.name, variant: "mono"),
+                      Tag(text: bundle.version, tone: "indigo"),
+                      Text(text: bundle.price, variant: "mono"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isFeatures:
+          VStack(
+            gap: 8.0,
+            children: [
+              SectionLabel(text: "Navigation Utilities"),
+              HStack(
+                gap: 8.0,
+                children: [
+                  Button(label: "Timeline Scroll", onTap: event "toggleTimelineScroll" { }),
+                  Button(label: "Parallel Universes", onTap: event "toggleParallelUniverses" { }),
+                ],
+              ),
+              
+              ...for y in data.isTimelineScrollActive:
+                Panel(
+                  padding: 10.0,
+                  child: VStack(
+                    gap: 8.0,
+                    cross: "start",
+                    children: [
+                      Text(text: "Timeline Checkpoints", variant: "title"),
+                      ...for checkpoint in data.checkpoints:
+                        Panel(
+                          padding: 8.0,
+                          onTap: event "restoreCheckpoint" { id: checkpoint.id },
+                          child: HStack(
+                            between: true,
+                            children: [
+                              Text(text: checkpoint.name, variant: "mono"),
+                              Tag(text: checkpoint.time, tone: "teal"),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+              ...for y in data.isParallelUniversesActive:
+                Panel(
+                  padding: 10.0,
+                  child: VStack(
+                    gap: 8.0,
+                    cross: "start",
+                    children: [
+                      Text(text: "Parallel Universes", variant: "title"),
+                      Button(label: "Fork", onTap: event "forkTimeline" { }),
+                      Panel(
+                        padding: 8.0,
+                        child: VStack(
+                          gap: 6.0,
+                          cross: "start",
+                          children: [
+                            Tag(text: "Universe A: Group Chat", tone: "indigo"),
+                            KeyValue(label: "Status", value: data.groupChatStatus),
+                            KeyValue(label: "Latency", value: data.groupChatLatency),
+                            Button(label: "Run A", onTap: event "runUniverse" { type: "group_chat" }),
+                          ],
+                        ),
+                      ),
+                      Panel(
+                        padding: 8.0,
+                        child: VStack(
+                          gap: 6.0,
+                          cross: "start",
+                          children: [
+                            Tag(text: "Universe B: Swarm", tone: "teal"),
+                            KeyValue(label: "Status", value: data.swarmStatus),
+                            KeyValue(label: "Latency", value: data.swarmLatency),
+                            Button(label: "Run B", onTap: event "runUniverse" { type: "swarm" }),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              Divider(),
+              SectionLabel(text: "Actors Directory"),
+              ...for actor in data.actors:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: actor.name, variant: "mono"),
+                      Tag(text: actor.status, tone: "teal"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isProfile:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "User", value: data.userId),
+              KeyValue(label: "Stripe ID", value: data.stripeAccountId),
+              KeyValue(label: "Verify Key", value: data.verifiedKey),
+            ],
+          ),
+
+        ...for x in data.isSdk:
+          VStack(
+            gap: 10.0,
+            children: [
+              Metric(label: "Signals Used", value: "42 / 100", delta: "Free tier usage", tone: "teal"),
+              Divider(),
+              Text(text: data.freeUsageText, variant: "dim"),
+            ],
+          ),
+
+        ...for x in data.isInnolang:
+          VStack(
+            gap: 12.0,
+            children: [
+              Text(text: data.description, variant: "body"),
+              Divider(),
+              SectionLabel(text: "KEY INNOLANG PRINCIPLES"),
+              Bullets(
+                tone: "teal",
+                items: [
+                  "Spec-first verification: Gherkin scenario tests define exact neuron behavior.",
+                  "Virtual Orleans Grains: Neurons exist as active virtual actors.",
+                  "System Integration Seam: Connects external systems (Word) directly to diagram surfaces."
+                ]
+              ),
+              Divider(),
+              SectionLabel(text: "WORD-TO-DIAGRAM NEURAL FLOW"),
+              ...for step in data.steps:
+                Panel(
+                  padding: 10.0,
+                  child: VStack(
+                    gap: 6.0,
+                    children: [
+                      HStack(
+                        between: true,
+                        children: [
+                          Tag(text: step.neuron, tone: step.tone),
+                          Tag(text: step.phase, tone: "indigo"),
+                        ],
+                      ),
+                      Text(text: step.synapse, variant: "mono"),
+                      Text(text: step.description, variant: "dim"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isDb:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Database Path", value: data.dbPath),
+              Divider(),
+              SectionLabel(text: "DATABASE TABLES"),
+              ...for table in data.tables:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: table.name, variant: "mono"),
+                      Tag(text: table.rows, tone: "indigo"),
+                      Tag(text: table.status, tone: "teal"),
+                    ],
+                  ),
+                ),
+              Divider(),
+              SectionLabel(text: "RECENT BUNDLE REGISTRY"),
+              ...for bundle in data.bundles:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: bundle.name, variant: "mono"),
+                      Tag(text: bundle.version, tone: "indigo"),
+                      Text(text: bundle.price, variant: "mono"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isMarketplaceNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              Text(text: data.commissionNote, variant: "dim"),
+              Divider(),
+              KeyValue(label: "Stripe Connect Engine", value: data.stripeStatus),
+              KeyValue(label: "Compiler Engine", value: data.compilerVersion),
+              KeyValue(label: "Signature Method", value: data.verificationEngine),
+              Divider(),
+              SectionLabel(text: "ACTIVE BUNDLES"),
+              ...for bundle in data.bundles:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: bundle.name, variant: "mono"),
+                      Tag(text: bundle.status, tone: "teal"),
+                      Text(text: bundle.price, variant: "mono"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isMarketplaceItem:
+          VStack(
+            gap: 12.0,
+            children: [
+              KeyValue(label: "Developer / Author", value: data.author),
+              KeyValue(label: "Runtime License", value: data.license),
+              KeyValue(label: "Neuron Version", value: data.version),
+              KeyValue(label: "Price", value: data.price),
+              Divider(),
+              SectionLabel(text: "DESCRIPTION"),
+              Panel(
+                padding: 12.0,
+                child: Text(text: data.description, variant: "body"),
+              ),
+              Divider(),
+              ...for x in data.installed:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    children: [
+                      Text(text: "STATUS: INSTALLED & ACTIVE IN ORLEANS", variant: "mono"),
+                    ],
+                  ),
+                ),
+              ...for x in data.notInstalled:
+                Button(
+                  label: "INSTALL FROM MARKETPLACE",
+                  onTap: event "installMarketplaceNeuron" { marketplaceId: data.marketplaceId },
+                ),
+            ],
+          ),
+
+        ...for x in data.isLicenseNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Active ECDSA Public Key", value: data.publicKey),
+              KeyValue(label: "Verification Algorithm", value: data.verifyAlgorithm),
+              KeyValue(label: "Licensing Status", value: data.status),
+              Divider(),
+              SectionLabel(text: "ISSUED ENTITLEMENTS"),
+              ...for license in data.licenseKeys:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: license.id, variant: "mono"),
+                      Tag(text: license.status, tone: "teal"),
+                      Text(text: license.user, variant: "mono"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isCreatorNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Orleans Grain ID", value: data.grainId),
+              KeyValue(label: "Total Spawned Nodes", value: data.neuronCount),
+              KeyValue(label: "Total Active Synapses", value: data.synapseCount),
+              KeyValue(label: "Virtual Memory Allocation", value: data.memoryUsage),
+              KeyValue(label: "Thread Execution priority", value: data.threadPriority),
+              KeyValue(label: "Kernel Status", value: data.status),
+            ],
+          ),
+
+        ...for x in data.isIdentityNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Global Tenant Key", value: data.tenant),
+              KeyValue(label: "Authentication State", value: data.authStatus),
+              KeyValue(label: "Active Session Count", value: data.sessionCount),
+              KeyValue(label: "Auto-Rotation Period", value: data.keyRotation),
+              KeyValue(label: "Cryptographic Formats", value: data.algorithms),
+            ],
+          ),
+
+        ...for x in data.isTravelNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Routing Solver Engine", value: data.optimizer),
+              KeyValue(label: "Optimized Trip Ledger", value: data.routedTrips),
+              KeyValue(label: "Total Payment Volume", value: data.totalPaid),
+              KeyValue(label: "Actor Thread State", value: data.status),
+              KeyValue(label: "Virtual Model Type", value: data.engine),
+            ],
+          ),
+
+        ...for x in data.isGmailNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Registered Mailbox", value: data.mailbox),
+              KeyValue(label: "OAuth2 Sync Status", value: data.syncStatus),
+              KeyValue(label: "Parsed Message Count", value: data.inboxCount),
+              KeyValue(label: "Telemetry Check Rate", value: data.checkInterval),
+              KeyValue(label: "Token OAuth Scope", value: data.authScope),
+            ],
+          ),
+
+        ...for x in data.isAiNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "LLM Weights Target", value: data.model),
+              KeyValue(label: "Processed Tokens Registry", value: data.tokensProcessed),
+              KeyValue(label: "Average Query Latency", value: data.avgLatency),
+              KeyValue(label: "Temperature Float", value: data.temperature),
+              KeyValue(label: "Context Limit Window", value: data.contextWindow),
+            ],
+          ),
+
+        ...for x in data.isSqliteNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Active Cache Storage File", value: data.dbPath),
+              KeyValue(label: "Disk Capacity In-Use", value: data.diskUsage),
+              KeyValue(label: "Transaction Saves Total", value: data.totalSaves),
+              KeyValue(label: "WAL Journal Locking Mode", value: data.journalMode),
+              Divider(),
+              SectionLabel(text: "CACHED SCHEMAS & RECORDS"),
+              ...for table in data.tables:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: table.name, variant: "mono"),
+                      Tag(text: table.rows, tone: "indigo"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isOnboardingNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Active Setup Scenario", value: data.wizardStatus),
+              KeyValue(label: "Onboarded Developer Node", value: data.onboardedUsers),
+              KeyValue(label: "Wizard Progress Phase", value: data.currentStep),
+              KeyValue(label: "Total Success Ratio", value: data.conversionRate),
+              Divider(),
+              SectionLabel(text: "SETUP PROTOCOL PROGRESS"),
+              ...for step in data.steps:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: step.name, variant: "body"),
+                      Tag(text: step.status, tone: "teal"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isTaskManagerNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Assigned Cron Loops", value: data.jobsCount),
+              KeyValue(label: "Total Scheduled Runs", value: data.triggersCount),
+              KeyValue(label: "Virtual Scheduler Type", value: data.scheduler),
+              KeyValue(label: "Process Health Status", value: data.healthStatus),
+              Divider(),
+              SectionLabel(text: "CRON REGISTRY"),
+              ...for job in data.jobs:
+                Panel(
+                  padding: 10.0,
+                  child: VStack(
+                    gap: 4.0,
+                    children: [
+                      HStack(
+                        between: true,
+                        children: [
+                          Text(text: job.name, variant: "mono"),
+                          Tag(text: job.status, tone: "teal"),
+                        ],
+                      ),
+                      Text(text: job.interval, variant: "dim"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isInnoLangInterpreter:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "InnoLang Linker Version", value: data.compilerVersion),
+              KeyValue(label: "Active Gherkin Specs", value: data.compiledScripts),
+              KeyValue(label: "Parsed Abstract Nodes", value: data.astNodesCount),
+              KeyValue(label: "Syntax Parser State", value: data.parserStatus),
+              KeyValue(label: "Signature Guard verifier", value: data.verifier),
+            ],
+          ),
+
+        ...for x in data.isWordConnectorNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Active Document Records", value: data.docsRead),
+              KeyValue(label: "OpenXML Engine Connector", value: data.connector),
+              KeyValue(label: "Total Characters Ingested", value: data.charsParsed),
+              KeyValue(label: "OS File Thread Lock State", value: data.fileLock),
+              Divider(),
+              SectionLabel(text: "PARSED OFFICE DOCUMENTS"),
+              ...for doc in data.recentDocs:
+                Panel(
+                  padding: 10.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      Text(text: doc.name, variant: "mono"),
+                      Tag(text: doc.size, tone: "indigo"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isDiagramExporterNeuron:
+          VStack(
+            gap: 10.0,
+            children: [
+              KeyValue(label: "Export Scheme Spec Format", value: data.exportFormat),
+              KeyValue(label: "Canvas Skia Render Engine", value: data.renderEngine),
+              KeyValue(label: "Total Exported Vectors", value: data.diagramsRendered),
+              KeyValue(label: "Drawing State Status", value: data.status),
+              Divider(),
+              SectionLabel(text: "EXPORT ARCHIVE REGISTER"),
+              ...for diagram in data.recentDiagrams:
+                Panel(
+                  padding: 10.0,
+                  child: VStack(
+                    gap: 4.0,
+                    children: [
+                      HStack(
+                        between: true,
+                        children: [
+                          Text(text: diagram.name, variant: "body"),
+                          Tag(text: diagram.status, tone: "teal"),
+                        ],
+                      ),
+                      Text(text: diagram.nodes, variant: "mono"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.hasActivity:
+          VStack(
+            gap: 10.0,
+            children: [
+              Text(text: "Correlation ID:", variant: "dim"),
+              Text(text: data.correlationId, variant: "mono"),
+              Divider(),
+              ...for synapse in data.synapses:
+                Panel(
+                  padding: 10.0,
+                  child: VStack(
+                    gap: 6.0,
+                    children: [
+                      HStack(
+                        between: true,
+                        children: [
+                          Tag(text: synapse.typeName, tone: synapse.iconTone),
+                          Text(text: synapse.time, variant: "mono"),
+                        ],
+                      ),
+                      HStack(
+                        gap: 8.0,
+                        children: [
+                          GlowIcon(seed: synapse.iconSeed, size: 16.0, tone: synapse.iconTone, shapeHint: "orb"),
+                          Text(text: synapse.from, variant: "mono"),
+                          Text(text: "→", variant: "dim"),
+                          Text(text: synapse.to, variant: "mono"),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.subtitle:
+          Text(text: data.subtitle, variant: "body"),
+
+        Divider(),
+        Button(label: "Close Overlay", onTap: event "closeSurface" { }),
+      ],
+    ),
+  ),
+
+  medium: Panel(
+    padding: 24.0,
+    child: VStack(
+      gap: 16.0,
+      children: [
+        HStack(
+          between: true,
+          children: [
+            HStack(
+              gap: 16.0,
+              cross: "center",
+              children: [
+                Avatar(initials: "B", tone: "indigo", size: 48.0),
+                VStack(
+                  cross: "start",
+                  gap: 4.0,
+                  children: [
+                    Text(text: data.title, variant: "title"),
+                    ...for x in data.hasActivity:
+                      Text(text: "Transaction Flow Correlation", variant: "dim"),
+                    ...for x in data.isSettings:
+                      Text(text: "Orleans virtual actor supervisor config", variant: "dim"),
+                    ...for x in data.isMarketplace:
+                      Text(text: "InoLang signed binary bundles", variant: "dim"),
+                    ...for x in data.isFeatures:
+                      Text(text: "Active grain directory state", variant: "dim"),
+                    ...for x in data.isProfile:
+                      Text(text: "Stripe identity credentials & keys", variant: "dim"),
+                    ...for x in data.isSdk:
+                      Text(text: "Signal telemetry usage monitor", variant: "dim"),
+                  ],
+                ),
+              ],
+            ),
+            ...for x in data.hasActivity:
+              Badge(text: "LIVE STREAM", tone: "rose"),
+          ],
+        ),
+
+        Divider(),
+
+        ...for x in data.isSettings:
+          VStack(
+            gap: 12.0,
+            children: [
+              KeyValue(label: "Database Connection String", value: data.dbPath),
+              KeyValue(label: "Event Loop Update Interval", value: data.syncInterval),
+              Divider(),
+              LlmSettingsPanel(
+                model: data.modelWeights,
+                temperature: data.temperature,
+                maxAttempts: data.maxAttempts,
+                onChange: event "updateLlmSettings" { }
+              ),
+              Divider(),
+              Panel(
+                padding: 12.0,
+                child: Text(text: data.epicNote, variant: "body"),
+              ),
+            ],
+          ),
+
+        ...for x in data.isMarketplace:
+          VStack(
+            gap: 10.0,
+            children: [
+              Panel(
+                padding: 12.0,
+                child: Text(text: data.commissionNote, variant: "body"),
+              ),
+              Divider(),
+              ...for bundle in data.bundles:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 1, size: 20.0, tone: "teal", shapeHint: "orb"),
+                          Text(text: bundle.name, variant: "title"),
+                        ],
+                      ),
+                      Tag(text: bundle.version, tone: "indigo"),
+                      Text(text: bundle.price, variant: "mono"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isFeatures:
+          VStack(
+            gap: 14.0,
+            children: [
+              SectionLabel(text: "System Navigation & Swarm Utilities"),
+              HStack(
+                gap: 10.0,
+                children: [
+                  Button(label: "Timeline Scroll Neuron", onTap: event "toggleTimelineScroll" { }),
+                  Button(label: "Parallel Universes", onTap: event "toggleParallelUniverses" { }),
+                ],
+              ),
+              
+              ...for y in data.isTimelineScrollActive:
+                Panel(
+                  padding: 16.0,
+                  child: VStack(
+                    gap: 12.0,
+                    cross: "start",
+                    children: [
+                      HStack(
+                        between: true,
+                        children: [
+                          Text(text: "TIMELINE SCROLL NEURON (ACTIVE)", variant: "title"),
+                          Badge(text: "SYSTEM", tone: "indigo"),
+                        ],
+                      ),
+                      Text(text: "Navigate backwards or forwards across the global brain transaction state checkpoints. Clicking restores telemetry and visual overlays dynamically.", variant: "dim"),
+                      Divider(),
+                      
+                      ...for checkpoint in data.checkpoints:
+                        Panel(
+                          padding: 10.0,
+                          onTap: event "restoreCheckpoint" { id: checkpoint.id },
+                          child: HStack(
+                            between: true,
+                            children: [
+                              VStack(
+                                cross: "start",
+                                gap: 4.0,
+                                children: [
+                                  Text(text: checkpoint.name, variant: "title"),
+                                  Text(text: checkpoint.details, variant: "dim"),
+                                ],
+                              ),
+                              Tag(text: checkpoint.time, tone: "teal"),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+              ...for y in data.isParallelUniversesActive:
+                Panel(
+                  padding: 16.0,
+                  child: VStack(
+                    gap: 12.0,
+                    cross: "start",
+                    children: [
+                      Text(text: "PARALLEL TIMELINES & SWARMS", variant: "title"),
+                      Button(label: "Fork New Timeline", onTap: event "forkTimeline" { }),
+                      Text(text: "Compare cognitive processing topologies between Multi-Agent Swarm execution and direct virtual actor Group Chats.", variant: "dim"),
+                      Divider(),
+                      
+                      HStack(
+                        gap: 12.0,
+                        equal: true,
+                        children: [
+                          Panel(
+                            padding: 12.0,
+                            child: VStack(
+                              gap: 8.0,
+                              cross: "start",
+                              children: [
+                                Tag(text: "UNIVERSE A: GROUP CHAT", tone: "indigo"),
+                                KeyValue(label: "Status", value: data.groupChatStatus),
+                                KeyValue(label: "Telemetry", value: data.groupChatTelemetry),
+                                KeyValue(label: "Latency", value: data.groupChatLatency),
+                                KeyValue(label: "Verification", value: data.groupChatVerify),
+                                Divider(),
+                                Button(label: "Run Group Chat", onTap: event "runUniverse" { type: "group_chat" }),
+                              ],
+                            ),
+                          ),
+                          
+                          Panel(
+                            padding: 12.0,
+                            child: VStack(
+                              gap: 8.0,
+                              cross: "start",
+                              children: [
+                                Tag(text: "UNIVERSE B: SWARM", tone: "teal"),
+                                KeyValue(label: "Status", value: data.swarmStatus),
+                                KeyValue(label: "Telemetry", value: data.swarmTelemetry),
+                                KeyValue(label: "Latency", value: data.swarmLatency),
+                                KeyValue(label: "Verification", value: data.swarmVerify),
+                                Divider(),
+                                Button(label: "Run Swarm", onTap: event "runUniverse" { type: "swarm" }),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+              Divider(),
+              SectionLabel(text: "Installed Grains Directory"),
+              ...for actor in data.actors:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 2, size: 18.0, tone: "indigo", shapeHint: "orb"),
+                          Text(text: actor.name, variant: "title"),
+                        ],
+                      ),
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          Text(text: actor.type, variant: "dim"),
+                          Tag(text: actor.status, tone: "teal"),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isProfile:
+          VStack(
+            gap: 12.0,
+            children: [
+              KeyValue(label: "User ID", value: data.userId),
+              KeyValue(label: "Stripe Connect Merchant ID", value: data.stripeAccountId),
+              KeyValue(label: "Public Key Signature", value: data.verifiedKey),
+            ],
+          ),
+
+        ...for x in data.isSdk:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "SIGNALS USED", value: "42", delta: "Metered current month", tone: "teal"),
+                  Metric(label: "TOTAL LIMIT", value: "100", delta: "Standard Developer cap", tone: "indigo"),
+                ],
+              ),
+              Divider(),
+              Text(text: data.freeUsageText, variant: "body"),
+            ],
+          ),
+
+        ...for x in data.isInnolang:
+          VStack(
+            gap: 12.0,
+            children: [
+              Text(text: data.description, variant: "body"),
+              Divider(),
+              SectionLabel(text: "KEY INNOLANG PRINCIPLES"),
+              Bullets(
+                tone: "teal",
+                items: [
+                  "Spec-first verification: Gherkin scenario tests define exact neuron behavior.",
+                  "Virtual Orleans Grains: Neurons exist as active virtual actors.",
+                  "System Integration Seam: Connects external systems (Word) directly to diagram surfaces."
+                ]
+              ),
+              Divider(),
+              SectionLabel(text: "WORD-TO-DIAGRAM NEURAL FLOW"),
+              ...for step in data.steps:
+                Panel(
+                  padding: 12.0,
+                  child: VStack(
+                    gap: 6.0,
+                    children: [
+                      HStack(
+                        between: true,
+                        children: [
+                          Tag(text: step.neuron, tone: step.tone),
+                          Tag(text: step.phase, tone: "indigo"),
+                        ],
+                      ),
+                      Text(text: step.synapse, variant: "mono"),
+                      Text(text: step.description, variant: "dim"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isDb:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "TOTAL BUNDLES", value: "16", delta: "4 pending approval", tone: "indigo"),
+                  Metric(label: "LICENSES ISSUED", value: "94", delta: "Active subscription keys", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Postgres Connection URI", value: data.dbPath),
+              Divider(),
+              SectionLabel(text: "DATABASE SCHEMAS & RECORDS"),
+              ...for table in data.tables:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 5, size: 18.0, tone: "indigo", shapeHint: "orb"),
+                          Text(text: table.name, variant: "title"),
+                        ],
+                      ),
+                      Tag(text: table.rows, tone: "indigo"),
+                      Tag(text: table.status, tone: "teal"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isMarketplaceNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "COMMISSION RATE", value: "20%", delta: "Stripe Rev-Share System", tone: "teal"),
+                  Metric(label: "TOTAL TRANSACTIONS", value: "158", delta: "Last 30 days volume", tone: "indigo"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Stripe Merchant Integration", value: data.stripeStatus),
+              KeyValue(label: "InoLang Linker Engine", value: data.compilerVersion),
+              KeyValue(label: "Bundle Signature Algorithm", value: data.verificationEngine),
+              Divider(),
+              SectionLabel(text: "REGISTERED DIGITAL BRAIN BUNDLES"),
+              ...for bundle in data.bundles:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 6, size: 18.0, tone: "teal", shapeHint: "orb"),
+                          Text(text: bundle.name, variant: "title"),
+                        ],
+                      ),
+                      Tag(text: bundle.status, tone: "indigo"),
+                      Text(text: bundle.price, variant: "mono"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isMarketplaceItem:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "LICENSE COST", value: data.price, delta: data.license, tone: "teal"),
+                  Metric(label: "NEURON VERSION", value: data.version, delta: data.author, tone: "indigo"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Ecosystem Author", value: data.author),
+              KeyValue(label: "Contract ABI Standards", value: "Syntax 2.0 (Kernel.Emit)"),
+              Divider(),
+              SectionLabel(text: "DETAILED DESCRIPTION"),
+              Panel(
+                padding: 12.0,
+                child: Text(text: data.description, variant: "body"),
+              ),
+              Divider(),
+              ...for x in data.installed:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    alignment: "center",
+                    children: [
+                      Text(text: "STATUS: INSTALLED & RUNNING ACTIVE IN ORLEANS", variant: "mono"),
+                    ],
+                  ),
+                ),
+              ...for x in data.notInstalled:
+                Button(
+                  label: "INSTALL FROM MARKETPLACE",
+                  onTap: event "installMarketplaceNeuron" { marketplaceId: data.marketplaceId },
+                ),
+            ],
+          ),
+
+        ...for x in data.isLicenseNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "ACTIVE ENTITLEMENTS", value: "94", delta: "Validated keys", tone: "teal"),
+                  Metric(label: "KEY FORMAT", value: "ECDSA", delta: "secp256k1 Curve", tone: "indigo"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Cryptographic Public Key", value: data.publicKey),
+              KeyValue(label: "Validation Algorithm", value: data.verifyAlgorithm),
+              KeyValue(label: "Licensing Server Status", value: data.status),
+              Divider(),
+              SectionLabel(text: "CRYPTOGRAPHIC ENTITLEMENT REGISTER"),
+              ...for license in data.licenseKeys:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 7, size: 18.0, tone: "indigo", shapeHint: "orb"),
+                          Text(text: license.id, variant: "title"),
+                        ],
+                      ),
+                      Tag(text: license.status, tone: "teal"),
+                      Text(text: license.user, variant: "mono"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isCreatorNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "SPAWNED NODES", value: data.neuronCount, delta: "Orleans virtual actor instances", tone: "indigo"),
+                  Metric(label: "ACTIVE SYNAPSES", value: data.synapseCount, delta: "Signal routing pathways", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Orleans Target Grain ID", value: data.grainId),
+              KeyValue(label: "Virtual Memory Allocation", value: data.memoryUsage),
+              KeyValue(label: "Thread Execution Priority", value: data.threadPriority),
+              KeyValue(label: "Kernel Status Telemetry", value: data.status),
+            ],
+          ),
+
+        ...for x in data.isIdentityNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "VERIFIED IDENTITY KEYS", value: data.authStatus, delta: "Cryptographic state OK", tone: "indigo"),
+                  Metric(label: "ACTIVE USER SESSION", value: data.sessionCount, delta: "Valid local credentials", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Global Tenant Key ID", value: data.tenant),
+              KeyValue(label: "Auto-Rotation Period", value: data.keyRotation),
+              KeyValue(label: "Cryptographic Formats", value: data.algorithms),
+            ],
+          ),
+
+        ...for x in data.isTravelNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "OPTIMIZED ROUTINGS", value: data.routedTrips, delta: "Successful book actions", tone: "indigo"),
+                  Metric(label: "TOTAL CHARGED VOLUME", value: data.totalPaid, delta: "Stripe Connect Engine state", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Routing Solver Solver Engine", value: data.optimizer),
+              KeyValue(label: "Actor Thread State", value: data.status),
+              KeyValue(label: "Virtual Model Type", value: data.engine),
+            ],
+          ),
+
+        ...for x in data.isGmailNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "PARSED INCOMING MSGS", value: data.inboxCount, delta: "Synced mailbox content", tone: "indigo"),
+                  Metric(label: "SYNC INTERVAL CHECK", value: data.checkInterval, delta: "Telemetry sync loop rate", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Registered Mailbox", value: data.mailbox),
+              KeyValue(label: "OAuth2 Sync Status", value: data.syncStatus),
+              KeyValue(label: "Token OAuth Scope", value: data.authScope),
+            ],
+          ),
+
+        ...for x in data.isAiNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "PROCESSED TOKENS", value: data.tokensProcessed, delta: "Total consumption registry", tone: "indigo"),
+                  Metric(label: "AVG INF LATENCY", value: data.avgLatency, delta: "Local-model response rate", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "LLM Weights Target Model", value: data.model),
+              KeyValue(label: "Temperature Float Parameter", value: data.temperature),
+              KeyValue(label: "Context Limit Window size", value: data.contextWindow),
+            ],
+          ),
+
+        ...for x in data.isSqliteNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "PERSISTENT DISK SPACE", value: data.diskUsage, delta: "SQLite primary storage state", tone: "indigo"),
+                  Metric(label: "TRANSACTION SAVES TOTAL", value: data.totalSaves, delta: "Durable database mutations", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Active Cache Storage File", value: data.dbPath),
+              KeyValue(label: "WAL Journal Locking Mode", value: data.journalMode),
+              Divider(),
+              SectionLabel(text: "CACHED SCHEMA SCHEMAS & RECORDS"),
+              ...for table in data.tables:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 12, size: 18.0, tone: "indigo", shapeHint: "orb"),
+                          Text(text: table.name, variant: "title"),
+                        ],
+                      ),
+                      Tag(text: table.rows, tone: "indigo"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isOnboardingNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "ONBOARDED DEV MEMBER", value: data.onboardedUsers, delta: "Enrollment wizard state", tone: "indigo"),
+                  Metric(label: "TOTAL SUCCESS RATIO", value: data.conversionRate, delta: "Key generation complete", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Active Setup Scenario", value: data.wizardStatus),
+              KeyValue(label: "Wizard Progress Phase", value: data.currentStep),
+              Divider(),
+              SectionLabel(text: "SETUP PROTOCOL PROGRESS REGISTER"),
+              ...for step in data.steps:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 13, size: 18.0, tone: "teal", shapeHint: "orb"),
+                          Text(text: step.name, variant: "title"),
+                        ],
+                      ),
+                      Tag(text: step.status, tone: "teal"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isTaskManagerNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "ASSIGNED CRON LOOPS", value: data.jobsCount, delta: "Active schedules registered", tone: "indigo"),
+                  Metric(label: "TOTAL RUN FREQUENCY", value: data.triggersCount, delta: "Trigger cycles executed", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Virtual Scheduler Type", value: data.scheduler),
+              KeyValue(label: "Process Health Status", value: data.healthStatus),
+              Divider(),
+              SectionLabel(text: "CRON SCHEDULER ACTIVE REGISTRY"),
+              ...for job in data.jobs:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 14, size: 18.0, tone: "indigo", shapeHint: "orb"),
+                          VStack(
+                            cross: "start",
+                            gap: 4.0,
+                            children: [
+                              Text(text: job.name, variant: "title"),
+                              Text(text: job.interval, variant: "dim"),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Tag(text: job.status, tone: "teal"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isInnoLangInterpreter:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "COMPILED SCRIPTS COUNT", value: data.compiledScripts, delta: "Validated Gherkin specs", tone: "indigo"),
+                  Metric(label: "PARSED ABSTRACT NODES", value: data.astNodesCount, delta: "Deterministic logic flow", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "InnoLang Linker version", value: data.compilerVersion),
+              KeyValue(label: "Syntax Parser State Status", value: data.parserStatus),
+              KeyValue(label: "Signature Guard verifier", value: data.verifier),
+            ],
+          ),
+
+        ...for x in data.isWordConnectorNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "PARSED DOCS REGISTRY", value: data.docsRead, delta: "Microsoft Word file count", tone: "indigo"),
+                  Metric(label: "TOTAL CHARACTERS READ", value: data.charsParsed, delta: "OpenXML parsed text elements", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "OpenXML Engine Connector", value: data.connector),
+              KeyValue(label: "OS File Thread Lock State", value: data.fileLock),
+              Divider(),
+              SectionLabel(text: "RECENT WORD CONNECTOR SESSIONS"),
+              ...for doc in data.recentDocs:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 15, size: 18.0, tone: "indigo", shapeHint: "orb"),
+                          Text(text: doc.name, variant: "title"),
+                        ],
+                      ),
+                      Tag(text: doc.size, tone: "indigo"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.isDiagramExporterNeuron:
+          VStack(
+            gap: 12.0,
+            children: [
+              HStack(
+                gap: 12.0,
+                children: [
+                  Metric(label: "EXPORTED VECTOR SCHEMAS", value: data.diagramsRendered, delta: "Drawing models cataloged", tone: "indigo"),
+                  Metric(label: "DRAWING ENGINE STATE", value: data.status, delta: "Canvas layout system", tone: "teal"),
+                ],
+              ),
+              Divider(),
+              KeyValue(label: "Export Spec Scheme Format", value: data.exportFormat),
+              KeyValue(label: "Canvas Skia Render Engine", value: data.renderEngine),
+              Divider(),
+              SectionLabel(text: "EXPORT HISTORY REGISTER"),
+              ...for diagram in data.recentDiagrams:
+                Panel(
+                  padding: 12.0,
+                  child: HStack(
+                    between: true,
+                    children: [
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: 16, size: 18.0, tone: "teal", shapeHint: "orb"),
+                          VStack(
+                            cross: "start",
+                            gap: 4.0,
+                            children: [
+                              Text(text: diagram.name, variant: "title"),
+                              Text(text: diagram.nodes, variant: "mono"),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Tag(text: diagram.status, tone: "teal"),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.hasActivity:
+          VStack(
+            gap: 12.0,
+            children: [
+              KeyValue(label: "Correlation ID", value: data.correlationId),
+              Divider(),
+              ...for synapse in data.synapses:
+                Panel(
+                  padding: 12.0,
+                  child: VStack(
+                    gap: 8.0,
+                    children: [
+                      HStack(
+                        between: true,
+                        children: [
+                          Tag(text: synapse.typeName, tone: synapse.iconTone),
+                          Text(text: synapse.time, variant: "mono"),
+                        ],
+                      ),
+                      HStack(
+                        gap: 12.0,
+                        children: [
+                          GlowIcon(seed: synapse.iconSeed, size: 20.0, tone: synapse.iconTone, shapeHint: "orb"),
+                          Text(text: synapse.from, variant: "title"),
+                          Text(text: "→", variant: "dim"),
+                          Text(text: synapse.to, variant: "title"),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        ...for x in data.subtitle:
+          Text(text: data.subtitle, variant: "body"),
+
+        Divider(),
+        Button(label: "Back to Brain View", onTap: event "closeSurface" { }),
+      ],
+    ),
+  ),
+);
+
+widget LayoutOverlay = Panel(
+  padding: 16.0,
+  child: VStack(
+    gap: 12.0,
+    children: [
+      HStack(
+        between: true,
+        children: [
+          Text(text: "Adaptive Swarm Layout", variant: "title"),
+          Tag(text: data.activeLayout, tone: "teal"),
+        ],
+      ),
+      Divider(),
+      ...for x in data.layoutFullscreen:
+        VStack(
+          gap: 8.0,
+          children: [
+            Text(text: "Immersive Fullscreen Media Active", variant: "body"),
+            Text(text: "Visual components optimized for high-density video canvas stream playback.", variant: "dim"),
+          ]
+        ),
+      ...for x in data.layoutSplitWork:
+        VStack(
+          gap: 8.0,
+          children: [
+            Text(text: "Deep-Work Split Editor Active", variant: "body"),
+            Text(text: "Virtual workspaces side-by-side: Code editor and interactive dynamic terminal.", variant: "dim"),
+          ]
+        ),
+      ...for x in data.layoutDefault:
+        VStack(
+          gap: 8.0,
+          children: [
+            Text(text: "Default Swarm Perspective", variant: "body"),
+            Text(text: "Standard interface viewport. Actor-neurons are in listening mode.", variant: "dim"),
+          ]
+        ),
+      Divider(),
+      Button(label: "Dismiss State Overview", onTap: event "closeSurface" { }),
+    ],
+  ),
+);
+
