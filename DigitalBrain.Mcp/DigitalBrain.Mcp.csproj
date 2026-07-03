@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.SeedPacks\DigitalBrain.SeedPacks.csproj" />
   </ItemGroup>
 

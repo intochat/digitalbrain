@@ -15,18 +15,20 @@ Done:
 - Made `Brain.slnx` the single canonical solution with `src`, `integrations`, `hosts`, `tests`, `deploy`, and `clients` folders.
 - Updated CI and deploy to test `Brain.slnx` with `-p:SkipFlutterBuild=true`.
 - Moved concrete marketplace seeds from `DigitalBrain.Core` into `DigitalBrain.SeedPacks`.
+- Started Phase 2 by moving executable pack contracts, pack config schema/surface helper, trust helpers, and `KitExperience`/`UiExperience` authoring helpers from `DigitalBrain.Core` into `DigitalBrain.Pack.Contracts`.
+- Added architecture guard tests that keep `DigitalBrain.Core` free of runtime, host, integration, and pack-contract assembly references.
 - Renamed product-level Silo restart/deploy language to Kernel while preserving Orleans technical terms.
 - Renamed `DigitalBrain.Tests/UnitTest1.cs` to `DigitalBrain.Tests/Kernel/NeuronTests.cs`.
 
 Still left:
 
-- Split `DigitalBrain.Core` into smaller primitive/runtime/pack/UI/system contract packages.
+- Continue splitting `DigitalBrain.Core` into smaller primitive/runtime/pack/UI/system contract packages.
 - Split `DigitalBrain.Kernel` into runtime modules and make the host a composition root.
 - Make integration project names match ownership boundaries, especially interface-only projects.
-- Move remaining demo/sample UI leakage out of Core and gateway paths.
+- Move remaining marketplace projection, demo/sample UI leakage, and UI schema out of Core and gateway paths.
 - Split the central test project into explicit feedback-speed lanes.
 - Expand deployment beyond the current one-kernel-image MVP if Telegram transport and MCP need independent images.
-- Add architecture guard tests for Core and module dependency direction.
+- Add architecture guard tests for module dependency direction.
 - Clean existing nullable/obsolete API warnings.
 
 ## Executive Summary
@@ -168,7 +170,7 @@ brain/
   src/
     DigitalBrain.Primitives/          # NeuronId, TaskId, Synapse base, causal metadata
     DigitalBrain.Contracts/           # Stable runtime contracts split by domain folders
-    DigitalBrain.Packs.Abstractions/  # IPackBehavior, BundleManifest, config fields, trust primitives
+    DigitalBrain.Pack.Contracts/      # IPackBehavior, PackManifest, config fields, trust primitives
     DigitalBrain.Ui.Contracts/        # UiWidgetTree, UiSurface, action schema, no samples
     DigitalBrain.Runtime/             # Orleans grain base, dispatch, journals, stream wiring
     DigitalBrain.Kernel.Host/         # ASP.NET/Orleans host, Program.cs, DI composition
@@ -282,7 +284,7 @@ Priority: P1
 Current state:
 
 - `DigitalBrain.Core` is positioned as the stable primitive/protocol package.
-- It contains primitives, marketplace, UI, trust, economics interfaces, demo messages, task contracts, DB/chart contracts, software-team contracts, self-update contracts, and embedded marketplace seed source.
+- It still contains primitives, marketplace projection, UI, economics interfaces, demo messages, task contracts, DB/chart contracts, software-team contracts, and self-update contracts.
 
 Recommendation:
 
@@ -290,7 +292,7 @@ Split by stability and dependency direction:
 
 - `DigitalBrain.Primitives`: `Synapse`, `SynapseType`, `NeuronId`, `TaskId`, causal metadata.
 - `DigitalBrain.Runtime.Contracts`: `INeuron`, `IHandle<T>`, checkpoint/branch contracts.
-- `DigitalBrain.Pack.Contracts`: `IPackBehavior`, `BundleManifest`, `PackManifest`, config field schema, trust primitives.
+- `DigitalBrain.Pack.Contracts`: `IPackBehavior`, `PackManifest`, config field schema, trust primitives. `BundleManifest` and marketplace projection types remain in Core until the UI/marketplace surface split removes their Core callers.
 - `DigitalBrain.Ui.Contracts`: `UiSurface`, `UiWidgetTree`, UI action schema.
 - `DigitalBrain.System.Contracts`: runtime management and self-update contracts.
 - Domain-specific contract packages only when a domain is genuinely shared outside Kernel.
@@ -547,11 +549,12 @@ Goal: reduce stable contract blast radius.
 
 Tasks:
 
-1. Move UI schema from `DigitalBrain.Core` into `DigitalBrain.Ui.Contracts`.
-2. Move pack/marketplace contracts into `DigitalBrain.Pack.Contracts`.
-3. Move demo/test contracts out of Core.
-4. Move seed pack code out of Core.
-5. Keep compatibility type-forwarding only if packaging requires it.
+1. Move executable pack contracts, pack config, and pack trust helpers into `DigitalBrain.Pack.Contracts`. Current slice done.
+2. Move UI schema from `DigitalBrain.Core` into `DigitalBrain.Ui.Contracts`.
+3. Move remaining marketplace projection contracts into `DigitalBrain.Pack.Contracts` once Core UI callers are split.
+4. Move demo/test contracts out of Core.
+5. Move seed pack code out of Core.
+6. Keep compatibility type-forwarding only if packaging requires it.
 
 Validation:
 

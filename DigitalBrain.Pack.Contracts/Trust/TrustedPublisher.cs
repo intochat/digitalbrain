@@ -1,7 +1,9 @@
+using DigitalBrain.Core;
+
 namespace DigitalBrain.Core.Trust;
 
-// Built-in trusted-publisher identity for FIRST-PARTY seeds and the kernel pack only. Lets secure-by-default
-// (reject unsigned) ship without breaking the system's own preinstalled packs. NOT a production secret:
+// Built-in trusted-publisher identity for first-party seeds and the kernel pack only. Lets secure-by-default
+// (reject unsigned) ship without breaking the system's own preinstalled packs. Not a production secret:
 // third-party/remote publishers sign with their own keys via PackSignatureVerifier; real cloud trust keying
 // is a separate (deferred) Key Vault concern.
 public static class TrustedPublisher

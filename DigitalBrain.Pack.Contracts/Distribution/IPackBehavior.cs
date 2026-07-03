@@ -1,3 +1,5 @@
+using DigitalBrain.Core;
+
 namespace DigitalBrain.Core.Distribution;
 
 public enum PackConfigFieldKind { Text, Secret, Choice }
@@ -14,7 +16,7 @@ public record PackConfigField(
 // The contract a typed-C# marketplace pack implements to embody behavior in the already-running kernel.
 // Pure and synchronous: the capability is Roslyn-compiled into a collectible AssemblyLoadContext under the
 // CapabilityGate and dispatched to by the host GeneratedNeuron. This is the typed-C# replacement for the old
-// LLM "personality" stub — the pack IS C#, never .ino. A pack assembly references only this Protocol assembly.
+// LLM "personality" stub - the pack IS C#, never .ino. A pack assembly references only stable protocol packages.
 [GenerateSerializer]
 public record PackManifest(
     [property: Id(0)] IReadOnlyList<SynapseType> HandledSynapseTypes,

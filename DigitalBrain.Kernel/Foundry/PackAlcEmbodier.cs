@@ -8,8 +8,8 @@ namespace DigitalBrain.Kernel.Foundry;
 
 // THE KEYSTONE embodiment engine: compile a typed-C# pack -> CapabilityGate -> collectible ALC -> instantiate
 // its IPackBehavior, returning a live, disposable capability the host GeneratedNeuron dispatches to.
-// Harvests v3 GateNeuron's Resolving host-dependency hook (so the pack's reference to DigitalBrain.Core
-// unifies with the running host, making the IPackBehavior cast valid) and SuppressFlow-for-collectibility,
+// Harvests v3 GateNeuron's Resolving host-dependency hook (so the pack's references to Core and pack contracts
+// unify with the running host, making the IPackBehavior cast valid) and SuppressFlow-for-collectibility,
 // plus v3 InoCompiler's TPA reference resolution. No .ino: the pack IS C#.
 public interface IPackEmbodiment
 {
@@ -43,7 +43,11 @@ public sealed class PackAlcEmbodier : IPackEmbodiment
     public EmbodiedPack Embody(string packName, string source)
     {
         var assemblyName = "pack_" + Sanitize(packName) + "_" + Guid.NewGuid().ToString("N");
-        var compilation = FoundryCompilation.CreateWith(assemblyName, source, typeof(IPackBehavior).Assembly);
+        var compilation = FoundryCompilation.CreateWith(
+            assemblyName,
+            source,
+            typeof(IPackBehavior).Assembly,
+            typeof(Synapse).Assembly);
 
         var violations = CapabilityGate.FindViolations(compilation);
         if (violations.Count > 0)
@@ -94,7 +98,7 @@ public sealed class PackAlcEmbodier : IPackEmbodiment
         return null;
     }
 
-    // Unify shared assemblies (DigitalBrain.Core et al.) with the host so the loaded type's IPackBehavior
+    // Unify shared assemblies (DigitalBrain.Core, DigitalBrain.Pack.Contracts, etc.) with the host so the loaded type's IPackBehavior
     // IS the host's IPackBehavior — only then is the cast in Instantiate valid across the ALC boundary.
     private static Assembly? ResolveFromHost(AssemblyLoadContext context, AssemblyName name) =>
         AppDomain.CurrentDomain.GetAssemblies()

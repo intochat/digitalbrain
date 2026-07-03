@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Core.Trust;
 
@@ -63,8 +64,7 @@ public static class PackSignatureVerifier
         }
         catch (Exception ex) when (ex is CryptographicException or FormatException or ArgumentException)
         {
-            // A malformed key/signature from an untrusted publisher is a verification FAILURE, not a crash.
-            // Only these narrow input-shape exceptions are treated as "invalid"; anything else propagates.
+            // A malformed key/signature from an untrusted publisher is a verification failure, not a crash.
             return false;
         }
     }

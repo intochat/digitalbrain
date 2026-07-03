@@ -5,11 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- Core abstractions package. This is the stable primitive layer (INeuron, Synapse, packs as executable skills, surfaces, journals, distribution contracts) for the company brain. -->
+    <!-- Core abstractions package. This is the stable primitive layer (INeuron, Synapse, surfaces, journals, and universal contracts) for the company brain. -->
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Core</PackageId>
     <Version>0.3.0</Version>
-    <Description>Core abstractions (INeuron, Synapse with full causal lineage, IPackBehavior with PackManifest, IHandle, basic universal contracts, UiSurface, journals, distribution, trust). Pure stable layer. Kernel-specific surfaces and runtime live in kernel package.</Description>
+    <Description>Core abstractions (INeuron, Synapse with full causal lineage, IHandle, basic universal contracts, UiSurface, journals). Pure stable layer. Pack authoring contracts live in DigitalBrain.Pack.Contracts; kernel-specific surfaces and runtime live in kernel package.</Description>
   </PropertyGroup>
 
   <ItemGroup>
