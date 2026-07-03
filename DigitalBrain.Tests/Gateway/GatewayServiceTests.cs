@@ -7,6 +7,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Kernel.Market;
+using DigitalBrain.Salesforce;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
 using DigitalBrain.UiKit;
@@ -159,6 +160,27 @@ public class GatewayServiceTests : NeuronTestBase
         var authUrl = Assert.Single(timeline.OfType<Signal>(), signal => signal.Name == GoogleSignals.AuthUrl);
         Assert.Equal("google", authUrl.Props["provider"]);
         Assert.Contains("accounts.google.com", authUrl.Props["url"]!.ToString());
+    }
+
+    [Fact]
+    public async Task Send_SalesforceAuthRequested_Routes_To_SalesforceAuthNeuron()
+    {
+        var svc = NewService();
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = SalesforceSignals.AuthRequested,
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                sessionId = "chat-session-salesforce"
+            }))
+        }, TestContext());
+
+        var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-main");
+        var timeline = await auth.GetOutgoingTimelineAsync();
+        var form = Assert.Single(timeline.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
+        Assert.Equal("salesforce", form.Props["pack"]);
+        Assert.Equal("chat-session-salesforce", form.Props["sessionId"]);
     }
 
     [Fact]

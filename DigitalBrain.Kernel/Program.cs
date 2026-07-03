@@ -146,6 +146,14 @@ builder.Services.AddScoped<DigitalBrain.Google.IGoogleDriveApiClient>(sp =>
 builder.Services.AddScoped<DigitalBrain.Google.IGoogleCalendarApiClient>(sp =>
     new DigitalBrain.Google.GoogleCalendarApiClient(sp.GetRequiredService<Google.Apis.Auth.OAuth2.UserCredential>()));
 
+// Salesforce CRM REST API client: built from the encrypted "salesforce"/"default" pack config scope that
+// the Salesforce credential prompt stores. Scoped for the same per-grain-activation reason as Google.
+builder.Services.AddScoped<DigitalBrain.Salesforce.ISalesforceApiClient>(sp =>
+    DigitalBrain.Salesforce.SalesforceClientFactory
+        .CreateApiClientAsync(sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>())
+        .GetAwaiter()
+        .GetResult());
+
 // Proxy to private marketplace (new separate repo) when enabled.
 // Register the stub here; real impl uses HttpClient to the marketplace service.
 var useRemote = builder.Configuration.GetValue("DigitalBrain:Marketplace:UseRemote", false);

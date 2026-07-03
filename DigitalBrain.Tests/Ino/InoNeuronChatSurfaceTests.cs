@@ -5,6 +5,7 @@ using DigitalBrain.Core.UiKit;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
+using DigitalBrain.Salesforce;
 using DigitalBrain.TestKit;
 using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
@@ -60,6 +61,31 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
         Assert.Equal(GoogleSignals.AuthRequested, button.Props["synapseType"]);
     }
 
+    [Fact]
+    public async Task SalesforceIntent_WithoutCredential_Emits_Credential_Form_Surface()
+    {
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("Show my salesforce accounts", "session-salesforce-auth"));
+
+        var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
+        Assert.Equal("Show my salesforce accounts", response.Prompt);
+        Assert.Contains("Salesforce credentials", response.Response);
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surface = Assert.Single((await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>());
+        Assert.Equal(ConfigFormSurface.Kind, surface.Kind);
+        Assert.Equal("salesforce", surface.Props["pack"]);
+        Assert.Equal("session-salesforce-auth", surface.Props["sessionId"]);
+
+        var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
+        var fields = FindNodes(tree)
+            .Where(node => node.Type == UiKitVocabulary.TextField)
+            .Select(node => node.Props)
+            .ToList();
+        Assert.Contains(fields, field => Equals(field["name"], SalesforceClientFactory.ClientIdKey));
+        Assert.Contains(fields, field => Equals(field["name"], SalesforceClientFactory.PasswordKey) && Equals(field["secret"], true));
+    }
+
     private static UiWidgetTree? FindNode(UiWidgetTree tree, string type)
     {
         if (tree.Type == type)
@@ -73,6 +99,17 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
         }
 
         return null;
+    }
+
+    private static IEnumerable<UiWidgetTree> FindNodes(UiWidgetTree tree)
+    {
+        yield return tree;
+
+        foreach (var child in tree.Children ?? [])
+        {
+            foreach (var found in FindNodes(child))
+                yield return found;
+        }
     }
 }
 

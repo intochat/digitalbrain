@@ -67,7 +67,8 @@ public static class ConfigFormSurface
         {
             ["label"] = field.Label,
             ["key"] = field.Key,
-            ["name"] = field.Key
+            ["name"] = field.Key,
+            ["placeholder"] = field.Label
         };
         if (field.DependsOnKey is not null) props["dependsOnKey"] = field.DependsOnKey;
         if (field.DependsOnValue is not null) props["dependsOnValue"] = field.DependsOnValue;
