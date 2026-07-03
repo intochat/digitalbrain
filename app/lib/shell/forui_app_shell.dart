@@ -97,7 +97,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
           .listen(_onCard, onError: _onFeedError, onDone: _onFeedDone);
       _authSignalSub?.cancel();
       final authSub = client
-          .watchSynapses(googleAuthUrlWatchRequest())
+          .watchSynapses(authUrlWatchRequest())
           .listen(_onAuthSignal, onError: _onAuthSignalError);
 
       setState(() {
@@ -122,19 +122,19 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   }
 
   void _onAuthSignal(gw.SynapseEnvelope envelope) {
-    openGoogleAuthUrlFromEnvelope(envelope).then(
+    openAuthUrlFromEnvelope(envelope).then(
       (opened) {
         if (!opened) {
-          debugPrint('DigitalBrain ignored malformed Google auth URL signal.');
+          debugPrint('DigitalBrain ignored malformed auth URL signal.');
         }
       },
       onError: (Object error) =>
-          debugPrint('DigitalBrain Google auth URL launch failed: $error'),
+          debugPrint('DigitalBrain auth URL launch failed: $error'),
     );
   }
 
   void _onAuthSignalError(Object error) {
-    debugPrint('DigitalBrain Google auth signal stream failed: $error');
+    debugPrint('DigitalBrain auth signal stream failed: $error');
   }
 
   void _onFeedError(Object error, StackTrace stackTrace) {

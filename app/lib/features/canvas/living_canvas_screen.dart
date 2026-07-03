@@ -7,6 +7,7 @@ import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
 import 'package:digitalbrain_flutter/grpc/brainwatch.pbgrpc.dart' as bw;
 import 'package:digitalbrain_flutter/grpc/uigateway.pbgrpc.dart';
 import 'package:digitalbrain_flutter/grpc/uigateway.pb.dart' as ui;
+import 'package:digitalbrain_flutter/grpc/action_dispatch.dart';
 import 'package:digitalbrain_flutter/grpc/endpoint.dart';
 import 'package:digitalbrain_flutter/grpc/grpc_channel.dart';
 
@@ -302,31 +303,11 @@ widget root = Panel(
     Map<String, Object?> args,
   ) {
     debugPrint('Panel $panelId event: $name $args');
-    var type = args['type']?.toString();
-    // Support surface action descriptors (installAction etc from kit): use synapseType if no top-level type.
-    final synapseTypeVal = args['synapseType'];
-    if ((type == null || type.isEmpty) && synapseTypeVal is String && synapseTypeVal.isNotEmpty) {
-      type = synapseTypeVal;
-    }
-    final actionVal = args['action'];
-    if ((type == null || type.isEmpty) && actionVal is Map && actionVal['synapseType'] is String) {
-      final ass = actionVal['synapseType'] as String;
-      if (ass.isNotEmpty) type = ass;
-    }
     final client = _client;
-    if (type == null || type.isEmpty || client == null) return;
-    final payload = Map<String, Object?>.of(args)..remove('type');
-    var typeName = type;
-    if (type == 'cancelTask') typeName = 'CancelTask';
-    final envelope = gw.SynapseEnvelope()
-      ..correlationId = panelId
-      ..typeName = typeName
-      ..payload = Uint8List.fromList(utf8.encode(jsonEncode(payload)));
+    final envelope = buildPanelEventEnvelope(panelId, name, args);
+    if (envelope == null || client == null) return;
     client.send(envelope);
   }
-
-
-
 
   @override
   void dispose() {
@@ -658,5 +639,4 @@ widget root = Panel(
       ),
     );
   }
-
 }

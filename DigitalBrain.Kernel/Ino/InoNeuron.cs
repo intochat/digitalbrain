@@ -286,19 +286,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         try
         {
             var values = await store.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
-            return HasValue(values, SalesforceClientFactory.ClientIdKey) &&
-                   HasValue(values, SalesforceClientFactory.ClientSecretKey) &&
-                   HasValue(values, SalesforceClientFactory.UsernameKey) &&
-                   HasValue(values, SalesforceClientFactory.PasswordKey);
+            return SalesforceClientFactory.HasUsableCredential(values);
         }
         catch (Exception ex)
         {
             Logger.LogDebug(ex, "Salesforce credential check failed.");
             return false;
         }
-
-        static bool HasValue(IReadOnlyDictionary<string, string> values, string key) =>
-            values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
     }
 
     private async Task DeliverGoogleAuthSurfaceAsync(string? sessionId)
@@ -381,8 +375,21 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["maxResults"] = maxResults
         }));
 
-        var salesforce = GrainFactory.GetGrain<ISalesforceCrmNeuron>("salesforce-main");
-        var records = await salesforce.ListAccountsAsync(maxResults);
+        string[] records;
+        try
+        {
+            var salesforce = GrainFactory.GetGrain<ISalesforceCrmNeuron>("salesforce-main");
+            records = await salesforce.ListAccountsAsync(maxResults);
+        }
+        catch (Exception ex) when (IsSalesforceIntegrationFailure(ex))
+        {
+            Logger.LogWarning(ex, "Salesforce query failed after credentials were configured.");
+            var failureReply = SalesforceFailureReply(ex);
+            await FireAsync(new InoResponse(req.Prompt, failureReply, []));
+            await DeliverReplySurfaceAsync(failureReply, req.SessionId);
+            await DeliverSalesforceCredentialSurfaceAsync(req.SessionId);
+            return;
+        }
 
         await Broadcast(new Signal(SalesforceSignals.QueryResultsReady, new Dictionary<string, object?>
         {
@@ -590,6 +597,31 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var title = records.Count == 1 ? "Latest Salesforce account:" : "Salesforce accounts:";
         var lines = records.Select((record, i) => $"{i + 1}. {TrimForSurface(record)}");
         return title + Environment.NewLine + string.Join(Environment.NewLine, lines);
+    }
+
+    private static string SalesforceFailureReply(Exception exception)
+    {
+        var message = exception.GetBaseException().Message;
+        if (message.StartsWith(SalesforceClientFactory.AuthenticationFailureMessage, StringComparison.Ordinal))
+            return TrimForSurface(message);
+
+        if (message.Contains("authentication", StringComparison.OrdinalIgnoreCase))
+            return SalesforceClientFactory.AuthenticationFailureMessage;
+
+        return "I couldn't query Salesforce: " + TrimForSurface(message) +
+               ". Check your Salesforce credentials and try again.";
+    }
+
+    private static bool IsSalesforceIntegrationFailure(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current.GetType().FullName?.Contains("Salesforce", StringComparison.OrdinalIgnoreCase) == true ||
+                current.Message.Contains("Salesforce", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private static string TrimForSurface(string value)

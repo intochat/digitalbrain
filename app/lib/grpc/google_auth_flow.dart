@@ -5,12 +5,19 @@ import 'package:url_launcher/url_launcher.dart';
 import 'digitalbrain.pb.dart' as gw;
 
 const googleAuthUrlSignal = 'GoogleAuthUrl';
+const salesforceAuthUrlSignal = 'SalesforceAuthUrl';
+const _authUrlSignals = {googleAuthUrlSignal, salesforceAuthUrlSignal};
 
-gw.WatchSynapsesRequest googleAuthUrlWatchRequest() =>
-    gw.WatchSynapsesRequest(typeFilter: const [googleAuthUrlSignal]);
+gw.WatchSynapsesRequest googleAuthUrlWatchRequest() => authUrlWatchRequest();
 
-String? googleAuthUrlFromEnvelope(gw.SynapseEnvelope envelope) {
-  if (envelope.typeName != googleAuthUrlSignal) return null;
+gw.WatchSynapsesRequest authUrlWatchRequest() =>
+    gw.WatchSynapsesRequest(typeFilter: _authUrlSignals.toList());
+
+String? googleAuthUrlFromEnvelope(gw.SynapseEnvelope envelope) =>
+    authUrlFromEnvelope(envelope);
+
+String? authUrlFromEnvelope(gw.SynapseEnvelope envelope) {
+  if (!_authUrlSignals.contains(envelope.typeName)) return null;
 
   try {
     final decoded = jsonDecode(utf8.decode(envelope.payload));
@@ -24,7 +31,11 @@ String? googleAuthUrlFromEnvelope(gw.SynapseEnvelope envelope) {
 }
 
 Future<bool> openGoogleAuthUrlFromEnvelope(gw.SynapseEnvelope envelope) async {
-  final url = googleAuthUrlFromEnvelope(envelope);
+  return openAuthUrlFromEnvelope(envelope);
+}
+
+Future<bool> openAuthUrlFromEnvelope(gw.SynapseEnvelope envelope) async {
+  final url = authUrlFromEnvelope(envelope);
   final uri = url == null ? null : Uri.tryParse(url);
   if (uri == null) return false;
 

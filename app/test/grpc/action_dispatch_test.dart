@@ -5,7 +5,8 @@ import 'package:digitalbrain_flutter/grpc/action_dispatch.dart';
 
 void main() {
   Map<String, Object?> payloadOf(envelope) =>
-      (jsonDecode(utf8.decode(envelope!.payload)) as Map).cast<String, Object?>();
+      (jsonDecode(utf8.decode(envelope!.payload)) as Map)
+          .cast<String, Object?>();
 
   test('action with synapseType + props produces a unary envelope (login)', () {
     final envelope = buildActionEnvelope('action', {
@@ -52,6 +53,28 @@ void main() {
     expect(payloadOf(envelope), {'sessionId': 'session-gmail-auth'});
   });
 
+  test('Salesforce auth button adds OAuth callback URL', () {
+    final envelope = buildActionEnvelope('press', {
+      'synapseType': 'SalesforceAuthRequested',
+      'props': {
+        'pack': 'salesforce',
+        'callbackPath': '/salesforce-callback',
+        'client_id': 'connected-app-id',
+        'client_secret': 'connected-app-secret',
+      },
+    });
+
+    expect(envelope, isNotNull);
+    expect(envelope!.typeName, 'SalesforceAuthRequested');
+    expect(payloadOf(envelope), {
+      'pack': 'salesforce',
+      'callbackPath': '/salesforce-callback',
+      'client_id': 'connected-app-id',
+      'client_secret': 'connected-app-secret',
+      'redirect_uri': 'http://localhost:8081/salesforce-callback',
+    });
+  });
+
   test('nav-only event (no synapseType) produces no envelope', () {
     final envelope = buildActionEnvelope('press', {
       'label': 'Marketplace',
@@ -67,13 +90,64 @@ void main() {
   test('coerces non-string props to strings before encoding', () {
     final env = buildActionEnvelope('press', {
       'synapseType': 'ExperienceStep',
-      'props': {'pack': 'p', 'eventName': 'go', 'agree': true, 'level': 0.5, 'missing': null},
+      'props': {
+        'pack': 'p',
+        'eventName': 'go',
+        'agree': true,
+        'level': 0.5,
+        'missing': null,
+      },
     });
-    final decoded = jsonDecode(utf8.decode(env!.payload)) as Map<String, dynamic>;
+    final decoded =
+        jsonDecode(utf8.decode(env!.payload)) as Map<String, dynamic>;
     expect(decoded['agree'], 'true');
     expect(decoded['level'], '0.5');
     expect(decoded['pack'], 'p');
     expect(decoded['eventName'], 'go');
     expect(decoded['missing'], '');
   });
+
+  test('panel config action flattens props for ConfigurationProvided', () {
+    final envelope = buildPanelEventEnvelope(
+      'surface.pack-config.salesforce',
+      'press',
+      {
+        'synapseType': 'ConfigurationProvided',
+        'props': {
+          'pack': 'salesforce',
+          'eventName': 'ConfigurationProvided',
+          'client_id': 'connected-app-id',
+          'client_secret': 'connected-app-secret',
+          'username': 'user@example.com',
+          'password': 'pw',
+        },
+      },
+    );
+
+    expect(envelope, isNotNull);
+    expect(envelope!.typeName, 'ConfigurationProvided');
+    expect(payloadOf(envelope), {
+      'pack': 'salesforce',
+      'eventName': 'ConfigurationProvided',
+      'client_id': 'connected-app-id',
+      'client_secret': 'connected-app-secret',
+      'username': 'user@example.com',
+      'password': 'pw',
+    });
+  });
+
+  test(
+    'panel legacy type event preserves typed payload and panel correlation',
+    () {
+      final envelope = buildPanelEventEnvelope('panel-reminder', 'snooze', {
+        'type': 'DigitalBrain.WidgetCanvas.Snooze',
+        'minutes': 5,
+      });
+
+      expect(envelope, isNotNull);
+      expect(envelope!.correlationId, 'panel-reminder');
+      expect(envelope.typeName, 'DigitalBrain.WidgetCanvas.Snooze');
+      expect(payloadOf(envelope), {'minutes': 5});
+    },
+  );
 }

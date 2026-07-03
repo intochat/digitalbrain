@@ -12,12 +12,19 @@ public sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiClie
             throw new ArgumentException("SOQL query is required.", nameof(soql));
 
         ct.ThrowIfCancellationRequested();
-        var result = await client.QueryAsync<Dictionary<string, object?>>(soql).ConfigureAwait(false);
-        ct.ThrowIfCancellationRequested();
+        try
+        {
+            var result = await client.QueryAsync<Dictionary<string, object?>>(soql).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
 
-        return result.Records
-            .Select(record => JsonConvert.SerializeObject(Normalize(record)))
-            .ToArray();
+            return result.Records
+                .Select(record => JsonConvert.SerializeObject(Normalize(record)))
+                .ToArray();
+        }
+        catch (Exception ex) when (IsSalesforceClientException(ex))
+        {
+            throw new InvalidOperationException($"Salesforce query failed: {ex.Message}");
+        }
     }
 
     public Task<string[]> ListAccountsAsync(int maxResults, CancellationToken ct)
@@ -39,4 +46,8 @@ public sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiClie
             .ToDictionary(kv => kv.Key, kv => Normalize(kv.Value)),
         _ => value
     };
+
+    private static bool IsSalesforceClientException(Exception ex) =>
+        ex is not OperationCanceledException &&
+        ex.GetType().Namespace?.StartsWith("Salesforce.", StringComparison.Ordinal) == true;
 }

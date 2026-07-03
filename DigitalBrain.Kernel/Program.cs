@@ -16,6 +16,8 @@ using Orleans.Configuration;
 using Orleans.Journaling;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Economics;
+using DigitalBrain.Kernel.Salesforce;
+using DigitalBrain.Salesforce;
 using NeuroOSPrototype.ServiceDefaults;
 
 // Prototype silo host for DigitalBrain.
@@ -129,6 +131,7 @@ if (isAspireHosted)
         packConfigBlobs = new BlobServiceClient(grainStateConnStr);
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
+builder.Services.AddHostedService<SalesforceAppConfigSeeder>();
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
 
@@ -304,6 +307,85 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
     return Results.Ok();
 });
 
+app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
+    HttpRequest request,
+    DigitalBrain.Core.Config.IPackConfigStore packConfigStore,
+    IGrainFactory grains,
+    ILogger<Program> callbackLogger) =>
+{
+    var returnedError = request.Query["error"].FirstOrDefault();
+    if (!string.IsNullOrWhiteSpace(returnedError))
+    {
+        var description = request.Query["error_description"].FirstOrDefault();
+        return Results.Content(
+            SalesforceCallbackPage("Salesforce login failed", $"{returnedError}: {description}".TrimEnd(':', ' ')),
+            "text/html",
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var code = request.Query["code"].FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(code))
+    {
+        return Results.Content(
+            SalesforceCallbackPage("Salesforce login failed", "The callback did not include an authorization code."),
+            "text/html",
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var values = await packConfigStore.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
+    var returnedState = request.Query["state"].FirstOrDefault();
+    if (values.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) &&
+        !string.IsNullOrWhiteSpace(expectedState) &&
+        !string.Equals(expectedState, returnedState, StringComparison.Ordinal))
+    {
+        return Results.Content(
+            SalesforceCallbackPage("Salesforce login failed", "The callback state did not match the pending login."),
+            "text/html",
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var redirectUri = values.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var storedRedirectUri)
+        ? storedRedirectUri
+        : SalesforceCallbackUri(request);
+
+    try
+    {
+        var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(values, code, redirectUri);
+        var merged = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in tokenValues)
+            merged[key] = value;
+        merged.Remove(SalesforceClientFactory.OAuthStateKey);
+        merged.Remove(SalesforceClientFactory.OAuthCodeVerifierKey);
+
+        await packConfigStore.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged);
+
+        var ingress = grains.GetGrain<IIngressNeuron>("salesforce-auth-callback-" + Guid.NewGuid().ToString("N"));
+        await ingress.IngestAsync("PackConfigured", new Dictionary<string, object?>
+        {
+            ["pack"] = SalesforceClientFactory.PackName,
+            ["scope"] = SalesforceClientFactory.DefaultScope
+        });
+        await ingress.IngestAsync(SalesforceSignals.AuthCompleted, new Dictionary<string, object?>
+        {
+            ["provider"] = "salesforce",
+            ["pack"] = SalesforceClientFactory.PackName,
+            ["scope"] = SalesforceClientFactory.DefaultScope
+        });
+
+        return Results.Content(
+            SalesforceCallbackPage("Salesforce connected", "You can close this browser tab and return to DigitalBrain."),
+            "text/html");
+    }
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        callbackLogger.LogWarning(ex, "Salesforce OAuth callback failed.");
+        return Results.Content(
+            SalesforceCallbackPage("Salesforce login failed", ex.GetBaseException().Message),
+            "text/html",
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+});
+
 if (!isAspireHosted)
 {
     app.MapMcp().RequireHost("*:8081");
@@ -381,6 +463,36 @@ static Google.Apis.Auth.OAuth2.UserCredential BuildGoogleCredential(IServiceProv
         Google.Apis.Gmail.v1.GmailService.ScopeConstants.MailGoogleCom,
         Google.Apis.Drive.v3.DriveService.ScopeConstants.Drive,
         Google.Apis.Calendar.v3.CalendarService.ScopeConstants.Calendar);
+}
+
+static string SalesforceCallbackUri(HttpRequest request) =>
+    new UriBuilder(request.Scheme, request.Host.Host, request.Host.Port ?? -1, SalesforceClientFactory.DefaultCallbackPath)
+        .Uri
+        .ToString();
+
+static string SalesforceCallbackPage(string title, string message)
+{
+    var safeTitle = System.Net.WebUtility.HtmlEncode(title);
+    var safeMessage = System.Net.WebUtility.HtmlEncode(message);
+    return $$"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <title>{{safeTitle}}</title>
+          <style>
+            body { font-family: system-ui, sans-serif; margin: 3rem; line-height: 1.5; }
+            main { max-width: 42rem; }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>{{safeTitle}}</h1>
+            <p>{{safeMessage}}</p>
+          </main>
+        </body>
+        </html>
+        """;
 }
 
 public partial class Program;
