@@ -7,7 +7,7 @@ compile, run, and durably load real C# at runtime.
 - **Tier 1 (Run):** `CodeRunNeuron` → `InProcessAlcExecutor`. Roslyn compile in memory,
   run in a collectible `AssemblyLoadContext`, unload. No restart. For logic/experiences.
 - **Tier 2 (Deploy):** `CodeDeployNeuron`. Verify-build to a temp project (Orleans codegen
-  runs, silo untouched) → on success commit source to `Generated/` → request Aspire silo
+  runs, kernel untouched) → on success commit source to `Generated/` → request Aspire kernel
   restart → Orleans auto-registers the new grain types. Journals (Redis) survive.
 
 ## Entry points

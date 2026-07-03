@@ -117,18 +117,18 @@ public class CodeFoundrySteps : IAsyncDisposable
         Assert.Contains(_timeline, s => s.Type == nameof(CodeBuilt));
     }
 
-    [Then(@"the timeline contains a SiloRestartRequested")]
-    public async Task ThenTimelineContainsSiloRestartRequested()
+    [Then(@"the timeline contains a KernelRestartRequested")]
+    public async Task ThenTimelineContainsKernelRestartRequested()
     {
         _timeline = await _currentGrain!.GetTimelineAsync();
-        Assert.Contains(_timeline, s => s.Type == nameof(SiloRestartRequested));
+        Assert.Contains(_timeline, s => s.Type == nameof(KernelRestartRequested));
     }
 
-    [Then(@"the timeline does not contain a SiloRestartRequested")]
-    public async Task ThenTimelineDoesNotContainSiloRestartRequested()
+    [Then(@"the timeline does not contain a KernelRestartRequested")]
+    public async Task ThenTimelineDoesNotContainKernelRestartRequested()
     {
         _timeline = await _currentGrain!.GetTimelineAsync();
-        Assert.DoesNotContain(_timeline, s => s.Type == nameof(SiloRestartRequested));
+        Assert.DoesNotContain(_timeline, s => s.Type == nameof(KernelRestartRequested));
     }
 
     [Then(@"the timeline contains a FoundryRolledBack")]
@@ -192,4 +192,3 @@ public class CodeFoundrySteps : IAsyncDisposable
         }
     }
 }
-

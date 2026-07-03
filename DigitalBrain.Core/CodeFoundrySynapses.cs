@@ -45,9 +45,9 @@ public record CodeBuilt(
     [property: Id(2)] string BuildLog) : Synapse(nameof(CodeBuilt), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record SiloRestartRequested(
+public record KernelRestartRequested(
     [property: Id(0)] string Reason,
-    [property: Id(1)] string ModuleName) : Synapse(nameof(SiloRestartRequested), DateTimeOffset.UtcNow);
+    [property: Id(1)] string ModuleName) : Synapse(nameof(KernelRestartRequested), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record FoundryRequest(

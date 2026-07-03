@@ -83,7 +83,7 @@ Requirements we questioned and their verdict:
 
 - **"We need a `Bundle` type."** → *Dumb as stated.* A new first-class type means a whole new install/trust/version/test rail to build and prove. **Deleted** in favor of `NeuroPack` + a manifest. The pack rail already compiles, signs, embodies, and proves N+1.
 - **"The marketplace must be open to the public for v1."** → *Dumb.* Open publishing forces the untrusted-code-sandbox problem, which is the single hardest thing in the system. **Deleted** for v1 → trusted-publisher gate.
-- **"Telegram should run from the dev AppHost in prod / or be co-hosted in the kernel."** → *Dumb.* Co-hosting puts public ingress on the silo and couples channel I/O to kernel scaling and rolling restarts; the dev AppHost is a dev launcher, not a prod host. **Resolved** → separate stateless channel app.
+- **"Telegram should run from the dev AppHost in prod / or be co-hosted in the kernel."** → *Dumb.* Co-hosting puts public ingress on the kernel and couples channel I/O to kernel scaling and rolling restarts; the dev AppHost is a dev launcher, not a prod host. **Resolved** → separate stateless channel app.
 - **"Each bundle needs its own branded bot."** → *Premature.* With a handful of trusted creators, N branded bots is multiplexing work with no v1 payoff. **Deferred** → single platform bot + deep-link routing.
 
 ### Step 2 — Delete the part or process
@@ -232,7 +232,7 @@ The in-app marketplace surface lists bundles faceted by **tier**, **channel**, a
 
 ### 7.3 Install → N+1
 
-`InstallFromMarketplace` runs the existing gates (ownership for private, signature verification, license entitlement for priced bundles), records commission, fires `NeuroPackInstalled`, and routes to the `GeneratedNeuron`, which compiles → embodies in a collectible ALC → handles its declared synapses. One broadcast now reaches N+1 handlers, no silo restart.
+`InstallFromMarketplace` runs the existing gates (ownership for private, signature verification, license entitlement for priced bundles), records commission, fires `NeuroPackInstalled`, and routes to the `GeneratedNeuron`, which compiles → embodies in a collectible ALC → handles its declared synapses. One broadcast now reaches N+1 handlers, no kernel restart.
 
 ### 7.4 Configure
 
@@ -255,7 +255,7 @@ Author sets `Price`; platform takes `CommissionRate`; priced installs require a 
 
 ### 7.8 Update
 
-Publishing a higher version and installing it re-embodies the bundle live. The `kernel` substrate bundle updates itself via the rolling HA restart (`PerformKernelSelfUpdate` → `AspireNeuron`). Content/channel bundles never need a silo restart.
+Publishing a higher version and installing it re-embodies the bundle live. The `kernel` substrate bundle updates itself via the rolling HA restart (`PerformKernelSelfUpdate` → `AspireNeuron`). Content/channel bundles never need a kernel restart.
 
 ---
 
@@ -359,7 +359,7 @@ Each phase is independently shippable and gets its own implementation plan (writ
 
 - **Authoring velocity:** time from "new bundle idea" to "green test with live-rendered UI" < 30 min for a small bundle.
 - **Distribution proof:** a signed content bundle published, shared by Telegram deep-link, and used by a fresh user in prod — end to end, no manual deploy.
-- **No-restart guarantee:** installing/updating a content or channel bundle never restarts the silo (kernel self-update is the only restart path, and it's rolling/HA).
+- **No-restart guarantee:** installing/updating a content or channel bundle never restarts the kernel (kernel self-update is the only restart path, and it's rolling/HA).
 - **Trust integrity:** no untrusted author code runs in the shared brain in v1.
 
 ---

@@ -15,9 +15,8 @@ jobs:
         with:
           dotnet-version: '11.0.x'
 
-      # Build + run via the test project so CI restores only its dependency graph. Brain.slnx pulls in
-      # ../app/Flutter.proj (the sibling app repo), which isn't checked out in headless CI, so building the whole
-      # solution can't work on a runner. The test project covers every .NET project under test.
+      # Brain.CI.slnx is the headless-safe solution boundary. Brain.Full.slnx keeps the sibling Flutter client
+      # integration for local development, but ../app is not checked out on GitHub runners.
       # E2E specs need the full Aspire stack (Ollama + replicas) + Playwright and are gated out of headless CI,
       # mirroring the documented "DigitalBrain.Tests excluding gated E2E" verification.
-      - run: dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release --filter "FullyQualifiedName!~E2E"
+      - run: dotnet test Brain.CI.slnx -c Release --filter "FullyQualifiedName!~E2E"

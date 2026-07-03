@@ -93,7 +93,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
                 bus.Broadcast(new RfwCard("digitalbrain", "KernelRollingDrainCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "draining", version })));
             }
 
-            await FireAsync(new RestartResource("silo", IsRollingUpdate: true, TargetVersion: version, Strategy: $"replica-{replica}-of-3"));
+            await FireAsync(new RestartResource("kernel", IsRollingUpdate: true, TargetVersion: version, Strategy: $"replica-{replica}-of-3"));
 
             var replicaLineage = await GetCausalLineageAsync(preUpdateCheckpoint.SynapseId);
             lineageCount = replicaLineage.Count;

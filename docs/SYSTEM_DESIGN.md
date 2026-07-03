@@ -361,11 +361,9 @@ for Orleans clustering/journal.
   repaired. The supported fast local-dev path is `aspire run` from `brain/` (`NeuroOSPrototype.AppHost`),
   which already has an equivalent-or-better resource graph (kernel, default Windows Flutter client,
   MCP, optional Telegram via env vars) than brain.cs ever reached.
-- **A pre-existing E2E fixture bug is deferred, not fixed**: `CONTINUITY.md` documents that
-  `DigitalBrainAppHostFixture.InitializeAsync` still waits on a resource literally named `"silo"` — a
-  leftover from the Silo→Kernel rename — causing a 5-minute hang; the workaround is excluding that E2E
-  namespace rather than fixing the wait target.
-  `docs/specs/2026-06-26-bucket-d-flutter-render-e2e-design.md`-era code was the last to touch this.
+- **Resolved (2026-07-03): the E2E AppHost fixture waits for `"kernel"`.** The stale Silo→Kernel
+  rename gap documented in earlier continuity notes no longer applies; `DigitalBrainAppHostFixture`
+  waits for the AppHost resource named `"kernel"` before resolving `web` and `grpc` endpoints.
 - **Distribution & Bundles Phase 2 (open publishing, untrusted-code sandbox, BYO-token branded bots,
   exportable bundle file, embeddable surface) is explicitly spec-only** — `docs/specs/
   2026-07-01-distribution-and-bundles.md` §11 marks it "decide on demand," not started. Phase 0 and

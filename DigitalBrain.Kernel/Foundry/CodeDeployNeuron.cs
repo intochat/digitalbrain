@@ -26,13 +26,13 @@ public class CodeDeployNeuron(ILogger<CodeDeployNeuron> logger, NeuronJournals j
         CommitSource(cmd.ModuleName, cmd.Source);
 
         var resourceController = ServiceProvider.GetRequiredService<IResourceController>();
-        await resourceController.RestartSiloAsync("apply-" + cmd.ModuleName);
-        await FireAsync(new SiloRestartRequested("apply-" + cmd.ModuleName, cmd.ModuleName));
+        await resourceController.RestartKernelAsync("apply-" + cmd.ModuleName);
+        await FireAsync(new KernelRestartRequested("apply-" + cmd.ModuleName, cmd.ModuleName));
     }
 
     private bool RestartPending()
     {
-        var lastRestart = OutgoingJournal.OfType<SiloRestartRequested>().LastOrDefault();
+        var lastRestart = OutgoingJournal.OfType<KernelRestartRequested>().LastOrDefault();
         if (lastRestart is null) return false;
         var lastActivated = OutgoingJournal.OfType<NeuronActivated>().LastOrDefault();
         return lastActivated is null || lastRestart.Timestamp >= lastActivated.Timestamp;

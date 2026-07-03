@@ -66,7 +66,7 @@ Scenario: Kernel self-update publishes as pre-installed pack then performs expli
   Given an aspire orchestrator neuron "aspire-main"
   When I publish pack "kernel" version "rolling-2026.6"
   And I download/install the pack "kernel" version "rolling-2026.6"
-  And I fire a StartDistributedApp for "silo"
+  And I fire a StartDistributedApp for "kernel"
   Then the timeline contains a NeuroPackInstalled
   And the timeline contains a DistributedAppStarted
   And the timeline contains a UiSurface
