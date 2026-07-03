@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Core.Ui;
+using DigitalBrain.Demo.Runtime;
 using DigitalBrain.Kernel.Auth;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Runtime.Grpc;
@@ -22,7 +23,7 @@ public sealed class GatewayService(
     {
         try
         {
-            if (request.TypeName == KernelSurfaceDemo.RequestType)
+            if (request.TypeName == SurfaceDemoRuntime.RequestType)
             {
                 await InstallAndRunSurfaceDemoAsync(request.CorrelationId);
                 return request;
@@ -413,9 +414,9 @@ public sealed class GatewayService(
             ? Guid.NewGuid().ToString("N")
             : correlationId;
 
-        var pack = KernelSurfaceDemo.SignedPack();
+        var pack = SurfaceDemoRuntime.SignedPack();
         var marketplace = grains.GetGrain<IMarketplaceNeuron>("market-ui-demo");
-        var generated = grains.GetGrain<IGeneratedNeuron>(KernelSurfaceDemo.GeneratedNeuronKey);
+        var generated = grains.GetGrain<IGeneratedNeuron>(SurfaceDemoRuntime.GeneratedNeuronKey);
 
         await PublishSurfaceDemoGraphAsync(requestCorrelationId, "request accepted");
 
@@ -459,8 +460,8 @@ public sealed class GatewayService(
         string phase,
         IReadOnlyList<Synapse>? generatedTimeline = null)
     {
-        var surface = KernelSurfaceDemo.ActivityGraphSurface(correlationId, phase, generatedTimeline);
-        var observability = grains.GetGrain<IObservabilityNeuron>(KernelSurfaceDemo.ObservabilityNeuronKey);
+        var surface = SurfaceDemoRuntime.ActivityGraphSurface(correlationId, phase, generatedTimeline);
+        var observability = grains.GetGrain<IObservabilityNeuron>(SurfaceDemoRuntime.ObservabilityNeuronKey);
         try
         {
             await observability.FireAsync(surface);

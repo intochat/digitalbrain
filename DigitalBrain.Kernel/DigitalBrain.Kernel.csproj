@@ -46,6 +46,7 @@
     <ProjectReference Include="..\DigitalBrain.Context\DigitalBrain.Context.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Demo.Contracts\DigitalBrain.Demo.Contracts.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Demo.Runtime\DigitalBrain.Demo.Runtime.csproj" />
     <ProjectReference Include="..\DigitalBrain.Developer\DigitalBrain.Developer.csproj" />
     <ProjectReference Include="..\DigitalBrain.Google\DigitalBrain.Google.csproj" />
     <ProjectReference Include="..\DigitalBrain.Marketplace.Contracts\DigitalBrain.Marketplace.Contracts.csproj" />

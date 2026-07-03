@@ -1,10 +1,10 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Trust;
 using DigitalBrain.Core.Ui;
+using DigitalBrain.Core.Trust;
 
-namespace DigitalBrain.Kernel.Gateway;
+namespace DigitalBrain.Demo.Runtime;
 
-public static class KernelSurfaceDemo
+public static class SurfaceDemoRuntime
 {
     public const string RequestType = "DigitalBrain.Kernel.SurfaceDemoRequested";
     public const string PackName = "SurfaceDemoPack";
