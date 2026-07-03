@@ -7,7 +7,8 @@ namespace DigitalBrain.Aspire;
 
 public sealed class DigitalBrainContext
 {
-    public required IResourceBuilder<DigitalBrainResource> Resource { get; init; }
+    public required string Name { get; init; }
+    public required IDistributedApplicationBuilder ApplicationBuilder { get; init; }
     public required OrleansService Orleans { get; init; }
     public required object Llm { get; init; }
     public required OrleansServiceClient OrleansClient { get; init; }
@@ -52,9 +53,6 @@ public static class DigitalBrainBuilderExtensions
             options.KernelReplicas = replicaOverride;
         }
 
-        var resource = new DigitalBrainResource(name);
-        var db = builder.AddResource(resource);
-
         var llmProvider = options.LlmProvider;
         var llmModel = options.LlmModel ?? (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase)
             ? "gpt-4o-mini"
@@ -88,7 +86,8 @@ public static class DigitalBrainBuilderExtensions
 
         return new DigitalBrainContext
         {
-            Resource = db,
+            Name = name,
+            ApplicationBuilder = builder,
             Orleans = orleans,
             Llm = qwen,
             OrleansClient = orleans.AsClient(),
@@ -177,11 +176,11 @@ public static class DigitalBrainBuilderExtensions
         string flutterAppPath,
         string target = "windows")
     {
-        var cmd = ctx.Resource.ApplicationBuilder.Configuration["DigitalBrain:FlutterCommand"]
+        var cmd = ctx.ApplicationBuilder.Configuration["DigitalBrain:FlutterCommand"]
             ?? Environment.GetEnvironmentVariable("FLUTTER_COMMAND")
             ?? "flutter";
 
-        return ctx.Resource.ApplicationBuilder.AddExecutable(
+        return ctx.ApplicationBuilder.AddExecutable(
                 name,
                 cmd,
                 flutterAppPath,
@@ -243,7 +242,7 @@ public static class DigitalBrainBuilderExtensions
     // The DigitalBrain.UI.AspireFlutter (or equivalent) pack can later provide/override these resource bits.
     public static IResourceBuilder<ExecutableResource>? AddDefaultDevFlutterClient(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
-        var flutterPath = ResolveDevFlutterAppPath(ctx.Resource.ApplicationBuilder);
+        var flutterPath = ResolveDevFlutterAppPath(ctx.ApplicationBuilder);
         if (string.IsNullOrEmpty(flutterPath))
             return null;
         return ctx.AddFlutterClient("flutter-ui", flutterPath, "windows")
