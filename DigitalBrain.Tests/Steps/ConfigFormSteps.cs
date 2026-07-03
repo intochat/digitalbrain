@@ -51,6 +51,7 @@ public class ConfigFormSteps : IAsyncDisposable
         return """
             using System.Collections.Generic;
             using DigitalBrain.Core;
+            using DigitalBrain.Core.Distribution;
 
             public sealed class GenericConfigured : IPackBehavior
             {

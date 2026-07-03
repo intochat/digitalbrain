@@ -12,7 +12,7 @@ public class PackAlcEmbodierTests
     public void Embodies_Compiled_Pack_Runs_It_Then_Unloads()
     {
         const string code = """
-            public sealed class UpperPack : DigitalBrain.Core.IPackBehavior
+            public sealed class UpperPack : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) => input.ToUpperInvariant();
             }
@@ -46,11 +46,11 @@ public class PackAlcEmbodierTests
     public void Embodies_Typed_Synapse_Handler()
     {
         const string code = """
-            public sealed class TypedPack : DigitalBrain.Core.IPackBehavior
+            public sealed class TypedPack : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) => "fallback:" + input;
 
-                public DigitalBrain.Core.PackManifest GetManifest() =>
+                public DigitalBrain.Core.Distribution.PackManifest GetManifest() =>
                     new(new[] { new DigitalBrain.Core.SynapseType(nameof(DigitalBrain.Core.DemoMessageSynapse)) });
 
                 public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
@@ -61,7 +61,7 @@ public class PackAlcEmbodierTests
                     var message = (DigitalBrain.Core.DemoMessageSynapse)synapse;
                     return new DigitalBrain.Core.Synapse[]
                     {
-                        new DigitalBrain.Core.PackEmission("", message.Text, "typed:" + message.Text)
+                        new DigitalBrain.Core.Distribution.PackEmission("", message.Text, "typed:" + message.Text)
                     };
                 }
             }
@@ -89,7 +89,7 @@ public class PackAlcEmbodierTests
     public void CapabilityGate_Rejects_Process_Launch()
     {
         const string code = """
-            public sealed class EvilPack : DigitalBrain.Core.IPackBehavior
+            public sealed class EvilPack : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input)
                 {

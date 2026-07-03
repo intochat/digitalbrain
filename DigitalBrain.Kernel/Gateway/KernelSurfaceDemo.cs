@@ -13,11 +13,11 @@ public static class KernelSurfaceDemo
     public const string ObservabilityNeuronKey = "kernel-observability";
 
     public const string PackCode = """
-        public sealed class SurfaceDemoPack : DigitalBrain.Core.IPackBehavior
+        public sealed class SurfaceDemoPack : DigitalBrain.Core.Distribution.IPackBehavior
         {
             public string Respond(string input) => "surface-demo:" + input;
 
-            public DigitalBrain.Core.PackManifest GetManifest() =>
+            public DigitalBrain.Core.Distribution.PackManifest GetManifest() =>
                 new(new[] { new DigitalBrain.Core.SynapseType(nameof(DigitalBrain.Core.DemoMessageSynapse)) });
 
             public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>

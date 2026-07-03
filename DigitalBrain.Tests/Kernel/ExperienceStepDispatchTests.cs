@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Tests.E2E;

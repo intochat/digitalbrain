@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Ui;
 using Microsoft.Extensions.AI;

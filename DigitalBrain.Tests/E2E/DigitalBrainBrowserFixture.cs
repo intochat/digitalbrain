@@ -4,7 +4,7 @@ namespace DigitalBrain.Tests.E2E;
 
 /// <summary>
 /// Provides a real running Flutter web app (inside a Chromium via Playwright) against
-/// the full DigitalBrain stack (Aspire + kernels + gateway).
+/// the full DigitalBrain stack (Aspire + kernel-hosted gateway).
 ///
 /// This fixture exists **only** for live rendering verification:
 /// - Does the RFW + UiSurfaceTreeRenderer + ui_kit actually produce visible, accessible widgets?

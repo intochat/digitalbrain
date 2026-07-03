@@ -6,7 +6,7 @@ namespace DigitalBrain.Tests.Authoring.DriverProbePack;
 public static class Source
 {
     public const string Code = """
-        public sealed class DriverProbePack : DigitalBrain.Core.IPackBehavior
+        public sealed class DriverProbePack : DigitalBrain.Core.Distribution.IPackBehavior
         {
             public string Respond(string input) => "driver-echo:" + (input ?? string.Empty);
         }

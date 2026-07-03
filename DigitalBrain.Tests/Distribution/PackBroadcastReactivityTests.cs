@@ -22,6 +22,7 @@ public class PackBroadcastReactivityTests : NeuronTestBase
         return """
             using System.Collections.Generic;
             using DigitalBrain.Core;
+            using DigitalBrain.Core.Distribution;
 
             public sealed class PingEcho : IPackBehavior
             {

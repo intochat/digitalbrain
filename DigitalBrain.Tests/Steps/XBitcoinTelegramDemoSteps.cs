@@ -1,6 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel.Market;
-using DigitalBrain.Mcp.Tools;
+using DigitalBrain.Mcp;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;

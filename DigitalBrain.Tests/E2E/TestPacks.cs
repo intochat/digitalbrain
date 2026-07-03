@@ -16,11 +16,11 @@ public static class TestPacks
     // and flt-semantics-identifier == surfaceId.
     // Ties to tg context flow (tg Signal -> viz/chart with originChannel -> flutter).
     public static string RenderableSurfacePack(string surfaceId) => $$"""
-        public sealed class RenderableSurfacePack : DigitalBrain.Core.IPackBehavior
+        public sealed class RenderableSurfacePack : DigitalBrain.Core.Distribution.IPackBehavior
         {
             public string Respond(string input) => "surface:" + input;
 
-            public DigitalBrain.Core.PackManifest GetManifest() =>
+            public DigitalBrain.Core.Distribution.PackManifest GetManifest() =>
                 new(new[] { new DigitalBrain.Core.SynapseType(nameof(DigitalBrain.Core.DemoMessageSynapse)) });
 
             public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>

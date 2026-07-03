@@ -11,7 +11,7 @@ public class PackSpecDriverTests : NeuronTestBase
     public async Task PublishInstallFire_RoundTrips_A_Minimal_Pack()
     {
         const string packCode = """
-            public sealed class DriverProbePack : DigitalBrain.Core.IPackBehavior
+            public sealed class DriverProbePack : DigitalBrain.Core.Distribution.IPackBehavior
             {
                 public string Respond(string input) => "driver-echo:" + (input ?? string.Empty);
             }

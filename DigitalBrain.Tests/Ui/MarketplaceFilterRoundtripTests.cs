@@ -12,7 +12,7 @@ public class MarketplaceFilterRoundtripTests : NeuronTestBase
         // hello-world is a KitExperience → Content tier when materialized at publish.
         // hello-world demo removed (bloat delete).
         await market.FireAsync(new PublishToMarketplace(
-            "plain", "1.0.0", Code: "public class P : DigitalBrain.Core.IPackBehavior { public string Respond(string i) => i; }",
+            "plain", "1.0.0", Code: "public class P : DigitalBrain.Core.Distribution.IPackBehavior { public string Respond(string i) => i; }",
             OwnerId: "tester", CommissionRate: 0.0));
 
         await market.FireAsync(new FilterMarketplace(Tier: "Content"));

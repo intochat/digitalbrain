@@ -10,6 +10,7 @@ public static class MarketplaceSeeds
     public const string TelegramResponderPackCode = """
 using System.Collections.Generic;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 
 public sealed class TelegramResponderNeuron : IPackBehavior
 {
@@ -81,6 +82,7 @@ public sealed class TelegramResponderNeuron : IPackBehavior
     public const string KeywordWatcherPackCode = """
 using System.Collections.Generic;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 
 public sealed class KeywordWatcherNeuron : IPackBehavior
 {
@@ -120,6 +122,7 @@ public sealed class KeywordWatcherNeuron : IPackBehavior
     public const string XBitcoinTelegramDemoPackCode = """
 using System.Collections.Generic;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 
 public sealed class XBitcoinTelegramDemoNeuron : IPackBehavior
 {

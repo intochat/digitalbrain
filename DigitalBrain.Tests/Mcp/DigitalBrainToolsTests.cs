@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Mcp.Tools;
+using DigitalBrain.Mcp;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
 

@@ -88,7 +88,7 @@ Requirements we questioned and their verdict:
 
 ### Step 2 — Delete the part or process
 
-Deleted from v1 scope: new Bundle runtime type, open publishing, untrusted-code sandbox, per-creator bots, exportable file, embeddable surface, the legacy diagnostic gateway (kernel hosts gRPC directly). If we don't add ~10% of these back later, we didn't delete hard enough — and several *are* explicitly scheduled back in Phase 2.
+Deleted from v1 scope: new Bundle runtime type, open publishing, untrusted-code sandbox, per-creator bots, exportable file, embeddable surface, and the standalone diagnostic HTTP shell (the kernel hosts gRPC directly). If we don't add ~10% of these back later, we didn't delete hard enough — and several *are* explicitly scheduled back in Phase 2.
 
 ### Step 3 — Simplify / optimize what remains
 

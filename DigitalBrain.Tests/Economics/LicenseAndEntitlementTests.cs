@@ -3,6 +3,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Economics;
 using DigitalBrain.Core.Trust;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Economics;
 using DigitalBrain.TestKit;
 
 namespace DigitalBrain.Tests.Economics;

@@ -9,7 +9,7 @@ namespace DigitalBrain.Tests.Trust;
 public class PublishGateTests : NeuronTestBase
 {
     private const string PackCode =
-        "public class P : DigitalBrain.Core.IPackBehavior { public string Respond(string i) => i; }";
+        "public class P : DigitalBrain.Core.Distribution.IPackBehavior { public string Respond(string i) => i; }";
 
     protected override void ConfigureSilo(ISiloBuilder builder) => builder.ConfigureServices(services =>
     {
