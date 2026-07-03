@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Marketplace.Contracts;
 
 namespace DigitalBrain.Kernel.Auth;
 
@@ -145,8 +146,8 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         var surfaces = new[]
         {
             BuildSignedInShellSurface(user, sessionId),
-            UiSurfaceLiveData.InstalledBundlesFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, sessionId),
-            UiSurfaceLiveData.MarketplaceListFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, sessionId),
+            MarketplaceUiSurfaces.InstalledBundlesFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, sessionId),
+            MarketplaceUiSurfaces.MarketplaceListFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, sessionId),
             UiSurfaceLiveData.TaskManagerFromTasks(taskEvents, userId: userId, sessionId: sessionId)
         };
 

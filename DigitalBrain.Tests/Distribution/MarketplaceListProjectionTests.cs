@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
+using DigitalBrain.Marketplace.Contracts;
 
 namespace DigitalBrain.Tests.Distribution;
 
@@ -12,7 +13,7 @@ public class MarketplaceListProjectionTests
             BundleTier.Content, new ExperienceRef("greet"), new[] { BundleChannel.InApp });
         var pack = new NeuroPack("greet", "1.0.0", Manifest: manifest);
 
-        var surface = UiSurfaceLiveData.MarketplaceListFromPacks(new[] { pack }, Array.Empty<NeuroPack>());
+        var surface = MarketplaceUiSurfaces.MarketplaceListFromPacks(new[] { pack }, Array.Empty<NeuroPack>());
 
         var items = (Dictionary<string, object?>[])surface.Props["packs"]!;
         var item = items.Single();
@@ -26,7 +27,7 @@ public class MarketplaceListProjectionTests
     {
         var pack = new NeuroPack("plain", "1.0.0");
 
-        var surface = UiSurfaceLiveData.MarketplaceListFromPacks(new[] { pack }, Array.Empty<NeuroPack>());
+        var surface = MarketplaceUiSurfaces.MarketplaceListFromPacks(new[] { pack }, Array.Empty<NeuroPack>());
 
         var item = ((Dictionary<string, object?>[])surface.Props["packs"]!).Single();
         Assert.Null(item["tier"]);

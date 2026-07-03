@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
+using DigitalBrain.Marketplace.Contracts;
 
 namespace DigitalBrain.Tests;
 
@@ -94,7 +95,7 @@ public class UiSurfaceContractTests
     [Fact]
     public void Live_Marketplace_Surface_Treats_Local_Ui_Packs_As_Preinstalled()
     {
-        var surface = UiSurfaceLiveData.MarketplaceListFromPacks(
+        var surface = MarketplaceUiSurfaces.MarketplaceListFromPacks(
             new[]
             {
                 new NeuroPack(
@@ -117,7 +118,7 @@ public class UiSurfaceContractTests
     [Fact]
     public void Live_Marketplace_Surface_Scopes_Install_Actions_To_User_Session()
     {
-        var surface = UiSurfaceLiveData.MarketplaceListFromPacks(
+        var surface = MarketplaceUiSurfaces.MarketplaceListFromPacks(
             new[]
             {
                 new NeuroPack(
@@ -146,7 +147,7 @@ public class UiSurfaceContractTests
     [Fact]
     public void Live_InstalledBundles_Surface_Exposes_Runnable_Experiences()
     {
-        var surface = UiSurfaceLiveData.InstalledBundlesFromPacks(
+        var surface = MarketplaceUiSurfaces.InstalledBundlesFromPacks(
             MarketplaceSeeds.LocalUiPacks,
             Array.Empty<NeuroPack>());
 
@@ -170,7 +171,7 @@ public class UiSurfaceContractTests
     [Fact]
     public void Live_InstalledBundles_Surface_Scopes_Experience_Actions_To_User_Session()
     {
-        var surface = UiSurfaceLiveData.InstalledBundlesFromPacks(
+        var surface = MarketplaceUiSurfaces.InstalledBundlesFromPacks(
             MarketplaceSeeds.LocalUiPacks,
             Array.Empty<NeuroPack>(),
             "alice",

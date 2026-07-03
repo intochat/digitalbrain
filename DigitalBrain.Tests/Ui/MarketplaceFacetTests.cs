@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
+using DigitalBrain.Marketplace.Contracts;
 
 namespace DigitalBrain.Tests.Ui;
 
@@ -25,7 +26,7 @@ public class MarketplaceFacetTests
             Pack("b", BundleTier.Substrate, BundleChannel.Telegram),
         };
 
-        var surface = UiSurfaceLiveData.MarketplaceTreeSurface(
+        var surface = MarketplaceUiSurfaces.MarketplaceTreeSurface(
             packs, Array.Empty<NeuroPack>(), tierFilter: null, channelFilter: null, emitter: "market-main");
 
         var tree = (UiWidgetTree)surface.Props["tree"]!;
@@ -45,7 +46,7 @@ public class MarketplaceFacetTests
     {
         var packs = new[] { Pack("a", BundleTier.Content, BundleChannel.InApp) };
 
-        var surface = UiSurfaceLiveData.MarketplaceTreeSurface(
+        var surface = MarketplaceUiSurfaces.MarketplaceTreeSurface(
             packs, Array.Empty<NeuroPack>(), null, null, "market-main");
 
         var tree = (UiWidgetTree)surface.Props["tree"]!;
@@ -67,7 +68,7 @@ public class MarketplaceFacetTests
             Pack("b", BundleTier.Substrate, BundleChannel.InApp),
         };
 
-        var surface = UiSurfaceLiveData.MarketplaceTreeSurface(
+        var surface = MarketplaceUiSurfaces.MarketplaceTreeSurface(
             packs, Array.Empty<NeuroPack>(), tierFilter: "Content", channelFilter: null, emitter: "market-main");
 
         var items = (Dictionary<string, object?>[])surface.Props["packs"]!;
