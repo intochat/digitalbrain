@@ -47,6 +47,7 @@ public sealed class PackAlcEmbodier : IPackEmbodiment
             assemblyName,
             source,
             typeof(IPackBehavior).Assembly,
+            typeof(DemoMessageSynapse).Assembly,
             typeof(Synapse).Assembly);
 
         var violations = CapabilityGate.FindViolations(compilation);

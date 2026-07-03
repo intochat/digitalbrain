@@ -2,6 +2,8 @@ namespace DigitalBrain.Core;
 
 public static class UiSurfaceSamples
 {
+    private const string DemoMessageSynapseName = "DemoMessageSynapse";
+
     public static UiSurface ActivityGraph() => new(
         UiSurfaceKinds.ActivityGraph,
         WithCommon(
@@ -61,7 +63,7 @@ public static class UiSurfaceSamples
                 ["body"] = "Generate a concise status summary of current work.",
                 [UiSurfaceKeys.Actions] = new[]
                 {
-                    SynapseAction("cancel-task", "Cancel", nameof(DemoMessageSynapse), new Dictionary<string, object?>
+                    SynapseAction("cancel-task", "Cancel", DemoMessageSynapseName, new Dictionary<string, object?>
                     {
                         ["taskId"] = "task-demo-1"
                     })
@@ -96,7 +98,7 @@ public static class UiSurfaceSamples
                 {
                     ["sessionId"] = "workbench"
                 }),
-                ["cancelAction"] = SynapseAction("dismiss-input", "Dismiss", nameof(DemoMessageSynapse), new Dictionary<string, object?>
+                ["cancelAction"] = SynapseAction("dismiss-input", "Dismiss", DemoMessageSynapseName, new Dictionary<string, object?>
                 {
                     ["taskId"] = "task-demo-1"
                 })
@@ -262,14 +264,14 @@ public static class UiSurfaceSamples
                 {
                     new Dictionary<string, object?>
                     {
-                        ["type"] = nameof(DemoMessageSynapse),
+                        ["type"] = DemoMessageSynapseName,
                         ["title"] = "Demo message",
                         ["at"] = DateTimeOffset.UtcNow
                     }
                 },
                 ["filters"] = new Dictionary<string, object?>
                 {
-                    ["types"] = new[] { nameof(DemoMessageSynapse), nameof(InoResponse) }
+                    ["types"] = new[] { DemoMessageSynapseName, nameof(InoResponse) }
                 }
             }));
 
