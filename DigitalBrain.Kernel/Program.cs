@@ -80,6 +80,7 @@ builder.Services.AddSingleton<DigitalBrain.Windows.FileSystemOperations>();
 
 // RoslynNeuron delegates its MSBuildWorkspace analysis logic to this ino-hosted, Orleans-free plain class.
 builder.Services.AddSingleton<DigitalBrain.Developer.RoslynAnalysisService>();
+builder.Services.AddHttpClient<DigitalBrain.Kernel.Market.IMarketDataApiClient, DigitalBrain.Kernel.Market.CoinGeckoApiClient>();
 
 // Co-host the MCP tool surface in-process. Only read-only tools are exposed over HTTP (remotely reachable);
 // mutation tools are stdio-only (local/trusted) pending a remote auth decision.
