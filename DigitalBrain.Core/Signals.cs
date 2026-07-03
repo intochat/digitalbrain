@@ -27,6 +27,13 @@ public static class GoogleSignals
     public const string GmailMessagesReady = "GmailMessagesReady";
 }
 
+public static class SalesforceSignals
+{
+    public const string AuthRequested = "SalesforceAuthRequested";
+    public const string QueryRequested = "SalesforceQueryRequested";
+    public const string QueryResultsReady = "SalesforceQueryResultsReady";
+}
+
 public static class ContextSignals
 {
     public const string RecallRequested = "ContextRecallRequested";

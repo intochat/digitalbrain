@@ -94,6 +94,9 @@
     <PackageVersion Include="Google.Apis.Drive.v3" Version="1.75.0.4192" />
     <PackageVersion Include="Google.Apis.Calendar.v3" Version="1.75.0.4182" />
     <PackageVersion Include="Google.Apis.Auth" Version="1.75.0" />
+    <!-- Salesforce CRM ino — Force.com Toolkit REST client; version verified via nuget.org 2026-07-03 -->
+    <PackageVersion Include="DeveloperForce.Force" Version="2.1.0" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <!-- Excel ingestion for chat attachments — version verified via nuget.org 2026-07-03 -->
     <PackageVersion Include="ClosedXML" Version="0.105.0" />
     <!-- SQLite schema inspection for dropped/local database files. -->

@@ -5,8 +5,10 @@ using DigitalBrain.Core.Config;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Core.UiKit;
 using DigitalBrain.Google;
+using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Market;
+using DigitalBrain.Salesforce;
 using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
 
@@ -22,6 +24,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private sealed record GmailMessageSummary(string Id, string Body);
 
     private InoRequest? _pendingGmailRequest;
+    private InoRequest? _pendingSalesforceRequest;
 
     public override async Task OnActivateAsync(CancellationToken ct)
     {
@@ -78,6 +81,12 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
+        if (IsSalesforceIntent(req.Prompt))
+        {
+            await HandleSalesforceIntentAsync(req);
+            return;
+        }
+
         var ctx = await BuildContextAsync(req.Prompt);
         var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx);
         var replyPlan = BuildReplyPlan(req.Prompt, rawReply);
@@ -102,6 +111,22 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     public async Task HandleAsync(Signal signal)
     {
+        if (signal.Name == "PackConfigured" &&
+            signal.Props.TryGetValue("pack", out var pack) &&
+            string.Equals(pack?.ToString(), SalesforceClientFactory.PackName, StringComparison.OrdinalIgnoreCase))
+        {
+            var pendingSalesforce = _pendingSalesforceRequest
+                ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => IsSalesforceIntent(r.Prompt));
+
+            if (pendingSalesforce is not null && await HasSalesforceCredentialAsync())
+            {
+                _pendingSalesforceRequest = null;
+                await FetchSalesforceAccountsAsync(pendingSalesforce);
+            }
+
+            return;
+        }
+
         if (signal.Name != GoogleSignals.AuthCompleted)
             return;
 
@@ -215,6 +240,20 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await FetchRecentGmailAsync(req);
     }
 
+    private async Task HandleSalesforceIntentAsync(InoRequest req)
+    {
+        if (!await HasSalesforceCredentialAsync())
+        {
+            _pendingSalesforceRequest = req;
+            var reply = "Salesforce credentials are required to query CRM records.";
+            await FireAsync(new InoResponse(req.Prompt, reply, []));
+            await DeliverSalesforceCredentialSurfaceAsync(req.SessionId);
+            return;
+        }
+
+        await FetchSalesforceAccountsAsync(req);
+    }
+
     private async Task<bool> HasGoogleCredentialAsync()
     {
         var store = ServiceProvider.GetService<IPackConfigStore>();
@@ -231,6 +270,30 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         catch (Exception ex)
         {
             Logger.LogDebug(ex, "Google credential check failed.");
+            return false;
+        }
+
+        static bool HasValue(IReadOnlyDictionary<string, string> values, string key) =>
+            values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
+    }
+
+    private async Task<bool> HasSalesforceCredentialAsync()
+    {
+        var store = ServiceProvider.GetService<IPackConfigStore>();
+        if (store is null)
+            return false;
+
+        try
+        {
+            var values = await store.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
+            return HasValue(values, SalesforceClientFactory.ClientIdKey) &&
+                   HasValue(values, SalesforceClientFactory.ClientSecretKey) &&
+                   HasValue(values, SalesforceClientFactory.UsernameKey) &&
+                   HasValue(values, SalesforceClientFactory.PasswordKey);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Salesforce credential check failed.");
             return false;
         }
 
@@ -269,6 +332,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface));
     }
 
+    private async Task DeliverSalesforceCredentialSurfaceAsync(string? sessionId)
+    {
+        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, sessionId);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
     private async Task FetchRecentGmailAsync(InoRequest req)
     {
         var maxResults = GmailResultCount(req.Prompt);
@@ -299,6 +369,30 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var reply = GmailReplyText(summaries);
         await FireAsync(new InoResponse(req.Prompt, reply, []));
         await DeliverGmailMessagesSurfaceAsync(summaries, req.SessionId);
+    }
+
+    private async Task FetchSalesforceAccountsAsync(InoRequest req)
+    {
+        var maxResults = SalesforceResultCount(req.Prompt);
+        await Broadcast(new Signal(SalesforceSignals.QueryRequested, new Dictionary<string, object?>
+        {
+            ["prompt"] = req.Prompt,
+            ["sessionId"] = req.SessionId,
+            ["maxResults"] = maxResults
+        }));
+
+        var salesforce = GrainFactory.GetGrain<ISalesforceCrmNeuron>("salesforce-main");
+        var records = await salesforce.ListAccountsAsync(maxResults);
+
+        await Broadcast(new Signal(SalesforceSignals.QueryResultsReady, new Dictionary<string, object?>
+        {
+            ["sessionId"] = req.SessionId,
+            ["count"] = records.Length
+        }));
+
+        var reply = SalesforceReplyText(records);
+        await FireAsync(new InoResponse(req.Prompt, reply, []));
+        await DeliverSalesforceRecordsSurfaceAsync(records, req.SessionId);
     }
 
     private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? sessionId)
@@ -332,6 +426,45 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), children),
             [UiSurfaceKeys.Title] = "Gmail",
             [UiSurfaceKeys.SurfaceId] = "surface.gmail.recent",
+            ["role"] = "assistant",
+        };
+        if (sessionId is not null) props["sessionId"] = sessionId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
+    private async Task DeliverSalesforceRecordsSurfaceAsync(IReadOnlyList<string> records, string? sessionId)
+    {
+        var children = new List<UiWidgetTree>
+        {
+            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Salesforce Accounts" })
+        };
+
+        if (records.Count == 0)
+        {
+            children.Add(new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "No Salesforce accounts were returned."
+            }));
+        }
+        else
+        {
+            for (var i = 0; i < records.Count; i++)
+            {
+                children.Add(new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?>
+                {
+                    ["text"] = $"{i + 1}. {TrimForSurface(records[i])}"
+                }));
+            }
+        }
+
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), children),
+            [UiSurfaceKeys.Title] = "Salesforce",
+            [UiSurfaceKeys.SurfaceId] = "surface.salesforce.accounts",
             ["role"] = "assistant",
         };
         if (sessionId is not null) props["sessionId"] = sessionId;
@@ -433,6 +566,12 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return p.Contains("last") || p.Contains("latest") || p.Contains("most recent") ? 1 : 5;
     }
 
+    private static int SalesforceResultCount(string prompt)
+    {
+        var p = prompt.ToLowerInvariant();
+        return p.Contains("last") || p.Contains("latest") || p.Contains("most recent") ? 1 : 5;
+    }
+
     private static string GmailReplyText(IReadOnlyList<GmailMessageSummary> messages)
     {
         if (messages.Count == 0)
@@ -440,6 +579,16 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var title = messages.Count == 1 ? "Latest Gmail message:" : "Recent Gmail messages:";
         var lines = messages.Select((m, i) => $"{i + 1}. {TrimForSurface(m.Body)}");
+        return title + Environment.NewLine + string.Join(Environment.NewLine, lines);
+    }
+
+    private static string SalesforceReplyText(IReadOnlyList<string> records)
+    {
+        if (records.Count == 0)
+            return "No Salesforce accounts were returned.";
+
+        var title = records.Count == 1 ? "Latest Salesforce account:" : "Salesforce accounts:";
+        var lines = records.Select((record, i) => $"{i + 1}. {TrimForSurface(record)}");
         return title + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
 
@@ -479,6 +628,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private static Regex GmailIntentRegex() =>
         new(@"\b(gmail|email|e-mail|mailbox|inbox)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static bool IsSalesforceIntent(string prompt) =>
+        SalesforceIntentRegex().IsMatch(prompt);
+
+    private static Regex SalesforceIntentRegex() =>
+        new(@"\b(salesforce|crm)\b",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static string SchemaReplyText(DbSchemaInspected inspected) =>

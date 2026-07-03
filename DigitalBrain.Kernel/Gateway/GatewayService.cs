@@ -6,6 +6,7 @@ using DigitalBrain.Google;
 using DigitalBrain.Kernel.Auth;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Runtime.Grpc;
+using DigitalBrain.Salesforce;
 using DigitalBrain.Telegram.Channel;
 using Grpc.Core;
 
@@ -87,6 +88,17 @@ public sealed class GatewayService(
                     : request.CorrelationId;
                 var authCompletedIngress = grains.GetGrain<IIngressNeuron>(key);
                 await authCompletedIngress.IngestAsync(GoogleSignals.AuthCompleted, PayloadProps(request));
+                return request;
+            }
+
+            if (request.TypeName == SalesforceSignals.AuthRequested || request.TypeName.Contains(SalesforceSignals.AuthRequested, StringComparison.OrdinalIgnoreCase))
+            {
+                var auth = grains.GetGrain<ISalesforceAuthNeuron>("salesforce-auth-main");
+                var signal = new Signal(SalesforceSignals.AuthRequested, PayloadProps(request))
+                {
+                    Receiver = new NeuronId("salesforce-auth-main")
+                };
+                await auth.DeliverAsync(signal);
                 return request;
             }
 
