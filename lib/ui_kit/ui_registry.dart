@@ -29,6 +29,7 @@ import 'ui_slider.dart';
 import 'ui_sidebar.dart';
 import 'ui_spinner.dart';
 import 'ui_switch.dart';
+import 'ui_table.dart';
 import 'ui_tabs.dart';
 import 'ui_text.dart';
 import 'ui_text_area.dart';
@@ -88,12 +89,27 @@ Widget buildUiNode(
       return UiKitTextArea(name: s('name'), placeholder: s('placeholder'));
     case 'ui:select':
       // Backend emits 'items'; older surfaces may use 'options'. Prefer 'items'.
-      final selectOptions = optList('items').isNotEmpty ? optList('items') : optList('options');
-      return UiKitSelect(name: s('name'), options: selectOptions, label: s('label'));
+      final selectOptions = optList('items').isNotEmpty
+          ? optList('items')
+          : optList('options');
+      return UiKitSelect(
+        name: s('name'),
+        options: selectOptions,
+        label: s('label'),
+      );
     case 'ui:radiogroup':
-      return UiKitRadioGroup(name: s('name'), options: optList('options'), label: s('label'));
+      return UiKitRadioGroup(
+        name: s('name'),
+        options: optList('options'),
+        label: s('label'),
+      );
     case 'ui:slider':
-      return UiKitSlider(name: s('name'), min: d('min'), max: d('max'), label: s('label'));
+      return UiKitSlider(
+        name: s('name'),
+        min: d('min'),
+        max: d('max'),
+        label: s('label'),
+      );
     case 'ui:datefield':
       return UiKitDateField(name: s('name'), label: s('label'));
     case 'ui:row':
@@ -116,8 +132,11 @@ Widget buildUiNode(
       return UiKitBadge(text: s('text'));
     case 'ui:tile':
       return UiKitTile(
-        title: s('title'), subtitle: s('subtitle'),
-        pack: s('pack'), experienceId: s('experienceId'), eventName: s('eventName'),
+        title: s('title'),
+        subtitle: s('subtitle'),
+        pack: s('pack'),
+        experienceId: s('experienceId'),
+        eventName: s('eventName'),
         onEvent: onEvent,
       );
     case 'ui:list':
@@ -126,15 +145,40 @@ Widget buildUiNode(
         onEvent: onEvent,
       );
     case 'ui:tabs':
-      return UiKitTabs(items: itemList(), pack: s('pack'), experienceId: s('experienceId'), onEvent: onEvent);
+      return UiKitTabs(
+        items: itemList(),
+        pack: s('pack'),
+        experienceId: s('experienceId'),
+        onEvent: onEvent,
+      );
     case 'ui:breadcrumb':
-      return UiKitBreadcrumb(items: itemList(), pack: s('pack'), experienceId: s('experienceId'), onEvent: onEvent);
+      return UiKitBreadcrumb(
+        items: itemList(),
+        pack: s('pack'),
+        experienceId: s('experienceId'),
+        onEvent: onEvent,
+      );
     case 'ui:sidebar':
-      return UiKitSidebar(items: itemList(), pack: s('pack'), experienceId: s('experienceId'), onEvent: onEvent);
+      return UiKitSidebar(
+        items: itemList(),
+        pack: s('pack'),
+        experienceId: s('experienceId'),
+        onEvent: onEvent,
+      );
     case 'ui:bottomnav':
-      return UiKitBottomNav(items: itemList(), pack: s('pack'), experienceId: s('experienceId'), onEvent: onEvent);
+      return UiKitBottomNav(
+        items: itemList(),
+        pack: s('pack'),
+        experienceId: s('experienceId'),
+        onEvent: onEvent,
+      );
     case 'ui:pagination':
-      return UiKitPagination(items: itemList(), pack: s('pack'), experienceId: s('experienceId'), onEvent: onEvent);
+      return UiKitPagination(
+        items: itemList(),
+        pack: s('pack'),
+        experienceId: s('experienceId'),
+        onEvent: onEvent,
+      );
     case 'ui:alert':
       return UiKitAlert(title: s('title'), subtitle: s('subtitle'));
     case 'ui:progress':
@@ -143,13 +187,33 @@ Widget buildUiNode(
       return const UiKitSpinner();
     case 'ui:tooltip':
       final tipKids = kids();
-      return UiKitTooltip(tip: s('tip'), child: tipKids.isEmpty ? const SizedBox.shrink() : tipKids.first);
+      return UiKitTooltip(
+        tip: s('tip'),
+        child: tipKids.isEmpty ? const SizedBox.shrink() : tipKids.first,
+      );
     case 'ui:dialog':
-      return UiKitDialog(open: props['open'] == true, title: s('title'), children: kids());
+      return UiKitDialog(
+        open: props['open'] == true,
+        title: s('title'),
+        children: kids(),
+      );
     case 'ui:sheet':
-      return UiKitSheet(open: props['open'] == true, title: s('title'), children: kids());
+      return UiKitSheet(
+        open: props['open'] == true,
+        title: s('title'),
+        children: kids(),
+      );
     case 'ui:toast':
       return UiKitToast(message: s('message'));
+    case 'ui:table':
+      final tableRows =
+          (props['rows'] as List?)
+              ?.map(
+                (row) => (row as List).map((cell) => cell.toString()).toList(),
+              )
+              .toList() ??
+          const <List<String>>[];
+      return UiKitTable(columns: optList('columns'), rows: tableRows);
     default:
       return const SizedBox.shrink();
   }
