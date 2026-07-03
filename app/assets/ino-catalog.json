@@ -1,0 +1,47 @@
+[
+  {
+    "Fqn": "DB.Google.Auth",
+    "Kind": 0,
+    "Fields": ["token", "email", "scopes"]
+  },
+  {
+    "Fqn": "DB.Signal.Alarm",
+    "Kind": 1,
+    "Fields": ["intervalMs", "message"]
+  },
+  {
+    "Fqn": "DB.LLM.Prompt",
+    "Kind": 0,
+    "Fields": ["prompt", "systemInstruction", "maxTokens"]
+  },
+  {
+    "Fqn": "DB.Ai.Request",
+    "Kind": 0,
+    "Fields": ["query", "context"]
+  },
+  {
+    "Fqn": "Google.Auth.New",
+    "Kind": 0,
+    "Fields": ["clientId", "redirectUrl"]
+  },
+  {
+    "Fqn": "DigitalBrain.SDK.Storage",
+    "Kind": 1,
+    "Fields": ["key", "value", "bytes"]
+  },
+  {
+    "Fqn": "DigitalBrain.SDK.Ai.GroupChat.GroupChatNeuron",
+    "Kind": 2,
+    "Fields": ["roomId", "participants"]
+  },
+  {
+    "Fqn": "Acme.Submit",
+    "Kind": 0,
+    "Fields": ["submissionId", "payload"]
+  },
+  {
+    "Fqn": "Acme.Worker",
+    "Kind": 2,
+    "Fields": ["workerId", "tasks"]
+  }
+]

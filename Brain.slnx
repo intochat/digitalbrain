@@ -1,8 +1,8 @@
 <Solution>
   <Folder Name="/clients/">
-    <!-- Flutter client integration. CI invokes this solution with SkipFlutterBuild=true because ../app is
-         available in this workspace but not checked out on GitHub runners. -->
-    <Project Path="../app/Flutter.proj" Type="C#" />
+    <!-- Flutter client integration. CI invokes this solution with SkipFlutterBuild=true so
+         headless .NET jobs keep the client visible without running Flutter. -->
+    <Project Path="app/Flutter.proj" Type="C#" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />

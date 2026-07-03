@@ -84,7 +84,7 @@ dotnet build DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj
 dotnet test --filter "UiSurface|KitExperience"
 ```
 
-From `app/`:
+From `brain/app/`:
 ```sh
 flutter pub get
 flutter run -d chrome   # or windows

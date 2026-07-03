@@ -3,7 +3,7 @@
 - **Status:** Draft for review
 - **Date:** 2026-07-01
 - **Owner:** Vladyslav Horbachov (creator #1)
-- **Repo:** `digitalbraintech/framework` (`brain/`); touches `digitalbraintech/app` (`app/`)
+- **Repo:** `digitalbraintech/brain` (`brain/`), including the Flutter client under `app/`
 - **Supersedes:** nothing — this is the first consolidated product definition for how software is *packaged, distributed, hosted, and iterated on* in DigitalBrain.
 
 ---
