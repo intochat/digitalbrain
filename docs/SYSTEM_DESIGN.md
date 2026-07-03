@@ -77,18 +77,19 @@ The stale docs at `docs/superpowers/specs/2026-06-30-telegram-llm-experience-des
 
 ### 1.3 Project graph
 
-Solution `Brain.slnx` lists 31 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
+Solution `Brain.slnx` lists 32 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
 
 | Project | Purpose |
 |---|---|
 | `DigitalBrain.Core` | Protocol layer — `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, checkpoint contracts, and shared runtime messages. Only depends on `Microsoft.Orleans.Core.Abstractions`/`Serialization`. Guard tests assert it has zero references to other `DigitalBrain.*` assemblies and no runtime/host/integration packages. |
+| `DigitalBrain.Demo.Contracts` | Demo/sample protocol layer — `DemoMessageSynapse` and `IDemoNeuron`. References Core primitives; Core does not reference this project, so demo/test protocols no longer live in the stable Core assembly. |
 | `DigitalBrain.Ui.Contracts` | Server-driven UI contract layer — `UiSurface`, `UiWidgetTree`, `RfwCard`, UI vocabularies, chart specs, typed surface records, generic action descriptors, and UI-facing neuron contracts. References Core primitives; Core does not reference this project. |
 | `DigitalBrain.Ui.Runtime` | Runtime/sample UI projection helpers — `UiSurfaceSamples` and `UiSurfaceLiveData`. References only Core primitives plus UI contracts so samples/live-data builders do not accumulate in the schema assembly. |
 | `DigitalBrain.Pack.Contracts` | Executable pack contract layer — `IPackBehavior`, `PackManifest`, pack config fields, `PackEmission`, trust helpers, `ConfigurationProvided`/`ConfigFormSurface`, and `KitExperience`/`UiExperience`. References Core and UI contracts; Core does not reference this project. |
 | `DigitalBrain.SeedPacks` | Seed catalog assembly. Owns `MarketplaceSeeds` and embeds seed pack source such as `PersonalAssistantNeuron.cs` so concrete marketplace seed content no longer lives in `DigitalBrain.Core`. |
 | `DigitalBrain.Kernel` | The Orleans runtime (formerly "Silo"). `Microsoft.NET.Sdk.Web`, container-packaged. Subfolders: `Auth, Awesome, Company, Config, Context, Economics, Foundry, Gateway, Generated, Ino, Kernel, Llm, Marketplace, Protos, Sandbox, Sdk, Ui`. Owns embodiment (Foundry/Sandbox), LLM (Microsoft.Extensions.AI + Ollama/Azure OpenAI), Economics (Stripe + ECDSA licenses), Context (Qdrant), server-driven UI (`Ui`/`Protos`, bidirectional gRPC `UiGateway`), HA self-update. References every isolated ino project below for their interfaces/logic, and hosts the concrete `Neuron`-derived grain classes for Windows/Developer/Context/UiKit/Telegram.Channel/Google (see §1.3a). |
 | `DigitalBrain.Aspire` | Hosting SDK: `AddDigitalBrain`, `WireKernelSilo`, `WithMcp`, `WithOrleansDashboard`, `AddFlutterClient`, `WireTelegramTransport` — all in `DigitalBrainBuilderExtensions.cs`. Not itself an Aspire project resource (`IsAspireProjectResource=false`). |
-| `DigitalBrain.Mcp` | MCP server (`Mcp`, an `Exe`, co-hosted on the kernel's Kestrel) exposing neuron tools (`DigitalBrainMutationTools.cs`, `DigitalBrainReadTools.cs`). References Core plus UI, pack, and marketplace contracts for surface projection and pack authoring. |
+| `DigitalBrain.Mcp` | MCP server (`Mcp`, an `Exe`, co-hosted on the kernel's Kestrel) exposing neuron tools (`DigitalBrainMutationTools.cs`, `DigitalBrainReadTools.cs`). References Core plus demo, UI, pack, and marketplace contracts for surface projection and pack authoring. |
 | `DigitalBrain.Telegram` | Pure shared library: transport-internal synapses (`TelegramMessageReceived`, `TelegramReplyRequested` — explicitly *not* journaled through the kernel) and `TelegramResponderNeuron`, a pure `IPackBehavior` pack. Fully self-contained — never derives from `Neuron`. References Core primitives plus pack contracts. |
 | `DigitalBrain.Telegram.Transport` | The actual ASP.NET Core webhook host — `/webhook` POST ingress, `/health`, gRPC-clients the kernel gateway. Deployed as its own container app (see 1.6). |
 | `DigitalBrain.TestKit` | `IDigitalBrain` facade over a real Orleans `TestCluster`, depends on Core + Kernel + every real-grain ino below. Gives each isolated ino's `.Tests` sibling a zero-boilerplate way to spin a cluster and resolve grains without depending on `DigitalBrain.Tests`. |
@@ -211,14 +212,14 @@ entitlement.
 **Compile → ALC → embody** — `DigitalBrain.Kernel/Foundry/`:
 - `FoundryCompilation.CreateWith` (`FoundryCompilation.cs:20-25`) parses source with
   `CSharpSyntaxTree.ParseText` and compiles against the trusted-platform-assemblies plus
-  `DigitalBrain.Pack.Contracts` plus `DigitalBrain.Core`, targeting `OutputKind.DynamicallyLinkedLibrary`.
+  `DigitalBrain.Pack.Contracts` plus `DigitalBrain.Core` plus `DigitalBrain.Demo.Contracts`, targeting `OutputKind.DynamicallyLinkedLibrary`.
 - `PackAlcEmbodier.Embody` (`PackAlcEmbodier.cs:42-80`) compiles, then runs
   `CapabilityGate.FindViolations(compilation)` — a semantic-model walk banning
   `System.Diagnostics.Process`, `System.Reflection.Emit`, `System.Runtime.InteropServices`,
   `System.Runtime.Loader`, `Microsoft.Win32.Registry` — and throws `PackEmbodimentException` on a hit.
   It emits to a `MemoryStream`, creates a **collectible** `AssemblyLoadContext` under
   `ExecutionContext.SuppressFlow()`, wires `Resolving += ResolveFromHost` so shared types like
-  `DigitalBrain.Core` and `DigitalBrain.Pack.Contracts` unify with the host assemblies (making the `IPackBehavior` cast valid across the
+  `DigitalBrain.Core`, `DigitalBrain.Demo.Contracts`, and `DigitalBrain.Pack.Contracts` unify with the host assemblies (making the `IPackBehavior` cast valid across the
   ALC boundary), loads the pack assembly, and instantiates the first public parameterless
   `IPackBehavior` type it finds. Returns an `EmbodiedPack` whose `Dispose()` calls
   `context.Unload()` — this is the mechanism that lets packs be added/removed without a kernel restart.

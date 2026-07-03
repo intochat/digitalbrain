@@ -39,6 +39,7 @@
     <ProjectReference Include="..\DigitalBrain.Telegram.Transport\DigitalBrain.Telegram.Transport.csproj" Aliases="TransportAssembly" />
     <PackageReference Include="Telegram.BotAPI" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Demo.Contracts\DigitalBrain.Demo.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\DigitalBrain.Marketplace.Contracts\DigitalBrain.Marketplace.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />

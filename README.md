@@ -7,6 +7,7 @@ The web client lives at [digitalbrain.tech](https://digitalbrain.tech) and talks
 ## What lives here
 
 - `DigitalBrain.Core` — pure protocol: `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, and shared runtime messages.
+- `DigitalBrain.Demo.Contracts` — demo/sample protocol contracts: `DemoMessageSynapse` and `IDemoNeuron`, kept out of the stable Core package.
 - `DigitalBrain.Ui.Contracts` — server-driven UI contracts: `UiSurface`, `UiWidgetTree`, `RfwCard`, UI vocabularies, typed surface records, chart specs, generic action descriptors, and UI-facing neuron contracts.
 - `DigitalBrain.Ui.Runtime` — runtime/sample UI projection helpers: `UiSurfaceSamples` and `UiSurfaceLiveData`, kept out of the stable schema assembly.
 - `DigitalBrain.Pack.Contracts` — executable pack contracts: `IPackBehavior`, `NeuroPack`, `PackManifest`, bundle manifest/config schema, pack trust helpers, and `KitExperience` authoring helpers.
@@ -75,6 +76,7 @@ From `brain/`:
 aspire doctor
 # targeted work
 dotnet build DigitalBrain.Core/DigitalBrain.Core.csproj
+dotnet build DigitalBrain.Demo.Contracts/DigitalBrain.Demo.Contracts.csproj
 dotnet build DigitalBrain.Ui.Contracts/DigitalBrain.Ui.Contracts.csproj
 dotnet build DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj
 dotnet test --filter "UiSurface|KitExperience"

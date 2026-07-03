@@ -36,4 +36,4 @@ public class DemoNeuron(ILogger<DemoNeuron> logger, NeuronJournals journals) : N
     }
 }
 
-// DemoMessageSynapse moved to Protocol for CLI/shared use
+// DemoMessageSynapse lives in DigitalBrain.Demo.Contracts for CLI/shared sample use.

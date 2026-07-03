@@ -20,6 +20,7 @@ Done:
 - Continued Phase 2 by moving `NeuroPack` and bundle manifests into `DigitalBrain.Pack.Contracts`, and marketplace commands/events/interfaces into `DigitalBrain.Marketplace.Contracts`.
 - Continued Phase 2 by moving `UiSurface`, `UiWidgetTree`, UI vocabularies, chart specs, typed surface records, `RfwCard`, generic action descriptors, and UI-facing neuron contracts into `DigitalBrain.Ui.Contracts`.
 - Continued Phase 2 by moving UI sample/live-data builders into `DigitalBrain.Ui.Runtime`, which references only Core plus UI contracts and keeps `DigitalBrain.Ui.Contracts` schema-oriented.
+- Continued Phase 2 by moving `DemoMessageSynapse` and `IDemoNeuron` into `DigitalBrain.Demo.Contracts`, preserving the `DigitalBrain.Core` namespace for source compatibility while keeping stable Core out of demo/test protocols.
 - Added architecture guard tests that keep `DigitalBrain.Core` free of runtime, host, integration, pack-contract, and UI-contract assembly references.
 - Renamed product-level Silo restart/deploy language to Kernel while preserving Orleans technical terms.
 - Renamed `DigitalBrain.Tests/UnitTest1.cs` to `DigitalBrain.Tests/Kernel/NeuronTests.cs`.
@@ -29,7 +30,7 @@ Still left:
 - Continue splitting `DigitalBrain.Core` into smaller primitive/runtime/pack/UI/system contract packages.
 - Split `DigitalBrain.Kernel` into runtime modules and make the host a composition root.
 - Make integration project names match ownership boundaries, especially interface-only projects.
-- Move remaining demo/sample UI leakage out of gateway paths and stable Core contracts.
+- Move remaining demo/sample UI leakage out of gateway paths.
 - Split the central test project into explicit feedback-speed lanes.
 - Expand deployment beyond the current one-kernel-image MVP if Telegram transport and MCP need independent images.
 - Add architecture guard tests for module dependency direction.
@@ -44,7 +45,7 @@ The repo structure around it is not coherent enough. The biggest problems are:
 - Tooling and agent skill caches dominate the tracked repository: `.agents` has 378 tracked files and `.claude` has 366 tracked files. That is more tracked files than `DigitalBrain.Kernel` and `DigitalBrain.Tests` combined.
 - `Brain.slnx` is now the canonical entry point. It references `../app/Flutter.proj`, and headless automation passes `SkipFlutterBuild=true` so CI does not need the sibling app checkout.
 - `DigitalBrain.Kernel` is doing too much. It is the Orleans host, gateway, UI backend, pack embodiment runtime, marketplace, LLM adapter, Google/Windows/Developer grain host, economics engine, self-update workflow, and code-foundry executor.
-- `DigitalBrain.Core` is called the stable protocol layer, but it already contains many product, demo, UI, marketplace, LLM, authoring, task, DB, charting, and self-update contracts.
+- `DigitalBrain.Core` is called the stable protocol layer, but it still contains many product, LLM, authoring, task, DB, charting, and self-update contracts.
 - Several top-level project-looking folders contain only build outputs (`DigitalBrain.Contracts`, `DigitalBrain.Sdk`, `DigitalBrain.SourceGen`). They are ignored, but they confuse humans and tooling.
 - Durable docs say `docs/specs` and `docs/plans` are deleted after merge, but those directories currently contain plan/spec files.
 - Naming still leaks old concepts (`silo`) into deploy scripts, workflow comments, synapses, tests, and runtime restart paths after the Silo -> Kernel rename.
@@ -58,7 +59,7 @@ Recommended first move: do a deletion and boundary pass before adding any more f
 `Brain.slnx` now includes:
 
 - Flutter via `../app/Flutter.proj` under a `clients` solution folder.
-- Main product projects (`DigitalBrain.Core`, `DigitalBrain.Ui.Contracts`, `DigitalBrain.Ui.Runtime`, `DigitalBrain.Kernel`, `DigitalBrain.Aspire`, `DigitalBrain.Mcp`, integrations, tests).
+- Main product projects (`DigitalBrain.Core`, `DigitalBrain.Demo.Contracts`, `DigitalBrain.Ui.Contracts`, `DigitalBrain.Ui.Runtime`, `DigitalBrain.Kernel`, `DigitalBrain.Aspire`, `DigitalBrain.Mcp`, integrations, tests).
 - AppHost and ServiceDefaults.
 - Deployment project under `/deploy/`.
 
@@ -127,10 +128,9 @@ This creates a monolithic runtime host. Some dependency direction is correct: Ke
 
 ### Core Boundary Drift
 
-The README says `DigitalBrain.Core` is "pure protocol" (`README.md:9`). In practice, `DigitalBrain.Core/Synapse.cs` contains:
+The README says `DigitalBrain.Core` is "pure protocol" (`README.md:9`). The boundary is cleaner now: marketplace, UI, pack, and demo/test contracts have moved to peer assemblies. `DigitalBrain.Core/Synapse.cs` still contains:
 
 - Core neuron/synapse abstractions.
-- Marketplace contracts.
 - User/session contracts.
 - LLM contracts.
 - software team and Ino contracts.
@@ -138,7 +138,6 @@ The README says `DigitalBrain.Core` is "pure protocol" (`README.md:9`). In pract
 - NuGet/developer contracts.
 - DB/chart/data-visualization contracts.
 - self-update contracts.
-- demo contracts.
 
 The UI grammar and UI-facing contracts now live in `DigitalBrain.Ui.Contracts`, but `DigitalBrain.Core/Synapse.cs` still contains many product and domain contracts. This keeps `Core` closer to a stable primitive layer than before, but it is not yet a minimal primitives package.
 
@@ -175,6 +174,7 @@ brain/
   src/
     DigitalBrain.Primitives/          # NeuronId, TaskId, Synapse base, causal metadata
     DigitalBrain.Contracts/           # Stable runtime contracts split by domain folders
+    DigitalBrain.Demo.Contracts/      # demo/sample protocol contracts
     DigitalBrain.Pack.Contracts/      # IPackBehavior, PackManifest, config fields, trust primitives
     DigitalBrain.Ui.Contracts/        # UiWidgetTree, UiSurface, action schema; no runtime/sample builders
     DigitalBrain.Ui.Runtime/          # runtime/sample UiSurface projections
@@ -290,7 +290,7 @@ Priority: P1
 Current state:
 
 - `DigitalBrain.Core` is positioned as the stable primitive/protocol package.
-- It still contains primitives, marketplace projection, UI, economics interfaces, demo messages, task contracts, DB/chart contracts, software-team contracts, and self-update contracts.
+- It still contains primitives, economics interfaces, task contracts, DB/chart contracts, software-team contracts, and self-update contracts. Marketplace, UI, pack, and demo contracts have already moved to peer assemblies.
 
 Recommendation:
 
@@ -445,13 +445,13 @@ Priority: P2
 Current state:
 
 - `UiSurfaceSamples` and demo surface IDs now live in `DigitalBrain.Ui.Runtime/UiSurfaceRuntime.cs`.
-- `DemoMessageSynapse` lives in `DigitalBrain.Core/Synapse.cs`.
+- `DemoMessageSynapse` and `IDemoNeuron` now live in `DigitalBrain.Demo.Contracts`.
 - `MarketplaceSeeds` has comments about deleted demo bloat and still embeds concrete seed pack source.
 - Gateway code contains demo routes and demo IDs.
 
 Recommendation:
 
-- Move samples into `DigitalBrain.Samples` or test fixtures.
+- Keep demo protocol in `DigitalBrain.Demo.Contracts`; move richer samples into `DigitalBrain.Samples` or test fixtures.
 - Keep only reusable UI schema and generic action descriptors in UI contracts.
 - Move seed packs into dedicated pack projects or embedded resources outside Core.
 - Gateway should route generic actions, not own demo behavior.
@@ -559,7 +559,7 @@ Tasks:
 2. Move UI schema from `DigitalBrain.Core` into `DigitalBrain.Ui.Contracts`. Current slice done.
 3. Move remaining marketplace contracts out of Core now that `NeuroPack` UI projections live in `DigitalBrain.Marketplace.Contracts`. Current slice done.
 4. Move UI sample/live-data builders out of UI contracts into `DigitalBrain.Ui.Runtime`. Current slice done.
-5. Move demo/test contracts out of Core.
+5. Move demo/test contracts out of Core. Current slice done.
 6. Move seed pack code out of Core.
 7. Keep compatibility type-forwarding only if packaging requires it.
 

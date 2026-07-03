@@ -57,6 +57,49 @@ public class CoreBoundaryTests
     }
 
     [Fact]
+    public void Demo_Contracts_Depend_On_Core_Not_The_Other_Way_Around()
+    {
+        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+        var demoContractsAssemblyName = typeof(DemoMessageSynapse).Assembly.GetName().Name!;
+        var references = DemoContractsReferenceNames();
+
+        Assert.Equal("DigitalBrain.Demo.Contracts", demoContractsAssemblyName);
+        Assert.Contains(coreAssemblyName, references);
+        Assert.DoesNotContain(demoContractsAssemblyName, CoreReferenceNames());
+    }
+
+    [Fact]
+    public void Demo_Contracts_Do_Not_Reference_Runtime_Host_Integration_Or_Marketplace_Packages()
+    {
+        var references = DemoContractsReferenceNames();
+        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+
+        var unexpectedDigitalBrainReferences = references
+            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
+                !string.Equals(name, coreAssemblyName, StringComparison.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(unexpectedDigitalBrainReferences);
+
+        var offenders = references
+            .Where(name => ForbiddenRuntimeHostOrIntegrationPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void Core_Does_Not_Own_Demo_Test_Contracts()
+    {
+        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+
+        Assert.NotEqual(coreAssemblyName, typeof(DemoMessageSynapse).Assembly.GetName().Name);
+        Assert.NotEqual(coreAssemblyName, typeof(IDemoNeuron).Assembly.GetName().Name);
+    }
+
+    [Fact]
     public void Pack_Contracts_Own_NeuroPack_And_Bundle_Manifest()
     {
         Assert.Equal("DigitalBrain.Pack.Contracts", typeof(NeuroPack).Assembly.GetName().Name);
@@ -222,6 +265,8 @@ public class CoreBoundaryTests
     private static string[] UiContractsReferenceNames() => ReferenceNames(typeof(UiSurface).Assembly);
 
     private static string[] UiRuntimeReferenceNames() => ReferenceNames(typeof(UiSurfaceLiveData).Assembly);
+
+    private static string[] DemoContractsReferenceNames() => ReferenceNames(typeof(DemoMessageSynapse).Assembly);
 
     private static bool MethodSignatureContains(MethodInfo method, Type type) =>
         TypeContains(method.ReturnType, type) ||
