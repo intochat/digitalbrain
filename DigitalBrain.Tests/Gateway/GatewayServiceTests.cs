@@ -4,8 +4,10 @@ using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
+using DigitalBrain.Kernel.Market;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
+using DigitalBrain.UiKit;
 using Grpc.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +21,7 @@ namespace DigitalBrain.Tests.Gateway;
 public class GatewayServiceTests : NeuronTestBase
 {
     private readonly HomeFeedBus _homeFeedBus = new();
+    private readonly FakeMarketDataApiClient _marketClient = new();
 
     protected override void ConfigureSilo(ISiloBuilder builder) => builder
         .AddMemoryGrainStorageAsDefault()
@@ -34,6 +37,7 @@ public class GatewayServiceTests : NeuronTestBase
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
             services.AddSingleton(_homeFeedBus);
+            services.AddSingleton<IMarketDataApiClient>(_marketClient);
         });
 
     private GatewayService NewService() =>
@@ -102,6 +106,36 @@ public class GatewayServiceTests : NeuronTestBase
         var timeline = await ino.GetOutgoingTimelineAsync();
         var response = Assert.Single(timeline.OfType<InoResponse>());
         Assert.Equal("what's the bitcoin price", response.Prompt);
+    }
+
+    [Fact]
+    public async Task Send_InoRequest_BitcoinPriceIntent_DeliversFormattedPriceSurface()
+    {
+        _marketClient.Price = "$42,123.45";
+        var svc = NewService();
+        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            prompt = "what's the bitcoin price?",
+            sessionId = "chat-session-btc"
+        });
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(InoRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
+        }, TestContext());
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var timeline = await flutter.GetIncomingTimelineAsync();
+
+        var surface = Assert.Single(timeline.OfType<UiSurface>());
+        Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
+        Assert.Equal("chat-session-btc", surface.Props["sessionId"]);
+        Assert.Equal("assistant", surface.Props["role"]);
+
+        var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
+        Assert.Equal(UiKitVocabulary.Text, tree.Type);
+        Assert.Contains("$42,123.45", tree.Props["text"]!.ToString());
     }
 
     [Fact]
