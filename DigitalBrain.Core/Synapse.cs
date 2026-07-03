@@ -127,12 +127,6 @@ public record UserSessionState(
     DateTimeOffset ExpiresAt,
     bool Active);
 
-public interface IUserSessionNeuron : INeuron, IHandle<LoginRequest>, IHandle<LogoutRequest>
-{
-    Task<UserSessionState?> GetSessionAsync(string sessionId);
-    Task<UiSurface> BuildLoginSurfaceAsync(string? clientId = null);
-}
-
 public interface IUserGrain : IGrainWithStringKey
 {
     Task<UserProfile> GetProfileAsync();
@@ -318,8 +312,6 @@ public record ClusterActivity(string NodeId, string Activity, double Value) : Sy
 [GenerateSerializer]
 public record ThreeDGraphUpdate(string GraphId, string DataJson) : Synapse(nameof(ThreeDGraphUpdate), DateTimeOffset.UtcNow);
 
-public interface IObservabilityNeuron : INeuron, IHandle<UiSurface>, IHandle<ClusterActivity>, IHandle<ThreeDGraphUpdate> { }
-
 [GenerateSerializer]
 public record VisualizeDataRequest(
     string Prompt,
@@ -338,12 +330,6 @@ public record IngestCompanySource(string Collection, string SourceId, string Tex
 public record CompanySourceIngested(string Collection, string SourceId, int ChunkCount) : Synapse(nameof(CompanySourceIngested), DateTimeOffset.UtcNow);
 
 public interface ICompanyKnowledgeNeuron : INeuron, IHandle<IngestCompanySource> { }
-
-[GenerateSerializer]
-public record DataChartGenerated(string RequestId, UiSurface Surface) : Synapse(nameof(DataChartGenerated), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record DataChartFailed(string RequestId, string Reason) : Synapse(nameof(DataChartFailed), DateTimeOffset.UtcNow);
 
 // First-class chart interaction and modification (conversational + selection driven)
 [GenerateSerializer]

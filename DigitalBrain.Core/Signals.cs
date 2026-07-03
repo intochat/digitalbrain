@@ -13,7 +13,7 @@ public static class TelegramSignals
 public static class UiSignals
 {
     // Central names for UiSurface kinds / events that cross channels (e.g. from Telegram viz to Flutter).
-    // Prefer UiSurfaceKinds / UiSurfaceKeys for most, but these for Signal-level where needed.
+    // Prefer the UI contract constants for structured surfaces; keep these for Signal-level routing.
     public const string SurfaceEmitted = "UiSurfaceEmitted";
     public const string WidgetTreeUpdated = "UiWidgetTreeUpdated";
 }
