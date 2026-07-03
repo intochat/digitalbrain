@@ -2,11 +2,6 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel.Gateway;
 
-public interface IIngressNeuron : INeuron
-{
-    Task IngestAsync(string signalName, IReadOnlyDictionary<string, object?> props);
-}
-
 [GrainType("digitalbrain.ingress")]
 public sealed class IngressNeuron(ILogger<IngressNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IIngressNeuron

@@ -35,6 +35,18 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         return $"Successfully fired DemoMessageSynapse with text '{text}' to neuron '{neuronId}'.";
     }
 
+    [McpServerTool(Name = "simulate_x_post"), Description("Simulate a new X (Twitter) post from an author, for demo/testing automations that react to XPostReceived. No real X API call is made.")]
+    public async Task<string> SimulateXPost(
+        [Description("X handle/author of the simulated post, e.g. 'elon'")] string author,
+        [Description("Post text")] string text,
+        [Description("Telegram chat id to notify if a reactive automation replies")] long chatId)
+    {
+        var ingress = Grains.GetGrain<IIngressNeuron>("ingress-main");
+        await ingress.IngestAsync("XPostReceived",
+            new Dictionary<string, object?> { ["author"] = author, ["text"] = text, ["chatId"] = chatId });
+        return $"Simulated X post from '{author}' broadcast as XPostReceived (chatId {chatId}).";
+    }
+
     [McpServerTool(Name = "ask_ino"), Description("Ask the INO AI assistant (uses ContextNeuron for smart management).")]
     public Task<string> AskIno([Description("Prompt for INO navigation/assistant")] string prompt)
         => Grains.GetGrain<IInoNeuron>("ino-main").AskAsync(prompt);
