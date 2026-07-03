@@ -55,3 +55,11 @@ public interface ILlmResponderNeuron : INeuron, IHandle<AskLlm>
     // the responder use this key so the AskLlm -> reply Signal path is reachable cluster-wide.
     const string SingletonKey = "llm-responder-main";
 }
+
+// Contract only (implementation is DigitalBrain.Kernel.Gateway.IngressNeuron). Lives in Core, like every
+// other neuron interface Mcp.Tools depends on, so MCP tools can resolve it without a ProjectReference to
+// Kernel (Kernel already references Mcp.Tools, so the reverse edge would be circular).
+public interface IIngressNeuron : INeuron
+{
+    Task IngestAsync(string signalName, IReadOnlyDictionary<string, object?> props);
+}

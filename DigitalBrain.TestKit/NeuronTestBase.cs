@@ -14,7 +14,9 @@ public abstract class NeuronTestBase : IAsyncLifetime
 
     protected TestCluster Cluster => _brain.Cluster;
 
-    protected TGrain Grain<TGrain>(string key) where TGrain : IGrainWithStringKey => _brain.Grain<TGrain>(key);
+    // Public (not protected) so TestGrainFactory — a top-level adapter outside this class hierarchy —
+    // can resolve grains on behalf of test-authored MCP tool instances.
+    public TGrain Grain<TGrain>(string key) where TGrain : IGrainWithStringKey => _brain.Grain<TGrain>(key);
     protected Task FireAsync<T>(T synapse) where T : Synapse => _brain.FireAsync(synapse);
     protected Task DeliverAsync<T>(T synapse) where T : Synapse => _brain.DeliverAsync(synapse);
 
