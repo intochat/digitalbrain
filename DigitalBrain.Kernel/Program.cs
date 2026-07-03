@@ -349,19 +349,6 @@ app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
         ? storedRedirectUri
         : SalesforceCallbackUri(request);
 
-    callbackLogger.LogWarning(
-        "DIAG callback pendingKeys=[{PendingKeys}] returnedState={ReturnedStatePrefix}... pendingState={PendingStatePrefix}... redirectUri={RedirectUri}",
-        string.Join(",", pending.Keys),
-        returnedState?[..Math.Min(8, returnedState.Length)],
-        pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var diagState) ? diagState[..Math.Min(8, diagState.Length)] : "<missing>",
-        redirectUri);
-    if (pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var diagVerifier))
-    {
-        callbackLogger.LogWarning(
-            "DIAG callback pending code_verifier len={VerifierLen} prefix={VerifierPrefix}...",
-            diagVerifier.Length, diagVerifier[..Math.Min(8, diagVerifier.Length)]);
-    }
-
     try
     {
         var exchangeValues = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
