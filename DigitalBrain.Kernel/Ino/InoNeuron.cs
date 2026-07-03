@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Core.UiKit;
@@ -15,6 +16,8 @@ namespace DigitalBrain.Kernel.Ino;
 [GrainType("ino.personal.v1")]
 public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron
 {
+    private sealed record ReplyPlan(string VisibleReply, IReadOnlyList<string> TaskDescriptions, string? BranchDescription);
+
     public override async Task OnActivateAsync(CancellationToken ct)
     {
         await base.OnActivateAsync(ct);
@@ -31,13 +34,52 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
+        if (IsTwoObjectRelationIntent(req.Prompt))
+        {
+            await FireAsync(new InoResponse(req.Prompt, "Rendered a relation graph.", []));
+            await DeliverGraphSurfaceAsync(
+                DbSchemaGraphMapper.RelationOfTwoObjectsTree(),
+                req.SessionId,
+                "Object relation",
+                "surface.graph.relation");
+            return;
+        }
+
+        if (IsSchemaVisualizationIntent(req.Prompt))
+        {
+            if (TryExtractDatabasePath(req.Prompt, out var databasePath))
+            {
+                var inspected = await InspectReferencedDatabaseAsync(databasePath, req.SessionId);
+                if (inspected is not null)
+                {
+                    await FireAsync(new InoResponse(req.Prompt, SchemaReplyText(inspected), []));
+                    await FireAsync(inspected);
+                    return;
+                }
+            }
+
+            var latest = LatestSuccessfulSchema(req.SessionId);
+            if (latest?.Schema is not null)
+            {
+                await FireAsync(new InoResponse(req.Prompt, "Rendered the most recent database schema.", []));
+                await ProcessSchemaInspectedAsync(latest, req.SessionId ?? latest.SessionId);
+                return;
+            }
+        }
+
         var ctx = await BuildContextAsync(req.Prompt);
-        var reply = await ReasonWithLlmAsync(req.Prompt, ctx);
+        var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx);
+        var replyPlan = BuildReplyPlan(req.Prompt, rawReply);
+        if (string.IsNullOrWhiteSpace(replyPlan.VisibleReply))
+        {
+            var directReply = await ReasonDirectlyWithLlmAsync(req.Prompt, ctx);
+            replyPlan = replyPlan with { VisibleReply = directReply };
+        }
 
-        var taskIds = await OrchestrateActionsIfNeededAsync(req.Prompt, reply);
+        var taskIds = await OrchestrateActionsIfNeededAsync(replyPlan);
 
-        await FireAsync(new InoResponse(req.Prompt, reply, taskIds.ToArray()));
-        await DeliverReplySurfaceAsync(reply, req.SessionId);
+        await FireAsync(new InoResponse(req.Prompt, replyPlan.VisibleReply, taskIds.ToArray()));
+        await DeliverReplySurfaceAsync(replyPlan.VisibleReply, req.SessionId);
 
         // Compress recent activity to long-term memory summary (journal driven).
         await CreateMemorySummaryAsync();
@@ -76,6 +118,48 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await FireAsync(new MemorySummary(ingested.FileName, summary, DateTimeOffset.UtcNow));
     }
 
+    public Task HandleAsync(DbSchemaInspected inspected) =>
+        ProcessSchemaInspectedAsync(inspected, inspected.SessionId);
+
+    private async Task ProcessSchemaInspectedAsync(DbSchemaInspected inspected, string? sessionId)
+    {
+        if (!inspected.Succeeded || inspected.Schema is null)
+        {
+            var message = $"I could not inspect database schema '{inspected.ConnectionName}': {inspected.Error ?? "unknown error"}.";
+            await DeliverReplySurfaceAsync(message, sessionId);
+            return;
+        }
+
+        var schema = inspected.Schema with { SessionId = sessionId ?? inspected.Schema.SessionId };
+        await DeliverGraphSurfaceAsync(
+            DbSchemaGraphMapper.ToGraphCanvasTree(schema),
+            sessionId ?? schema.SessionId,
+            $"{schema.ConnectionName} schema",
+            "surface.db-schema." + StableSurfaceId(schema.ConnectionName));
+
+        await FireAsync(new MemorySummary(
+            schema.ConnectionName,
+            SchemaMemorySummary(schema),
+            DateTimeOffset.UtcNow));
+    }
+
+    private async Task<DbSchemaInspected?> InspectReferencedDatabaseAsync(string databasePath, string? sessionId)
+    {
+        var connectionName = Path.GetFileNameWithoutExtension(databasePath);
+        if (string.IsNullOrWhiteSpace(connectionName))
+            connectionName = "sqlite-db";
+
+        var cmd = new DbInspectSchema(connectionName, "sqlite", SourcePath: databasePath, SessionId: sessionId);
+        var db = GrainFactory.GetGrain<IDbSupportNeuron>("db-main");
+        await db.FireAsync(cmd);
+
+        var timeline = await db.GetTimelineAsync();
+        return timeline
+            .OfType<DbSchemaInspected>()
+            .LastOrDefault(result => result.CorrelationId == cmd.SynapseId)
+            ?? timeline.OfType<DbSchemaInspected>().LastOrDefault(result => result.ConnectionName == connectionName);
+    }
+
     private async Task DeliverReplySurfaceAsync(string reply, string? sessionId)
     {
         var props = new Dictionary<string, object?>
@@ -83,6 +167,23 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["tree"] = new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = reply }),
             [UiSurfaceKeys.Title] = "INO",
             ["role"] = "assistant",
+        };
+        if (sessionId is not null) props["sessionId"] = sessionId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
+    private async Task DeliverGraphSurfaceAsync(UiWidgetTree tree, string? sessionId, string title, string surfaceId)
+    {
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = tree,
+            [UiSurfaceKeys.Title] = title,
+            [UiSurfaceKeys.SurfaceId] = surfaceId,
+            ["role"] = "assistant",
+            ["surfaceKind"] = UiSurfaceKinds.GraphCanvas,
         };
         if (sessionId is not null) props["sessionId"] = sessionId;
 
@@ -124,29 +225,175 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return $"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nskills:{skillCtx}\neditor:{editorCtx}";
     }
 
+    private DbSchemaInspected? LatestSuccessfulSchema(string? sessionId)
+    {
+        var schemas = IncomingJournal
+            .Concat(OutgoingJournal)
+            .OfType<DbSchemaInspected>()
+            .Where(schema => schema.Succeeded && schema.Schema is not null)
+            .DistinctBy(schema => schema.SynapseId)
+            .OrderBy(schema => schema.Timestamp)
+            .ToList();
+
+        if (schemas.Count == 0)
+            return null;
+
+        if (!string.IsNullOrWhiteSpace(sessionId))
+        {
+            var sessionMatch = schemas.LastOrDefault(schema => schema.SessionId == sessionId);
+            if (sessionMatch is not null)
+                return sessionMatch;
+        }
+
+        return schemas[^1];
+    }
+
+    private static bool IsSchemaVisualizationIntent(string prompt)
+    {
+        var p = prompt.ToLowerInvariant();
+        return p.Contains("schema") ||
+               p.Contains("visualize database") ||
+               p.Contains("visualize db") ||
+               p.Contains("show database") ||
+               p.Contains("show db");
+    }
+
+    private static bool IsTwoObjectRelationIntent(string prompt)
+    {
+        var p = prompt.ToLowerInvariant();
+        return (p.Contains("draw") || p.Contains("show") || p.Contains("visualize")) &&
+               p.Contains("relation") &&
+               (p.Contains("2 objects") || p.Contains("two objects") || p.Contains("object"));
+    }
+
+    private static bool TryExtractDatabasePath(string prompt, out string path)
+    {
+        foreach (Match match in DatabasePathRegex().Matches(prompt))
+        {
+            var candidate = match.Value.Trim('"', '\'', ' ', '\t').TrimEnd('.', ',', ';', ')', ']');
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                path = candidate;
+                return true;
+            }
+        }
+
+        path = string.Empty;
+        return false;
+    }
+
+    private static Regex DatabasePathRegex() =>
+        new(@"(?:""[^""]+\.(?:db|sqlite|sqlite3)""|'[^']+\.(?:db|sqlite|sqlite3)'|[A-Za-z]:\\[^\s""']+\.(?:db|sqlite|sqlite3))",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static string SchemaReplyText(DbSchemaInspected inspected) =>
+        inspected.Succeeded && inspected.Schema is not null
+            ? $"Rendered database schema for {inspected.Schema.SourcePath ?? inspected.ConnectionName}."
+            : $"I could not inspect database schema '{inspected.ConnectionName}': {inspected.Error ?? "unknown error"}.";
+
+    private static string SchemaMemorySummary(DbSchemaModel schema)
+    {
+        var objectCount = schema.Tables.Count;
+        var columnCount = schema.Tables.Sum(table => table.Columns.Count);
+        var fkCount = schema.Tables.Sum(table => table.ForeignKeys.Count);
+        var indexCount = schema.Tables.Sum(table => table.Indexes.Count);
+        var tables = string.Join("; ", schema.Tables.Select(table =>
+            $"{table.Name}({string.Join(", ", table.Columns.Select(column => column.Name))})"));
+
+        return $"Inspected SQLite schema '{schema.SourcePath ?? schema.ConnectionName}' with {objectCount} objects, {columnCount} columns, {fkCount} relationships, {indexCount} indexes. Tables: {tables}";
+    }
+
+    private static string StableSurfaceId(string value)
+    {
+        var chars = value
+            .Trim()
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
+            .ToArray();
+        var id = new string(chars).Trim('-');
+        return string.IsNullOrWhiteSpace(id) ? "sqlite" : id;
+    }
+
     private async Task<string> ReasonWithLlmAsync(string prompt, string context)
     {
         var chat = ServiceProvider.GetService<IChatClient>();
         if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
 
-        var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. Be concise, propose kernel tasks or branches when useful. Output action if any as 'TASK: desc' or 'BRANCH: whatif'.";
+        var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. Be concise and answer the user's request directly. Only add action directives on separate lines when the user explicitly asks to create a task, branch, simulation, or what-if. Valid directives are 'TASK: desc' and 'BRANCH: whatif'. Never let a directive replace the user-visible answer.";
         var full = sys + "\nCTX:\n" + context + "\nUSER: " + prompt;
         var response = await chat.GetResponseAsync(full);
         return response.Text.Trim();
     }
 
-    private async Task<List<string>> OrchestrateActionsIfNeededAsync(string prompt, string reply)
+    private async Task<string> ReasonDirectlyWithLlmAsync(string prompt, string context)
+    {
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
+
+        var response = await chat.GetResponseAsync(
+            "Answer the user's request directly in one or two sentences. Do not output TASK or BRANCH directives.\nCTX:\n"
+            + context + "\nUSER: " + prompt);
+        var text = response.Text.Trim();
+        return string.IsNullOrWhiteSpace(text) ? "I do not have a useful answer yet." : text;
+    }
+
+    private static ReplyPlan BuildReplyPlan(string prompt, string rawReply)
+    {
+        var visibleLines = new List<string>();
+        var taskDescriptions = new List<string>();
+        string? branchDescription = null;
+
+        foreach (var line in rawReply.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("TASK:", StringComparison.OrdinalIgnoreCase))
+            {
+                var task = trimmed["TASK:".Length..].Trim();
+                if (task.Length > 0)
+                    taskDescriptions.Add(task);
+                continue;
+            }
+
+            if (trimmed.StartsWith("BRANCH:", StringComparison.OrdinalIgnoreCase))
+            {
+                var branch = trimmed["BRANCH:".Length..].Trim();
+                if (branch.Length > 0 && ShouldCreateBranch(prompt))
+                    branchDescription = branch;
+                continue;
+            }
+
+            if (line.Length > 0)
+                visibleLines.Add(line);
+        }
+
+        var visible = string.Join(Environment.NewLine, visibleLines).Trim();
+        if (string.IsNullOrWhiteSpace(visible))
+        {
+            if (taskDescriptions.Count > 0)
+                visible = "I'll start that task: " + taskDescriptions[0];
+            else if (!string.IsNullOrWhiteSpace(branchDescription))
+                visible = "I'll open a branch to explore: " + branchDescription;
+        }
+
+        return new ReplyPlan(visible, taskDescriptions, branchDescription);
+    }
+
+    private static bool ShouldCreateBranch(string prompt) =>
+        prompt.Contains("what if", StringComparison.OrdinalIgnoreCase) ||
+        prompt.Contains("branch", StringComparison.OrdinalIgnoreCase) ||
+        prompt.Contains("simulate", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<List<string>> OrchestrateActionsIfNeededAsync(ReplyPlan replyPlan)
     {
         var created = new List<string>();
-        if (reply.Contains("TASK:", StringComparison.OrdinalIgnoreCase))
+        foreach (var taskDesc in replyPlan.TaskDescriptions)
         {
-            var taskDesc = reply.Split("TASK:", 2)[1].Split('\n')[0].Trim();
             var tid = "task-" + Guid.NewGuid().ToString("N")[..8];
             var kt = GrainFactory.GetGrain<IKernelTask>(tid);
             await kt.FireAsync(new RunTask(tid, taskDesc));
             created.Add(tid);
         }
-        if (reply.Contains("BRANCH:", StringComparison.OrdinalIgnoreCase) || prompt.Contains("what if", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
         {
             var cp = await CreateCheckpointAsync();
             var bid = await BranchAsync(cp);

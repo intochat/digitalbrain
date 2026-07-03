@@ -194,6 +194,99 @@ public static class UiKitVocabulary
     public const string Sheet = "ui:Sheet";
     public const string Toast = "ui:Toast";
     public const string Table = "ui:Table";
+    public const string GraphCanvas = "ui:GraphCanvas";
+}
+
+[GenerateSerializer]
+public record CanvasGraphSpec(
+    [property: Id(0)] string Title,
+    [property: Id(1)] IReadOnlyList<CanvasGraphNode> Nodes,
+    [property: Id(2)] IReadOnlyList<CanvasGraphEdge> Edges,
+    [property: Id(3)] string Layout = "force",
+    [property: Id(4)] IReadOnlyList<CanvasGraphGroup>? Groups = null,
+    [property: Id(5)] string? Summary = null)
+{
+    public IReadOnlyDictionary<string, object?> ToProps() => new Dictionary<string, object?>
+    {
+        ["title"] = Title,
+        ["layout"] = Layout,
+        ["nodes"] = Nodes.Select(n => n.ToProps()).ToArray(),
+        ["edges"] = Edges.Select(e => e.ToProps()).ToArray(),
+        ["groups"] = Groups?.Select(g => g.ToProps()).ToArray() ?? Array.Empty<IReadOnlyDictionary<string, object?>>(),
+        ["summary"] = Summary
+    };
+}
+
+[GenerateSerializer]
+public record CanvasGraphNode(
+    [property: Id(0)] string Id,
+    [property: Id(1)] string Label,
+    [property: Id(2)] string? Kind = null,
+    [property: Id(3)] string? Group = null,
+    [property: Id(4)] IReadOnlyList<CanvasGraphField>? Fields = null,
+    [property: Id(5)] IReadOnlyDictionary<string, object?>? Details = null)
+{
+    public IReadOnlyDictionary<string, object?> ToProps() => new Dictionary<string, object?>
+    {
+        ["id"] = Id,
+        ["label"] = Label,
+        ["kind"] = Kind,
+        ["group"] = Group,
+        ["fields"] = Fields?.Select(f => f.ToProps()).ToArray() ?? Array.Empty<IReadOnlyDictionary<string, object?>>(),
+        ["details"] = Details ?? new Dictionary<string, object?>()
+    };
+}
+
+[GenerateSerializer]
+public record CanvasGraphField(
+    [property: Id(0)] string Name,
+    [property: Id(1)] string? Type = null,
+    [property: Id(2)] string? Badge = null,
+    [property: Id(3)] string? Description = null,
+    [property: Id(4)] bool Key = false)
+{
+    public IReadOnlyDictionary<string, object?> ToProps() => new Dictionary<string, object?>
+    {
+        ["name"] = Name,
+        ["type"] = Type,
+        ["badge"] = Badge,
+        ["description"] = Description,
+        ["key"] = Key
+    };
+}
+
+[GenerateSerializer]
+public record CanvasGraphEdge(
+    [property: Id(0)] string Id,
+    [property: Id(1)] string From,
+    [property: Id(2)] string To,
+    [property: Id(3)] string? Label = null,
+    [property: Id(4)] string? Kind = null,
+    [property: Id(5)] IReadOnlyDictionary<string, object?>? Details = null)
+{
+    public IReadOnlyDictionary<string, object?> ToProps() => new Dictionary<string, object?>
+    {
+        ["id"] = Id,
+        ["from"] = From,
+        ["to"] = To,
+        ["label"] = Label,
+        ["kind"] = Kind,
+        ["details"] = Details ?? new Dictionary<string, object?>()
+    };
+}
+
+[GenerateSerializer]
+public record CanvasGraphGroup(
+    [property: Id(0)] string Id,
+    [property: Id(1)] string Label,
+    [property: Id(2)] IReadOnlyDictionary<string, object?>? Details = null)
+{
+    public IReadOnlyDictionary<string, object?> ToProps() => new Dictionary<string, object?>
+    {
+        ["id"] = Id,
+        ["label"] = Label,
+        ["details"] = Details ?? new Dictionary<string, object?>()
+    };
 }
 
 [GenerateSerializer]
@@ -263,6 +356,7 @@ public static class UiSurfaceKinds
     public const string Timeline = "timeline";
     public const string DataChart = "data-chart";
     public const string Table = "table";
+    public const string GraphCanvas = "graph-canvas";
     // All UI is UiSurface based. These enable neurons to own chrome, nav and full main UI.
     public const string AppShell = "app-shell";        // main root chrome + nav + layout, streamed by a neuron
     public const string ShellChrome = "shell-chrome";
@@ -284,6 +378,7 @@ public static class UiSurfaceKeys
     public const string SynapseType = "synapseType";
     public const string Props = "props";
     public const string ChartSpec = "chartSpec";
+    public const string GraphSpec = "graphSpec";
 }
 
 public static class UiSurfaceLayouts

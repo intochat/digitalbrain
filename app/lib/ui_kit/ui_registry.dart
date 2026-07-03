@@ -13,6 +13,7 @@ import 'ui_date_field.dart';
 import 'ui_dialog.dart';
 import 'ui_divider.dart';
 import 'ui_gap.dart';
+import 'ui_graph_canvas.dart';
 import 'ui_header.dart';
 import 'ui_heading.dart';
 import 'ui_icon.dart';
@@ -214,6 +215,9 @@ Widget buildUiNode(
               .toList() ??
           const <List<String>>[];
       return UiKitTable(columns: optList('columns'), rows: tableRows);
+    case 'ui:graphcanvas':
+    case 'ui:canvasgraph':
+      return UiKitGraphCanvas.fromProps(props);
     default:
       return const SizedBox.shrink();
   }

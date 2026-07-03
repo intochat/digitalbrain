@@ -8,6 +8,7 @@ import 'package:digitalbrain_flutter/ui_kit/ui_button.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_panel.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_screen.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_table.dart';
+import 'package:digitalbrain_flutter/ui_kit/ui_graph_canvas.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_text_field.dart';
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
 
@@ -120,6 +121,26 @@ void main() {
       ]);
     });
 
+    test('maps ui:graphcanvas to UiKitGraphCanvas', () {
+      final node = buildUiNode(
+        'ui:graphcanvas',
+        {
+          'title': 'Object relation',
+          'nodes': [
+            {'id': 'object-1', 'label': 'Object 1'},
+            {'id': 'object-2', 'label': 'Object 2'},
+          ],
+          'edges': [
+            {'from': 'object-1', 'to': 'object-2', 'label': 'relates to'},
+          ],
+        },
+        [],
+        (_, _) {},
+        buildChild: _noop,
+      );
+      expect(node, isA<UiKitGraphCanvas>());
+    });
+
     testWidgets('ui:table renders header and row cells', (tester) async {
       final node = buildUiNode(
         'ui:table',
@@ -139,6 +160,83 @@ void main() {
       expect(find.text('Jan'), findsOneWidget);
       expect(find.text('12000'), findsOneWidget);
     });
+
+    testWidgets('ui:graphcanvas renders two-node relation graph', (
+      tester,
+    ) async {
+      final node = buildUiNode(
+        'ui:graphcanvas',
+        {
+          'title': 'Object relation',
+          'nodes': [
+            {'id': 'object-1', 'label': 'Object 1'},
+            {'id': 'object-2', 'label': 'Object 2'},
+          ],
+          'edges': [
+            {'from': 'object-1', 'to': 'object-2', 'label': 'relates to'},
+          ],
+        },
+        [],
+        (_, _) {},
+        buildChild: _noop,
+      );
+
+      await tester.pumpWidget(_wrap(SizedBox(width: 700, child: node)));
+      expect(find.text('Object relation'), findsOneWidget);
+      expect(find.text('Object 1'), findsOneWidget);
+      expect(find.text('Object 2'), findsOneWidget);
+      expect(find.text('relates to'), findsOneWidget);
+    });
+
+    testWidgets(
+      'ui:graphcanvas renders schema fields without dropping labels',
+      (tester) async {
+        final node = buildUiNode(
+          'ui:graphcanvas',
+          {
+            'title': r'E:\budget.db schema',
+            'layout': 'schema',
+            'nodes': [
+              {
+                'id': 'accounts',
+                'label': 'accounts',
+                'kind': 'table',
+                'fields': [
+                  {'name': 'id', 'type': 'INTEGER', 'badge': 'PK', 'key': true},
+                  {'name': 'name', 'type': 'TEXT', 'badge': 'NOT NULL'},
+                ],
+              },
+              {
+                'id': 'transactions',
+                'label': 'transactions',
+                'kind': 'table',
+                'fields': [
+                  {'name': 'id', 'type': 'INTEGER', 'badge': 'PK', 'key': true},
+                  {'name': 'account_id', 'type': 'INTEGER', 'badge': 'FK'},
+                  {'name': 'amount', 'type': 'REAL', 'badge': 'NOT NULL'},
+                ],
+              },
+            ],
+            'edges': [
+              {
+                'from': 'transactions',
+                'to': 'accounts',
+                'label': 'account_id -> id',
+              },
+            ],
+          },
+          [],
+          (_, _) {},
+          buildChild: _noop,
+        );
+
+        await tester.pumpWidget(_wrap(SizedBox(width: 760, child: node)));
+        expect(find.text('accounts'), findsOneWidget);
+        expect(find.text('transactions'), findsOneWidget);
+        expect(find.text('account_id'), findsOneWidget);
+        expect(find.text('account_id -> id'), findsOneWidget);
+      },
+    );
 
     testWidgets('ui:text renders correctly in widget tree', (tester) async {
       final node = buildUiNode(

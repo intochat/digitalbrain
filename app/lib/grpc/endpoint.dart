@@ -32,6 +32,31 @@ import 'package:digitalbrain_flutter/telemetry/platform_env.dart';
   );
 }
 
+/// Endpoint for ordinary HTTP requests such as multipart upload.
+///
+/// Desktop Aspire exposes the kernel twice: a gRPC HTTP/2-only endpoint and a
+/// web endpoint. Multipart upload is HTTP/1.x, so it must prefer the web URL.
+(String host, int port, bool secure) resolveKernelUploadEndpoint() {
+  final base = Uri.base;
+
+  const configured = String.fromEnvironment('KERNEL_UPLOAD_ENDPOINT');
+  final aspireUrl = kIsWeb
+      ? null
+      : resolveAspireKernelUploadUrl(
+          webUrl: getEnv('services__kernel__web__0'),
+          httpUrl: getEnv('services__kernel__http__0'),
+          httpsUrl: getEnv('services__kernel__https__0'),
+          grpcUrl: getEnv('services__kernel__grpc__0'),
+        );
+
+  return resolveEndpointFrom(
+    isWeb: kIsWeb,
+    base: base,
+    kernelEndpoint: configured.isEmpty ? null : configured,
+    aspireKernelUrl: aspireUrl,
+  );
+}
+
 String? resolveAspireKernelUrl({
   String? grpcUrl,
   String? httpsUrl,
@@ -47,6 +72,23 @@ String? resolveAspireKernelUrl({
       nonEmpty(httpsUrl) ??
       nonEmpty(httpUrl) ??
       nonEmpty(webUrl);
+}
+
+String? resolveAspireKernelUploadUrl({
+  String? webUrl,
+  String? httpUrl,
+  String? httpsUrl,
+  String? grpcUrl,
+}) {
+  String? nonEmpty(String? value) {
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  return nonEmpty(webUrl) ??
+      nonEmpty(httpUrl) ??
+      nonEmpty(httpsUrl) ??
+      nonEmpty(grpcUrl);
 }
 
 (String host, int port, bool secure) resolveEndpointFrom({
