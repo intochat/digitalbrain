@@ -7,11 +7,12 @@
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Telegram</PackageId>
     <Version>0.1.0</Version>
-    <Description>Transport-internal Telegram typed synapses and the TelegramResponderNeuron pack. Depends only on DigitalBrain.Core; the kernel never references this project.</Description>
+    <Description>Transport-internal Telegram typed synapses and the TelegramResponderNeuron pack. Depends on Core primitives and pack contracts; the kernel never references this project.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

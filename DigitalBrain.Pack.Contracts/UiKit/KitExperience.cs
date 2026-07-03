@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
 
 namespace DigitalBrain.Core.UiKit;
@@ -55,7 +56,7 @@ public abstract class KitExperience : IPackBehavior
     }
 
     // Any action-bearing node (carries eventName) must know pack + experienceId so the client can route the ExperienceStep.
-    // Hops do not know those ids, so the base injects them at emit time — covers Button, Tile, and future nav nodes.
+    // Hops do not know those ids, so the base injects them at emit time - covers Button, Tile, and future nav nodes.
     private static UiWidgetTree Inject(UiWidgetTree node, string id)
     {
         if (node.Props.ContainsKey("eventName"))

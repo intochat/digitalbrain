@@ -4,7 +4,8 @@ Aspire hosting package for the DigitalBrain **Kernel** — the minimal Orleans s
 
 ## Layering (structure + distribution)
 
-- **Core** (DigitalBrain.Core): stable abstractions — INeuron, Synapse (with SynapseId/CausationId/CorrelationId), dual journals, Checkpoint/Branch/Restore, IPackBehavior + typed dispatch, UiSurface/RfwCard as first-class synapses, trust, distribution contracts. This is the non-negotiable center. Everything is expressed through neurons and synapses.
+- **Core** (DigitalBrain.Core): stable abstractions — INeuron, Synapse (with SynapseId/CausationId/CorrelationId), dual journals, Checkpoint/Branch/Restore, UiSurface/RfwCard as first-class synapses, and universal runtime messages. This is the non-negotiable center. Everything is expressed through neurons and synapses.
+- **Pack contracts** (DigitalBrain.Pack.Contracts): IPackBehavior + typed dispatch contracts, PackManifest/config fields, trust helpers, and the KitExperience authoring base. Core must not reference this assembly; pack contracts reference Core primitives.
 - **Kernel** (this package + DigitalBrain.Kernel base): the Aspire-orchestrated minimal Orleans kernel runtime + built-in kernel features (journaled marketplace substrate, collectible-ALC embodiment host, kernel tasks, system status/self-healing via checkpoints, foundry for compile/embody, core orchestration). AddDigitalBrain wires clustering, durable journals (blobs), LLM, etc.
 - **Experiences / INO / domain features**: published to the marketplace as signed typed-C# packs. Installed and updated into a running kernel exactly like any other pack. The kernel itself stays the stable base (3 replicas by default enable rolling updates and self-improvement without full downtime).
 

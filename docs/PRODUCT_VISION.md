@@ -119,14 +119,14 @@ Everything is a Neuron or a Synapse. On top of that protocol, the product is com
 │ SUBSTRATE bundles      the platform itself, shipped as packs │
 │   kernel (self-updating), ui-kit (39 ForUI covers)           │
 ├─────────────────────────────────────────────────────────────┤
-│ PROTOCOL core          not a bundle — the law                │
-│   Neuron, Synapse, IHandle<T>, IPackBehavior, manifest types │
+│ PROTOCOL core/contracts not bundles — the law                │
+│   Neuron, Synapse, IHandle<T>, pack contracts, manifests     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.1 Protocol core (`DigitalBrain.Core`)
 
-Not a bundle — the dependency-light law every bundle is written against: `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, `IPackBehavior`, the marketplace/trust/UI contracts, and (new) the **bundle manifest types**. Stays dependency-light because `Mcp.Tools` references only Core.
+Not a bundle — the dependency-light law every bundle is written against: Core provides `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, marketplace/UI wire contracts, and the **bundle manifest types**. `DigitalBrain.Pack.Contracts` provides `IPackBehavior`, `PackManifest`, required config fields, and trust helpers. Core stays independent of the pack-contract assembly so the primitive layer does not grow runtime or integration dependencies.
 
 ### 4.2 Substrate bundles
 
@@ -150,7 +150,7 @@ What creators actually ship. A content bundle is a `NeuroPack` whose manifest de
 
 A **Bundle** is a `NeuroPack` (unchanged wire format — name, version, typed-C# `Code`, owner, ECDSA signature, price, commission) plus a **manifest** that makes it a *product* rather than a bare capability.
 
-The manifest extends the existing `PackManifest` (which today declares `HandledSynapseTypes` + `RequiredConfig`) with product fields. Proposed shape, living in `DigitalBrain.Core` next to `IPackBehavior`:
+The manifest extends the existing `PackManifest` (which today declares `HandledSynapseTypes` + `RequiredConfig`) with product fields. `PackManifest` lives in `DigitalBrain.Pack.Contracts`; `BundleManifest` currently remains in `DigitalBrain.Core` until the marketplace/UI projection split removes the Core callers:
 
 ```csharp
 public record BundleManifest(

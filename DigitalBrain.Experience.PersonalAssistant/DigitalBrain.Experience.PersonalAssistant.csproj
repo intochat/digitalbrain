@@ -7,11 +7,12 @@
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Experience.PersonalAssistant</PackageId>
     <Version>0.1.0</Version>
-    <Description>Personal AI assistant pack: Telegram-triggered, context-aware, visualizes results via the UI Kit ino when appropriate. Depends only on DigitalBrain.Core; the kernel never references this project.</Description>
+    <Description>Personal AI assistant pack: Telegram-triggered, context-aware, visualizes results via the UI Kit pack contracts when appropriate. The kernel never references this project.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

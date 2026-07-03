@@ -77,16 +77,17 @@ The stale docs at `docs/superpowers/specs/2026-06-30-telegram-llm-experience-des
 
 ### 1.3 Project graph
 
-Solution `Brain.slnx` lists 28 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
+Solution `Brain.slnx` lists 29 projects plus the Flutter client folder reference (`../app/Flutter.proj`).
 
 | Project | Purpose |
 |---|---|
-| `DigitalBrain.Core` | Protocol layer — `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, `IPackBehavior`, checkpoint/trust/UI-surface contracts. Only depends on `Microsoft.Orleans.Core.Abstractions`/`Serialization`. Kept dependency-light so MCP and pack projects can reference this without pulling in runtime hosts. Zero references to any specific integration/vendor type (Google, Gmail, Winget, Git, Roslyn, Flutter UI, Telegram chat, Context grain, …) — only generic `*Signals` string-constant registries, which are name registries, not type contracts. |
+| `DigitalBrain.Core` | Protocol layer — `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, checkpoint/UI-surface contracts, and shared runtime messages. Only depends on `Microsoft.Orleans.Core.Abstractions`/`Serialization`. Guard tests assert it has zero references to other `DigitalBrain.*` assemblies and no runtime/host/integration packages. |
+| `DigitalBrain.Pack.Contracts` | Executable pack contract layer — `IPackBehavior`, `PackManifest`, pack config fields, `PackEmission`, trust helpers, `ConfigurationProvided`/`ConfigFormSurface`, and `KitExperience`/`UiExperience`. References Core primitives; Core does not reference this project. |
 | `DigitalBrain.SeedPacks` | Seed catalog assembly. Owns `MarketplaceSeeds` and embeds seed pack source such as `PersonalAssistantNeuron.cs` so concrete marketplace seed content no longer lives in `DigitalBrain.Core`. |
 | `DigitalBrain.Kernel` | The Orleans runtime (formerly "Silo"). `Microsoft.NET.Sdk.Web`, container-packaged. Subfolders: `Auth, Awesome, Company, Config, Context, Economics, Foundry, Gateway, Generated, Ino, Kernel, Llm, Marketplace, Protos, Sandbox, Sdk, Ui`. Owns embodiment (Foundry/Sandbox), LLM (Microsoft.Extensions.AI + Ollama/Azure OpenAI), Economics (Stripe + ECDSA licenses), Context (Qdrant), server-driven UI (`Ui`/`Protos`, bidirectional gRPC `UiGateway`), HA self-update. References every isolated ino project below for their interfaces/logic, and hosts the concrete `Neuron`-derived grain classes for Windows/Developer/Context/UiKit/Telegram.Channel/Google (see §1.3a). |
 | `DigitalBrain.Aspire` | Hosting SDK: `AddDigitalBrain`, `WireKernelSilo`, `WithMcp`, `WithOrleansDashboard`, `AddFlutterClient`, `WireTelegramTransport` — all in `DigitalBrainBuilderExtensions.cs`. Not itself an Aspire project resource (`IsAspireProjectResource=false`). |
-| `DigitalBrain.Mcp` / `DigitalBrain.Mcp.Tools` | MCP server (`Mcp`, an `Exe`, co-hosted on the kernel's Kestrel) exposing neuron tools defined in `Mcp.Tools` (`DigitalBrainMutationTools.cs`, `DigitalBrainReadTools.cs`) — `Mcp.Tools` references only `Core`. |
-| `DigitalBrain.Telegram` | Pure shared library: transport-internal synapses (`TelegramMessageReceived`, `TelegramReplyRequested` — explicitly *not* journaled through the kernel) and `TelegramResponderNeuron`, a pure `IPackBehavior` pack. Fully self-contained — never derives from `Neuron`. |
+| `DigitalBrain.Mcp` | MCP server (`Mcp`, an `Exe`, co-hosted on the kernel's Kestrel) exposing neuron tools (`DigitalBrainMutationTools.cs`, `DigitalBrainReadTools.cs`). References Core plus pack contracts for pack emission and marketplace-authoring surfaces. |
+| `DigitalBrain.Telegram` | Pure shared library: transport-internal synapses (`TelegramMessageReceived`, `TelegramReplyRequested` — explicitly *not* journaled through the kernel) and `TelegramResponderNeuron`, a pure `IPackBehavior` pack. Fully self-contained — never derives from `Neuron`. References Core primitives plus pack contracts. |
 | `DigitalBrain.Telegram.Transport` | The actual ASP.NET Core webhook host — `/webhook` POST ingress, `/health`, gRPC-clients the kernel gateway. Deployed as its own container app (see 1.6). |
 | `DigitalBrain.TestKit` | `IDigitalBrain` facade over a real Orleans `TestCluster`, depends on Core + Kernel + every real-grain ino below. Gives each isolated ino's `.Tests` sibling a zero-boilerplate way to spin a cluster and resolve grains without depending on `DigitalBrain.Tests`. |
 | `DigitalBrain.Windows` (+ `.Tests`) | Real-grain ino. `IFileSystemNeuron`/`IWingetNeuron`/`IShellNeuron` interfaces, `ProcessRunner`, `FileSystemOperations` (real `System.IO` calls) — Core-only dependency. Grain classes stay in Kernel (§1.3a). |
@@ -95,7 +96,7 @@ Solution `Brain.slnx` lists 28 projects plus the Flutter client folder reference
 | `DigitalBrain.UiKit` (+ `.Tests`) | Real-grain ino, interface-only (see §1.3a honest limitation). `IFlutterUiNeuron` interface — Core-only. `FlutterUiNeuron` grain class, `HomeFeedBus`, `SignalEgressBus`, `UiSurfaceRfwBridge` all stay in Kernel as cross-cutting broadcast infra. |
 | `DigitalBrain.Telegram.Channel` (+ `.Tests`) | Real-grain ino, interface-only (see §1.3a honest limitation). `ITelegramChatNeuron` interface — Core-only. `TelegramChatNeuron` grain class (stateful, journal-derived binding/routing) stays in Kernel. |
 | `DigitalBrain.Google` (+ `.Tests`) | Real-grain ino. `IGmailNeuron`/`IGoogleDriveNeuron`/`IGoogleCalendarNeuron` interfaces, `I*ApiClient` wrapper interfaces + real `Google*ApiClient` implementations, `GoogleCredentialFactory` — Core + `Google.Apis.*` only. Grain classes (`GmailNeuron`, `GoogleDriveNeuron`, `GoogleCalendarNeuron`, `GoogleAuthNeuron`) live in Kernel, not this project (the one correction the neuron-placement amendment made to the base spec). |
-| `DigitalBrain.Experience.PersonalAssistant` (+ `.Tests`) | Pure-pack ino. `PersonalAssistantNeuron : IPackBehavior` — multi-hop: recall Context → augmented `AskLlm` → text reply or visualize, composing Telegram+Context+LLM via generic `Signal` names. Fully self-contained — never derives from `Neuron`. Core-only. Its source is embedded into `DigitalBrain.SeedPacks` and seeded into the marketplace at runtime (`MarketplaceSeeds.PersonalAssistantPackCode`). |
+| `DigitalBrain.Experience.PersonalAssistant` (+ `.Tests`) | Pure-pack ino. `PersonalAssistantNeuron : IPackBehavior` — multi-hop: recall Context → augmented `AskLlm` → text reply or visualize, composing Telegram+Context+LLM via generic `Signal` names. Fully self-contained — never derives from `Neuron`. References Core primitives plus pack contracts. Its source is embedded into `DigitalBrain.SeedPacks` and seeded into the marketplace at runtime (`MarketplaceSeeds.PersonalAssistantPackCode`). |
 | `NeuroOSPrototype.AppHost` + `NeuroOSPrototype.ServiceDefaults` | The Aspire host resource graph (below) and standard OTel/health/resilience defaults. |
 | `DigitalBrain.Tests` | Reqnroll BDD + xUnit over a real Orleans `TestCluster`. See Part 2. |
 
@@ -177,9 +178,9 @@ not aspirational.
 
 ### 1.5 NeuroPack lifecycle: author → sign → publish → trust-gate → compile → embody → dispatch
 
-`IPackBehavior` (`DigitalBrain.Core/Distribution/IPackBehavior.cs:23-43`) is the pure/sync contract a
-pack implements — no `IChatClient`, no DI, "a pack assembly references only this Protocol assembly"
-(comment, lines 14-17). Only `string Respond(string input)` is required; `GetManifest()`,
+`IPackBehavior` (`DigitalBrain.Pack.Contracts/Distribution/IPackBehavior.cs`) is the pure/sync contract a
+pack implements — no `IChatClient`, no DI. Pack assemblies reference `DigitalBrain.Pack.Contracts` and
+`DigitalBrain.Core` primitives rather than the runtime host. Only `string Respond(string input)` is required; `GetManifest()`,
 `GetBundleManifest()`, `CanHandle(Synapse)`, `Handle(Synapse)` have default implementations that route
 `ExperienceUsed` through `Respond` and wrap the result as a `PackEmission`.
 
@@ -188,16 +189,16 @@ IsPrivate, CommissionRate, Code, Description, AuthorPublicKeyBase64, SignatureBa
 — `Manifest` (a `BundleManifest?`) is carried directly on the pack record, populated lazily at publish
 time (see below), not a parallel type.
 
-**Signing** — `DigitalBrain.Core/Trust/PackSignatureVerifier.cs`. ECDSA-nistP256
+**Signing** — `DigitalBrain.Pack.Contracts/Trust/PackSignatureVerifier.cs`. ECDSA-nistP256
 (`ECDsa.Create(ECCurve.NamedCurves.nistP256)`). Canonical content =
 `Name|Version|SHA256(Code)|AuthorPublicKeyBase64`; `VerifyPack` recomputes it and calls
 `ecdsa.VerifyData(..., HashAlgorithmName.SHA256)`, treating `CryptographicException`/
 `FormatException`/`ArgumentException` as a plain `false` rather than a crash.
 
-**Trust gate** — `DigitalBrain.Core/Trust/PublisherTrust.cs:9-13`: `IsTrusted` = signature verifies
+**Trust gate** — `DigitalBrain.Pack.Contracts/Trust/PublisherTrust.cs`: `IsTrusted` = signature verifies
 **AND** `trustedPublisherKeys.Contains(pack.AuthorPublicKeyBase64)` — integrity and trust are
 deliberately separate checks (a validly self-signed stranger still fails the allowlist). Enforced in
-`MarketplaceNeuron.HandleAsync(PublishToMarketplace)` (`DigitalBrain.Kernel/SystemNeurons.cs:499`):
+`MarketplaceNeuron.HandleAsync(PublishToMarketplace)` (`DigitalBrain.Kernel/MarketplaceNeuron.cs`):
 publishing is rejected outright when `DigitalBrain:Marketplace:GatePublishing` is `true` (config
 default `false`) and the publisher isn't trusted; the gate is re-applied on cache rebuild from journal
 replay so a rejected pack stays excluded across restarts. Install has its own separate gate
@@ -208,17 +209,17 @@ entitlement.
 **Compile → ALC → embody** — `DigitalBrain.Kernel/Foundry/`:
 - `FoundryCompilation.CreateWith` (`FoundryCompilation.cs:20-25`) parses source with
   `CSharpSyntaxTree.ParseText` and compiles against the trusted-platform-assemblies plus
-  `DigitalBrain.Core`, targeting `OutputKind.DynamicallyLinkedLibrary`.
+  `DigitalBrain.Pack.Contracts` plus `DigitalBrain.Core`, targeting `OutputKind.DynamicallyLinkedLibrary`.
 - `PackAlcEmbodier.Embody` (`PackAlcEmbodier.cs:42-80`) compiles, then runs
   `CapabilityGate.FindViolations(compilation)` — a semantic-model walk banning
   `System.Diagnostics.Process`, `System.Reflection.Emit`, `System.Runtime.InteropServices`,
   `System.Runtime.Loader`, `Microsoft.Win32.Registry` — and throws `PackEmbodimentException` on a hit.
   It emits to a `MemoryStream`, creates a **collectible** `AssemblyLoadContext` under
   `ExecutionContext.SuppressFlow()`, wires `Resolving += ResolveFromHost` so shared types like
-  `DigitalBrain.Core` unify with the host assembly (making the `IPackBehavior` cast valid across the
+  `DigitalBrain.Core` and `DigitalBrain.Pack.Contracts` unify with the host assemblies (making the `IPackBehavior` cast valid across the
   ALC boundary), loads the pack assembly, and instantiates the first public parameterless
   `IPackBehavior` type it finds. Returns an `EmbodiedPack` whose `Dispose()` calls
-  `context.Unload()` — this is the mechanism that lets packs be added/removed without a silo restart.
+  `context.Unload()` — this is the mechanism that lets packs be added/removed without a kernel restart.
 - Embody happens at two points: `MarketplaceNeuron.MaterializeManifest` (best-effort, at publish time,
   purely to extract `BundleManifest` for catalog faceting) and `GeneratedNeuron.TryEmbody`
   (`SystemNeurons.cs:975-998`, at install time — this is the one that becomes the live dispatch
@@ -334,10 +335,10 @@ needing a compile-time reference to every pack's synapse types.
 
 ### 1.9 Config/secrets primitive
 
-`PackConfigField` (`DigitalBrain.Core/Distribution/IPackBehavior.cs:6-12`): `Key, Label,
+`PackConfigField` (`DigitalBrain.Pack.Contracts/Distribution/IPackBehavior.cs`): `Key, Label,
 Kind(Text|Secret|Choice), Choices, DependsOnKey, DependsOnValue`. A pack declares a list of these as
 `PackManifest.RequiredConfig`. Kernel auto-render: `ConfigFormSurface.Build`
-(`DigitalBrain.Core/Configuration.cs:14-75`) maps each field to a `ui:TextField`/`ui:Select` node plus
+(`DigitalBrain.Pack.Contracts/Configuration.cs`) maps each field to a `ui:TextField`/`ui:Select` node plus
 a submit `ui:Button` that emits `ConfigurationProvided`, wrapped in a `ui:Screen`/`ui:Column`
 `UiSurface` — no bespoke per-pack form code.
 

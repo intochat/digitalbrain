@@ -89,11 +89,15 @@ public sealed class PackSpecDriver(INeuronTestHost host)
     }
 
     // Same compile call PackAlcEmbodier.Embody uses for real published packs (assembly name + the
-    // IPackBehavior-carrying assembly as an extra reference) — this exercises the production compile
+    // IPackBehavior and Core assemblies as extra references) - this exercises the production compile
     // path, not a reimplementation of it, so a CapabilityGate regression here means real embodiment breaks too.
     public IReadOnlyList<string> CheckCompilation(string code)
     {
-        var compilation = FoundryCompilation.CreateWith("spec_" + Guid.NewGuid().ToString("N"), code, typeof(IPackBehavior).Assembly);
+        var compilation = FoundryCompilation.CreateWith(
+            "spec_" + Guid.NewGuid().ToString("N"),
+            code,
+            typeof(IPackBehavior).Assembly,
+            typeof(Synapse).Assembly);
         return CapabilityGate.FindViolations(compilation);
     }
 }
