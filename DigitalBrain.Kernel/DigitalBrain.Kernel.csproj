@@ -53,6 +53,7 @@
     <ProjectReference Include="..\DigitalBrain.SeedPacks\DigitalBrain.SeedPacks.csproj" />
     <ProjectReference Include="..\DigitalBrain.Telegram.Channel\DigitalBrain.Telegram.Channel.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
     <ProjectReference Include="..\DigitalBrain.UiKit\DigitalBrain.UiKit.csproj" />
     <ProjectReference Include="..\DigitalBrain.Windows\DigitalBrain.Windows.csproj" />
     <ProjectReference Include="..\NeuroOSPrototype.ServiceDefaults\NeuroOSPrototype.ServiceDefaults.csproj" />

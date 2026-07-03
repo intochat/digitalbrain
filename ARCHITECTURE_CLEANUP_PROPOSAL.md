@@ -18,7 +18,8 @@ Done:
 - Started Phase 2 by moving executable pack contracts, pack config schema/surface helper, trust helpers, and `KitExperience`/`UiExperience` authoring helpers from `DigitalBrain.Core` into `DigitalBrain.Pack.Contracts`.
 - Continued Phase 2 by moving `NeuroPack` marketplace and installed-bundle UI projection helpers from `DigitalBrain.Core` into `DigitalBrain.Marketplace.Contracts`.
 - Continued Phase 2 by moving `NeuroPack` and bundle manifests into `DigitalBrain.Pack.Contracts`, and marketplace commands/events/interfaces into `DigitalBrain.Marketplace.Contracts`.
-- Continued Phase 2 by moving `UiSurface`, `UiWidgetTree`, UI vocabularies, chart specs, typed surface records, `RfwCard`, and UI-facing neuron contracts into `DigitalBrain.Ui.Contracts`. The existing UI sample/live-data helpers moved with the UI contracts to keep dependency direction clean (`Ui.Contracts` -> `Core`, never `Core` -> `Ui.Contracts`).
+- Continued Phase 2 by moving `UiSurface`, `UiWidgetTree`, UI vocabularies, chart specs, typed surface records, `RfwCard`, generic action descriptors, and UI-facing neuron contracts into `DigitalBrain.Ui.Contracts`.
+- Continued Phase 2 by moving UI sample/live-data builders into `DigitalBrain.Ui.Runtime`, which references only Core plus UI contracts and keeps `DigitalBrain.Ui.Contracts` schema-oriented.
 - Added architecture guard tests that keep `DigitalBrain.Core` free of runtime, host, integration, pack-contract, and UI-contract assembly references.
 - Renamed product-level Silo restart/deploy language to Kernel while preserving Orleans technical terms.
 - Renamed `DigitalBrain.Tests/UnitTest1.cs` to `DigitalBrain.Tests/Kernel/NeuronTests.cs`.
@@ -28,7 +29,7 @@ Still left:
 - Continue splitting `DigitalBrain.Core` into smaller primitive/runtime/pack/UI/system contract packages.
 - Split `DigitalBrain.Kernel` into runtime modules and make the host a composition root.
 - Make integration project names match ownership boundaries, especially interface-only projects.
-- Move remaining demo/sample UI leakage out of UI contracts and gateway paths.
+- Move remaining demo/sample UI leakage out of gateway paths and stable Core contracts.
 - Split the central test project into explicit feedback-speed lanes.
 - Expand deployment beyond the current one-kernel-image MVP if Telegram transport and MCP need independent images.
 - Add architecture guard tests for module dependency direction.
@@ -57,7 +58,7 @@ Recommended first move: do a deletion and boundary pass before adding any more f
 `Brain.slnx` now includes:
 
 - Flutter via `../app/Flutter.proj` under a `clients` solution folder.
-- Main product projects (`DigitalBrain.Core`, `DigitalBrain.Ui.Contracts`, `DigitalBrain.Kernel`, `DigitalBrain.Aspire`, `DigitalBrain.Mcp`, integrations, tests).
+- Main product projects (`DigitalBrain.Core`, `DigitalBrain.Ui.Contracts`, `DigitalBrain.Ui.Runtime`, `DigitalBrain.Kernel`, `DigitalBrain.Aspire`, `DigitalBrain.Mcp`, integrations, tests).
 - AppHost and ServiceDefaults.
 - Deployment project under `/deploy/`.
 
@@ -103,7 +104,8 @@ Largest source files:
 
 | File | Lines | Concern |
 | --- | ---: | --- |
-| `DigitalBrain.Ui.Contracts/UiSurfaces.cs` | 1,000+ | UI grammar, samples, live-data builders, action helpers now isolated from Core |
+| `DigitalBrain.Ui.Contracts/UiSurfaces.cs` | ~350 | UI grammar, typed surface records, chart specs, and generic action descriptors |
+| `DigitalBrain.Ui.Runtime/UiSurfaceRuntime.cs` | ~650 | Runtime/sample live-data builders now outside the schema assembly |
 | `DigitalBrain.Tests/UnitTest1.cs` | 500 | Legacy scaffold name with real tests |
 | `DigitalBrain.Tests/Steps/NeuronSteps.cs` | 435 | Large shared BDD step class |
 | `DigitalBrain.Kernel/Gateway/GatewayService.cs` | 423 | gRPC gateway plus UI/demo routing |
@@ -174,7 +176,8 @@ brain/
     DigitalBrain.Primitives/          # NeuronId, TaskId, Synapse base, causal metadata
     DigitalBrain.Contracts/           # Stable runtime contracts split by domain folders
     DigitalBrain.Pack.Contracts/      # IPackBehavior, PackManifest, config fields, trust primitives
-    DigitalBrain.Ui.Contracts/        # UiWidgetTree, UiSurface, action schema; split samples later
+    DigitalBrain.Ui.Contracts/        # UiWidgetTree, UiSurface, action schema; no runtime/sample builders
+    DigitalBrain.Ui.Runtime/          # runtime/sample UiSurface projections
     DigitalBrain.Runtime/             # Orleans grain base, dispatch, journals, stream wiring
     DigitalBrain.Kernel.Host/         # ASP.NET/Orleans host, Program.cs, DI composition
     DigitalBrain.Gateway/             # gRPC gateway services and protobufs
@@ -344,7 +347,7 @@ Do not split by folders only. Split by deploy/runtime responsibility:
 - `DigitalBrain.Marketplace.Runtime`: `MarketplaceNeuron`, catalog, install/publish policy, seed provider.
 - `DigitalBrain.Foundry.Runtime`: `PackAlcEmbodier`, capability gate, code-run/code-gen/code-deploy neurons.
 - `DigitalBrain.Llm.Runtime`: `LlmResponderNeuron`, `DigitalBrainChat`, scoped chat client factory.
-- `DigitalBrain.Ui.Runtime`: `FlutterUiNeuron`, `ChatNeuron`, home feed/signal egress buses, RFW bridge.
+- `DigitalBrain.Ui.Host`: `FlutterUiNeuron`, `ChatNeuron`, home feed/signal egress buses, RFW bridge. Keep this separate from the current lightweight `DigitalBrain.Ui.Runtime` helper assembly unless it stays free of host/runtime package dependencies.
 
 Short-term rule:
 
@@ -441,7 +444,7 @@ Priority: P2
 
 Current state:
 
-- `UiSurfaceSamples` and demo surface IDs now live in `DigitalBrain.Ui.Contracts/UiSurfaces.cs`.
+- `UiSurfaceSamples` and demo surface IDs now live in `DigitalBrain.Ui.Runtime/UiSurfaceRuntime.cs`.
 - `DemoMessageSynapse` lives in `DigitalBrain.Core/Synapse.cs`.
 - `MarketplaceSeeds` has comments about deleted demo bloat and still embeds concrete seed pack source.
 - Gateway code contains demo routes and demo IDs.
@@ -449,7 +452,7 @@ Current state:
 Recommendation:
 
 - Move samples into `DigitalBrain.Samples` or test fixtures.
-- Keep only reusable UI schema/builders in UI contracts.
+- Keep only reusable UI schema and generic action descriptors in UI contracts.
 - Move seed packs into dedicated pack projects or embedded resources outside Core.
 - Gateway should route generic actions, not own demo behavior.
 
@@ -555,9 +558,10 @@ Tasks:
 1. Move executable pack contracts, pack config, and pack trust helpers into `DigitalBrain.Pack.Contracts`. Current slice done.
 2. Move UI schema from `DigitalBrain.Core` into `DigitalBrain.Ui.Contracts`. Current slice done.
 3. Move remaining marketplace contracts out of Core now that `NeuroPack` UI projections live in `DigitalBrain.Marketplace.Contracts`. Current slice done.
-4. Move demo/test contracts out of Core.
-5. Move seed pack code out of Core.
-6. Keep compatibility type-forwarding only if packaging requires it.
+4. Move UI sample/live-data builders out of UI contracts into `DigitalBrain.Ui.Runtime`. Current slice done.
+5. Move demo/test contracts out of Core.
+6. Move seed pack code out of Core.
+7. Keep compatibility type-forwarding only if packaging requires it.
 
 Validation:
 
