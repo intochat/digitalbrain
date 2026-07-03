@@ -1,5 +1,44 @@
 # CONTINUITY — NeuroOS best-of-breed consolidation
 
+## 2026-07-03 — X post → Bitcoin price → Telegram demo
+
+Merged to master (`spec/x-bitcoin-telegram-demo`, fast-forward). Proves the cross-channel capstone demo
+first flagged at the end of the prior session's "Next" note (X/Twitter integration + Bitcoin price +
+Telegram) — reusing existing infrastructure end-to-end rather than building new closed-loop machinery.
+Reached here after an initial, larger "self-improvement loop" spec (system edits its own source tree,
+open-ended discovery, fully autonomous merge+redeploy) was scoped down on user feedback ("too
+complicated... let's oversimplify... show MVP to my team asap"); that spec/branch (`spec/self-
+improvement-loop`, 1 commit) is parked, not merged, in case that direction is revisited later.
+
+Shipped: `IMarketDataApiClient`/`CoinGeckoApiClient` (real CoinGecko HTTP wrapper, mirrors
+`DigitalBrain.Google`'s `I*ApiClient` pattern), `MarketDataNeuron` (Kernel-side grain reacting to
+`Signal("CheckBitcoinPrice")`, mirrors `LlmResponderNeuron`), a `simulate_x_post` MCP tool (thin wrapper
+over `IIngressNeuron.IngestAsync`), a hand-authored `XBitcoinTelegramDemoNeuron` pack seeded in
+`MarketplaceSeeds.cs` alongside `TelegramResponderPackCode`/`KeywordWatcherPackCode`, and an end-to-end
+Reqnroll scenario (`XBitcoinTelegramDemo.feature`) proving the full real chain — MCP tool → ingress
+broadcast → embodied pack → `MarketDataNeuron` (only the HTTP call faked) → embodied pack → Telegram
+egress bus — over a real Orleans `TestCluster`, same style as `TelegramExperience.feature`.
+
+Two real cross-task findings surfaced only at review, both fixed:
+- **Task 3** needed `IIngressNeuron`'s interface (not its implementation) relocated from
+  `DigitalBrain.Kernel.Gateway` into `DigitalBrain.Core`, and `NeuronTestBase.Grain<T>()` widened
+  `protected`→`public` — both were compile-hard requirements of extracting a shared `TestGrainFactory`
+  test double for `DigitalBrain.Mcp.Tools` (which references only `Core`), independently verified via
+  `.csproj`/project-reference inspection by the task reviewer, not just taken on the implementer's word.
+- **Final whole-branch review caught a real Critical bug the five task-level reviews missed**:
+  `MarketDataNeuron` was never added to `Program.cs`'s existing startup-warmup block (the one that
+  explicitly activates `ILlmResponderNeuron` because "broadcasts only reach already-activated grains").
+  Every test passed anyway because the Reqnroll steps force-activate the grain directly in the `Given`
+  step, masking that the live demo would silently break the moment it was shown to the team. Worth
+  flagging precisely because the controller's own guidance to the Task 2/5 reviewers had wrongly framed
+  this as "a pre-existing, accepted `LlmResponderNeuron` gap" — never verified before being asserted as
+  fact in review-scoping instructions. It wasn't: that gap is closed at `Program.cs:254`. Fixed in a single
+  follow-up commit (`Program.cs` warmup line + corrected comment + two unrelated Minors: `InvariantCulture`
+  on the CoinGecko price formatting, `sealed` on `MarketDataNeuron`), re-reviewed clean.
+
+Real X/Twitter API integration and live-generation of the automation via `run_code_foundry` (which already
+has its own separate Reqnroll coverage, `CodeFoundry.feature`) were explicit non-goals for this pass.
+
 ## Prior work summary (2026-06-24 through 2026-07-02, compacted 2026-07-02)
 
 Full detail for everything below lives in git history (`git log`), not here — this is a recap so a
