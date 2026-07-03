@@ -39,10 +39,7 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
         var graphTimeline = await ResolveNeuron("cluster-vis").GetTimelineAsync();
         var chartTimeline = await Grains.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();
 
-        var marketplace = Grains.GetGrain<IMarketplaceNeuron>("market-main");
-        var published = await GetPublishedPacksWithLocalSeedsAsync(marketplace);
-        var marketplaceTimeline = await marketplace.GetTimelineAsync();
-        var installed = marketplaceTimeline.OfType<NeuroPackInstalled>().Select(i => i.Pack).ToArray();
+        var marketplaceTimeline = await Grains.GetGrain<IMarketplaceNeuron>("market-main").GetTimelineAsync();
 
         var timeline = taskTimelines
             .SelectMany(t => t.Timeline)
@@ -54,7 +51,7 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
             .ToArray();
 
         var surfaces = UiSurfaceLiveData.BuildWorkbenchSurfaces(
-            taskTimelines, graphTimeline, published, installed, timeline, maxEvents, chartTimeline);
+            taskTimelines, graphTimeline, timeline, maxEvents, chartTimeline);
 
         return JsonSerializer.Serialize(surfaces, SurfaceJsonOptions);
     }

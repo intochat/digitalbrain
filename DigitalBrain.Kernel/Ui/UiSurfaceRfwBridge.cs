@@ -57,7 +57,8 @@ public static class UiSurfaceRfwBridge
         {
             var payload = new Dictionary<string, object?> { ["tree"] = treeObj, ["kind"] = surface.Kind };
             // Carry experience markers so the experience host can match the hop and key its semantics on the surfaceId.
-            foreach (var markerKey in new[] { "activeExperience", "experienceId", UiSurfaceKeys.SurfaceId, UiSurfaceKeys.Title })
+            // sessionId/role let a chat client pick out its own assistant replies from the shared HomeFeed stream.
+            foreach (var markerKey in new[] { "activeExperience", "experienceId", UiSurfaceKeys.SurfaceId, UiSurfaceKeys.Title, "sessionId", "role" })
             {
                 if (surface.Props.TryGetValue(markerKey, out var markerValue) && markerValue is not null)
                     payload[markerKey] = markerValue;

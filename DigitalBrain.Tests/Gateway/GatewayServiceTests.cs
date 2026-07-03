@@ -83,6 +83,28 @@ public class GatewayServiceTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task Send_InoRequest_Routes_The_Real_Prompt_Not_A_Placeholder()
+    {
+        var svc = NewService();
+        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            prompt = "what's the bitcoin price",
+            sessionId = "chat-session-1"
+        });
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(InoRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
+        }, TestContext());
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        var timeline = await ino.GetOutgoingTimelineAsync();
+        var response = Assert.Single(timeline.OfType<InoResponse>());
+        Assert.Equal("what's the bitcoin price", response.Prompt);
+    }
+
+    [Fact]
     public async Task Send_SurfaceDemoRequested_InstallsPack_And_BroadcastsRenderableSurface()
     {
         using var subscription = _homeFeedBus.Subscribe();

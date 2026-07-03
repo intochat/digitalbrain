@@ -94,5 +94,7 @@
     <PackageVersion Include="Google.Apis.Drive.v3" Version="1.75.0.4192" />
     <PackageVersion Include="Google.Apis.Calendar.v3" Version="1.75.0.4182" />
     <PackageVersion Include="Google.Apis.Auth" Version="1.75.0" />
+    <!-- Excel ingestion for chat attachments — version verified via nuget.org 2026-07-03 -->
+    <PackageVersion Include="ClosedXML" Version="0.105.0" />
   </ItemGroup>
 </Project>

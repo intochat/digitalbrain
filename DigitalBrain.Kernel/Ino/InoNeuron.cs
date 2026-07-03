@@ -1,5 +1,9 @@
+using System.Text.Json;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Ui;
+using DigitalBrain.Core.UiKit;
 using DigitalBrain.Kernel.Kernel;
+using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Kernel.Ino;
@@ -23,9 +27,54 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var taskIds = await OrchestrateActionsIfNeededAsync(req.Prompt, reply);
 
         await FireAsync(new InoResponse(req.Prompt, reply, taskIds.ToArray()));
+        await DeliverReplySurfaceAsync(reply, req.SessionId);
 
         // Compress recent activity to long-term memory summary (journal driven).
         await CreateMemorySummaryAsync();
+    }
+
+    public async Task HandleAsync(TabularDataIngested ingested)
+    {
+        var headers = JsonSerializer.Deserialize<List<string>>(ingested.HeadersJson) ?? [];
+        var rows = JsonSerializer.Deserialize<List<List<string>>>(ingested.RowsJson) ?? [];
+
+        var tree = new UiWidgetTree(UiKitVocabulary.Panel, new Dictionary<string, object?>(), new List<UiWidgetTree>
+        {
+            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = ingested.FileName }),
+            new(UiKitVocabulary.Table, new Dictionary<string, object?> { ["columns"] = headers, ["rows"] = rows }),
+        });
+
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = tree,
+            [UiSurfaceKeys.Title] = "INO",
+            ["role"] = "assistant",
+        };
+        if (ingested.SessionId is not null) props["sessionId"] = ingested.SessionId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+
+        // Deterministic (not LLM-generated) so follow-up questions can find this data via BuildContextAsync
+        // even when no IChatClient is configured (the [no-llm] fallback path).
+        var summary = $"Uploaded '{ingested.FileName}' with columns [{string.Join(", ", headers)}] and {rows.Count} data rows. Column stats: {ingested.ColumnStatsJson}";
+        await FireAsync(new MemorySummary(ingested.FileName, summary, DateTimeOffset.UtcNow));
+    }
+
+    private async Task DeliverReplySurfaceAsync(string reply, string? sessionId)
+    {
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = reply }),
+            [UiSurfaceKeys.Title] = "INO",
+            ["role"] = "assistant",
+        };
+        if (sessionId is not null) props["sessionId"] = sessionId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
     }
 
     public async Task<string> AskAsync(string prompt)
