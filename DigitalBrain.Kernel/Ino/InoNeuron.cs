@@ -3,6 +3,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Core.UiKit;
 using DigitalBrain.Kernel.Kernel;
+using DigitalBrain.Kernel.Market;
 using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
 
@@ -21,6 +22,15 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     public async Task HandleAsync(InoRequest req)
     {
+        if (IsBitcoinPriceIntent(req.Prompt))
+        {
+            var price = await GrainFactory.GetGrain<IMarketDataNeuron>("market-data-main").GetBitcoinPriceUsdAsync();
+            var priceReply = $"The current Bitcoin price is {price}.";
+            await FireAsync(new InoResponse(req.Prompt, priceReply, []));
+            await DeliverReplySurfaceAsync(priceReply, req.SessionId);
+            return;
+        }
+
         var ctx = await BuildContextAsync(req.Prompt);
         var reply = await ReasonWithLlmAsync(req.Prompt, ctx);
 
@@ -32,6 +42,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         // Compress recent activity to long-term memory summary (journal driven).
         await CreateMemorySummaryAsync();
     }
+
+    private static bool IsBitcoinPriceIntent(string prompt) =>
+        prompt.Contains("bitcoin", StringComparison.OrdinalIgnoreCase) &&
+        prompt.Contains("price", StringComparison.OrdinalIgnoreCase);
 
     public async Task HandleAsync(TabularDataIngested ingested)
     {
