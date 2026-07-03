@@ -9,6 +9,7 @@ namespace DigitalBrain.Salesforce;
 public static class SalesforceClientFactory
 {
     public const string PackName = "salesforce";
+    public const string OAuthPendingPackName = "salesforce-oauth-pending";
     public const string DefaultScope = "default";
     public const string DefaultLoginUrl = "https://login.salesforce.com";
     public const string DefaultApiVersion = "v60.0";

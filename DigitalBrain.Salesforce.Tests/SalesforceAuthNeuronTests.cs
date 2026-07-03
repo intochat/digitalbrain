@@ -92,6 +92,33 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         Assert.Contains("Salesforce OAuth is not configured", FlattenText(tree));
     }
 
+    [Fact]
+    public async Task OAuthStart_Pending_State_Survives_Concurrent_Credential_Write()
+    {
+        var writer = Grain<ISalesforceConnectedAppConfigWriter>("salesforce-connected-app-writer-race");
+        await writer.StoreConnectedAppConfigAsync();
+
+        var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test-race");
+        await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
+        {
+            ["sessionId"] = "session-race",
+            ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+        })
+        { Receiver = new NeuronId("salesforce-auth-test-race") });
+
+        await auth.GetOutgoingTimelineAsync();
+
+        // Simulates a concurrent write racing in from elsewhere (credential form submit, or
+        // SalesforceAppConfigSeeder at boot) using a snapshot that predates the OAuth-start write.
+        // That write must not erase the pending PKCE state stashed by StartOAuthAsync.
+        await writer.StoreConnectedAppConfigAsync();
+
+        var pending = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
+        Assert.True(pending.ContainsKey(SalesforceClientFactory.OAuthStateKey));
+        Assert.True(pending.ContainsKey(SalesforceClientFactory.OAuthCodeVerifierKey));
+    }
+
     private static IEnumerable<UiWidgetTree> FindNodes(UiWidgetTree tree)
     {
         yield return tree;
@@ -123,6 +150,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
 public interface ISalesforceConnectedAppConfigWriter : INeuron
 {
     Task StoreConnectedAppConfigAsync();
+    Task<IReadOnlyDictionary<string, string>> ReadPackAsync(string scope, string pack);
 }
 
 [GrainType("digitalbrain.test.salesforce-connected-app-writer")]
@@ -141,4 +169,7 @@ public sealed class SalesforceConnectedAppConfigWriter(
                 [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
                 [SalesforceClientFactory.LoginUrlKey] = "https://test.salesforce.com"
             });
+
+    public Task<IReadOnlyDictionary<string, string>> ReadPackAsync(string scope, string pack) =>
+        ServiceProvider.GetRequiredService<IPackConfigStore>().GetAsync(scope, pack);
 }

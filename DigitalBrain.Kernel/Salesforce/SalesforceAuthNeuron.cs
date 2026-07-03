@@ -68,8 +68,6 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         var state = Guid.NewGuid().ToString("N");
         var codeVerifier = SalesforceClientFactory.CreatePkceCodeVerifier();
         var codeChallenge = SalesforceClientFactory.CreatePkceCodeChallenge(codeVerifier);
-        values[SalesforceClientFactory.OAuthStateKey] = state;
-        values[SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier;
 
         string url;
         try
@@ -83,6 +81,27 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         }
 
         await store.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, values);
+
+        // Pending PKCE state lives in its own pack, isolated from the credentials blob above. That blob
+        // is also written by the credentials form and SalesforceAppConfigSeeder; sharing one slot meant a
+        // concurrent write built from a stale snapshot could silently clobber the in-flight (state,
+        // code_verifier) pair before the callback read it back, producing an intermittent
+        // "invalid code verifier" failure from Salesforce.
+        await store.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>
+        {
+            [SalesforceClientFactory.OAuthStateKey] = state,
+            [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier
+        });
+        logger.LogWarning(
+            "DIAG StartOAuthAsync stored pending state={StatePrefix}... verifierLen={VerifierLen} verifierPrefix={VerifierPrefix}...",
+            state[..8], codeVerifier.Length, codeVerifier[..8]);
+
+        var readBack = await store.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
+        logger.LogWarning(
+            "DIAG StartOAuthAsync immediate read-back keys=[{Keys}] hasState={HasState} hasVerifier={HasVerifier}",
+            string.Join(",", readBack.Keys),
+            readBack.ContainsKey(SalesforceClientFactory.OAuthStateKey),
+            readBack.ContainsKey(SalesforceClientFactory.OAuthCodeVerifierKey));
 
         await Broadcast(new Signal(SalesforceSignals.AuthUrl, new Dictionary<string, object?>
         {
