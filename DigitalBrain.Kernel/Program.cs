@@ -333,8 +333,9 @@ app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
     }
 
     var values = await packConfigStore.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
+    var pending = await packConfigStore.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
     var returnedState = request.Query["state"].FirstOrDefault();
-    if (values.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) &&
+    if (pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) &&
         !string.IsNullOrWhiteSpace(expectedState) &&
         !string.Equals(expectedState, returnedState, StringComparison.Ordinal))
     {
@@ -348,16 +349,32 @@ app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
         ? storedRedirectUri
         : SalesforceCallbackUri(request);
 
+    callbackLogger.LogWarning(
+        "DIAG callback pendingKeys=[{PendingKeys}] returnedState={ReturnedStatePrefix}... pendingState={PendingStatePrefix}... redirectUri={RedirectUri}",
+        string.Join(",", pending.Keys),
+        returnedState?[..Math.Min(8, returnedState.Length)],
+        pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var diagState) ? diagState[..Math.Min(8, diagState.Length)] : "<missing>",
+        redirectUri);
+    if (pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var diagVerifier))
+    {
+        callbackLogger.LogWarning(
+            "DIAG callback pending code_verifier len={VerifierLen} prefix={VerifierPrefix}...",
+            diagVerifier.Length, diagVerifier[..Math.Min(8, diagVerifier.Length)]);
+    }
+
     try
     {
-        var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(values, code, redirectUri);
+        var exchangeValues = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
+        if (pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var pendingCodeVerifier))
+            exchangeValues[SalesforceClientFactory.OAuthCodeVerifierKey] = pendingCodeVerifier;
+
+        var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(exchangeValues, code, redirectUri);
         var merged = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in tokenValues)
             merged[key] = value;
-        merged.Remove(SalesforceClientFactory.OAuthStateKey);
-        merged.Remove(SalesforceClientFactory.OAuthCodeVerifierKey);
 
         await packConfigStore.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged);
+        await packConfigStore.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
 
         var ingress = grains.GetGrain<IIngressNeuron>("salesforce-auth-callback-" + Guid.NewGuid().ToString("N"));
         await ingress.IngestAsync("PackConfigured", new Dictionary<string, object?>
