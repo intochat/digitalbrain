@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pbgrpc.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
-import 'package:digitalbrain_flutter/grpc/brainwatch.pbgrpc.dart';
+import 'package:digitalbrain_flutter/grpc/brainwatch.pbgrpc.dart' as bw;
 import 'package:digitalbrain_flutter/grpc/uigateway.pbgrpc.dart';
 import 'package:digitalbrain_flutter/grpc/uigateway.pb.dart' as ui;
 import 'package:digitalbrain_flutter/grpc/endpoint.dart';
@@ -27,7 +27,7 @@ class LivingCanvasScreen extends StatefulWidget {
 class _LivingCanvasScreenState extends State<LivingCanvasScreen> {
   dynamic _channel;
   DigitalBrainGatewayClient? _client;
-  BrainWatchClient? _brainWatchClient;
+  bw.BrainWatchClient? _brainWatchClient;
   UiGatewayClient? _uiClient;
 
   static const String _brainId = 'default';
@@ -216,7 +216,7 @@ widget root = Panel(
         _channel,
         interceptors: kernelInterceptors(),
       );
-      _brainWatchClient = BrainWatchClient(
+      _brainWatchClient = bw.BrainWatchClient(
         _channel,
         interceptors: kernelInterceptors(),
       );
@@ -371,7 +371,7 @@ widget root = Panel(
 
     // Listen to gRPC synapse events to catch RenderAsync UI cards
     _brainWatchClient!
-        .watchSynapses(WatchSynapsesRequest(brainId: 'default'))
+        .watchSynapses(bw.WatchSynapsesRequest(brainId: 'default'))
         .listen((edge) {
           if (edge.typeName.contains("SystemAlertFiredEvent") ||
               edge.typeName.contains("ConceptsExtractedEvent")) {

@@ -7,6 +7,7 @@ import 'package:digitalbrain_flutter/grpc/digitalbrain.pbgrpc.dart';
 import 'package:digitalbrain_flutter/grpc/endpoint.dart';
 import 'package:digitalbrain_flutter/grpc/grpc_channel.dart';
 import 'package:digitalbrain_flutter/grpc/action_dispatch.dart';
+import 'package:digitalbrain_flutter/grpc/google_auth_flow.dart';
 import 'package:digitalbrain_flutter/rfw_host/inline_rfw_surface.dart';
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
@@ -43,6 +44,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   StreamController<ui.UiInputSynapse>? _uiInput;
   StreamSubscription<ui.UiStateSignal>? _uiSessionSub;
   StreamSubscription<gw.RfwCardEnvelope>? _homeFeedSub;
+  StreamSubscription<gw.SynapseEnvelope>? _authSignalSub;
   StreamSubscription<dynamic>? _channelStateSub;
 
   // Live data from neurons (minimal state for composition; all chrome/content from neuron trees)
@@ -60,6 +62,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   @override
   void dispose() {
     _homeFeedSub?.cancel();
+    _authSignalSub?.cancel();
     _uiSessionSub?.cancel();
     _channelStateSub?.cancel();
     _uiInput?.close();
@@ -92,11 +95,16 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
       final sub = client
           .watchHomeFeed(gw.WatchHomeFeedRequest())
           .listen(_onCard, onError: _onFeedError, onDone: _onFeedDone);
+      _authSignalSub?.cancel();
+      final authSub = client
+          .watchSynapses(googleAuthUrlWatchRequest())
+          .listen(_onAuthSignal, onError: _onAuthSignalError);
 
       setState(() {
         _channel = channel;
         _gatewayClient = client;
         _homeFeedSub = sub;
+        _authSignalSub = authSub;
         _feedStatus = 'Waiting for neuron UI feed from $endpoint';
         _uiClient = UiGatewayClient(
           channel,
@@ -111,6 +119,22 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
         _feedStatus = 'Kernel UI feed connection failed: $error';
       });
     }
+  }
+
+  void _onAuthSignal(gw.SynapseEnvelope envelope) {
+    openGoogleAuthUrlFromEnvelope(envelope).then(
+      (opened) {
+        if (!opened) {
+          debugPrint('DigitalBrain ignored malformed Google auth URL signal.');
+        }
+      },
+      onError: (Object error) =>
+          debugPrint('DigitalBrain Google auth URL launch failed: $error'),
+    );
+  }
+
+  void _onAuthSignalError(Object error) {
+    debugPrint('DigitalBrain Google auth signal stream failed: $error');
   }
 
   void _onFeedError(Object error, StackTrace stackTrace) {

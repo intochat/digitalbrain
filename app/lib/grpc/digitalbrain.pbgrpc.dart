@@ -48,6 +48,15 @@ class DigitalBrainGatewayClient extends $grpc.Client {
         options: options);
   }
 
+  $grpc.ResponseStream<$0.SynapseEnvelope> watchSynapses(
+    $0.WatchSynapsesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(
+        _$watchSynapses, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
   $grpc.ResponseFuture<$0.TranscribeResponse> transcribe(
     $async.Stream<$0.TranscribeRequest> request, {
     $grpc.CallOptions? options,
@@ -112,6 +121,11 @@ class DigitalBrainGatewayClient extends $grpc.Client {
           '/digitalbrain.DigitalBrainGateway/WatchHomeFeed',
           ($0.WatchHomeFeedRequest value) => value.writeToBuffer(),
           $0.RfwCardEnvelope.fromBuffer);
+  static final _$watchSynapses =
+      $grpc.ClientMethod<$0.WatchSynapsesRequest, $0.SynapseEnvelope>(
+          '/digitalbrain.DigitalBrainGateway/WatchSynapses',
+          ($0.WatchSynapsesRequest value) => value.writeToBuffer(),
+          $0.SynapseEnvelope.fromBuffer);
   static final _$transcribe =
       $grpc.ClientMethod<$0.TranscribeRequest, $0.TranscribeResponse>(
           '/digitalbrain.DigitalBrainGateway/Transcribe',

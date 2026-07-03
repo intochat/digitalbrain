@@ -133,6 +133,54 @@ class WatchHomeFeedRequest extends $pb.GeneratedMessage {
   static WatchHomeFeedRequest? _defaultInstance;
 }
 
+class WatchSynapsesRequest extends $pb.GeneratedMessage {
+  factory WatchSynapsesRequest({
+    $core.Iterable<$core.String>? typeFilter,
+  }) {
+    final result = create();
+    if (typeFilter != null) result.typeFilter.addAll(typeFilter);
+    return result;
+  }
+
+  WatchSynapsesRequest._();
+
+  factory WatchSynapsesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory WatchSynapsesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WatchSynapsesRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain'),
+      createEmptyInstance: create)
+    ..pPS(1, _omitFieldNames ? '' : 'typeFilter')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchSynapsesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchSynapsesRequest copyWith(void Function(WatchSynapsesRequest) updates) =>
+      super.copyWith((message) => updates(message as WatchSynapsesRequest))
+          as WatchSynapsesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static WatchSynapsesRequest create() => WatchSynapsesRequest._();
+  @$core.override
+  WatchSynapsesRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static WatchSynapsesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<WatchSynapsesRequest>(create);
+  static WatchSynapsesRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.String> get typeFilter => $_getList(0);
+}
+
 class RfwCardEnvelope extends $pb.GeneratedMessage {
   factory RfwCardEnvelope({
     $core.String? correlationId,

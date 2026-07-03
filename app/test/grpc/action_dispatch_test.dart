@@ -41,6 +41,17 @@ void main() {
     expect(payloadOf(envelope), {'sessionId': 's1', 'clientId': 'flutter'});
   });
 
+  test('Google auth button press dispatches GoogleAuthRequested', () {
+    final envelope = buildActionEnvelope('press', {
+      'synapseType': 'GoogleAuthRequested',
+      'props': {'sessionId': 'session-gmail-auth'},
+    });
+
+    expect(envelope, isNotNull);
+    expect(envelope!.typeName, 'GoogleAuthRequested');
+    expect(payloadOf(envelope), {'sessionId': 'session-gmail-auth'});
+  });
+
   test('nav-only event (no synapseType) produces no envelope', () {
     final envelope = buildActionEnvelope('press', {
       'label': 'Marketplace',
