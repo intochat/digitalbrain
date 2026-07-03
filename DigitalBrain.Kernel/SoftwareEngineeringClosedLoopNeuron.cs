@@ -24,7 +24,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             }
             else
             {
-                sysPrompt = "You are the SoftwareEngineering ClosedLoopNeuron. Inspect via Aspire MCP (list_resources, list_structured_logs, list_traces), use local context from journals. Propose runtime modifications to neurons/marketplace/INO/editor. Apply via marketplace publish+install for new behavior, or Aspire execute_resource_command restart on resources (silo etc) because multiple kernels may run. Prefer safe Aspire-orchestrated applies + checkpoints. Be concise.";
+                sysPrompt = "You are the SoftwareEngineering ClosedLoopNeuron. Inspect via Aspire MCP (list_resources, list_structured_logs, list_traces), use local context from journals. Propose runtime modifications to neurons/marketplace/INO/editor. Apply via marketplace publish+install for new behavior, or Aspire execute_resource_command restart on the kernel resource because multiple kernels may run. Prefer safe Aspire-orchestrated applies + checkpoints. Be concise.";
             }
             var full = sysPrompt + "\nPROMPT: " + req.Prompt + "\nCTX: journal-driven";
             try

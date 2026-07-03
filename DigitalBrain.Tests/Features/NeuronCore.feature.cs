@@ -533,7 +533,7 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.AndAsync("I download/install the pack \"kernel\" version \"rolling-2026.6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 69
-  await testRunner.AndAsync("I fire a StartDistributedApp for \"silo\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+  await testRunner.AndAsync("I fire a StartDistributedApp for \"kernel\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 70
   await testRunner.ThenAsync("the timeline contains a NeuroPackInstalled", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");

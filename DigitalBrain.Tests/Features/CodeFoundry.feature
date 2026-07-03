@@ -20,13 +20,13 @@ Scenario: Tier-2 deploy with passing verify-build requests a restart
   Given a code deploy neuron "deploy1" with verify-build succeeding
   When I deploy module "GreeterNeuron" with source "// greeter"
   Then the timeline contains a CodeBuilt
-  And the timeline contains a SiloRestartRequested
+  And the timeline contains a KernelRestartRequested
 
 Scenario: Tier-2 deploy with failing verify-build rolls back without restart
   Given a code deploy neuron "deploy2" with verify-build failing
   When I deploy module "BadNeuron" with source "// broken"
   Then the timeline contains a FoundryRolledBack
-  And the timeline does not contain a SiloRestartRequested
+  And the timeline does not contain a KernelRestartRequested
 
 Scenario: Foundry loop checkpoints then completes a Tier-1 request
   Given a foundry loop neuron "foundry1"

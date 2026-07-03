@@ -6,7 +6,8 @@ The web client lives at [digitalbrain.tech](https://digitalbrain.tech) and talks
 
 ## What lives here
 
-- `DigitalBrain.Core` — pure protocol: `INeuron`, `Synapse`, `IHandle<T>`, `UiSurface`/`UiWidgetTree`, `NeuronId`/`TaskId`, `IPackBehavior`, marketplace seeds.
+- `DigitalBrain.Core` — pure protocol: `INeuron`, `Synapse`, `IHandle<T>`, `UiSurface`/`UiWidgetTree`, `NeuronId`/`TaskId`, `IPackBehavior`.
+- `DigitalBrain.SeedPacks` — local marketplace seed catalog and embedded built-in pack source.
 - `DigitalBrain.Kernel` — the runtime (Orleans + services): base `Neuron`, embodiment (`Foundry`/`PackAlcEmbodier`), LLM, economics (Stripe + ECDSA), context/memory (hybrid + Qdrant), server-driven UI (UiSurface emission + bidirectional `UiGateway`), self-update/HA rolling.
 - `DigitalBrain.Aspire` — hosting SDK (`AddDigitalBrain`, `WireKernelSilo`, `AddFlutterClient`...).
 - `NeuroOSPrototype.AppHost` — the Aspire model (3× kernel replicas, Ollama, Azurite, MCP, flutter-ui).

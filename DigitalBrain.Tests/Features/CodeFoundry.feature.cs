@@ -269,7 +269,7 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.ThenAsync("the timeline contains a CodeBuilt", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 23
-  await testRunner.AndAsync("the timeline contains a SiloRestartRequested", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+  await testRunner.AndAsync("the timeline contains a KernelRestartRequested", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -306,7 +306,7 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.ThenAsync("the timeline contains a FoundryRolledBack", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 29
-  await testRunner.AndAsync("the timeline does not contain a SiloRestartRequested", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+  await testRunner.AndAsync("the timeline does not contain a KernelRestartRequested", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

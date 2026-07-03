@@ -195,7 +195,7 @@ public class NeuronSteps : IAsyncDisposable
             };
             await aspire.FireAsync(new UiSurface(DigitalBrain.Core.KernelUiSurfaceKinds.RollingDrain, drainProps));
 
-            await aspire.FireAsync(new RestartResource("silo", IsRollingUpdate: true, TargetVersion: "rolling-2026.6", Strategy: $"replica-{replica}-of-3"));
+            await aspire.FireAsync(new RestartResource("kernel", IsRollingUpdate: true, TargetVersion: "rolling-2026.6", Strategy: $"replica-{replica}-of-3"));
 
             var verifyProps = new Dictionary<string, object?>
             {

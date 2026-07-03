@@ -17,8 +17,15 @@ public sealed class DigitalBrainContext
     // The resolved LLM model name (e.g. "qwen2.5-coder:1.5b") for env injection
     public required string LlmModel { get; init; }
 
+    // The resolved LLM provider ("ollama" | "azureopenai"), set via DigitalBrainOptions.WithLLM<TModel>()
+    public required string LlmProvider { get; init; }
+
     // Ollama container http endpoint for DigitalBrain__Llm__OllamaEndpoint injection
     public required EndpointReference OllamaEndpoint { get; init; }
+
+    // Set only when LlmProvider is "azureopenai" (WithLLM<TModel>() where TModel.Provider == "azureopenai")
+    public IResourceBuilder<ParameterResource>? AzureOpenAIEndpoint { get; init; }
+    public IResourceBuilder<ParameterResource>? AzureOpenAIKey { get; init; }
 
     // Storage resources exposed so AppHost can wire WithReference on silo
     public required IResourceBuilder<AzureBlobStorageResource> GrainBlobs { get; init; }
@@ -49,6 +56,15 @@ public static class DigitalBrainBuilderExtensions
         var db = builder.AddResource(resource);
 
         var llmModel = options.LlmModel ?? "qwen2.5-coder:1.5b";
+        var llmProvider = options.LlmProvider;
+
+        IResourceBuilder<ParameterResource>? azureOpenAIEndpoint = null;
+        IResourceBuilder<ParameterResource>? azureOpenAIKey = null;
+        if (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase))
+        {
+            azureOpenAIEndpoint = builder.AddParameter("azure-openai-endpoint");
+            azureOpenAIKey = builder.AddParameter("azure-openai-key", secret: true);
+        }
 
         var storage = builder.AddAzureStorage("storage").RunAsEmulator();
         var clusteringTable = storage.AddTables("clustering");
@@ -73,7 +89,10 @@ public static class DigitalBrainBuilderExtensions
             KernelReplicas = options.KernelReplicas,
             UseLocalMarketplace = options.UseLocalMarketplace,
             LlmModel = llmModel,
+            LlmProvider = llmProvider,
             OllamaEndpoint = ollama.GetEndpoint("http"),
+            AzureOpenAIEndpoint = azureOpenAIEndpoint,
+            AzureOpenAIKey = azureOpenAIKey,
             EnableOrleansDashboard = options.EnableOrleansDashboard,
             OrleansDashboardPort = options.OrleansDashboardPort,
             EnableMcp = options.EnableMcp,
@@ -118,11 +137,21 @@ public static class DigitalBrainBuilderExtensions
         kernel.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
-        // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks)
-        kernel.WithEnvironment("DigitalBrain__Llm__Provider", "ollama");
+        // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks). Provider/model come from
+        // DigitalBrainOptions.WithLLM<TModel>() (see LlmModels.cs) rather than a hardcoded string.
+        kernel.WithEnvironment("DigitalBrain__Llm__Provider", ctx.LlmProvider);
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
         kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
             ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
+
+        if (ctx.AzureOpenAIEndpoint is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__AzureOpenAIEndpoint", ctx.AzureOpenAIEndpoint);
+        }
+        if (ctx.AzureOpenAIKey is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__AzureOpenAIKey", ctx.AzureOpenAIKey);
+        }
 
         if (ctx.EnableOrleansDashboard && ctx.OrleansDashboardPort.HasValue)
         {
@@ -252,10 +281,21 @@ public static class DigitalBrainBuilderExtensions
 public sealed class DigitalBrainOptions
 {
     public string? LlmModel { get; set; }
+    public string LlmProvider { get; set; } = "ollama";
     public int KernelReplicas { get; set; } = 3;
     public bool UseLocalMarketplace { get; set; } = true;
 
     public bool EnableOrleansDashboard { get; set; } = true;
     public int? OrleansDashboardPort { get; set; } = 8080;
     public bool EnableMcp { get; set; } = true;
+
+    // Typed model selection, e.g. options.WithLLM<Gpt4oMini>() or options.WithLLM<Qwen25Coder1_5B>() —
+    // replaces setting LlmModel/LlmProvider as raw strings.
+    public DigitalBrainOptions WithLLM<TModel>() where TModel : LlmModel, new()
+    {
+        var model = new TModel();
+        LlmProvider = model.Provider;
+        LlmModel = model.Id;
+        return this;
+    }
 }

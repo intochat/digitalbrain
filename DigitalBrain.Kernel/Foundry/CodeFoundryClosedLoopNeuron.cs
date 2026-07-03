@@ -56,7 +56,7 @@ public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> lo
     }
 
     // Note on resume-after-restart: in production a Tier-2 restart interrupts this handler after
-    // SiloRestartRequested. On reactivation the orchestrator re-reads its journal; because
+    // KernelRestartRequested. On reactivation the orchestrator re-reads its journal; because
     // FoundryCompleted is fired immediately after a successful CodeBuilt (before the physical restart
     // completes), the cycle's terminal synapse is already journaled and the loop does not re-run.
     // The Tier-2 scenario here asserts the CodeBuilt/restart path via the deploy neuron (Task 7);

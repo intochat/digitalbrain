@@ -27,7 +27,7 @@ internal static class Program
 
     // Images live in public Docker Hub. ACA pulls without registry creds because the repos are public;
     // otherwise add AppInputs.RegistryCredentialsArgs (server=docker.io) with a Docker Hub access-token secret.
-    private const string SiloImageRepository = "docker.io/vhorbachov/digitalbrain-silo";
+    private const string KernelImageRepository = "docker.io/vhorbachov/digitalbrain-kernel";
     private const string TelegramImageRepository = "docker.io/vhorbachov/digitalbrain-telegram";
 
     // Container App secret names backing the NeuroOS runtime contract.
@@ -39,7 +39,7 @@ internal static class Program
     private const string TelegramBotTokenSecret = "telegram-bot-token";
     private const string InternalServiceKeySecret = "digitalbrain-internal-service-key";
 
-    // The env + silo were previously created under DeploymentKit's "app-runtime" component. Alias to that old
+    // The environment + kernel app were previously created under DeploymentKit's "app-runtime" component. Alias to that old
     // parent URN so Pulumi re-parents them to the stack root in place instead of replacing the live resources.
     private const string LegacyRuntimeComponentUrn =
         "urn:pulumi:dev::digitalbrain-deploy::DeploymentKit:deploymentkit:DeploymentKitApp::digitalbrain-app-runtime-prod";
@@ -189,10 +189,10 @@ internal static class Program
             Tags = StandardTags("container-apps-environment")
         }, AliasOldRuntimeParent());
 
-        var siloImage = Output.Format($"{SiloImageRepository}:{imageTag}");
+        var kernelImage = Output.Format($"{KernelImageRepository}:{imageTag}");
         var telegramImage = Output.Format($"{TelegramImageRepository}:{imageTag}");
 
-        var silo = new App.ContainerApp("digitalbrain-jobs", new App.ContainerAppArgs
+        var kernelApp = new App.ContainerApp("digitalbrain-jobs", new App.ContainerAppArgs
         {
             ContainerAppName = "digitalbrain-jobs",
             ResourceGroupName = resourceGroup.Name,
@@ -220,7 +220,7 @@ internal static class Program
                     new AppInputs.ContainerArgs
                     {
                         Name = "jobs",
-                        Image = siloImage,
+                        Image = kernelImage,
                         Resources = new AppInputs.ContainerResourcesArgs { Cpu = 1.0, Memory = "2Gi" },
                         Env =
                         {
@@ -243,11 +243,11 @@ internal static class Program
             Tags = StandardTags("container-app-jobs")
         }, AliasOldRuntimeParent());
 
-        // The Telegram transport calls the kernel's gRPC gateway. The silo's external FQDN is reachable from
+        // The Telegram transport calls the kernel's gRPC gateway. The kernel app's external FQDN is reachable from
         // within the same ACA environment, so we build the address from LatestRevisionFqdn. Must be HTTPS
         // because ACA external ingress always terminates TLS. Same key the Aspire dev wiring sets:
         // "DigitalBrain:GatewayAddress" (colon separator, mirrored in transport Program.cs).
-        var kernelGatewayAddress = silo.LatestRevisionFqdn.Apply(fqdn => $"https://{fqdn}");
+        var kernelGatewayAddress = kernelApp.LatestRevisionFqdn.Apply(fqdn => $"https://{fqdn}");
 
         var telegramTransport = new App.ContainerApp("digitalbrain-telegram", new App.ContainerAppArgs
         {
@@ -303,7 +303,7 @@ internal static class Program
             ["storageAccount"] = storage.Name,
             ["openAiEndpoint"] = openAiEndpoint,
             ["chatDeployment"] = ChatDeploymentName,
-            ["siloApp"] = silo.Name,
+            ["kernelApp"] = kernelApp.Name,
             ["telegramApp"] = telegramTransport.Name,
             ["telegramFqdn"] = telegramTransport.LatestRevisionFqdn,
             ["imageTag"] = imageTag,

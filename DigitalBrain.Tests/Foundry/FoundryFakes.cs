@@ -18,7 +18,7 @@ public sealed class FakeBuildRunner : IBuildRunner
 public sealed class FakeResourceController : IResourceController
 {
     public int Restarts { get; private set; }
-    public Task RestartSiloAsync(string reason)
+    public Task RestartKernelAsync(string reason)
     {
         Restarts++;
         return Task.CompletedTask;
@@ -41,7 +41,7 @@ public class FoundryFakesTests
     public async Task FakeResourceControllerCountsRestarts()
     {
         var controller = new FakeResourceController();
-        await controller.RestartSiloAsync("test");
+        await controller.RestartKernelAsync("test");
         Assert.Equal(1, controller.Restarts);
     }
 }

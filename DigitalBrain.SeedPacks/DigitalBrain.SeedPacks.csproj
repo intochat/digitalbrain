@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DigitalBrain.Core</RootNamespace>
+    <AssemblyName>DigitalBrain.SeedPacks</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Single source of truth for the PersonalAssistant marketplace seed pack: the real neuron source
+         is embedded and read back at runtime by MarketplaceSeeds.PersonalAssistantPackCode. -->
+    <EmbeddedResource Include="..\DigitalBrain.Experience.PersonalAssistant\PersonalAssistantNeuron.cs">
+      <LogicalName>PersonalAssistantNeuron.cs</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

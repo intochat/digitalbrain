@@ -7,7 +7,7 @@ public sealed class AzureResourceController(ILogger<AzureResourceController> log
 
     public string? LastReason { get; private set; }
 
-    public Task RestartSiloAsync(string reason)
+    public Task RestartKernelAsync(string reason)
     {
         LastReason = reason;
         _logger.LogWarning("Cloud self-update: requesting ACA revision restart ({Reason}).", reason);
