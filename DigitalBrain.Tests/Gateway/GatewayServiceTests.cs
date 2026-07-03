@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Ui;
+using DigitalBrain.Demo.Runtime;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Foundry;
@@ -146,7 +147,7 @@ public class GatewayServiceTests : NeuronTestBase
 
         await svc.Send(new SynapseEnvelope
         {
-            TypeName = KernelSurfaceDemo.RequestType,
+            TypeName = SurfaceDemoRuntime.RequestType,
             CorrelationId = "ui-demo-test"
         }, TestContext());
 
@@ -173,7 +174,7 @@ public class GatewayServiceTests : NeuronTestBase
         Assert.Contains("\"source\"", card.DataJson);
         Assert.Contains("Embodied pack live", card.DataJson);
 
-        var generated = Grain<IGeneratedNeuron>(KernelSurfaceDemo.GeneratedNeuronKey);
+        var generated = Grain<IGeneratedNeuron>(SurfaceDemoRuntime.GeneratedNeuronKey);
         var timeline = await generated.GetOutgoingTimelineAsync();
         var emittedSurface = Assert.Single(timeline.OfType<UiSurface>(), surface =>
             surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var id) &&
@@ -181,7 +182,7 @@ public class GatewayServiceTests : NeuronTestBase
         Assert.Equal("ui-demo-test", emittedSurface.CorrelationId);
         Assert.False(string.IsNullOrWhiteSpace(emittedSurface.CausationId));
 
-        var observability = Grain<IObservabilityNeuron>(KernelSurfaceDemo.ObservabilityNeuronKey);
+        var observability = Grain<IObservabilityNeuron>(SurfaceDemoRuntime.ObservabilityNeuronKey);
         var graphTimeline = await observability.GetOutgoingTimelineAsync();
         Assert.Contains(graphTimeline.OfType<UiSurface>(), surface =>
             surface.Kind == UiSurfaceKinds.ActivityGraph &&
