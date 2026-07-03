@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 using Microsoft.CodeAnalysis;
 
 namespace DigitalBrain.Kernel.Foundry;

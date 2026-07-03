@@ -6,6 +6,7 @@ using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Kernel;
 

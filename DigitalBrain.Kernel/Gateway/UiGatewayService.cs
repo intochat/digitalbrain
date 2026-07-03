@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Core;
+using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Runtime.Grpc.Ui;
 using Grpc.Core;
 

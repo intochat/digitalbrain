@@ -1,6 +1,6 @@
 using DigitalBrain.Google;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Google;
 
 [GrainType("digitalbrain.google.calendar.v1")]
 public class GoogleCalendarNeuron(ILogger<GoogleCalendarNeuron> logger, NeuronJournals journals, IGoogleCalendarApiClient client)

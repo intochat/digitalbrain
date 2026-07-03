@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
+using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Gateway;
 

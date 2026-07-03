@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Sdk;
 
 // Foundation for typed integration neurons (the SDK layer): file system, shell, git, dotnet, nuget, roslyn, …
 // Each contract is an Orleans grain reached by typed RPC (zero-reflection dispatch) and carries

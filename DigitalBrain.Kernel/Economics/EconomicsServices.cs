@@ -1,6 +1,6 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Economics;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Economics;
 
 public static class EconomicsServices
 {

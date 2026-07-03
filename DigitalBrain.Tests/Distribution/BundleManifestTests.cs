@@ -1,4 +1,5 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
+using DigitalBrain.Core.UiKit;
 
 namespace DigitalBrain.Tests.Distribution;
 

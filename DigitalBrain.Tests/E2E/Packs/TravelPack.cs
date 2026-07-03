@@ -4,6 +4,7 @@
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 
 namespace DigitalBrain.Tests.E2E.Packs;
 

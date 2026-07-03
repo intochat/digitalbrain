@@ -1,6 +1,6 @@
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Kernel;
 
 // Reads the AES checkpoint key (base64) from DigitalBrain:Checkpoint:Key (env/appsettings/Key Vault-mapped config).
 public sealed class ConfigCheckpointKeyProvider(IConfiguration configuration) : ICheckpointKeyProvider

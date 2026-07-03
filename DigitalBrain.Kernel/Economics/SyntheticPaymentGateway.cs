@@ -1,7 +1,7 @@
 using System.Text.Json;
-using DigitalBrain.Core;
+using DigitalBrain.Core.Economics;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Economics;
 
 // Dev/test payment gateway: returns a synthetic checkout session and treats any confirmation payload as a
 // completed payment. Used when no Stripe secret is configured. Never contacts a payment provider.

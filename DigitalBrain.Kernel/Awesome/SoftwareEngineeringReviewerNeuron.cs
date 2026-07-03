@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Awesome;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Awesome;
 
 // The "awesome" software-engineering experience: real review work via ProjectReview, replacing the old
 // string-templating teams. Handles a content review (ReviewRequest) and a kernel-local project review

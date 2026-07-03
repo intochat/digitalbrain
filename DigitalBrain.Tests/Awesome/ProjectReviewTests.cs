@@ -1,4 +1,4 @@
-using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Awesome;
 
 namespace DigitalBrain.Tests.Awesome;
 

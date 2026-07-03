@@ -1,4 +1,4 @@
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sandbox;
 
 // Isolation tiers for executing untrusted pack code, weakest to strongest:
 //  - InProcessGated: collectible ALC + CapabilityGate (PackAlcEmbodier) — same process, a guardrail not a sandbox.

@@ -1,8 +1,9 @@
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
 
-namespace Aspire.Hosting.DigitalBrain;
+namespace DigitalBrain.Aspire;
 
 public sealed class DigitalBrainContext
 {

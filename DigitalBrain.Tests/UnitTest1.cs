@@ -1,5 +1,8 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
+using DigitalBrain.Core.Trust;
 using DigitalBrain.Developer;
+using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -194,7 +197,7 @@ public class NeuronTests : NeuronTestBase
     [Fact]
     public async Task KernelTask_Runs_And_Recovers_Status()
     {
-        var task = Grain<DigitalBrain.Kernel.IKernelTask>("task-test-1");
+        var task = Grain<IKernelTask>("task-test-1");
         await task.FireAsync(new RunTask("task-test-1", "demo work"));
         var info = await task.GetInfoAsync();
         Assert.Equal("completed", info.Status);

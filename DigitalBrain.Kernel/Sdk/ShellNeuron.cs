@@ -1,7 +1,7 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Sdk;
 using DigitalBrain.Windows;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sdk;
 
 [GrainType("digitalbrain.sdk.shell.v1")]
 public class ShellNeuron(ILogger<ShellNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IShellNeuron

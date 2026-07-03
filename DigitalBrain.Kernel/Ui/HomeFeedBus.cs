@@ -2,10 +2,9 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
-using DigitalBrain.Core;
 using Orleans.Streams;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Ui;
 
 // Singleton fanout for RfwCards — the server-driven-UI backbone. Each WatchHomeFeed gRPC subscriber opens its own
 // unbounded channel; neurons broadcast RfwCards to all subscribers. A bounded content-hash dedup window avoids

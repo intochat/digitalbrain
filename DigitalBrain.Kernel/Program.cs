@@ -12,6 +12,9 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
 using Orleans.Configuration;
 using Orleans.Journaling;
+using DigitalBrain.Kernel.Kernel;
+using DigitalBrain.Kernel.Economics;
+using NeuroOSPrototype.ServiceDefaults;
 
 // Prototype silo host for DigitalBrain.
 // Aspire-hosted path: env vars ConnectionStrings__clustering / grainstate / journal are injected by Aspire.

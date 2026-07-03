@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Awesome;
 using DigitalBrain.TestKit;
 
 namespace DigitalBrain.Tests.Awesome;

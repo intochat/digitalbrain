@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Economics;
 
 // ECDSA-signed software licenses for premium marketplace packs. Reuses PackSignatureVerifier (ECDSA-nistP256).
 // Harvested from digitalbrain's LicenseNeuron (token shape), re-homed onto MAIN's Neuron/journal model — the

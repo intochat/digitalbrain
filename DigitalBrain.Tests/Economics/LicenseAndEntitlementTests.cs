@@ -1,5 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Economics;
+using DigitalBrain.Core.Trust;
 using DigitalBrain.Kernel;
 using DigitalBrain.TestKit;
 

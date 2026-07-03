@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Context;
 using Microsoft.Extensions.AI;
+using DigitalBrain.Core.Distribution;
 
 namespace DigitalBrain.Kernel.Company;
 

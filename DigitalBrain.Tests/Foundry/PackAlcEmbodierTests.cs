@@ -1,5 +1,6 @@
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 
 namespace DigitalBrain.Tests.Foundry;
 

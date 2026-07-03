@@ -1,4 +1,4 @@
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Kernel;
 
 using DigitalBrain.Core;
 

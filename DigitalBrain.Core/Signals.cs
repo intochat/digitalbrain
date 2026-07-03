@@ -21,6 +21,7 @@ public static class UiSignals
 public static class GoogleSignals
 {
     public const string AuthRequested = "GoogleAuthRequested";
+    public const string AuthUrl = "GoogleAuthUrl";
     public const string AuthCompleted = "GoogleAuthCompleted";
     public const string GmailFetchRequested = "GmailFetchRequested";
     public const string GmailMessagesReady = "GmailMessagesReady";

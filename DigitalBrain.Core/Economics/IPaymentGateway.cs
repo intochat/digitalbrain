@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Economics;
 
 // Payment abstraction for premium marketplace purchases. Implemented by a synthetic dev gateway and a real
 // Stripe gateway (selected by config). A confirmed payment leads to a license being issued for the buyer.

@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Ui;
 
 // Singleton egress fanout for broadcast Signals — the outbound mirror of generic Send. Each WatchSynapses gRPC
 // subscriber opens its own unbounded channel with a type-name filter; the per-silo SignalEgressStreamSubscriber

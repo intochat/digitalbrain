@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Sdk;
 
 // Result of a process/command execution by an SDK integration neuron (Shell/DotNet/NuGet/Winget).
 // A non-zero ExitCode is legitimate data (build failure, conflict); a failure to START the process throws.

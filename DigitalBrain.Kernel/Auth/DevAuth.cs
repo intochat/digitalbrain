@@ -1,4 +1,4 @@
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Auth;
 
 // Development-only convenience: a seeded local account whose credentials always authenticate and which
 // the login surface is pre-filled with, so a fresh checkout can sign in without any setup. Enabled only

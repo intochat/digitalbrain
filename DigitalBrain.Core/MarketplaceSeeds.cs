@@ -1,3 +1,6 @@
+using DigitalBrain.Core.Distribution;
+using DigitalBrain.Core.Trust;
+
 namespace DigitalBrain.Core;
 
 public static class MarketplaceSeeds

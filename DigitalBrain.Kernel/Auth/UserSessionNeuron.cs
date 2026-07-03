@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
 using DigitalBrain.Core;
+using DigitalBrain.Kernel.Ui;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Auth;
 
 [GrainType("digitalbrain.user-session.v1")]
 public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IUserSessionNeuron

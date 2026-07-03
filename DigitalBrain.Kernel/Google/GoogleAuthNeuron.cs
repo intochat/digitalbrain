@@ -1,12 +1,17 @@
 using DigitalBrain.Core;
 using DigitalBrain.Google;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Google;
 
 [GrainType("digitalbrain.google.auth.v1")]
 public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IGoogleAuthNeuron
 {
+    // Dev placeholders - in real use from IConfiguration or PackConfig (client id/secret from Google Cloud Console)
+    private const string DevClientId = "your-client-id.apps.googleusercontent.com";
+    private const string DevClientSecret = "your-client-secret";
+    private const string DevRedirectUri = "http://localhost:8080/google-callback"; // backend callback (to be wired)
+
     public static AuthButtonSurface SignInSurface() => new(
         Provider: "google",
         Label: "Sign in with Google",
@@ -16,8 +21,14 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
     public async Task HandleAsync(Signal signal)
     {
         if (signal.Name != GoogleSignals.AuthRequested) return;
-        // Real interactive consent is out of scope (see spec) — this confirms the refresh token
-        // already provided via PackConfigStore is present and reachable, then announces completion.
-        await FireAsync(new Signal(GoogleSignals.AuthCompleted, new Dictionary<string, object?>()));
+
+        var url = GoogleCredentialFactory.CreateAuthorizationUrl(
+            DevClientId,
+            DevClientSecret,
+            DevRedirectUri,
+            "https://www.googleapis.com/auth/gmail.readonly",
+            "https://www.googleapis.com/auth/gmail.modify");
+
+        await FireAsync(new Signal(GoogleSignals.AuthUrl, new Dictionary<string, object?> { ["url"] = url }));
     }
 }

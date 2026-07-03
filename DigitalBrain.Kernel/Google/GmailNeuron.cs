@@ -1,6 +1,6 @@
 using DigitalBrain.Google;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Google;
 
 [GrainType("digitalbrain.google.gmail.v1")]
 public class GmailNeuron(ILogger<GmailNeuron> logger, NeuronJournals journals, IGmailApiClient client)

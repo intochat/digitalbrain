@@ -1,8 +1,9 @@
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Core;
+using DigitalBrain.Core.Economics;
+using DigitalBrain.Core.Trust;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Economics;
 
 // The license server. Issues ECDSA-signed, portable license tokens (reusing PackSignatureVerifier) and records
 // each grant in its journal; entitlement (HasLicense) is journal-derived. The signing key pair is persisted in

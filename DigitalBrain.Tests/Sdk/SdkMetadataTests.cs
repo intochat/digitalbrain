@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Sdk;
 using DigitalBrain.Developer;
 
 namespace DigitalBrain.Tests.Sdk;

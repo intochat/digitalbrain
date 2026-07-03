@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text;
-using DigitalBrain.Core;
+using DigitalBrain.Core.Sdk;
 
 namespace DigitalBrain.Windows;
 

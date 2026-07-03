@@ -1,7 +1,7 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Sdk;
 using DigitalBrain.Windows;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sdk;
 
 // NET-NEW: Windows Package Manager neuron. No donor tree had one — built on the shared ProcessRunner.
 [GrainType("digitalbrain.sdk.winget.v1")]
