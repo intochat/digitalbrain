@@ -4,9 +4,11 @@ using DigitalBrain.Context;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Config;
+using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Market;
+using DigitalBrain.Kernel.Uploads;
 using DigitalBrain.Kernel.Ui;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
@@ -81,6 +83,7 @@ builder.Services.AddSingleton<SignalEgressBus>();
 
 // FileSystemNeuron delegates its System.IO logic to this ino-hosted, Orleans-free plain class.
 builder.Services.AddSingleton<DigitalBrain.Windows.FileSystemOperations>();
+builder.Services.AddSingleton<SqliteSchemaInspector>();
 
 // RoslynNeuron delegates its MSBuildWorkspace analysis logic to this ino-hosted, Orleans-free plain class.
 builder.Services.AddSingleton<DigitalBrain.Developer.RoslynAnalysisService>();
@@ -218,8 +221,8 @@ if (serveWebBundle)
 app.MapGrpcService<DigitalBrain.Kernel.Gateway.GatewayService>();
 app.MapGrpcService<DigitalBrain.Kernel.Gateway.UiGatewayService>();
 
-// Chat file-attachment upload: client posts the raw xlsx bytes as multipart/form-data (field "file"), server
-// parses and routes to InoNeuron so the reply arrives on the same WatchHomeFeed stream as a chat surface.
+// Chat file-attachment upload: client posts raw bytes as multipart/form-data (field "file"), server parses
+// supported local formats and routes to InoNeuron so the reply arrives on the same WatchHomeFeed stream.
 app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
 {
     if (!request.HasFormContentType)
@@ -231,6 +234,52 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
         return Results.BadRequest("No file uploaded.");
 
     var sessionId = form["sessionId"].FirstOrDefault();
+    var kind = ChatUploadClassifier.Classify(file.FileName);
+
+    if (kind == ChatUploadKind.SqliteDatabase)
+    {
+        var tempPath = ChatUploadClassifier.TempDatabasePath(file.FileName);
+        try
+        {
+            await using (var temp = File.Create(tempPath))
+            {
+                await file.CopyToAsync(temp);
+            }
+
+            var cmd = ChatUploadClassifier.BuildDbInspectSchema(file.FileName, tempPath, sessionId);
+            var db = grains.GetGrain<IDbSupportNeuron>("db-main");
+            await db.FireAsync(cmd);
+
+            var dbTimeline = await db.GetTimelineAsync();
+            var inspected = dbTimeline
+                .OfType<DbSchemaInspected>()
+                .LastOrDefault(result => result.CorrelationId == cmd.SynapseId)
+                ?? dbTimeline.OfType<DbSchemaInspected>().LastOrDefault(result => result.ConnectionName == cmd.ConnectionName);
+
+            if (inspected is not null)
+            {
+                var schemaIno = grains.GetGrain<IInoNeuron>("ino-main");
+                await schemaIno.FireAsync(inspected);
+            }
+
+            return Results.Ok();
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                app.Logger.LogWarning(ex, "Could not delete temporary SQLite upload copy {FileName}.", Path.GetFileName(tempPath));
+            }
+        }
+    }
+
+    if (kind != ChatUploadKind.TabularWorkbook)
+        return Results.BadRequest("Unsupported upload type.");
 
     using var fileStream = new MemoryStream();
     await file.CopyToAsync(fileStream);

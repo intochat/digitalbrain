@@ -155,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx'],
+      allowedExtensions: ['xlsx', 'db', 'sqlite', 'sqlite3'],
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;
@@ -170,7 +170,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToEnd();
 
     try {
-      final (host, port, secure) = resolveKernelEndpoint();
+      final (host, port, secure) = resolveKernelUploadEndpoint();
       final uri = Uri(
         scheme: secure ? 'https' : 'http',
         host: host,
@@ -328,7 +328,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Expanded(
                 child: FTextField(
                   control: FTextFieldControl.managed(controller: _input),
-                  hint: 'Ask INO anything, or attach an .xlsx...',
+                  hint: 'Ask INO anything, or attach an .xlsx/.db...',
                   onSubmit: (_) => _send(),
                 ),
               ),

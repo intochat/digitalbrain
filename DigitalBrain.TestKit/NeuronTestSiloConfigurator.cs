@@ -3,6 +3,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Developer;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Company;
+using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Ui;
@@ -49,6 +50,7 @@ public sealed class NeuronTestSiloConfigurator : ISiloConfigurator
                 services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
                 services.AddSingleton<SkillPackSynthesizer>();
                 services.AddSingleton<FileSystemOperations>();
+                services.AddSingleton<SqliteSchemaInspector>();
                 services.AddSingleton<RoslynAnalysisService>();
                 services.AddSingleton<HomeFeedBus>();
                 services.AddHomeFeedStreamSubscriber();

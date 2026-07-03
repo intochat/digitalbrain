@@ -96,5 +96,8 @@
     <PackageVersion Include="Google.Apis.Auth" Version="1.75.0" />
     <!-- Excel ingestion for chat attachments — version verified via nuget.org 2026-07-03 -->
     <PackageVersion Include="ClosedXML" Version="0.105.0" />
+    <!-- SQLite schema inspection for dropped/local database files. -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
   </ItemGroup>
 </Project>

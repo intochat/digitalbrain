@@ -156,7 +156,7 @@ public interface ISoftwareEngineeringTeam : INeuron, IHandle<CreateSimpleApp> { 
 
 public interface ISoftware20Team : ISoftwareEngineeringTeam { }
 
-public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataIngested>
+public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataIngested>, IHandle<DbSchemaInspected>
 {
     Task<string> AskAsync(string prompt);
 }
@@ -290,7 +290,75 @@ public record DbConnect(string ConnectionName, string Provider, string Connectio
 [GenerateSerializer]
 public record DbQuery(string ConnectionName, string Query, string? Result = null) : Synapse(nameof(DbQuery), DateTimeOffset.UtcNow);
 
-public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery> { }
+[GenerateSerializer]
+public record DbInspectSchema(
+    string ConnectionName,
+    string Provider,
+    string? ConnectionString = null,
+    string? SourcePath = null,
+    string? SessionId = null) : Synapse(nameof(DbInspectSchema), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record DbSchemaInspected(
+    string ConnectionName,
+    string Provider,
+    DbSchemaModel? Schema,
+    bool Succeeded = true,
+    string? Error = null,
+    string? SessionId = null) : Synapse(nameof(DbSchemaInspected), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record DbSchemaModel(
+    [property: Id(0)] string ConnectionName,
+    [property: Id(1)] string Provider,
+    [property: Id(2)] IReadOnlyList<DbTable> Tables,
+    [property: Id(3)] string? SourcePath = null,
+    [property: Id(4)] string? SessionId = null,
+    [property: Id(5)] IReadOnlyDictionary<string, string?>? Metadata = null);
+
+[GenerateSerializer]
+public record DbTable(
+    [property: Id(0)] string Name,
+    [property: Id(1)] string Kind,
+    [property: Id(2)] IReadOnlyList<DbColumn> Columns,
+    [property: Id(3)] IReadOnlyList<DbForeignKey> ForeignKeys,
+    [property: Id(4)] IReadOnlyList<DbIndex> Indexes,
+    [property: Id(5)] string? Schema = null,
+    [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
+
+[GenerateSerializer]
+public record DbColumn(
+    [property: Id(0)] string Name,
+    [property: Id(1)] string? StoreType,
+    [property: Id(2)] bool IsNullable,
+    [property: Id(3)] int PrimaryKeyOrdinal = 0,
+    [property: Id(4)] string? DefaultValue = null,
+    [property: Id(5)] int Ordinal = 0,
+    [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
+
+[GenerateSerializer]
+public record DbForeignKey(
+    [property: Id(0)] string Name,
+    [property: Id(1)] string Table,
+    [property: Id(2)] IReadOnlyList<string> Columns,
+    [property: Id(3)] string PrincipalTable,
+    [property: Id(4)] IReadOnlyList<string> PrincipalColumns,
+    [property: Id(5)] string? OnUpdate = null,
+    [property: Id(6)] string? OnDelete = null,
+    [property: Id(7)] string? Match = null,
+    [property: Id(8)] IReadOnlyDictionary<string, string?>? Metadata = null);
+
+[GenerateSerializer]
+public record DbIndex(
+    [property: Id(0)] string Name,
+    [property: Id(1)] string Table,
+    [property: Id(2)] IReadOnlyList<string> Columns,
+    [property: Id(3)] bool IsUnique = false,
+    [property: Id(4)] bool IsPartial = false,
+    [property: Id(5)] string? Origin = null,
+    [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
+
+public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery>, IHandle<DbInspectSchema> { }
 
 // Filter changes - INO/Context must be notified so assistant knows current UI view state
 [GenerateSerializer]

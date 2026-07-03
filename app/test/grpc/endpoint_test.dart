@@ -45,5 +45,14 @@ void main() {
 
       expect(url, 'http://localhost:60419');
     });
+
+    test('desktop Aspire upload endpoint selection prefers web over grpc', () {
+      final url = resolveAspireKernelUploadUrl(
+        grpcUrl: 'http://localhost:60419',
+        webUrl: 'http://localhost:60420',
+      );
+
+      expect(url, 'http://localhost:60420');
+    });
   });
 }
