@@ -1,7 +1,7 @@
 using DigitalBrain.Core;
 using System.Text.Json;
 
-namespace DigitalBrain.Mcp.Tools;
+namespace DigitalBrain.Mcp;
 
 // Shared, transport-agnostic helpers for the DigitalBrain MCP tool surfaces. Reached through an in-process
 // IGrainFactory when co-hosted in the silo (HTTP) and the Orleans-client IGrainFactory in the stdio server.

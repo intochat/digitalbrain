@@ -1,7 +1,7 @@
 using DigitalBrain.Core;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Kernel;
 
 // Encrypts/decrypts a kernel Checkpoint at rest. The polymorphic Synapse snapshot is serialized with the Orleans
 // serializer (which handles every [GenerateSerializer] subtype) and then protected via INeuronStateProtector.

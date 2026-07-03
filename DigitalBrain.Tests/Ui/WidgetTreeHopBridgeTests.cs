@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Core;
-using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Ui;
 

@@ -1,8 +1,8 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Sdk;
 using DigitalBrain.Developer;
 using DigitalBrain.Windows;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sdk;
 
 // Typed NuGet neuron via the dotnet CLI; supersedes the untyped NuGetManagerNeuron.
 [GrainType("digitalbrain.sdk.nuget.v1")]

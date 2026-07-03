@@ -1,5 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Kernel.Auth;
+using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Telegram.Channel;
 using Grpc.Core;

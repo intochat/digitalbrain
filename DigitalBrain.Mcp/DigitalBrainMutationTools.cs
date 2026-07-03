@@ -1,9 +1,10 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
 
-namespace DigitalBrain.Mcp.Tools;
+namespace DigitalBrain.Mcp;
 
 // Mutating DigitalBrain MCP tools: fire side-effecting synapses, spend LLM tokens, or change marketplace/cluster
 // state. Registered on the stdio transport only (local/trusted); withheld from the kernel's HTTP transport

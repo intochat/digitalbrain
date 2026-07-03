@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Distribution;
 
 [GenerateSerializer]
 public enum BundleTier { Substrate, Channel, Content }

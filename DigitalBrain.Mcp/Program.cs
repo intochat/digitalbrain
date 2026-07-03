@@ -4,7 +4,7 @@
 // no degraded no-cluster mode (fail-fast). For an in-process, remote-reachable variant the silo co-hosts the same
 // tools over HTTP (see DigitalBrain.Kernel/Program.cs).
 
-using DigitalBrain.Mcp.Tools;
+using DigitalBrain.Mcp;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

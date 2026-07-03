@@ -1,4 +1,4 @@
-using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Sandbox;
 
 namespace DigitalBrain.Tests.Sandbox;
 

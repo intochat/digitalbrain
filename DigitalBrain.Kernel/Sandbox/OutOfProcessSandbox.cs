@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sandbox;
 
 // Runs untrusted pack code in a SEPARATE runtime process — the isolation boundary the in-process collectible-ALC
 // guardrail (PackAlcEmbodier) cannot provide (.NET has no in-process CAS). The pack is a console program: it is

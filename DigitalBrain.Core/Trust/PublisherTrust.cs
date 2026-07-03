@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Trust;
 
 // Publisher-trust decision for gated publishing. A pack is trusted iff it carries a valid author signature
 // (integrity — code untampered since signing) AND its author public key is on the trusted allowlist.

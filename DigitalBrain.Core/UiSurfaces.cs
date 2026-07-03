@@ -260,6 +260,7 @@ public static class UiSurfaceKinds
     public const string InstalledBundles = "installed-bundles";
     public const string Timeline = "timeline";
     public const string DataChart = "data-chart";
+    public const string Table = "table";
     // All UI is UiSurface based. These enable neurons to own chrome, nav and full main UI.
     public const string AppShell = "app-shell";        // main root chrome + nav + layout, streamed by a neuron
     public const string ShellChrome = "shell-chrome";
@@ -1512,6 +1513,22 @@ public record ListSurface(
 {
     ["title"] = Title,
     ["items"] = Items
+});
+
+/// <summary>
+/// Tabular data surface rendered by the client as a rich UI kit table (used for dropped Excel/CSV in chat).
+/// Columns and rows are string data for simple, self-explanatory rendering.
+/// </summary>
+[GenerateSerializer]
+public record TableSurface(
+    string Title,
+    IReadOnlyList<string> Columns,
+    IReadOnlyList<IReadOnlyList<string>> Rows
+) : UiSurface(UiSurfaceKinds.Table, new Dictionary<string, object?>
+{
+    ["title"] = Title,
+    ["columns"] = Columns,
+    ["rows"] = Rows
 });
 
 /// <summary>

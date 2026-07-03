@@ -1,8 +1,8 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Economics;
 using Stripe;
 using Stripe.Checkout;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Economics;
 
 // Real Stripe payment gateway, ported from digitalbrain's StripeGateway. Creates Checkout Sessions and verifies
 // completion webhooks. Selected only when Stripe:SecretKey is configured (see EconomicsServices); a missing

@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
 using Orleans.TestingHost;
 using Reqnroll;
+using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Steps;
 

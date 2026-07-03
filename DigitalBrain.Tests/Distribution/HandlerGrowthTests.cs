@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Distribution;
 using DigitalBrain.TestKit;
 
 namespace DigitalBrain.Tests.Distribution;

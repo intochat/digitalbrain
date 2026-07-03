@@ -1,7 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Developer;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sdk;
 
 // Typed Roslyn neuron. Delegates MSBuildWorkspace solution analysis to the ino-hosted, Orleans-free
 // RoslynAnalysisService; this grain only adds the journal-derived ArchitectReport broadcast.

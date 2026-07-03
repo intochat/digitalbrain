@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Trust;
 
 // ECDSA-nistP256 + SHA256 signing/verification for marketplace packs. BCL-only (no BouncyCastle).
 // Ported from digitalbrain BundleSignatureVerifier; surfaces base64 strings because NeuroPack and the

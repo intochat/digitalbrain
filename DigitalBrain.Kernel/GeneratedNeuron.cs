@@ -2,6 +2,8 @@ using DigitalBrain.Core;
 using DigitalBrain.Kernel.Foundry;
 using Microsoft.Extensions.AI;
 using Microsoft.CodeAnalysis;
+using DigitalBrain.Core.Distribution;
+using DigitalBrain.Kernel.Ui;
 namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.generated")]

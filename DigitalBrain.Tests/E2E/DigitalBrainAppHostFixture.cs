@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Trust;
 using DigitalBrain.Runtime.Grpc;
 using Google.Protobuf;
 using Grpc.Net.Client;

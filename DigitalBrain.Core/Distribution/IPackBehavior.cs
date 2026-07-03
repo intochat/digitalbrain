@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Distribution;
 
 public enum PackConfigFieldKind { Text, Secret, Choice }
 

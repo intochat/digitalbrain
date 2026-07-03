@@ -1,6 +1,6 @@
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Kernel;
 
 public static class KernelServices
 {

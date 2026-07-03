@@ -1,8 +1,8 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Sdk;
 using DigitalBrain.Developer;
 using DigitalBrain.Windows;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sdk;
 
 [GrainType("digitalbrain.sdk.dotnet.v1")]
 public class DotNetNeuron(ILogger<DotNetNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IDotNetNeuron

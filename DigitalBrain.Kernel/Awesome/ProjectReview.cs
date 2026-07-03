@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Awesome;
 
 public sealed record ProjectReviewOutcome(string Summary, string Report, int FileCount, int TodoCount, bool Truncated);
 

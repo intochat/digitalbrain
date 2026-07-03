@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.Mcp.Tools;
 using DigitalBrain.Tests.TestSupport;
@@ -7,6 +6,7 @@ using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Reqnroll;
+using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Steps;
 

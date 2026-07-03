@@ -1,6 +1,6 @@
 using DigitalBrain.Windows;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sdk;
 
 [GrainType("digitalbrain.sdk.filesystem.v1")]
 public class FileSystemNeuron(ILogger<FileSystemNeuron> logger, NeuronJournals journals, FileSystemOperations ops)

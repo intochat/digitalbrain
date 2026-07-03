@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Tests.TestSupport;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

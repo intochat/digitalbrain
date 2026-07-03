@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Awesome;
 
 // Software-engineering "awesome" experience: real review work (not string templating).
 // Harvested from final's SoftwareEngineeringTeam (ProjectReview), re-homed onto MAIN's Neuron/Synapse model.

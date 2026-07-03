@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Ui;
 
 // A Remote Flutter Widgets payload pushed from a neuron to the Home feed. DataJson is an opaque blob (RFW data
 // is dynamic, so there is no static schema). This is the second server-driven-UI payload kind alongside UiSurface

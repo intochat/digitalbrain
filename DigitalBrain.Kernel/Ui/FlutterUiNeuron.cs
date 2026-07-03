@@ -3,7 +3,7 @@ using DigitalBrain.UiKit;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Ui;
 
 [GrainType("digitalbrain.flutter-ui.v1")]
 public sealed class FlutterUiNeuron(ILogger<FlutterUiNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IFlutterUiNeuron

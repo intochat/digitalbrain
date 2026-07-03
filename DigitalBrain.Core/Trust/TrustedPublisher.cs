@@ -1,4 +1,4 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Trust;
 
 // Built-in trusted-publisher identity for FIRST-PARTY seeds and the kernel pack only. Lets secure-by-default
 // (reject unsigned) ship without breaking the system's own preinstalled packs. NOT a production secret:

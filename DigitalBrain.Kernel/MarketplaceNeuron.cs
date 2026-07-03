@@ -1,5 +1,8 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Economics;
+using DigitalBrain.Core.Trust;
 using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Ui;
 using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel;
 

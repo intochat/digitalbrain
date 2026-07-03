@@ -31,7 +31,6 @@
   <Project Path="DigitalBrain.Windows/DigitalBrain.Windows.csproj" />
   <Project Path="DigitalBrain.Windows.Tests/DigitalBrain.Windows.Tests.csproj" />
   <Project Path="DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-  <Project Path="DigitalBrain.Mcp.Tools/DigitalBrain.Mcp.Tools.csproj" />
   <Project Path="NeuroOSPrototype.AppHost/NeuroOSPrototype.AppHost.csproj" />
   <Project Path="NeuroOSPrototype.ServiceDefaults/NeuroOSPrototype.ServiceDefaults.csproj" />
 </Solution>

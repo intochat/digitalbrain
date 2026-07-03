@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Kernel;
 
 // AES-GCM protector with a shared symmetric key. Cross-platform and round-trips across silo nodes (unlike DPAPI),
 // so it fits the distributed Aspire/ACA silo. The key is supplied from config (Key Vault in cloud).

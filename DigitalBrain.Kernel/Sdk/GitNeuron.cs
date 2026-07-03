@@ -1,7 +1,7 @@
 using DigitalBrain.Developer;
 using DigitalBrain.Windows;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Kernel.Sdk;
 
 // Typed git integration neuron. Re-homed from IAW's GitAgent onto MAIN's Neuron base; process-exec is delegated
 // to the shared ProcessRunner. Reached by typed RPC; metrics are journal-derived (MAIN idiom).

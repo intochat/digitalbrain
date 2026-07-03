@@ -3,7 +3,7 @@ using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
 
-namespace DigitalBrain.Mcp.Tools;
+namespace DigitalBrain.Mcp;
 
 // Read-only DigitalBrain MCP tools: observe cluster state without side effects. Safe to expose over the
 // kernel's HTTP transport (remotely reachable). Mutation tools live in DigitalBrainMutationTools (stdio-only).
