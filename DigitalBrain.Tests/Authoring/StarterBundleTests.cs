@@ -12,7 +12,7 @@ public class StarterBundleTests
 
         var tree = harness.GetTree(StarterBundleSource.Hops.Ask);
 
-        tree.ShouldHaveNodeOfType(DigitalBrain.Core.Ui.TextField);
+        tree.ShouldHaveNodeOfType(DigitalBrain.Core.UiKitVocabulary.TextField);
         tree.ShouldHaveButtonWithLabel("Echo");
     }
 }

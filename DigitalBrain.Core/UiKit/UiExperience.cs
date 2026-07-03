@@ -33,26 +33,26 @@ public sealed class UiHop
 
     public UiHop Text(string text)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Text, new Dictionary<string, object?> { ["text"] = text }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = text }));
         return this;
     }
 
     public UiHop Text(Func<IReadOnlyDictionary<string, string>, string> text)
     {
-        Factories.Add(state => new UiWidgetTree(Ui.Text, new Dictionary<string, object?> { ["text"] = text(state) }));
+        Factories.Add(state => new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = text(state) }));
         return this;
     }
 
     public UiHop TextField(string name, string placeholder = "")
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.TextField,
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.TextField,
             new Dictionary<string, object?> { ["name"] = name, ["placeholder"] = placeholder }));
         return this;
     }
 
     public UiHop Button(string label, string goTo)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Button,
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Button,
             new Dictionary<string, object?> { ["label"] = label, ["eventName"] = goTo }));
         return this;
     }
@@ -61,35 +61,35 @@ public sealed class UiHop
     {
         var inner = new UiHop(Id);
         body(inner);
-        Factories.Add(state => new UiWidgetTree(Ui.Panel, new Dictionary<string, object?>(),
+        Factories.Add(state => new UiWidgetTree(UiKitVocabulary.Panel, new Dictionary<string, object?>(),
             inner.Factories.Select(factory => factory(state)).ToList()));
         return this;
     }
 
     public UiHop Checkbox(string name, string label)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Checkbox,
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Checkbox,
             new Dictionary<string, object?> { ["name"] = name, ["label"] = label }));
         return this;
     }
 
     public UiHop Switch(string name, string label)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Switch,
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Switch,
             new Dictionary<string, object?> { ["name"] = name, ["label"] = label }));
         return this;
     }
 
     public UiHop TextArea(string name, string placeholder = "")
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.TextArea,
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.TextArea,
             new Dictionary<string, object?> { ["name"] = name, ["placeholder"] = placeholder }));
         return this;
     }
 
     public UiHop Select(string name, IReadOnlyList<string> options, string? label = null)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Select, new Dictionary<string, object?>
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Select, new Dictionary<string, object?>
         {
             ["name"] = name, ["options"] = options, ["label"] = label ?? string.Empty
         }));
@@ -98,7 +98,7 @@ public sealed class UiHop
 
     public UiHop RadioGroup(string name, IReadOnlyList<string> options, string? label = null)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.RadioGroup, new Dictionary<string, object?>
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.RadioGroup, new Dictionary<string, object?>
         {
             ["name"] = name, ["options"] = options, ["label"] = label ?? string.Empty
         }));
@@ -107,7 +107,7 @@ public sealed class UiHop
 
     public UiHop Slider(string name, double min = 0, double max = 1, string? label = null)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Slider, new Dictionary<string, object?>
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Slider, new Dictionary<string, object?>
         {
             ["name"] = name, ["min"] = min, ["max"] = max, ["label"] = label ?? string.Empty
         }));
@@ -116,7 +116,7 @@ public sealed class UiHop
 
     public UiHop DateField(string name, string? label = null)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.DateField, new Dictionary<string, object?>
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.DateField, new Dictionary<string, object?>
         {
             ["name"] = name, ["label"] = label ?? string.Empty
         }));
@@ -127,7 +127,7 @@ public sealed class UiHop
     {
         var inner = new UiHop(Id);
         body(inner);
-        Factories.Add(state => new UiWidgetTree(Ui.Row, new Dictionary<string, object?>(),
+        Factories.Add(state => new UiWidgetTree(UiKitVocabulary.Row, new Dictionary<string, object?>(),
             inner.Factories.Select(f => f(state)).ToList()));
         return this;
     }
@@ -136,44 +136,44 @@ public sealed class UiHop
     {
         var inner = new UiHop(Id);
         body(inner);
-        Factories.Add(state => new UiWidgetTree(Ui.Column, new Dictionary<string, object?>(),
+        Factories.Add(state => new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(),
             inner.Factories.Select(f => f(state)).ToList()));
         return this;
     }
 
     public UiHop Divider()
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Divider, new Dictionary<string, object?>()));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Divider, new Dictionary<string, object?>()));
         return this;
     }
 
     public UiHop Header(string title)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Header, new Dictionary<string, object?> { ["title"] = title }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Header, new Dictionary<string, object?> { ["title"] = title }));
         return this;
     }
 
     public UiHop Gap(double size = 16)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Gap, new Dictionary<string, object?> { ["size"] = size }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Gap, new Dictionary<string, object?> { ["size"] = size }));
         return this;
     }
 
     public UiHop Heading(string text)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Heading, new Dictionary<string, object?> { ["text"] = text }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = text }));
         return this;
     }
 
     public UiHop Icon(string name)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Icon, new Dictionary<string, object?> { ["name"] = name }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Icon, new Dictionary<string, object?> { ["name"] = name }));
         return this;
     }
 
     public UiHop Avatar(string? imageUrl = null, string? fallback = null)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Avatar, new Dictionary<string, object?>
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Avatar, new Dictionary<string, object?>
         {
             ["imageUrl"] = imageUrl ?? string.Empty, ["fallback"] = fallback ?? string.Empty
         }));
@@ -182,7 +182,7 @@ public sealed class UiHop
 
     public UiHop Badge(string text)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Badge, new Dictionary<string, object?> { ["text"] = text }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Badge, new Dictionary<string, object?> { ["text"] = text }));
         return this;
     }
 
@@ -192,7 +192,7 @@ public sealed class UiHop
         {
             var props = new Dictionary<string, object?> { ["title"] = title, ["subtitle"] = subtitle ?? string.Empty };
             if (goTo is not null) props["eventName"] = goTo;
-            return new UiWidgetTree(Ui.Tile, props);
+            return new UiWidgetTree(UiKitVocabulary.Tile, props);
         });
         return this;
     }
@@ -201,14 +201,14 @@ public sealed class UiHop
     {
         var inner = new UiHop(Id);
         body(inner);
-        Factories.Add(state => new UiWidgetTree(Ui.List, new Dictionary<string, object?>(),
+        Factories.Add(state => new UiWidgetTree(UiKitVocabulary.List, new Dictionary<string, object?>(),
             inner.Factories.Select(f => f(state)).ToList()));
         return this;
     }
 
     public UiHop Alert(string title, string? subtitle = null)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Alert, new Dictionary<string, object?>
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Alert, new Dictionary<string, object?>
         {
             ["title"] = title, ["subtitle"] = subtitle ?? string.Empty
         }));
@@ -217,13 +217,13 @@ public sealed class UiHop
 
     public UiHop Progress(double value)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Progress, new Dictionary<string, object?> { ["value"] = value }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Progress, new Dictionary<string, object?> { ["value"] = value }));
         return this;
     }
 
     public UiHop Spinner()
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Spinner, new Dictionary<string, object?>()));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Spinner, new Dictionary<string, object?>()));
         return this;
     }
 
@@ -231,7 +231,7 @@ public sealed class UiHop
     {
         var inner = new UiHop(Id);
         body(inner);
-        Factories.Add(state => new UiWidgetTree(Ui.Tooltip,
+        Factories.Add(state => new UiWidgetTree(UiKitVocabulary.Tooltip,
             new Dictionary<string, object?> { ["tip"] = tip },
             inner.Factories.Select(f => f(state)).ToList()));
         return this;
@@ -239,25 +239,25 @@ public sealed class UiHop
 
     public UiHop Tabs(params (string label, string goTo)[] items)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Tabs, new Dictionary<string, object?> { ["items"] = NavItems(items) }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Tabs, new Dictionary<string, object?> { ["items"] = NavItems(items) }));
         return this;
     }
 
     public UiHop Breadcrumb(params (string label, string goTo)[] items)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Breadcrumb, new Dictionary<string, object?> { ["items"] = NavItems(items) }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Breadcrumb, new Dictionary<string, object?> { ["items"] = NavItems(items) }));
         return this;
     }
 
     public UiHop Sidebar(params (string label, string goTo)[] items)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Sidebar, new Dictionary<string, object?> { ["items"] = NavItems(items) }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Sidebar, new Dictionary<string, object?> { ["items"] = NavItems(items) }));
         return this;
     }
 
     public UiHop BottomNav(params (string label, string goTo)[] items)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.BottomNav, new Dictionary<string, object?> { ["items"] = NavItems(items) }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.BottomNav, new Dictionary<string, object?> { ["items"] = NavItems(items) }));
         return this;
     }
 
@@ -266,7 +266,7 @@ public sealed class UiHop
         var items = Enumerable.Range(0, pages)
             .Select(i => new Dictionary<string, object?> { ["label"] = (i + 1).ToString(), ["eventName"] = goToPrefix + i })
             .ToList();
-        Factories.Add(_ => new UiWidgetTree(Ui.Pagination, new Dictionary<string, object?> { ["items"] = items }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Pagination, new Dictionary<string, object?> { ["items"] = items }));
         return this;
     }
 
@@ -274,7 +274,7 @@ public sealed class UiHop
     {
         var inner = new UiHop(Id);
         body(inner);
-        Factories.Add(state => new UiWidgetTree(Ui.Dialog,
+        Factories.Add(state => new UiWidgetTree(UiKitVocabulary.Dialog,
             new Dictionary<string, object?> { ["open"] = open, ["title"] = title },
             inner.Factories.Select(f => f(state)).ToList()));
         return this;
@@ -284,7 +284,7 @@ public sealed class UiHop
     {
         var inner = new UiHop(Id);
         body(inner);
-        Factories.Add(state => new UiWidgetTree(Ui.Sheet,
+        Factories.Add(state => new UiWidgetTree(UiKitVocabulary.Sheet,
             new Dictionary<string, object?> { ["open"] = open, ["title"] = title },
             inner.Factories.Select(f => f(state)).ToList()));
         return this;
@@ -292,7 +292,7 @@ public sealed class UiHop
 
     public UiHop Toast(string message)
     {
-        Factories.Add(_ => new UiWidgetTree(Ui.Toast, new Dictionary<string, object?> { ["message"] = message }));
+        Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Toast, new Dictionary<string, object?> { ["message"] = message }));
         return this;
     }
 
