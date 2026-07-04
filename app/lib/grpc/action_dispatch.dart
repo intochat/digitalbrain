@@ -11,6 +11,7 @@ const _metaKeys = {
   'target',
   'targetSurfaceKind',
   'path',
+  'props',
 };
 
 /// Builds the unary `Send` envelope for a surface action event, or null when the
@@ -21,8 +22,9 @@ const _metaKeys = {
 /// the flattened props become the payload directly.
 gw.SynapseEnvelope? buildActionEnvelope(
   String name,
-  Map<String, Object?> args,
-) {
+  Map<String, Object?> args, {
+  String? defaultClientId,
+}) {
   if (name != 'press' && name != 'select' && name != 'action') return null;
 
   final rawAction = args['action'];
@@ -32,14 +34,23 @@ gw.SynapseEnvelope? buildActionEnvelope(
   if (synapseType == null || synapseType.isEmpty) return null;
 
   final rawProps = action['props'];
+  final topLevelProps = {
+    for (final entry in action.entries)
+      if (!_metaKeys.contains(entry.key)) entry.key: entry.value,
+  };
   final props = rawProps is Map
-      ? rawProps.cast<String, Object?>()
-      : {
-          for (final entry in action.entries)
-            if (!_metaKeys.contains(entry.key)) entry.key: entry.value,
-        };
+      ? {...topLevelProps, ...rawProps.cast<String, Object?>()}
+      : topLevelProps;
 
   final resolvedProps = Map<String, Object?>.of(props);
+  final fallbackClientId = defaultClientId?.trim();
+  if (fallbackClientId != null && fallbackClientId.isNotEmpty) {
+    final currentClientId = resolvedProps['clientId']?.toString().trim();
+    if (currentClientId == null || currentClientId.isEmpty) {
+      resolvedProps['clientId'] = fallbackClientId;
+    }
+  }
+
   final callbackPath = resolvedProps['callbackPath']?.toString().trim();
   final redirectUri = resolvedProps['redirect_uri']?.toString().trim();
   if (callbackPath != null &&
@@ -68,9 +79,14 @@ gw.SynapseEnvelope? buildActionEnvelope(
 gw.SynapseEnvelope? buildPanelEventEnvelope(
   String panelId,
   String name,
-  Map<String, Object?> args,
-) {
-  final actionEnvelope = buildActionEnvelope(name, args);
+  Map<String, Object?> args, {
+  String? defaultClientId,
+}) {
+  final actionEnvelope = buildActionEnvelope(
+    name,
+    args,
+    defaultClientId: defaultClientId,
+  );
   if (actionEnvelope != null) return actionEnvelope;
 
   var type = args['type']?.toString();
@@ -79,6 +95,14 @@ gw.SynapseEnvelope? buildPanelEventEnvelope(
   if (type == 'cancelTask') type = 'CancelTask';
 
   final payload = Map<String, Object?>.of(args)..remove('type');
+  final fallbackClientId = defaultClientId?.trim();
+  if (fallbackClientId != null && fallbackClientId.isNotEmpty) {
+    final currentClientId = payload['clientId']?.toString().trim();
+    if (currentClientId == null || currentClientId.isEmpty) {
+      payload['clientId'] = fallbackClientId;
+    }
+  }
+
   return gw.SynapseEnvelope()
     ..correlationId = panelId
     ..typeName = type

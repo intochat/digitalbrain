@@ -75,6 +75,49 @@ void main() {
     });
   });
 
+  test('default client id is added when action props omit it', () {
+    final envelope = buildActionEnvelope('press', {
+      'synapseType': 'SalesforceAuthRequested',
+      'props': {'pack': 'salesforce', 'callbackPath': '/salesforce-callback'},
+    }, defaultClientId: 'flutter');
+
+    expect(envelope, isNotNull);
+    expect(payloadOf(envelope), {
+      'pack': 'salesforce',
+      'callbackPath': '/salesforce-callback',
+      'clientId': 'flutter',
+      'redirect_uri': 'http://localhost:8081/salesforce-callback',
+    });
+  });
+
+  test('nested props preserve explicit client id over default', () {
+    final envelope = buildActionEnvelope('press', {
+      'synapseType': 'SalesforceAuthRequested',
+      'props': {'pack': 'salesforce', 'clientId': 'surface-client'},
+    }, defaultClientId: 'flutter');
+
+    expect(envelope, isNotNull);
+    expect(payloadOf(envelope), {
+      'pack': 'salesforce',
+      'clientId': 'surface-client',
+    });
+  });
+
+  test('top-level action context is merged with nested props', () {
+    final envelope = buildActionEnvelope('press', {
+      'synapseType': 'ConfigurationProvided',
+      'clientId': 'outer-client',
+      'props': {'pack': 'salesforce', 'username': 'user@example.com'},
+    });
+
+    expect(envelope, isNotNull);
+    expect(payloadOf(envelope), {
+      'clientId': 'outer-client',
+      'pack': 'salesforce',
+      'username': 'user@example.com',
+    });
+  });
+
   test('nav-only event (no synapseType) produces no envelope', () {
     final envelope = buildActionEnvelope('press', {
       'label': 'Marketplace',
@@ -122,6 +165,7 @@ void main() {
           'password': 'pw',
         },
       },
+      defaultClientId: 'flutter',
     );
 
     expect(envelope, isNotNull);
@@ -129,6 +173,7 @@ void main() {
     expect(payloadOf(envelope), {
       'pack': 'salesforce',
       'eventName': 'ConfigurationProvided',
+      'clientId': 'flutter',
       'client_id': 'connected-app-id',
       'client_secret': 'connected-app-secret',
       'username': 'user@example.com',
