@@ -339,5 +339,5 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         (value ?? string.Empty).Trim().ToLowerInvariant();
 
     private static bool IsValidUsernameCharset(string username) =>
-        username.Length > 0 && !username.Any(ch => ch is '/' or '\'' or '"' || char.IsWhiteSpace(ch));
+        !username.Any(ch => ch is '/' or '\'' or '"' || char.IsWhiteSpace(ch));
 }

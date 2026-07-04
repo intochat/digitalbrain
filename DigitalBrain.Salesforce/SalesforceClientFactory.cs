@@ -37,14 +37,6 @@ public static class SalesforceClientFactory
     public const string MissingConnectedAppConfigMessage =
         "Salesforce OAuth is not configured. Configure the Connected App Client ID and Client Secret in Aspire parameters (salesforce-client-id and salesforce-client-secret) or save them in the Salesforce credentials form, then try Login via Salesforce again.";
 
-    public static async Task<SalesforceApiClient> CreateApiClientAsync(
-        IPackConfigStore store,
-        string scope = DefaultScope)
-    {
-        var values = await store.GetAsync(scope, PackName).ConfigureAwait(false);
-        return new SalesforceApiClient(await CreateForceClientAsync(values).ConfigureAwait(false));
-    }
-
     public static async Task<IReadOnlyDictionary<string, string>> GetMergedScopedValuesAsync(
         IPackConfigStore store,
         NeuronScope scope)

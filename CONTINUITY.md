@@ -1,5 +1,47 @@
 # CONTINUITY — NeuroOS best-of-breed consolidation
 
+## 2026-07-04 — MULTIUSER Stage S2 (Identity Spine) + Stage S3 (Salesforce Per-User)
+
+Merged to master (subagent-driven, 9 tasks, plan
+`docs/superpowers/plans/2026-07-04-multiuser-s2-s3-identity-and-salesforce-per-user.md`). Builds on Stage
+S1 (below): turned `UserSessionNeuron`'s existing `UserId`/`sessionId` identity into something the rest of
+the kernel actually uses. S2 added the `NeuronScope`/`PackConfigScopes` identity spine in
+`DigitalBrain.Core`, addressed `RfwCard`s to a `SessionId` so `HomeFeedBus` only fans session-addressed
+cards to their matching subscriber, and made the gateway resolve `sessionId → UserSessionState` once
+server-side instead of trusting client-supplied `buyerId`/`scope`/`sessionId` payload fields. S3 moved
+Salesforce auth/CRM grains from the `"salesforce-auth-main"` global singleton to per-`{userId}` grains,
+split pack-config storage into a shared `PackConfigScopes.App` ("default") scope for connected-app config
+and per-user `PackConfigScopes.ForUser(userId)` ("user:{userId}") scopes for tokens, and routed the OAuth
+callback (a cold, unauthenticated HTTP GET) to the right per-user grain via a plaintext
+`{userId}:{nonce}` state prefix (the owner-approved minimal alternative to D-MU2's encrypted state,
+deferred to S4).
+
+Two real plan gaps were found and fixed during implementation, not just asserted: (1) the plan's
+arbitrary-buyer-scope anti-pattern fix for `ConfigFormSteps.cs` was missed for
+`DigitalBrain.Tests/Steps/TelegramReactiveLoopSteps.cs`, which has the identical pattern — caught by an
+implementer via a full-suite regression run and git-stash bisection, then fixed identically in an
+authorized scope-widened follow-up commit; (2) the final acceptance test's
+`Two_Users_Interleaved_OAuth_Flows_Do_Not_Cross_Contaminate` had vacuous token-equality assertions
+(`aliceTokens`/`bobTokens == "fake-access-token"`) that would pass identically even if both users'
+writes collapsed into one shared scope, since `FakeSalesforceTokenHandler` always returns the same
+constant token string — fixed with a genuine presence/absence check between Alice's and Bob's
+`CompleteOAuthAsync` calls instead of relying on value equality.
+
+A final whole-branch review (most capable model) found one Important finding and several trivial Minor
+findings, all closed out in one cleanup pass. Important: `SalesforceApiClientFactory`/
+`SalesforceClientFactory.GetMergedScopedValuesAsync` merge the shared App scope as the base for every
+user's credential view, so a pre-existing installation with a completed OAuth flow under the old
+singleton model would have a leftover token in that shared scope leak into every other user's merged
+view until they complete their own OAuth — explicitly confirmed not applicable to this installation (a
+dev/prototype with no prior real Salesforce OAuth completions) and documented as a greenfield-only
+assumption in the plan's new "Known Limitations" section rather than building migration/purge code. Also
+in this pass: an explicit early-reject in `SalesforceAuthNeuron.CompleteOAuthAsync` for a callback routed
+to a grain with zero pending OAuth state (proven via TDD to matter — the old fallthrough would actually
+*succeed* the token exchange against the test double's fake HTTP handler, since it doesn't validate the
+PKCE `code_verifier`), plus dead-code/comment cleanup (`SalesforceClientFactory.CreateApiClientAsync`,
+a redundant `UserSessionNeuron.IsValidUsernameCharset` guard, and stale comments in `HomeFeedBus.cs`/
+`GatewayService.cs`). Full solution `dotnet test` green throughout (0 failures).
+
 ## 2026-07-04 — MULTIUSER Stage S1: Salesforce OAuth callback grain-routing
 
 Merged to master (subagent-driven, plan `docs/superpowers/plans/2026-07-04-salesforce-oauth-callback-grain-routing.md`).

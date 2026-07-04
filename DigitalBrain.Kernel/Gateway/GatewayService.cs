@@ -56,7 +56,7 @@ public sealed class GatewayService(
             if (request.TypeName == nameof(InstallFromMarketplace) || request.TypeName.Contains("InstallFromMarketplace", StringComparison.OrdinalIgnoreCase))
             {
                 var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
-                // payload json carries props (packName/version/buyerId from surface action)
+                // payload json carries props (packName/version from surface action); buyerId is server-resolved below
                 var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
                 var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var packName = p.TryGetValue("packName", out var pn) ? pn?.ToString() ?? p.GetValueOrDefault("name")?.ToString() ?? "" : "";
@@ -265,9 +265,7 @@ public sealed class GatewayService(
         }
     }
 
-    // Resolves a client-supplied sessionId to its server-side UserSessionState exactly once. Callers must use
-    // the RESULT's fields (session?.UserId, session?.SessionId), never the raw request field, downstream — an
-    // invalid/expired/fabricated sessionId collapses to null here so nothing built on it can trust a lie.
+    // Resolves a client-supplied sessionId once; callers must use the result's fields downstream, never the raw request field.
     private async Task<UserSessionState?> ResolveSessionAsync(string? sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId)) return null;

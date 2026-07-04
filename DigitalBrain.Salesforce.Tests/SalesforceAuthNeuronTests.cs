@@ -190,6 +190,31 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         Assert.False(stored.ContainsKey(SalesforceClientFactory.AccessTokenKey));
     }
 
+    [Fact]
+    public async Task CompleteOAuthAsync_With_No_Pending_Flow_Fails_Without_Exchanging_Code()
+    {
+        var writer = Grain<ISalesforceConnectedAppConfigWriter>("salesforce-connected-app-writer-no-pending");
+        await writer.StoreConnectedAppConfigAsync();
+
+        // This grain never received AuthRequested/StartOAuthAsync, so its pending-state pack is empty —
+        // the same shape as the "salesforce-auth-unknown" routing sentinel or any per-user grain that
+        // never started a flow.
+        var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test-no-pending");
+
+        var result = await auth.CompleteOAuthAsync(new SalesforceOAuthCallback(
+            Code: "some-code",
+            State: "some-state",
+            Error: null,
+            ErrorDescription: null,
+            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+
+        Assert.False(result.Success);
+        Assert.Equal("The callback state did not match the pending login.", result.Message);
+
+        var stored = await writer.ReadPackAsync(PackConfigScopes.ForUser(new UserId("salesforce-auth-test-no-pending")), SalesforceClientFactory.PackName);
+        Assert.False(stored.ContainsKey(SalesforceClientFactory.AccessTokenKey));
+    }
+
     private static IEnumerable<UiWidgetTree> FindNodes(UiWidgetTree tree)
     {
         yield return tree;
