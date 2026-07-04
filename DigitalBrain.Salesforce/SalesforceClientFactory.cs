@@ -124,7 +124,8 @@ public static class SalesforceClientFactory
     public static async Task<IReadOnlyDictionary<string, string>> ExchangeAuthorizationCodeAsync(
         IReadOnlyDictionary<string, string> values,
         string code,
-        string redirectUri)
+        string redirectUri,
+        HttpMessageHandler? tokenEndpointHandler = null)
     {
         if (string.IsNullOrWhiteSpace(code))
             throw new InvalidOperationException("Salesforce authorization callback did not include a code.");
@@ -150,7 +151,7 @@ public static class SalesforceClientFactory
             form["code_verifier"] = codeVerifier.Trim();
         }
 
-        var token = await RequestTokenAsync(TokenEndpoint(loginUrl), form)
+        var token = await RequestTokenAsync(TokenEndpoint(loginUrl), form, tokenEndpointHandler)
             .ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.InstanceUrl))
@@ -298,9 +299,10 @@ public static class SalesforceClientFactory
 
     private static async Task<SalesforceTokenResponse> RequestTokenAsync(
         string tokenEndpoint,
-        IReadOnlyDictionary<string, string> form)
+        IReadOnlyDictionary<string, string> form,
+        HttpMessageHandler? handler = null)
     {
-        using var http = new HttpClient();
+        using var http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
         using var content = new FormUrlEncodedContent(form);
 
         HttpResponseMessage response;
