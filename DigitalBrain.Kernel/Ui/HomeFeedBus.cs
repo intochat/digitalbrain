@@ -15,7 +15,7 @@ namespace DigitalBrain.Kernel.Ui;
 public sealed class HomeFeedBus(IClusterClient? clusterClient = null, ILogger<HomeFeedBus>? logger = null)
 {
     private const int MaxSeenEntries = 5_000;
-    private readonly ConcurrentDictionary<Guid, Channel<RfwCard>> _subscribers = new();
+    private readonly ConcurrentDictionary<Guid, (string? SessionId, Channel<RfwCard> Channel)> _subscribers = new();
     private readonly HashSet<string> _seen = new();
     private readonly Queue<string> _seenOrder = new();
     private readonly object _seenLock = new();
@@ -23,11 +23,11 @@ public sealed class HomeFeedBus(IClusterClient? clusterClient = null, ILogger<Ho
     private readonly ILogger<HomeFeedBus>? _logger = logger;
     private IAsyncStream<RfwCard>? _stream;
 
-    public Subscription Subscribe()
+    public Subscription Subscribe(string? sessionId = null)
     {
         var id = Guid.NewGuid();
         var channel = Channel.CreateUnbounded<RfwCard>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
-        _subscribers[id] = channel;
+        _subscribers[id] = (sessionId, channel);
         return new Subscription(this, id, channel);
     }
 
@@ -35,8 +35,12 @@ public sealed class HomeFeedBus(IClusterClient? clusterClient = null, ILogger<Ho
     public void FanLocal(RfwCard card)
     {
         if (IsDuplicate(card)) return;
-        foreach (var (_, channel) in _subscribers)
-            channel.Writer.TryWrite(card);
+        foreach (var (_, subscriber) in _subscribers)
+        {
+            if (card.SessionId is not null && !string.Equals(card.SessionId, subscriber.SessionId, StringComparison.Ordinal))
+                continue;
+            subscriber.Channel.Writer.TryWrite(card);
+        }
     }
 
     public void Broadcast(RfwCard card)
