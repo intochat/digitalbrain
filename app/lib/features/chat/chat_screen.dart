@@ -55,7 +55,7 @@ class _ChatScreenState extends State<ChatScreen> {
     'sqlite3',
   };
 
-  final String _sessionId = 'chat-${Random().nextInt(1 << 31)}';
+  final String _clientId = 'chat-${Random().nextInt(1 << 31)}';
   final RfwRuntimeHost _rfwHost = RfwRuntimeHost();
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
@@ -99,7 +99,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final client = widget._debugClientFactory?.call() ?? _buildRealClient();
       final sub = client
-          .watchHomeFeed(gw.WatchHomeFeedRequest())
+          .watchHomeFeed(gw.WatchHomeFeedRequest(clientId: _clientId))
           .listen(_onCard, onError: _onFeedError);
       final authSub = client
           .watchSynapses(authUrlWatchRequest())
@@ -133,7 +133,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onCard(gw.RfwCardEnvelope envelope) {
     if (!mounted) return;
     final data = _decode(envelope.dataJson);
-    if (data['role'] != 'assistant' || data['sessionId'] != _sessionId) return;
+    if (data['role'] != 'assistant') return;
     final tree = data['tree'] as Map<String, Object?>?;
     if (tree == null) return;
     setState(() {
@@ -166,7 +166,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final envelope = gw.SynapseEnvelope()
       ..typeName = 'InoRequest'
       ..payload = utf8.encode(
-        jsonEncode({'prompt': text, 'sessionId': _sessionId}),
+        jsonEncode({'prompt': text, 'clientId': _clientId}),
       );
     client.send(envelope).catchError((Object error) {
       if (!mounted) return null;
@@ -254,7 +254,7 @@ class _ChatScreenState extends State<ChatScreen> {
         path: '/upload',
       );
       final request = http.MultipartRequest('POST', uri)
-        ..fields['sessionId'] = _sessionId
+        ..fields['clientId'] = _clientId
         ..files.add(
           http.MultipartFile.fromBytes('file', bytes, filename: fileName),
         );
