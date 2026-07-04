@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pbgrpc.dart';
@@ -48,6 +49,7 @@ class _LivingCanvasScreenState extends State<LivingCanvasScreen> {
   StreamSubscription<gw.RfwCardEnvelope>? _homeFeedSub;
   StreamController<ui.UiInputSynapse>? _uiInput;
   StreamSubscription<ui.UiStateSignal>? _uiSessionSub;
+  final String _clientId = 'canvas-${Random().nextInt(1 << 31)}';
 
   // Fallback / Initial templates in case of offline launch or silo restarts
   static const _fallbackTemplates = {
@@ -236,17 +238,17 @@ widget root = Panel(
   void _subscribeHomeFeedPanels() {
     final client = _client;
     if (client == null) return;
-    _homeFeedSub = client.watchHomeFeed(gw.WatchHomeFeedRequest()).listen((
-      env,
-    ) {
-      // Only neuron UI surfaces become floating panels. Raw `synapse-broadcast`
-      // traces and observer feeds carry no renderable surface
-      // and share a correlationId with the surface card — without this filter
-      // they spawn empty "No surface" panels and clobber the real surface.
-      if (!_isRenderableSurface(env)) return;
-      _panels.upsertFromEnvelope(env);
-      _panels.saveLayout();
-    }, onError: (_) {});
+    _homeFeedSub = client
+        .watchHomeFeed(gw.WatchHomeFeedRequest(clientId: _clientId))
+        .listen((env) {
+          // Only neuron UI surfaces become floating panels. Raw `synapse-broadcast`
+          // traces and observer feeds carry no renderable surface
+          // and share a correlationId with the surface card — without this filter
+          // they spawn empty "No surface" panels and clobber the real surface.
+          if (!_isRenderableSurface(env)) return;
+          _panels.upsertFromEnvelope(env);
+          _panels.saveLayout();
+        }, onError: (_) {});
   }
 
   // A card is renderable iff it ships RFW `source` or a `{name,...}` ui-layout
