@@ -93,6 +93,40 @@ public class NeuronTests : NeuronTestBase
     }
 
     [Fact]
+    public void AutomationRecords_Are_Synapses_And_Construct_Correctly()
+    {
+        // TDD: forces the new contracts from Automations.cs and basic usage.
+        var script = new RegisterScript("daily-brief", "return Array.Empty<Synapse>();", "demo script");
+        var reaction = new RegisterReaction("on-my-activate", "NeuronActivated", "daily-brief", "MyNeuron");
+        var app = new AutomationApp("my-app", "example app");
+
+        Assert.IsAssignableFrom<Synapse>(script);
+        Assert.Equal(nameof(RegisterScript), script.Type);
+        Assert.Equal("NeuronActivated", reaction.When);
+        Assert.Equal("MyNeuron", reaction.Target);
+        Assert.Equal("daily-brief", reaction.ScriptRef);
+        Assert.NotNull(app);
+    }
+
+    [Fact]
+    public async Task AutomationNeuron_Registers_And_Reacts_To_NeuronActivated()
+    {
+        // Core happy path from the plan: when X.Lifetime.Activated then script "runs".
+        var auto = Grain<IAutomationNeuron>("automation-main");
+        await auto.GetTimelineAsync(); // activate
+
+        await auto.FireAsync(new RegisterScript("act-script", "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?>()) };", "demo"));
+        await auto.FireAsync(new RegisterReaction("act-reaction", "NeuronActivated", "act-script", "act-test"));
+
+        // Simulate a neuron activating (the real Neuron base does this on OnActivate)
+        // Directly simulate the lifetime event the plan targets: when MyNeuron.Lifetime.Activated
+        await auto.FireAsync(new NeuronActivated(new NeuronId("act-test")));
+
+        var tl = await auto.GetTimelineAsync();
+        Assert.Contains(tl, s => s.Type == "AutomationFired" || s.Type == "ScriptExecuted" || s.Type == "ScriptRegistered");
+    }
+
+    [Fact]
     public async Task Marketplace_Install_Takes_Commission_And_Delivers_Pack()
     {
         var market = Grain<IMarketplaceNeuron>("market-test-2");

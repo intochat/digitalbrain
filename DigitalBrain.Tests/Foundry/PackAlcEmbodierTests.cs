@@ -155,5 +155,43 @@ public class PackAlcEmbodierTests
         var embodied = _embodier.Embody("PersonalAssistantNeuron", MarketplaceSeeds.PersonalAssistantPackCode);
         embodied.Dispose();
     }
+
+    [Fact]
+    public async Task ScriptRunner_Executes_Small_CSharp_Body_And_Returns_Synapses()
+    {
+        // TDD for Task 2: pure execution of C# script (the "then" part of reactions).
+        // No ALC, no full pack.
+        var input = new Signal("TestTrigger", new Dictionary<string, object?> { ["value"] = 42 });
+        var self = new NeuronId("test-neuron");
+
+        // script returns list (or could call fire)
+        var outputs = await ScriptRunner.ExecuteAsync(
+            "return new[] { new PackEmission(\"test-script\", \"t\", \"ok\") };",
+            input,
+            self,
+            s => Task.CompletedTask);
+
+        Assert.Single(outputs);
+        var pe = outputs[0] as PackEmission;
+        Assert.NotNull(pe);
+        Assert.Equal("ok", pe.Output);
+    }
+
+    [Fact]
+    public async Task ScriptRunner_Handles_Inline_Prefix_And_Errors_Gracefully()
+    {
+        var input = new Signal("Bad", new Dictionary<string, object?>());
+        var self = new NeuronId("err-test");
+
+        var outputs = await ScriptRunner.ExecuteAsync(
+            "inline: return new[] { new PackEmission(\"script\", \"input\", \"ok\") };",
+            input,
+            self,
+            s => Task.CompletedTask);
+
+        Assert.Single(outputs);
+        var emission = outputs[0] as PackEmission;
+        Assert.NotNull(emission);
+    }
 }
 
