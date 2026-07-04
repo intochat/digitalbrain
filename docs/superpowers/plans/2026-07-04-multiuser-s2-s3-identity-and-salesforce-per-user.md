@@ -1697,3 +1697,21 @@ git commit -m "test(salesforce): prove two-user OAuth flows never cross-contamin
 - [ ] Run the full suite: `dotnet test`
 - [ ] Grep for stale hardcoded Salesforce singleton keys that should no longer exist in production code paths: `grep -rn "salesforce-auth-main\|salesforce-main" DigitalBrain.Kernel/` — expect zero hits outside of comments/docs.
 - [ ] Per this repo's standing instruction: run the Aspire integration path (`aspire run` / the Aspire MCP tools) and confirm the app still boots and the Salesforce "Connect" button + Home feed both work end-to-end before considering this plan complete.
+
+## Known Limitations
+
+This plan assumes a **greenfield deployment** with no pre-existing Salesforce OAuth tokens stored under
+the old shared `"default"`/`"salesforce"` pack-config scope. `SalesforceApiClientFactory`/
+`SalesforceClientFactory.GetMergedScopedValuesAsync` merge the shared `PackConfigScopes.App` ("default")
+scope as the base for every user's credential check/CRM client, overlaying that user's own
+`PackConfigScopes.ForUser(userId)` tokens on top. Before this plan, a completed OAuth flow wrote its
+tokens into that same shared "default" scope (the pre-S3 singleton model). If any installation had a
+user complete a real Salesforce OAuth flow before this plan shipped, that leftover `access_token` would
+still be sitting in the shared "default" scope after upgrade — and would leak into every OTHER user's
+merged credential view until that other user completes their own OAuth, since the merge always starts
+from the shared App-scope base. `SalesforceAppConfigSeeder.cs` only ever merges connected-app fields
+(client ID/secret/login URL) into that scope; it never clears old token keys, so nothing today purges
+this automatically. A future migration would need to purge the `access_token`/`refresh_token`/
+`instance_url` keys from the shared "default" scope on upgrade. Confirmed not applicable to this
+installation at time of shipping (2026-07-04) — no user had completed a real Salesforce OAuth flow
+through the old singleton model before this plan landed.

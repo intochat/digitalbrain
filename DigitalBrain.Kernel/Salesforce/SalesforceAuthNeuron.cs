@@ -122,9 +122,20 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         var appValues = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
         var pending = await store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName);
 
-        if (pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) &&
-            !string.IsNullOrWhiteSpace(expectedState) &&
-            !string.Equals(expectedState, callback.State, StringComparison.Ordinal))
+        // No pending flow at all (e.g. the "salesforce-auth-unknown" routing sentinel, or any per-user
+        // grain that never started a flow) must reject immediately rather than fall through to a token
+        // exchange that has no PKCE code_verifier to present — an explicit CSRF gate, not an incidental
+        // failure that only happens to occur because the real Salesforce token endpoint would reject it.
+        if (!pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) ||
+            string.IsNullOrWhiteSpace(expectedState))
+        {
+            return new SalesforceOAuthCallbackResult(
+                false,
+                "Salesforce login failed",
+                "The callback state did not match the pending login.");
+        }
+
+        if (!string.Equals(expectedState, callback.State, StringComparison.Ordinal))
         {
             return new SalesforceOAuthCallbackResult(
                 false,

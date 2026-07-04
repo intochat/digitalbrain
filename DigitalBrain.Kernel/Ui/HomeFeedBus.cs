@@ -8,8 +8,9 @@ using Orleans.Streams;
 namespace DigitalBrain.Kernel.Ui;
 
 // Singleton fanout for RfwCards — the server-driven-UI backbone. Each WatchHomeFeed gRPC subscriber opens its own
-// unbounded channel; neurons broadcast RfwCards to all subscribers. A bounded content-hash dedup window avoids
-// re-pushing identical cards.
+// unbounded channel; unaddressed cards (null SessionId) reach every subscriber, while cards addressed to a
+// specific SessionId reach only the matching subscriber. A bounded content-hash dedup window avoids re-pushing
+// identical cards.
 // With multiple HA silo replicas, Broadcast publishes to a shared Orleans MemoryStream ("HomeFeed") so every silo's
 // HomeFeedStreamSubscriber picks it up and fans it locally — delivering to clients connected to any replica.
 public sealed class HomeFeedBus(IClusterClient? clusterClient = null, ILogger<HomeFeedBus>? logger = null)
