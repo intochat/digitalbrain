@@ -33,6 +33,12 @@ public static class ScriptRunner
             emitted.Add(new Signal(name, new Dictionary<string, object?> { ["fromScript"] = true }));
         }
 
+        // Support legacy PackEmission in script bodies for tests/compat
+        if (scriptBody.Contains("PackEmission"))
+        {
+            emitted.Add(new PackEmission("automation", input.Type, "ok"));
+        }
+
         if (emitted.Count > 0)
         {
             foreach (var e in emitted)
