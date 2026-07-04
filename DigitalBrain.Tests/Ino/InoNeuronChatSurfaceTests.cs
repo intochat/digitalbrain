@@ -75,7 +75,7 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
         var surface = Assert.Single((await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>());
         Assert.Equal(ConfigFormSurface.Kind, surface.Kind);
         Assert.Equal("salesforce", surface.Props["pack"]);
-        Assert.Equal("session-salesforce-auth", surface.Props["sessionId"]);
+        Assert.Equal("session-salesforce-auth", surface.Props["clientId"]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         var fields = FindNodes(tree)
@@ -260,7 +260,7 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
         Assert.Contains(surfaces, surface =>
             surface.Kind == ConfigFormSurface.Kind &&
             Equals(surface.Props["pack"], SalesforceClientFactory.PackName) &&
-            Equals(surface.Props["sessionId"], "session-salesforce-invalid"));
+            Equals(surface.Props["clientId"], "session-salesforce-invalid"));
     }
 
     private static string FlattenText(UiWidgetTree tree)

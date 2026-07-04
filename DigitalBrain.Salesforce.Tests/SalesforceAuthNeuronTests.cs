@@ -25,14 +25,14 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test");
         await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-1"
+            ["clientId"] = "session-1"
         })
         { Receiver = new NeuronId("salesforce-auth-test") });
 
         var outgoing = await auth.GetOutgoingTimelineAsync();
         var form = Assert.Single(outgoing.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
         Assert.Equal(SalesforceClientFactory.PackName, form.Props["pack"]);
-        Assert.Equal("session-1", form.Props["sessionId"]);
+        Assert.Equal("session-1", form.Props["clientId"]);
 
         var tree = Assert.IsType<UiWidgetTree>(form.Props["tree"]);
         var fields = FindNodes(tree)
@@ -60,7 +60,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test");
         await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-oauth",
+            ["clientId"] = "session-oauth",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
             [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
         })
@@ -83,7 +83,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test");
         await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-oauth-missing",
+            ["clientId"] = "session-oauth-missing",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
             [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
         })
@@ -91,7 +91,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
 
         var outgoing = await auth.GetOutgoingTimelineAsync();
         var form = Assert.Single(outgoing.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
-        Assert.Equal("session-oauth-missing", form.Props["sessionId"]);
+        Assert.Equal("session-oauth-missing", form.Props["clientId"]);
 
         var tree = Assert.IsType<UiWidgetTree>(form.Props["tree"]);
         Assert.Contains("Salesforce OAuth is not configured", FlattenText(tree));
@@ -106,7 +106,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test-race");
         await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-race",
+            ["clientId"] = "session-race",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
             [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
         })
@@ -133,7 +133,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test-complete");
         await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-complete",
+            ["clientId"] = "session-complete",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
             [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
         })
@@ -170,7 +170,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test-mismatch");
         await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-mismatch",
+            ["clientId"] = "session-mismatch",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
             [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
         })
