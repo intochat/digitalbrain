@@ -7,72 +7,63 @@ using Orleans.Streams;
 
 namespace DigitalBrain.Kernel.Ui;
 
-// Singleton fanout for RfwCards — the server-driven-UI backbone. Each WatchHomeFeed gRPC subscriber opens its own
-// unbounded channel; unaddressed cards (null SessionId) reach every subscriber, while cards addressed to a
-// specific SessionId reach only the matching subscriber. A bounded content-hash dedup window avoids re-pushing
-// identical cards.
-// With multiple HA silo replicas, Broadcast publishes to a shared Orleans MemoryStream ("HomeFeed") so every silo's
-// HomeFeedStreamSubscriber picks it up and fans it locally — delivering to clients connected to any replica.
-public sealed class HomeFeedBus(IClusterClient? clusterClient = null, ILogger<HomeFeedBus>? logger = null)
+// Server-driven-UI backbone. Broadcast publishes an RfwCard onto an Orleans stream keyed by the card's
+// ClientId (or a well-known unaddressed key when ClientId is null); Orleans's own pub-sub delivers it to
+// exactly the WatchHomeFeed connections subscribed to that key, cluster-wide, regardless of which silo
+// published it or which silo the subscriber is attached to. Each WatchHomeFeed call subscribes directly to
+// its own client stream plus the shared unaddressed stream via SubscribeAsync — there is no in-process
+// subscriber registry and no per-silo relay; Orleans tracks who is listening.
+public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBus>? logger = null)
 {
     private const int MaxSeenEntries = 5_000;
-    private readonly ConcurrentDictionary<Guid, (string? SessionId, Channel<RfwCard> Channel)> _subscribers = new();
+    private static readonly Guid UnaddressedKey = Guid.Empty;
     private readonly HashSet<string> _seen = new();
     private readonly Queue<string> _seenOrder = new();
     private readonly object _seenLock = new();
-    private readonly IClusterClient? _clusterClient = clusterClient;
-    private readonly ILogger<HomeFeedBus>? _logger = logger;
-    private IAsyncStream<RfwCard>? _stream;
-
-    public Subscription Subscribe(string? sessionId = null)
-    {
-        var id = Guid.NewGuid();
-        var channel = Channel.CreateUnbounded<RfwCard>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
-        _subscribers[id] = (sessionId, channel);
-        return new Subscription(this, id, channel);
-    }
-
-    // Called by HomeFeedStreamSubscriber on each silo to fan a received stream card to local gRPC subscribers.
-    public void FanLocal(RfwCard card)
-    {
-        if (IsDuplicate(card)) return;
-        foreach (var (_, subscriber) in _subscribers)
-        {
-            // TEMPORARY fail-open: addressing is only enforced once the SUBSCRIBER itself has registered a
-            // real session. No client does yet (WatchHomeFeed is opened once at app startup, before login,
-            // and the client never learns/forwards its real session afterward) — see docs/superpowers/plans/
-            // 2026-07-04-multiuser-s2-s3-identity-and-salesforce-per-user.md, "Known Limitations". A
-            // no-session subscriber sees every card (matching pre-existing behavior); a subscriber that DOES
-            // register a real session still only sees unaddressed cards plus its own.
-            if (subscriber.SessionId is not null && card.SessionId is not null &&
-                !string.Equals(card.SessionId, subscriber.SessionId, StringComparison.Ordinal))
-                continue;
-            subscriber.Channel.Writer.TryWrite(card);
-        }
-    }
 
     public void Broadcast(RfwCard card)
     {
-        if (_clusterClient is null)
-        {
-            // Single-silo / test fallback: fan directly to local subscribers (old behavior).
-            FanLocal(card);
-            return;
-        }
+        if (IsDuplicate(card)) return;
+
+        var streamId = card.ClientId is null
+            ? StreamId.Create("homefeed", UnaddressedKey)
+            : StreamId.Create("homefeed", card.ClientId);
 
         _ = Task.Run(async () =>
         {
-            try { await GetOrCreateStream().OnNextAsync(card); }
-            catch (Exception ex) { _logger?.LogError(ex, "HomeFeed stream publish failed"); }
+            try
+            {
+                await clusterClient.GetStreamProvider("HomeFeed").GetStream<RfwCard>(streamId).OnNextAsync(card);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "HomeFeed stream publish failed for clientId={ClientId}", card.ClientId);
+            }
         });
     }
 
-    private IAsyncStream<RfwCard> GetOrCreateStream()
+    // One subscription per WatchHomeFeed gRPC call: the caller's own personal stream (only if it supplied a
+    // clientId) plus the shared unaddressed stream every connection receives. DisposeAsync unsubscribes both.
+    public async Task<Subscription> SubscribeAsync(string? clientId)
     {
-        if (_stream is not null) return _stream;
-        var provider = _clusterClient!.GetStreamProvider("HomeFeed");
-        _stream = provider.GetStream<RfwCard>(StreamId.Create("homefeed", Guid.Empty));
-        return _stream;
+        var channel = Channel.CreateUnbounded<RfwCard>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        var provider = clusterClient.GetStreamProvider("HomeFeed");
+
+        Task OnCard(RfwCard card, StreamSequenceToken _)
+        {
+            channel.Writer.TryWrite(card);
+            return Task.CompletedTask;
+        }
+
+        var unaddressedHandle = await provider.GetStream<RfwCard>(StreamId.Create("homefeed", UnaddressedKey)).SubscribeAsync(OnCard);
+
+        StreamSubscriptionHandle<RfwCard>? personalHandle = null;
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            personalHandle = await provider.GetStream<RfwCard>(StreamId.Create("homefeed", clientId)).SubscribeAsync(OnCard);
+        }
+
+        return new Subscription(channel, unaddressedHandle, personalHandle);
     }
 
     private bool IsDuplicate(RfwCard card)
@@ -91,14 +82,19 @@ public sealed class HomeFeedBus(IClusterClient? clusterClient = null, ILogger<Ho
     private static string ContentHash(RfwCard card) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{card.LibraryName}|{card.RootWidget}|{card.DataJson}")));
 
-    public sealed class Subscription(HomeFeedBus owner, Guid id, Channel<RfwCard> channel) : IDisposable
+    public sealed class Subscription(
+        Channel<RfwCard> channel,
+        StreamSubscriptionHandle<RfwCard> unaddressedHandle,
+        StreamSubscriptionHandle<RfwCard>? personalHandle) : IAsyncDisposable
     {
         public ChannelReader<RfwCard> Reader { get; } = channel.Reader;
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            if (owner._subscribers.TryRemove(id, out _))
-                channel.Writer.TryComplete();
+            await unaddressedHandle.UnsubscribeAsync();
+            if (personalHandle is not null)
+                await personalHandle.UnsubscribeAsync();
+            channel.Writer.TryComplete();
         }
     }
 }

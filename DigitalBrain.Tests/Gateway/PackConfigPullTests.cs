@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
+using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Gateway;
 
@@ -25,6 +26,12 @@ public class PackConfigPullTests : NeuronTestBase
 {
     private readonly SignalEgressBus _egressBus = new();
     private readonly IPackConfigStore _configStore = BuildConfigStore();
+    private HomeFeedBus? _homeFeedBusInstance;
+
+    // Lazily resolved via the silo's own DI container (HomeFeedBus now requires a real IClusterClient, only
+    // available once the cluster has finished starting — see GatewayServiceTests for the same pattern).
+    private HomeFeedBus HomeFeedBus => _homeFeedBusInstance ??=
+        ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
 
     protected override void ConfigureSilo(ISiloBuilder builder) => builder
         .AddMemoryGrainStorageAsDefault()
@@ -52,7 +59,7 @@ public class PackConfigPullTests : NeuronTestBase
     }
 
     private GatewayService NewService() =>
-        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), new HomeFeedBus(),
+        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), HomeFeedBus,
             _egressBus, new FakeHostEnvironment(), NullLogger<GatewayService>.Instance, _configStore);
 
     // A production-equivalent service whose GetPackConfig gate is armed with a configured InternalServiceKey.
@@ -61,7 +68,7 @@ public class PackConfigPullTests : NeuronTestBase
             new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:InternalServiceKey"] = internalKey })
                 .Build(),
-            new HomeFeedBus(), _egressBus, new FakeHostEnvironment("Production"),
+            HomeFeedBus, _egressBus, new FakeHostEnvironment("Production"),
             NullLogger<GatewayService>.Instance, _configStore);
 
     private async Task StoreConfigAsync(GatewayService svc)

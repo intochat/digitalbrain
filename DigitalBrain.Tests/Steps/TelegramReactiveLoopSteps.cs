@@ -41,8 +41,14 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
     private const string PackName = "TelegramResponderNeuron";
     private const string Scope = "telegram-loop-user";
     private string? _configScope;
+    private HomeFeedBus? _homeFeedBusInstance;
 
     private SignalEgressBus.Subscription? _egressSubscription;
+
+    // Lazily resolved via the silo's own DI container (HomeFeedBus now requires a real IClusterClient, only
+    // available once the cluster has finished starting — see GatewayServiceTests for the same pattern).
+    private HomeFeedBus HomeFeedBus => _homeFeedBusInstance ??=
+        ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
 
     [BeforeScenario("reactiveloop")]
     public Task BeforeScenarioAsync()
@@ -116,7 +122,7 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
         var gateway = new GatewayService(
             Cluster.GrainFactory,
             new ConfigurationBuilder().Build(),
-            new HomeFeedBus(),
+            HomeFeedBus,
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance,
@@ -255,10 +261,16 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
     private const string WatcherPackName   = "KeywordWatcherNeuron";
     private const string N1Scope           = "n1-reactivity-user";
     private string? _configScope;
+    private HomeFeedBus? _homeFeedBusInstance;
 
     // Signals collected from the egress bus in arrival order; both Then-steps read from this list.
     private readonly List<Signal> _collectedSignals = new();
     private SignalEgressBus.Subscription? _egressSubscription;
+
+    // Lazily resolved via the silo's own DI container (HomeFeedBus now requires a real IClusterClient, only
+    // available once the cluster has finished starting — see GatewayServiceTests for the same pattern).
+    private HomeFeedBus HomeFeedBus => _homeFeedBusInstance ??=
+        ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
 
     [BeforeScenario("n1")]
     public Task BeforeScenarioAsync()
@@ -300,7 +312,7 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
         var gateway = new GatewayService(
             Cluster.GrainFactory,
             new ConfigurationBuilder().Build(),
-            new HomeFeedBus(),
+            HomeFeedBus,
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance,

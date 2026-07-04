@@ -96,7 +96,13 @@ class SynapseEnvelope extends $pb.GeneratedMessage {
 }
 
 class WatchHomeFeedRequest extends $pb.GeneratedMessage {
-  factory WatchHomeFeedRequest() => create();
+  factory WatchHomeFeedRequest({
+    $core.String? clientId,
+  }) {
+    final result = create();
+    if (clientId != null) result.clientId = clientId;
+    return result;
+  }
 
   WatchHomeFeedRequest._();
 
@@ -111,6 +117,7 @@ class WatchHomeFeedRequest extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'WatchHomeFeedRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain'),
       createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'clientId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -131,6 +138,15 @@ class WatchHomeFeedRequest extends $pb.GeneratedMessage {
   static WatchHomeFeedRequest getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<WatchHomeFeedRequest>(create);
   static WatchHomeFeedRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get clientId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set clientId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasClientId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearClientId() => $_clearField(1);
 }
 
 class WatchSynapsesRequest extends $pb.GeneratedMessage {

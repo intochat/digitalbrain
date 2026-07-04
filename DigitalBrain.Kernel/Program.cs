@@ -71,9 +71,9 @@ builder.Services.AddCors(options => options.AddPolicy("browser", policy => polic
     .AllowAnyHeader()
     .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding")));
 
-// Server-driven UI fanout: neurons broadcast RfwCards; WatchHomeFeed gRPC subscribers stream them.
-// The per-silo HomeFeedStreamSubscriber (wired into the silo below) re-fans cards from the shared Orleans
-// MemoryStream so cards broadcast on any silo reach all replicas.
+// Server-driven UI fanout: neurons broadcast RfwCards; each WatchHomeFeed gRPC call subscribes directly to
+// its own per-clientId Orleans stream plus the shared unaddressed stream (see HomeFeedBus.SubscribeAsync) —
+// Orleans's own pub-sub delivers cross-silo, no per-silo relay needed.
 builder.Services.AddSingleton<HomeFeedBus>();
 
 // Signal egress fanout: neurons broadcast Signals on the timeline; WatchSynapses gRPC subscribers stream them
@@ -206,7 +206,6 @@ builder.UseOrleans(siloBuilder =>
     siloBuilder.AddMemoryStreams("HomeFeed");
     siloBuilder.AddMemoryStreams("DigitalBrainTimeline");
     siloBuilder.AddMemoryGrainStorage("PubSubStore");
-    siloBuilder.ConfigureServices(services => services.AddHomeFeedStreamSubscriber());
     siloBuilder.ConfigureServices(services => services.AddSignalEgressStreamSubscriber());
     siloBuilder.AddFoundry();
 });

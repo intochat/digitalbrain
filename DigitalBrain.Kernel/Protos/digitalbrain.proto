@@ -38,7 +38,7 @@ message SynapseEnvelope {
 }
 
 message WatchHomeFeedRequest {
-  string session_id = 1;
+  string client_id = 1;
 }
 message RfwCardEnvelope {
   string correlation_id = 1;
