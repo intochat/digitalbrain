@@ -15,6 +15,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
 {
     private Dictionary<string, string> _scripts = new(StringComparer.OrdinalIgnoreCase);
     private List<RegisterReaction> _reactions = new();
+    private Dictionary<string, int> _execCounts = new(StringComparer.OrdinalIgnoreCase);
 
     protected override bool ShouldSubscribeToTimeline => true;
 
@@ -63,6 +64,9 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 await FireAsync(new Signal("ReactionRemoved", new Dictionary<string, object?> { ["id"] = rm.Id }));
                 await EmitAutomationsSurfaceAsync();
                 return;
+            case PromoteAutomationToPack promo:
+                await HandlePromoteAsync(promo);
+                return;
         }
 
         await TryExecuteMatchingAsync(synapse);
@@ -86,6 +90,8 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
 
             Logger.LogInformation("Automation executing reaction {ReactionId} (when={When}) with script {ScriptRef}", reaction.Id, reaction.When, reaction.ScriptRef);
 
+            _execCounts[reaction.Id] = _execCounts.GetValueOrDefault(reaction.Id) + 1;
+
             var outputs = await Foundry.ScriptRunner.ExecuteAsync(
                 code,
                 synapse,
@@ -108,25 +114,27 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
             {
                 await FireAsync(StampCurrent(output));
             }
+
+            await EmitAutomationsSurfaceAsync();
         }
     }
 
     private static bool IsMatch(RegisterReaction r, Synapse s)
     {
         if (string.IsNullOrEmpty(r.When) || r.When == "*")
-            return TargetMatches(r.Target, s);
+            return TargetMatches(r.Target, s) && ScopeMatches(r.Scope, s);
 
         if (r.When.Equals("NeuronActivated", StringComparison.OrdinalIgnoreCase) && s is NeuronActivated na)
-            return TargetMatches(r.Target, na);
+            return TargetMatches(r.Target, na) && ScopeMatches(r.Scope, na);
 
         if (r.When.StartsWith("Signal:", StringComparison.OrdinalIgnoreCase) && s is Signal sig)
         {
             var wanted = r.When["Signal:".Length..];
-            return sig.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase) && TargetMatches(r.Target, s);
+            return sig.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase) && TargetMatches(r.Target, s) && ScopeMatches(r.Scope, s);
         }
 
         if (r.When.Equals(s.Type, StringComparison.OrdinalIgnoreCase))
-            return TargetMatches(r.Target, s);
+            return TargetMatches(r.Target, s) && ScopeMatches(r.Scope, s);
 
         return false;
     }
@@ -137,6 +145,17 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         if (s is NeuronActivated na)
             return na.Neuron.Value.Contains(target.Trim('*'), StringComparison.OrdinalIgnoreCase);
         return true;
+    }
+
+    private static bool ScopeMatches(string scope, Synapse s)
+    {
+        if (string.IsNullOrWhiteSpace(scope) || scope == "default") return true;
+        // Coordinate with NeuronScope: for activation, match user prefix of neuron id; for signals look for user in Props
+        if (s is NeuronActivated na && NeuronScope.TryParse(na.Neuron.Value, out var sc))
+            return string.Equals(sc.UserId.Value, scope, StringComparison.OrdinalIgnoreCase) || sc.UserId.Value == "default";
+        if (s is Signal sig && sig.Props != null && sig.Props.TryGetValue("userId", out var u) && u is string us)
+            return string.Equals(us, scope, StringComparison.OrdinalIgnoreCase);
+        return true; // default loose for compat
     }
 
     private void EnsureProjections()
@@ -166,6 +185,8 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                     if (!removes.Contains(r.Id)) _reactions.Add(r);
             }
         }
+
+        // counts stay zero on replay; execution increments live
     }
 
     public async Task<IReadOnlyList<string>> ListActiveScriptsAsync()
@@ -185,8 +206,8 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
     public async Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null)
     {
         var scriptId = id + "-script";
-        await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction"));
-        await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>()));
+        await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction", Array.Empty<string>(), "default"));
+        await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>(), "default"));
     }
 
     public Task<string?> GetScriptCodeAsync(string id)
@@ -204,20 +225,79 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         await EmitAutomationsSurfaceAsync();
     }
 
+    public async Task PromoteToPackAsync(string packName, string version, IReadOnlyList<string> reactionIds, string? ownerId = null)
+    {
+        await FireAsync(new PromoteAutomationToPack(packName, version, reactionIds, ownerId));
+    }
+
+    private async Task HandlePromoteAsync(PromoteAutomationToPack promo)
+    {
+        EnsureProjections();
+        var selected = _reactions.Where(r => promo.ReactionIds.Contains(r.Id)).ToList();
+        // Thin manifest/source stub consumable by pack pipeline / seeds (real pack would synthesize full IPackBehavior + publish).
+        // Flow example: MCP promote_automations_to_pack -> this emits AutomationPromoted + Signal("AutomationCrystallized") with stub -> CodeFoundry or marketplace seeds can consume.
+        var summary = $"Promoted {selected.Count} reactions to {promo.PackName}@{promo.Version}. Reactions: {string.Join(",", selected.Select(r => r.Id))}";
+        var stubCode = $"// Auto-crystallized from automations\n// Reactions: {string.Join(", ", selected.Select(r => r.Id))}\npublic sealed class {promo.PackName}Pack : DigitalBrain.Core.Distribution.IPackBehavior {{ /* TODO: implement from scripts */ public string Respond(string i) => i; }}";
+        await FireAsync(new AutomationPromoted(promo.PackName, promo.Version, summary));
+        // Fire a signal carrying the stub so CodeFoundry or marketplace can pick it up
+        await FireAsync(new Signal("AutomationCrystallized", new Dictionary<string, object?> { ["pack"] = promo.PackName, ["code"] = stubCode }));
+    }
+
+    public Task<IReadOnlyList<ScriptLibraryEntry>> ListScriptLibraryAsync()
+    {
+        EnsureProjections();
+        var entries = new List<ScriptLibraryEntry>();
+        var usage = _reactions.GroupBy(r => r.ScriptRef).ToDictionary(g => g.Key, g => g.Count());
+        foreach (var kv in _scripts)
+        {
+            // Note: full RegisterScript metadata not stored separately; use defaults + usage
+            entries.Add(new ScriptLibraryEntry(kv.Key, kv.Value, "shared library script", Array.Empty<string>(), usage.GetValueOrDefault(kv.Key)));
+        }
+        return Task.FromResult<IReadOnlyList<ScriptLibraryEntry>>(entries);
+    }
+
     private async Task EmitAutomationsSurfaceAsync()
     {
         EnsureProjections();
-        var reactionItems = _reactions
-            .Select(r => $"{r.Id}: when {r.When} -> {r.ScriptRef}")
-            .ToList();
-        var scriptItems = _scripts
-            .Select(kv => $"{kv.Key}: { (kv.Value.Length > 40 ? kv.Value.Substring(0,40) + "..." : kv.Value) }")
+        var now = DateTimeOffset.UtcNow;
+
+        var reactionViews = _reactions
+            .Select(r => new ReactionView(r.Id, r.When, r.ScriptRef, r.Target, _execCounts.GetValueOrDefault(r.Id)))
             .ToList();
 
-        if (reactionItems.Count == 0) reactionItems.Add("No active reactions. Define via MCP or synapses.");
+        var scriptViews = _scripts
+            .Select(kv =>
+            {
+                var used = _reactions.Count(rr => rr.ScriptRef == kv.Key);
+                return new ScriptView(kv.Key, "library script", kv.Value.Length > 60 ? kv.Value[..60] + "..." : kv.Value, used);
+            })
+            .ToList();
 
+        await FireAsync(new AutomationSurface(reactionViews, scriptViews, now));
+
+        // Visual graph foundation (data-only; future UI consumes + emits Register* back)
+        await EmitAutomationGraphSurfaceAsync(reactionViews, scriptViews, now);
+
+        // Also keep lightweight list for timeline consumers that expect ListSurface
+        var reactionItems = _reactions.Any()
+            ? _reactions.Select(r => $"{r.Id}: when {r.When} -> {r.ScriptRef}").ToList()
+            : new List<string> { "No active reactions. Define via MCP or synapses." };
         await FireAsync(new ListSurface("Active Reactions", reactionItems));
-        if (scriptItems.Count > 0)
-            await FireAsync(new ListSurface("Active Scripts (library)", scriptItems));
+    }
+
+    private async Task EmitAutomationGraphSurfaceAsync(IReadOnlyList<ReactionView> reactions, IReadOnlyList<ScriptView> scripts, DateTimeOffset now)
+    {
+        var nodes = new List<AutomationGraphNode>();
+        var edges = new List<AutomationGraphEdge>();
+        foreach (var s in scripts)
+            nodes.Add(new AutomationGraphNode(s.Id, "script", s.Id, new Dictionary<string, object?> { ["preview"] = s.CodePreview }));
+        foreach (var r in reactions)
+        {
+            nodes.Add(new AutomationGraphNode(r.Id, "reaction", $"{r.Id} ({r.When})", new Dictionary<string, object?> { ["when"] = r.When, ["target"] = r.Target }));
+            if (!string.IsNullOrEmpty(r.ScriptRef))
+                edges.Add(new AutomationGraphEdge(r.Id, r.ScriptRef, "uses-script"));
+            edges.Add(new AutomationGraphEdge("timeline", r.Id, $"when:{r.When}"));
+        }
+        await FireAsync(new AutomationGraphSurface("Automations Graph", nodes, edges, now));
     }
 }

@@ -145,6 +145,7 @@ public class NeuronTests : NeuronTestBase
         // Verify Define worked (registration + surface); script execution covered in other tests
         Assert.Contains(tl, s => s.Type == "ReactionRegistered" || s.Type == "ScriptRegistered");
         Assert.Contains(tl, s => s is ListSurface ls && (ls.Title.Contains("Automations") || ls.Title.Contains("Reactions")));
+        Assert.Contains(tl, s => s is AutomationSurface); // dedicated surface for UI
     }
 
     [Fact]
@@ -188,6 +189,18 @@ public class NeuronTests : NeuronTestBase
         Assert.NotNull(installed);
         Assert.Equal("CommPack", installed.Pack.Name);
         Assert.Equal("real code here", installed.Pack.Code);
+    }
+
+    [Fact]
+    public async Task PromoteAndGraphSurface_Work()
+    {
+        var auto = Grain<IAutomationNeuron>("automation-main");
+        await auto.GetTimelineAsync();
+        await auto.DefineReactionAsync("promo-demo", "NeuronActivated", null, "return new[] { new Signal(\"P\", null) };");
+        await auto.PromoteToPackAsync("demo-pack", "0.0.1", new[] { "promo-demo" });
+        var tl = await auto.GetTimelineAsync();
+        Assert.Contains(tl, s => s.Type == nameof(AutomationPromoted) || s.Type == "AutomationCrystallized");
+        Assert.Contains(tl, s => s is AutomationGraphSurface);
     }
 
     [Fact]
