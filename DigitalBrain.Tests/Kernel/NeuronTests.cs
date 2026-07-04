@@ -127,6 +127,25 @@ public class NeuronTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task DefineReactionAsync_Enables_InoStyle_WhenActivatedThenScript()
+    {
+        // Ergonomics for Ino/MCP (plan Task 8): one call for "when X then C#"
+        var auto = Grain<IAutomationNeuron>("automation-main");
+        await auto.GetTimelineAsync();
+
+        await auto.DefineReactionAsync(
+            "brief-on-activate",
+            "NeuronActivated",
+            "personal-assistant",
+            @"if (Synapse is NeuronActivated) { await Fire(new Signal(""DailyBriefGenerated"", new Dictionary<string,object?> { [""source""] = ""activation"" })); }");
+
+        await auto.FireAsync(new NeuronActivated(new NeuronId("personal-assistant")));
+
+        var tl = await auto.GetTimelineAsync();
+        Assert.Contains(tl, s => s.Type == "DailyBriefGenerated");
+    }
+
+    [Fact]
     public async Task Marketplace_Install_Takes_Commission_And_Delivers_Pack()
     {
         var market = Grain<IMarketplaceNeuron>("market-test-2");

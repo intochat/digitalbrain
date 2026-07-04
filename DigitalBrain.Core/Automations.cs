@@ -44,4 +44,8 @@ public interface IAutomationNeuron : INeuron
 {
     Task<IReadOnlyList<string>> ListActiveScriptsAsync();
     Task<IReadOnlyList<string>> ListActiveReactionsAsync();
+
+    /// High-level convenience for Ino/LLM/MCP: define a reaction + inline script body in one call.
+    /// "when MyNeuron.Lifetime.Activated then { C# body }"
+    Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null);
 }

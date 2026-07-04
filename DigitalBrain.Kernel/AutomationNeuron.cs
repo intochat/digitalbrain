@@ -69,16 +69,31 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
             if (!_scripts.TryGetValue(reaction.ScriptRef, out var code) &&
                 !reaction.ScriptRef.StartsWith("inline:", StringComparison.OrdinalIgnoreCase))
             {
+                Logger.LogWarning("Script ref '{Ref}' not found for reaction {ReactionId}", reaction.ScriptRef, reaction.Id);
                 continue;
             }
 
             code ??= reaction.ScriptRef;
+
+            Logger.LogInformation("Automation executing reaction {ReactionId} (when={When}) with script {ScriptRef}", reaction.Id, reaction.When, reaction.ScriptRef);
 
             var outputs = await Foundry.ScriptRunner.ExecuteAsync(
                 code,
                 synapse,
                 Self,
                 s => FireAsync(StampCurrent(s)).AsTask());
+
+            // Light declared-emits enforcement (plan Task 9)
+            if (reaction.DeclaredEmits != null && reaction.DeclaredEmits.Count > 0)
+            {
+                foreach (var o in outputs)
+                {
+                    if (!reaction.DeclaredEmits.Any(d => d == o.Type || d == "*"))
+                    {
+                        Logger.LogWarning("Reaction {Id} emitted undeclared type {Type} (declared: {Declared})", reaction.Id, o.Type, string.Join(",", reaction.DeclaredEmits));
+                    }
+                }
+            }
 
             foreach (var output in outputs)
             {
@@ -143,5 +158,12 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
     {
         EnsureProjections();
         return Task.FromResult((IReadOnlyList<string>)_reactions.Select(r => r.Id).ToList());
+    }
+
+    public async Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null)
+    {
+        var scriptId = id + "-script";
+        await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction"));
+        await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>()));
     }
 }
