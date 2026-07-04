@@ -370,7 +370,25 @@ if (grainFactory != null)
                 await grainFactory.GetGrain<ILlmResponderNeuron>(ILlmResponderNeuron.SingletonKey).GetTimelineAsync();
 
                 // AutomationNeuron must be warmed so it receives NeuronActivated and other timeline events.
-                await grainFactory.GetGrain<IAutomationNeuron>("automation-main").GetTimelineAsync();
+                var automation = grainFactory.GetGrain<IAutomationNeuron>("automation-main");
+                await automation.GetTimelineAsync();
+
+                // Seed a couple of example automations for immediate value (priority 3)
+                // Users/Ino can define more via MCP tools or direct synapses.
+                await automation.DefineReactionAsync(
+                    "demo-on-activation",
+                    "NeuronActivated",
+                    null,
+                    "return new[] { new Signal(\"DemoAutomationFired\", new Dictionary<string,object?> { [\"note\"] = \"system wrote this on activation\" }) };"
+                );
+
+                // Another example: react to any Signal with name "TestSignal"
+                await automation.DefineReactionAsync(
+                    "demo-signal-reactor",
+                    "Signal:TestSignal",
+                    null,
+                    "return new[] { new Signal(\"SignalHandled\", new Dictionary<string,object?> { [\"original\"] = \"TestSignal\" }) };"
+                );
 
                 // MarketDataNeuron has the same activate-before-broadcast requirement as ILlmResponderNeuron
                 // above: it's an IHandle<Signal> grain that filters Signal("CheckBitcoinPrice") off the

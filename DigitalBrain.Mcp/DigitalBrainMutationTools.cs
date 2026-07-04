@@ -93,6 +93,39 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         return "Cluster activity sent for 3D visualization.";
     }
 
+    [McpServerTool(Name = "define_reaction"), Description("Define or update a reactive automation: when a condition happens, run the given small C# script body. Supports 'NeuronActivated', 'Signal:XXX', etc.")]
+    public async Task<string> DefineReaction(
+        [Description("Unique id for the reaction")] string id,
+        [Description("Condition e.g. 'NeuronActivated' or 'Signal:MySignal'")] string when,
+        [Description("Optional target neuron key (e.g. 'personal-assistant') or null for any")] string? target,
+        [Description("The C# script body to execute (can use await Fire(new Signal(...)))")] string scriptCode)
+    {
+        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
+        await auto.DefineReactionAsync(id, when, target, scriptCode);
+        return $"Defined reaction '{id}' (when={when}, target={target ?? "any"}). Script will run on match.";
+    }
+
+    [McpServerTool(Name = "list_automations"), Description("List currently active reactions and scripts. Supports reuse by script id.")]
+    public async Task<string> ListAutomations()
+    {
+        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
+        var reactions = await auto.ListActiveReactionsAsync();
+        var scripts = await auto.ListActiveScriptsAsync();
+        var details = new System.Text.StringBuilder();
+        details.AppendLine("Active reactions:");
+        foreach (var r in reactions)
+        {
+            details.AppendLine($"  - {r}");
+        }
+        details.AppendLine("Active scripts (reusable by id):");
+        foreach (var s in scripts)
+        {
+            var code = await auto.GetScriptCodeAsync(s);  // for library view
+            details.AppendLine($"  - {s}: {(code?.Length > 50 ? code.Substring(0,50) + "..." : code)}");
+        }
+        return details.ToString();
+    }
+
     [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]
     public async Task<string> RunClosedLoop(
         [Description("Loop type: ui | se")] string loopType,

@@ -1,15 +1,15 @@
-using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
 
 namespace DigitalBrain.Kernel.Foundry;
 
-/// Lightweight C# script executor for reactive automations.
-/// The 'code' is real small C# (as written by author or LLM).
-/// Current execution emulates common patterns from the source (new Signal(...), PackEmission)
-/// so bodies in reactions produce the intended effects.
-/// (Full Microsoft.CodeAnalysis.CSharp.Scripting eval prepared in comments + package; enabled when Roslyn graph fully aligned.)
-/// No ALC, very lightweight.
+/// Real C# script executor for reactive automations (priority 1).
+/// Accepts small C# bodies exactly as written by authors/LLM/Ino.
+/// Supports both `return new[] { ... }` and `await Fire(...)` via narrow globals.
+/// Uses Microsoft.CodeAnalysis.CSharp.Scripting (pinned to 4.8.0 for compatibility).
+/// No collectible ALC (lightweight vs full packs).
 public static class ScriptRunner
 {
     public sealed record ScriptGlobals(
@@ -18,9 +18,17 @@ public static class ScriptRunner
         Func<Synapse, Task> Fire
     );
 
+    private static readonly ScriptOptions _options = ScriptOptions.Default
+        .AddReferences(
+            typeof(Synapse).Assembly,
+            typeof(Signal).Assembly,
+            typeof(NeuronId).Assembly,
+            typeof(PackEmission).Assembly)
+        .AddImports("System", "System.Collections.Generic", "DigitalBrain.Core", "DigitalBrain.Core.Distribution");
+
     /// Executes a small script body.
-    /// Supports "inline:..." prefix or plain body.
-    /// Emulates return new[] { new Signal(...) } and Fire usage by parsing the C# text.
+    /// "inline:..." prefix supported for convenience.
+    /// Real eval with CSharpScript. Errors become diagnostic PackEmission (never poison host).
     public static async Task<IReadOnlyList<Synapse>> ExecuteAsync(
         string scriptBody, Synapse input, NeuronId self, Func<Synapse, Task> fire)
     {
@@ -30,41 +38,19 @@ public static class ScriptRunner
         if (scriptBody.StartsWith("inline:", StringComparison.OrdinalIgnoreCase))
             scriptBody = scriptBody["inline:".Length..].Trim();
 
-        var emitted = new List<Synapse>();
+        var globals = new ScriptGlobals(input, self, fire);
 
-        // Parse common "new Signal("Name", ...)" from the C# body text
-        foreach (Match m in Regex.Matches(scriptBody, @"new\s+Signal\s*\(\s*""([^""]+)"""))
+        try
         {
-            var name = m.Groups[1].Value;
-            emitted.Add(new Signal(name, new Dictionary<string, object?> { ["fromScript"] = true }));
+            // Use RunAsync + ReturnValue to support statement blocks with 'return' and side-effect 'await Fire(...)'
+            var script = CSharpScript.Create<IReadOnlyList<Synapse>>(scriptBody, globalsType: typeof(ScriptGlobals), options: _options);
+            var result = await script.RunAsync(globals);
+            return result.ReturnValue ?? Array.Empty<Synapse>();
         }
-
-        // Legacy pack style
-        if (scriptBody.Contains("PackEmission") || scriptBody.Contains("\"ok\""))
+        catch (Exception ex)
         {
-            emitted.Add(new PackEmission("automation", input.Type, "ok"));
+            var msg = ex.GetBaseException().Message;
+            return new[] { new PackEmission("automation-script", input.Type, "script-error:" + msg) };
         }
-
-        if (emitted.Count > 0)
-        {
-            foreach (var e in emitted)
-                await fire(e);
-            return emitted;
-        }
-
-        // Simulate error path for bad scripts (plan: one bad reaction never poisons the neuron or siblings)
-        if (scriptBody.Contains("THROW") || scriptBody.Contains("bad-script"))
-        {
-            return new[] { new PackEmission("automation-script", input.Type, "script-error:simulated-bad-script") };
-        }
-
-        // Default marker (script "ran")
-        await fire(new Signal("ScriptExecuted", new Dictionary<string, object?>
-        {
-            ["scriptLength"] = scriptBody.Length,
-            ["self"] = self.Value
-        }));
-
-        return Array.Empty<Synapse>();
     }
 }

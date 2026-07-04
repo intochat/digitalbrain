@@ -166,15 +166,13 @@ public class PackAlcEmbodierTests
 
         // script returns list (or could call fire)
         var outputs = await ScriptRunner.ExecuteAsync(
-            "return new[] { new PackEmission(\"test-script\", \"t\", \"ok\") };",
+            "return new[] { new Signal(\"ScriptResult\", new Dictionary<string,object?> { [\"ok\"] = true }) };",
             input,
             self,
             s => Task.CompletedTask);
 
         Assert.Single(outputs);
-        var pe = outputs[0] as PackEmission;
-        Assert.NotNull(pe);
-        Assert.Equal("ok", pe.Output);
+        Assert.Equal("ScriptResult", outputs[0].Type);
     }
 
     [Fact]
@@ -184,14 +182,13 @@ public class PackAlcEmbodierTests
         var self = new NeuronId("err-test");
 
         var outputs = await ScriptRunner.ExecuteAsync(
-            "inline: return new[] { new PackEmission(\"script\", \"input\", \"ok\") };",
+            "inline: return new[] { new Signal(\"ScriptResult\", new Dictionary<string,object?> { [\"ok\"] = true }) };",
             input,
             self,
             s => Task.CompletedTask);
 
         Assert.Single(outputs);
-        var emission = outputs[0] as PackEmission;
-        Assert.NotNull(emission);
+        Assert.Equal("ScriptResult", outputs[0].Type);
     }
 }
 
