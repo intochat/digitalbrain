@@ -147,6 +147,39 @@ public class UiSurfaceContractTests
     }
 
     [Fact]
+    public void Live_Marketplace_Surface_Projects_Salesforce_As_A_Capability_Tile()
+    {
+        var surface = MarketplaceUiSurfaces.MarketplaceListFromPacks(
+            MarketplaceSeeds.LocalUiPacks,
+            Array.Empty<NeuroPack>(),
+            "alice",
+            "client-1");
+
+        var packs = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(surface.Props["packs"]);
+        var salesforce = packs.Single(pack => Equals(pack["name"], MarketplaceUiSurfaces.SalesforceCapabilityPackName));
+
+        Assert.Equal("Salesforce CRM", salesforce["title"]);
+        Assert.Equal("integration", salesforce["kind"]);
+        Assert.Equal("salesforce", salesforce["icon"]);
+        Assert.Equal("Not enabled", salesforce["status"]);
+        Assert.Equal(false, salesforce["installed"]);
+        Assert.Contains("Accounts", Assert.IsAssignableFrom<IEnumerable<string>>(salesforce["capabilities"]));
+        Assert.Contains("SOQL query", Assert.IsAssignableFrom<IEnumerable<string>>(salesforce["capabilities"]));
+
+        var enableProps = AssertActionProps(salesforce["enableAction"], nameof(InstallFromMarketplace));
+        Assert.Equal(MarketplaceUiSurfaces.SalesforceCapabilityPackName, enableProps["packName"]);
+        Assert.Equal("0.1.0", enableProps["version"]);
+        Assert.Equal("alice", enableProps["buyerId"]);
+        Assert.Equal("client-1", enableProps["clientId"]);
+
+        var connectProps = AssertActionProps(salesforce["connectAction"], SalesforceSignals.AuthRequested);
+        Assert.Equal(MarketplaceUiSurfaces.SalesforceConfigPackName, connectProps["pack"]);
+        Assert.Equal(MarketplaceUiSurfaces.SalesforceCallbackPath, connectProps["callbackPath"]);
+        Assert.Equal("alice", connectProps["userId"]);
+        Assert.Equal("client-1", connectProps["clientId"]);
+    }
+
+    [Fact]
     public void Live_InstalledBundles_Surface_Exposes_Runnable_Experiences()
     {
         var surface = MarketplaceUiSurfaces.InstalledBundlesFromPacks(
@@ -186,6 +219,31 @@ public class UiSurfaceContractTests
             surface.Props["experiences"]);
         // "Run self-test" from Dummy demo removed.
         // Assert other scoped experiences if present (e.g. Gmail or real ones).
+    }
+
+    [Fact]
+    public void Live_InstalledBundles_Surface_Exposes_Salesforce_Capability_Actions_When_Installed()
+    {
+        var salesforcePack = MarketplaceSeeds.LocalUiPacks.Single(p =>
+            p.Name == MarketplaceUiSurfaces.SalesforceCapabilityPackName);
+        var surface = MarketplaceUiSurfaces.InstalledBundlesFromPacks(
+            MarketplaceSeeds.LocalUiPacks,
+            new[] { salesforcePack },
+            "alice",
+            "client-1");
+
+        var experiences = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
+            surface.Props["experiences"]);
+
+        var connect = experiences.Single(experience => Equals(experience["name"], "Connect Salesforce"));
+        var configure = experiences.Single(experience => Equals(experience["name"], "Configure Salesforce"));
+        var listAccounts = experiences.Single(experience => Equals(experience["name"], "List Accounts"));
+
+        AssertActionProps(connect["action"], SalesforceSignals.AuthRequested);
+        AssertActionProps(configure["action"], SalesforceSignals.AuthRequested);
+        var listProps = AssertActionProps(listAccounts["action"], nameof(InoRequest));
+        Assert.Contains("Salesforce accounts", listProps["prompt"]?.ToString());
+        Assert.Equal("client-1", listProps["clientId"]);
     }
 
     [Fact]
@@ -262,6 +320,20 @@ public class UiSurfaceContractTests
         Assert.Contains(packs, p => p.Name == "DigitalBrain.UI.CreatorSurfaces");
         Assert.Contains(packs, p => p.Name == "DigitalBrain.UI.AspireFlutter");
         Assert.All(packs, p => Assert.Equal("digitalbraintech", p.OwnerId));
+    }
+
+    [Fact]
+    public void Local_Marketplace_Seeds_Include_Salesforce_Capability_Pack()
+    {
+        var pack = MarketplaceSeeds.LocalUiPacks.Single(p =>
+            p.Name == MarketplaceUiSurfaces.SalesforceCapabilityPackName);
+
+        Assert.Equal("0.1.0", pack.Version);
+        Assert.Contains("OAuth", pack.Description);
+        Assert.Contains("SOQL", pack.Description);
+        Assert.Equal("digitalbraintech", pack.OwnerId);
+        Assert.Equal("Channel", pack.Manifest?.Tier.ToString());
+        Assert.Contains("InApp", pack.Manifest?.Channels.Select(c => c.ToString()) ?? Array.Empty<string>());
     }
 
     private static void AssertCommonProp(UiSurface surface, string key) =>

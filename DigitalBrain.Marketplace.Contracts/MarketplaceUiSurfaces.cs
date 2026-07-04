@@ -4,6 +4,10 @@ using DigitalBrain.Core;
 
 public static class MarketplaceUiSurfaces
 {
+    public const string SalesforceCapabilityPackName = "DigitalBrain.Capability.Salesforce";
+    public const string SalesforceConfigPackName = "salesforce";
+    public const string SalesforceCallbackPath = "/salesforce-callback";
+
     public static UiSurface MarketplaceListFromPacks(
         IReadOnlyList<NeuroPack> publishedPacks,
         IReadOnlyList<NeuroPack> installedPacks,
@@ -16,18 +20,39 @@ public static class MarketplaceUiSurfaces
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var packs = publishedPacks
-            .Select(pack => new Dictionary<string, object?>
+            .Select(pack =>
             {
-                ["name"] = pack.Name,
-                ["version"] = pack.Version,
-                ["ownerId"] = pack.OwnerId,
-                ["private"] = pack.IsPrivate,
-                ["commissionRate"] = pack.CommissionRate,
-                ["description"] = pack.Description,
-                ["installed"] = installedKeys.Contains(PackKey(pack)) || IsPreinstalledLocalPack(pack),
-                ["tier"] = pack.Manifest?.Tier.ToString(),
-                ["channels"] = pack.Manifest?.Channels.Select(c => c.ToString()).ToArray(),
-                ["entryExperienceId"] = pack.Manifest?.EntryExperience?.ExperienceId
+                var installed = installedKeys.Contains(PackKey(pack)) || IsPreinstalledLocalPack(pack);
+                var row = new Dictionary<string, object?>
+                {
+                    ["name"] = pack.Name,
+                    ["title"] = DisplayName(pack),
+                    ["label"] = DisplayName(pack),
+                    ["version"] = pack.Version,
+                    ["ownerId"] = pack.OwnerId,
+                    ["private"] = pack.IsPrivate,
+                    ["commissionRate"] = pack.CommissionRate,
+                    ["description"] = pack.Description,
+                    ["installed"] = installed,
+                    ["status"] = StatusFor(pack, installed),
+                    ["kind"] = CapabilityKind(pack),
+                    ["icon"] = IconFor(pack),
+                    ["capabilities"] = CapabilitiesFor(pack),
+                    ["tier"] = pack.Manifest?.Tier.ToString(),
+                    ["channels"] = pack.Manifest?.Channels.Select(c => c.ToString()).ToArray(),
+                    ["entryExperienceId"] = pack.Manifest?.EntryExperience?.ExperienceId
+                };
+
+                var actions = MarketplaceActionsFor(pack, installed, userId, clientId).ToArray();
+                row["actions"] = actions;
+                if (actions.FirstOrDefault(a => Equals(a[UiSurfaceKeys.ActionId], "enable-salesforce")) is { } enable)
+                    row["enableAction"] = enable;
+                if (actions.FirstOrDefault(a => Equals(a[UiSurfaceKeys.ActionId], "connect-salesforce")) is { } connect)
+                    row["connectAction"] = connect;
+                if (actions.FirstOrDefault(a => Equals(a[UiSurfaceKeys.ActionId], "configure-salesforce")) is { } configure)
+                    row["configureAction"] = configure;
+
+                return row;
             })
             .ToArray();
 
@@ -118,7 +143,7 @@ public static class MarketplaceUiSurfaces
         var tree = new UiWidgetTree("column", new Dictionary<string, object?>(), new List<UiWidgetTree>
         {
             new("row", new Dictionary<string, object?>(), facetButtons),
-            new("list", new Dictionary<string, object?> { ["items"] = filtered })
+            new("column", new Dictionary<string, object?>(), filtered.Select(MarketplaceCardTree).ToArray())
         });
 
         return new UiSurface(UiSurfaceKinds.MarketplaceList, new Dictionary<string, object?>
@@ -378,6 +403,44 @@ public static class MarketplaceUiSurfaces
                 userId,
                 clientId);
         }
+        else if (pack.Name.Equals(SalesforceCapabilityPackName, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return ExperienceRow(
+                pack,
+                "connect-salesforce",
+                "Connect Salesforce",
+                "integration",
+                "Start Salesforce OAuth for this user.",
+                SalesforceConnectAction(userId, clientId),
+                userId,
+                clientId);
+            yield return ExperienceRow(
+                pack,
+                "configure-salesforce",
+                "Configure Salesforce",
+                "integration",
+                "Open the Salesforce credentials and connected app configuration surface.",
+                SalesforceConfigureAction(userId, clientId),
+                userId,
+                clientId);
+            yield return ExperienceRow(
+                pack,
+                "list-salesforce-accounts",
+                "List Accounts",
+                "crm",
+                "Ask INO to list Salesforce Account records through the read-only CRM neuron.",
+                UiSurfaceActions.SynapseAction(
+                    "list-salesforce-accounts",
+                    "List Accounts",
+                    nameof(InoRequest),
+                    new Dictionary<string, object?>
+                    {
+                        ["prompt"] = "List Salesforce accounts using the Salesforce CRM capability.",
+                        ["clientId"] = clientId
+                    }),
+                userId,
+                clientId);
+        }
         else if (pack.Name.Contains("ClosedLoop", StringComparison.OrdinalIgnoreCase))
         {
             var loopType = pack.Name.Contains("Software", StringComparison.OrdinalIgnoreCase) ? "se" : "ui";
@@ -523,6 +586,126 @@ public static class MarketplaceUiSurfaces
         pack.Name.StartsWith("DigitalBrain.Experience", StringComparison.Ordinal) ||
         pack.Name.Equals("ui-gallery", StringComparison.OrdinalIgnoreCase) ||
         pack.Name.Contains("Dummy", StringComparison.OrdinalIgnoreCase);
+
+    private static string DisplayName(NeuroPack pack) =>
+        pack.Name.Equals(SalesforceCapabilityPackName, StringComparison.OrdinalIgnoreCase)
+            ? "Salesforce CRM"
+            : pack.Name;
+
+    private static string CapabilityKind(NeuroPack pack) =>
+        pack.Name.Equals(SalesforceCapabilityPackName, StringComparison.OrdinalIgnoreCase)
+            ? "integration"
+            : pack.Manifest?.Tier.ToString()?.ToLowerInvariant() ?? "pack";
+
+    private static string IconFor(NeuroPack pack) =>
+        pack.Name.Equals(SalesforceCapabilityPackName, StringComparison.OrdinalIgnoreCase)
+            ? "salesforce"
+            : "package";
+
+    private static string StatusFor(NeuroPack pack, bool installed) =>
+        pack.Name.Equals(SalesforceCapabilityPackName, StringComparison.OrdinalIgnoreCase)
+            ? installed ? "Enabled" : "Not enabled"
+            : installed ? "Installed" : "Available";
+
+    private static string[] CapabilitiesFor(NeuroPack pack) =>
+        pack.Name.Equals(SalesforceCapabilityPackName, StringComparison.OrdinalIgnoreCase)
+            ? new[] { "Accounts", "SOQL query", "CRM summaries" }
+            : Array.Empty<string>();
+
+    private static IEnumerable<IReadOnlyDictionary<string, object?>> MarketplaceActionsFor(
+        NeuroPack pack,
+        bool installed,
+        string userId,
+        string? clientId)
+    {
+        if (pack.Name.Equals(SalesforceCapabilityPackName, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return UiSurfaceActions.SynapseAction(
+                "enable-salesforce",
+                installed ? "Enabled" : "Enable",
+                nameof(InstallFromMarketplace),
+                new Dictionary<string, object?>
+                {
+                    ["packName"] = pack.Name,
+                    ["version"] = pack.Version,
+                    ["buyerId"] = userId,
+                    ["userId"] = userId,
+                    ["clientId"] = clientId
+                });
+            yield return SalesforceConnectAction(userId, clientId);
+            yield return SalesforceConfigureAction(userId, clientId);
+            yield break;
+        }
+
+        yield return UiSurfaceActions.SynapseAction(
+            installed ? "update-pack" : "install-pack",
+            installed ? "Update" : "Install",
+            nameof(InstallFromMarketplace),
+            new Dictionary<string, object?>
+            {
+                ["packName"] = pack.Name,
+                ["version"] = pack.Version,
+                ["buyerId"] = userId,
+                ["userId"] = userId,
+                ["clientId"] = clientId
+            });
+    }
+
+    private static IReadOnlyDictionary<string, object?> SalesforceConnectAction(string userId, string? clientId) =>
+        UiSurfaceActions.SynapseAction(
+            "connect-salesforce",
+            "Connect Salesforce",
+            SalesforceSignals.AuthRequested,
+            new Dictionary<string, object?>
+            {
+                ["pack"] = SalesforceConfigPackName,
+                ["callbackPath"] = SalesforceCallbackPath,
+                ["userId"] = userId,
+                ["clientId"] = clientId
+            });
+
+    private static IReadOnlyDictionary<string, object?> SalesforceConfigureAction(string userId, string? clientId) =>
+        UiSurfaceActions.SynapseAction(
+            "configure-salesforce",
+            "Configure",
+            SalesforceSignals.AuthRequested,
+            new Dictionary<string, object?>
+            {
+                ["pack"] = SalesforceConfigPackName,
+                ["userId"] = userId,
+                ["clientId"] = clientId
+            });
+
+    private static UiWidgetTree MarketplaceCardTree(IReadOnlyDictionary<string, object?> item)
+    {
+        var title = item.TryGetValue("title", out var t) ? t?.ToString() ?? "" : "";
+        var subtitle = item.TryGetValue("status", out var s) ? s?.ToString() ?? "" : "";
+        var description = item.TryGetValue("description", out var d) ? d?.ToString() ?? "" : "";
+        var capabilities = item.TryGetValue("capabilities", out var c) && c is IEnumerable<string> cs
+            ? cs.ToArray()
+            : Array.Empty<string>();
+        var actions = item.TryGetValue("actions", out var a) && a is IEnumerable<IReadOnlyDictionary<string, object?>> actionRows
+            ? actionRows
+            : Array.Empty<IReadOnlyDictionary<string, object?>>();
+
+        var children = new List<UiWidgetTree>();
+        if (!string.IsNullOrWhiteSpace(description))
+            children.Add(new("text", new Dictionary<string, object?> { ["text"] = description }));
+        if (capabilities.Length > 0)
+            children.Add(new("text", new Dictionary<string, object?> { ["text"] = "Capabilities: " + string.Join(", ", capabilities) }));
+
+        var buttons = actions
+            .Select(action => new UiWidgetTree("fbutton", new Dictionary<string, object?>(action)))
+            .ToArray();
+        if (buttons.Length > 0)
+            children.Add(new("row", new Dictionary<string, object?>(), buttons));
+
+        return new UiWidgetTree("fcard", new Dictionary<string, object?>
+        {
+            ["title"] = title,
+            ["subtitle"] = subtitle
+        }, children);
+    }
 
     private static IReadOnlyDictionary<string, object?> WithCommon(
         string surfaceId,

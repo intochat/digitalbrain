@@ -1,5 +1,6 @@
 using DigitalBrain.Core.Distribution;
 using DigitalBrain.Core.Trust;
+using DigitalBrain.Marketplace.Contracts;
 
 namespace DigitalBrain.Core;
 
@@ -236,6 +237,16 @@ public sealed class XBitcoinTelegramDemoNeuron : IPackBehavior
             0.0,
             "",
             "Preinstalled Gmail insights experience. Retrieves the last 100 Gmail-shaped messages from the local connector/sample path, summarizes them with the local Ollama model, and emits a chart surface."),
+
+        new NeuroPack(
+            MarketplaceUiSurfaces.SalesforceCapabilityPackName,
+            "0.1.0",
+            "digitalbraintech",
+            false,
+            0.0,
+            "",
+            "Salesforce CRM capability: OAuth connection plus read-only Accounts, SOQL query, and CRM summaries through INO.",
+            Manifest: new(BundleTier.Channel, null, new[] { BundleChannel.InApp })),
 
         new NeuroPack(
             "DigitalBrain.Telegram.Responder",
