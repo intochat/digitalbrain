@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +13,8 @@ import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
 import 'package:digitalbrain_flutter/grpc/uigateway.pbgrpc.dart';
 import 'package:digitalbrain_flutter/grpc/uigateway.pb.dart' as ui;
+import 'app_session.dart';
+import 'digitalbrain_client_scope.dart';
 
 /// Dynamic NeuroUI shell. Subscribes to WatchHomeFeed and renders chrome + nav + body
 /// entirely from live UiSurface / widget-tree / rfw surfaces emitted by neurons.
@@ -37,8 +38,69 @@ String? autoSwitchTargetForKind(String kind) {
   return null;
 }
 
+enum SurfaceDisposition { shell, chat, content, toast, ignore }
+
+String surfaceKindOf(Map<String, Object?> data) =>
+    (data['kind'] ?? data['surfaceKind'] ?? '').toString();
+
+SurfaceDisposition classifySurface(Map<String, Object?> data) {
+  final kind = surfaceKindOf(data).toLowerCase();
+  if (kind == 'toast' || kind == 'notification' || kind.contains('toast')) {
+    return SurfaceDisposition.toast;
+  }
+  if (isShellSurface(data)) return SurfaceDisposition.shell;
+  if (isChatSurface(data)) return SurfaceDisposition.chat;
+  if (kind.isNotEmpty) return SurfaceDisposition.content;
+  return SurfaceDisposition.ignore;
+}
+
+bool isChatSurface(Map<String, Object?> data) =>
+    data['role'] == 'assistant' && data['tree'] is Map;
+
+bool isShellSurface(Map<String, Object?> data) {
+  final kind = surfaceKindOf(data).toLowerCase();
+  if (kind == 'app-shell' || kind.contains('shell')) return true;
+  if (data['activeContent'] != null) return true;
+
+  final treeNode = data['tree'];
+  if (treeNode is! Map) return false;
+  if (treeNode['activeContent'] != null) return true;
+
+  final props = treeNode['Props'];
+  if (props is Map && props['activeContent'] != null) return true;
+
+  final type =
+      treeNode['Type']?.toString().toLowerCase() ??
+      treeNode['type']?.toString().toLowerCase() ??
+      '';
+  return type.contains('scaffold') || type == 'app-shell';
+}
+
+bool shellChatIsSelected(String location, String? selectedTarget) {
+  final target = (selectedTarget ?? '').trim().toLowerCase();
+  return location == '/chat' ||
+      target == 'chat' ||
+      target == '/chat' ||
+      target.contains('ino');
+}
+
+class _ShellChatMessage {
+  final bool isUser;
+  final String? text;
+  final Map<String, Object?>? tree;
+
+  const _ShellChatMessage.user(String this.text) : isUser = true, tree = null;
+
+  const _ShellChatMessage.assistant(Map<String, Object?> this.tree)
+    : isUser = false,
+      text = null;
+}
+
 class _ForuiAppShellState extends State<ForuiAppShell> {
   final RfwRuntimeHost _rfwHost = RfwRuntimeHost();
+  final TextEditingController _chatInput = TextEditingController();
+  final ScrollController _chatScroll = ScrollController();
+  final List<_ShellChatMessage> _chatMessages = [];
   dynamic _channel;
   DigitalBrainGatewayClient? _gatewayClient;
   UiGatewayClient? _uiClient;
@@ -47,13 +109,14 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   StreamSubscription<gw.RfwCardEnvelope>? _homeFeedSub;
   StreamSubscription<gw.SynapseEnvelope>? _authSignalSub;
   StreamSubscription<dynamic>? _channelStateSub;
-  final String _clientId = 'shell-${Random().nextInt(1 << 31)}';
+  final String _clientId = digitalBrainAppClientId;
 
   // Live data from neurons (minimal state for composition; all chrome/content from neuron trees)
   Map<String, Object?>? _shellTree;
   final Map<String, gw.RfwCardEnvelope> _surfacesByKind = {};
   String? _selectedTarget; // from tree only; no hardcoded default
   String? _feedStatus;
+  bool _chatSending = false;
 
   @override
   void initState() {
@@ -69,6 +132,8 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     _channelStateSub?.cancel();
     _uiInput?.close();
     _channel?.shutdown();
+    _chatInput.dispose();
+    _chatScroll.dispose();
     super.dispose();
   }
 
@@ -172,12 +237,13 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   void _onCard(gw.RfwCardEnvelope envelope) {
     if (!mounted) return;
     final data = _decode(envelope.dataJson);
-    final kind = (data['kind'] ?? data['surfaceKind'] ?? '').toString();
+    final kind = surfaceKindOf(data);
     debugPrint('DigitalBrain received UI surface kind="$kind"');
 
     // Runtime-only ForUI notification from neuron/synapse (no static Flutter view).
     // Neuron emits UiSurface(kind: "toast" | "notification") with title/description.
-    if (kind == 'toast' || kind == 'notification' || kind.contains('toast')) {
+    final disposition = classifySurface(data);
+    if (disposition == SurfaceDisposition.toast) {
       final titleText = (data['title'] ?? data['message'] ?? 'Hello World!')
           .toString();
       final descText = data['description']?.toString();
@@ -194,34 +260,34 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     }
 
     setState(() {
-      final treeNode = data['tree'] as Map?;
-      final hasShellMarker =
-          kind == 'app-shell' ||
-          kind == 'widget-tree' ||
-          kind.contains('shell') ||
-          data['activeContent'] != null;
-      final treeLooksLikeShell =
-          treeNode != null &&
-          (treeNode['activeContent'] != null ||
-              (treeNode['Props'] as Map?)?['activeContent'] != null ||
-              (treeNode['Type']?.toString().toLowerCase().contains(
-                    'scaffold',
-                  ) ??
-                  false) ||
-              (treeNode['Type']?.toString().toLowerCase() == 'app-shell'));
-      if (hasShellMarker || treeLooksLikeShell) {
-        _shellTree = data;
-        _feedStatus = null;
-        final ac =
-            data['activeContent'] ??
-            (treeNode)?['activeContent'] ??
-            ((treeNode)?['Props'] as Map?)?['activeContent'];
-        if (ac is String && ac.isNotEmpty) {
-          _selectedTarget = ac;
-        }
-      } else if (kind.isNotEmpty) {
-        _surfacesByKind[kind] = envelope;
-        _feedStatus = null;
+      switch (disposition) {
+        case SurfaceDisposition.shell:
+          final treeNode = data['tree'] as Map?;
+          _shellTree = data;
+          _feedStatus = null;
+          final ac =
+              data['activeContent'] ??
+              (treeNode)?['activeContent'] ??
+              ((treeNode)?['Props'] as Map?)?['activeContent'];
+          if (ac is String && ac.isNotEmpty) {
+            _selectedTarget = ac;
+          }
+          break;
+        case SurfaceDisposition.chat:
+          final tree = data['tree'] as Map<String, Object?>;
+          _chatMessages.add(_ShellChatMessage.assistant(tree));
+          _chatSending = false;
+          _feedStatus = null;
+          break;
+        case SurfaceDisposition.content:
+          if (kind.isNotEmpty) {
+            _surfacesByKind[kind] = envelope;
+            _feedStatus = null;
+          }
+          break;
+        case SurfaceDisposition.toast:
+        case SurfaceDisposition.ignore:
+          break;
       }
 
       // Auto-switch to a pack's config form the moment it's emitted post-install
@@ -232,6 +298,9 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
         _selectedTarget = autoSwitchTarget;
       }
     });
+    if (disposition == SurfaceDisposition.chat) {
+      _scrollChatToEnd();
+    }
   }
 
   void _handleSurfaceEvent(String name, Map<String, Object?> args) {
@@ -254,6 +323,183 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                 debugPrint('DigitalBrain action dispatch failed: $error'),
           );
     }
+  }
+
+  void _sendChat() {
+    final text = _chatInput.text.trim();
+    final client = _gatewayClient;
+    if (text.isEmpty || client == null || _chatSending) return;
+
+    setState(() {
+      _chatMessages.add(_ShellChatMessage.user(text));
+      _chatSending = true;
+      _chatInput.clear();
+      _feedStatus = null;
+    });
+    _scrollChatToEnd();
+
+    final envelope = gw.SynapseEnvelope()
+      ..typeName = 'InoRequest'
+      ..payload = utf8.encode(
+        jsonEncode({'prompt': text, 'clientId': _clientId}),
+      );
+    unawaited(
+      client
+          .send(envelope)
+          .then<void>(
+            (_) {},
+            onError: (Object error) {
+              if (!mounted) return;
+              setState(() {
+                _chatSending = false;
+                _feedStatus = 'Failed to send chat message: $error';
+              });
+            },
+          ),
+    );
+  }
+
+  void _scrollChatToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_chatScroll.hasClients) return;
+      _chatScroll.animateTo(
+        _chatScroll.position.maxScrollExtent + 80,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Widget _buildChatBody(UiSurfaceTreeRenderer renderer) {
+    final t = FTheme.of(context);
+    return Column(
+      children: [
+        Expanded(
+          child: _chatMessages.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Text(
+                      'INO',
+                      textAlign: TextAlign.center,
+                      style: t.typography.sm.copyWith(
+                        color: t.colors.mutedForeground,
+                      ),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  controller: _chatScroll,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _chatMessages.length + (_chatSending ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index >= _chatMessages.length) {
+                      return const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: FCircularProgress(
+                              size: FCircularProgressSizeVariant.xs,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    final message = _chatMessages[index];
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: 12,
+                        left: message.isUser ? 48 : 0,
+                        right: message.isUser ? 0 : 48,
+                      ),
+                      child: Align(
+                        alignment: message.isUser
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: message.isUser
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: t.colors.primary,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  message.text!,
+                                  style: t.typography.md.copyWith(
+                                    color: t.colors.primaryForeground,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 720,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: t.colors.card,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: t.colors.border,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: renderer.build(
+                                  message.tree!,
+                                  _handleSurfaceEvent,
+                                  rfwHost: _rfwHost,
+                                  onNavSelected: _goTo,
+                                  activeTarget: _selectedTarget,
+                                ),
+                              ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: t.colors.border, width: 0.5)),
+            color: t.colors.background,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: FTextField(
+                  control: FTextFieldControl.managed(controller: _chatInput),
+                  hint: 'Ask INO...',
+                  onSubmit: (_) => _sendChat(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Send',
+                child: FButton(
+                  onPress: _chatSending ? null : _sendChat,
+                  child: const Icon(Icons.send),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _withClientScope(Widget child) {
+    final client = _gatewayClient;
+    if (client == null) return child;
+    return DigitalBrainClientScope(client: client, child: child);
   }
 
   Map<String, Object?> _decode(String json) {
@@ -310,11 +556,15 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     // contain "gallery" (e.g. /experience/ui-gallery/ui-gallery), sending them to the blank
     // /gallery route instead of letting the absolute-path branch below navigate to them.
     if (t == 'gallery' || t == '/gallery') {
+      setState(() => _selectedTarget = 'gallery');
       context.go('/gallery');
       return;
     }
     if (t.contains('chat') || t.contains('ino') || t == '/chat') {
-      context.go('/chat');
+      setState(() => _selectedTarget = 'chat');
+      if (GoRouterState.of(context).uri.path != '/chat') {
+        context.go('/chat');
+      }
       return;
     }
     if (t.startsWith('/')) {
@@ -367,8 +617,12 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
         }
       }
 
+      final loc = GoRouterState.of(context).uri.path;
+
       Widget body;
-      if (activeEnvelope != null) {
+      if (shellChatIsSelected(loc, _selectedTarget)) {
+        body = _buildChatBody(renderer);
+      } else if (activeEnvelope != null) {
         body =
             _renderEnvelope(
               activeEnvelope,
@@ -380,11 +634,10 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
         body = const SizedBox.shrink();
       }
 
-      final loc = GoRouterState.of(context).uri.path;
-
       // All UI is 100% from neuron trees / kit. No more .dart screens.
       final effectiveTarget = (_selectedTarget ?? '').toLowerCase();
-      if (effectiveTarget.contains('market') || loc == '/marketplace') {
+      if (!shellChatIsSelected(loc, _selectedTarget) &&
+          (effectiveTarget.contains('market') || loc == '/marketplace')) {
         final env =
             _surfacesByKind['marketplace'] ??
             _surfacesByKind[_selectedTarget ?? ''];
@@ -395,13 +648,15 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
 
       // Stable anchor: a neuron-emitted shell tree only arrives after sign-in, so
       // this identifier marks the signed-in state for tests and assistive tech.
-      return Semantics(
-        identifier: 'app-shell-ready',
-        explicitChildNodes: true,
-        child: FScaffold(
-          sidebar: sidebarWidget,
-          header: headerWidget,
-          child: body,
+      return _withClientScope(
+        Semantics(
+          identifier: 'app-shell-ready',
+          explicitChildNodes: true,
+          child: FScaffold(
+            sidebar: sidebarWidget,
+            header: headerWidget,
+            child: body,
+          ),
         ),
       );
     }
@@ -464,11 +719,13 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
           _renderEnvelope(env, renderer, 'installed-fallback') ?? fallbackBody;
     }
 
-    return FScaffold(
-      header: const FHeader(title: Text('DigitalBrain')),
-      sidebar:
-          const SizedBox.shrink(), // sidebar + nav fully from emitted shell tree (neuron kit)
-      child: fallbackBody,
+    return _withClientScope(
+      FScaffold(
+        header: const FHeader(title: Text('DigitalBrain')),
+        sidebar:
+            const SizedBox.shrink(), // sidebar + nav fully from emitted shell tree (neuron kit)
+        child: fallbackBody,
+      ),
     );
   }
 }

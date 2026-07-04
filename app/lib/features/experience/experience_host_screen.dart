@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +10,7 @@ import 'package:digitalbrain_flutter/grpc/endpoint.dart';
 import 'package:digitalbrain_flutter/grpc/grpc_channel.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
+import 'package:digitalbrain_flutter/shell/app_session.dart';
 
 import 'experience_hop_view.dart';
 import 'experience_match.dart';
@@ -37,7 +37,7 @@ class _ExperienceHostScreenState extends State<ExperienceHostScreen> {
   DigitalBrainGatewayClient? _client;
   StreamSubscription<gw.RfwCardEnvelope>? _feedSub;
   bool _startFired = false;
-  final String _clientId = 'experience-${Random().nextInt(1 << 31)}';
+  final String _clientId = digitalBrainAppClientId;
 
   Map<String, Object?>? _hopData;
   String? _hopCorrelationId;
@@ -135,6 +135,7 @@ class _ExperienceHostScreenState extends State<ExperienceHostScreen> {
           'pack': pack,
           'experienceId': experienceId,
           'eventName': 'start',
+          'clientId': _clientId,
         }),
       );
     client

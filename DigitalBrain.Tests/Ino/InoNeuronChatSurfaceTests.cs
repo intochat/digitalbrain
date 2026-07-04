@@ -62,20 +62,45 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
     }
 
     [Fact]
-    public async Task SalesforceIntent_WithoutCredential_Emits_Credential_Form_Surface()
+    public async Task SalesforceIntent_WithoutLogin_Emits_Login_Surface()
     {
         var ino = Grain<IInoNeuron>("ino-main");
         await ino.FireAsync(new InoRequest("Show my salesforce accounts", "session-salesforce-auth"));
 
         var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
         Assert.Equal("Show my salesforce accounts", response.Prompt);
-        Assert.Contains("Salesforce credentials", response.Response);
+        Assert.Contains("Sign in", response.Response);
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surface = Assert.Single((await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>());
+        Assert.Equal(UiSurfaceKinds.Login, surface.Kind);
+        Assert.Equal("session-salesforce-auth", surface.Props["clientId"]);
+
+        var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
+        Assert.DoesNotContain(FindNodes(tree), node =>
+            Equals(node.Props.GetValueOrDefault("synapseType"), SalesforceSignals.AuthRequested));
+    }
+
+    [Fact]
+    public async Task SalesforceIntent_SignedInWithoutCredential_Emits_Credential_Form_Surface()
+    {
+        const string clientId = "session-salesforce-auth-signed-in";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("salesforce-auth-user", "correct horse battery staple", clientId));
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("Show my salesforce accounts", clientId));
+
+        var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
+        Assert.Equal("Show my salesforce accounts", response.Prompt);
+        Assert.Contains("Salesforce credentials", response.Response);
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>();
+        var surface = Assert.Single(surfaces, surface => surface.Kind == ConfigFormSurface.Kind);
         Assert.Equal(ConfigFormSurface.Kind, surface.Kind);
         Assert.Equal("salesforce", surface.Props["pack"]);
-        Assert.Equal("session-salesforce-auth", surface.Props["clientId"]);
+        Assert.Equal(clientId, surface.Props["clientId"]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         var fields = FindNodes(tree)

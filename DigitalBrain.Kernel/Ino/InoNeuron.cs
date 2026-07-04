@@ -146,12 +146,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task<string> ResolveUserIdAsync(string? clientId)
     {
+        var state = await ResolveSessionAsync(clientId);
+        return state?.UserId.Value ?? UserId.Anonymous.Value;
+    }
+
+    private async Task<UserSessionState?> ResolveSessionAsync(string? clientId)
+    {
         if (string.IsNullOrWhiteSpace(clientId))
-            return UserId.Anonymous.Value;
+            return null;
 
         var session = GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
-        var state = await session.GetSessionByClientIdAsync(clientId);
-        return state?.UserId.Value ?? UserId.Anonymous.Value;
+        return await session.GetSessionByClientIdAsync(clientId);
     }
 
     public async Task HandleAsync(TabularDataIngested ingested)
@@ -256,7 +261,16 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task HandleSalesforceIntentAsync(InoRequest req)
     {
-        var salesforceUserId = await ResolveUserIdAsync(req.ClientId);
+        var salesforceSession = await ResolveSessionAsync(req.ClientId);
+        if (salesforceSession is null)
+        {
+            var reply = "Sign in before connecting Salesforce.";
+            await FireAsync(new InoResponse(req.Prompt, reply, []));
+            await DeliverLoginSurfaceAsync(req.ClientId);
+            return;
+        }
+
+        var salesforceUserId = salesforceSession.UserId.Value;
         if (!await HasSalesforceCredentialAsync(salesforceUserId))
         {
             _pendingSalesforceRequest = req;
@@ -337,6 +351,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
+    private async Task DeliverLoginSurfaceAsync(string? clientId)
+    {
+        var session = GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
+        var surface = await session.BuildLoginSurfaceAsync(clientId);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
         await flutter.DeliverAsync(StampCurrent(surface));
     }
@@ -820,4 +842,3 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 }
-
