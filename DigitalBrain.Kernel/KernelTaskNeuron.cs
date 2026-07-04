@@ -35,7 +35,7 @@ public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals j
         if (bus != null)
         {
             var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
-            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, sessionId: cmd.SessionId);
+            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, clientId: cmd.SessionId);
             bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
 
             var directData = System.Text.Json.JsonSerializer.Serialize(new
@@ -55,7 +55,7 @@ public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals j
         if (bus != null)
         {
             var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
-            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, sessionId: cmd.SessionId);
+            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, clientId: cmd.SessionId);
             bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
 
             var directData = System.Text.Json.JsonSerializer.Serialize(new

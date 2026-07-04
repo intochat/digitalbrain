@@ -8,7 +8,7 @@ public static class MarketplaceUiSurfaces
         IReadOnlyList<NeuroPack> publishedPacks,
         IReadOnlyList<NeuroPack> installedPacks,
         string userId = "anonymous",
-        string? sessionId = null)
+        string? clientId = null)
     {
         userId = EffectiveUserId(userId);
         var installedKeys = installedPacks
@@ -42,7 +42,7 @@ public static class MarketplaceUiSurfaces
                 props: new Dictionary<string, object?>
                 {
                     ["userId"] = userId,
-                    ["sessionId"] = sessionId,
+                    ["clientId"] = clientId,
                     ["packs"] = packs,
                     ["installAction"] = UiSurfaceActions.SynapseAction(
                         "install-pack",
@@ -52,7 +52,7 @@ public static class MarketplaceUiSurfaces
                         {
                             ["buyerId"] = userId,
                             ["userId"] = userId,
-                            ["sessionId"] = sessionId
+                            ["sessionId"] = clientId
                         }),
                     ["updateAction"] = UiSurfaceActions.SynapseAction(
                         "update-pack",
@@ -62,7 +62,7 @@ public static class MarketplaceUiSurfaces
                         {
                             ["buyerId"] = userId,
                             ["userId"] = userId,
-                            ["sessionId"] = sessionId
+                            ["sessionId"] = clientId
                         })
                 }));
     }
@@ -138,7 +138,7 @@ public static class MarketplaceUiSurfaces
         IReadOnlyList<NeuroPack> publishedPacks,
         IReadOnlyList<NeuroPack> installedPacks,
         string userId = "anonymous",
-        string? sessionId = null)
+        string? clientId = null)
     {
         userId = EffectiveUserId(userId);
         var installedKeys = installedPacks
@@ -150,7 +150,7 @@ public static class MarketplaceUiSurfaces
                 installedKeys.Contains(PackKey(pack)) ||
                 IsPreinstalledLocalPack(pack)))
             .GroupBy(PackKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group => BundleRow(group.First(), userId, sessionId))
+            .Select(group => BundleRow(group.First(), userId, clientId))
             .ToArray();
 
         var experiences = bundles
@@ -161,7 +161,7 @@ public static class MarketplaceUiSurfaces
                     : Array.Empty<IReadOnlyDictionary<string, object?>>())
             .ToArray();
 
-        var launcherTree = BuildInstalledLauncherTree(bundles, userId, sessionId);
+        var launcherTree = BuildInstalledLauncherTree(bundles, userId, clientId);
         return new UiSurface(
             UiSurfaceKinds.InstalledBundles,
             WithCommon(
@@ -173,7 +173,7 @@ public static class MarketplaceUiSurfaces
                 props: new Dictionary<string, object?>
                 {
                     ["userId"] = userId,
-                    ["sessionId"] = sessionId,
+                    ["clientId"] = clientId,
                     ["bundles"] = bundles,
                     ["experiences"] = experiences,
                     ["tree"] = launcherTree
@@ -257,16 +257,16 @@ public static class MarketplaceUiSurfaces
         return new UiWidgetTree("column", new Dictionary<string, object?>(), kids);
     }
 
-    private static Dictionary<string, object?> BundleRow(NeuroPack pack, string userId, string? sessionId)
+    private static Dictionary<string, object?> BundleRow(NeuroPack pack, string userId, string? clientId)
     {
-        var experiences = ExperiencesForPack(pack, userId, sessionId).ToArray();
+        var experiences = ExperiencesForPack(pack, userId, clientId).ToArray();
         return new Dictionary<string, object?>
         {
             ["name"] = pack.Name,
             ["version"] = pack.Version,
             ["ownerId"] = pack.OwnerId,
             ["userId"] = userId,
-            ["sessionId"] = sessionId,
+            ["clientId"] = clientId,
             ["installed"] = true,
             ["hasUi"] = true,
             ["status"] = experiences.Length == 0 ? "installed" : "ready",
@@ -277,7 +277,7 @@ public static class MarketplaceUiSurfaces
         };
     }
 
-    private static IEnumerable<IReadOnlyDictionary<string, object?>> ExperiencesForPack(NeuroPack pack, string userId, string? sessionId)
+    private static IEnumerable<IReadOnlyDictionary<string, object?>> ExperiencesForPack(NeuroPack pack, string userId, string? clientId)
     {
         if (pack.Name.Equals("DigitalBrain.UI.Workbench", StringComparison.OrdinalIgnoreCase))
         {
@@ -297,7 +297,7 @@ public static class MarketplaceUiSurfaces
                         ["sessionId"] = "workbench"
                     }),
                 userId,
-                sessionId);
+                clientId);
         }
         else if (pack.Name.Equals("DigitalBrain.UI.Graph3D", StringComparison.OrdinalIgnoreCase))
         {
@@ -317,7 +317,7 @@ public static class MarketplaceUiSurfaces
                         ["sessionId"] = "workbench"
                     }),
                 userId,
-                sessionId);
+                clientId);
         }
         else if (pack.Name.Equals("DigitalBrain.UI.CreatorSurfaces", StringComparison.OrdinalIgnoreCase))
         {
@@ -337,7 +337,7 @@ public static class MarketplaceUiSurfaces
                         ["sessionId"] = "workbench"
                     }),
                 userId,
-                sessionId);
+                clientId);
         }
         else if (pack.Name.Equals("DigitalBrain.UI.AspireFlutter", StringComparison.OrdinalIgnoreCase))
         {
@@ -356,7 +356,7 @@ public static class MarketplaceUiSurfaces
                         ["resourceName"] = "flutter-ui"
                     }),
                 userId,
-                sessionId);
+                clientId);
         }
         else if (pack.Name.Equals("DigitalBrain.Experience.GmailInsights", StringComparison.OrdinalIgnoreCase))
         {
@@ -376,7 +376,7 @@ public static class MarketplaceUiSurfaces
                         ["action"] = "gmail:last-100-chart"
                     }),
                 userId,
-                sessionId);
+                clientId);
         }
         else if (pack.Name.Contains("ClosedLoop", StringComparison.OrdinalIgnoreCase))
         {
@@ -397,7 +397,7 @@ public static class MarketplaceUiSurfaces
                         ["prompt"] = "Run installed bundle " + pack.Name
                     }),
                 userId,
-                sessionId);
+                clientId);
         }
         else if (pack.Name.Contains("Dummy", StringComparison.OrdinalIgnoreCase) || pack.Name.Contains("DevPack", StringComparison.OrdinalIgnoreCase))
         {
@@ -413,7 +413,7 @@ public static class MarketplaceUiSurfaces
                     nameof(ExperienceUsed),
                     new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "self-test" }),
                 userId,
-                sessionId);
+                clientId);
             yield return ExperienceRow(
                 pack,
                 "emit-test-surface",
@@ -426,7 +426,7 @@ public static class MarketplaceUiSurfaces
                     nameof(ExperienceUsed),
                     new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "emit-test-surface" }),
                 userId,
-                sessionId);
+                clientId);
         }
         else
         {
@@ -442,7 +442,7 @@ public static class MarketplaceUiSurfaces
                     nameof(ExperienceUsed),
                     new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "run" }),
                 userId,
-                sessionId);
+                clientId);
             yield return ExperienceRow(
                 pack,
                 "emit-test-surface",
@@ -455,7 +455,7 @@ public static class MarketplaceUiSurfaces
                     nameof(ExperienceUsed),
                     new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "emit-test-surface" }),
                 userId,
-                sessionId);
+                clientId);
         }
     }
 
@@ -467,17 +467,17 @@ public static class MarketplaceUiSurfaces
         string summary,
         IReadOnlyDictionary<string, object?> action,
         string userId,
-        string? sessionId) => new Dictionary<string, object?>
+        string? clientId) => new Dictionary<string, object?>
         {
             ["experienceId"] = ExperienceSlug(pack, suffix),
             ["bundleName"] = pack.Name,
             ["userId"] = userId,
-            ["sessionId"] = sessionId,
+            ["clientId"] = clientId,
             ["name"] = name,
             ["kind"] = kind,
             ["status"] = "ready",
             ["summary"] = summary,
-            ["action"] = ScopedAction(action, userId, sessionId)
+            ["action"] = ScopedAction(action, userId, clientId)
         };
 
     private static string EffectiveUserId(string? userId) =>
@@ -486,7 +486,7 @@ public static class MarketplaceUiSurfaces
     private static IReadOnlyDictionary<string, object?> ScopedAction(
         IReadOnlyDictionary<string, object?> action,
         string userId,
-        string? sessionId)
+        string? clientId)
     {
         var scopedAction = new Dictionary<string, object?>(action);
         var props = action.TryGetValue(UiSurfaceKeys.Props, out var value) &&
@@ -495,7 +495,7 @@ public static class MarketplaceUiSurfaces
                 : new Dictionary<string, object?>();
 
         props["userId"] = EffectiveUserId(userId);
-        props["sessionId"] = sessionId;
+        props["sessionId"] = clientId;
 
         if (string.Equals(action.TryGetValue(UiSurfaceKeys.SynapseType, out var type) ? type?.ToString() : null,
                 nameof(InstallFromMarketplace),
