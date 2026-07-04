@@ -139,8 +139,6 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
             }))
         }, TestServerCallContext.Create());
 
-        var session = Cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
-        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Last().SessionId;
         _configScope = PackConfigScopes.ForUser(new UserId(Scope));
 
         var values = new Dictionary<string, string>
@@ -150,7 +148,7 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
             ["llm_key"] = key,
             ["pack"] = PackName,
             ["scope"] = _configScope,
-            ["sessionId"] = sessionId
+            ["clientId"] = "test"
         };
         var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
 
@@ -329,8 +327,6 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
             }))
         }, TestServerCallContext.Create());
 
-        var session = Cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
-        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Last().SessionId;
         _configScope = PackConfigScopes.ForUser(new UserId(N1Scope));
 
         var values = new Dictionary<string, string>
@@ -340,7 +336,7 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
             ["llm_key"]        = key,
             ["pack"]           = ResponderPackName,
             ["scope"]          = _configScope,
-            ["sessionId"]      = sessionId
+            ["clientId"]       = "test"
         };
         var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
 
