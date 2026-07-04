@@ -517,30 +517,54 @@ public static class UiSurfaceLiveData
         var progresses = taskEvents.OfType<TaskProgress>().ToList();
         var completed = taskEvents.OfType<TaskCompleted>().ToList();
         var cancelled = taskEvents.OfType<TaskCancelled>().ToList();
+        var completedIds = completed.Select(c => c.TaskId).ToHashSet();
+        var cancelledIds = cancelled.Select(c => c.TaskId).ToHashSet();
+        var createdIds = created.Select(c => c.TaskId).Distinct().ToArray();
 
-        int activeCount = Math.Max(0, created.Count - completed.Count - cancelled.Count);
+        int activeCount = createdIds.Count(id => !completedIds.Contains(id) && !cancelledIds.Contains(id));
 
-        var taskRows = created.TakeLast(maxEvents).Select(c =>
+        var taskRows = created
+            .GroupBy(c => c.TaskId)
+            .Select(g => g.Last())
+            .TakeLast(maxEvents)
+            .Select(c =>
         {
             var latest = progresses.LastOrDefault(p => p.TaskId == c.TaskId);
-            string status = completed.Any(x => x.TaskId == c.TaskId) ? "completed"
-                : cancelled.Any(x => x.TaskId == c.TaskId) ? "cancelled"
+            var completion = completed.LastOrDefault(x => x.TaskId == c.TaskId);
+            var cancellation = cancelled.LastOrDefault(x => x.TaskId == c.TaskId);
+            string status = completion is not null ? "completed"
+                : cancellation is not null ? "cancelled"
                 : latest != null ? "running:" + latest.Detail : "created";
+            string state = completion is not null ? "completed"
+                : cancellation is not null ? "cancelled"
+                : "active";
+            var eventRows = taskEvents
+                .Where(e => IsTaskEventFor(e, c.TaskId))
+                .OrderBy(e => e.Timestamp)
+                .Select(TaskEventRow)
+                .ToArray();
 
             var row = new Dictionary<string, object?>
             {
                 ["taskId"] = c.TaskId.Value,
+                ["description"] = c.Description,
                 ["correlationId"] = c.SynapseId,
                 ["shortHash"] = c.TaskId.Value.Length > 8 ? c.TaskId.Value[..8] : c.TaskId.Value,
                 ["originNeuron"] = c.Sender?.Value ?? "kernel",
                 ["originIcon"] = "task",
                 ["ageMs"] = (int)(DateTimeOffset.UtcNow - c.Timestamp).TotalMilliseconds,
                 ["edgeCount"] = 1,
+                ["state"] = state,
                 ["status"] = status,
+                ["latestProgress"] = latest?.Detail,
+                ["result"] = completion?.Result,
+                ["events"] = eventRows,
+                ["completed"] = completion is not null,
+                ["cancelled"] = cancellation is not null,
                 ["userId"] = userId,
                 ["clientId"] = clientId
             };
-            if (!completed.Any(x => x.TaskId == c.TaskId) && !cancelled.Any(x => x.TaskId == c.TaskId))
+            if (completion is null && cancellation is null)
             {
                 row["cancelAction"] = UiSurfaceSamples.SynapseAction(
                     "cancel-task",
@@ -561,8 +585,18 @@ public static class UiSurfaceLiveData
         {
             ["active"] = activeCount,
             ["completed"] = completed.Count,
+            ["cancelled"] = cancelled.Count,
             ["failed"] = 0
         };
+        var runAction = UiSurfaceSamples.SynapseAction(
+            "run-task",
+            "Run Task",
+            nameof(RunTask),
+            new Dictionary<string, object?>
+            {
+                ["userId"] = userId,
+                ["sessionId"] = clientId
+            });
 
         return new UiSurface(
             UiSurfaceKinds.TaskManager,
@@ -578,17 +612,160 @@ public static class UiSurfaceLiveData
                     ["clientId"] = clientId,
                     ["totals"] = totals,
                     ["tasks"] = taskRows,
-                    ["runAction"] = UiSurfaceSamples.SynapseAction(
-                        "run-task",
-                        "Run Task",
-                        nameof(RunTask),
-                        new Dictionary<string, object?>
-                        {
-                            ["userId"] = userId,
-                            ["sessionId"] = clientId
-                        })
+                    ["runAction"] = runAction,
+                    ["tree"] = TaskManagerTree(taskRows, totals, runAction)
                 }));
     }
+
+    private static UiWidgetTree TaskManagerTree(
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> taskRows,
+        IReadOnlyDictionary<string, object?> totals,
+        IReadOnlyDictionary<string, object?> runAction)
+    {
+        var children = new List<UiWidgetTree>
+        {
+            new("text", new Dictionary<string, object?>
+            {
+                ["text"] = $"Active: {totals["active"]}  Completed: {totals["completed"]}  Cancelled: {totals["cancelled"]}"
+            }),
+            new("row", new Dictionary<string, object?>(), new[]
+            {
+                new UiWidgetTree("fbutton", new Dictionary<string, object?>(runAction))
+            })
+        };
+
+        var active = taskRows.Where(IsActiveTaskRow).ToArray();
+        var completed = taskRows.Where(row => Equals(row.GetValueOrDefault("state"), "completed")).ToArray();
+        var cancelled = taskRows.Where(row => Equals(row.GetValueOrDefault("state"), "cancelled")).ToArray();
+
+        children.Add(TaskSectionTree("Active", active));
+        children.Add(TaskSectionTree("Completed", completed));
+        children.Add(TaskSectionTree("Cancelled", cancelled));
+
+        return new UiWidgetTree("column", new Dictionary<string, object?>(), children);
+    }
+
+    private static UiWidgetTree TaskSectionTree(
+        string title,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows)
+    {
+        var children = rows.Count == 0
+            ? new List<UiWidgetTree>
+            {
+                new("text", new Dictionary<string, object?> { ["text"] = "No tasks" })
+            }
+            : rows.Select(TaskCardTree).ToList();
+
+        return new UiWidgetTree("fcard", new Dictionary<string, object?>
+        {
+            ["title"] = title,
+            ["subtitle"] = rows.Count.ToString()
+        }, children);
+    }
+
+    private static UiWidgetTree TaskCardTree(IReadOnlyDictionary<string, object?> row)
+    {
+        var taskId = StringProp(row, "taskId", "task");
+        var description = StringProp(row, "description");
+        var status = StringProp(row, "status", "created");
+        var latest = StringProp(row, "latestProgress");
+        var result = StringProp(row, "result");
+        var children = new List<UiWidgetTree>();
+
+        if (!string.IsNullOrWhiteSpace(description))
+            children.Add(new("text", new Dictionary<string, object?> { ["text"] = description }));
+        if (!string.IsNullOrWhiteSpace(latest))
+            children.Add(new("text", new Dictionary<string, object?> { ["text"] = "Progress: " + latest }));
+        if (!string.IsNullOrWhiteSpace(result))
+            children.Add(new("text", new Dictionary<string, object?> { ["text"] = "Result: " + result }));
+        if (row.TryGetValue("events", out var rawEvents) &&
+            rawEvents is IEnumerable<IReadOnlyDictionary<string, object?>> events)
+        {
+            var eventText = string.Join(" -> ", events.Select(e => StringProp(e, "label")).Where(s => !string.IsNullOrWhiteSpace(s)));
+            if (!string.IsNullOrWhiteSpace(eventText))
+                children.Add(new("text", new Dictionary<string, object?> { ["text"] = "Events: " + eventText }));
+        }
+
+        if (row.TryGetValue("cancelAction", out var rawAction) &&
+            rawAction is IReadOnlyDictionary<string, object?> cancelAction)
+        {
+            children.Add(new("row", new Dictionary<string, object?>(), new[]
+            {
+                new UiWidgetTree("fbutton", new Dictionary<string, object?>(cancelAction))
+            }));
+        }
+
+        return new UiWidgetTree("fcard", new Dictionary<string, object?>
+        {
+            ["title"] = taskId,
+            ["subtitle"] = status
+        }, children);
+    }
+
+    private static bool IsActiveTaskRow(IReadOnlyDictionary<string, object?> row) =>
+        !Equals(row.GetValueOrDefault("state"), "completed") &&
+        !Equals(row.GetValueOrDefault("state"), "cancelled");
+
+    private static bool IsTaskEventFor(Synapse synapse, TaskId taskId) =>
+        synapse switch
+        {
+            TaskCreated e => e.TaskId == taskId,
+            TaskStarted e => e.TaskId == taskId,
+            TaskProgress e => e.TaskId == taskId,
+            TaskCompleted e => e.TaskId == taskId,
+            TaskCancelled e => e.TaskId == taskId,
+            _ => false
+        };
+
+    private static Dictionary<string, object?> TaskEventRow(Synapse synapse) =>
+        synapse switch
+        {
+            TaskCreated e => new()
+            {
+                ["type"] = nameof(TaskCreated),
+                ["label"] = "created",
+                ["detail"] = e.Description,
+                ["at"] = e.Timestamp
+            },
+            TaskStarted e => new()
+            {
+                ["type"] = nameof(TaskStarted),
+                ["label"] = "started",
+                ["detail"] = null,
+                ["at"] = e.Timestamp
+            },
+            TaskProgress e => new()
+            {
+                ["type"] = nameof(TaskProgress),
+                ["label"] = e.Detail,
+                ["detail"] = e.Detail,
+                ["at"] = e.Timestamp
+            },
+            TaskCompleted e => new()
+            {
+                ["type"] = nameof(TaskCompleted),
+                ["label"] = "completed",
+                ["detail"] = e.Result,
+                ["at"] = e.Timestamp
+            },
+            TaskCancelled e => new()
+            {
+                ["type"] = nameof(TaskCancelled),
+                ["label"] = "cancelled",
+                ["detail"] = null,
+                ["at"] = e.Timestamp
+            },
+            _ => new()
+            {
+                ["type"] = synapse.Type,
+                ["label"] = synapse.Type,
+                ["detail"] = null,
+                ["at"] = synapse.Timestamp
+            }
+        };
+
+    private static string StringProp(IReadOnlyDictionary<string, object?> row, string key, string fallback = "") =>
+        row.TryGetValue(key, out var value) ? value?.ToString() ?? fallback : fallback;
 
     private static string EffectiveUserId(string? userId) =>
         string.IsNullOrWhiteSpace(userId) ? "anonymous" : userId.Trim();

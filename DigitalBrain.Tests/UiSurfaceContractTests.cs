@@ -273,6 +273,63 @@ public class UiSurfaceContractTests
         Assert.Equal("task-alice-1", cancelProps["taskId"]);
         Assert.Equal("alice", cancelProps["userId"]);
         Assert.Equal("client-1", cancelProps["sessionId"]);
+
+        Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
+        Assert.Equal("Summarize latest mail", row["description"]);
+        Assert.Equal("active", row["state"]);
+    }
+
+    [Fact]
+    public void Live_TaskManager_Surface_Renders_Active_Completed_And_Cancelled_Tasks()
+    {
+        var activeTask = new TaskId("task-active");
+        var completedTask = new TaskId("task-completed");
+        var cancelledTask = new TaskId("task-cancelled");
+
+        var surface = UiSurfaceLiveData.TaskManagerFromTasks(
+            new Synapse[]
+            {
+                new TaskCreated(activeTask, "Keep working"),
+                new TaskStarted(activeTask),
+                new TaskProgress(activeTask, "running"),
+                new TaskCreated(completedTask, "Finish report"),
+                new TaskProgress(completedTask, "finalizing"),
+                new TaskCompleted(completedTask, "report ready"),
+                new TaskCreated(cancelledTask, "Stop this"),
+                new TaskCancelled(cancelledTask)
+            },
+            userId: "alice",
+            clientId: "client-1");
+
+        var totals = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(surface.Props["totals"]);
+        Assert.Equal(1, totals["active"]);
+        Assert.Equal(1, totals["completed"]);
+        Assert.Equal(1, totals["cancelled"]);
+
+        var rows = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(surface.Props["tasks"])
+            .ToArray();
+        var activeRow = rows.Single(row => Equals(row["taskId"], "task-active"));
+        var completedRow = rows.Single(row => Equals(row["taskId"], "task-completed"));
+        var cancelledRow = rows.Single(row => Equals(row["taskId"], "task-cancelled"));
+
+        Assert.Equal("active", activeRow["state"]);
+        Assert.True(activeRow.ContainsKey("cancelAction"));
+        Assert.Equal("completed", completedRow["state"]);
+        Assert.Equal("report ready", completedRow["result"]);
+        Assert.False(completedRow.ContainsKey("cancelAction"));
+        Assert.Equal("cancelled", cancelledRow["state"]);
+        Assert.False(cancelledRow.ContainsKey("cancelAction"));
+
+        var events = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(completedRow["events"]);
+        Assert.Contains(events, e => Equals(e["type"], nameof(TaskCompleted)));
+
+        var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
+        var descendants = Descend(tree).ToArray();
+        Assert.Contains(descendants, node => node.Type == "fcard" && Equals(node.Props["title"], "Active"));
+        Assert.Contains(descendants, node => node.Type == "fcard" && Equals(node.Props["title"], "Completed"));
+        Assert.Contains(descendants, node => node.Type == "fcard" && Equals(node.Props["title"], "Cancelled"));
+        Assert.Contains(descendants, node => node.Type == "fbutton" && Equals(node.Props[UiSurfaceKeys.Label], "Run Task"));
+        Assert.Contains(descendants, node => node.Type == "fbutton" && Equals(node.Props[UiSurfaceKeys.Label], "Cancel"));
     }
 
     [Fact]
@@ -338,6 +395,20 @@ public class UiSurfaceContractTests
 
     private static void AssertCommonProp(UiSurface surface, string key) =>
         Assert.True(surface.Props.ContainsKey(key), $"{surface.Kind} is missing common prop '{key}'.");
+
+    private static IEnumerable<UiWidgetTree> Descend(UiWidgetTree node)
+    {
+        yield return node;
+        if (node.Children is null) yield break;
+
+        foreach (var child in node.Children)
+        {
+            foreach (var descendant in Descend(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
 
     private static IReadOnlyDictionary<string, object?> AssertSynapseAction(object? value, string expectedSynapseType)
     {
