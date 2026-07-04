@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -46,6 +47,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   StreamSubscription<gw.RfwCardEnvelope>? _homeFeedSub;
   StreamSubscription<gw.SynapseEnvelope>? _authSignalSub;
   StreamSubscription<dynamic>? _channelStateSub;
+  final String _clientId = 'shell-${Random().nextInt(1 << 31)}';
 
   // Live data from neurons (minimal state for composition; all chrome/content from neuron trees)
   Map<String, Object?>? _shellTree;
@@ -93,7 +95,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
 
       _homeFeedSub?.cancel();
       final sub = client
-          .watchHomeFeed(gw.WatchHomeFeedRequest())
+          .watchHomeFeed(gw.WatchHomeFeedRequest(clientId: _clientId))
           .listen(_onCard, onError: _onFeedError, onDone: _onFeedDone);
       _authSignalSub?.cancel();
       final authSub = client

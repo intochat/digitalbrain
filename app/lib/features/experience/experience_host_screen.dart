@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -36,6 +37,7 @@ class _ExperienceHostScreenState extends State<ExperienceHostScreen> {
   DigitalBrainGatewayClient? _client;
   StreamSubscription<gw.RfwCardEnvelope>? _feedSub;
   bool _startFired = false;
+  final String _clientId = 'experience-${Random().nextInt(1 << 31)}';
 
   Map<String, Object?>? _hopData;
   String? _hopCorrelationId;
@@ -57,10 +59,17 @@ class _ExperienceHostScreenState extends State<ExperienceHostScreen> {
   void _connect() {
     try {
       final (host, port, secure) = resolveKernelEndpoint();
-      final channel = createKernelChannel(host: host, port: port, secure: secure);
-      final client = DigitalBrainGatewayClient(channel, interceptors: kernelInterceptors());
+      final channel = createKernelChannel(
+        host: host,
+        port: port,
+        secure: secure,
+      );
+      final client = DigitalBrainGatewayClient(
+        channel,
+        interceptors: kernelInterceptors(),
+      );
       final sub = client
-          .watchHomeFeed(gw.WatchHomeFeedRequest())
+          .watchHomeFeed(gw.WatchHomeFeedRequest(clientId: _clientId))
           .listen(_onCard, onError: _onError);
       setState(() {
         _channel = channel;
@@ -105,10 +114,12 @@ class _ExperienceHostScreenState extends State<ExperienceHostScreen> {
     final envelope = buildActionEnvelope(name, args);
     final client = _client;
     if (envelope == null || client == null) return;
-    client.send(envelope).then(
-      (_) {},
-      onError: (Object error) => _onError(error, StackTrace.current),
-    );
+    client
+        .send(envelope)
+        .then(
+          (_) {},
+          onError: (Object error) => _onError(error, StackTrace.current),
+        );
   }
 
   void _fireStart() {
@@ -119,15 +130,19 @@ class _ExperienceHostScreenState extends State<ExperienceHostScreen> {
     final envelope = gw.SynapseEnvelope()
       ..correlationId = 'start-$pack'
       ..typeName = 'ExperienceStep'
-      ..payload = utf8.encode(jsonEncode({
-        'pack': pack,
-        'experienceId': experienceId,
-        'eventName': 'start',
-      }));
-    client.send(envelope).then(
-      (_) {},
-      onError: (Object error) => _onError(error, StackTrace.current),
-    );
+      ..payload = utf8.encode(
+        jsonEncode({
+          'pack': pack,
+          'experienceId': experienceId,
+          'eventName': 'start',
+        }),
+      );
+    client
+        .send(envelope)
+        .then(
+          (_) {},
+          onError: (Object error) => _onError(error, StackTrace.current),
+        );
   }
 
   @override
