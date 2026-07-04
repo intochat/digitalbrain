@@ -1,9 +1,11 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Config;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Demo.Runtime;
 using DigitalBrain.Google;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Kernel.Market;
@@ -48,6 +50,55 @@ public class GatewayServiceTests : NeuronTestBase
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance);
+
+    [Fact]
+    public async Task ConfigurationProvided_With_Scope_Not_Owned_By_Caller_Is_Rejected()
+    {
+        // NewService() passes packConfigStore: null, which trips the earlier "store not configured" guard
+        // before ever reaching the scope check. Build a service with a real store instead.
+        var services = new ServiceCollection();
+        services.AddPackConfigStore(blobsForKeyRing: null);
+        var packConfigStore = services.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
+
+        var svc = new GatewayService(Cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
+            new SignalEgressBus(), new FakeHostEnvironment(), NullLogger<GatewayService>.Instance, packConfigStore);
+
+        var ex = await Assert.ThrowsAsync<RpcException>(() => svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(ConfigurationProvided),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                pack = "some-pack",
+                scope = "user:someone-else",
+                secretField = "value"
+            }))
+        }, TestContext()));
+
+        Assert.Equal(StatusCode.PermissionDenied, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task InstallFromMarketplace_Ignores_Client_Supplied_BuyerId_When_Unauthenticated()
+    {
+        using var subscription = _homeFeedBus.Subscribe();
+        var svc = NewService();
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(InstallFromMarketplace),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                packName = "nonexistent-pack",
+                version = "1.0",
+                buyerId = "attacker-supplied-victim-id"
+            }))
+        }, TestContext());
+
+        var market = Grain<IMarketplaceNeuron>("market-main");
+        var timeline = await market.GetOutgoingTimelineAsync();
+        var install = Assert.Single(timeline.OfType<InstallFromMarketplace>(), i => i.PackName == "nonexistent-pack");
+        Assert.Equal("anonymous", install.BuyerId);
+    }
 
     [Fact]
     public async Task Ask_Ino_ReturnsNonEmptyReply()
@@ -190,10 +241,28 @@ public class GatewayServiceTests : NeuronTestBase
     {
         _marketClient.Price = "$42,123.45";
         var svc = NewService();
+
+        // InoRequest now resolves sessionId through ResolveSessionAsync (a client-supplied id that never
+        // logged in resolves to null, per this task's identity-trust fix), so this test must present a real
+        // session — an arbitrary literal like the old "chat-session-btc" would no longer round-trip.
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(LoginRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                username = "bitcoin-price-user",
+                password = "correct horse battery staple",
+                clientId = "test"
+            }))
+        }, TestContext());
+
+        var session = Grain<IUserSessionNeuron>("session-main");
+        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Single().SessionId;
+
         var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
         {
             prompt = "what's the bitcoin price?",
-            sessionId = "chat-session-btc"
+            sessionId
         });
 
         await svc.Send(new SynapseEnvelope
@@ -207,7 +276,7 @@ public class GatewayServiceTests : NeuronTestBase
 
         var surface = Assert.Single(timeline.OfType<UiSurface>());
         Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
-        Assert.Equal("chat-session-btc", surface.Props["sessionId"]);
+        Assert.Equal(sessionId, surface.Props["sessionId"]);
         Assert.Equal("assistant", surface.Props["role"]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
