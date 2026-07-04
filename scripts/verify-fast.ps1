@@ -33,11 +33,17 @@ param(
     [switch]$KeepAspireStopped
 )
 
-$ErrorActionPreference = 'Stop'
-Set-StrictMode -Version Latest
+# Do not enable global StrictMode or ErrorActionPreference=Stop here. Flutter's
+# Windows launcher can stall before dart.exe starts under those PowerShell
+# policies. This script checks external-process exit codes explicitly instead.
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $AppHost = 'NeuroOSPrototype.AppHost\NeuroOSPrototype.AppHost.csproj'
+$FlutterBatCommand = Get-Command 'flutter.bat' -ErrorAction SilentlyContinue
+if ($null -eq $FlutterBatCommand) {
+    throw 'flutter.bat was not found on PATH.'
+}
+$FlutterBat = $FlutterBatCommand.Source
 
 $KernelFilter = @(
     'FullyQualifiedName~HomeFeedBusTests',
@@ -50,20 +56,6 @@ $KernelFilter = @(
     'FullyQualifiedName~DigitalBrainModelRegistryTests',
     'FullyQualifiedName~ChatClientRegistrationTests'
 ) -join '|'
-
-$FlutterAnalyzeTargets = @(
-    'lib\grpc\action_dispatch.dart',
-    'lib\shell\forui_app_shell.dart',
-    'lib\features\experience\experience_host_screen.dart',
-    'lib\features\canvas\living_canvas_screen.dart',
-    'test\grpc\action_dispatch_test.dart',
-    'test\shell\forui_app_shell_test.dart'
-)
-
-$FlutterTestTargets = @(
-    'test\grpc\action_dispatch_test.dart',
-    'test\shell\forui_app_shell_test.dart'
-)
 
 function Invoke-Step {
     param(
@@ -188,18 +180,32 @@ try {
     }
 
     if ($IncludeFlutter) {
+        # Analyze accepts explicit paths from the repo root. That avoids changing
+        # PowerShell location before Flutter's Windows launcher starts.
+        & $FlutterBat analyze `
+            'app\lib\grpc\action_dispatch.dart' `
+            'app\lib\shell\forui_app_shell.dart' `
+            'app\lib\features\experience\experience_host_screen.dart' `
+            'app\lib\features\canvas\living_canvas_screen.dart' `
+            'app\test\grpc\action_dispatch_test.dart' `
+            'app\test\shell\forui_app_shell_test.dart'
+        if ($LASTEXITCODE -ne 0) {
+            throw "flutter analyze targeted shell/client files failed with exit code $LASTEXITCODE"
+        }
+
         Push-Location (Join-Path $RepoRoot 'app')
         try {
-            Invoke-Step 'flutter analyze targeted shell/client files' {
-                Invoke-External 'flutter' (@('analyze') + $FlutterAnalyzeTargets)
-            }
-            Invoke-Step 'flutter test targeted shell/client tests' {
-                Invoke-External 'flutter' (@('test') + $FlutterTestTargets)
+            & $FlutterBat test `
+                'test\grpc\action_dispatch_test.dart' `
+                'test\shell\forui_app_shell_test.dart'
+            if ($LASTEXITCODE -ne 0) {
+                throw "flutter test targeted shell/client tests failed with exit code $LASTEXITCODE"
             }
         }
         finally {
             Pop-Location
         }
+        Write-Host 'ok: flutter analyze/test targeted shell/client files'
     }
 
     $kernelTestArgs = @('test', 'DigitalBrain.Tests\DigitalBrain.Tests.csproj', '-m:1')
