@@ -41,7 +41,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
         await FireAsync(listSurface);
         if (bus != null)
         {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(listSurface, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(listSurface, Self.Value));
         }
     }
 
@@ -154,7 +154,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
         var bus2 = ServiceProvider.GetService<HomeFeedBus>();
         if (bus2 != null)
         {
-            bus2.Broadcast(UiSurfaceRfwBridge.FromUiSurface(refInst, Self.Value));
+            await bus2.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(refInst, Self.Value));
         }
 
         Logger.LogInformation("Marketplace INSTALL {Key} by {Buyer}. Commission {Rate:P0} taken for seller {Seller}.",
@@ -187,7 +187,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus is not null)
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
     }
 
     private IReadOnlyList<NeuroPack> GetPublishedPacks()

@@ -30,7 +30,10 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
 
         await FireAsync(surface);
-        ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
+        {
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        }
     }
 
     private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props)
@@ -192,7 +195,10 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId, message);
 
         await FireAsync(surface);
-        ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
+        {
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        }
     }
 
     private static bool IsOAuthStart(IReadOnlyDictionary<string, object?> props) =>

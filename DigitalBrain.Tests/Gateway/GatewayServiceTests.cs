@@ -199,15 +199,15 @@ public class GatewayServiceTests : NeuronTestBase
         // subscribe round-trip a bounded, generous window before addressing cards.
         for (var attempt = 0; attempt < 40 && writer.Messages.Count < 2; attempt++)
         {
-            // DataJson varies per attempt because HomeFeedBus content-hash-dedups identical cards at the point
-            // of Broadcast (before any subscriber even sees them) — an unvarying probe would only ever land once.
-            HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "ReadinessProbe", $"{{\"attempt\":{attempt}}}", myClientId));
+            // DataJson varies per attempt because HomeFeedBus content-hash-dedups identical cards at publish time
+            // before any subscriber sees them — an unvarying probe would only ever land once.
+            await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "ReadinessProbe", $"{{\"attempt\":{attempt}}}", myClientId));
             await Task.Delay(25);
         }
 
-        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToMe", "{}", myClientId));
-        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToSomeoneElse", "{}", "someone-elses-client-id"));
-        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
+        await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "AddressedToMe", "{}", myClientId));
+        await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "AddressedToSomeoneElse", "{}", "someone-elses-client-id"));
+        await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "Unaddressed", "{}"));
 
         await Task.Delay(300);
         cts.Cancel();
@@ -229,8 +229,8 @@ public class GatewayServiceTests : NeuronTestBase
         for (var attempt = 0; attempt < 40 && writer.Messages.Count == 0; attempt++)
             await Task.Delay(25);
 
-        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToSomeone", "{}", "some-real-client-id"));
-        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "SystemUnaddressed", "{}"));
+        await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "AddressedToSomeone", "{}", "some-real-client-id"));
+        await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "SystemUnaddressed", "{}"));
 
         await Task.Delay(300);
         cts.Cancel();

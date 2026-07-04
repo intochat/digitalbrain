@@ -14,10 +14,9 @@ public sealed class FlutterUiNeuron(ILogger<FlutterUiNeuron> logger, NeuronJourn
         if (bus is not null)
         {
             var card = UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value);
-            bus.Broadcast(card);
+            await bus.BroadcastAsync(card);
         }
 
         Logger.LogInformation("FlutterUiNeuron handled UiSurface kind={Kind}", surface.Kind);
-        await Task.CompletedTask;
     }
 }

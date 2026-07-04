@@ -17,7 +17,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
 
         if (!ActiveSessions().Any())
         {
-            Broadcast(LoginSurface());
+            await BroadcastAsync(LoginSurface());
         }
     }
 
@@ -69,7 +69,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         await FireAsync(new LoginSucceeded(user.UserId, sessionId, user.DisplayName, user.Roles, clientId));
         await FireAsync(new UserSessionCreated(user.UserId, sessionId, expiresAt, clientId));
 
-        BroadcastSignedIn(user, sessionId, clientId);
+        await BroadcastSignedInAsync(user, sessionId, clientId);
 
         // Reuse the existing product-surface startup path after a real session exists.
         await GrainFactory.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new StartDistributedApp("digitalbrain"));
@@ -85,7 +85,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             await FireAsync(new UserSessionEnded(request.SessionId, clientId));
         }
 
-        Broadcast(LoginSurface(clientId: clientId));
+        await BroadcastAsync(LoginSurface(clientId: clientId));
     }
 
     public Task<UserSessionState?> GetSessionAsync(string sessionId)
@@ -139,7 +139,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         foreach (var surface in surfaces)
         {
             await FireAsync(surface);
-            Broadcast(surface);
+            await BroadcastAsync(surface);
         }
     }
 
@@ -210,10 +210,10 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
     private async Task RejectAsync(string username, string reason, string clientId)
     {
         await FireAsync(new LoginFailed(username, reason, clientId));
-        Broadcast(LoginSurface(reason, clientId));
+        await BroadcastAsync(LoginSurface(reason, clientId));
     }
 
-    private void BroadcastSignedIn(LocalUserRegistered user, string sessionId, string clientId)
+    private async Task BroadcastSignedInAsync(LocalUserRegistered user, string sessionId, string clientId)
     {
         var surface = new UiSurface("session-status", new Dictionary<string, object?>
         {
@@ -230,13 +230,16 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             ["body"] = $"Signed in as {user.DisplayName}"
         });
 
-        Broadcast(surface);
+        await BroadcastAsync(surface);
     }
 
-    private void Broadcast(UiSurface surface)
+    private async Task BroadcastAsync(UiSurface surface)
     {
         var bus = ServiceProvider.GetService<HomeFeedBus>();
-        bus?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        if (bus is not null)
+        {
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        }
     }
 
     private IReadOnlyList<Synapse> SessionJournal() =>

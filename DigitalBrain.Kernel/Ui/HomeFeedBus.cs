@@ -6,7 +6,7 @@ using Orleans.Streams;
 
 namespace DigitalBrain.Kernel.Ui;
 
-// Server-driven-UI backbone. Broadcast publishes an RfwCard onto an Orleans stream keyed by the card's
+// Server-driven-UI backbone. BroadcastAsync publishes an RfwCard onto an Orleans stream keyed by the card's
 // ClientId (or a well-known unaddressed key when ClientId is null); Orleans's own pub-sub delivers it to
 // exactly the WatchHomeFeed connections subscribed to that key, cluster-wide, regardless of which silo
 // published it or which silo the subscriber is attached to. Each WatchHomeFeed call subscribes directly to
@@ -15,30 +15,39 @@ namespace DigitalBrain.Kernel.Ui;
 public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBus>? logger = null)
 {
     private const int MaxSeenEntries = 5_000;
+    private const string ProviderName = "HomeFeed";
+    private const string StreamNamespace = "homefeed";
     private static readonly Guid UnaddressedKey = Guid.Empty;
     private readonly HashSet<string> _seen = new();
     private readonly Queue<string> _seenOrder = new();
     private readonly object _seenLock = new();
 
-    public void Broadcast(RfwCard card)
+    public async Task BroadcastAsync(RfwCard card)
     {
         if (IsDuplicate(card)) return;
 
-        var streamId = card.ClientId is null
-            ? StreamId.Create("homefeed", UnaddressedKey)
-            : StreamId.Create("homefeed", card.ClientId);
+        await PublishAsync(card);
+    }
 
-        _ = Task.Run(async () =>
+    // Compatibility path for legacy synchronous callers. Prefer BroadcastAsync from async handlers/tests so
+    // publish failures are observed by the caller instead of only being logged.
+    public void Broadcast(RfwCard card)
+    {
+        _ = BroadcastAndLogAsync(card);
+    }
+
+    private async Task BroadcastAndLogAsync(RfwCard card)
+    {
+        if (IsDuplicate(card)) return;
+
+        try
         {
-            try
-            {
-                await clusterClient.GetStreamProvider("HomeFeed").GetStream<RfwCard>(streamId).OnNextAsync(card);
-            }
-            catch (Exception ex)
-            {
-                logger?.LogError(ex, "HomeFeed stream publish failed for clientId={ClientId}", card.ClientId);
-            }
-        });
+            await PublishAsync(card);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "HomeFeed stream publish failed for clientId={ClientId}", card.ClientId);
+        }
     }
 
     // One subscription per WatchHomeFeed gRPC call: the caller's own personal stream (only if it supplied a
@@ -46,7 +55,7 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
     public async Task<Subscription> SubscribeAsync(string? clientId)
     {
         var channel = Channel.CreateUnbounded<RfwCard>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
-        var provider = clusterClient.GetStreamProvider("HomeFeed");
+        var provider = clusterClient.GetStreamProvider(ProviderName);
 
         Task OnCard(RfwCard card, StreamSequenceToken _)
         {
@@ -54,16 +63,27 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
             return Task.CompletedTask;
         }
 
-        var unaddressedHandle = await provider.GetStream<RfwCard>(StreamId.Create("homefeed", UnaddressedKey)).SubscribeAsync(OnCard);
+        var unaddressedHandle = await provider.GetStream<RfwCard>(StreamId.Create(StreamNamespace, UnaddressedKey)).SubscribeAsync(OnCard);
 
         StreamSubscriptionHandle<RfwCard>? personalHandle = null;
         if (!string.IsNullOrWhiteSpace(clientId))
         {
-            personalHandle = await provider.GetStream<RfwCard>(StreamId.Create("homefeed", clientId)).SubscribeAsync(OnCard);
+            personalHandle = await provider.GetStream<RfwCard>(StreamId.Create(StreamNamespace, clientId)).SubscribeAsync(OnCard);
         }
 
         return new Subscription(channel, unaddressedHandle, personalHandle);
     }
+
+    private static StreamId StreamIdFor(string? clientId) =>
+        clientId is null
+            ? StreamId.Create(StreamNamespace, UnaddressedKey)
+            : StreamId.Create(StreamNamespace, clientId);
+
+    private Task PublishAsync(RfwCard card) =>
+        clusterClient
+            .GetStreamProvider(ProviderName)
+            .GetStream<RfwCard>(StreamIdFor(card.ClientId))
+            .OnNextAsync(card);
 
     private bool IsDuplicate(RfwCard card)
     {

@@ -36,14 +36,14 @@ public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals j
         {
             var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
             var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, clientId: cmd.SessionId);
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
 
             var directData = System.Text.Json.JsonSerializer.Serialize(new
             {
                 totals = tm.Props.GetValueOrDefault("totals"),
                 tasks = tm.Props.GetValueOrDefault("tasks")
             });
-            bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+            await bus.BroadcastAsync(new RfwCard("digitalbrain", "TaskManagerCard", directData));
         }
     }
 
@@ -56,14 +56,14 @@ public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals j
         {
             var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
             var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, clientId: cmd.SessionId);
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
 
             var directData = System.Text.Json.JsonSerializer.Serialize(new
             {
                 totals = tm.Props.GetValueOrDefault("totals"),
                 tasks = tm.Props.GetValueOrDefault("tasks")
             });
-            bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+            await bus.BroadcastAsync(new RfwCard("digitalbrain", "TaskManagerCard", directData));
         }
     }
 
