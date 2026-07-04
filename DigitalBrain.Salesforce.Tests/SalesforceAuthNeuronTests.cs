@@ -185,6 +185,9 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
 
         Assert.False(result.Success);
         Assert.Equal("The callback state did not match the pending login.", result.Message);
+
+        var stored = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
+        Assert.False(stored.ContainsKey(SalesforceClientFactory.AccessTokenKey));
     }
 
     private static IEnumerable<UiWidgetTree> FindNodes(UiWidgetTree tree)
