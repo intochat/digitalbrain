@@ -1,14 +1,15 @@
 # CONTINUATION — Multi-User Feed Isolation: Client-Server Session Bridge
 
-Status: NOT STARTED — DESIGN NEEDED. A live production bug was found and mitigated with a **fail-open
-shim** the same day MULTIUSER Stage S2/S3 shipped; this doc is the handoff for designing and implementing
-the real fix. Until this lands, per-session feed isolation (P6a) is **not enforced** in the running app.
+Status: RESOLVED — see docs/superpowers/specs/2026-07-04-multiuser-feed-isolation-design.md (design) and
+docs/superpowers/plans/2026-07-04-multiuser-feed-isolation-clientid-routing.md (implementation). Per-session
+feed isolation (P6a) is enforced via per-clientId Orleans stream routing; the fail-open shim from commit
+50ed11e has been fully reverted.
 Repo: `E:\brain`. Prior art — read in this order: `docs/CONTINUATION-MULTIUSER-IDENTITY.md` (original
 identity design, decisions D-MU1–D-MU7, invariants I1–I5), `docs/CONTINUATION-MULTIUSER-S2-S3.md` (the S2/S3
 implementation this bug was found in, now shipped), `docs/superpowers/plans/2026-07-04-multiuser-s2-s3-
 identity-and-salesforce-per-user.md` (the implementation plan — its "Known Limitations" section has the
-full bug write-up), `CONTINUITY.md` (dated entries for Stage S1, Stage S2/S3, and the live-bug mitigation —
-read the two `2026-07-04` entries there before anything else). Date: 2026-07-04.
+full bug write-up), `CONTINUITY.md` (dated entries for Stage S1, Stage S2/S3, the live-bug mitigation, and
+the resolution — read the `2026-07-04` entries there before anything else). Date: 2026-07-04.
 
 ---
 

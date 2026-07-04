@@ -1,5 +1,60 @@
 # CONTINUITY — NeuroOS best-of-breed consolidation
 
+## 2026-07-04 — MULTIUSER Feed Isolation: ClientId Routing (fail-open shim fully reverted)
+
+Merged to master (brainstorm → spec → 9-task subagent-driven plan, design
+`docs/superpowers/specs/2026-07-04-multiuser-feed-isolation-design.md`, plan
+`docs/superpowers/plans/2026-07-04-multiuser-feed-isolation-clientid-routing.md`). Closes out the live
+production bug mitigated same-day by the fail-open shim in commit `50ed11e` (see the entry below) — this
+was the real fix that shim was standing in for.
+
+**Root design decision:** collapsed the client-facing identity to one concept, `clientId` — a token the
+client already half-had (it was hardcoded to the literal `"flutter"` everywhere, wired through the login
+form's `submitAction` payload but never populated per-connection). `sessionId` becomes purely internal to
+`UserSessionNeuron`, resolved on demand via a new `GetSessionByClientIdAsync(clientId)`; the client never
+sees, stores, or round-trips a real session id again. This reached its final shape iteratively in
+brainstorming — two earlier, more complex proposals (a session-rebinding control-plane message; a separate
+`Address()` method alongside `Broadcast()`) were rejected in favor of deleting the hand-rolled subscriber
+dictionary entirely: `HomeFeedBus` now publishes every `RfwCard` onto an Orleans stream keyed by
+`card.ClientId` (or the existing unaddressed key when null), and each `WatchHomeFeed` gRPC call subscribes
+directly to its own personal stream plus the shared system stream — no per-silo relay
+(`HomeFeedStreamSubscriber`, deleted), no in-process fan-out loop.
+
+**What shipped, task by task:** proto + `HomeFeedBus` Orleans-native rewrite; `GetSessionByClientIdAsync`;
+threading the real connecting `clientId` through `UserSessionNeuron`'s post-login broadcasts (shell,
+marketplace, task manager); `GatewayService.Send`'s `InstallFromMarketplace`/`ConfigurationProvided`/
+`LogoutRequest`/`InoRequest`/`SalesforceSignals.AuthRequested` branches all resolve real identity from
+`clientId` instead of a raw session id the client never has; all four Flutter `WatchHomeFeed` call sites
+(`chat_screen.dart`, `forui_app_shell.dart`, `living_canvas_screen.dart`, `experience_host_screen.dart`) now
+send a stable per-connection `clientId`. **All three fail-open shims from `50ed11e` are now fully
+reverted**: `HomeFeedBus` addressing is unconditional (moot anyway — routing is now per-stream, not a
+runtime check), `InoRequest`'s `clientId` resolves to a real session, and `SalesforceSignals.AuthRequested`
+rejects with `Unauthenticated` instead of falling back to `"anonymous"`.
+
+**Fixed beyond the original mitigation:** `InoNeuron.ResolveUserIdAsync` was calling `GetSessionAsync`
+against the chat screen's own per-widget correlation token — never a real session id — so
+Salesforce/Gmail identity resolution triggered from chat always silently fell through to the anonymous
+user, even under the fail-open shim. This is now `GetSessionByClientIdAsync`, resolving the real logged-in
+user.
+
+Every task in the 9-task plan hit at least one caller the plan's own file list missed (the same class of
+gap the S2/S3 plan hit with `ConfigFormSteps.cs`/`TelegramReactiveLoopSteps.cs`) — each found via a full
+solution build/test run, not a targeted grep, and fixed mechanically once found. One task (Task 5) replaced
+its own brief's regression test after discovering the test targeted a grain the chat-driven Salesforce flow
+never actually reaches; the replacement was independently verified as a strengthening, not a weakening, by
+tracing the full production call path. Full solution `dotnet test Brain.slnx`: 0 failures throughout (410
+tests, 6 pre-existing skips, unchanged baseline).
+
+**Live-verified**, not just unit-tested — the same gap that let the original bug reach production. Ran the
+AppHost via `aspire run`, drove the real kernel gRPC endpoint directly (the Flutter client here runs as a
+native Windows desktop app with no available GUI-automation surface, so this project's `verify` skill
+targets the gRPC boundary instead): two real logged-in users on distinct `clientId` connections never saw
+each other's shell/marketplace/task-manager cards; a chat-driven Salesforce credential-form request reached
+only the requesting connection; logout correctly re-showed the login form on the same connection; a direct
+Salesforce button-click request with no session was rejected `Unauthenticated`. No exceptions in kernel logs
+beyond expected client-disconnect noise and one pre-existing, unrelated `SystemStatusNeuron` self-awareness
+warning.
+
 ## 2026-07-04 — MULTIUSER Stage S2 (Identity Spine) + Stage S3 (Salesforce Per-User)
 
 Merged to master (subagent-driven, 9 tasks, plan
