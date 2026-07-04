@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cross_file/cross_file.dart';
@@ -17,6 +16,7 @@ import 'package:digitalbrain_flutter/grpc/endpoint.dart';
 import 'package:digitalbrain_flutter/grpc/google_auth_flow.dart';
 import 'package:digitalbrain_flutter/grpc/grpc_channel.dart';
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
+import 'package:digitalbrain_flutter/shell/app_session.dart';
 
 /// Native chat shell: message list + input bar, wired to the real kernel over gRPC.
 /// User bubbles are plain text; assistant bubbles render the neuron-emitted UiWidgetTree
@@ -26,11 +26,13 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     DigitalBrainGatewayClient Function()? debugClientFactory,
+    this.clientId = digitalBrainAppClientId,
   }) : _debugClientFactory = debugClientFactory;
 
   /// Test-only seam: lets a widget test force a deterministic connection failure
   /// instead of dialing the real kernel over gRPC.
   final DigitalBrainGatewayClient Function()? _debugClientFactory;
+  final String clientId;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -55,7 +57,7 @@ class _ChatScreenState extends State<ChatScreen> {
     'sqlite3',
   };
 
-  final String _clientId = 'chat-${Random().nextInt(1 << 31)}';
+  late final String _clientId = widget.clientId;
   final RfwRuntimeHost _rfwHost = RfwRuntimeHost();
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
@@ -133,7 +135,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onCard(gw.RfwCardEnvelope envelope) {
     if (!mounted) return;
     final data = _decode(envelope.dataJson);
-    if (data['role'] != 'assistant') return;
+    if (!_shouldRenderCard(data)) return;
     final tree = data['tree'] as Map<String, Object?>?;
     if (tree == null) return;
     setState(() {
@@ -141,6 +143,15 @@ class _ChatScreenState extends State<ChatScreen> {
       _sending = false;
     });
     _scrollToEnd();
+  }
+
+  bool _shouldRenderCard(Map<String, Object?> data) {
+    if (data['role'] == 'assistant') return true;
+
+    final kind = (data['kind'] ?? data['surfaceKind'] ?? '').toString();
+    return kind == 'login' ||
+        kind == 'pack-config-form' ||
+        kind == 'auth-button';
   }
 
   Map<String, Object?> _decode(String json) {
@@ -168,14 +179,20 @@ class _ChatScreenState extends State<ChatScreen> {
       ..payload = utf8.encode(
         jsonEncode({'prompt': text, 'clientId': _clientId}),
       );
-    client.send(envelope).catchError((Object error) {
-      if (!mounted) return null;
-      setState(() {
-        _sending = false;
-        _connectionError = 'Failed to send: $error';
-      });
-      return null;
-    });
+    unawaited(
+      client
+          .send(envelope)
+          .then<void>(
+            (_) {},
+            onError: (Object error) {
+              if (!mounted) return;
+              setState(() {
+                _sending = false;
+                _connectionError = 'Failed to send: $error';
+              });
+            },
+          ),
+    );
   }
 
   void _handleSurfaceEvent(String name, Map<String, Object?> args) {
@@ -183,13 +200,19 @@ class _ChatScreenState extends State<ChatScreen> {
     final client = _client;
     if (envelope == null || client == null) return;
 
-    client.send(envelope).catchError((Object error) {
-      if (!mounted) return null;
-      setState(() {
-        _connectionError = 'Failed to dispatch action: $error';
-      });
-      return null;
-    });
+    unawaited(
+      client
+          .send(envelope)
+          .then<void>(
+            (_) {},
+            onError: (Object error) {
+              if (!mounted) return;
+              setState(() {
+                _connectionError = 'Failed to dispatch action: $error';
+              });
+            },
+          ),
+    );
   }
 
   Future<void> _attachFile() async {

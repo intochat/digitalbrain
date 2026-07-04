@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pbgrpc.dart';
@@ -11,6 +10,7 @@ import 'package:digitalbrain_flutter/grpc/uigateway.pb.dart' as ui;
 import 'package:digitalbrain_flutter/grpc/action_dispatch.dart';
 import 'package:digitalbrain_flutter/grpc/endpoint.dart';
 import 'package:digitalbrain_flutter/grpc/grpc_channel.dart';
+import 'package:digitalbrain_flutter/shell/app_session.dart';
 
 import 'package:digitalbrain_flutter/features/neuron_constructor/visual_constructor_state.dart';
 import 'package:digitalbrain_flutter/features/neuron_constructor/visual_constructor_canvas.dart';
@@ -49,7 +49,7 @@ class _LivingCanvasScreenState extends State<LivingCanvasScreen> {
   StreamSubscription<gw.RfwCardEnvelope>? _homeFeedSub;
   StreamController<ui.UiInputSynapse>? _uiInput;
   StreamSubscription<ui.UiStateSignal>? _uiSessionSub;
-  final String _clientId = 'canvas-${Random().nextInt(1 << 31)}';
+  final String _clientId = digitalBrainAppClientId;
 
   // Fallback / Initial templates in case of offline launch or silo restarts
   static const _fallbackTemplates = {

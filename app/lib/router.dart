@@ -2,24 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/canvas/living_canvas_screen.dart';
-import 'features/chat/chat_screen.dart';
 import 'features/experience/experience_host_screen.dart';
 import 'features/spike/globe_lottie_spike.dart';
 import 'shell/forui_app_shell.dart';
 
 final digitalbrainRouter = GoRouter(
-  initialLocation: '/',
+  initialLocation: '/chat',
   routes: [
-    // The app opens straight into chat — a native shell talking to the real kernel over
-    // gRPC, independent of the neuron-driven ForuiAppShell (which requires sign-in before
-    // it emits a tree at all). Assistant replies are still SDUI under the hood.
-    GoRoute(
-      path: '/',
-      name: 'chat-home',
-      builder: (context, state) => const ChatScreen(),
-    ),
-    // Main experience is the live neuron-driven shell (chrome + body from app-shell/widget-tree via UiSurfaceTreeRenderer + kit nodes).
-    // All UI must come from neurons/synapses; client is thin host only.
+    GoRoute(path: '/', redirect: (context, state) => '/chat'),
     ShellRoute(
       builder: (context, state, child) => ForuiAppShell(child: child),
       routes: [
