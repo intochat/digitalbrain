@@ -309,85 +309,22 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
 
 app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
     HttpRequest request,
-    DigitalBrain.Core.Config.IPackConfigStore packConfigStore,
-    IGrainFactory grains,
-    ILogger<Program> callbackLogger) =>
+    IGrainFactory grains) =>
 {
-    var returnedError = request.Query["error"].FirstOrDefault();
-    if (!string.IsNullOrWhiteSpace(returnedError))
-    {
-        var description = request.Query["error_description"].FirstOrDefault();
-        return Results.Content(
-            SalesforceCallbackPage("Salesforce login failed", $"{returnedError}: {description}".TrimEnd(':', ' ')),
-            "text/html",
-            statusCode: StatusCodes.Status400BadRequest);
-    }
+    var callback = new SalesforceOAuthCallback(
+        Code: request.Query["code"].FirstOrDefault(),
+        State: request.Query["state"].FirstOrDefault(),
+        Error: request.Query["error"].FirstOrDefault(),
+        ErrorDescription: request.Query["error_description"].FirstOrDefault(),
+        FallbackRedirectUri: SalesforceCallbackUri(request));
 
-    var code = request.Query["code"].FirstOrDefault();
-    if (string.IsNullOrWhiteSpace(code))
-    {
-        return Results.Content(
-            SalesforceCallbackPage("Salesforce login failed", "The callback did not include an authorization code."),
-            "text/html",
-            statusCode: StatusCodes.Status400BadRequest);
-    }
+    var auth = grains.GetGrain<ISalesforceAuthNeuron>("salesforce-auth-main");
+    var result = await auth.CompleteOAuthAsync(callback);
 
-    var values = await packConfigStore.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
-    var pending = await packConfigStore.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
-    var returnedState = request.Query["state"].FirstOrDefault();
-    if (pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) &&
-        !string.IsNullOrWhiteSpace(expectedState) &&
-        !string.Equals(expectedState, returnedState, StringComparison.Ordinal))
-    {
-        return Results.Content(
-            SalesforceCallbackPage("Salesforce login failed", "The callback state did not match the pending login."),
-            "text/html",
-            statusCode: StatusCodes.Status400BadRequest);
-    }
-
-    var redirectUri = values.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var storedRedirectUri)
-        ? storedRedirectUri
-        : SalesforceCallbackUri(request);
-
-    try
-    {
-        var exchangeValues = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
-        if (pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var pendingCodeVerifier))
-            exchangeValues[SalesforceClientFactory.OAuthCodeVerifierKey] = pendingCodeVerifier;
-
-        var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(exchangeValues, code, redirectUri);
-        var merged = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, value) in tokenValues)
-            merged[key] = value;
-
-        await packConfigStore.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged);
-        await packConfigStore.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
-
-        var ingress = grains.GetGrain<IIngressNeuron>("salesforce-auth-callback-" + Guid.NewGuid().ToString("N"));
-        await ingress.IngestAsync("PackConfigured", new Dictionary<string, object?>
-        {
-            ["pack"] = SalesforceClientFactory.PackName,
-            ["scope"] = SalesforceClientFactory.DefaultScope
-        });
-        await ingress.IngestAsync(SalesforceSignals.AuthCompleted, new Dictionary<string, object?>
-        {
-            ["provider"] = "salesforce",
-            ["pack"] = SalesforceClientFactory.PackName,
-            ["scope"] = SalesforceClientFactory.DefaultScope
-        });
-
-        return Results.Content(
-            SalesforceCallbackPage("Salesforce connected", "You can close this browser tab and return to DigitalBrain."),
-            "text/html");
-    }
-    catch (Exception ex) when (ex is not OperationCanceledException)
-    {
-        callbackLogger.LogWarning(ex, "Salesforce OAuth callback failed.");
-        return Results.Content(
-            SalesforceCallbackPage("Salesforce login failed", ex.GetBaseException().Message),
-            "text/html",
-            statusCode: StatusCodes.Status400BadRequest);
-    }
+    return Results.Content(
+        SalesforceCallbackPage(result.Title, result.Message),
+        "text/html",
+        statusCode: result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
 });
 
 if (!isAspireHosted)
