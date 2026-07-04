@@ -170,6 +170,11 @@ public static class DigitalBrainBuilderExtensions
             kernel.WithEnvironment("DigitalBrain__Llm__AzureOpenAIKey", ctx.AzureOpenAIKey);
         }
 
+        kernel.WithOptionalEnvironment("DigitalBrain:Voice:Provider", "DIGITALBRAIN_VOICE_PROVIDER", "DigitalBrain__Voice__Provider");
+        kernel.WithOptionalEnvironment("DigitalBrain:Voice:Model", "DIGITALBRAIN_VOICE_MODEL", "DigitalBrain__Voice__Model");
+        kernel.WithOptionalEnvironment("DigitalBrain:Voice:Endpoint", "DIGITALBRAIN_VOICE_ENDPOINT", "DigitalBrain__Voice__Endpoint");
+        kernel.WithOptionalEnvironment("DigitalBrain:Voice:ApiKey", "DIGITALBRAIN_VOICE_API_KEY", "DigitalBrain__Voice__ApiKey");
+
         if (ctx.EnableOrleansDashboard && ctx.OrleansDashboardPort.HasValue)
         {
             kernel.WithEnvironment("ORLEANS_DASHBOARD_PORT", ctx.OrleansDashboardPort.Value.ToString());
@@ -196,6 +201,20 @@ public static class DigitalBrainBuilderExtensions
             kernel.WithEnvironment($"{prefix}__Id", registration.Model.Id);
             kernel.WithEnvironment($"{prefix}__DisplayName", registration.Model.DisplayName);
             kernel.WithEnvironment($"{prefix}__Role", registration.Role.ToString());
+        }
+    }
+
+    private static void WithOptionalEnvironment(
+        this IResourceBuilder<ProjectResource> resource,
+        string configurationKey,
+        string environmentKey,
+        string targetKey)
+    {
+        var value = resource.ApplicationBuilder.Configuration[configurationKey]
+            ?? Environment.GetEnvironmentVariable(environmentKey);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            resource.WithEnvironment(targetKey, value);
         }
     }
 

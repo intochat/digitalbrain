@@ -58,3 +58,13 @@ public sealed class Gpt4oMini : LlmModel
     public override string Provider => DigitalBrainProviderIds.AzureOpenAI;
     public override string Id => "gpt-4o-mini";
 }
+
+/// <summary>
+/// Local OpenAI-compatible Whisper transcription endpoint.
+/// </summary>
+public sealed class Whisper1Local : VoiceToTextModel
+{
+    public override string Provider => DigitalBrainProviderIds.OpenAICompatible;
+    public override string Id => "whisper-1";
+    public override string DisplayName => "Local Whisper";
+}
