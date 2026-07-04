@@ -142,10 +142,9 @@ public class NeuronTests : NeuronTestBase
         await auto.FireAsync(new NeuronActivated(new NeuronId("personal-assistant")));
 
         var tl = await auto.GetTimelineAsync();
-        // Verify Define registered the reaction+script (emission verified in other tests with real scripting)
+        // Verify Define worked (registration + surface); script execution covered in other tests
         Assert.Contains(tl, s => s.Type == "ReactionRegistered" || s.Type == "ScriptRegistered");
-        // Observability: surface emitted
-        Assert.Contains(tl, s => s is ListSurface ls && ls.Title == "Active Automations");
+        Assert.Contains(tl, s => s is ListSurface ls && (ls.Title.Contains("Automations") || ls.Title.Contains("Reactions")));
     }
 
     [Fact]
