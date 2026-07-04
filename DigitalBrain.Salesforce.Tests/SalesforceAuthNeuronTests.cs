@@ -119,7 +119,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         // That write must not erase the pending PKCE state stashed by StartOAuthAsync.
         await writer.StoreConnectedAppConfigAsync();
 
-        var pending = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
+        var pending = await writer.ReadPackAsync(PackConfigScopes.ForUser(new UserId("salesforce-auth-test-race")), SalesforceClientFactory.OAuthPendingPackName);
         Assert.True(pending.ContainsKey(SalesforceClientFactory.OAuthStateKey));
         Assert.True(pending.ContainsKey(SalesforceClientFactory.OAuthCodeVerifierKey));
     }
@@ -154,10 +154,10 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         Assert.True(result.Success);
         Assert.Equal("Salesforce connected", result.Title);
 
-        var stored = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
+        var stored = await writer.ReadPackAsync(PackConfigScopes.ForUser(new UserId("salesforce-auth-test-complete")), SalesforceClientFactory.PackName);
         Assert.Equal("fake-access-token", stored[SalesforceClientFactory.AccessTokenKey]);
 
-        var pendingAfter = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
+        var pendingAfter = await writer.ReadPackAsync(PackConfigScopes.ForUser(new UserId("salesforce-auth-test-complete")), SalesforceClientFactory.OAuthPendingPackName);
         Assert.False(pendingAfter.ContainsKey(SalesforceClientFactory.OAuthStateKey));
     }
 
@@ -186,7 +186,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         Assert.False(result.Success);
         Assert.Equal("The callback state did not match the pending login.", result.Message);
 
-        var stored = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
+        var stored = await writer.ReadPackAsync(PackConfigScopes.ForUser(new UserId("salesforce-auth-test-mismatch")), SalesforceClientFactory.PackName);
         Assert.False(stored.ContainsKey(SalesforceClientFactory.AccessTokenKey));
     }
 

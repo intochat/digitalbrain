@@ -36,7 +36,7 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
     private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props)
     {
         var store = ServiceProvider.GetRequiredService<IPackConfigStore>();
-        var existing = await store.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
+        var existing = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
         var values = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
 
         CopyIfPresent(props, values, SalesforceClientFactory.ClientIdKey);
@@ -80,14 +80,14 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
             return;
         }
 
-        await store.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, values);
+        await store.SetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, values);
 
-        // Pending PKCE state lives in its own pack, isolated from the credentials blob above. That blob
-        // is also written by the credentials form and SalesforceAppConfigSeeder; sharing one slot meant a
-        // concurrent write built from a stale snapshot could silently clobber the in-flight (state,
-        // code_verifier) pair before the callback read it back, producing an intermittent
-        // "invalid code verifier" failure from Salesforce.
-        await store.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>
+        // Pending PKCE state lives under the caller's OWN per-user scope (I3/I4): each user's grain activation
+        // is the single writer of its own pending slot, so two users starting OAuth concurrently never clobber
+        // each other (the pre-S3 clobbering race this comment used to describe was between config-form writes and
+        // OAuth-start writes to the SAME shared slot; per-user scoping removes that shared slot entirely).
+        var userScope = PackConfigScopes.ForUser(Self.AsScope().UserId);
+        await store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>
         {
             [SalesforceClientFactory.OAuthStateKey] = state,
             [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier
@@ -118,8 +118,9 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         }
 
         var store = ServiceProvider.GetRequiredService<IPackConfigStore>();
-        var values = await store.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
-        var pending = await store.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
+        var userScope = PackConfigScopes.ForUser(Self.AsScope().UserId);
+        var appValues = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
+        var pending = await store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName);
 
         if (pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) &&
             !string.IsNullOrWhiteSpace(expectedState) &&
@@ -131,35 +132,35 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
                 "The callback state did not match the pending login.");
         }
 
-        var redirectUri = values.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var storedRedirectUri)
+        var redirectUri = appValues.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var storedRedirectUri)
             ? storedRedirectUri
             : callback.FallbackRedirectUri;
 
         try
         {
-            var exchangeValues = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
+            var exchangeValues = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
             if (pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var pendingCodeVerifier))
                 exchangeValues[SalesforceClientFactory.OAuthCodeVerifierKey] = pendingCodeVerifier;
 
             var handler = ServiceProvider.GetService<HttpMessageHandler>();
             var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(exchangeValues, callback.Code, redirectUri, handler);
-            var merged = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
+            var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var (key, value) in tokenValues)
-                merged[key] = value;
+                userTokenValues[key] = value;
 
-            await store.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged);
-            await store.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
+            await store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues);
+            await store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
 
             await Broadcast(new Signal("PackConfigured", new Dictionary<string, object?>
             {
                 ["pack"] = SalesforceClientFactory.PackName,
-                ["scope"] = SalesforceClientFactory.DefaultScope
+                ["scope"] = userScope
             }));
             await Broadcast(new Signal(SalesforceSignals.AuthCompleted, new Dictionary<string, object?>
             {
                 ["provider"] = "salesforce",
                 ["pack"] = SalesforceClientFactory.PackName,
-                ["scope"] = SalesforceClientFactory.DefaultScope
+                ["scope"] = userScope
             }));
 
             return new SalesforceOAuthCallbackResult(
