@@ -50,8 +50,12 @@ public class HomeFeedBusTests
         Assert.False(subscriptionA.Reader.TryRead(out _));
     }
 
+    // TEMPORARY: fails open until the client can register a real session (see HomeFeedBus.FanLocal's
+    // comment) — a subscriber that never registers a session sees every card, addressed or not, matching
+    // pre-existing (pre-multiuser) behavior. This is intentionally the opposite of the stricter isolation
+    // this bus is designed to enforce once a real per-subscriber session is available.
     [Fact]
-    public async Task Subscriber_Without_SessionId_Only_Receives_Unaddressed_Cards()
+    public async Task Subscriber_Without_SessionId_Receives_Every_Card_Fail_Open()
     {
         var bus = new HomeFeedBus();
         using var subscription = bus.Subscribe();
@@ -59,8 +63,10 @@ public class HomeFeedBusTests
         bus.Broadcast(new RfwCard("digitalbrain", "ForA", "{}", "session-a"));
         bus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
 
-        var received = await subscription.Reader.ReadAsync();
-        Assert.Equal("Unaddressed", received.RootWidget);
+        var first = await subscription.Reader.ReadAsync();
+        var second = await subscription.Reader.ReadAsync();
+        Assert.Equal("ForA", first.RootWidget);
+        Assert.Equal("Unaddressed", second.RootWidget);
         Assert.False(subscription.Reader.TryRead(out _));
     }
 }

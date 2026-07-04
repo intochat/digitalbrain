@@ -95,10 +95,12 @@ public sealed class GatewayService(
                 var authProps = PayloadProps(request);
                 var authSessionId = authProps.TryGetValue("sessionId", out var authSid) ? authSid?.ToString() : null;
                 var authSession = await ResolveSessionAsync(authSessionId);
-                if (authSession is null)
-                    throw new RpcException(new Status(StatusCode.Unauthenticated, "Sign in before connecting Salesforce."));
-
-                var salesforceUserId = authSession.UserId.Value;
+                // TEMPORARY: the Flutter client has no channel yet to forward its real login session here
+                // (see docs/superpowers/plans/2026-07-04-multiuser-s2-s3-identity-and-salesforce-per-user.md,
+                // "Known Limitations" / live-bug follow-up) — fall back to a consistent "anonymous" identity
+                // rather than hard-rejecting, restoring today's single-user functionality until the client is
+                // updated to capture and forward a real session.
+                var salesforceUserId = authSession?.UserId.Value ?? UserId.Anonymous.Value;
                 var auth = grains.GetGrain<ISalesforceAuthNeuron>(salesforceUserId);
                 var signal = new Signal(SalesforceSignals.AuthRequested, authProps)
                 {
@@ -160,11 +162,15 @@ public sealed class GatewayService(
                 var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
                 var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var prompt = p.TryGetValue("prompt", out var pr) ? pr?.ToString() ?? "" : "";
+                // sessionId here is a client-generated per-widget UI correlation token (see chat_screen.dart's
+                // _sessionId), not a real login session — it has no authorization role, only routing a reply
+                // back to the right chat widget instance, so it is passed through verbatim rather than resolved
+                // against session-main (resolving it here previously broke that correlation entirely, since a
+                // correlation token never matches a real session and always collapsed to null).
                 var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
-                var inoSession = await ResolveSessionAsync(sessionId);
 
                 var ino = grains.GetGrain<IInoNeuron>("ino-main");
-                await ino.FireAsync(new InoRequest(prompt, inoSession?.SessionId));
+                await ino.FireAsync(new InoRequest(prompt, sessionId));
                 return request;
             }
 
