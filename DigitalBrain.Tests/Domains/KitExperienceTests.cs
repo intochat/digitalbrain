@@ -8,7 +8,7 @@ public class KitExperienceTests
     [Fact]
     public void ForExperienceHopTree_carries_tree_and_markers()
     {
-        var tree = new UiWidgetTree(DigitalBrain.Core.UiKitVocabulary.Screen, new Dictionary<string, object?>());
+        var tree = new UiWidgetTree(UiKitVocabulary.Screen, new Dictionary<string, object?>());
         var surface = UiSurface.ForExperienceHopTree("hello-world", "hello-world", "ask", tree, title: "Hello World");
 
         Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
@@ -42,13 +42,13 @@ public class KitExperienceTests
         var surface = Assert.IsType<UiSurface>(Assert.Single(outputs));
         Assert.Equal("ask", surface.Props[UiSurfaceKeys.SurfaceId]);
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Screen, tree.Type);
+        Assert.Equal(UiKitVocabulary.Screen, tree.Type);
         Assert.Collection(tree.Children!,
-            n => Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Text, n.Type),
-            n => Assert.Equal(DigitalBrain.Core.UiKitVocabulary.TextField, n.Type),
+            n => Assert.Equal(UiKitVocabulary.Text, n.Type),
+            n => Assert.Equal(UiKitVocabulary.TextField, n.Type),
             n =>
             {
-                Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Button, n.Type);
+                Assert.Equal(UiKitVocabulary.Button, n.Type);
                 Assert.Equal("greeting", n.Props["eventName"]);
                 Assert.Equal("hello-world", n.Props["pack"]);          // injected at emit time
                 Assert.Equal("hello-world", n.Props["experienceId"]);
@@ -66,7 +66,7 @@ public class KitExperienceTests
         Assert.Equal("greeting", surface.Props[UiSurfaceKeys.SurfaceId]);
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         var panel = Assert.Single(tree.Children!);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Panel, panel.Type);
+        Assert.Equal(UiKitVocabulary.Panel, panel.Type);
         var text = Assert.Single(panel.Children!);
         Assert.Equal("Hello Alice!", text.Props["text"]);
     }
@@ -89,12 +89,12 @@ public class KitExperienceTests
         hop.Checkbox("agree", "I agree").Switch("notify", "Notify me").TextArea("bio", "About you");
         var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
 
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Checkbox, nodes[0].Type);
+        Assert.Equal(UiKitVocabulary.Checkbox, nodes[0].Type);
         Assert.Equal("agree", nodes[0].Props["name"]);
         Assert.Equal("I agree", nodes[0].Props["label"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Switch, nodes[1].Type);
+        Assert.Equal(UiKitVocabulary.Switch, nodes[1].Type);
         Assert.Equal("notify", nodes[1].Props["name"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.TextArea, nodes[2].Type);
+        Assert.Equal(UiKitVocabulary.TextArea, nodes[2].Type);
         Assert.Equal("About you", nodes[2].Props["placeholder"]);
     }
 
@@ -108,14 +108,14 @@ public class KitExperienceTests
            .DateField("when", "When");
         var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
 
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Select, nodes[0].Type);
+        Assert.Equal(UiKitVocabulary.Select, nodes[0].Type);
         Assert.Equal("color", nodes[0].Props["name"]);
         var options = Assert.IsAssignableFrom<IReadOnlyList<string>>(nodes[0].Props["options"]);
         Assert.Equal(new[] { "Red", "Green" }, options);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.RadioGroup, nodes[1].Type);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Slider, nodes[2].Type);
+        Assert.Equal(UiKitVocabulary.RadioGroup, nodes[1].Type);
+        Assert.Equal(UiKitVocabulary.Slider, nodes[2].Type);
         Assert.Equal(10.0, nodes[2].Props["max"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.DateField, nodes[3].Type);
+        Assert.Equal(UiKitVocabulary.DateField, nodes[3].Type);
     }
 
     [Fact]
@@ -125,12 +125,12 @@ public class KitExperienceTests
         hop.Row(r => r.Text("a").Text("b")).Divider().Header("Section").Gap(8);
         var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
 
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Row, nodes[0].Type);
+        Assert.Equal(UiKitVocabulary.Row, nodes[0].Type);
         Assert.Equal(2, nodes[0].Children!.Count);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Divider, nodes[1].Type);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Header, nodes[2].Type);
+        Assert.Equal(UiKitVocabulary.Divider, nodes[1].Type);
+        Assert.Equal(UiKitVocabulary.Header, nodes[2].Type);
         Assert.Equal("Section", nodes[2].Props["title"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Gap, nodes[3].Type);
+        Assert.Equal(UiKitVocabulary.Gap, nodes[3].Type);
         Assert.Equal(8.0, nodes[3].Props["size"]);
     }
 
@@ -140,13 +140,13 @@ public class KitExperienceTests
         var hop = new UiHop("h");
         hop.Heading("Title").Icon("star").Avatar(fallback: "AB").Badge("New");
         var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Heading, nodes[0].Type);
+        Assert.Equal(UiKitVocabulary.Heading, nodes[0].Type);
         Assert.Equal("Title", nodes[0].Props["text"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Icon, nodes[1].Type);
+        Assert.Equal(UiKitVocabulary.Icon, nodes[1].Type);
         Assert.Equal("star", nodes[1].Props["name"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Avatar, nodes[2].Type);
+        Assert.Equal(UiKitVocabulary.Avatar, nodes[2].Type);
         Assert.Equal("AB", nodes[2].Props["fallback"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Badge, nodes[3].Type);
+        Assert.Equal(UiKitVocabulary.Badge, nodes[3].Type);
         Assert.Equal("New", nodes[3].Props["text"]);
     }
 
@@ -156,7 +156,7 @@ public class KitExperienceTests
         var pack = new GalleryStubPack();
         var outputs = pack.Handle(new ExperienceStep("p", "p", "start", new Dictionary<string, string>()));
         var tree = (UiWidgetTree)((UiSurface)outputs[0]).Props["tree"];
-        var tile = FindByType(tree, DigitalBrain.Core.UiKitVocabulary.Tile);
+        var tile = FindByType(tree, UiKitVocabulary.Tile);
         Assert.Equal("p", tile.Props["pack"]);
         Assert.Equal("p", tile.Props["experienceId"]);
         Assert.Equal("next", tile.Props["eventName"]);
@@ -175,12 +175,12 @@ public class KitExperienceTests
         var hop = new UiHop("h");
         hop.Alert("Heads up", "details").Progress(0.4).Spinner().Tooltip("hint", t => t.Text("hover me"));
         var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Alert, nodes[0].Type);
+        Assert.Equal(UiKitVocabulary.Alert, nodes[0].Type);
         Assert.Equal("Heads up", nodes[0].Props["title"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Progress, nodes[1].Type);
+        Assert.Equal(UiKitVocabulary.Progress, nodes[1].Type);
         Assert.Equal(0.4, nodes[1].Props["value"]);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Spinner, nodes[2].Type);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Tooltip, nodes[3].Type);
+        Assert.Equal(UiKitVocabulary.Spinner, nodes[2].Type);
+        Assert.Equal(UiKitVocabulary.Tooltip, nodes[3].Type);
         Assert.Equal("hint", nodes[3].Props["tip"]);
         Assert.Single(nodes[3].Children!);
     }
@@ -191,7 +191,7 @@ public class KitExperienceTests
         var pack = new NavStubPack();
         var outputs = pack.Handle(new ExperienceStep("p", "p", "start", new Dictionary<string, string>()));
         var tree = (UiWidgetTree)((UiSurface)outputs[0]).Props["tree"];
-        var tabs = FindByType(tree, DigitalBrain.Core.UiKitVocabulary.Tabs);
+        var tabs = FindByType(tree, UiKitVocabulary.Tabs);
         Assert.Equal("p", tabs.Props["pack"]);
         var items = Assert.IsAssignableFrom<IReadOnlyList<object>>(tabs.Props["items"]);
         Assert.Equal(2, items.Count);
@@ -213,8 +213,8 @@ public class KitExperienceTests
         var hop = new UiHop("h");
         hop.Sidebar(("Home", "home"), ("Settings", "settings")).BottomNav(("A", "a"), ("B", "b"));
         var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Sidebar, nodes[0].Type);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.BottomNav, nodes[1].Type);
+        Assert.Equal(UiKitVocabulary.Sidebar, nodes[0].Type);
+        Assert.Equal(UiKitVocabulary.BottomNav, nodes[1].Type);
         Assert.Equal(2, ((IReadOnlyList<object>)nodes[0].Props["items"]!).Count);
     }
 
@@ -224,11 +224,11 @@ public class KitExperienceTests
         var hop = new UiHop("h");
         hop.Dialog(true, "Confirm", d => d.Text("Sure?").Button("OK", "done")).Toast("Saved");
         var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Dialog, nodes[0].Type);
+        Assert.Equal(UiKitVocabulary.Dialog, nodes[0].Type);
         Assert.Equal(true, nodes[0].Props["open"]);
         Assert.Equal("Confirm", nodes[0].Props["title"]);
         Assert.Equal(2, nodes[0].Children!.Count);
-        Assert.Equal(DigitalBrain.Core.UiKitVocabulary.Toast, nodes[1].Type);
+        Assert.Equal(UiKitVocabulary.Toast, nodes[1].Type);
         Assert.Equal("Saved", nodes[1].Props["message"]);
     }
 

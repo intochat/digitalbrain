@@ -26,13 +26,13 @@ public sealed class LoginRendersE2ETests(DigitalBrainBrowserFixture fixture)
             r => r.Url.Contains("WatchHomeFeed"),
             new() { Timeout = 60_000 });
 
-        var shotDir = System.IO.Path.Combine(AppContext.BaseDirectory, "e2e-screenshots");
-        System.IO.Directory.CreateDirectory(shotDir);
+        var shotDir = Path.Combine(AppContext.BaseDirectory, "e2e-screenshots");
+        Directory.CreateDirectory(shotDir);
 
         // First-user provisioning: on fresh state any credentials bootstrap the admin account.
         var username = _fx.Page.Locator("[flt-semantics-identifier=\"field-username\"]");
         await username.WaitForAsync(new() { Timeout = 60_000 });
-        await _fx.Page.ScreenshotAsync(new() { Path = System.IO.Path.Combine(shotDir, "e2e-login-form.png") });
+        await _fx.Page.ScreenshotAsync(new() { Path = Path.Combine(shotDir, "e2e-login-form.png") });
 
         await username.ClickAsync();
         await _fx.Page.Keyboard.TypeAsync("e2e-admin");
@@ -48,6 +48,6 @@ public sealed class LoginRendersE2ETests(DigitalBrainBrowserFixture fixture)
         var shell = _fx.Page.Locator("[flt-semantics-identifier=\"app-shell-ready\"]");
         await shell.WaitForAsync(new() { Timeout = 30_000 });
         Assert.Equal(1, await shell.CountAsync());
-        await _fx.Page.ScreenshotAsync(new() { Path = System.IO.Path.Combine(shotDir, "e2e-login-signed-in.png") });
+        await _fx.Page.ScreenshotAsync(new() { Path = Path.Combine(shotDir, "e2e-login-signed-in.png") });
     }
 }

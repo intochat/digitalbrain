@@ -21,7 +21,7 @@ public class NeuronBroadcastTests : NeuronTestBase
         await sender.FireAsync(new DemoMessageSynapse("channel-probe") with { IsBroadcast = true });
 
         // Broadcast delivery is asynchronous (Orleans fans it out off the publisher's turn), so poll.
-        IReadOnlyList<Synapse> incoming = System.Array.Empty<Synapse>();
+        IReadOnlyList<Synapse> incoming = Array.Empty<Synapse>();
         for (var attempt = 0; attempt < 40; attempt++)
         {
             incoming = await receiver.GetIncomingTimelineAsync();

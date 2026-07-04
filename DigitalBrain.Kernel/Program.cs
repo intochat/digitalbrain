@@ -152,7 +152,7 @@ builder.Services.AddScoped<DigitalBrain.Google.IGoogleCalendarApiClient>(sp =>
 // Salesforce CRM REST API client: built from the encrypted "salesforce"/"default" pack config scope that
 // the Salesforce credential prompt stores. Scoped for the same per-grain-activation reason as Google.
 builder.Services.AddScoped<DigitalBrain.Salesforce.ISalesforceApiClient>(sp =>
-    DigitalBrain.Salesforce.SalesforceClientFactory
+    SalesforceClientFactory
         .CreateApiClientAsync(sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>())
         .GetAwaiter()
         .GetResult());

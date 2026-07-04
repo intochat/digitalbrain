@@ -17,7 +17,7 @@ public class ContextRecallTests : NeuronTestBase
         var hits = await context.RecallAsync("alarm", top: 2);
 
         Assert.NotEmpty(hits);
-        Assert.Contains(hits, h => h.Contains("alarm", System.StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(hits, h => h.Contains("alarm", StringComparison.OrdinalIgnoreCase));
     }
 }
 

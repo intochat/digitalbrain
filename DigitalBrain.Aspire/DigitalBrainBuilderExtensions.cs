@@ -83,7 +83,8 @@ public static class DigitalBrainBuilderExtensions
         const string ollamaFallbackModel = "qwen2.5-coder:1.5b";
         var ollama = builder.AddOllama("ollama")
             .WithGPUSupport()
-            .WithDataVolume();
+            .WithDataVolume()
+            .WithOpenWebUI();
         var qwen = ollama.AddModel("qwen", ollamaFallbackModel);
 
         return new DigitalBrainContext
@@ -270,29 +271,29 @@ public static class DigitalBrainBuilderExtensions
     public static string? ResolveDevFlutterAppPath(IDistributedApplicationBuilder b)
     {
         var flutterPathEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_FLUTTER_APP_PATH");
-        if (!string.IsNullOrWhiteSpace(flutterPathEnv) && System.IO.Directory.Exists(flutterPathEnv))
-            return System.IO.Path.GetFullPath(flutterPathEnv);
+        if (!string.IsNullOrWhiteSpace(flutterPathEnv) && Directory.Exists(flutterPathEnv))
+            return Path.GetFullPath(flutterPathEnv);
 
         var appHostDir = b.AppHostDirectory;
         var candidates = new[]
         {
-            System.IO.Path.GetFullPath(System.IO.Path.Combine(appHostDir, "..", "app")),
-            System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "app")),
-            System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "..", "app")),
+            Path.GetFullPath(Path.Combine(appHostDir, "..", "app")),
+            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "app")),
+            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "app")),
         };
 
         foreach (var c in candidates)
         {
-            if (System.IO.Directory.Exists(c) && System.IO.File.Exists(System.IO.Path.Combine(c, "pubspec.yaml")))
+            if (Directory.Exists(c) && File.Exists(Path.Combine(c, "pubspec.yaml")))
                 return c;
         }
 
         var dir = new System.IO.DirectoryInfo(appHostDir);
         for (int i = 0; i < 6 && dir != null; i++)
         {
-            var candidate = System.IO.Path.Combine(dir.FullName, "app");
-            if (System.IO.Directory.Exists(candidate) && System.IO.File.Exists(System.IO.Path.Combine(candidate, "pubspec.yaml")))
-                return System.IO.Path.GetFullPath(candidate);
+            var candidate = Path.Combine(dir.FullName, "app");
+            if (Directory.Exists(candidate) && File.Exists(Path.Combine(candidate, "pubspec.yaml")))
+                return Path.GetFullPath(candidate);
             dir = dir.Parent;
         }
         return null;

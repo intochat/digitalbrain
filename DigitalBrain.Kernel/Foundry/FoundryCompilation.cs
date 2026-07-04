@@ -64,7 +64,7 @@ public static class FoundryCompilation
             try
             {
                 // GetAssemblyName throws BadImageFormatException for native DLLs; use it as a managed-PE filter
-                System.Reflection.AssemblyName.GetAssemblyName(dll);
+                AssemblyName.GetAssemblyName(dll);
                 refs.Add(MetadataReference.CreateFromFile(dll));
             }
             catch { /* skip native or unreadable dlls */ }

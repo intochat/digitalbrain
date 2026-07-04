@@ -118,7 +118,7 @@ public class ConfigFormSteps : IAsyncDisposable
         Assert.Contains(field3, keys);
 
         // The submit button round-trips a ConfigurationProvided carrying the pack name.
-        var submit = FindNodes(tree).First(n => n.Type == DigitalBrain.Core.UiKitVocabulary.Button);
+        var submit = FindNodes(tree).First(n => n.Type == UiKitVocabulary.Button);
         Assert.Equal(nameof(ConfigurationProvided), submit.Props.GetValueOrDefault("synapseType"));
         Assert.Equal(_packName, submit.Props.GetValueOrDefault("pack"));
     }
@@ -163,7 +163,7 @@ public class ConfigFormSteps : IAsyncDisposable
 
     private static IReadOnlyList<string> CollectFieldKeys(UiWidgetTree tree) =>
         FindNodes(tree)
-            .Where(n => n.Type is var t && (t == DigitalBrain.Core.UiKitVocabulary.TextField || t == DigitalBrain.Core.UiKitVocabulary.Select))
+            .Where(n => n.Type is var t && (t == UiKitVocabulary.TextField || t == UiKitVocabulary.Select))
             .Select(n => n.Props.GetValueOrDefault("key")?.ToString() ?? n.Props.GetValueOrDefault("name")?.ToString())
             .OfType<string>()
             .ToList();

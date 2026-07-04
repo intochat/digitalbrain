@@ -11,7 +11,7 @@ public class DigitalBrainToolsTests : NeuronTestBase
 {
     [Fact]
     public void Ping_Works_Standalone()
-        => Assert.Contains("connected", DigitalBrainReadTools.PingDigitalBrain(), System.StringComparison.OrdinalIgnoreCase);
+        => Assert.Contains("connected", DigitalBrainReadTools.PingDigitalBrain(), StringComparison.OrdinalIgnoreCase);
 
     [Fact]
     public async Task Publish_Then_List_Through_InProcess_GrainFactory()

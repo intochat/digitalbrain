@@ -214,7 +214,7 @@ public sealed class GatewayService(
             if (string.Equals(request.TypeName, TelegramSignals.MessageReceived, StringComparison.Ordinal)
                 && signalProps.TryGetValue("chatId", out var chatIdValue) && chatIdValue is not null)
             {
-                var chatKey = "tg-chat-" + System.Convert.ToInt64(chatIdValue);
+                var chatKey = "tg-chat-" + Convert.ToInt64(chatIdValue);
                 var chat = grains.GetGrain<ITelegramChatNeuron>(chatKey);
                 await chat.DeliverAsync(new Signal(request.TypeName, signalProps));
                 return request;

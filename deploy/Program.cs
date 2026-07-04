@@ -50,12 +50,12 @@ internal static class Program
     {
         var config = new Config();
         var imageTag = config.Get("imageTag")
-            ?? System.Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
+            ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
             ?? "latest";
 
         // CI injects the AES checkpoint-encryption key as a secret env var (from a GitHub Actions secret) so it
         // never lives in git; local runs can instead use `pulumi config set --secret checkpointKey ...`.
-        var checkpointKeyEnv = System.Environment.GetEnvironmentVariable("DIGITALBRAIN_CHECKPOINT_KEY");
+        var checkpointKeyEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_CHECKPOINT_KEY");
         var checkpointKey = config.GetSecret("checkpointKey")
             ?? (string.IsNullOrEmpty(checkpointKeyEnv) ? null : Output.CreateSecret(checkpointKeyEnv))
             ?? throw new System.InvalidOperationException(
