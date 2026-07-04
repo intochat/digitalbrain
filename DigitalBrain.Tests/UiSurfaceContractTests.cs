@@ -15,6 +15,7 @@ public class UiSurfaceContractTests
         { UiSurfaceSamples.Login(), new[] { "clientId", "fields", "submitAction", "tree" } },
         { UiSurfaceSamples.MarketplaceList(), new[] { "packs", "installAction", "updateAction" } },
         { UiSurfaceSamples.InstalledBundles(), new[] { "bundles", "experiences" } },
+        { UiSurfaceSamples.Workspace(), new[] { "workspaceId", "activeWorkspace", "contextSources", "isolation", "tree" } },
         { UiSurfaceSamples.Timeline(), new[] { "events", "filters" } },
         { UiSurfaceSamples.DataChart(), new[] { UiSurfaceKeys.ChartSpec, "data", "x", "y", "chartType" } }
     };
@@ -47,6 +48,7 @@ public class UiSurfaceContractTests
         Assert.Equal("login", UiSurfaceKinds.Login);
         Assert.Equal("marketplace-list", UiSurfaceKinds.MarketplaceList);
         Assert.Equal("installed-bundles", UiSurfaceKinds.InstalledBundles);
+        Assert.Equal("workspace", UiSurfaceKinds.Workspace);
         Assert.Equal("timeline", UiSurfaceKinds.Timeline);
         Assert.Equal("data-chart", UiSurfaceKinds.DataChart);
     }
@@ -330,6 +332,32 @@ public class UiSurfaceContractTests
         Assert.Contains(descendants, node => node.Type == "fcard" && Equals(node.Props["title"], "Cancelled"));
         Assert.Contains(descendants, node => node.Type == "fbutton" && Equals(node.Props[UiSurfaceKeys.Label], "Run Task"));
         Assert.Contains(descendants, node => node.Type == "fbutton" && Equals(node.Props[UiSurfaceKeys.Label], "Cancel"));
+    }
+
+    [Fact]
+    public void Live_Workspace_Surface_Describes_Context_Boundary()
+    {
+        var surface = UiSurfaceLiveData.WorkspaceBoundary("alice", "finance", "client-1");
+
+        Assert.Equal(UiSurfaceKinds.Workspace, surface.Kind);
+        Assert.Equal("alice", surface.Props["userId"]);
+        Assert.Equal("finance", surface.Props["workspaceId"]);
+        Assert.Equal("finance", surface.Props["activeWorkspace"]);
+        Assert.Equal("client-1", surface.Props["clientId"]);
+
+        var sources = Assert.IsAssignableFrom<IEnumerable<string>>(surface.Props["contextSources"]);
+        Assert.Contains(sources, source => source.Contains("Uploaded files"));
+        Assert.Contains(sources, source => source.Contains("Vector collection"));
+
+        var isolation = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(surface.Props["isolation"]);
+        Assert.Equal("user:alice:workspace:finance:documents", isolation["vectorCollection"]);
+        Assert.Equal(PackConfigScopes.ForUser(new UserId("alice")), isolation["packConfigScope"]);
+
+        var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
+        var descendants = Descend(tree).ToArray();
+        Assert.Contains(descendants, node => node.Type == "fcard" && Equals(node.Props["title"], "Active workspace"));
+        Assert.Contains(descendants, node => node.Type == "fcard" && Equals(node.Props["title"], "Context sources"));
+        Assert.Contains(descendants, node => node.Type == "fcard" && Equals(node.Props["title"], "Isolation boundary"));
     }
 
     [Fact]

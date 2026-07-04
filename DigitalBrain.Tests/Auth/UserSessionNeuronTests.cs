@@ -109,6 +109,8 @@ public sealed class UserSessionNeuronTests : NeuronTestBase
 
         Assert.Equal(clientId, shellCard.ClientId);
         Assert.Contains(clientId, shellCard.DataJson, StringComparison.Ordinal);
+        Assert.Contains("\"workspaceId\":\"default\"", shellCard.DataJson, StringComparison.Ordinal);
+        Assert.Contains("\"targetSurfaceKind\":\"workspace\"", shellCard.DataJson, StringComparison.Ordinal);
     }
 
     [Fact]

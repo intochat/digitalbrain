@@ -36,7 +36,7 @@ public class DbSupportNeuronTests : NeuronTestBase
         try
         {
             var db = Grain<IDbSupportNeuron>("db-test-inspect");
-            await db.FireAsync(new DbInspectSchema("budget", "sqlite", SourcePath: path, ClientId: "session-1"));
+            await db.FireAsync(new DbInspectSchema("budget", "sqlite", SourcePath: path, ClientId: "session-1", WorkspaceId: "finance"));
 
             var timeline = await db.GetTimelineAsync();
             var result = timeline.OfType<DbSchemaInspected>().LastOrDefault(s => s.ConnectionName == "budget");
@@ -45,7 +45,9 @@ public class DbSupportNeuronTests : NeuronTestBase
             Assert.True(result!.Succeeded);
             Assert.Null(result.Error);
             Assert.Equal("session-1", result.ClientId);
+            Assert.Equal("finance", result.WorkspaceId);
             Assert.NotNull(result.Schema);
+            Assert.Equal("finance", result.Schema!.WorkspaceId);
             Assert.Contains(result.Schema!.Tables, table => table.Name == "accounts");
             Assert.Contains(result.Schema.Tables, table => table.Name == "transactions");
         }
@@ -68,5 +70,6 @@ public class DbSupportNeuronTests : NeuronTestBase
         Assert.False(result!.Succeeded);
         Assert.Null(result.Schema);
         Assert.Contains("Unsupported database provider", result.Error);
+        Assert.Equal(WorkspaceIds.Default, result.WorkspaceId);
     }
 }

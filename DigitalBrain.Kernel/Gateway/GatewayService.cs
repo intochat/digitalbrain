@@ -131,7 +131,7 @@ public sealed class GatewayService(
 
                 var controlKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    "pack", "packName", "scope", "clientId", "buyerId", "userId", "synapseType", "eventName"
+                    "pack", "packName", "scope", "clientId", "buyerId", "userId", "workspaceId", "synapseType", "eventName"
                 };
                 var values = p
                     .Where(kv => !controlKeys.Contains(kv.Key))
@@ -160,9 +160,10 @@ public sealed class GatewayService(
                 var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var prompt = p.TryGetValue("prompt", out var pr) ? pr?.ToString() ?? "" : "";
                 var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
+                var workspaceId = p.TryGetValue("workspaceId", out var wid) ? wid?.ToString() : null;
 
                 var ino = grains.GetGrain<IInoNeuron>("ino-main");
-                await ino.FireAsync(new InoRequest(prompt, clientId));
+                await ino.FireAsync(new InoRequest(prompt, clientId, workspaceId));
                 return request;
             }
 

@@ -243,6 +243,7 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
         return Results.BadRequest("No file uploaded.");
 
     var clientId = form["clientId"].FirstOrDefault();
+    var workspaceId = form["workspaceId"].FirstOrDefault();
     var kind = ChatUploadClassifier.Classify(file.FileName);
 
     if (kind == ChatUploadKind.SqliteDatabase)
@@ -255,7 +256,7 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
                 await file.CopyToAsync(temp);
             }
 
-            var cmd = ChatUploadClassifier.BuildDbInspectSchema(file.FileName, tempPath, clientId);
+            var cmd = ChatUploadClassifier.BuildDbInspectSchema(file.FileName, tempPath, clientId, workspaceId);
             var db = grains.GetGrain<IDbSupportNeuron>("db-main");
             await db.FireAsync(cmd);
 
@@ -300,7 +301,8 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
         System.Text.Json.JsonSerializer.Serialize(dataset.Headers),
         System.Text.Json.JsonSerializer.Serialize(dataset.Rows),
         System.Text.Json.JsonSerializer.Serialize(dataset.ColumnStats),
-        clientId));
+        clientId,
+        workspaceId));
 
     return Results.Ok();
 });

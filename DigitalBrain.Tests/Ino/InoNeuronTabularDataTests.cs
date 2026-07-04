@@ -26,7 +26,8 @@ public class InoNeuronTabularDataTests : NeuronTestBase
             JsonSerializer.Serialize(headers),
             JsonSerializer.Serialize(rows),
             JsonSerializer.Serialize(stats),
-            "session-1"));
+            "session-1",
+            "finance"));
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var timeline = await flutter.GetIncomingTimelineAsync();
@@ -34,6 +35,7 @@ public class InoNeuronTabularDataTests : NeuronTestBase
         var surface = Assert.Single(timeline.OfType<UiSurface>());
         Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
         Assert.Equal("session-1", surface.Props["clientId"]);
+        Assert.Equal("finance", surface.Props["workspaceId"]);
         Assert.Equal("assistant", surface.Props["role"]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
@@ -55,12 +57,17 @@ public class InoNeuronTabularDataTests : NeuronTestBase
             JsonSerializer.Serialize(new[] { "Month", "Revenue" }),
             JsonSerializer.Serialize(new List<List<string>> { new() { "Jan", "12000" } }),
             JsonSerializer.Serialize(new object[0]),
-            "session-1"));
+            "session-1",
+            "finance"));
 
-        var reply = await ino.AskAsync("what was the total revenue?");
+        await ino.FireAsync(new InoRequest("what was the total revenue?", "session-1", "finance"));
 
-        Assert.False(string.IsNullOrWhiteSpace(reply));
         var timeline = await ino.GetOutgoingTimelineAsync();
-        Assert.Contains(timeline.OfType<MemorySummary>(), m => m.Summary.Contains("q2-sales.xlsx"));
+        var reply = timeline.OfType<InoResponse>().LastOrDefault();
+        Assert.NotNull(reply);
+        Assert.False(string.IsNullOrWhiteSpace(reply!.Response));
+        Assert.Contains(timeline.OfType<MemorySummary>(), m =>
+            m.Summary.Contains("q2-sales.xlsx") &&
+            m.WorkspaceId == "finance");
     }
 }

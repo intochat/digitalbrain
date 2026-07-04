@@ -26,7 +26,8 @@ public class ChatUploadClassifierTests
         var cmd = ChatUploadClassifier.BuildDbInspectSchema(
             @"C:\Users\demo\budget.db",
             @"C:\Temp\upload-copy.db",
-            "session-1");
+            "session-1",
+            "finance");
 
         var builder = new SqliteConnectionStringBuilder(cmd.ConnectionString);
 
@@ -34,6 +35,7 @@ public class ChatUploadClassifierTests
         Assert.Equal("sqlite", cmd.Provider);
         Assert.Equal("budget.db", cmd.SourcePath);
         Assert.Equal("session-1", cmd.ClientId);
+        Assert.Equal("finance", cmd.WorkspaceId);
         Assert.Equal(@"C:\Temp\upload-copy.db", builder.DataSource);
     }
 }

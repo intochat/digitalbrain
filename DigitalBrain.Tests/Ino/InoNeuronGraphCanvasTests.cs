@@ -10,7 +10,7 @@ public class InoNeuronGraphCanvasTests : NeuronTestBase
     public async Task DbSchemaInspected_Emits_GraphCanvas_Surface_To_FlutterUi()
     {
         var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new DbSchemaInspected("budget", "sqlite", BudgetSchema(), ClientId: "session-1"));
+        await ino.FireAsync(new DbSchemaInspected("budget", "sqlite", BudgetSchema(), ClientId: "session-1", WorkspaceId: "finance"));
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surface = Assert.Single((await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>());
@@ -18,6 +18,7 @@ public class InoNeuronGraphCanvasTests : NeuronTestBase
         Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
         Assert.Equal("assistant", surface.Props["role"]);
         Assert.Equal("session-1", surface.Props["clientId"]);
+        Assert.Equal("finance", surface.Props["workspaceId"]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         Assert.Equal(UiKitVocabulary.GraphCanvas, tree.Type);
@@ -29,14 +30,16 @@ public class InoNeuronGraphCanvasTests : NeuronTestBase
         Assert.Single(edges);
 
         var timeline = await ino.GetOutgoingTimelineAsync();
-        Assert.Contains(timeline.OfType<MemorySummary>(), summary => summary.Summary.Contains("accounts"));
+        Assert.Contains(timeline.OfType<MemorySummary>(), summary =>
+            summary.Summary.Contains("accounts") &&
+            summary.WorkspaceId == "finance");
     }
 
     [Fact]
     public async Task InoRequest_DrawRelationOfTwoObjects_Emits_GraphCanvas_Surface()
     {
         var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new InoRequest("draw relation of 2 objects", "session-2"));
+        await ino.FireAsync(new InoRequest("draw relation of 2 objects", "session-2", "design"));
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surface = Assert.Single((await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>());
@@ -45,6 +48,7 @@ public class InoNeuronGraphCanvasTests : NeuronTestBase
         Assert.Equal(UiKitVocabulary.GraphCanvas, tree.Type);
         Assert.Equal("Object relation", tree.Props["title"]);
         Assert.Equal("session-2", surface.Props["clientId"]);
+        Assert.Equal("design", surface.Props["workspaceId"]);
 
         var nodes = Assert.IsAssignableFrom<object[]>(tree.Props["nodes"]);
         var edges = Assert.IsAssignableFrom<object[]>(tree.Props["edges"]);
@@ -88,5 +92,6 @@ public class InoNeuronGraphCanvasTests : NeuronTestBase
                 new[] { new DbIndex("ix_transactions_account_id", "transactions", new[] { "account_id" }) })
         },
         @"E:\budget.db",
-        "session-1");
+        "session-1",
+        WorkspaceId: "finance");
 }
