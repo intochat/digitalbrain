@@ -61,12 +61,11 @@ public sealed class GatewayService(
                 var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var packName = p.TryGetValue("packName", out var pn) ? pn?.ToString() ?? p.GetValueOrDefault("name")?.ToString() ?? "" : "";
                 var ver = p.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "";
-                var buyer = p.TryGetValue("buyerId", out var b)
-                    ? b?.ToString()
-                    : p.TryGetValue("userId", out var uid) ? uid?.ToString() : null;
                 var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
+                var installSession = await ResolveSessionAsync(sessionId);
+                var buyer = installSession?.UserId.Value ?? "anonymous";
                 if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId; // fallback
-                await market.FireAsync(new InstallFromMarketplace(packName, ver, string.IsNullOrWhiteSpace(buyer) ? "anonymous" : buyer, sessionId));
+                await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer, sessionId));
                 return request;
             }
 
@@ -114,11 +113,15 @@ public sealed class GatewayService(
                 string? Field(string key) => p.TryGetValue(key, out var v) ? v?.ToString() : null;
 
                 var pack = Field("pack") ?? Field("packName") ?? request.CorrelationId;
-                // The storage scope MUST be one the readers actually look under. The responder pack,
-                // LlmResponderNeuron, and the Telegram transport all read scope "default", so honor an explicit
-                // "scope" field when supplied and otherwise fall back to "default" — never a per-session/buyer
-                // scope, which would silently strand the configured token/key where no reader ever looks.
-                var scope = Field("scope") ?? "default";
+                var scope = Field("scope") ?? PackConfigScopes.App;
+
+                // The scope must be either the shared app-level slot every reader (responder pack, LlmResponderNeuron,
+                // Telegram transport) actually pulls from, or the caller's OWN resolved per-user slot — never an
+                // arbitrary/other-user scope, per P6b.
+                var configSession = await ResolveSessionAsync(Field("sessionId"));
+                var callerOwnScope = configSession is not null ? PackConfigScopes.ForUser(configSession.UserId) : null;
+                if (scope != PackConfigScopes.App && scope != callerOwnScope)
+                    throw new RpcException(new Status(StatusCode.PermissionDenied, $"Scope '{scope}' is not permitted for this caller."));
 
                 var controlKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
@@ -151,9 +154,10 @@ public sealed class GatewayService(
                 var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var prompt = p.TryGetValue("prompt", out var pr) ? pr?.ToString() ?? "" : "";
                 var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
+                var inoSession = await ResolveSessionAsync(sessionId);
 
                 var ino = grains.GetGrain<IInoNeuron>("ino-main");
-                await ino.FireAsync(new InoRequest(prompt, sessionId));
+                await ino.FireAsync(new InoRequest(prompt, inoSession?.SessionId));
                 return request;
             }
 

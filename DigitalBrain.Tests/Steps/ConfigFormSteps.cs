@@ -27,6 +27,7 @@ public class ConfigFormSteps : IAsyncDisposable
     private readonly TestCluster _cluster;
     private string _packName = "";
     private const string Scope = "config-form-user";
+    private string? _configScope;
 
     public ConfigFormSteps()
     {
@@ -126,16 +127,6 @@ public class ConfigFormSteps : IAsyncDisposable
     [When(@"I submit configuration for the pack with token ""(.*)"", provider ""(.*)"", key ""(.*)""")]
     public async Task WhenISubmitConfiguration(string token, string provider, string key)
     {
-        var values = new Dictionary<string, string>
-        {
-            ["telegram_token"] = token,
-            ["llm_provider"] = provider,
-            ["llm_key"] = key,
-            ["pack"] = _packName,
-            ["scope"] = Scope
-        };
-        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
-
         var gateway = new GatewayService(
             _cluster.GrainFactory,
             new ConfigurationBuilder().Build(),
@@ -147,6 +138,32 @@ public class ConfigFormSteps : IAsyncDisposable
 
         await gateway.Send(new SynapseEnvelope
         {
+            TypeName = nameof(LoginRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                username = Scope,
+                password = "config-form-test-password",
+                clientId = "test"
+            }))
+        }, TestServerCallContext.Create());
+
+        var session = _cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
+        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Last().SessionId;
+        _configScope = PackConfigScopes.ForUser(new UserId(Scope));
+
+        var values = new Dictionary<string, string>
+        {
+            ["telegram_token"] = token,
+            ["llm_provider"] = provider,
+            ["llm_key"] = key,
+            ["pack"] = _packName,
+            ["scope"] = _configScope,
+            ["sessionId"] = sessionId
+        };
+        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
+
+        await gateway.Send(new SynapseEnvelope
+        {
             TypeName = nameof(ConfigurationProvided),
             Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
@@ -155,7 +172,7 @@ public class ConfigFormSteps : IAsyncDisposable
     [Then(@"the pack config store returns token ""(.*)"", provider ""(.*)"", key ""(.*)""")]
     public async Task ThenTheStoreReturnsValues(string token, string provider, string key)
     {
-        var stored = await SharedConfigStore.GetAsync(Scope, _packName);
+        var stored = await SharedConfigStore.GetAsync(_configScope!, _packName);
         Assert.Equal(token, stored["telegram_token"]);
         Assert.Equal(provider, stored["llm_provider"]);
         Assert.Equal(key, stored["llm_key"]);
