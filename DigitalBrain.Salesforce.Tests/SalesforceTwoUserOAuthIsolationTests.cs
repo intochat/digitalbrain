@@ -60,11 +60,17 @@ public class SalesforceTwoUserOAuthIsolationTests : NeuronTestBase
         var aliceResult = await alice.CompleteOAuthAsync(new SalesforceOAuthCallback(
             Code: "alice-code", State: aliceState, Error: null, ErrorDescription: null,
             FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+        Assert.True(aliceResult.Success);
+
+        // Presence/absence check (not value equality, which the constant-valued fake token handler can't
+        // discriminate between users): if Alice's completion had collapsed into Bob's scope, Bob's scope would
+        // already show a token here, before Bob has even completed his own flow.
+        var bobTokensBeforeBobCompletes = await writer.ReadPackAsync(PackConfigScopes.ForUser(new UserId("bob")), SalesforceClientFactory.PackName);
+        Assert.False(bobTokensBeforeBobCompletes.ContainsKey(SalesforceClientFactory.AccessTokenKey));
+
         var bobResult = await bob.CompleteOAuthAsync(new SalesforceOAuthCallback(
             Code: "bob-code", State: bobState, Error: null, ErrorDescription: null,
             FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
-
-        Assert.True(aliceResult.Success);
         Assert.True(bobResult.Success);
 
         var aliceTokens = await writer.ReadPackAsync(PackConfigScopes.ForUser(new UserId("alice")), SalesforceClientFactory.PackName);
