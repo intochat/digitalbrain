@@ -101,3 +101,11 @@ there is no persisted store to clean up.
    (with `e2e.runsettings` wired up, per the Render loop section above) or with
    `dotnet test --settings e2e.runsettings ...` to watch it render.
 5. When both are green, the bundle is publishable.
+
+## Lightweight automations complement bundles
+
+Use reactive automations (RegisterReaction + small real C# via AutomationNeuron) for fast glue, personal reactions, "when Activated then ..." without full pack lifecycle. 
+
+When an automation proves valuable, crystallize with MCP `promote_automations_to_pack` (emits stub + AutomationCrystallized signal). The stub can seed a real bundle source for KitExperience + BundleHarness authoring.
+
+See `docs/LIGHTWEIGHT-REACTIVE-AUTOMATIONS-PLAN.md` (Writing Automations + promotion section) for examples. Automations stay orthogonal: no ALC, no publish, immediate.

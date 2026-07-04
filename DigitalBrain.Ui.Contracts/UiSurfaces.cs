@@ -436,6 +436,69 @@ public record ListSurface(
     ["items"] = Items
 });
 
+/// Dedicated surface for lightweight automations observability (reactions + scripts + last exec info).
+/// Emitted by AutomationNeuron on register/remove/execute/query. Consumable by UI/HomeFeed.
+[GenerateSerializer]
+public record AutomationSurface(
+    IReadOnlyList<ReactionView> Reactions,
+    IReadOnlyList<ScriptView> Scripts,
+    DateTimeOffset LastUpdated
+) : UiSurface("automation", new Dictionary<string, object?>
+{
+    ["reactions"] = Reactions,
+    ["scripts"] = Scripts,
+    ["lastUpdated"] = LastUpdated
+});
+
+[GenerateSerializer]
+public record ReactionView(
+    [property: Id(0)] string Id,
+    [property: Id(1)] string When,
+    [property: Id(2)] string ScriptRef,
+    [property: Id(3)] string? Target = null,
+    [property: Id(4)] int ExecCount = 0
+);
+
+[GenerateSerializer]
+public record ScriptView(
+    [property: Id(0)] string Id,
+    [property: Id(1)] string Description,
+    [property: Id(2)] string CodePreview,
+    [property: Id(3)] int UsageCount = 0
+);
+
+/// Data-only visual graph foundation for automations (priority 7). Nodes = reactions/scripts, edges capture when/then.
+/// A future editor emits the same RegisterScript/RegisterReaction records; this is just observable surface.
+/// Rfw / Flutter can render from the nodes/edges.
+[GenerateSerializer]
+public record AutomationGraphSurface(
+    [property: Id(0)] string Title,
+    [property: Id(1)] IReadOnlyList<AutomationGraphNode> Nodes,
+    [property: Id(2)] IReadOnlyList<AutomationGraphEdge> Edges,
+    [property: Id(3)] DateTimeOffset GeneratedAt
+) : UiSurface("automation-graph", new Dictionary<string, object?>
+{
+    ["title"] = Title,
+    ["nodes"] = Nodes,
+    ["edges"] = Edges,
+    ["generatedAt"] = GeneratedAt
+});
+
+[GenerateSerializer]
+public record AutomationGraphNode(
+    [property: Id(0)] string Id,
+    [property: Id(1)] string Kind, // "reaction" | "script"
+    [property: Id(2)] string Label,
+    [property: Id(3)] IReadOnlyDictionary<string, object?>? Props = null
+);
+
+[GenerateSerializer]
+public record AutomationGraphEdge(
+    [property: Id(0)] string From,
+    [property: Id(1)] string To,
+    [property: Id(2)] string Label // e.g. "when" or "uses"
+);
+
 /// <summary>
 /// Tabular data surface rendered by the client as a rich UI kit table (used for dropped Excel/CSV in chat).
 /// Columns and rows are string data for simple, self-explanatory rendering.

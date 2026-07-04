@@ -1,7 +1,7 @@
 # Lightweight Reactive Automations — Implementation Plan (Reactions + C# Scripts)
 
-**Status:** ALL TASKS IMPLEMENTED (2026-07-04). Multiple commits. Full plan complete. See bottom for summary + verification.  
-**Date:** 2026-07-04  
+**Status:** ALL TASKS + ALL REMAINING OPEN ITEMS IMPLEMENTED (2026-07-05). One coherent pass. Full plan + 10 priorities complete. See "All Remaining Items" section.  
+**Date:** 2026-07-05  
 **Owner:** (to be assigned)  
 **Related:** `docs/CONTINUATION-DISTRIBUTION.md` (the heavier rail), `docs/PRODUCT_VISION.md`, `docs/SYSTEM_DESIGN.md`, `docs/authoring-a-bundle.md`, AGENTS.md
 
@@ -487,3 +487,92 @@ Once the basic loop is green (Tasks 1-6), the rest is incremental polish and int
 Start with Task 1. Write the test that forces the first record or the ScriptRunner first. Keep changes tiny. Run the fast commands constantly.
 
 Ready when the first `NeuronActivated` → custom script emission demo works end-to-end in a test cluster.
+
+---
+
+## All Remaining Items Implemented (2026-07-05)
+
+**Status:** COMPLETE. One coherent pass covering all 10 priorities from user query (mapping to Open/Later + gaps). Fast inner loop used constantly. Followed AGENTS.md, Context7 for APIs (CSharpScript, Orleans), real C# active (with cache + fallback), no vacuous comments, reused patterns (Neuron journals, FireAsync+StampCurrent, ListSurface, MCP style, Signal).
+
+### Summary of delivered (all items):
+
+1. **Real C# scripting activated** — ScriptRunner uses CSharpScript.Create/RunAsync + ScriptGlobals + return/Fire support + "inline:". Errors -> PackEmission. Updated tests (PackAlc + existing) exercise real bodies. Fallback emulation for skew resilience. Note pin in Directory.Packages.props.
+
+2. **Dedicated AutomationSurface** — Added AutomationSurface + ReactionView/ScriptView in UiSurfaces.cs. Neuron emits it (plus graph) on reg/remove/exec/query. list_automations triggers surface.
+
+3. **Ino/MCP sugar** — Added `create_automation_from_description` (natural "when X then emit Y" -> real C# + Define). Improved descriptions/examples in `define_reaction`.
+
+4. **Script library first-class** — Added ListScriptLibraryAsync + ScriptLibraryEntry. Richer data (desc, emits, usage). GetScriptCode/List updated. MCP shows library. Demo reuse (shared script id by 2+ reactions) in seeds + tests.
+
+5. **More real seeds** — 4 high-quality examples in Program.cs startup: auto UiSurface brief on activate, Signal+context reactor, script sharing (shared.brief-gen by two reactions), scoped demo. Fresh system has working automations.
+
+6. **Promotion path** — Added PromoteAutomationToPack + AutomationPromoted + impl in neuron (thin stub + signal). MCP `promote_automations_to_pack`. Comment shows flow to pack pipeline.
+
+7. **Visual constructor foundation** — Added AutomationGraphSurface + Node/Edge (data only) in UiSurfaces. Neuron emits on changes. Consumes same Register* records underneath.
+
+8. **Caching + hardening** — Concurrent cache of compiled Script by body hash in ScriptRunner. Error isolation per-exec (try), declared-emits light gate, one bad never poisons others, logging. Capability comments.
+
+9. **Multi-user/scoping** — Added Scope="default" to RegisterScript/Reaction (and new records). Grain IsMatch/ScopeMatches respects (NeuronScope coord for activations, userId in signals). Backward global default. MCP define supports scope. Seeds show scoped vs global.
+
+10. **Docs/examples** — This section + updated plan. Interface docs for GetScriptCode/surfaces. Added practical examples in seeds + MCP tool. (See also: writing guide addition below.)
+
+### Verification
+- `dotnet build && dotnet test --filter "Automation|ScriptRunner|NeuronActivated" --no-build` green after groups.
+- Surfaces (AutomationSurface, Graph, List) emitted and visible in timeline.
+- User via MCP/Ino: natural desc -> stored -> surface -> activation fires real C# instantly.
+- All open decisions addressed without bloat.
+
+**Follow-ups (non-blocking):** Full visual editor widget, deeper pack crystallize (use stub), richer Ino prompt integration, perf on very large script libs.
+
+## Writing Automations (practical guide)
+
+Copy-paste examples (use via MCP or direct Fire Register* / DefineReactionAsync). Bodies are real C# executed against:
+
+```csharp
+// globals
+Synapse input;   // the triggering synapse (NeuronActivated, Signal, ...)
+NeuronId Self;
+Func<Synapse, Task> Fire;  // await Fire(new Signal("Foo", ...)) for side effects
+```
+
+**1. Basic on activation (emits UI surface)**
+```csharp
+// via MCP create_automation_from_description or define_reaction
+when: "NeuronActivated", script: "return new[] { new ListSurface(\"Hello\", new[] { \"Activated!\" }) };"
+```
+
+**2. React to Signal + return**
+```csharp
+when: "Signal:DailyBriefRequested", script: "return new[] { new Signal(\"DailyBriefGenerated\", new Dictionary<string,object?> { [\"text\"] = \"brief\" }) };"
+```
+
+**3. Side-effect only + reuse shared script id**
+```csharp
+// first register script once
+RegisterScript("shared.log", "await Fire(new Signal(\"Log\", null)); return Array.Empty<Synapse>();");
+// then multiple reactions ref "shared.log"
+```
+
+**4. Natural via Ino/MCP sugar**
+```
+create_automation_from_description: "when personal-assistant activates then emit DailyBriefGenerated with neuron name"
+```
+
+**5. Scoped personal**
+```
+define_reaction id=personal-foo when=NeuronActivated target=... script=... scope=my-user-42
+```
+
+Surface output example (AutomationSurface):
+- Reactions: [ {id, when, scriptRef, execCount} ]
+- Scripts: previews + usage
+
+Complements bundles: use lightweight for glue/self-write; crystallize via promote when ready for marketplace distribution (see authoring-a-bundle.md note).
+
+**In code seeds:** see DigitalBrain.Kernel/Program.cs startup (real bodies active on fresh start).
+
+## Relation to bundles (authoring-a-bundle.md note)
+
+Lightweight automations are orthogonal fast path. Full bundles (NeuroPack + IPackBehavior + ALC) for rich/monetized UI. Automations can be promoted to pack seeds via promote_automations_to_pack (emits stub + signal for foundry/market).
+
+See docs/authoring-a-bundle.md for pack side.

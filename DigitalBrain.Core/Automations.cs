@@ -10,7 +10,8 @@ public record RegisterScript(
     [property: Id(0)] string Id,
     [property: Id(1)] string Code,
     [property: Id(2)] string Description = "",
-    [property: Id(3)] IReadOnlyList<string> DeclaredEmits = null!)
+    [property: Id(3)] IReadOnlyList<string> DeclaredEmits = null!,
+    [property: Id(4)] string Scope = "default")
     : Synapse(nameof(RegisterScript), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
@@ -19,7 +20,8 @@ public record RegisterReaction(
     [property: Id(1)] string When,
     [property: Id(2)] string ScriptRef,
     [property: Id(3)] string? Target = null,
-    [property: Id(4)] IReadOnlyList<string> DeclaredEmits = null!)
+    [property: Id(4)] IReadOnlyList<string> DeclaredEmits = null!,
+    [property: Id(5)] string Scope = "default")
     : Synapse(nameof(RegisterReaction), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
@@ -43,6 +45,19 @@ public record CreateAutomationApp(
 [GenerateSerializer]
 public record RemoveReaction(string Id) : Synapse(nameof(RemoveReaction), DateTimeOffset.UtcNow);
 
+/// Thin promotion bridge (priority 6): take reactions/scripts and emit a seed that pack pipeline can consume.
+/// Does not replace full authoring; just crystallizes the lightweight def into NeuroPack form for distribution.
+[GenerateSerializer]
+public record PromoteAutomationToPack(
+    [property: Id(0)] string PackName,
+    [property: Id(1)] string Version,
+    [property: Id(2)] IReadOnlyList<string> ReactionIds,
+    [property: Id(3)] string? OwnerId = null)
+    : Synapse(nameof(PromoteAutomationToPack), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record AutomationPromoted(string PackName, string Version, string ManifestSummary) : Synapse(nameof(AutomationPromoted), DateTimeOffset.UtcNow);
+
 public interface IAutomationNeuron : INeuron
 {
     Task<IReadOnlyList<string>> ListActiveScriptsAsync();
@@ -52,7 +67,22 @@ public interface IAutomationNeuron : INeuron
     /// "when MyNeuron.Lifetime.Activated then { C# body }"
     Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null);
 
-    /// For script library / reuse (priority 4)
+    /// Get script source by id for library/reuse (documented for surfaces + MCP).
     Task<string?> GetScriptCodeAsync(string id);
     Task RemoveReactionAsync(string id);
+
+    /// Richer library view for MCP/UI (description, declared emits, usage). Surfaces (AutomationSurface, AutomationGraphSurface) emitted on changes/queries.
+    Task<IReadOnlyList<ScriptLibraryEntry>> ListScriptLibraryAsync();
+
+    /// Promote selected reactions to NeuroPack seed (thin bridge to heavy rail).
+    Task PromoteToPackAsync(string packName, string version, IReadOnlyList<string> reactionIds, string? ownerId = null);
 }
+
+[GenerateSerializer]
+public record ScriptLibraryEntry(
+    [property: Id(0)] string Id,
+    [property: Id(1)] string Code,
+    [property: Id(2)] string Description,
+    [property: Id(3)] IReadOnlyList<string> DeclaredEmits,
+    [property: Id(4)] int UsageCount
+);

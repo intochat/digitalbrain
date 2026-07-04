@@ -190,5 +190,23 @@ public class PackAlcEmbodierTests
         Assert.Single(outputs);
         Assert.Equal("ScriptResult", outputs[0].Type);
     }
+
+    [Fact]
+    public async Task ScriptRunner_Executes_Real_Bodies_With_Await_Fire_SideEffect()
+    {
+        // Updated per plan to exercise return + side-effect await Fire using real C#.
+        var sideEffects = new List<Synapse>();
+        var input = new Signal("Trigger", null);
+        var self = new NeuronId("script-test");
+
+        var body = """
+            await Fire(new Signal("FiredViaDelegate", new Dictionary<string,object?> { ["via"] = "await" }));
+            return new[] { new Signal("ReturnedToo", null) };
+            """;
+        var outputs = await ScriptRunner.ExecuteAsync(body, input, self, s => { sideEffects.Add(s); return Task.CompletedTask; });
+
+        Assert.Contains(outputs, o => o.Type == "ReturnedToo");
+        Assert.Contains(sideEffects, s => s.Type == "FiredViaDelegate");
+    }
 }
 

@@ -93,22 +93,34 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         return "Cluster activity sent for 3D visualization.";
     }
 
-    [McpServerTool(Name = "define_reaction"), Description("Define or update a reactive automation: when a condition happens, run the given small C# script body. Supports 'NeuronActivated', 'Signal:XXX', etc.")]
+    [McpServerTool(Name = "define_reaction"), Description("Define or update a reactive automation. when=NeuronActivated|Signal:Foo|*, script is real C# using return new[] or await Fire. Example: when=NeuronActivated, script='return new[] { new Signal(\"MySignal\", null) };' ")]
     public async Task<string> DefineReaction(
         [Description("Unique id for the reaction")] string id,
         [Description("Condition e.g. 'NeuronActivated' or 'Signal:MySignal'")] string when,
         [Description("Optional target neuron key (e.g. 'personal-assistant') or null for any")] string? target,
-        [Description("The C# script body to execute (can use await Fire(new Signal(...)))")] string scriptCode)
+        [Description("The C# script body (real executable C#; supports return [...] and await Fire)")] string scriptCode,
+        [Description("Optional scope for multi-user (default='default' = global)")] string scope = "default")
     {
         var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
-        await auto.DefineReactionAsync(id, when, target, scriptCode);
-        return $"Defined reaction '{id}' (when={when}, target={target ?? "any"}). Script will run on match.";
+        // For scoped, use direct records so scope is honored (DefineReactionAsync defaults global for compat)
+        if (scope != "default")
+        {
+            var sid = id + "-script";
+            await auto.FireAsync(new RegisterScript(sid, scriptCode, "via-mcp", Array.Empty<string>(), scope));
+            await auto.FireAsync(new RegisterReaction(id, when, sid, target, Array.Empty<string>(), scope));
+        }
+        else
+        {
+            await auto.DefineReactionAsync(id, when, target, scriptCode);
+        }
+        return $"Defined reaction '{id}' (when={when}, target={target ?? "any"}, scope={scope}).";
     }
 
-    [McpServerTool(Name = "list_automations"), Description("List currently active reactions and scripts. Supports reuse by script id.")]
+    [McpServerTool(Name = "list_automations"), Description("List currently active reactions and scripts (surface-friendly). Use define_reaction or create_automation_from_description to add. Supports script reuse by id.")]
     public async Task<string> ListAutomations()
     {
         var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
+        // Query triggers fresh surface emission (AutomationSurface + ListSurface) for UI/HomeFeed
         var reactions = await auto.ListActiveReactionsAsync();
         var scripts = await auto.ListActiveScriptsAsync();
         var details = new System.Text.StringBuilder();
@@ -120,9 +132,17 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         details.AppendLine("Active scripts (reusable by id):");
         foreach (var s in scripts)
         {
-            var code = await auto.GetScriptCodeAsync(s);  // for library view
+            var code = await auto.GetScriptCodeAsync(s);
             details.AppendLine($"  - {s}: {(code?.Length > 50 ? code.Substring(0,50) + "..." : code)}");
         }
+        // Rich library view (priority 4)
+        var lib = await auto.ListScriptLibraryAsync();
+        if (lib.Count > 0)
+        {
+            details.AppendLine("Script library entries (id, usage):");
+            foreach (var e in lib) details.AppendLine($"  - {e.Id} (uses:{e.UsageCount}) desc:{e.Description}");
+        }
+        details.AppendLine("(AutomationSurface emitted to timeline for UI consumption.)");
         return details.ToString();
     }
 
@@ -132,6 +152,43 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
         await auto.RemoveReactionAsync(id);
         return $"Removed reaction {id}.";
+    }
+
+    [McpServerTool(Name = "create_automation_from_description"), Description("High-level sugar for Ino/LLM: describe in English like 'when personal-assistant activates then emit DailyBriefGenerated with name'. Internally creates real RegisterScript + Reaction using DefineReactionAsync. Returns confirmation.")]
+    public async Task<string> CreateAutomationFromDescription(
+        [Description("Natural language description of the when-then automation")] string description,
+        [Description("Optional explicit id, otherwise derived")] string? id = null)
+    {
+        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
+        // Minimal heuristic parser for common patterns; produces real executable C# body.
+        var lower = description.ToLowerInvariant();
+        string when = "NeuronActivated";
+        string? target = null;
+        string script = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from natural\" }) };";
+
+        if (lower.Contains("signal:") || lower.Contains("on signal"))
+        {
+            var sigMatch = System.Text.RegularExpressions.Regex.Match(description, @"Signal[:\s]+([A-Za-z0-9_]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var sig = sigMatch.Success ? sigMatch.Groups[1].Value : "CustomSignal";
+            when = $"Signal:{sig}";
+        }
+        else if (lower.Contains("activate") || lower.Contains("activated"))
+        {
+            when = "NeuronActivated";
+            if (lower.Contains("personal-assistant") || lower.Contains("assistant")) target = "personal-assistant";
+            else if (lower.Contains("myneuron") || lower.Contains("target")) target = "target-neuron";
+        }
+
+        if (lower.Contains("emit") || lower.Contains("dailybrief") || lower.Contains("signal"))
+        {
+            var emitMatch = System.Text.RegularExpressions.Regex.Match(description, @"emit\s+([A-Za-z0-9_]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var emitName = emitMatch.Success ? emitMatch.Groups[1].Value : "AutomationTriggered";
+            script = $"return new[] {{ new Signal(\"{emitName}\", new Dictionary<string,object?> {{ [\"from\"] = \"automation\", [\"target\"] = \"{target ?? "any"}\" }}) }};";
+        }
+
+        var autoId = id ?? "natural-" + Guid.NewGuid().ToString("N")[..8];
+        await auto.DefineReactionAsync(autoId, when, target, script);
+        return $"Created automation '{autoId}' from description. when={when} target={target ?? "any"}. Real C# body: {script}";
     }
 
     [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]
@@ -331,5 +388,18 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         await GetPublishedPacksWithLocalSeedsAsync(market);
         await market.FireAsync(new InstallFromMarketplace(packName, version, buyerId));
         return $"Installed '{packName}@{version}' for buyer '{buyerId}'. Commission should have been taken.";
+    }
+
+    [McpServerTool(Name = "promote_automations_to_pack"), Description("Thin promotion (priority 6): crystallize selected reaction ids + their scripts into a NeuroPack seed stub for the heavy publish/install pipeline. Example: promote 'my-auto' reactions to a named pack.")]
+    public async Task<string> PromoteAutomationsToPack(
+        [Description("Pack name for the crystallized output")] string packName,
+        [Description("Version e.g. 0.1.0")] string version,
+        [Description("Comma separated reaction ids to include")] string reactionIdsCsv,
+        [Description("Optional owner")] string ownerId = "automation-user")
+    {
+        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
+        var ids = reactionIdsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        await auto.PromoteToPackAsync(packName, version, ids, ownerId);
+        return $"Promotion requested for {packName}@{version} covering {ids.Count} reactions. Watch for AutomationPromoted + crystallized signal.";
     }
 }

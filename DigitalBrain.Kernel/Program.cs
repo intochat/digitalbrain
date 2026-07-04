@@ -373,36 +373,32 @@ if (grainFactory != null)
                 var automation = grainFactory.GetGrain<IAutomationNeuron>("automation-main");
                 await automation.GetTimelineAsync();
 
-                // Seed a couple of example automations for immediate value (priority 3)
-                // Users/Ino can define more via MCP tools or direct synapses.
+                // High-quality seeds (priority 5): real C# bodies, useful behaviors, script sharing.
+                // 1. Auto-emit UiSurface on activation (immediate UI value)
                 await automation.DefineReactionAsync(
-                    "demo-on-activation",
+                    "auto-brief-on-activation",
                     "NeuronActivated",
                     null,
-                    "return new[] { new Signal(\"DemoAutomationFired\", new Dictionary<string,object?> { [\"note\"] = \"system wrote this on activation\" }) };"
+                    "return new[] { new ListSurface(\"AutomationBrief\", new[] { \"System activated - lightweight reactions live\", \"Use MCP list_automations or define more\" }) };"
                 );
 
-                // Another example: react to any Signal with name "TestSignal"
+                // 2. React to Signal + context, emit useful signal (glue)
                 await automation.DefineReactionAsync(
-                    "demo-signal-reactor",
-                    "Signal:TestSignal",
+                    "signal-context-reactor",
+                    "Signal:DailyBriefRequested",
                     null,
-                    "return new[] { new Signal(\"SignalHandled\", new Dictionary<string,object?> { [\"original\"] = \"TestSignal\" }) };"
+                    "var name = (input as Signal)?.Payload?.GetValueOrDefault(\"neuron\")?.ToString() ?? \"brain\"; return new[] { new Signal(\"DailyBriefGenerated\", new Dictionary<string,object?> { [\"source\"] = \"automation\", [\"neuron\"] = name }) };"
                 );
 
-                // Demo script sharing: one script used by multiple reactions
-                await automation.DefineReactionAsync(
-                    "shared-on-activation",
-                    "NeuronActivated",
-                    "shared-demo",
-                    "return new[] { new Signal(\"SharedScriptFired\", new Dictionary<string,object?> { [\"shared\"] = true }) };"
-                );
-                await automation.DefineReactionAsync(
-                    "shared-on-signal",
-                    "Signal:SharedTrigger",
-                    null,
-                    "return new[] { new Signal(\"SharedScriptFired\", new Dictionary<string,object?> { [\"shared\"] = true }) };"
-                );
+                // 3+4. Script sharing demo: one script id referenced by two different reactions
+                await automation.FireAsync(new RegisterScript("shared.brief-gen", "return new[] { new Signal(\"SharedBriefEmitted\", new Dictionary<string,object?> { [\"reused\"] = true }) };", "Reusable brief emitter", Array.Empty<string>(), "default"));
+                await automation.FireAsync(new RegisterReaction("brief-on-pa-activate", "NeuronActivated", "shared.brief-gen", "personal-assistant", Array.Empty<string>(), "default"));
+                await automation.FireAsync(new RegisterReaction("brief-on-any-activate", "NeuronActivated", "shared.brief-gen", null, Array.Empty<string>(), "default"));
+
+                // Scoped demo (priority 9): only matches for specific user scope (backward default=global)
+                await automation.FireAsync(new RegisterScript("scoped.demo", "return new[] { new Signal(\"ScopedOnly\", null) };", "scoped only", Array.Empty<string>(), "demo-user"));
+                await automation.FireAsync(new RegisterReaction("scoped-reaction", "NeuronActivated", "scoped.demo", null, Array.Empty<string>(), "demo-user"));
+
 
                 // MarketDataNeuron has the same activate-before-broadcast requirement as ILlmResponderNeuron
                 // above: it's an IHandle<Signal> grain that filters Signal("CheckBitcoinPrice") off the
