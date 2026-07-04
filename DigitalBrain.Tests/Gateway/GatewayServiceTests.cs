@@ -476,7 +476,7 @@ public class GatewayServiceTests : NeuronTestBase
         var cards = new List<RfwCard>();
         while (cards.Count < 8 &&
                (!cards.Any(c => c.DataJson.Contains("journaled response and surface update observed", StringComparison.Ordinal)) ||
-                !cards.Any(c => c.DataJson.Contains("\"surfaceId\":\"surface-demo-pack\"", StringComparison.Ordinal))))
+                !cards.Any(IsSurfaceDemoPackCard)))
         {
             cards.Add(await subscription.Reader.ReadAsync(timeout.Token));
         }
@@ -488,7 +488,7 @@ public class GatewayServiceTests : NeuronTestBase
         Assert.Contains("\"edges\"", graph.DataJson);
         Assert.Contains("\"correlationId\":\"ui-demo-test\"", graph.DataJson);
 
-        var card = Assert.Single(cards, c => c.DataJson.Contains("\"surfaceId\":\"surface-demo-pack\"", StringComparison.Ordinal));
+        var card = Assert.Single(cards, IsSurfaceDemoPackCard);
         Assert.Equal("digitalbrain", card.LibraryName);
         Assert.Equal("root", card.RootWidget);
         Assert.False(string.IsNullOrWhiteSpace(card.CorrelationId));
@@ -508,6 +508,10 @@ public class GatewayServiceTests : NeuronTestBase
         Assert.Contains(graphTimeline.OfType<UiSurface>(), surface =>
             surface.Kind == UiSurfaceKinds.ActivityGraph &&
             surface.CorrelationId == "ui-demo-test");
+
+        static bool IsSurfaceDemoPackCard(RfwCard card) =>
+            card.DataJson.Contains("\"surfaceId\":\"surface-demo-pack\"", StringComparison.Ordinal) &&
+            card.DataJson.Contains("\"kind\":\"task-window\"", StringComparison.Ordinal);
     }
 
     private static ServerCallContext TestContext(CancellationToken cancellationToken = default) =>
