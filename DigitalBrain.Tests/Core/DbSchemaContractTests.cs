@@ -23,7 +23,7 @@ public class DbSchemaContractTests
             SessionId: "session-1",
             Metadata: new Dictionary<string, string?> { ["sqlite:version"] = "3.46.0" });
 
-        var inspected = new DbSchemaInspected("budget", "sqlite", schema, SessionId: "session-1");
+        var inspected = new DbSchemaInspected("budget", "sqlite", schema, ClientId: "session-1");
 
         Assert.True(inspected.Succeeded);
         Assert.Equal("sqlite", inspected.Provider);

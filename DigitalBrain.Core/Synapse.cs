@@ -223,7 +223,7 @@ public record TaskInfo(
 
 // INO - the personal ultra-context assistant.
 [GenerateSerializer]
-public record InoRequest(string Prompt, string? SessionId = null) : Synapse(nameof(InoRequest), DateTimeOffset.UtcNow);
+public record InoRequest(string Prompt, string? ClientId = null) : Synapse(nameof(InoRequest), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) : Synapse(nameof(InoResponse), DateTimeOffset.UtcNow);
@@ -296,7 +296,7 @@ public record DbInspectSchema(
     string Provider,
     string? ConnectionString = null,
     string? SourcePath = null,
-    string? SessionId = null) : Synapse(nameof(DbInspectSchema), DateTimeOffset.UtcNow);
+    string? ClientId = null) : Synapse(nameof(DbInspectSchema), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record DbSchemaInspected(
@@ -305,7 +305,7 @@ public record DbSchemaInspected(
     DbSchemaModel? Schema,
     bool Succeeded = true,
     string? Error = null,
-    string? SessionId = null) : Synapse(nameof(DbSchemaInspected), DateTimeOffset.UtcNow);
+    string? ClientId = null) : Synapse(nameof(DbSchemaInspected), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record DbSchemaModel(

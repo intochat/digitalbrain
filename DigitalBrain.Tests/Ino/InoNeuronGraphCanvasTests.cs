@@ -10,14 +10,14 @@ public class InoNeuronGraphCanvasTests : NeuronTestBase
     public async Task DbSchemaInspected_Emits_GraphCanvas_Surface_To_FlutterUi()
     {
         var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new DbSchemaInspected("budget", "sqlite", BudgetSchema(), SessionId: "session-1"));
+        await ino.FireAsync(new DbSchemaInspected("budget", "sqlite", BudgetSchema(), ClientId: "session-1"));
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surface = Assert.Single((await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>());
 
         Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
         Assert.Equal("assistant", surface.Props["role"]);
-        Assert.Equal("session-1", surface.Props["sessionId"]);
+        Assert.Equal("session-1", surface.Props["clientId"]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         Assert.Equal(UiKitVocabulary.GraphCanvas, tree.Type);
@@ -44,7 +44,7 @@ public class InoNeuronGraphCanvasTests : NeuronTestBase
 
         Assert.Equal(UiKitVocabulary.GraphCanvas, tree.Type);
         Assert.Equal("Object relation", tree.Props["title"]);
-        Assert.Equal("session-2", surface.Props["sessionId"]);
+        Assert.Equal("session-2", surface.Props["clientId"]);
 
         var nodes = Assert.IsAssignableFrom<object[]>(tree.Props["nodes"]);
         var edges = Assert.IsAssignableFrom<object[]>(tree.Props["edges"]);

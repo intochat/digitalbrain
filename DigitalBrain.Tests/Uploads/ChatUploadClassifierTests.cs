@@ -33,7 +33,7 @@ public class ChatUploadClassifierTests
         Assert.Equal("budget", cmd.ConnectionName);
         Assert.Equal("sqlite", cmd.Provider);
         Assert.Equal("budget.db", cmd.SourcePath);
-        Assert.Equal("session-1", cmd.SessionId);
+        Assert.Equal("session-1", cmd.ClientId);
         Assert.Equal(@"C:\Temp\upload-copy.db", builder.DataSource);
     }
 }

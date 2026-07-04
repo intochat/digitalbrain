@@ -16,7 +16,7 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         string path,
         string connectionName,
         string? sourcePath = null,
-        string? sessionId = null,
+        string? clientId = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -37,7 +37,7 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
             builder.ToString(),
             connectionName,
             sourcePath ?? path,
-            sessionId,
+            clientId,
             cancellationToken);
     }
 
@@ -45,7 +45,7 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         string connectionString,
         string connectionName,
         string? sourcePath = null,
-        string? sessionId = null,
+        string? clientId = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -107,7 +107,7 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
             "sqlite",
             tables,
             sourcePath ?? builder.DataSource,
-            sessionId,
+            clientId,
             new Dictionary<string, string?>
             {
                 ["sqlite:version"] = sqliteVersion,

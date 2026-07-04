@@ -306,7 +306,7 @@ public class NeuronTests : NeuronTestBase
         var chartGenerated = chartTimeline.OfType<DataChartGenerated>().LastOrDefault(g => g.RequestId == "gmail-last-100-alice");
         Assert.NotNull(chartGenerated);
         Assert.Equal("alice", chartGenerated.Surface.Props["userId"]);
-        Assert.Equal("session-1", chartGenerated.Surface.Props["sessionId"]);
+        Assert.Equal("session-1", chartGenerated.Surface.Props["clientId"]);
         Assert.True(chartGenerated.Surface.Props.ContainsKey(UiSurfaceKeys.ChartSpec));
     }
 

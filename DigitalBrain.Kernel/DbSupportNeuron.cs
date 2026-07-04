@@ -38,7 +38,7 @@ public class DbSupportNeuron(
                 Schema: null,
                 Succeeded: false,
                 Error: $"Unsupported database provider '{cmd.Provider}'. Schema inspection currently supports SQLite files.",
-                SessionId: cmd.SessionId));
+                ClientId: cmd.ClientId));
             return;
         }
 
@@ -55,12 +55,12 @@ public class DbSupportNeuron(
                     cmd.ConnectionString,
                     cmd.ConnectionName,
                     cmd.SourcePath,
-                    cmd.SessionId)
+                    cmd.ClientId)
                 : await sqliteSchemaInspector.InspectFileAsync(
                     cmd.SourcePath ?? string.Empty,
                     cmd.ConnectionName,
                     cmd.SourcePath,
-                    cmd.SessionId);
+                    cmd.ClientId);
 
             await FireAsync(new DbSchemaInspected(
                 cmd.ConnectionName,
@@ -68,7 +68,7 @@ public class DbSupportNeuron(
                 schema,
                 Succeeded: true,
                 Error: null,
-                SessionId: cmd.SessionId));
+                ClientId: cmd.ClientId));
         }
         catch (Exception ex)
         {
@@ -84,7 +84,7 @@ public class DbSupportNeuron(
                 Schema: null,
                 Succeeded: false,
                 Error: ex.GetBaseException().Message,
-                SessionId: cmd.SessionId));
+                ClientId: cmd.ClientId));
         }
     }
 

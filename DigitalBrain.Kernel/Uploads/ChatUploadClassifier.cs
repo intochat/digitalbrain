@@ -34,7 +34,7 @@ public static class ChatUploadClassifier
     public static bool IsTabularWorkbook(string fileName) =>
         Path.GetExtension(fileName).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
 
-    public static DbInspectSchema BuildDbInspectSchema(string fileName, string serverPath, string? sessionId)
+    public static DbInspectSchema BuildDbInspectSchema(string fileName, string serverPath, string? clientId)
     {
         var safeFileName = SafeFileName(fileName);
         var connectionName = Path.GetFileNameWithoutExtension(safeFileName);
@@ -51,7 +51,7 @@ public static class ChatUploadClassifier
             "sqlite",
             connectionString,
             safeFileName,
-            sessionId);
+            clientId);
     }
 
     public static string TempDatabasePath(string fileName)
