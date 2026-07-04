@@ -137,11 +137,13 @@ public class UiSurfaceContractTests
         var installProps = AssertActionProps(surface.Props["installAction"], nameof(InstallFromMarketplace));
         Assert.Equal("alice", installProps["buyerId"]);
         Assert.Equal("alice", installProps["userId"]);
-        Assert.Equal("client-1", installProps["sessionId"]);
+        Assert.Equal("client-1", installProps["clientId"]);
+        Assert.False(installProps.ContainsKey("sessionId"));
 
         var updateProps = AssertActionProps(surface.Props["updateAction"], nameof(InstallFromMarketplace));
         Assert.Equal("alice", updateProps["buyerId"]);
-        Assert.Equal("client-1", updateProps["sessionId"]);
+        Assert.Equal("client-1", updateProps["clientId"]);
+        Assert.False(updateProps.ContainsKey("sessionId"));
     }
 
     [Fact]

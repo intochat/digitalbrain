@@ -1,5 +1,9 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Ui;
+using DigitalBrain.Kernel.Ui;
 using DigitalBrain.TestKit;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Auth;
 
@@ -74,6 +78,37 @@ public sealed class UserSessionNeuronTests : NeuronTestBase
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         Assert.Equal(NeuronUiKit.Form, tree.Type);
         Assert.Equal(nameof(LoginRequest), tree.Props[UiSurfaceKeys.SynapseType]);
+    }
+
+    // Proves the actual bug this task's plan fixes: after a real login, the signed-in shell surface
+    // reaches the connecting client's own HomeFeedBus stream (addressed by its clientId), not merely a
+    // Props dictionary that happens to carry the right value with nothing actually routing on it. Follows
+    // the direct-subscribe pattern from HomeFeedCrossSiloTests.cs/GatewayServiceTests.cs rather than driving
+    // the gRPC-facing WatchHomeFeed surface.
+    [Fact]
+    public async Task Login_Broadcasts_Signed_In_Shell_Surface_To_The_Connecting_Clients_HomeFeedBus_Stream()
+    {
+        var session = Grain<IUserSessionNeuron>("session-shell-routing");
+        var bus = ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
+
+        const string clientId = "shell-routing-connection";
+        await using var subscription = await bus.SubscribeAsync(clientId);
+
+        await session.HandleAsync(new LoginRequest("shell-routing-user", "correct horse battery staple", clientId));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        RfwCard? shellCard = null;
+        while (shellCard is null)
+        {
+            var card = await subscription.Reader.ReadAsync(cts.Token);
+            if (string.Equals(card.CorrelationId, "surface.shell.shell-routing-user", StringComparison.Ordinal))
+            {
+                shellCard = card;
+            }
+        }
+
+        Assert.Equal(clientId, shellCard.ClientId);
+        Assert.Contains(clientId, shellCard.DataJson, StringComparison.Ordinal);
     }
 
     [Fact]

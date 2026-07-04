@@ -52,7 +52,7 @@ public static class MarketplaceUiSurfaces
                         {
                             ["buyerId"] = userId,
                             ["userId"] = userId,
-                            ["sessionId"] = clientId
+                            ["clientId"] = clientId
                         }),
                     ["updateAction"] = UiSurfaceActions.SynapseAction(
                         "update-pack",
@@ -62,7 +62,7 @@ public static class MarketplaceUiSurfaces
                         {
                             ["buyerId"] = userId,
                             ["userId"] = userId,
-                            ["sessionId"] = clientId
+                            ["clientId"] = clientId
                         })
                 }));
     }
@@ -183,7 +183,7 @@ public static class MarketplaceUiSurfaces
     public static UiWidgetTree BuildInstalledLauncherTree(
         IReadOnlyList<IReadOnlyDictionary<string, object?>> bundles,
         string userId = "anonymous",
-        string? sessionId = null)
+        string? clientId = null)
     {
         userId = EffectiveUserId(userId);
         var kids = new List<UiWidgetTree>();
@@ -213,7 +213,7 @@ public static class MarketplaceUiSurfaces
                         ["action"] = "open",
                         ["targetSurfaceKind"] = name,
                         ["userId"] = userId,
-                        ["sessionId"] = sessionId
+                        ["sessionId"] = clientId
                     }));
                 }
 
@@ -233,10 +233,10 @@ public static class MarketplaceUiSurfaces
                     btnP["packName"] = pName;
                     btnP["action"] = pAction;
                     btnP["userId"] = userId;
-                    btnP["sessionId"] = sessionId;
+                    btnP["sessionId"] = clientId;
                     if (act != null)
                     {
-                        btnP["actionDescriptor"] = ScopedAction(act, userId, sessionId);
+                        btnP["actionDescriptor"] = ScopedAction(act, userId, clientId);
                     }
                     actionKids.Add(new UiWidgetTree("fbutton", btnP));
                 }
