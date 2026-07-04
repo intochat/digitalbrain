@@ -390,6 +390,20 @@ if (grainFactory != null)
                     "return new[] { new Signal(\"SignalHandled\", new Dictionary<string,object?> { [\"original\"] = \"TestSignal\" }) };"
                 );
 
+                // Demo script sharing: one script used by multiple reactions
+                await automation.DefineReactionAsync(
+                    "shared-on-activation",
+                    "NeuronActivated",
+                    "shared-demo",
+                    "return new[] { new Signal(\"SharedScriptFired\", new Dictionary<string,object?> { [\"shared\"] = true }) };"
+                );
+                await automation.DefineReactionAsync(
+                    "shared-on-signal",
+                    "Signal:SharedTrigger",
+                    null,
+                    "return new[] { new Signal(\"SharedScriptFired\", new Dictionary<string,object?> { [\"shared\"] = true }) };"
+                );
+
                 // MarketDataNeuron has the same activate-before-broadcast requirement as ILlmResponderNeuron
                 // above: it's an IHandle<Signal> grain that filters Signal("CheckBitcoinPrice") off the
                 // timeline, so it must be activated before that broadcast arrives or it never fires.
