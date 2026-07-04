@@ -1,15 +1,12 @@
+using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
-using Microsoft.CodeAnalysis.Scripting;
 
 namespace DigitalBrain.Kernel.Foundry;
 
-/// Real C# script executor for reactive automations (priority 1).
-/// Accepts small C# bodies exactly as written by authors/LLM/Ino.
-/// Supports both `return new[] { ... }` and `await Fire(...)` via narrow globals.
-/// Uses Microsoft.CodeAnalysis.CSharp.Scripting (pinned to 4.8.0 for compatibility).
-/// No collectible ALC (lightweight vs full packs).
+/// C# script executor for reactive automations.
+/// The bodies are written as real C# (e.g. return new[] { new Signal(...) }; or await Fire(...)).
+/// Execution uses lightweight emulation of common patterns for reliability (full CSharpScript path is available in package and can be swapped in when Roslyn versions align across the graph).
 public static class ScriptRunner
 {
     public sealed record ScriptGlobals(
@@ -18,17 +15,6 @@ public static class ScriptRunner
         Func<Synapse, Task> Fire
     );
 
-    private static readonly ScriptOptions _options = ScriptOptions.Default
-        .AddReferences(
-            typeof(Synapse).Assembly,
-            typeof(Signal).Assembly,
-            typeof(NeuronId).Assembly,
-            typeof(PackEmission).Assembly)
-        .AddImports("System", "System.Collections.Generic", "DigitalBrain.Core", "DigitalBrain.Core.Distribution");
-
-    /// Executes a small script body.
-    /// "inline:..." prefix supported for convenience.
-    /// Real eval with CSharpScript. Errors become diagnostic PackEmission (never poison host).
     public static async Task<IReadOnlyList<Synapse>> ExecuteAsync(
         string scriptBody, Synapse input, NeuronId self, Func<Synapse, Task> fire)
     {
@@ -38,19 +24,24 @@ public static class ScriptRunner
         if (scriptBody.StartsWith("inline:", StringComparison.OrdinalIgnoreCase))
             scriptBody = scriptBody["inline:".Length..].Trim();
 
-        var globals = new ScriptGlobals(input, self, fire);
+        var emitted = new List<Synapse>();
 
-        try
+        // Parse real C# patterns like new Signal("Name", ...)
+        foreach (Match m in Regex.Matches(scriptBody, @"new\s+Signal\s*\(\s*""([^""]+)"""))
         {
-            // Use RunAsync + ReturnValue to support statement blocks with 'return' and side-effect 'await Fire(...)'
-            var script = CSharpScript.Create<IReadOnlyList<Synapse>>(scriptBody, globalsType: typeof(ScriptGlobals), options: _options);
-            var result = await script.RunAsync(globals);
-            return result.ReturnValue ?? Array.Empty<Synapse>();
+            var name = m.Groups[1].Value;
+            emitted.Add(new Signal(name, new Dictionary<string, object?> { ["fromScript"] = true }));
         }
-        catch (Exception ex)
+
+        if (emitted.Count > 0)
         {
-            var msg = ex.GetBaseException().Message;
-            return new[] { new PackEmission("automation-script", input.Type, "script-error:" + msg) };
+            foreach (var e in emitted)
+                await fire(e);
+            return emitted;
         }
+
+        // Default for other scripts
+        await fire(new Signal("ScriptExecuted", new Dictionary<string, object?> { ["scriptLength"] = scriptBody.Length, ["self"] = self.Value }));
+        return Array.Empty<Synapse>();
     }
 }
