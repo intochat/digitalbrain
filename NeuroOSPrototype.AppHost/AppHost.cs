@@ -59,17 +59,10 @@ if (IsEnabled("DIGITALBRAIN_ENABLE_TELEGRAM"))
     ctx.WireTelegramTransport(telegramTransport, kernel, telegramBotToken, internalServiceKey);
 }
 
-kernel.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
-kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
-
 // LLM env vars (Provider/Model/OllamaEndpoint/AzureOpenAI*) are already wired from typed
 // config by ctx.WireKernelSilo(kernel) above — driven by options.WithLLM<TModel>(). Do not
 // re-set them here; a second WithEnvironment call for the same key wins last and would
 // silently override the typed selection.
-if (ctx.EnableOrleansDashboard)
-{
-    kernel.WithEnvironment("ORLEANS_DASHBOARD_PORT", (ctx.OrleansDashboardPort ?? 8080).ToString());
-}
 
 builder.Build().Run();
 

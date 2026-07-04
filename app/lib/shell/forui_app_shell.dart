@@ -11,8 +11,6 @@ import 'package:digitalbrain_flutter/grpc/google_auth_flow.dart';
 import 'package:digitalbrain_flutter/rfw_host/inline_rfw_surface.dart';
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
-import 'package:digitalbrain_flutter/grpc/uigateway.pbgrpc.dart';
-import 'package:digitalbrain_flutter/grpc/uigateway.pb.dart' as ui;
 import 'app_session.dart';
 import 'digitalbrain_client_scope.dart';
 
@@ -103,9 +101,6 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   final List<_ShellChatMessage> _chatMessages = [];
   dynamic _channel;
   DigitalBrainGatewayClient? _gatewayClient;
-  UiGatewayClient? _uiClient;
-  StreamController<ui.UiInputSynapse>? _uiInput;
-  StreamSubscription<ui.UiStateSignal>? _uiSessionSub;
   StreamSubscription<gw.RfwCardEnvelope>? _homeFeedSub;
   StreamSubscription<gw.SynapseEnvelope>? _authSignalSub;
   StreamSubscription<dynamic>? _channelStateSub;
@@ -128,9 +123,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   void dispose() {
     _homeFeedSub?.cancel();
     _authSignalSub?.cancel();
-    _uiSessionSub?.cancel();
     _channelStateSub?.cancel();
-    _uiInput?.close();
     _channel?.shutdown();
     _chatInput.dispose();
     _chatScroll.dispose();
@@ -173,12 +166,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
         _homeFeedSub = sub;
         _authSignalSub = authSub;
         _feedStatus = 'Waiting for neuron UI feed from $endpoint';
-        _uiClient = UiGatewayClient(
-          channel,
-          interceptors: kernelInterceptors(),
-        );
       });
-      _openUiSession();
     } catch (error, stackTrace) {
       debugPrint('DigitalBrain shell failed to open WatchHomeFeed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -219,19 +207,6 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     setState(() {
       _feedStatus = 'Kernel UI feed stream closed before any surface arrived.';
     });
-  }
-
-  // Receive-only: this bidi session carries server->client UiStateSignals. Client->server
-  // actions go via the unary Send RPC (see _handleSurfaceEvent) because gRPC-Web cannot
-  // client-stream. Do NOT route sends back through _uiInput here.
-  void _openUiSession() {
-    final c = _uiClient;
-    if (c == null) return;
-    final input = StreamController<ui.UiInputSynapse>();
-    _uiInput = input;
-    _uiSessionSub = c
-        .engageUiSession(input.stream)
-        .listen((_) {}, onError: (_) {});
   }
 
   void _onCard(gw.RfwCardEnvelope envelope) {
