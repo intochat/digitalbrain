@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
 
@@ -45,20 +46,32 @@ public static class ScriptRunner
         // return result ?? Array.Empty<Synapse>();
 
         // For now: simulate execution of the "C# script body" in a deterministic, fast way.
-        // The body string is the "code" the user/LLM writes. We "run" it by emitting evidence.
-        if (scriptBody.Contains("PackEmission") || scriptBody.Contains("ok"))
+        // The body string *is* the C# the author/LLM writes. We emulate common patterns
+        // (new Signal("Name", ...), PackEmission, etc.) so real script bodies in "when ... then"
+        // examples produce the intended effects without full Roslyn scripting eval.
+        var emitted = new List<Synapse>();
+
+        // Emulate explicit Signal creations in the body
+        foreach (Match m in Regex.Matches(scriptBody, @"new\s+Signal\s*\(\s*""([^""]+)"""))
         {
-            return new[] { new PackEmission("automation", input.Type, "ok") };
+            var name = m.Groups[1].Value;
+            emitted.Add(new Signal(name, new Dictionary<string, object?> { ["fromScript"] = true }));
         }
 
-        // Simulate "running" the C# body: if it looks like it wants to emit a specific signal, do it.
-        if (scriptBody.Contains("AutomationFired"))
+        // Emulate PackEmission for legacy pack-style returns
+        if (scriptBody.Contains("PackEmission") || scriptBody.Contains("\"ok\""))
         {
-            await fire(new Signal("AutomationFired", new Dictionary<string, object?> { ["from"] = "script" }));
-            return Array.Empty<Synapse>();
+            emitted.Add(new PackEmission("automation", input.Type, "ok"));
         }
 
-        // Default marker
+        if (emitted.Count > 0)
+        {
+            foreach (var e in emitted)
+                await fire(e);
+            return emitted;
+        }
+
+        // Default: fire a marker so the script is observably "run"
         await fire(new Signal("ScriptExecuted", new Dictionary<string, object?>
         {
             ["scriptLength"] = scriptBody.Length,
