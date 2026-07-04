@@ -90,7 +90,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
             await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingDrain, drainProps));
             if (bus is not null)
             {
-                bus.Broadcast(new RfwCard("digitalbrain", "KernelRollingDrainCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "draining", version })));
+                await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingDrainCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "draining", version })));
             }
 
             await FireAsync(new RestartResource("kernel", IsRollingUpdate: true, TargetVersion: version, Strategy: $"replica-{replica}-of-3"));
@@ -116,7 +116,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
             await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingVerify, verifyProps));
             if (bus is not null)
             {
-                bus.Broadcast(new RfwCard("digitalbrain", "KernelRollingVerifyCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = verifyPhase, version, lineageEvents = lineageCount })));
+                await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingVerifyCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = verifyPhase, version, lineageEvents = lineageCount })));
             }
 
             if (verifyFailed)
@@ -138,7 +138,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
                 await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingRollback, rollbackProps));
                 if (bus is not null)
                 {
-                    bus.Broadcast(new RfwCard("digitalbrain", "KernelRollingRollbackCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "rolledback", version })));
+                    await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingRollbackCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "rolledback", version })));
                 }
                 return; // Abort: do not process further replicas, do not emit RollingComplete.
             }
@@ -147,7 +147,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
         var statusData = System.Text.Json.JsonSerializer.Serialize(new { process = KernelPack.Name, version, status = "complete", haReplicas = 3, checkpoint = preUpdateCheckpoint.SynapseId, lineageEvents = lineageCount });
         if (bus is not null)
         {
-            bus.Broadcast(new RfwCard("digitalbrain", "KernelUpdateStatusCard", statusData));
+            await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelUpdateStatusCard", statusData));
         }
 
         var completeProps = new Dictionary<string, object?>
@@ -171,13 +171,15 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
 [GrainType("digitalbrain.observability.v1")]
 public class ObservabilityNeuron(ILogger<ObservabilityNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IObservabilityNeuron
 {
-    public Task HandleAsync(UiSurface surface)
+    public async Task HandleAsync(UiSurface surface)
     {
         Logger.LogInformation("Observability surface {Kind} correlation={CorrelationId}", surface.Kind, surface.CorrelationId);
 
         var bus = ServiceProvider.GetService<HomeFeedBus>();
-        bus?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
-        return Task.CompletedTask;
+        if (bus is not null)
+        {
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        }
     }
 
     public async Task HandleAsync(ClusterActivity activity)

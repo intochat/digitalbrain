@@ -99,7 +99,10 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         var surface = ConfigFormSurface.Build(_embodied.PackName, required, Self.Value);
         await FireAsync(surface);
-        ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
+        {
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        }
         Logger.LogInformation("GeneratedNeuron emitted config form for pack '{Pack}' ({FieldCount} fields).", _embodied.PackName, required.Count);
     }
 
@@ -147,7 +150,7 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         {
             var normalized = NormalizePackOutput(_embodied.PackName, output);
             await Broadcast(normalized);
-            BroadcastPackSurface(normalized, _embodied.PackName);
+            await BroadcastPackSurfaceAsync(normalized, _embodied.PackName);
         }
 
         Logger.LogInformation(
@@ -173,18 +176,18 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         };
     }
 
-    private void BroadcastPackSurface(Synapse output, string packName)
+    private async Task BroadcastPackSurfaceAsync(Synapse output, string packName)
     {
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus is null) return;
 
         if (output is UiSurface surface)
         {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, packName));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, packName));
         }
         else if (output is RfwCard card)
         {
-            bus.Broadcast(card);
+            await bus.BroadcastAsync(card);
         }
     }
 
@@ -209,7 +212,10 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
                 var surf = new UiSurface(used.Pack, new Dictionary<string, object?> { [UiSurfaceKeys.Title] = used.Pack, ["pack"] = used.Pack, ["tree"] = winTree });
                 await FireAsync(surf);
                 var b = ServiceProvider.GetService<HomeFeedBus>();
-                b?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
+                if (b is not null)
+                {
+                    await b.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
+                }
             }
         }
 
@@ -251,7 +257,7 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
             var bus = ServiceProvider.GetService<HomeFeedBus>();
             if (bus != null)
             {
-                bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
+                await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
             }
         }
     }
@@ -276,7 +282,10 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         var surface = BuildGmailInsightsSurface(used, summary, emails.Count, chartRequestId);
         await FireAsync(surface);
-        ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
+        {
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        }
 
         var chart = GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-" + chartRequestId);
         await chart.FireAsync(new VisualizeDataRequest(

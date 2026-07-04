@@ -536,7 +536,7 @@ public sealed class GatewayService(
         catch (Exception ex) when (IsObservabilityJournalUnavailable(ex))
         {
             logger.LogWarning(ex, "Observability neuron unavailable; streaming graph surface without blocking phase={Phase} correlation={CorrelationId}", phase, correlationId);
-            homeFeedBus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, "digitalbrain.gateway"));
+            await homeFeedBus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, "digitalbrain.gateway"));
         }
     }
 

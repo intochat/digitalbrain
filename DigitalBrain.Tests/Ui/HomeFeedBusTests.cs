@@ -21,7 +21,7 @@ public class HomeFeedBusTests : NeuronTestBase
     {
         await using var subscription = await Bus.SubscribeAsync(clientId: null);
 
-        Bus.Broadcast(new RfwCard("digitalbrain", "Card", "{\"a\":1}"));
+        await Bus.BroadcastAsync(new RfwCard("digitalbrain", "Card", "{\"a\":1}"));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var received = await subscription.Reader.ReadAsync(cts.Token);
@@ -34,8 +34,8 @@ public class HomeFeedBusTests : NeuronTestBase
         await using var subscription = await Bus.SubscribeAsync(clientId: null);
 
         var card = new RfwCard("digitalbrain", "Card", "{\"a\":1}");
-        Bus.Broadcast(card);
-        Bus.Broadcast(card); // identical content -> deduped
+        await Bus.BroadcastAsync(card);
+        await Bus.BroadcastAsync(card); // identical content -> deduped
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var first = await subscription.Reader.ReadAsync(cts.Token);
@@ -50,9 +50,9 @@ public class HomeFeedBusTests : NeuronTestBase
     {
         await using var subscriptionA = await Bus.SubscribeAsync(clientId: "client-a");
 
-        Bus.Broadcast(new RfwCard("digitalbrain", "ForA", "{}", "client-a"));
-        Bus.Broadcast(new RfwCard("digitalbrain", "ForB", "{}", "client-b"));
-        Bus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
+        await Bus.BroadcastAsync(new RfwCard("digitalbrain", "ForA", "{}", "client-a"));
+        await Bus.BroadcastAsync(new RfwCard("digitalbrain", "ForB", "{}", "client-b"));
+        await Bus.BroadcastAsync(new RfwCard("digitalbrain", "Unaddressed", "{}"));
 
         // "ForA" arrives via the personal-stream subscription and "Unaddressed" via the shared-stream
         // subscription — two independent async pipelines with no guaranteed relative order, so collect both
@@ -71,8 +71,8 @@ public class HomeFeedBusTests : NeuronTestBase
     {
         await using var subscription = await Bus.SubscribeAsync(clientId: null);
 
-        Bus.Broadcast(new RfwCard("digitalbrain", "ForA", "{}", "client-a"));
-        Bus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
+        await Bus.BroadcastAsync(new RfwCard("digitalbrain", "ForA", "{}", "client-a"));
+        await Bus.BroadcastAsync(new RfwCard("digitalbrain", "Unaddressed", "{}"));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var first = await subscription.Reader.ReadAsync(cts.Token);

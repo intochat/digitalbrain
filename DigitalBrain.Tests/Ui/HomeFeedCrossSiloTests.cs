@@ -20,7 +20,7 @@ public class HomeFeedCrossSiloTests : NeuronTestBase
         await using var subscription = await bus1.SubscribeAsync(clientId: null);
         var card = new RfwCard("digitalbrain", "CrossSiloCard", "{\"x\":1}");
 
-        bus0.Broadcast(card);
+        await bus0.BroadcastAsync(card);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var received = await subscription.Reader.ReadAsync(cts.Token);
@@ -37,7 +37,7 @@ public class HomeFeedCrossSiloTests : NeuronTestBase
         await using var subscriptionA = await bus1.SubscribeAsync(clientId: "client-a");
         var card = new RfwCard("digitalbrain", "AddressedCrossSiloCard", "{\"x\":2}", ClientId: "client-a");
 
-        bus0.Broadcast(card);
+        await bus0.BroadcastAsync(card);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var received = await subscriptionA.Reader.ReadAsync(cts.Token);
@@ -54,7 +54,7 @@ public class HomeFeedCrossSiloTests : NeuronTestBase
         await using var subscription = await bus0.SubscribeAsync(clientId: null);
         var card = new RfwCard("digitalbrain", "SelfDeliveryCard", "{\"x\":3}");
 
-        bus0.Broadcast(card);
+        await bus0.BroadcastAsync(card);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var received = await subscription.Reader.ReadAsync(cts.Token);
@@ -67,8 +67,8 @@ public class HomeFeedCrossSiloTests : NeuronTestBase
         var bus0 = ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
 
         await using var subscriptionB = await bus0.SubscribeAsync(clientId: "client-b");
-        bus0.Broadcast(new RfwCard("digitalbrain", "AddressedToA", "{}", ClientId: "client-a"));
-        bus0.Broadcast(new RfwCard("digitalbrain", "UnaddressedSystemCard", "{}"));
+        await bus0.BroadcastAsync(new RfwCard("digitalbrain", "AddressedToA", "{}", ClientId: "client-a"));
+        await bus0.BroadcastAsync(new RfwCard("digitalbrain", "UnaddressedSystemCard", "{}"));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         // Only the unaddressed card should ever arrive on B's subscription — read exactly one message and
