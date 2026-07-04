@@ -73,7 +73,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
 
         // Reuse the existing product-surface startup path after a real session exists.
         await GrainFactory.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new StartDistributedApp("digitalbrain"));
-        await BroadcastProductHomeAsync(user, sessionId);
+        await BroadcastProductHomeAsync(user, sessionId, clientId);
     }
 
     public async Task HandleAsync(LogoutRequest request)
@@ -187,16 +187,16 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
     private bool DevAuthEnabled() =>
         DevAuth.Enabled(ServiceProvider.GetService<IConfiguration>(), ServiceProvider.GetService<IHostEnvironment>());
 
-    private async Task BroadcastProductHomeAsync(LocalUserRegistered user, string sessionId)
+    private async Task BroadcastProductHomeAsync(LocalUserRegistered user, string sessionId, string clientId)
     {
         var userId = user.UserId.Value;
         var taskEvents = OutgoingJournal.Concat(IncomingJournal).ToList();
         var surfaces = new[]
         {
-            BuildSignedInShellSurface(user, sessionId),
-            MarketplaceUiSurfaces.InstalledBundlesFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, sessionId),
-            MarketplaceUiSurfaces.MarketplaceListFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, sessionId),
-            UiSurfaceLiveData.TaskManagerFromTasks(taskEvents, userId: userId, sessionId: sessionId)
+            BuildSignedInShellSurface(user, sessionId, clientId),
+            MarketplaceUiSurfaces.InstalledBundlesFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, clientId),
+            MarketplaceUiSurfaces.MarketplaceListFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, clientId),
+            UiSurfaceLiveData.TaskManagerFromTasks(taskEvents, userId: userId, clientId: clientId)
         };
 
         foreach (var surface in surfaces)
@@ -206,7 +206,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         }
     }
 
-    private UiSurface BuildSignedInShellSurface(LocalUserRegistered user, string sessionId)
+    private UiSurface BuildSignedInShellSurface(LocalUserRegistered user, string sessionId, string clientId)
     {
         var menuItems = new[]
         {
@@ -224,8 +224,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
                     nameof(LogoutRequest),
                     new Dictionary<string, object?>
                     {
-                        ["sessionId"] = sessionId,
-                        ["clientId"] = "flutter"
+                        ["clientId"] = clientId
                     })
             })
         };
@@ -237,7 +236,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
                 ["title"] = "DigitalBrain",
                 ["activeContent"] = UiSurfaceKinds.InstalledBundles,
                 ["userId"] = user.UserId.Value,
-                ["sessionId"] = sessionId
+                ["clientId"] = clientId
             },
             new List<UiWidgetTree>
             {
@@ -260,7 +259,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
             ["userId"] = user.UserId.Value,
             ["displayName"] = user.DisplayName,
-            ["sessionId"] = sessionId
+            ["clientId"] = clientId
         });
     }
 
@@ -289,7 +288,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Compact,
             ["userId"] = user.UserId.Value,
             ["displayName"] = user.DisplayName,
-            ["sessionId"] = sessionId,
+            ["clientId"] = clientId,
             ["status"] = "signed-in",
             ["body"] = $"Signed in as {user.DisplayName}"
         });

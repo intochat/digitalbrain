@@ -510,7 +510,7 @@ public static class UiSurfaceLiveData
         IReadOnlyList<Synapse> taskEvents,
         int maxEvents = 10,
         string userId = "anonymous",
-        string? sessionId = null)
+        string? clientId = null)
     {
         userId = EffectiveUserId(userId);
         var created = taskEvents.OfType<TaskCreated>().ToList();
@@ -538,7 +538,7 @@ public static class UiSurfaceLiveData
                 ["edgeCount"] = 1,
                 ["status"] = status,
                 ["userId"] = userId,
-                ["sessionId"] = sessionId
+                ["clientId"] = clientId
             };
             if (!completed.Any(x => x.TaskId == c.TaskId) && !cancelled.Any(x => x.TaskId == c.TaskId))
             {
@@ -550,7 +550,7 @@ public static class UiSurfaceLiveData
                     {
                         ["taskId"] = c.TaskId.Value,
                         ["userId"] = userId,
-                        ["sessionId"] = sessionId
+                        ["sessionId"] = clientId
                     });
             }
 
@@ -575,7 +575,7 @@ public static class UiSurfaceLiveData
                 props: new Dictionary<string, object?>
                 {
                     ["userId"] = userId,
-                    ["sessionId"] = sessionId,
+                    ["clientId"] = clientId,
                     ["totals"] = totals,
                     ["tasks"] = taskRows,
                     ["runAction"] = UiSurfaceSamples.SynapseAction(
@@ -585,7 +585,7 @@ public static class UiSurfaceLiveData
                         new Dictionary<string, object?>
                         {
                             ["userId"] = userId,
-                            ["sessionId"] = sessionId
+                            ["sessionId"] = clientId
                         })
                 }));
     }

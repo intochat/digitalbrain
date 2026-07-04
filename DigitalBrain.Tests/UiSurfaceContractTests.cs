@@ -129,19 +129,19 @@ public class UiSurfaceContractTests
             },
             Array.Empty<NeuroPack>(),
             "alice",
-            "session-1");
+            "client-1");
 
         Assert.Equal("alice", surface.Props["userId"]);
-        Assert.Equal("session-1", surface.Props["sessionId"]);
+        Assert.Equal("client-1", surface.Props["clientId"]);
 
         var installProps = AssertActionProps(surface.Props["installAction"], nameof(InstallFromMarketplace));
         Assert.Equal("alice", installProps["buyerId"]);
         Assert.Equal("alice", installProps["userId"]);
-        Assert.Equal("session-1", installProps["sessionId"]);
+        Assert.Equal("client-1", installProps["sessionId"]);
 
         var updateProps = AssertActionProps(surface.Props["updateAction"], nameof(InstallFromMarketplace));
         Assert.Equal("alice", updateProps["buyerId"]);
-        Assert.Equal("session-1", updateProps["sessionId"]);
+        Assert.Equal("client-1", updateProps["sessionId"]);
     }
 
     [Fact]
@@ -175,10 +175,10 @@ public class UiSurfaceContractTests
             MarketplaceSeeds.LocalUiPacks,
             Array.Empty<NeuroPack>(),
             "alice",
-            "session-1");
+            "client-1");
 
         Assert.Equal("alice", surface.Props["userId"]);
-        Assert.Equal("session-1", surface.Props["sessionId"]);
+        Assert.Equal("client-1", surface.Props["clientId"]);
 
         var experiences = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
             surface.Props["experiences"]);
@@ -193,26 +193,26 @@ public class UiSurfaceContractTests
         var surface = UiSurfaceLiveData.TaskManagerFromTasks(
             new Synapse[] { new TaskCreated(taskId, "Summarize latest mail") },
             userId: "alice",
-            sessionId: "session-1");
+            clientId: "client-1");
 
         Assert.Equal("alice", surface.Props["userId"]);
-        Assert.Equal("session-1", surface.Props["sessionId"]);
+        Assert.Equal("client-1", surface.Props["clientId"]);
 
         var runProps = AssertActionProps(surface.Props["runAction"], nameof(RunTask));
         Assert.Equal("alice", runProps["userId"]);
-        Assert.Equal("session-1", runProps["sessionId"]);
+        Assert.Equal("client-1", runProps["sessionId"]);
 
         var rows = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
             surface.Props["tasks"]);
         var row = Assert.Single(rows);
         Assert.Equal("task-alice-1", row["taskId"]);
         Assert.Equal("alice", row["userId"]);
-        Assert.Equal("session-1", row["sessionId"]);
+        Assert.Equal("client-1", row["clientId"]);
 
         var cancelProps = AssertActionProps(row["cancelAction"], nameof(CancelTask));
         Assert.Equal("task-alice-1", cancelProps["taskId"]);
         Assert.Equal("alice", cancelProps["userId"]);
-        Assert.Equal("session-1", cancelProps["sessionId"]);
+        Assert.Equal("client-1", cancelProps["sessionId"]);
     }
 
     [Fact]
