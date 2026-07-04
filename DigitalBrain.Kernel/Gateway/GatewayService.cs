@@ -61,11 +61,11 @@ public sealed class GatewayService(
                 var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var packName = p.TryGetValue("packName", out var pn) ? pn?.ToString() ?? p.GetValueOrDefault("name")?.ToString() ?? "" : "";
                 var ver = p.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "";
-                var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
-                var installSession = await ResolveSessionAsync(sessionId);
+                var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
+                var installSession = await ResolveSessionByClientIdAsync(clientId);
                 var buyer = installSession?.UserId.Value ?? "anonymous";
                 if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId; // fallback
-                await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer, sessionId));
+                await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer, clientId));
                 return request;
             }
 
@@ -94,7 +94,7 @@ public sealed class GatewayService(
             {
                 var authProps = PayloadProps(request);
                 var authSessionId = authProps.TryGetValue("sessionId", out var authSid) ? authSid?.ToString() : null;
-                var authSession = await ResolveSessionAsync(authSessionId);
+                var authSession = await ResolveSessionByClientIdAsync(authSessionId);
                 // TEMPORARY: the Flutter client has no channel yet to forward its real login session here
                 // (see docs/superpowers/plans/2026-07-04-multiuser-s2-s3-identity-and-salesforce-per-user.md,
                 // "Known Limitations" / live-bug follow-up) — fall back to a consistent "anonymous" identity
@@ -127,14 +127,14 @@ public sealed class GatewayService(
                 // The scope must be either the shared app-level slot every reader (responder pack, LlmResponderNeuron,
                 // Telegram transport) actually pulls from, or the caller's OWN resolved per-user slot — never an
                 // arbitrary/other-user scope, per P6b.
-                var configSession = await ResolveSessionAsync(Field("sessionId"));
+                var configSession = await ResolveSessionByClientIdAsync(Field("clientId"));
                 var callerOwnScope = configSession is not null ? PackConfigScopes.ForUser(configSession.UserId) : null;
                 if (scope != PackConfigScopes.App && scope != callerOwnScope)
                     throw new RpcException(new Status(StatusCode.PermissionDenied, $"Scope '{scope}' is not permitted for this caller."));
 
                 var controlKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    "pack", "packName", "scope", "sessionId", "buyerId", "userId", "synapseType", "eventName"
+                    "pack", "packName", "scope", "clientId", "buyerId", "userId", "synapseType", "eventName"
                 };
                 var values = p
                     .Where(kv => !controlKeys.Contains(kv.Key))
@@ -191,9 +191,9 @@ public sealed class GatewayService(
                 var session = grains.GetGrain<IUserSessionNeuron>("session-main");
                 var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
                 var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
-                var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() ?? "" : "";
                 var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
-                await session.FireAsync(new LogoutRequest(sessionId, clientId));
+                var logoutSession = await ResolveSessionByClientIdAsync(clientId);
+                await session.FireAsync(new LogoutRequest(logoutSession?.SessionId ?? "", clientId));
                 return request;
             }
 
@@ -274,12 +274,13 @@ public sealed class GatewayService(
         }
     }
 
-    // Resolves a client-supplied sessionId once; callers must use the result's fields downstream, never the raw request field.
-    private async Task<UserSessionState?> ResolveSessionAsync(string? sessionId)
+    // Resolves a client-supplied clientId once; callers must use the result's fields downstream, never trust
+    // a raw client-supplied userId/sessionId directly.
+    private async Task<UserSessionState?> ResolveSessionByClientIdAsync(string? clientId)
     {
-        if (string.IsNullOrWhiteSpace(sessionId)) return null;
+        if (string.IsNullOrWhiteSpace(clientId)) return null;
         var session = grains.GetGrain<IUserSessionNeuron>("session-main");
-        return await session.GetSessionAsync(sessionId);
+        return await session.GetSessionByClientIdAsync(clientId);
     }
 
     // Egress for external transports: stream broadcast Signals whose Name is in the request filter (empty = all),
