@@ -17,6 +17,7 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         string connectionName,
         string? sourcePath = null,
         string? clientId = null,
+        string? workspaceId = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -38,6 +39,7 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
             connectionName,
             sourcePath ?? path,
             clientId,
+            workspaceId,
             cancellationToken);
     }
 
@@ -46,6 +48,7 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         string connectionName,
         string? sourcePath = null,
         string? clientId = null,
+        string? workspaceId = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -112,7 +115,8 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
             {
                 ["sqlite:version"] = sqliteVersion,
                 ["objectCount"] = tables.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            });
+            },
+            WorkspaceIds.Effective(workspaceId));
 
         logger.LogInformation(
             "Inspected SQLite schema source={Source} objects={ObjectCount} columns={ColumnCount} fks={ForeignKeyCount} indexes={IndexCount}",

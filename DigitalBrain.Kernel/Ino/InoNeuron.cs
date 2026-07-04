@@ -33,12 +33,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     public async Task HandleAsync(InoRequest req)
     {
+        var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         if (IsBitcoinPriceIntent(req.Prompt))
         {
             var price = await GrainFactory.GetGrain<IMarketDataNeuron>("market-data-main").GetBitcoinPriceUsdAsync();
             var priceReply = $"The current Bitcoin price is {price}.";
             await FireAsync(new InoResponse(req.Prompt, priceReply, []));
-            await DeliverReplySurfaceAsync(priceReply, req.ClientId);
+            await DeliverReplySurfaceAsync(priceReply, req.ClientId, workspaceId);
             return;
         }
 
@@ -48,6 +49,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             await DeliverGraphSurfaceAsync(
                 DbSchemaGraphMapper.RelationOfTwoObjectsTree(),
                 req.ClientId,
+                workspaceId,
                 "Object relation",
                 "surface.graph.relation");
             return;
@@ -57,7 +59,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             if (TryExtractDatabasePath(req.Prompt, out var databasePath))
             {
-                var inspected = await InspectReferencedDatabaseAsync(databasePath, req.ClientId);
+                var inspected = await InspectReferencedDatabaseAsync(databasePath, req.ClientId, workspaceId);
                 if (inspected is not null)
                 {
                     await FireAsync(new InoResponse(req.Prompt, SchemaReplyText(inspected), []));
@@ -66,11 +68,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 }
             }
 
-            var latest = LatestSuccessfulSchema(req.ClientId);
+            var latest = LatestSuccessfulSchema(req.ClientId, workspaceId);
             if (latest?.Schema is not null)
             {
                 await FireAsync(new InoResponse(req.Prompt, "Rendered the most recent database schema.", []));
-                await ProcessSchemaInspectedAsync(latest, req.ClientId ?? latest.ClientId);
+                await ProcessSchemaInspectedAsync(latest, req.ClientId ?? latest.ClientId, workspaceId);
                 return;
             }
         }
@@ -87,7 +89,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        var ctx = await BuildContextAsync(req.Prompt);
+        var ctx = await BuildContextAsync(req.Prompt, workspaceId);
         var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx);
         var replyPlan = BuildReplyPlan(req.Prompt, rawReply);
         if (string.IsNullOrWhiteSpace(replyPlan.VisibleReply))
@@ -99,10 +101,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var taskIds = await OrchestrateActionsIfNeededAsync(replyPlan);
 
         await FireAsync(new InoResponse(req.Prompt, replyPlan.VisibleReply, taskIds.ToArray()));
-        await DeliverReplySurfaceAsync(replyPlan.VisibleReply, req.ClientId);
+        await DeliverReplySurfaceAsync(replyPlan.VisibleReply, req.ClientId, workspaceId);
 
         // Compress recent activity to long-term memory summary (journal driven).
-        await CreateMemorySummaryAsync();
+        await CreateMemorySummaryAsync(workspaceId);
     }
 
     private static bool IsBitcoinPriceIntent(string prompt) =>
@@ -161,6 +163,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     public async Task HandleAsync(TabularDataIngested ingested)
     {
+        var workspaceId = WorkspaceIds.Effective(ingested.WorkspaceId);
         var headers = JsonSerializer.Deserialize<List<string>>(ingested.HeadersJson) ?? [];
         var rows = JsonSerializer.Deserialize<List<List<string>>>(ingested.RowsJson) ?? [];
 
@@ -177,6 +180,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["role"] = "assistant",
         };
         if (ingested.ClientId is not null) props["clientId"] = ingested.ClientId;
+        props["workspaceId"] = workspaceId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
@@ -185,41 +189,49 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         // Deterministic (not LLM-generated) so follow-up questions can find this data via BuildContextAsync
         // even when no IChatClient is configured (the [no-llm] fallback path).
         var summary = $"Uploaded '{ingested.FileName}' with columns [{string.Join(", ", headers)}] and {rows.Count} data rows. Column stats: {ingested.ColumnStatsJson}";
-        await FireAsync(new MemorySummary(ingested.FileName, summary, DateTimeOffset.UtcNow));
+        await FireAsync(new MemorySummary(ingested.FileName, summary, DateTimeOffset.UtcNow, workspaceId));
     }
 
     public Task HandleAsync(DbSchemaInspected inspected) =>
-        ProcessSchemaInspectedAsync(inspected, inspected.ClientId);
+        ProcessSchemaInspectedAsync(inspected, inspected.ClientId, inspected.WorkspaceId);
 
-    private async Task ProcessSchemaInspectedAsync(DbSchemaInspected inspected, string? clientId)
+    private async Task ProcessSchemaInspectedAsync(DbSchemaInspected inspected, string? clientId, string? workspaceId)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         if (!inspected.Succeeded || inspected.Schema is null)
         {
             var message = $"I could not inspect database schema '{inspected.ConnectionName}': {inspected.Error ?? "unknown error"}.";
-            await DeliverReplySurfaceAsync(message, clientId);
+            await DeliverReplySurfaceAsync(message, clientId, workspaceId);
             return;
         }
 
-        var schema = inspected.Schema with { SessionId = clientId ?? inspected.Schema.SessionId };
+        var schema = inspected.Schema with
+        {
+            SessionId = clientId ?? inspected.Schema.SessionId,
+            WorkspaceId = workspaceId
+        };
         await DeliverGraphSurfaceAsync(
             DbSchemaGraphMapper.ToGraphCanvasTree(schema),
             clientId ?? schema.SessionId,
+            workspaceId,
             $"{schema.ConnectionName} schema",
             "surface.db-schema." + StableSurfaceId(schema.ConnectionName));
 
         await FireAsync(new MemorySummary(
             schema.ConnectionName,
             SchemaMemorySummary(schema),
-            DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow,
+            workspaceId));
     }
 
-    private async Task<DbSchemaInspected?> InspectReferencedDatabaseAsync(string databasePath, string? clientId)
+    private async Task<DbSchemaInspected?> InspectReferencedDatabaseAsync(string databasePath, string? clientId, string? workspaceId)
     {
         var connectionName = Path.GetFileNameWithoutExtension(databasePath);
         if (string.IsNullOrWhiteSpace(connectionName))
             connectionName = "sqlite-db";
 
-        var cmd = new DbInspectSchema(connectionName, "sqlite", SourcePath: databasePath, ClientId: clientId);
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+        var cmd = new DbInspectSchema(connectionName, "sqlite", SourcePath: databasePath, ClientId: clientId, WorkspaceId: workspaceId);
         var db = GrainFactory.GetGrain<IDbSupportNeuron>("db-main");
         await db.FireAsync(cmd);
 
@@ -230,13 +242,15 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ?? timeline.OfType<DbSchemaInspected>().LastOrDefault(result => result.ConnectionName == connectionName);
     }
 
-    private async Task DeliverReplySurfaceAsync(string reply, string? clientId)
+    private async Task DeliverReplySurfaceAsync(string reply, string? clientId, string? workspaceId = null)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         var props = new Dictionary<string, object?>
         {
             ["tree"] = new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = reply }),
             [UiSurfaceKeys.Title] = "INO",
             ["role"] = "assistant",
+            ["workspaceId"] = workspaceId
         };
         if (clientId is not null) props["clientId"] = clientId;
 
@@ -247,12 +261,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task HandleGmailIntentAsync(InoRequest req)
     {
+        var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         if (!await HasGoogleCredentialAsync())
         {
             _pendingGmailRequest = req;
             var reply = "Google authentication is required to read Gmail.";
             await FireAsync(new InoResponse(req.Prompt, reply, []));
-            await DeliverGoogleAuthSurfaceAsync(req.ClientId);
+            await DeliverGoogleAuthSurfaceAsync(req.ClientId, workspaceId);
             return;
         }
 
@@ -261,6 +276,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task HandleSalesforceIntentAsync(InoRequest req)
     {
+        var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         var salesforceSession = await ResolveSessionAsync(req.ClientId);
         if (salesforceSession is null)
         {
@@ -276,7 +292,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             _pendingSalesforceRequest = req;
             var reply = "Salesforce credentials are required to query CRM records.";
             await FireAsync(new InoResponse(req.Prompt, reply, []));
-            await DeliverSalesforceCredentialSurfaceAsync(req.ClientId);
+            await DeliverSalesforceCredentialSurfaceAsync(req.ClientId, workspaceId);
             return;
         }
 
@@ -324,8 +340,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 
-    private async Task DeliverGoogleAuthSurfaceAsync(string? clientId)
+    private async Task DeliverGoogleAuthSurfaceAsync(string? clientId, string? workspaceId = null)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         var tree = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), new List<UiWidgetTree>
         {
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
@@ -347,6 +364,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             [UiSurfaceKeys.SurfaceId] = "surface.google-auth.gmail",
             ["role"] = "assistant",
             ["surfaceKind"] = UiSurfaceKinds.AuthButton,
+            ["workspaceId"] = workspaceId
         };
         if (clientId is not null) props["clientId"] = clientId;
 
@@ -363,20 +381,34 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface));
     }
 
-    private async Task DeliverSalesforceCredentialSurfaceAsync(string? clientId)
+    private async Task DeliverSalesforceCredentialSurfaceAsync(string? clientId, string? workspaceId = null)
     {
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
+        if (!surface.Props.ContainsKey("workspaceId"))
+        {
+            surface = surface with
+            {
+                Props = surface.Props
+                    .Concat(new[]
+                    {
+                        new KeyValuePair<string, object?>("workspaceId", WorkspaceIds.Effective(workspaceId))
+                    })
+                    .ToDictionary(pair => pair.Key, pair => pair.Value)
+            };
+        }
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
         await flutter.DeliverAsync(StampCurrent(surface));
     }
 
     private async Task FetchRecentGmailAsync(InoRequest req)
     {
+        var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         var maxResults = GmailResultCount(req.Prompt);
         await Broadcast(new Signal(GoogleSignals.GmailFetchRequested, new Dictionary<string, object?>
         {
             ["prompt"] = req.Prompt,
             ["clientId"] = req.ClientId,
+            ["workspaceId"] = workspaceId,
             ["maxResults"] = maxResults
         }));
 
@@ -393,22 +425,25 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await Broadcast(new Signal(GoogleSignals.GmailMessagesReady, new Dictionary<string, object?>
         {
             ["clientId"] = req.ClientId,
+            ["workspaceId"] = workspaceId,
             ["count"] = summaries.Count,
             ["messageIds"] = string.Join(",", summaries.Select(m => m.Id))
         }));
 
         var reply = GmailReplyText(summaries);
         await FireAsync(new InoResponse(req.Prompt, reply, []));
-        await DeliverGmailMessagesSurfaceAsync(summaries, req.ClientId);
+        await DeliverGmailMessagesSurfaceAsync(summaries, req.ClientId, workspaceId);
     }
 
     private async Task FetchSalesforceAccountsAsync(InoRequest req, string salesforceUserId)
     {
+        var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         var maxResults = SalesforceResultCount(req.Prompt);
         await Broadcast(new Signal(SalesforceSignals.QueryRequested, new Dictionary<string, object?>
         {
             ["prompt"] = req.Prompt,
             ["clientId"] = req.ClientId,
+            ["workspaceId"] = workspaceId,
             ["maxResults"] = maxResults
         }));
 
@@ -423,24 +458,26 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             Logger.LogWarning(ex, "Salesforce query failed after credentials were configured.");
             var failureReply = SalesforceFailureReply(ex);
             await FireAsync(new InoResponse(req.Prompt, failureReply, []));
-            await DeliverReplySurfaceAsync(failureReply, req.ClientId);
-            await DeliverSalesforceCredentialSurfaceAsync(req.ClientId);
+            await DeliverReplySurfaceAsync(failureReply, req.ClientId, workspaceId);
+            await DeliverSalesforceCredentialSurfaceAsync(req.ClientId, workspaceId);
             return;
         }
 
         await Broadcast(new Signal(SalesforceSignals.QueryResultsReady, new Dictionary<string, object?>
         {
             ["clientId"] = req.ClientId,
+            ["workspaceId"] = workspaceId,
             ["count"] = records.Length
         }));
 
         var reply = SalesforceReplyText(records);
         await FireAsync(new InoResponse(req.Prompt, reply, []));
-        await DeliverSalesforceRecordsSurfaceAsync(records, req.ClientId);
+        await DeliverSalesforceRecordsSurfaceAsync(records, req.ClientId, workspaceId);
     }
 
-    private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? clientId)
+    private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? clientId, string? workspaceId = null)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         var children = new List<UiWidgetTree>
         {
             new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Recent Gmail" })
@@ -471,6 +508,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             [UiSurfaceKeys.Title] = "Gmail",
             [UiSurfaceKeys.SurfaceId] = "surface.gmail.recent",
             ["role"] = "assistant",
+            ["workspaceId"] = workspaceId
         };
         if (clientId is not null) props["clientId"] = clientId;
 
@@ -479,8 +517,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface));
     }
 
-    private async Task DeliverSalesforceRecordsSurfaceAsync(IReadOnlyList<string> records, string? clientId)
+    private async Task DeliverSalesforceRecordsSurfaceAsync(IReadOnlyList<string> records, string? clientId, string? workspaceId = null)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         var children = new List<UiWidgetTree>
         {
             new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Salesforce Accounts" })
@@ -510,6 +549,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             [UiSurfaceKeys.Title] = "Salesforce",
             [UiSurfaceKeys.SurfaceId] = "surface.salesforce.accounts",
             ["role"] = "assistant",
+            ["workspaceId"] = workspaceId
         };
         if (clientId is not null) props["clientId"] = clientId;
 
@@ -518,8 +558,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface));
     }
 
-    private async Task DeliverGraphSurfaceAsync(UiWidgetTree tree, string? clientId, string title, string surfaceId)
+    private async Task DeliverGraphSurfaceAsync(UiWidgetTree tree, string? clientId, string? workspaceId, string title, string surfaceId)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         var props = new Dictionary<string, object?>
         {
             ["tree"] = tree,
@@ -527,6 +568,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             [UiSurfaceKeys.SurfaceId] = surfaceId,
             ["role"] = "assistant",
             ["surfaceKind"] = UiSurfaceKinds.GraphCanvas,
+            ["workspaceId"] = workspaceId
         };
         if (clientId is not null) props["clientId"] = clientId;
 
@@ -543,15 +585,19 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return last?.Response ?? "processed";
     }
 
-    private async Task<string> BuildContextAsync(string prompt)
+    private async Task<string> BuildContextAsync(string prompt, string? workspaceId)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         var recentOut = OutgoingJournal.TakeLast(8).Select(s => s.Type + ":" + s.ToString()).ToList();
         var recentIn = IncomingJournal.TakeLast(5).Select(s => "in:" + s.ToString()).ToList();
 
         var completed = OutgoingJournal.OfType<TaskCompleted>().TakeLast(3);
         var taskCtx = string.Join(";", completed.Select(t => t.TaskId + "=" + (t.Result ?? "")));
 
-        var mems = OutgoingJournal.OfType<MemorySummary>().TakeLast(5);
+        var mems = OutgoingJournal
+            .OfType<MemorySummary>()
+            .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId)
+            .TakeLast(5);
         var memCtx = string.Join(";", mems.Select(m => m.Topic + "=" + m.Summary));
 
         // Include recently applied marketplace skills / installed packs so INO can use their code+desc at runtime.
@@ -568,12 +614,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return $"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nskills:{skillCtx}\neditor:{editorCtx}";
     }
 
-    private DbSchemaInspected? LatestSuccessfulSchema(string? clientId)
+    private DbSchemaInspected? LatestSuccessfulSchema(string? clientId, string? workspaceId)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         var schemas = IncomingJournal
             .Concat(OutgoingJournal)
             .OfType<DbSchemaInspected>()
             .Where(schema => schema.Succeeded && schema.Schema is not null)
+            .Where(schema => WorkspaceIds.Effective(schema.WorkspaceId ?? schema.Schema?.WorkspaceId) == workspaceId)
             .DistinctBy(schema => schema.SynapseId)
             .OrderBy(schema => schema.Timestamp)
             .ToList();
@@ -822,8 +870,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return created;
     }
 
-    private async Task CreateMemorySummaryAsync()
+    private async Task CreateMemorySummaryAsync(string? workspaceId)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
         var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(20).ToList();
         if (recent.Count < 5) return;
 
@@ -837,7 +886,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (summaryText.Length > 10)
         {
             var topic = summaryText.Split('.')[0].Trim();
-            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0,30) : topic, summaryText, DateTimeOffset.UtcNow);
+            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0,30) : topic, summaryText, DateTimeOffset.UtcNow, workspaceId);
             await FireAsync(mem);
         }
     }

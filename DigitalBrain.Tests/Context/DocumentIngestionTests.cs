@@ -1,4 +1,5 @@
 using DigitalBrain.Context;
+using DigitalBrain.Core;
 using DigitalBrain.Kernel.Llm;
 
 namespace DigitalBrain.Tests.Context;
@@ -43,5 +44,13 @@ public class DocumentIngestionTests
 
         var hits = await store.SearchAsync("docs", new float[384], top: 100);
         Assert.Equal(count, hits.Length);
+    }
+
+    [Fact]
+    public void WorkspaceIds_Builds_User_And_Workspace_Vector_Namespace()
+    {
+        var collection = WorkspaceIds.VectorCollection(new UserId("Alice.Local"), "Finance Q2");
+
+        Assert.Equal("user:alice-local:workspace:finance-q2:documents", collection);
     }
 }

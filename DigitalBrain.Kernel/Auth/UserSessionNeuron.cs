@@ -10,6 +10,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
 {
     private const int PasswordHashIterations = 100_000;
     private static readonly TimeSpan SessionLifetime = TimeSpan.FromHours(12);
+    private const string DefaultWorkspaceId = WorkspaceIds.Default;
 
     public override async Task OnActivateAsync(CancellationToken ct)
     {
@@ -133,6 +134,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             BuildSignedInShellSurface(user, sessionId, clientId),
             MarketplaceUiSurfaces.InstalledBundlesFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, clientId),
             MarketplaceUiSurfaces.MarketplaceListFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, clientId),
+            UiSurfaceLiveData.WorkspaceBoundary(userId, DefaultWorkspaceId, clientId),
             UiSurfaceLiveData.TaskManagerFromTasks(taskEvents, userId: userId, clientId: clientId)
         };
 
@@ -149,6 +151,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         {
             MenuItem("Installed", UiSurfaceKinds.InstalledBundles),
             MenuItem("Marketplace", UiSurfaceKinds.MarketplaceList),
+            MenuItem("Workspace", UiSurfaceKinds.Workspace),
             MenuItem("Tasks", UiSurfaceKinds.TaskManager),
             MenuItem("INO Chat", "chat"),
             new UiWidgetTree(NeuronUiKit.Divider, new Dictionary<string, object?>()),
@@ -173,7 +176,8 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
                 ["title"] = "DigitalBrain",
                 ["activeContent"] = UiSurfaceKinds.InstalledBundles,
                 ["userId"] = user.UserId.Value,
-                ["clientId"] = clientId
+                ["clientId"] = clientId,
+                ["workspaceId"] = DefaultWorkspaceId
             },
             new List<UiWidgetTree>
             {
@@ -196,7 +200,8 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
             ["userId"] = user.UserId.Value,
             ["displayName"] = user.DisplayName,
-            ["clientId"] = clientId
+            ["clientId"] = clientId,
+            ["workspaceId"] = DefaultWorkspaceId
         });
     }
 

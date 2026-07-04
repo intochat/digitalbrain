@@ -223,14 +223,21 @@ public record TaskInfo(
 
 // INO - the personal ultra-context assistant.
 [GenerateSerializer]
-public record InoRequest(string Prompt, string? ClientId = null) : Synapse(nameof(InoRequest), DateTimeOffset.UtcNow);
+public record InoRequest(
+    string Prompt,
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(InoRequest), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) : Synapse(nameof(InoResponse), DateTimeOffset.UtcNow);
 
 // For INO excellent long-term/multi-scale context (summaries from journals).
 [GenerateSerializer]
-public record MemorySummary(string Topic, string Summary, DateTimeOffset At) : Synapse(nameof(MemorySummary), At);
+public record MemorySummary(
+    string Topic,
+    string Summary,
+    DateTimeOffset At,
+    string? WorkspaceId = null) : Synapse(nameof(MemorySummary), At);
 
 // INO Code Editor neuron - for visual editing and execution of INO code
 [GenerateSerializer]
@@ -296,7 +303,8 @@ public record DbInspectSchema(
     string Provider,
     string? ConnectionString = null,
     string? SourcePath = null,
-    string? ClientId = null) : Synapse(nameof(DbInspectSchema), DateTimeOffset.UtcNow);
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(DbInspectSchema), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record DbSchemaInspected(
@@ -305,7 +313,8 @@ public record DbSchemaInspected(
     DbSchemaModel? Schema,
     bool Succeeded = true,
     string? Error = null,
-    string? ClientId = null) : Synapse(nameof(DbSchemaInspected), DateTimeOffset.UtcNow);
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(DbSchemaInspected), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record DbSchemaModel(
@@ -314,7 +323,8 @@ public record DbSchemaModel(
     [property: Id(2)] IReadOnlyList<DbTable> Tables,
     [property: Id(3)] string? SourcePath = null,
     [property: Id(4)] string? SessionId = null,
-    [property: Id(5)] IReadOnlyDictionary<string, string?>? Metadata = null);
+    [property: Id(5)] IReadOnlyDictionary<string, string?>? Metadata = null,
+    [property: Id(6)] string? WorkspaceId = null);
 
 [GenerateSerializer]
 public record DbTable(

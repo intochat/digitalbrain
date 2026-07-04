@@ -251,6 +251,9 @@ public static class UiSurfaceSamples
                 }
             }));
 
+    public static UiSurface Workspace() =>
+        UiSurfaceLiveData.WorkspaceBoundary("anonymous", WorkspaceIds.Default, "workbench");
+
     public static UiSurface Timeline() => new(
         UiSurfaceKinds.Timeline,
         WithCommon(
@@ -401,6 +404,7 @@ public static class UiSurfaceLiveData
         var surfaces = new List<UiSurface>
         {
             ActivityGraphFromTimeline(graphTimeline, maxEvents),
+            WorkspaceBoundary(userId, WorkspaceIds.Default, sessionId),
             TaskManagerFromTasks(taskTimelines.SelectMany(t => t.Timeline).ToList(), maxEvents, userId, sessionId)
         };
 
@@ -504,6 +508,73 @@ public static class UiSurfaceLiveData
             .Concat(direct)
             .TakeLast(maxEvents)
             .ToArray();
+    }
+
+    public static UiSurface WorkspaceBoundary(
+        string userId = "anonymous",
+        string? workspaceId = null,
+        string? clientId = null)
+    {
+        userId = EffectiveUserId(userId);
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+        var vectorCollection = WorkspaceIds.VectorCollection(new UserId(userId), workspaceId);
+        var sources = new[]
+        {
+            "Uploaded files",
+            "Salesforce connection scope",
+            "Chat/session memory",
+            "Vector collection: " + vectorCollection
+        };
+        var isolation = new Dictionary<string, object?>
+        {
+            ["userId"] = userId,
+            ["workspaceId"] = workspaceId,
+            ["clientId"] = clientId,
+            ["packConfigScope"] = PackConfigScopes.ForUser(new UserId(userId)),
+            ["vectorCollection"] = vectorCollection
+        };
+
+        var tree = new UiWidgetTree("column", new Dictionary<string, object?>(), new List<UiWidgetTree>
+        {
+            new("fcard", new Dictionary<string, object?>
+            {
+                ["title"] = "Active workspace",
+                ["subtitle"] = workspaceId
+            }, new[]
+            {
+                new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "User: " + userId }),
+                new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Client: " + (clientId ?? "none") })
+            }),
+            new("fcard", new Dictionary<string, object?>
+            {
+                ["title"] = "Context sources",
+                ["subtitle"] = sources.Length.ToString()
+            }, sources.Select(source => new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = source })).ToArray()),
+            new("fcard", new Dictionary<string, object?>
+            {
+                ["title"] = "Isolation boundary",
+                ["subtitle"] = vectorCollection
+            }, isolation.Select(pair => new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = pair.Key + ": " + pair.Value })).ToArray())
+        });
+
+        return new UiSurface(
+            UiSurfaceKinds.Workspace,
+            WithCommon(
+                surfaceId: "surface.workspace." + userId,
+                emitter: "session-main",
+                title: "Workspace",
+                layout: UiSurfaceLayouts.Panel,
+                priority: 12,
+                props: new Dictionary<string, object?>
+                {
+                    ["userId"] = userId,
+                    ["workspaceId"] = workspaceId,
+                    ["clientId"] = clientId,
+                    ["activeWorkspace"] = workspaceId,
+                    ["contextSources"] = sources,
+                    ["isolation"] = isolation,
+                    ["tree"] = tree
+                }));
     }
 
     public static UiSurface TaskManagerFromTasks(

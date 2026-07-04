@@ -98,7 +98,8 @@ public sealed class UiGatewayService(
         {
             case nameof(InoRequest):
                 var prompt = GetProp(props, "prompt") ?? GetProp(props, "text") ?? payloadJson;
-                await grainFactory.GetGrain<IInoNeuron>("ino-main").FireAsync(new InoRequest(prompt, GetProp(props, "sessionId")));
+                var inoClientId = GetProp(props, "clientId") ?? GetProp(props, "sessionId");
+                await grainFactory.GetGrain<IInoNeuron>("ino-main").FireAsync(new InoRequest(prompt, inoClientId, GetProp(props, "workspaceId")));
                 return;
             case nameof(LoginRequest):
                 var username = GetProp(props, "username") ?? "";

@@ -249,6 +249,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   Map<String, Object?>? _shellTree;
   final Map<String, gw.RfwCardEnvelope> _surfacesByKind = {};
   String? _selectedTarget; // from tree only; no hardcoded default
+  String _workspaceId = 'default';
   String? _feedStatus;
   String? _composerStatus;
   bool _chatSending = false;
@@ -389,6 +390,13 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
           if (ac is String && ac.isNotEmpty) {
             _selectedTarget = ac;
           }
+          final workspaceId =
+              data['workspaceId'] ??
+              (treeNode)?['workspaceId'] ??
+              ((treeNode)?['Props'] as Map?)?['workspaceId'];
+          if (workspaceId is String && workspaceId.trim().isNotEmpty) {
+            _workspaceId = workspaceId.trim();
+          }
           break;
         case SurfaceDisposition.chat:
           final tree = data['tree'] as Map<String, Object?>;
@@ -421,6 +429,9 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   }
 
   void _handleSurfaceEvent(String name, Map<String, Object?> args) {
+    final scopedArgs = args.containsKey('workspaceId')
+        ? args
+        : {...args, 'workspaceId': _workspaceId};
     final target = (args['targetSurfaceKind'] ?? args['target'] ?? args['path'])
         ?.toString();
     if (target != null && target.isNotEmpty) {
@@ -431,7 +442,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     // input — only unary + server-streaming work there. Send is the gRPC-Web-safe path.
     final envelope = buildActionEnvelope(
       name,
-      args,
+      scopedArgs,
       defaultClientId: _clientId,
     );
     final client = _gatewayClient;
@@ -462,7 +473,11 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     final envelope = gw.SynapseEnvelope()
       ..typeName = 'InoRequest'
       ..payload = utf8.encode(
-        jsonEncode({'prompt': text, 'clientId': _clientId}),
+        jsonEncode({
+          'prompt': text,
+          'clientId': _clientId,
+          'workspaceId': _workspaceId,
+        }),
       );
     unawaited(
       client
@@ -565,6 +580,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     final length = await file.length();
     final request = http.MultipartRequest('POST', _uploadUri())
       ..fields['clientId'] = _clientId
+      ..fields['workspaceId'] = _workspaceId
       ..files.add(
         http.MultipartFile(
           'file',

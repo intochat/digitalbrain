@@ -353,6 +353,7 @@ public static class UiSurfaceKinds
     public const string UserInput = "user-input";
     public const string MarketplaceList = "marketplace-list";
     public const string InstalledBundles = "installed-bundles";
+    public const string Workspace = "workspace";
     public const string Timeline = "timeline";
     public const string DataChart = "data-chart";
     public const string Table = "table";
