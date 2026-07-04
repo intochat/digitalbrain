@@ -8,6 +8,7 @@ public static class DigitalBrainProviderIds
     public const string Ollama = "ollama";
     public const string AzureOpenAI = "azureopenai";
     public const string OpenAI = "openai";
+    public const string OpenAICompatible = "openai-compatible";
     public const string Anthropic = "anthropic";
     public const string GitHubModels = "github-models";
     public const string Xai = "xai";

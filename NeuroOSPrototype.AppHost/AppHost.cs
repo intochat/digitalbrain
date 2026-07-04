@@ -9,6 +9,10 @@ var builder = DistributedApplication.CreateBuilder(args);
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
     options.WithLLM<Qwen25Coder1_5B>();
+    if (HasValue("DigitalBrain:Voice:Endpoint", "DIGITALBRAIN_VOICE_ENDPOINT"))
+    {
+        options.WithVoice2Text<Whisper1Local>();
+    }
     // options.WithLLM<Gpt4oMini>(); // switch to Azure OpenAI when ready (needs azure-openai-endpoint/-key parameters)
     options.UseLocalMarketplace = true;
 })
@@ -69,3 +73,7 @@ builder.Build().Run();
 static bool IsEnabled(string name) =>
     string.Equals(Environment.GetEnvironmentVariable(name), "true", StringComparison.OrdinalIgnoreCase)
     || string.Equals(Environment.GetEnvironmentVariable(name), "1", StringComparison.OrdinalIgnoreCase);
+
+bool HasValue(string configurationKey, string environmentKey) =>
+    !string.IsNullOrWhiteSpace(builder.Configuration[configurationKey])
+    || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(environmentKey));

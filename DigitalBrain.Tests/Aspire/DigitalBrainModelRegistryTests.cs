@@ -88,6 +88,20 @@ public sealed class DigitalBrainModelRegistryTests
     }
 
     [Fact]
+    public void LocalWhisperVoiceModelUsesOpenAICompatibleProvider()
+    {
+        var options = new DigitalBrainOptions();
+
+        options.WithVoice2Text<Whisper1Local>();
+
+        var voice = Assert.Single(options.ModelRegistry.Registrations);
+        Assert.Equal(DigitalBrainCapabilityKind.VoiceToText, voice.Model.Kind);
+        Assert.Equal(DigitalBrainProviderIds.OpenAICompatible, voice.Model.Provider);
+        Assert.Equal("whisper-1", voice.Model.Id);
+        Assert.Equal("Local Whisper", voice.Model.DisplayName);
+    }
+
+    [Fact]
     public void AsFastWithoutARegisteredModelFailsClearly()
     {
         var options = new DigitalBrainOptions();
