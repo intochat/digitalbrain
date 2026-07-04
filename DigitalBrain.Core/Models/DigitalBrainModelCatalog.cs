@@ -90,6 +90,16 @@ public sealed class DigitalBrainModelRegistry
             x.Model.Kind == DigitalBrainCapabilityKind.LargeLanguageModel);
 
     /// <summary>
+    /// Preferred voice-to-text model for speech transcription runtime consumers.
+    /// </summary>
+    public DigitalBrainModelRegistration? DefaultVoiceToText =>
+        registrations.LastOrDefault(static x =>
+            x.Model.Kind == DigitalBrainCapabilityKind.VoiceToText &&
+            x.Role == DigitalBrainModelRole.Default)
+        ?? registrations.LastOrDefault(static x =>
+            x.Model.Kind == DigitalBrainCapabilityKind.VoiceToText);
+
+    /// <summary>
     /// Adds a provider/model registration and returns its index for later role updates.
     /// </summary>
     public int Register(DigitalBrainModelDescriptor model, DigitalBrainModelRole role)

@@ -79,6 +79,7 @@ public sealed class DigitalBrainModelRegistryTests
             registration.Model.Kind == DigitalBrainCapabilityKind.VoiceToText &&
             registration.Model.Provider == DigitalBrainProviderIds.OpenAI &&
             registration.Model.Id == "whisper-test");
+        Assert.Equal("whisper-test", options.ModelRegistry.DefaultVoiceToText?.Model.Id);
 
         Assert.Contains(options.ModelRegistry.Registrations, registration =>
             registration.Model.Kind == DigitalBrainCapabilityKind.VectorDatabase &&
