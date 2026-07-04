@@ -9,8 +9,8 @@ public class WidgetTreeHopBridgeTests
     [Fact]
     public void WidgetTree_hop_surface_carries_markers_and_keys_correlation_on_surfaceId()
     {
-        var tree = new UiWidgetTree(DigitalBrain.Core.UiKitVocabulary.Screen, new Dictionary<string, object?>(),
-            new List<UiWidgetTree> { new(DigitalBrain.Core.UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "hi" }) });
+        var tree = new UiWidgetTree(UiKitVocabulary.Screen, new Dictionary<string, object?>(),
+            new List<UiWidgetTree> { new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "hi" }) });
         var surface = UiSurface.ForExperienceHopTree("hello-world", "hello-world", "ask", tree);
 
         var card = UiSurfaceRfwBridge.FromUiSurface(surface, "hello-world");
@@ -28,12 +28,12 @@ public class WidgetTreeHopBridgeTests
     [Fact]
     public void WidgetTree_hop_surface_carries_title_marker()
     {
-        var tree = new UiWidgetTree(DigitalBrain.Core.UiKitVocabulary.Screen, new Dictionary<string, object?>());
+        var tree = new UiWidgetTree(UiKitVocabulary.Screen, new Dictionary<string, object?>());
         var surface = UiSurface.ForExperienceHopTree("ui-gallery", "ui-gallery", "inputs", tree, title: "Inputs");
 
         var card = UiSurfaceRfwBridge.FromUiSurface(surface, "ui-gallery");
 
-        using var doc = System.Text.Json.JsonDocument.Parse(card.DataJson);
+        using var doc = JsonDocument.Parse(card.DataJson);
         Assert.Equal("Inputs", doc.RootElement.GetProperty("title").GetString());
     }
 }

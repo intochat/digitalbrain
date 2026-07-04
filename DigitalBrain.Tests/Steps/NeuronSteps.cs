@@ -183,7 +183,7 @@ public class NeuronSteps : IAsyncDisposable
         {
             var drainProps = new Dictionary<string, object?>
             {
-                [UiSurfaceKeys.SurfaceId] = $"{DigitalBrain.Core.KernelUiSurfaceKinds.RollingDrain}-{replica}",
+                [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingDrain}-{replica}",
                 [UiSurfaceKeys.Emitter] = "aspire-kupdate",
                 [UiSurfaceKeys.Title] = $"Drain Replica {replica}/3",
                 [UiSurfaceKeys.Priority] = 70 + replica,
@@ -193,13 +193,13 @@ public class NeuronSteps : IAsyncDisposable
                 ["version"] = "rolling-2026.6",
                 ["checkpointId"] = checkpoint.SynapseId
             };
-            await aspire.FireAsync(new UiSurface(DigitalBrain.Core.KernelUiSurfaceKinds.RollingDrain, drainProps));
+            await aspire.FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingDrain, drainProps));
 
             await aspire.FireAsync(new RestartResource("kernel", IsRollingUpdate: true, TargetVersion: "rolling-2026.6", Strategy: $"replica-{replica}-of-3"));
 
             var verifyProps = new Dictionary<string, object?>
             {
-                [UiSurfaceKeys.SurfaceId] = $"{DigitalBrain.Core.KernelUiSurfaceKinds.RollingVerify}-{replica}",
+                [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingVerify}-{replica}",
                 [UiSurfaceKeys.Emitter] = "aspire-kupdate",
                 [UiSurfaceKeys.Title] = $"Verify Replica {replica}/3",
                 [UiSurfaceKeys.Priority] = 70 + replica,
@@ -209,12 +209,12 @@ public class NeuronSteps : IAsyncDisposable
                 ["version"] = "rolling-2026.6",
                 ["lineageEvents"] = 0
             };
-            await aspire.FireAsync(new UiSurface(DigitalBrain.Core.KernelUiSurfaceKinds.RollingVerify, verifyProps));
+            await aspire.FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingVerify, verifyProps));
         }
 
         var completeProps = new Dictionary<string, object?>
         {
-            [UiSurfaceKeys.SurfaceId] = $"{DigitalBrain.Core.KernelUiSurfaceKinds.RollingComplete}-rolling-2026.6",
+            [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingComplete}-rolling-2026.6",
             [UiSurfaceKeys.Emitter] = "aspire-kupdate",
             [UiSurfaceKeys.Title] = "Kernel Rolling Update",
             [UiSurfaceKeys.Priority] = 80,
@@ -223,7 +223,7 @@ public class NeuronSteps : IAsyncDisposable
             ["status"] = "complete",
             ["replicasProcessed"] = 3
         };
-        await aspire.FireAsync(new UiSurface(DigitalBrain.Core.KernelUiSurfaceKinds.RollingComplete, completeProps));
+        await aspire.FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingComplete, completeProps));
 
         await Task.Delay(50);
         _currentGrain = aspire;

@@ -23,7 +23,7 @@ public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainBrowserFixture
         using var channel = _fx.CreateGatewayGrpcChannel();
         var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
 
-        using var cts = new CancellationTokenSource(System.TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest(), cancellationToken: cts.Token);
 
         var delivered = ReadForGalleryHopAsync(feed.ResponseStream, cts.Token);

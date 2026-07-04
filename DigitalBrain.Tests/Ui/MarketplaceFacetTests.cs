@@ -31,7 +31,7 @@ public class MarketplaceFacetTests
 
         var tree = (UiWidgetTree)surface.Props["tree"]!;
         var buttons = Descend(tree)
-            .Where(n => n.Type == DigitalBrain.Core.NeuronUiKit.ActionButton)
+            .Where(n => n.Type == NeuronUiKit.ActionButton)
             .Select(n => n.Props[UiSurfaceKeys.Label]?.ToString())
             .ToList();
 
@@ -51,7 +51,7 @@ public class MarketplaceFacetTests
 
         var tree = (UiWidgetTree)surface.Props["tree"]!;
         var contentBtn = Descend(tree).Single(n =>
-            n.Type == DigitalBrain.Core.NeuronUiKit.ActionButton
+            n.Type == NeuronUiKit.ActionButton
             && n.Props[UiSurfaceKeys.Label]?.ToString() == "Content");
 
         Assert.Equal(nameof(FilterMarketplace), contentBtn.Props[UiSurfaceKeys.SynapseType]);

@@ -41,7 +41,7 @@ public sealed class PackEmbodimentRendersE2ETests(DigitalBrainBrowserFixture fix
         // Real browser assert for routed surface id (via flt-semantics-identifier attr) + context readiness.
         await _fx.AssertSurfaceContext($"[flt-semantics-identifier=\"{surfaceId}\"]", "surfaceId", surfaceId);
 
-        var shot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"e2e-render-{surfaceId}.png");
+        var shot = Path.Combine(Path.GetTempPath(), $"e2e-render-{surfaceId}.png");
         await _fx.Page.ScreenshotAsync(new() { Path = shot });
     }
 }

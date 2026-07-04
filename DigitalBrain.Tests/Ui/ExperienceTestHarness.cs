@@ -28,7 +28,7 @@ public static class UiTreeAssertions
 
     public static void ShouldHaveButtonWithLabel(this UiWidgetTree tree, string label)
     {
-        var node = FindNode(tree, DigitalBrain.Core.UiKitVocabulary.Button);
+        var node = FindNode(tree, UiKitVocabulary.Button);
         if (node != null && MatchesLabel(node, label))
             return;
 
@@ -41,7 +41,7 @@ public static class UiTreeAssertions
 
     public static void ShouldHaveSelect(this UiWidgetTree tree, string name)
     {
-        var node = FindNode(tree, DigitalBrain.Core.UiKitVocabulary.Select);
+        var node = FindNode(tree, UiKitVocabulary.Select);
         if (node != null && node.Props.TryGetValue("name", out var n) && n?.ToString() == name)
             return;
 
@@ -62,7 +62,7 @@ public static class UiTreeAssertions
 
     public static void ShouldHaveList(this UiWidgetTree tree)
     {
-        if (FindNode(tree, DigitalBrain.Core.UiKitVocabulary.List) != null || FindNode(tree, "list") != null)
+        if (FindNode(tree, UiKitVocabulary.List) != null || FindNode(tree, "list") != null)
             return;
         throw new Xunit.Sdk.XunitException("No list node found.");
     }
@@ -131,7 +131,7 @@ public static class UiTreeAssertions
 
     private static UiWidgetTree? FindPanelContaining(UiWidgetTree node, string text)
     {
-        if (string.Equals(node.Type, DigitalBrain.Core.UiKitVocabulary.Panel, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(node.Type, UiKitVocabulary.Panel, StringComparison.OrdinalIgnoreCase) &&
             ContainsTextRecursive(node, text))
             return node;
 

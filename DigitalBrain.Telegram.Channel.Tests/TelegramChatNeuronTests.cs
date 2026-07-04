@@ -23,7 +23,7 @@ public class TelegramChatNeuronTests : NeuronTestBase
 
         var reply = (await chat.GetOutgoingTimelineAsync())
             .OfType<Signal>().Single(s => s.Name == "TelegramReplyRequested");
-        Assert.Equal(100L, System.Convert.ToInt64(reply.Props["chatId"]));
+        Assert.Equal(100L, Convert.ToInt64(reply.Props["chatId"]));
         Assert.Contains("hello-world", reply.Props["text"]?.ToString());
     }
 

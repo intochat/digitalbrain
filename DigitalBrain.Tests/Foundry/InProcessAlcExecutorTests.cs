@@ -25,7 +25,7 @@ public static class Module
     {
         var result = _executor.Execute("public static class Module { this is not C# }", "Run");
         Assert.False(result.Success);
-        Assert.Contains("compile", result.Error, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("compile", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -42,6 +42,6 @@ public static class Module
 }";
         var result = _executor.Execute(source, "Run");
         Assert.False(result.Success);
-        Assert.Contains("capability", result.Error, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("capability", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 }

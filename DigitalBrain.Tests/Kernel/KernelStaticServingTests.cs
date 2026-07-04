@@ -8,7 +8,7 @@ public class KernelStaticServingTests
     [Fact]
     public async Task Serves_Index_Html_From_Configured_WebRoot()
     {
-        var webRoot = Path.Combine(Path.GetTempPath(), "dbtest-webroot-" + System.Guid.NewGuid().ToString("N"));
+        var webRoot = Path.Combine(Path.GetTempPath(), "dbtest-webroot-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(webRoot);
         await File.WriteAllTextAsync(Path.Combine(webRoot, "index.html"), "<!doctype html><title>db-e2e-marker</title>");
         try

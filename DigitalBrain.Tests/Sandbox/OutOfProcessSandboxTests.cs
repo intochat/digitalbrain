@@ -24,7 +24,7 @@ public class OutOfProcessSandboxTests
 
         Assert.True(result.Success, result.Error);
         Assert.Contains("SANDBOXED:", result.Output);
-        Assert.DoesNotContain($"SANDBOXED:{System.Environment.ProcessId}\n", result.Output); // not the test process
+        Assert.DoesNotContain($"SANDBOXED:{Environment.ProcessId}\n", result.Output); // not the test process
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class OutOfProcessSandboxTests
         var result = await _sandbox.RunAsync(source);
 
         Assert.False(result.Success);
-        Assert.Contains("capability gate", result.Error, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("capability gate", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -48,6 +48,6 @@ public class OutOfProcessSandboxTests
     {
         var result = await _sandbox.RunAsync("this is not valid c#");
         Assert.False(result.Success);
-        Assert.Contains("compile error", result.Error, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("compile error", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -100,7 +100,7 @@ public class PackAlcEmbodierTests
             """;
 
         var ex = Assert.Throws<PackEmbodimentException>(() => _embodier.Embody("EvilPack", code));
-        Assert.Contains("capability gate", ex.Message, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("capability gate", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     // Moved from DigitalBrain.Tests/Telegram/ResponderPackTests.cs (Task 7): these two prove the
@@ -111,7 +111,7 @@ public class PackAlcEmbodierTests
     [Fact]
     public void TelegramResponderPackCode_Compiles_And_Embodies_Via_PackAlcEmbodier()
     {
-        var embodied = _embodier.Embody("TelegramResponderNeuron", DigitalBrain.Core.MarketplaceSeeds.TelegramResponderPackCode);
+        var embodied = _embodier.Embody("TelegramResponderNeuron", MarketplaceSeeds.TelegramResponderPackCode);
 
         Assert.NotNull(embodied);
 
@@ -126,7 +126,7 @@ public class PackAlcEmbodierTests
     public void TelegramResponderPackCode_Passes_CapabilityGate()
     {
         // CapabilityGate rejects System.Net / Process / Reflection.Emit. Successful Embody proves it passes.
-        var embodied = _embodier.Embody("TelegramResponderNeuron", DigitalBrain.Core.MarketplaceSeeds.TelegramResponderPackCode);
+        var embodied = _embodier.Embody("TelegramResponderNeuron", MarketplaceSeeds.TelegramResponderPackCode);
         embodied.Dispose();
     }
 
@@ -137,7 +137,7 @@ public class PackAlcEmbodierTests
     [Fact]
     public void PersonalAssistantPackCode_Compiles_And_Embodies_Via_PackAlcEmbodier()
     {
-        var embodied = _embodier.Embody("PersonalAssistantNeuron", DigitalBrain.Core.MarketplaceSeeds.PersonalAssistantPackCode);
+        var embodied = _embodier.Embody("PersonalAssistantNeuron", MarketplaceSeeds.PersonalAssistantPackCode);
 
         Assert.NotNull(embodied);
 
@@ -152,7 +152,7 @@ public class PackAlcEmbodierTests
     public void PersonalAssistantPackCode_Passes_CapabilityGate()
     {
         // CapabilityGate rejects System.Net / Process / Reflection.Emit. Successful Embody proves it passes.
-        var embodied = _embodier.Embody("PersonalAssistantNeuron", DigitalBrain.Core.MarketplaceSeeds.PersonalAssistantPackCode);
+        var embodied = _embodier.Embody("PersonalAssistantNeuron", MarketplaceSeeds.PersonalAssistantPackCode);
         embodied.Dispose();
     }
 }

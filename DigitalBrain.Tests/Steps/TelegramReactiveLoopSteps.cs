@@ -207,7 +207,7 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
 
     private static IReadOnlyList<string> CollectFieldKeys(UiWidgetTree tree) =>
         FindNodes(tree)
-            .Where(n => n.Type == DigitalBrain.Core.UiKitVocabulary.TextField || n.Type == DigitalBrain.Core.UiKitVocabulary.Select)
+            .Where(n => n.Type == UiKitVocabulary.TextField || n.Type == UiKitVocabulary.Select)
             .Select(n => n.Props.GetValueOrDefault("key")?.ToString() ?? n.Props.GetValueOrDefault("name")?.ToString())
             .OfType<string>()
             .ToList();

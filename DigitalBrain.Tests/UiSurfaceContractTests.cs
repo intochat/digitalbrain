@@ -284,13 +284,13 @@ public class UiSurfaceContractTests
     [Fact]
     public void NeuronUiKit_Consts_Are_Stable_For_Server_Driven_Trees()
     {
-        Assert.Equal("neuron:Menu", DigitalBrain.Core.NeuronUiKit.Menu);
-        Assert.Equal("neuron:MenuItem", DigitalBrain.Core.NeuronUiKit.MenuItem);
-        Assert.Equal("neuron:ActionButton", DigitalBrain.Core.NeuronUiKit.ActionButton);
-        Assert.Equal("neuron:NeuronButton", DigitalBrain.Core.NeuronUiKit.NeuronButton);
-        Assert.Equal("neuron:Form", DigitalBrain.Core.NeuronUiKit.Form);
-        Assert.Equal("neuron:Header", DigitalBrain.Core.NeuronUiKit.Header);
-        Assert.Equal("neuron:Divider", DigitalBrain.Core.NeuronUiKit.Divider);
+        Assert.Equal("neuron:Menu", NeuronUiKit.Menu);
+        Assert.Equal("neuron:MenuItem", NeuronUiKit.MenuItem);
+        Assert.Equal("neuron:ActionButton", NeuronUiKit.ActionButton);
+        Assert.Equal("neuron:NeuronButton", NeuronUiKit.NeuronButton);
+        Assert.Equal("neuron:Form", NeuronUiKit.Form);
+        Assert.Equal("neuron:Header", NeuronUiKit.Header);
+        Assert.Equal("neuron:Divider", NeuronUiKit.Divider);
     }
 
     [Fact]
@@ -301,14 +301,14 @@ public class UiSurfaceContractTests
             new Dictionary<string, object?> { ["activeContent"] = "marketplace-list" },
             new List<DigitalBrain.Core.UiWidgetTree>
             {
-                new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Header, new Dictionary<string, object?> { ["title"] = "DigitalBrain" }),
-                new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Menu, new Dictionary<string, object?>(),
+                new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.Header, new Dictionary<string, object?> { ["title"] = "DigitalBrain" }),
+                new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.Menu, new Dictionary<string, object?>(),
                     new[]
                     {
-                        new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.MenuItem,
+                        new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.MenuItem,
                             new Dictionary<string, object?> { ["label"] = "Marketplace", ["targetSurfaceKind"] = "marketplace-list" }),
-                        new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Divider, new Dictionary<string, object?>()),
-                        new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.MenuItem,
+                        new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.Divider, new Dictionary<string, object?>()),
+                        new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.MenuItem,
                             new Dictionary<string, object?> { ["label"] = "Tasks", ["targetSurfaceKind"] = "task-manager" })
                     })
             });
@@ -317,11 +317,11 @@ public class UiSurfaceContractTests
         // header + menu
         Assert.Equal(2, shell.Children!.Count);
         var menu = shell.Children[1];
-        Assert.Equal(DigitalBrain.Core.NeuronUiKit.Menu, menu.Type);
+        Assert.Equal(NeuronUiKit.Menu, menu.Type);
         Assert.Equal(3, menu.Children!.Count); // item + divider + item
-        Assert.Equal(DigitalBrain.Core.NeuronUiKit.MenuItem, menu.Children[0].Type);
+        Assert.Equal(NeuronUiKit.MenuItem, menu.Children[0].Type);
         Assert.Equal("Marketplace", menu.Children[0].Props["label"]);
-        Assert.Equal(DigitalBrain.Core.NeuronUiKit.Divider, menu.Children[1].Type);
+        Assert.Equal(NeuronUiKit.Divider, menu.Children[1].Type);
     }
 
     [Fact]
