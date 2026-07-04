@@ -95,38 +95,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             return Task.FromResult<UserSessionState?>(null);
         }
 
-        var ended = OutgoingJournal
-            .Concat(IncomingJournal)
-            .OfType<UserSessionEnded>()
-            .Any(e => string.Equals(e.SessionId, sessionId, StringComparison.Ordinal));
-        if (ended)
-        {
-            return Task.FromResult<UserSessionState?>(null);
-        }
-
-        var created = OutgoingJournal
-            .Concat(IncomingJournal)
-            .OfType<UserSessionCreated>()
-            .DistinctBy(s => s.SynapseId)
-            .LastOrDefault(s => string.Equals(s.SessionId, sessionId, StringComparison.Ordinal));
-        if (created is null || created.ExpiresAt <= DateTimeOffset.UtcNow)
-        {
-            return Task.FromResult<UserSessionState?>(null);
-        }
-
-        var login = OutgoingJournal
-            .Concat(IncomingJournal)
-            .OfType<LoginSucceeded>()
-            .DistinctBy(s => s.SynapseId)
-            .LastOrDefault(s => string.Equals(s.SessionId, sessionId, StringComparison.Ordinal));
-
-        return Task.FromResult<UserSessionState?>(new UserSessionState(
-            created.UserId,
-            created.SessionId,
-            login?.DisplayName ?? created.UserId.Value,
-            login?.Roles ?? Array.Empty<string>(),
-            created.ExpiresAt,
-            Active: true));
+        return Task.FromResult(ResolveSession(sessionId, SessionJournal()));
     }
 
     public Task<UserSessionState?> GetSessionByClientIdAsync(string clientId)
@@ -136,39 +105,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             return Task.FromResult<UserSessionState?>(null);
         }
 
-        var ended = OutgoingJournal
-            .Concat(IncomingJournal)
-            .OfType<UserSessionEnded>()
-            .Select(e => e.SessionId)
-            .ToHashSet(StringComparer.Ordinal);
-
-        var created = OutgoingJournal
-            .Concat(IncomingJournal)
-            .OfType<UserSessionCreated>()
-            .DistinctBy(s => s.SynapseId)
-            .Where(s => string.Equals(s.ClientId, clientId, StringComparison.Ordinal))
-            .Where(s => s.ExpiresAt > DateTimeOffset.UtcNow && !ended.Contains(s.SessionId))
-            .OrderBy(s => s.ExpiresAt)
-            .LastOrDefault();
-
-        if (created is null)
-        {
-            return Task.FromResult<UserSessionState?>(null);
-        }
-
-        var login = OutgoingJournal
-            .Concat(IncomingJournal)
-            .OfType<LoginSucceeded>()
-            .DistinctBy(s => s.SynapseId)
-            .LastOrDefault(s => string.Equals(s.SessionId, created.SessionId, StringComparison.Ordinal));
-
-        return Task.FromResult<UserSessionState?>(new UserSessionState(
-            created.UserId,
-            created.SessionId,
-            login?.DisplayName ?? created.UserId.Value,
-            login?.Roles ?? Array.Empty<string>(),
-            created.ExpiresAt,
-            Active: true));
+        return Task.FromResult(ResolveSessionByClientId(clientId, SessionJournal()));
     }
 
     public Task<UiSurface> BuildLoginSurfaceAsync(string? clientId = null) =>
@@ -302,28 +239,83 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         bus?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
     }
 
+    private IReadOnlyList<Synapse> SessionJournal() =>
+        OutgoingJournal
+            .Concat(IncomingJournal)
+            .DistinctBy(s => s.SynapseId)
+            .ToList();
+
+    private UserSessionState? ResolveSession(string sessionId, IReadOnlyList<Synapse> journal)
+    {
+        var ended = EndedSessionIds(journal);
+        if (ended.Contains(sessionId))
+        {
+            return null;
+        }
+
+        var created = journal
+            .OfType<UserSessionCreated>()
+            .LastOrDefault(s => string.Equals(s.SessionId, sessionId, StringComparison.Ordinal));
+
+        return created is null || !IsActive(created, ended, DateTimeOffset.UtcNow)
+            ? null
+            : BuildSessionState(created, journal);
+    }
+
+    private UserSessionState? ResolveSessionByClientId(string clientId, IReadOnlyList<Synapse> journal)
+    {
+        var ended = EndedSessionIds(journal);
+        var now = DateTimeOffset.UtcNow;
+        var created = journal
+            .OfType<UserSessionCreated>()
+            .Where(s => string.Equals(s.ClientId, clientId, StringComparison.Ordinal))
+            .Where(s => IsActive(s, ended, now))
+            .OrderBy(s => s.ExpiresAt)
+            .LastOrDefault();
+
+        return created is null ? null : BuildSessionState(created, journal);
+    }
+
+    private static UserSessionState BuildSessionState(UserSessionCreated created, IReadOnlyList<Synapse> journal)
+    {
+        var login = journal
+            .OfType<LoginSucceeded>()
+            .LastOrDefault(s => string.Equals(s.SessionId, created.SessionId, StringComparison.Ordinal));
+
+        return new UserSessionState(
+            created.UserId,
+            created.SessionId,
+            login?.DisplayName ?? created.UserId.Value,
+            login?.Roles ?? Array.Empty<string>(),
+            created.ExpiresAt,
+            Active: true);
+    }
+
     private IEnumerable<UserSessionCreated> ActiveSessions()
     {
-        var ended = OutgoingJournal
-            .Concat(IncomingJournal)
+        var journal = SessionJournal();
+        var ended = EndedSessionIds(journal);
+        var now = DateTimeOffset.UtcNow;
+
+        return journal
+            .OfType<UserSessionCreated>()
+            .Where(s => IsActive(s, ended, now));
+    }
+
+    private IEnumerable<LocalUserRegistered> RegisteredUsers() =>
+        SessionJournal()
+            .OfType<LocalUserRegistered>()
+            .GroupBy(u => u.Username, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.Last());
+
+    private static HashSet<string> EndedSessionIds(IReadOnlyList<Synapse> journal) =>
+        journal
             .OfType<UserSessionEnded>()
             .Select(e => e.SessionId)
             .ToHashSet(StringComparer.Ordinal);
 
-        return OutgoingJournal
-            .Concat(IncomingJournal)
-            .OfType<UserSessionCreated>()
-            .DistinctBy(s => s.SynapseId)
-            .Where(s => s.ExpiresAt > DateTimeOffset.UtcNow && !ended.Contains(s.SessionId));
-    }
-
-    private IEnumerable<LocalUserRegistered> RegisteredUsers() =>
-        OutgoingJournal
-            .Concat(IncomingJournal)
-            .OfType<LocalUserRegistered>()
-            .DistinctBy(s => s.SynapseId)
-            .GroupBy(u => u.Username, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.Last());
+    private static bool IsActive(UserSessionCreated session, IReadOnlySet<string> ended, DateTimeOffset now) =>
+        session.ExpiresAt > now && !ended.Contains(session.SessionId);
 
     private bool AllowFirstUserProvisioning()
     {
