@@ -40,6 +40,7 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
     private readonly SignalEgressBus _egressBus = new();
     private const string PackName = "TelegramResponderNeuron";
     private const string Scope = "telegram-loop-user";
+    private string? _configScope;
 
     private SignalEgressBus.Subscription? _egressSubscription;
 
@@ -112,16 +113,6 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
     [When(@"I provide the Telegram configuration token ""(.*)"", provider ""(.*)"", key ""(.*)""")]
     public async Task WhenIProvideTheTelegramConfiguration(string token, string provider, string key)
     {
-        var values = new Dictionary<string, string>
-        {
-            ["telegram_token"] = token,
-            ["llm_provider"] = provider,
-            ["llm_key"] = key,
-            ["pack"] = PackName,
-            ["scope"] = Scope
-        };
-        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
-
         var gateway = new GatewayService(
             Cluster.GrainFactory,
             new ConfigurationBuilder().Build(),
@@ -133,11 +124,37 @@ public sealed class TelegramReactiveLoopSteps : NeuronTestBase
 
         await gateway.Send(new SynapseEnvelope
         {
+            TypeName = nameof(LoginRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                username = Scope,
+                password = "telegram-loop-test-password",
+                clientId = "test"
+            }))
+        }, TestServerCallContext.Create());
+
+        var session = Cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
+        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Last().SessionId;
+        _configScope = PackConfigScopes.ForUser(new UserId(Scope));
+
+        var values = new Dictionary<string, string>
+        {
+            ["telegram_token"] = token,
+            ["llm_provider"] = provider,
+            ["llm_key"] = key,
+            ["pack"] = PackName,
+            ["scope"] = _configScope,
+            ["sessionId"] = sessionId
+        };
+        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
+
+        await gateway.Send(new SynapseEnvelope
+        {
             TypeName = nameof(ConfigurationProvided),
             Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
 
-        var stored = await _configStore.GetAsync(Scope, PackName);
+        var stored = await _configStore.GetAsync(_configScope, PackName);
         Assert.Equal(token, stored["telegram_token"]);
     }
 
@@ -237,6 +254,7 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
     private const string ResponderPackName = "TelegramResponderNeuron";
     private const string WatcherPackName   = "KeywordWatcherNeuron";
     private const string N1Scope           = "n1-reactivity-user";
+    private string? _configScope;
 
     // Signals collected from the egress bus in arrival order; both Then-steps read from this list.
     private readonly List<Signal> _collectedSignals = new();
@@ -279,16 +297,6 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
     [Given(@"I provide the Telegram configuration token ""(.*)"", provider ""(.*)"", key ""(.*)""")]
     public async Task GivenN1TelegramConfig(string token, string provider, string key)
     {
-        var values = new Dictionary<string, string>
-        {
-            ["telegram_token"] = token,
-            ["llm_provider"]   = provider,
-            ["llm_key"]        = key,
-            ["pack"]           = ResponderPackName,
-            ["scope"]          = N1Scope
-        };
-        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
-
         var gateway = new GatewayService(
             Cluster.GrainFactory,
             new ConfigurationBuilder().Build(),
@@ -297,6 +305,32 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance,
             _configStore);
+
+        await gateway.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(LoginRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                username = N1Scope,
+                password = "n1-reactivity-test-password",
+                clientId = "test"
+            }))
+        }, TestServerCallContext.Create());
+
+        var session = Cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
+        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Last().SessionId;
+        _configScope = PackConfigScopes.ForUser(new UserId(N1Scope));
+
+        var values = new Dictionary<string, string>
+        {
+            ["telegram_token"] = token,
+            ["llm_provider"]   = provider,
+            ["llm_key"]        = key,
+            ["pack"]           = ResponderPackName,
+            ["scope"]          = _configScope,
+            ["sessionId"]      = sessionId
+        };
+        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
 
         await gateway.Send(new SynapseEnvelope
         {
