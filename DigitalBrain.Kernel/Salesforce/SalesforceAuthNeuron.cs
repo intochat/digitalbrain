@@ -65,7 +65,7 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
             return;
         }
 
-        var state = Guid.NewGuid().ToString("N");
+        var state = $"{Self.AsScope().UserId.Value}:{Guid.NewGuid():N}";
         var codeVerifier = SalesforceClientFactory.CreatePkceCodeVerifier();
         var codeChallenge = SalesforceClientFactory.CreatePkceCodeChallenge(codeVerifier);
 

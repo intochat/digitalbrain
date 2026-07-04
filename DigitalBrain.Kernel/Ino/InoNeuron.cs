@@ -118,10 +118,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var pendingSalesforce = _pendingSalesforceRequest
                 ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => IsSalesforceIntent(r.Prompt));
 
-            if (pendingSalesforce is not null && await HasSalesforceCredentialAsync())
+            if (pendingSalesforce is not null)
             {
-                _pendingSalesforceRequest = null;
-                await FetchSalesforceAccountsAsync(pendingSalesforce);
+                var salesforceUserId = await ResolveUserIdAsync(pendingSalesforce.SessionId);
+                if (await HasSalesforceCredentialAsync(salesforceUserId))
+                {
+                    _pendingSalesforceRequest = null;
+                    await FetchSalesforceAccountsAsync(pendingSalesforce, salesforceUserId);
+                }
             }
 
             return;
@@ -138,6 +142,16 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         _pendingGmailRequest = null;
         await FetchRecentGmailAsync(pending);
+    }
+
+    private async Task<string> ResolveUserIdAsync(string? sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+            return UserId.Anonymous.Value;
+
+        var session = GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
+        var state = await session.GetSessionAsync(sessionId);
+        return state?.UserId.Value ?? UserId.Anonymous.Value;
     }
 
     public async Task HandleAsync(TabularDataIngested ingested)
@@ -242,7 +256,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task HandleSalesforceIntentAsync(InoRequest req)
     {
-        if (!await HasSalesforceCredentialAsync())
+        var salesforceUserId = await ResolveUserIdAsync(req.SessionId);
+        if (!await HasSalesforceCredentialAsync(salesforceUserId))
         {
             _pendingSalesforceRequest = req;
             var reply = "Salesforce credentials are required to query CRM records.";
@@ -251,7 +266,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        await FetchSalesforceAccountsAsync(req);
+        await FetchSalesforceAccountsAsync(req, salesforceUserId);
     }
 
     private async Task<bool> HasGoogleCredentialAsync()
@@ -277,7 +292,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
     }
 
-    private async Task<bool> HasSalesforceCredentialAsync()
+    private async Task<bool> HasSalesforceCredentialAsync(string userId)
     {
         var store = ServiceProvider.GetService<IPackConfigStore>();
         if (store is null)
@@ -285,8 +300,12 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         try
         {
-            var values = await store.GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
-            return SalesforceClientFactory.HasUsableCredential(values);
+            var appValues = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
+            var userValues = await store.GetAsync(PackConfigScopes.ForUser(new UserId(userId)), SalesforceClientFactory.PackName);
+            var merged = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, value) in userValues)
+                merged[key] = value;
+            return SalesforceClientFactory.HasUsableCredential(merged);
         }
         catch (Exception ex)
         {
@@ -365,7 +384,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await DeliverGmailMessagesSurfaceAsync(summaries, req.SessionId);
     }
 
-    private async Task FetchSalesforceAccountsAsync(InoRequest req)
+    private async Task FetchSalesforceAccountsAsync(InoRequest req, string salesforceUserId)
     {
         var maxResults = SalesforceResultCount(req.Prompt);
         await Broadcast(new Signal(SalesforceSignals.QueryRequested, new Dictionary<string, object?>
@@ -378,7 +397,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         string[] records;
         try
         {
-            var salesforce = GrainFactory.GetGrain<ISalesforceCrmNeuron>("salesforce-main");
+            var salesforce = GrainFactory.GetGrain<ISalesforceCrmNeuron>(salesforceUserId);
             records = await salesforce.ListAccountsAsync(maxResults);
         }
         catch (Exception ex) when (IsSalesforceIntegrationFailure(ex))

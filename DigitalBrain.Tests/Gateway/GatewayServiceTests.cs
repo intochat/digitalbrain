@@ -312,18 +312,84 @@ public class GatewayServiceTests : NeuronTestBase
 
         await svc.Send(new SynapseEnvelope
         {
-            TypeName = SalesforceSignals.AuthRequested,
+            TypeName = nameof(LoginRequest),
             Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
             {
-                sessionId = "chat-session-salesforce"
+                username = "salesforce-auth-test-user",
+                password = "correct horse battery staple",
+                clientId = "test"
             }))
         }, TestContext());
 
-        var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-main");
+        var session = Grain<IUserSessionNeuron>("session-main");
+        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Single().SessionId;
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = SalesforceSignals.AuthRequested,
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                sessionId
+            }))
+        }, TestContext());
+
+        var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test-user");
         var timeline = await auth.GetOutgoingTimelineAsync();
         var form = Assert.Single(timeline.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
         Assert.Equal("salesforce", form.Props["pack"]);
-        Assert.Equal("chat-session-salesforce", form.Props["sessionId"]);
+        Assert.Equal(sessionId, form.Props["sessionId"]);
+    }
+
+    [Fact]
+    public async Task Send_SalesforceAuthRequested_Routes_To_The_Callers_Own_UserKeyed_Grain()
+    {
+        var svc = NewService();
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(LoginRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                username = "salesforce-test-user",
+                password = "correct horse battery staple",
+                clientId = "test"
+            }))
+        }, TestContext());
+
+        var session = Grain<IUserSessionNeuron>("session-main");
+        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Single().SessionId;
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = SalesforceSignals.AuthRequested,
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                sessionId
+            }))
+        }, TestContext());
+
+        var auth = Grain<ISalesforceAuthNeuron>("salesforce-test-user");
+        var timeline = await auth.GetOutgoingTimelineAsync();
+        var form = Assert.Single(timeline.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
+        Assert.Equal("salesforce", form.Props["pack"]);
+        Assert.Equal(sessionId, form.Props["sessionId"]);
+    }
+
+    [Fact]
+    public async Task Send_SalesforceAuthRequested_Without_A_Session_Is_Rejected()
+    {
+        var svc = NewService();
+
+        var ex = await Assert.ThrowsAsync<RpcException>(() => svc.Send(new SynapseEnvelope
+        {
+            TypeName = SalesforceSignals.AuthRequested,
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                sessionId = "not-a-real-session"
+            }))
+        }, TestContext()));
+
+        Assert.Equal(StatusCode.Unauthenticated, ex.StatusCode);
     }
 
     [Fact]
