@@ -149,13 +149,12 @@ builder.Services.AddScoped<DigitalBrain.Google.IGoogleDriveApiClient>(sp =>
 builder.Services.AddScoped<DigitalBrain.Google.IGoogleCalendarApiClient>(sp =>
     new DigitalBrain.Google.GoogleCalendarApiClient(sp.GetRequiredService<Google.Apis.Auth.OAuth2.UserCredential>()));
 
-// Salesforce CRM REST API client: built from the encrypted "salesforce"/"default" pack config scope that
-// the Salesforce credential prompt stores. Scoped for the same per-grain-activation reason as Google.
-builder.Services.AddScoped<DigitalBrain.Salesforce.ISalesforceApiClient>(sp =>
-    SalesforceClientFactory
-        .CreateApiClientAsync(sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>())
-        .GetAwaiter()
-        .GetResult());
+// Salesforce CRM REST API client: built lazily per call from the shared app-level connected-app config
+// ("default" scope) merged with the calling grain's own per-user token scope ("user:{userId}"). Singleton
+// (not scoped) because, unlike the old eager factory, it no longer resolves a client at grain-activation
+// time — SalesforceCrmNeuron calls CreateAsync explicitly per method with its own NeuronScope, so "user
+// hasn't connected yet" is a normal per-call condition instead of an activation-time throw.
+builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
 
 // Proxy to private marketplace (new separate repo) when enabled.
 // Register the stub here; real impl uses HttpClient to the marketplace service.
