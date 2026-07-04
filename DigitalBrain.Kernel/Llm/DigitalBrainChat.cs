@@ -1,5 +1,6 @@
 using Azure;
 using Azure.AI.OpenAI;
+using DigitalBrain.Core.Models;
 using Microsoft.Extensions.AI;
 using OllamaSharp;
 
@@ -9,24 +10,22 @@ public static class DigitalBrainChat
 {
     public static IServiceCollection AddDigitalBrainChat(this IServiceCollection services, IConfiguration config)
     {
-        var provider = config["DigitalBrain:Llm:Provider"];
-        var model = config["DigitalBrain:Llm:Model"] ?? "qwen2.5-coder:1.5b";
+        var options = DigitalBrainLlmRuntimeOptions.FromConfiguration(config);
 
-        if (string.Equals(provider, "ollama", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(options.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase))
         {
-            var endpoint = config["DigitalBrain:Llm:OllamaEndpoint"] ?? "http://localhost:11434";
-            var ollamaClient = new OllamaApiClient(new Uri(endpoint), model);
+            var ollamaClient = new OllamaApiClient(new Uri(options.OllamaEndpoint), options.Model);
             var chatClient = new ChatClientBuilder(ollamaClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
             services.AddChatClient(chatClient);
         }
-        else if (string.Equals(provider, "azureopenai", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(options.Provider, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase))
         {
-            var endpoint = config["DigitalBrain:Llm:AzureOpenAIEndpoint"]
+            var endpoint = options.AzureOpenAIEndpoint
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:AzureOpenAIEndpoint is required for azureopenai provider.");
-            var key = config["DigitalBrain:Llm:AzureOpenAIKey"]
+            var key = options.AzureOpenAIKey
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:AzureOpenAIKey is required for azureopenai provider.");
             var azureClient = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key))
-                .GetChatClient(model)
+                .GetChatClient(options.Model)
                 .AsIChatClient();
             var chatClient = new ChatClientBuilder(azureClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
             services.AddChatClient(chatClient);

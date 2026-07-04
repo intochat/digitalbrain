@@ -1,4 +1,5 @@
 using DigitalBrain.Aspire;
+using DigitalBrain.Core.Models;
 
 namespace DigitalBrain.Tests.Aspire;
 
