@@ -1,5 +1,38 @@
 # CONTINUITY — NeuroOS best-of-breed consolidation
 
+## 2026-07-04 — MULTIUSER Stage S1: Salesforce OAuth callback grain-routing
+
+Merged to master (subagent-driven, plan `docs/superpowers/plans/2026-07-04-salesforce-oauth-callback-grain-routing.md`).
+Fixes P1 from `docs/CONTINUATION-MULTIUSER-IDENTITY.md`: the `/salesforce-callback` minimal-API endpoint
+in `Program.cs` used to read/write `IPackConfigStore` and exchange the authorization code directly,
+bypassing `SalesforceAuthNeuron` entirely. With 3 Kernel replicas behind Aspire's proxy (confirmed live —
+this AppHost runs `kernel-hfzjyduu`/`kernel-sqpftzde`/`kernel-uaxsruac`), a callback landing on a
+different replica than the one that started the flow hit an empty, replica-local pending-state store
+and failed 100% reproducibly.
+
+Shipped in 4 tasks: (1) an optional `HttpMessageHandler` seam on
+`SalesforceClientFactory.ExchangeAuthorizationCodeAsync` + `FakeSalesforceTokenHandler` test double, so
+the token exchange is fakeable without real network I/O or Windows HTTP.sys ACL friction; (2)
+`ISalesforceAuthNeuron.CompleteOAuthAsync` — the grain now owns pending-state validation and the token
+exchange, with `SalesforceOAuthCallback`/`SalesforceOAuthCallbackResult` added to
+`DigitalBrain.Core/Synapse.cs` (`[GenerateSerializer]` + explicit sequential `[Id(n)]`, matching the
+non-negotiable convention for new cross-grain-boundary types); (3) `Program.cs`'s endpoint reduced to
+pure parse-and-route (82 lines → 18), with the old direct-store-IO path deleted, not commented out; (4)
+`SalesforceOAuthCrossSiloTests` — starts the OAuth flow via one Orleans TestingHost silo's `IGrainFactory`
+and completes it via a different silo's, asserting `GetSiloIdentityAsync()` is identical both times (the
+property that makes the fix real, independently traced by the task reviewer rather than taken on faith).
+
+Grain keys stay `"salesforce-auth-main"` (no per-user routing yet — that's MULTIUSER S3). No journaled
+OAuth lifecycle synapses added (deferred to S4's shared `OAuthFlowNeuron`, per invariant I3: tokens/PKCE
+material never enter a journal). Full solution: `dotnet build Brain.slnx` clean, `dotnet test Brain.slnx`
+0 failures across every project. Smoke-tested against the real 3-replica AppHost via `aspire run`:
+`GET /salesforce-callback?error=access_denied&error_description=smoke-test` returned the expected HTTP
+400 "Salesforce login failed" page with no exceptions logged.
+
+Not done: MULTIUSER S2-S5 (identity spine, per-user keying, Google on the shared flow, chat layer) and
+the whole-repo cleanup waves in `docs/CONTINUATION-CLEANUP-SIMPLIFICATION.md` — per that doc's own D-CL6
+sequencing (S1 → cleanup D1-D4 → S2-S5), those are separate follow-on plans.
+
 ## 2026-07-03 — X post → Bitcoin price → Telegram demo
 
 Merged to master (`spec/x-bitcoin-telegram-demo`, fast-forward). Proves the cross-channel capstone demo
