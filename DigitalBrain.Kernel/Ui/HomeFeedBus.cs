@@ -38,7 +38,14 @@ public sealed class HomeFeedBus(IClusterClient? clusterClient = null, ILogger<Ho
         if (IsDuplicate(card)) return;
         foreach (var (_, subscriber) in _subscribers)
         {
-            if (card.SessionId is not null && !string.Equals(card.SessionId, subscriber.SessionId, StringComparison.Ordinal))
+            // TEMPORARY fail-open: addressing is only enforced once the SUBSCRIBER itself has registered a
+            // real session. No client does yet (WatchHomeFeed is opened once at app startup, before login,
+            // and the client never learns/forwards its real session afterward) — see docs/superpowers/plans/
+            // 2026-07-04-multiuser-s2-s3-identity-and-salesforce-per-user.md, "Known Limitations". A
+            // no-session subscriber sees every card (matching pre-existing behavior); a subscriber that DOES
+            // register a real session still only sees unaddressed cards plus its own.
+            if (subscriber.SessionId is not null && card.SessionId is not null &&
+                !string.Equals(card.SessionId, subscriber.SessionId, StringComparison.Ordinal))
                 continue;
             subscriber.Channel.Writer.TryWrite(card);
         }

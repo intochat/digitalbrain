@@ -192,8 +192,12 @@ public class GatewayServiceTests : NeuronTestBase
         Assert.DoesNotContain(writer.Messages, m => m.RootWidget == "AddressedToSomeoneElse");
     }
 
+    // TEMPORARY: fails open until the Flutter client can capture and forward its real login session to
+    // WatchHomeFeed (it currently never does — see HomeFeedBus.FanLocal's comment and docs/superpowers/
+    // plans/2026-07-04-multiuser-s2-s3-identity-and-salesforce-per-user.md, "Known Limitations"). An
+    // unauthenticated subscriber currently receives every card, matching pre-existing behavior.
     [Fact]
-    public async Task WatchHomeFeed_Unauthenticated_Never_Receives_Session_Addressed_Cards()
+    public async Task WatchHomeFeed_Unauthenticated_Receives_Every_Card_Fail_Open()
     {
         var svc = NewService();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -211,7 +215,7 @@ public class GatewayServiceTests : NeuronTestBase
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => watchTask);
 
         Assert.Contains(writer.Messages, m => m.RootWidget == "SystemUnaddressed");
-        Assert.DoesNotContain(writer.Messages, m => m.RootWidget == "AddressedToSomeone");
+        Assert.Contains(writer.Messages, m => m.RootWidget == "AddressedToSomeone");
     }
 
     [Fact]
@@ -375,21 +379,29 @@ public class GatewayServiceTests : NeuronTestBase
         Assert.Equal(sessionId, form.Props["sessionId"]);
     }
 
+    // TEMPORARY: falls back to the shared "anonymous" identity rather than rejecting, until the Flutter
+    // client can capture and forward its real login session here (it currently never does — see
+    // GatewayService.cs's AuthRequested branch comment and docs/superpowers/plans/2026-07-04-multiuser-s2-
+    // s3-identity-and-salesforce-per-user.md, "Known Limitations"). Restores today's single-user "Connect
+    // Salesforce" functionality.
     [Fact]
-    public async Task Send_SalesforceAuthRequested_Without_A_Session_Is_Rejected()
+    public async Task Send_SalesforceAuthRequested_Without_A_Session_Falls_Back_To_Anonymous()
     {
         var svc = NewService();
 
-        var ex = await Assert.ThrowsAsync<RpcException>(() => svc.Send(new SynapseEnvelope
+        await svc.Send(new SynapseEnvelope
         {
             TypeName = SalesforceSignals.AuthRequested,
             Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
             {
                 sessionId = "not-a-real-session"
             }))
-        }, TestContext()));
+        }, TestContext());
 
-        Assert.Equal(StatusCode.Unauthenticated, ex.StatusCode);
+        var auth = Grain<ISalesforceAuthNeuron>(UserId.Anonymous.Value);
+        var timeline = await auth.GetOutgoingTimelineAsync();
+        var form = Assert.Single(timeline.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
+        Assert.Equal("salesforce", form.Props["pack"]);
     }
 
     [Fact]
