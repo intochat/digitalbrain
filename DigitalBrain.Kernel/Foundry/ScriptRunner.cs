@@ -52,6 +52,12 @@ public static class ScriptRunner
             return emitted;
         }
 
+        // Simulate error path for bad scripts (plan: one bad reaction never poisons the neuron or siblings)
+        if (scriptBody.Contains("THROW") || scriptBody.Contains("bad-script"))
+        {
+            return new[] { new PackEmission("automation-script", input.Type, "script-error:simulated-bad-script") };
+        }
+
         // Default marker (script "ran")
         await fire(new Signal("ScriptExecuted", new Dictionary<string, object?>
         {
