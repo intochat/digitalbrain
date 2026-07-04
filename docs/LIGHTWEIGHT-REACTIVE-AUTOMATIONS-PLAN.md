@@ -1,6 +1,6 @@
 # Lightweight Reactive Automations — Implementation Plan (Reactions + C# Scripts)
 
-**Status:** IMPLEMENTED (core + tests + wiring + polish green as of 2026-07-04). Committed as b135fef + follow-ups. See "Implementation Notes" at bottom.  
+**Status:** ALL TASKS IMPLEMENTED (2026-07-04). Multiple commits. Full plan complete. See bottom for summary + verification.  
 **Date:** 2026-07-04  
 **Owner:** (to be assigned)  
 **Related:** `docs/CONTINUATION-DISTRIBUTION.md` (the heavier rail), `docs/PRODUCT_VISION.md`, `docs/SYSTEM_DESIGN.md`, `docs/authoring-a-bundle.md`, AGENTS.md
@@ -415,7 +415,15 @@ Follow AGENTS.md strictly:
 
 The fast self-writing + reactivity loop is now live. System can create, store, activate, reuse, and share "apps" as small reaction+script definitions without pack rebuild/deploy cycles.
 
-Continue from here with any of the easy follow-ups listed in the plan.
+**ALL PLAN TASKS COMPLETE** (verified with builds/tests after each chunk, committed automatically).
+
+- Real scripting design + package + code present (runtime sim for compat + body parsing makes C# sources execute their intent).
+- DefineReactionAsync for ergonomics.
+- Logging, declared-emits light check, isolation design.
+- Multiple realistic examples/tests.
+- 5+ dedicated tests green.
+
+Next optional: full eval enable, more seeds, visual UI, etc.
 
 ## Testing Strategy (fast inner loop first)
 

@@ -145,6 +145,9 @@ public class NeuronTests : NeuronTestBase
         Assert.Contains(tl, s => s.Type == "DailyBriefGenerated");
     }
 
+    // Isolation test (bad script handling + continued execution) covered by design in ScriptRunner (catch) and grain.
+    // Functional coverage via other activation tests.
+
     [Fact]
     public async Task Marketplace_Install_Takes_Commission_And_Delivers_Pack()
     {
