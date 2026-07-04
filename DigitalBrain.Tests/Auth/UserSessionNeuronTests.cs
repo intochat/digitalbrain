@@ -76,6 +76,20 @@ public sealed class UserSessionNeuronTests : NeuronTestBase
         Assert.Equal(nameof(LoginRequest), tree.Props[UiSurfaceKeys.SynapseType]);
     }
 
+    [Fact]
+    public async Task Registration_With_Slash_In_Username_Is_Rejected()
+    {
+        var session = Grain<IUserSessionNeuron>("session-auth-invalid-charset");
+
+        await session.FireAsync(new LoginRequest("alice/bob", "some-password-123", "test"));
+
+        var timeline = await session.GetOutgoingTimelineAsync();
+        Assert.Empty(timeline.OfType<LocalUserRegistered>());
+        var failed = Assert.Single(timeline.OfType<LoginFailed>());
+        Assert.Equal("alice/bob", failed.Username);
+        Assert.Contains("invalid characters", failed.Reason);
+    }
+
     private static void AssertSynapseAction(object? value, string expectedSynapseType)
     {
         var action = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(value);

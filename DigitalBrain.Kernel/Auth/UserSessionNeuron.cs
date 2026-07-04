@@ -32,6 +32,12 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             return;
         }
 
+        if (!IsValidUsernameCharset(username))
+        {
+            await RejectAsync(username, "username may not contain invalid characters ('/', whitespace, or quotes)", clientId);
+            return;
+        }
+
         // Dev-only convenience: the seeded credentials always authenticate (provisioned on first use,
         // password-bypassed if an account already exists) so a fresh checkout can sign in without setup.
         // Off outside Development, so the deployed app is unaffected.
@@ -331,4 +337,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
 
     private static string NormalizeUsername(string value) =>
         (value ?? string.Empty).Trim().ToLowerInvariant();
+
+    private static bool IsValidUsernameCharset(string username) =>
+        username.Length > 0 && !username.Any(ch => ch is '/' or '\'' or '"' || char.IsWhiteSpace(ch));
 }
