@@ -119,4 +119,27 @@ public class SalesforceClientFactoryTests
         Assert.Contains("missing client_id", ex.Message);
         Assert.Contains("Salesforce", ex.Message);
     }
+
+    [Fact]
+    public async Task ExchangeAuthorizationCodeAsync_Uses_Provided_Handler_Instead_Of_Real_Network_Call()
+    {
+        var handler = new FakeSalesforceTokenHandler("fake-access-token", "https://fake.my.salesforce.com", "fake-refresh-token");
+
+        var result = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(
+            new Dictionary<string, string>
+            {
+                [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
+                [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
+                [SalesforceClientFactory.LoginUrlKey] = "https://test.salesforce.com",
+                [SalesforceClientFactory.OAuthCodeVerifierKey] = "verifier-1"
+            },
+            "auth-code-1",
+            "http://localhost:8081/salesforce-callback",
+            handler);
+
+        Assert.Equal("fake-access-token", result[SalesforceClientFactory.AccessTokenKey]);
+        Assert.Equal("https://fake.my.salesforce.com", result[SalesforceClientFactory.InstanceUrlKey]);
+        Assert.Equal("fake-refresh-token", result[SalesforceClientFactory.RefreshTokenKey]);
+        Assert.Equal(1, handler.RequestCount);
+    }
 }
