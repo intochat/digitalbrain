@@ -90,6 +90,80 @@ public class GatewayServiceTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task WatchHomeFeed_Only_Delivers_Cards_Addressed_To_The_Resolved_Session()
+    {
+        var svc = NewService();
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(LoginRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                username = "feed-isolation-user",
+                password = "correct horse battery staple",
+                clientId = "test"
+            }))
+        }, TestContext());
+
+        var session = Grain<IUserSessionNeuron>("session-main");
+        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Single().SessionId;
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var writer = new CapturingServerStreamWriter<RfwCardEnvelope>();
+        var watchTask = svc.WatchHomeFeed(new WatchHomeFeedRequest { SessionId = sessionId }, writer, TestContext(cts.Token));
+
+        for (var attempt = 0; attempt < 40 && writer.Messages.Count == 0; attempt++)
+            await Task.Delay(25);
+
+        // The line above only proves the (synchronously-written) initial login card arrived — it says nothing about
+        // whether homeFeedBus.Subscribe(sessionId) has run yet: that happens only after WatchHomeFeed awaits the real
+        // ResolveSessionAsync grain round-trip, which is genuinely asynchronous and does not complete inline the way
+        // the login card's write did. Broadcasting before that subscription is registered would be silently dropped
+        // by HomeFeedBus, so give the grain round-trip a bounded, generous window to land before addressing cards.
+        for (var attempt = 0; attempt < 40 && writer.Messages.Count < 2; attempt++)
+        {
+            // DataJson varies per attempt because HomeFeedBus content-hash-dedups identical cards at the point of
+            // Broadcast (before any subscriber even sees them) — an unvarying probe would only ever be attempted once.
+            _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "ReadinessProbe", $"{{\"attempt\":{attempt}}}", sessionId));
+            await Task.Delay(25);
+        }
+
+        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToMe", "{}", sessionId));
+        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToSomeoneElse", "{}", "someone-elses-session"));
+        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
+
+        await Task.Delay(300);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => watchTask);
+
+        Assert.Contains(writer.Messages, m => m.RootWidget == "AddressedToMe");
+        Assert.Contains(writer.Messages, m => m.RootWidget == "Unaddressed");
+        Assert.DoesNotContain(writer.Messages, m => m.RootWidget == "AddressedToSomeoneElse");
+    }
+
+    [Fact]
+    public async Task WatchHomeFeed_Unauthenticated_Never_Receives_Session_Addressed_Cards()
+    {
+        var svc = NewService();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var writer = new CapturingServerStreamWriter<RfwCardEnvelope>();
+        var watchTask = svc.WatchHomeFeed(new WatchHomeFeedRequest(), writer, TestContext(cts.Token));
+
+        for (var attempt = 0; attempt < 40 && writer.Messages.Count == 0; attempt++)
+            await Task.Delay(25);
+
+        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToSomeone", "{}", "some-real-session"));
+        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "SystemUnaddressed", "{}"));
+
+        await Task.Delay(300);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => watchTask);
+
+        Assert.Contains(writer.Messages, m => m.RootWidget == "SystemUnaddressed");
+        Assert.DoesNotContain(writer.Messages, m => m.RootWidget == "AddressedToSomeone");
+    }
+
+    [Fact]
     public async Task Send_InoRequest_Routes_The_Real_Prompt_Not_A_Placeholder()
     {
         var svc = NewService();

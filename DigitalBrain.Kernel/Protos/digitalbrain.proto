@@ -37,7 +37,9 @@ message SynapseEnvelope {
   bytes payload = 3;
 }
 
-message WatchHomeFeedRequest {}
+message WatchHomeFeedRequest {
+  string session_id = 1;
+}
 message RfwCardEnvelope {
   string correlation_id = 1;
   string library_name = 2;
