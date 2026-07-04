@@ -246,11 +246,22 @@ public sealed class GatewayService(
         await WriteCardAsync(responseStream, UiSurfaceRfwBridge.FromUiSurface(initialLogin, "session-main"));
         logger.LogInformation("WatchHomeFeed sent initial login surface to {Peer}", context.Peer);
 
-        using var subscription = homeFeedBus.Subscribe();
+        var session = await ResolveSessionAsync(request.SessionId);
+        using var subscription = homeFeedBus.Subscribe(session?.SessionId);
         await foreach (var card in subscription.Reader.ReadAllAsync(context.CancellationToken))
         {
             await WriteCardAsync(responseStream, card);
         }
+    }
+
+    // Resolves a client-supplied sessionId to its server-side UserSessionState exactly once. Callers must use
+    // the RESULT's fields (session?.UserId, session?.SessionId), never the raw request field, downstream — an
+    // invalid/expired/fabricated sessionId collapses to null here so nothing built on it can trust a lie.
+    private async Task<UserSessionState?> ResolveSessionAsync(string? sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId)) return null;
+        var session = grains.GetGrain<IUserSessionNeuron>("session-main");
+        return await session.GetSessionAsync(sessionId);
     }
 
     // Egress for external transports: stream broadcast Signals whose Name is in the request filter (empty = all),
