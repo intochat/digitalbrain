@@ -5,6 +5,7 @@ using DigitalBrain.Demo.Runtime;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel.Auth;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Kernel.Voice;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Telegram.Channel;
@@ -19,8 +20,12 @@ public sealed class GatewayService(
     SignalEgressBus signalEgressBus,
     IHostEnvironment environment,
     ILogger<GatewayService> logger,
-    IPackConfigStore? packConfigStore = null) : DigitalBrainGateway.DigitalBrainGatewayBase
+    IPackConfigStore? packConfigStore = null,
+    IVoiceTranscriber? voiceTranscriber = null) : DigitalBrainGateway.DigitalBrainGatewayBase
 {
+    private const long MaxTranscriptionBytes = 25L * 1024 * 1024;
+    private readonly IVoiceTranscriber voiceTranscriber = voiceTranscriber ?? new NoOpVoiceTranscriber();
+
     public override async Task<SynapseEnvelope> Send(SynapseEnvelope request, ServerCallContext context)
     {
         try
@@ -471,6 +476,74 @@ public sealed class GatewayService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Timeline failed for {NeuronId}", request.NeuronId);
+            throw new RpcException(new Status(StatusCode.Internal, ex.GetBaseException().Message));
+        }
+    }
+
+    public override async Task<TranscribeResponse> Transcribe(IAsyncStreamReader<TranscribeRequest> requestStream, ServerCallContext context)
+    {
+        var correlationId = Guid.NewGuid().ToString("N");
+        await using var audio = new MemoryStream();
+        string? mimeType = null;
+        string? languageHint = null;
+
+        while (await requestStream.MoveNext(context.CancellationToken))
+        {
+            var request = requestStream.Current;
+            if (!string.IsNullOrWhiteSpace(request.MimeType))
+            {
+                mimeType = request.MimeType;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.LanguageHint))
+            {
+                languageHint = request.LanguageHint;
+            }
+
+            if (request.AudioChunk.Length == 0)
+            {
+                continue;
+            }
+
+            if (audio.Length + request.AudioChunk.Length > MaxTranscriptionBytes)
+            {
+                throw new RpcException(new Status(StatusCode.ResourceExhausted, "Transcription audio is too large."));
+            }
+
+            await audio.WriteAsync(request.AudioChunk.ToByteArray(), context.CancellationToken);
+        }
+
+        if (audio.Length == 0)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "No audio was provided."));
+        }
+
+        try
+        {
+            var result = await voiceTranscriber.TranscribeAsync(
+                new VoiceTranscriptionRequest(
+                    audio.ToArray(),
+                    string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType,
+                    languageHint,
+                    correlationId),
+                context.CancellationToken);
+
+            return new TranscribeResponse
+            {
+                Transcript = result.Transcript,
+                DetectedLanguage = result.DetectedLanguage ?? string.Empty,
+                CorrelationId = string.IsNullOrWhiteSpace(result.CorrelationId)
+                    ? correlationId
+                    : result.CorrelationId
+            };
+        }
+        catch (RpcException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Transcribe failed for {CorrelationId}", correlationId);
             throw new RpcException(new Status(StatusCode.Internal, ex.GetBaseException().Message));
         }
     }

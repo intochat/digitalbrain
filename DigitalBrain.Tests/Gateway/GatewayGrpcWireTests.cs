@@ -34,4 +34,22 @@ public class GatewayGrpcWireTests : IClassFixture<WebApplicationFactory<Program>
         var reply = await _client.AskAsync(new AskRequest { NeuronId = "ino-main", Prompt = "hi" });
         Assert.False(string.IsNullOrWhiteSpace(reply.Text));
     }
+
+    [Fact]
+    public async Task Transcribe_OverGrpc_ReturnsCorrelationId()
+    {
+        using var call = _client.Transcribe();
+
+        await call.RequestStream.WriteAsync(new TranscribeRequest
+        {
+            MimeType = "audio/wav",
+            AudioChunk = global::Google.Protobuf.ByteString.CopyFrom(new byte[] { 1, 2, 3 })
+        });
+        await call.RequestStream.CompleteAsync();
+
+        var reply = await call.ResponseAsync;
+
+        Assert.Equal(string.Empty, reply.Transcript);
+        Assert.False(string.IsNullOrWhiteSpace(reply.CorrelationId));
+    }
 }

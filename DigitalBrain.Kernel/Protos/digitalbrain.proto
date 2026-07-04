@@ -10,6 +10,8 @@ service DigitalBrainGateway {
   rpc Ask(AskRequest) returns (AskReply);
   rpc Fire(FireRequest) returns (FireReply);
   rpc Timeline(TimelineRequest) returns (TimelineReply);
+  // Native voice input: clients stream recorded audio chunks and receive a transcript.
+  rpc Transcribe(stream TranscribeRequest) returns (TranscribeResponse);
   // Server-driven UI: stream Remote Flutter Widgets cards as neurons broadcast them to the Home feed.
   rpc WatchHomeFeed(WatchHomeFeedRequest) returns (stream RfwCardEnvelope);
   // Egress for external transports: stream broadcast Signals filtered by type name (empty filter = all).
@@ -77,3 +79,15 @@ message TimelineEntry {
   string text = 3;
 }
 message TimelineReply { repeated TimelineEntry entries = 1; }
+
+message TranscribeRequest {
+  bytes audio_chunk = 1;
+  string mime_type = 2;
+  string language_hint = 3;
+}
+
+message TranscribeResponse {
+  string transcript = 1;
+  string detected_language = 2;
+  string correlation_id = 3;
+}

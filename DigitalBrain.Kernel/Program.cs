@@ -10,6 +10,7 @@ using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Uploads;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Kernel.Voice;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
 using Orleans.Configuration;
@@ -116,6 +117,7 @@ if (isAspireHosted)
 }
 
 builder.Services.AddDigitalBrainChat(builder.Configuration);
+builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
 builder.Services.AddSingleton<DigitalBrain.Kernel.Llm.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
 builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddEconomics(builder.Configuration);

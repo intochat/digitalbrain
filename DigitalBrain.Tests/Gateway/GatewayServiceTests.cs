@@ -9,6 +9,7 @@ using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Kernel.Market;
+using DigitalBrain.Kernel.Voice;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
@@ -163,6 +164,56 @@ public class GatewayServiceTests : NeuronTestBase
 
         var timeline = await svc.Timeline(new TimelineRequest { NeuronId = "demo-fire", MaxEntries = 10 }, TestContext());
         Assert.Contains(timeline.Entries, e => e.Type == nameof(DemoMessageSynapse) && e.Text.Contains("ping-123"));
+    }
+
+    [Fact]
+    public async Task Transcribe_StreamsAudioChunks_ToVoiceTranscriber()
+    {
+        var transcriber = new RecordingVoiceTranscriber();
+        var svc = new GatewayService(
+            Cluster.GrainFactory,
+            new ConfigurationBuilder().Build(),
+            HomeFeedBus,
+            new SignalEgressBus(),
+            new FakeHostEnvironment(),
+            NullLogger<GatewayService>.Instance,
+            voiceTranscriber: transcriber);
+
+        var reply = await svc.Transcribe(new ListAsyncStreamReader<TranscribeRequest>(new[]
+        {
+            new TranscribeRequest
+            {
+                MimeType = "audio/wav",
+                AudioChunk = global::Google.Protobuf.ByteString.CopyFrom(new byte[] { 1, 2 })
+            },
+            new TranscribeRequest
+            {
+                LanguageHint = "en",
+                AudioChunk = global::Google.Protobuf.ByteString.CopyFrom(new byte[] { 3 })
+            }
+        }), TestContext());
+
+        Assert.Equal("turn on the lights", reply.Transcript);
+        Assert.Equal("en", reply.DetectedLanguage);
+        Assert.False(string.IsNullOrWhiteSpace(reply.CorrelationId));
+
+        var captured = Assert.Single(transcriber.Requests);
+        Assert.Equal(new byte[] { 1, 2, 3 }, captured.Audio);
+        Assert.Equal("audio/wav", captured.MimeType);
+        Assert.Equal("en", captured.LanguageHint);
+        Assert.Equal(reply.CorrelationId, captured.CorrelationId);
+    }
+
+    [Fact]
+    public async Task Transcribe_WithoutAudio_IsRejected()
+    {
+        var ex = await Assert.ThrowsAsync<RpcException>(() =>
+            NewService().Transcribe(new ListAsyncStreamReader<TranscribeRequest>(new[]
+            {
+                new TranscribeRequest { MimeType = "audio/wav" }
+            }), TestContext()));
+
+        Assert.Equal(StatusCode.InvalidArgument, ex.StatusCode);
     }
 
     [Fact]
@@ -476,6 +527,45 @@ public class GatewayServiceTests : NeuronTestBase
             }
 
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ListAsyncStreamReader<T>(IEnumerable<T> messages) : IAsyncStreamReader<T>
+    {
+        private readonly IEnumerator<T> enumerator = messages.GetEnumerator();
+
+        public T Current { get; private set; } = default!;
+
+        public Task<bool> MoveNext(CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<bool>(cancellationToken);
+            }
+
+            if (!enumerator.MoveNext())
+            {
+                return Task.FromResult(false);
+            }
+
+            Current = enumerator.Current;
+            return Task.FromResult(true);
+        }
+    }
+
+    private sealed class RecordingVoiceTranscriber : IVoiceTranscriber
+    {
+        public List<VoiceTranscriptionRequest> Requests { get; } = [];
+
+        public Task<VoiceTranscriptionResult> TranscribeAsync(
+            VoiceTranscriptionRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            return Task.FromResult(new VoiceTranscriptionResult(
+                "turn on the lights",
+                "en",
+                request.CorrelationId));
         }
     }
 }
