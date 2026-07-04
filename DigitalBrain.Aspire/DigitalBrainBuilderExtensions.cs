@@ -14,11 +14,12 @@ public sealed class DigitalBrainContext
     public required OrleansServiceClient OrleansClient { get; init; }
     public required int KernelReplicas { get; init; }
     public required bool UseLocalMarketplace { get; init; }
+    public required DigitalBrainModelRegistry ModelRegistry { get; init; }
 
-    // The resolved LLM model name (e.g. "qwen2.5-coder:1.5b") for env injection
+    // The resolved LLM model name (e.g. "qwen2.5-coder:1.5b") for env injection.
     public required string LlmModel { get; init; }
 
-    // The resolved LLM provider ("ollama" | "azureopenai"), set via DigitalBrainOptions.WithLLM<TModel>()
+    // The resolved LLM provider ("ollama" | "azureopenai"), set via DigitalBrainOptions.WithLLM<TModel>().
     public required string LlmProvider { get; init; }
 
     // Ollama container http endpoint for DigitalBrain__Llm__OllamaEndpoint injection
@@ -55,8 +56,8 @@ public static class DigitalBrainBuilderExtensions
             options.KernelReplicas = replicaOverride;
         }
 
-        var llmProvider = options.LlmProvider;
-        var llmModel = options.LlmModel ?? (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase)
+        var llmProvider = options.ResolvedLlmProvider;
+        var llmModel = options.ResolvedLlmModel ?? (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase)
             ? "gpt-4o-mini"
             : "qwen2.5-coder:1.5b");
 
@@ -96,6 +97,7 @@ public static class DigitalBrainBuilderExtensions
             OrleansClient = orleans.AsClient(),
             KernelReplicas = options.KernelReplicas,
             UseLocalMarketplace = options.UseLocalMarketplace,
+            ModelRegistry = options.ModelRegistry.Snapshot(),
             LlmModel = llmModel,
             LlmProvider = llmProvider,
             OllamaEndpoint = ollama.GetEndpoint("http"),
@@ -302,8 +304,59 @@ public static class DigitalBrainBuilderExtensions
 
 public sealed class DigitalBrainOptions
 {
-    public string? LlmModel { get; set; }
-    public string LlmProvider { get; set; } = "ollama";
+    private int? lastModelRegistration;
+    private string? llmModel;
+    private string llmProvider = DigitalBrainProviderIds.Ollama;
+    private bool llmModelOverridden;
+    private bool llmProviderOverridden;
+
+    /// <summary>
+    /// Provider/model capabilities declared by the AppHost.
+    /// </summary>
+    public DigitalBrainModelRegistry ModelRegistry { get; } = new();
+
+    /// <summary>
+    /// Optional single-model runtime override. Leave unset when using the model registry roles.
+    /// </summary>
+    public string? LlmModel
+    {
+        get => llmModel;
+        set
+        {
+            llmModel = value;
+            llmModelOverridden = true;
+        }
+    }
+
+    /// <summary>
+    /// Optional single-provider runtime override. Leave unset when using the model registry roles.
+    /// </summary>
+    public string LlmProvider
+    {
+        get => llmProvider;
+        set
+        {
+            llmProvider = value;
+            llmProviderOverridden = true;
+        }
+    }
+
+    /// <summary>
+    /// Provider that will be injected into the current single-model kernel runtime.
+    /// </summary>
+    public string ResolvedLlmProvider =>
+        !llmProviderOverridden && ModelRegistry.DefaultLlm is { } defaultLlm
+            ? defaultLlm.Model.Provider
+            : llmProvider;
+
+    /// <summary>
+    /// Model id or deployment name that will be injected into the current single-model kernel runtime.
+    /// </summary>
+    public string? ResolvedLlmModel =>
+        !llmModelOverridden && ModelRegistry.DefaultLlm is { } defaultLlm
+            ? defaultLlm.Model.Id
+            : llmModel;
+
     public int KernelReplicas { get; set; } = 3;
     public bool UseLocalMarketplace { get; set; } = true;
 
@@ -311,13 +364,82 @@ public sealed class DigitalBrainOptions
     public int? OrleansDashboardPort { get; set; } = 8080;
     public bool EnableMcp { get; set; } = true;
 
-    // Typed model selection, e.g. options.WithLLM<Gpt4oMini>() or options.WithLLM<Qwen25Coder1_5B>() —
-    // replaces setting LlmModel/LlmProvider as raw strings.
+    /// <summary>
+    /// Registers an LLM capability and makes it the kernel's current single-model runtime selection.
+    /// </summary>
     public DigitalBrainOptions WithLLM<TModel>() where TModel : LlmModel, new()
     {
         var model = new TModel();
-        LlmProvider = model.Provider;
-        LlmModel = model.Id;
+        lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Balanced);
+        SelectLlm(model);
         return this;
+    }
+
+    /// <summary>
+    /// Registers an embedding model for the future context/vector pipeline without changing chat routing.
+    /// </summary>
+    public DigitalBrainOptions WithEmbedding<TModel>() where TModel : EmbeddingModel, new()
+    {
+        var model = new TModel();
+        lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Default);
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a voice-to-text model without changing chat routing.
+    /// </summary>
+    public DigitalBrainOptions WithVoice2Text<TModel>() where TModel : VoiceToTextModel, new()
+    {
+        var model = new TModel();
+        lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Default);
+        return this;
+    }
+
+    /// <summary>
+    /// Registers the vector database provider intended for embedding persistence.
+    /// </summary>
+    public DigitalBrainOptions WithVectorDatabase(string provider, string id = "default")
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+
+        lastModelRegistration = ModelRegistry.Register(
+            new DigitalBrainModelDescriptor(DigitalBrainCapabilityKind.VectorDatabase, provider, id, id),
+            DigitalBrainModelRole.Default);
+        return this;
+    }
+
+    /// <summary>
+    /// Marks the most recently registered model as the fast LLM route.
+    /// </summary>
+    public DigitalBrainOptions AsFast() => SetLastModelRole(DigitalBrainModelRole.Fast);
+
+    /// <summary>
+    /// Marks the most recently registered model as the balanced/default LLM route.
+    /// </summary>
+    public DigitalBrainOptions AsBalanced() => SetLastModelRole(DigitalBrainModelRole.Balanced);
+
+    /// <summary>
+    /// Marks the most recently registered model as the reasoning LLM route.
+    /// </summary>
+    public DigitalBrainOptions AsReasoning() => SetLastModelRole(DigitalBrainModelRole.Reasoning);
+
+    private DigitalBrainOptions SetLastModelRole(DigitalBrainModelRole role)
+    {
+        if (lastModelRegistration is null)
+        {
+            throw new InvalidOperationException("Register a model before assigning a routing role.");
+        }
+
+        ModelRegistry.SetRole(lastModelRegistration.Value, role);
+        return this;
+    }
+
+    private void SelectLlm(DigitalBrainModel model)
+    {
+        llmProvider = model.Provider;
+        llmModel = model.Id;
+        llmProviderOverridden = false;
+        llmModelOverridden = false;
     }
 }
