@@ -256,15 +256,18 @@ public sealed class GatewayService(
     public override async Task WatchHomeFeed(WatchHomeFeedRequest request, IServerStreamWriter<RfwCardEnvelope> responseStream, ServerCallContext context)
     {
         logger.LogInformation("WatchHomeFeed opened for {Peer}", context.Peer);
-        // The first card a client sees is the login surface — pre-fill it with the dev credentials in Development.
+        var clientId = string.IsNullOrWhiteSpace(request.ClientId) ? null : request.ClientId;
+
+        // The first card a client sees is the login surface — pre-fill it with the dev credentials in
+        // Development. clientId rides along on the form's submitAction payload (UiSurfaceRuntime.Login), so
+        // the client's own submit button re-sends it with no further Flutter code needed for that leg.
         var initialLogin = DevAuth.Enabled(configuration, environment)
-            ? UiSurfaceSamples.Login(clientId: "flutter", defaultUsername: DevAuth.Username, defaultPassword: DevAuth.Password)
-            : UiSurfaceSamples.Login(clientId: "flutter");
+            ? UiSurfaceSamples.Login(clientId: clientId ?? "flutter", defaultUsername: DevAuth.Username, defaultPassword: DevAuth.Password)
+            : UiSurfaceSamples.Login(clientId: clientId ?? "flutter");
         await WriteCardAsync(responseStream, UiSurfaceRfwBridge.FromUiSurface(initialLogin, "session-main"));
         logger.LogInformation("WatchHomeFeed sent initial login surface to {Peer}", context.Peer);
 
-        var session = await ResolveSessionAsync(request.SessionId);
-        using var subscription = homeFeedBus.Subscribe(session?.SessionId);
+        await using var subscription = await homeFeedBus.SubscribeAsync(clientId);
         await foreach (var card in subscription.Reader.ReadAllAsync(context.CancellationToken))
         {
             await WriteCardAsync(responseStream, card);

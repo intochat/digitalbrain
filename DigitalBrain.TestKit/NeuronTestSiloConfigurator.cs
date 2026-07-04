@@ -53,7 +53,6 @@ public sealed class NeuronTestSiloConfigurator : ISiloConfigurator
                 services.AddSingleton<SqliteSchemaInspector>();
                 services.AddSingleton<RoslynAnalysisService>();
                 services.AddSingleton<HomeFeedBus>();
-                services.AddHomeFeedStreamSubscriber();
                 services.AddSingleton<SignalEgressBus>();
                 services.AddSignalEgressStreamSubscriber();
                 services.AddSingleton<IConfiguration>(

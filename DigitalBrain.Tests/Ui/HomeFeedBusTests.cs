@@ -1,73 +1,84 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.TestKit;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Ui;
 
-public class HomeFeedBusTests
+// Single-silo coverage of HomeFeedBus's dedup + addressing behavior; cross-silo delivery is covered by
+// HomeFeedCrossSiloTests. HomeFeedBus now requires a real IClusterClient (no more parameterless/local-fanout
+// constructor), so every test resolves the singleton via the running silo's own DI container instead of
+// `new HomeFeedBus()`.
+public class HomeFeedBusTests : NeuronTestBase
 {
+    private HomeFeedBus Bus =>
+        ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
+
     [Fact]
     public async Task Broadcast_Reaches_Subscribers()
     {
-        var bus = new HomeFeedBus();
-        using var subscription = bus.Subscribe();
+        await using var subscription = await Bus.SubscribeAsync(clientId: null);
 
-        bus.Broadcast(new RfwCard("digitalbrain", "Card", "{\"a\":1}"));
+        Bus.Broadcast(new RfwCard("digitalbrain", "Card", "{\"a\":1}"));
 
-        var received = await subscription.Reader.ReadAsync();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var received = await subscription.Reader.ReadAsync(cts.Token);
         Assert.Equal("Card", received.RootWidget);
     }
 
     [Fact]
     public async Task Identical_Cards_Are_Deduped()
     {
-        var bus = new HomeFeedBus();
-        using var subscription = bus.Subscribe();
+        await using var subscription = await Bus.SubscribeAsync(clientId: null);
 
         var card = new RfwCard("digitalbrain", "Card", "{\"a\":1}");
-        bus.Broadcast(card);
-        bus.Broadcast(card); // identical content -> deduped
+        Bus.Broadcast(card);
+        Bus.Broadcast(card); // identical content -> deduped
 
-        Assert.True(subscription.Reader.TryRead(out var first));
-        Assert.Equal("Card", first!.RootWidget);
-        Assert.False(subscription.Reader.TryRead(out _)); // nothing more
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var first = await subscription.Reader.ReadAsync(cts.Token);
+        Assert.Equal("Card", first.RootWidget);
+
+        using var drainCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => subscription.Reader.ReadAsync(drainCts.Token).AsTask());
     }
 
     [Fact]
-    public async Task Subscriber_With_SessionId_Only_Receives_Cards_Addressed_To_It_Or_Unaddressed()
+    public async Task Subscriber_With_ClientId_Only_Receives_Cards_Addressed_To_It_Or_Unaddressed()
     {
-        var bus = new HomeFeedBus();
-        using var subscriptionA = bus.Subscribe("session-a");
+        await using var subscriptionA = await Bus.SubscribeAsync(clientId: "client-a");
 
-        bus.Broadcast(new RfwCard("digitalbrain", "ForA", "{}", "session-a"));
-        bus.Broadcast(new RfwCard("digitalbrain", "ForB", "{}", "session-b"));
-        bus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
+        Bus.Broadcast(new RfwCard("digitalbrain", "ForA", "{}", "client-a"));
+        Bus.Broadcast(new RfwCard("digitalbrain", "ForB", "{}", "client-b"));
+        Bus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
 
-        var first = await subscriptionA.Reader.ReadAsync();
-        var second = await subscriptionA.Reader.ReadAsync();
-        Assert.Equal("ForA", first.RootWidget);
-        Assert.Equal("Unaddressed", second.RootWidget);
-        Assert.False(subscriptionA.Reader.TryRead(out _));
+        // "ForA" arrives via the personal-stream subscription and "Unaddressed" via the shared-stream
+        // subscription — two independent async pipelines with no guaranteed relative order, so collect both
+        // and assert membership rather than a specific arrival order.
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var first = await subscriptionA.Reader.ReadAsync(cts.Token);
+        var second = await subscriptionA.Reader.ReadAsync(cts.Token);
+        Assert.Equal(new[] { "ForA", "Unaddressed" }, new[] { first.RootWidget, second.RootWidget }.OrderBy(w => w));
+
+        using var drainCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => subscriptionA.Reader.ReadAsync(drainCts.Token).AsTask());
     }
 
-    // TEMPORARY: fails open until the client can register a real session (see HomeFeedBus.FanLocal's
-    // comment) — a subscriber that never registers a session sees every card, addressed or not, matching
-    // pre-existing (pre-multiuser) behavior. This is intentionally the opposite of the stricter isolation
-    // this bus is designed to enforce once a real per-subscriber session is available.
     [Fact]
-    public async Task Subscriber_Without_SessionId_Receives_Every_Card_Fail_Open()
+    public async Task Subscriber_Without_ClientId_Never_Receives_Cards_Addressed_To_Someone_Else()
     {
-        var bus = new HomeFeedBus();
-        using var subscription = bus.Subscribe();
+        await using var subscription = await Bus.SubscribeAsync(clientId: null);
 
-        bus.Broadcast(new RfwCard("digitalbrain", "ForA", "{}", "session-a"));
-        bus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
+        Bus.Broadcast(new RfwCard("digitalbrain", "ForA", "{}", "client-a"));
+        Bus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
 
-        var first = await subscription.Reader.ReadAsync();
-        var second = await subscription.Reader.ReadAsync();
-        Assert.Equal("ForA", first.RootWidget);
-        Assert.Equal("Unaddressed", second.RootWidget);
-        Assert.False(subscription.Reader.TryRead(out _));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var first = await subscription.Reader.ReadAsync(cts.Token);
+        Assert.Equal("Unaddressed", first.RootWidget);
+
+        using var drainCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => subscription.Reader.ReadAsync(drainCts.Token).AsTask());
     }
 }
-

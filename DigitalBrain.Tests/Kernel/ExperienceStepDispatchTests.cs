@@ -7,6 +7,7 @@ using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.TestingHost;
 using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Kernel;
@@ -14,7 +15,12 @@ namespace DigitalBrain.Tests.Kernel;
 [Collection("silo-host")]
 public class ExperienceStepDispatchTests : NeuronTestBase
 {
-    private readonly HomeFeedBus _homeFeedBus = new();
+    private HomeFeedBus? _homeFeedBusInstance;
+
+    // Lazily resolved via the silo's own DI container (HomeFeedBus now requires a real IClusterClient, only
+    // available once the cluster has finished starting — see GatewayServiceTests for the same pattern).
+    private HomeFeedBus HomeFeedBus => _homeFeedBusInstance ??=
+        ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
 
     protected override void ConfigureSilo(ISiloBuilder builder) => builder
         .AddMemoryGrainStorageAsDefault()
@@ -35,7 +41,6 @@ public class ExperienceStepDispatchTests : NeuronTestBase
                         ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
                     })
                     .Build());
-            services.AddSingleton(_homeFeedBus);
         });
 
     [Fact]
@@ -53,7 +58,7 @@ public class ExperienceStepDispatchTests : NeuronTestBase
         var generated = Grain<IGeneratedNeuron>("generated-travel");
         await generated.DeliverAsync(new NeuroPackInstalled(pack));
 
-        using var sub = _homeFeedBus.Subscribe();
+        await using var sub = await HomeFeedBus.SubscribeAsync(clientId: null);
 
         await generated.FireAsync(new ExperienceStep(
             Pack: "travel",

@@ -130,7 +130,7 @@ public class ConfigFormSteps : IAsyncDisposable
         var gateway = new GatewayService(
             _cluster.GrainFactory,
             new ConfigurationBuilder().Build(),
-            new HomeFeedBus(),
+            ((InProcessSiloHandle)_cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>(),
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance,

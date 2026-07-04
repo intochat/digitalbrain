@@ -18,6 +18,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
+using Orleans.TestingHost;
 using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Gateway;
@@ -25,8 +26,14 @@ namespace DigitalBrain.Tests.Gateway;
 [Collection("silo-host")]
 public class GatewayServiceTests : NeuronTestBase
 {
-    private readonly HomeFeedBus _homeFeedBus = new();
+    private HomeFeedBus? _homeFeedBusInstance;
     private readonly FakeMarketDataApiClient _marketClient = new();
+
+    // Lazily resolved via the silo's own DI container (same pattern as HomeFeedCrossSiloTests) — HomeFeedBus
+    // now requires a real IClusterClient, which is only available once the cluster has finished starting,
+    // i.e. after NeuronTestBase.InitializeAsync runs. A field initializer would run too early.
+    private HomeFeedBus HomeFeedBus => _homeFeedBusInstance ??=
+        ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
 
     protected override void ConfigureSilo(ISiloBuilder builder) => builder
         .AddMemoryGrainStorageAsDefault()
@@ -41,12 +48,12 @@ public class GatewayServiceTests : NeuronTestBase
             services.AddScoped<NeuronJournals>();
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-            services.AddSingleton(_homeFeedBus);
+            services.AddSingleton<HomeFeedBus>();
             services.AddSingleton<IMarketDataApiClient>(_marketClient);
         });
 
     private GatewayService NewService() =>
-        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
+        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), HomeFeedBus,
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance);
@@ -60,7 +67,7 @@ public class GatewayServiceTests : NeuronTestBase
         services.AddPackConfigStore(blobsForKeyRing: null);
         var packConfigStore = services.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
 
-        var svc = new GatewayService(Cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
+        var svc = new GatewayService(Cluster.GrainFactory, new ConfigurationBuilder().Build(), HomeFeedBus,
             new SignalEgressBus(), new FakeHostEnvironment(), NullLogger<GatewayService>.Instance, packConfigStore);
 
         var ex = await Assert.ThrowsAsync<RpcException>(() => svc.Send(new SynapseEnvelope
@@ -80,7 +87,7 @@ public class GatewayServiceTests : NeuronTestBase
     [Fact]
     public async Task InstallFromMarketplace_Ignores_Client_Supplied_BuyerId_When_Unauthenticated()
     {
-        using var subscription = _homeFeedBus.Subscribe();
+        await using var subscription = await HomeFeedBus.SubscribeAsync(clientId: null);
         var svc = NewService();
 
         await svc.Send(new SynapseEnvelope
@@ -141,47 +148,33 @@ public class GatewayServiceTests : NeuronTestBase
     }
 
     [Fact]
-    public async Task WatchHomeFeed_Only_Delivers_Cards_Addressed_To_The_Resolved_Session()
+    public async Task WatchHomeFeed_Only_Delivers_Cards_Addressed_To_This_Connections_ClientId()
     {
         var svc = NewService();
-
-        await svc.Send(new SynapseEnvelope
-        {
-            TypeName = nameof(LoginRequest),
-            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                username = "feed-isolation-user",
-                password = "correct horse battery staple",
-                clientId = "test"
-            }))
-        }, TestContext());
-
-        var session = Grain<IUserSessionNeuron>("session-main");
-        var sessionId = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Single().SessionId;
+        const string myClientId = "feed-isolation-client";
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var writer = new CapturingServerStreamWriter<RfwCardEnvelope>();
-        var watchTask = svc.WatchHomeFeed(new WatchHomeFeedRequest { SessionId = sessionId }, writer, TestContext(cts.Token));
+        var watchTask = svc.WatchHomeFeed(new WatchHomeFeedRequest { ClientId = myClientId }, writer, TestContext(cts.Token));
 
         for (var attempt = 0; attempt < 40 && writer.Messages.Count == 0; attempt++)
             await Task.Delay(25);
 
-        // The line above only proves the (synchronously-written) initial login card arrived — it says nothing about
-        // whether homeFeedBus.Subscribe(sessionId) has run yet: that happens only after WatchHomeFeed awaits the real
-        // ResolveSessionAsync grain round-trip, which is genuinely asynchronous and does not complete inline the way
-        // the login card's write did. Broadcasting before that subscription is registered would be silently dropped
-        // by HomeFeedBus, so give the grain round-trip a bounded, generous window to land before addressing cards.
+        // The line above only proves the (synchronously-written) initial login card arrived — it says nothing
+        // about whether HomeFeedBus.SubscribeAsync's Orleans subscriptions have actually landed yet, which is
+        // genuinely asynchronous. Broadcasting before that lands would be silently missed, so give the
+        // subscribe round-trip a bounded, generous window before addressing cards.
         for (var attempt = 0; attempt < 40 && writer.Messages.Count < 2; attempt++)
         {
-            // DataJson varies per attempt because HomeFeedBus content-hash-dedups identical cards at the point of
-            // Broadcast (before any subscriber even sees them) — an unvarying probe would only ever be attempted once.
-            _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "ReadinessProbe", $"{{\"attempt\":{attempt}}}", sessionId));
+            // DataJson varies per attempt because HomeFeedBus content-hash-dedups identical cards at the point
+            // of Broadcast (before any subscriber even sees them) — an unvarying probe would only ever land once.
+            HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "ReadinessProbe", $"{{\"attempt\":{attempt}}}", myClientId));
             await Task.Delay(25);
         }
 
-        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToMe", "{}", sessionId));
-        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToSomeoneElse", "{}", "someone-elses-session"));
-        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
+        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToMe", "{}", myClientId));
+        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToSomeoneElse", "{}", "someone-elses-client-id"));
+        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "Unaddressed", "{}"));
 
         await Task.Delay(300);
         cts.Cancel();
@@ -192,12 +185,8 @@ public class GatewayServiceTests : NeuronTestBase
         Assert.DoesNotContain(writer.Messages, m => m.RootWidget == "AddressedToSomeoneElse");
     }
 
-    // TEMPORARY: fails open until the Flutter client can capture and forward its real login session to
-    // WatchHomeFeed (it currently never does — see HomeFeedBus.FanLocal's comment and docs/superpowers/
-    // plans/2026-07-04-multiuser-s2-s3-identity-and-salesforce-per-user.md, "Known Limitations"). An
-    // unauthenticated subscriber currently receives every card, matching pre-existing behavior.
     [Fact]
-    public async Task WatchHomeFeed_Unauthenticated_Receives_Every_Card_Fail_Open()
+    public async Task WatchHomeFeed_Without_A_ClientId_Never_Receives_Cards_Addressed_To_Someone_Else()
     {
         var svc = NewService();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -207,15 +196,15 @@ public class GatewayServiceTests : NeuronTestBase
         for (var attempt = 0; attempt < 40 && writer.Messages.Count == 0; attempt++)
             await Task.Delay(25);
 
-        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToSomeone", "{}", "some-real-session"));
-        _homeFeedBus.Broadcast(new RfwCard("digitalbrain", "SystemUnaddressed", "{}"));
+        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "AddressedToSomeone", "{}", "some-real-client-id"));
+        HomeFeedBus.Broadcast(new RfwCard("digitalbrain", "SystemUnaddressed", "{}"));
 
         await Task.Delay(300);
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => watchTask);
 
         Assert.Contains(writer.Messages, m => m.RootWidget == "SystemUnaddressed");
-        Assert.Contains(writer.Messages, m => m.RootWidget == "AddressedToSomeone");
+        Assert.DoesNotContain(writer.Messages, m => m.RootWidget == "AddressedToSomeone");
     }
 
     [Fact]
@@ -407,7 +396,7 @@ public class GatewayServiceTests : NeuronTestBase
     [Fact]
     public async Task Send_SurfaceDemoRequested_InstallsPack_And_BroadcastsRenderableSurface()
     {
-        using var subscription = _homeFeedBus.Subscribe();
+        await using var subscription = await HomeFeedBus.SubscribeAsync(clientId: null);
         var svc = NewService();
 
         await svc.Send(new SynapseEnvelope

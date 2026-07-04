@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
+using Orleans.TestingHost;
 using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Gateway;
@@ -17,7 +18,12 @@ namespace DigitalBrain.Tests.Gateway;
 [Collection("signal-sink-host")]
 public class GenericSendTests : NeuronTestBase
 {
-    private readonly HomeFeedBus _homeFeedBus = new();
+    private HomeFeedBus? _homeFeedBusInstance;
+
+    // Lazily resolved via the silo's own DI container (HomeFeedBus now requires a real IClusterClient, only
+    // available once the cluster has finished starting — see GatewayServiceTests for the same pattern).
+    private HomeFeedBus HomeFeedBus => _homeFeedBusInstance ??=
+        ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
 
     protected override void ConfigureSilo(ISiloBuilder builder) => builder
         .AddMemoryGrainStorageAsDefault()
@@ -32,11 +38,10 @@ public class GenericSendTests : NeuronTestBase
             services.AddScoped<NeuronJournals>();
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-            services.AddSingleton(_homeFeedBus);
         });
 
     private GatewayService NewService() =>
-        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
+        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), HomeFeedBus,
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance);
@@ -84,7 +89,7 @@ public class GenericSendTests : NeuronTestBase
             new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:InternalServiceKey"] = "the-key" })
                 .Build(),
-            _homeFeedBus, new SignalEgressBus(), new FakeHostEnvironment("Production"),
+            HomeFeedBus, new SignalEgressBus(), new FakeHostEnvironment("Production"),
             NullLogger<GatewayService>.Instance);
 
         var payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Encoding.UTF8.GetBytes("{\"chatId\":7,\"text\":\"hi\"}"));

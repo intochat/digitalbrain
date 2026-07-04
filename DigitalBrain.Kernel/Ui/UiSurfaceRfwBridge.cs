@@ -40,8 +40,8 @@ public static class UiSurfaceRfwBridge
 
     public static RfwCard FromUiSurface(UiSurface surface, string emitter)
     {
-        var addressedSessionId = surface.Props.TryGetValue("sessionId", out var sessionIdValue) && sessionIdValue is not null
-            ? sessionIdValue.ToString()
+        var addressedClientId = surface.Props.TryGetValue("clientId", out var clientIdValue) && clientIdValue is not null
+            ? clientIdValue.ToString()
             : null;
 
         // If the surface already carries a full RFW or widget tree definition, honor it directly.
@@ -54,7 +54,7 @@ public static class UiSurfaceRfwBridge
             var correlation = surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var sid) && sid is string sidStr && sidStr.Length > 0
                 ? sidStr
                 : surface.CorrelationId ?? surface.SynapseId;
-            return new RfwCard(lib, root, dataJson, addressedSessionId) { CorrelationId = correlation };
+            return new RfwCard(lib, root, dataJson, addressedClientId) { CorrelationId = correlation };
         }
 
         if (surface.Kind == UiSurface.WidgetTreeKind && surface.Props.TryGetValue("tree", out var treeObj))
@@ -64,8 +64,8 @@ public static class UiSurfaceRfwBridge
                 : surface.Kind;
             var payload = new Dictionary<string, object?> { ["tree"] = treeObj, ["kind"] = kind };
             // Carry experience markers so the experience host can match the hop and key its semantics on the surfaceId.
-            // sessionId/role let a chat client pick out its own assistant replies from the shared HomeFeed stream.
-            foreach (var markerKey in new[] { "activeExperience", "experienceId", UiSurfaceKeys.SurfaceId, UiSurfaceKeys.Title, "sessionId", "role", "surfaceKind" })
+            // clientId/role let a chat client pick out its own assistant replies from the shared HomeFeed stream.
+            foreach (var markerKey in new[] { "activeExperience", "experienceId", UiSurfaceKeys.SurfaceId, UiSurfaceKeys.Title, "clientId", "role", "surfaceKind" })
             {
                 if (surface.Props.TryGetValue(markerKey, out var markerValue) && markerValue is not null)
                     payload[markerKey] = markerValue;
@@ -73,7 +73,7 @@ public static class UiSurfaceRfwBridge
             var correlation = surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var sid) && sid is string sidStr && sidStr.Length > 0
                 ? sidStr
                 : surface.CorrelationId ?? surface.SynapseId;
-            return new RfwCard("digitalbrain", "WidgetTreeHost", JsonSerializer.Serialize(payload), addressedSessionId)
+            return new RfwCard("digitalbrain", "WidgetTreeHost", JsonSerializer.Serialize(payload), addressedClientId)
             {
                 CorrelationId = correlation
             };
@@ -102,7 +102,7 @@ public static class UiSurfaceRfwBridge
             data[key] = value;
         }
 
-        return new RfwCard("digitalbrain", "root", JsonSerializer.Serialize(data), addressedSessionId)
+        return new RfwCard("digitalbrain", "root", JsonSerializer.Serialize(data), addressedClientId)
         {
             CorrelationId = surface.CorrelationId ?? surface.SynapseId
         };

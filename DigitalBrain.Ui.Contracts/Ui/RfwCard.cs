@@ -4,7 +4,7 @@ namespace DigitalBrain.Core.Ui;
 // is dynamic, so there is no static schema). This is the second server-driven-UI payload kind alongside UiSurface
 // (the canonical SDUI model stays UiSurface; RfwCard is added for the streaming RFW feed). Harvested from digitalbrain.
 [GenerateSerializer]
-public record RfwCard(string LibraryName, string RootWidget, string DataJson, string? SessionId = null)
+public record RfwCard(string LibraryName, string RootWidget, string DataJson, string? ClientId = null)
     : Synapse(nameof(RfwCard), DateTimeOffset.UtcNow);
 
 // The Chat neuron: handles a data-visualization request and emits an RfwCard for the live UI feed.

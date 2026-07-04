@@ -1,11 +1,13 @@
 using DigitalBrain.Kernel.Gateway;
+using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Telegram.Channel;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using DigitalBrain.Kernel.Ui;
+using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Telegram;
 
@@ -14,10 +16,15 @@ namespace DigitalBrain.Tests.Telegram;
 [Collection("tg-routing-host")]
 public class TelegramDeepLinkRoutingTests : NeuronTestBase
 {
-    private readonly HomeFeedBus _homeFeedBus = new();
+    private HomeFeedBus? _homeFeedBusInstance;
+
+    // Lazily resolved via the silo's own DI container (HomeFeedBus now requires a real IClusterClient, only
+    // available once the cluster has finished starting — see GatewayServiceTests for the same pattern).
+    private HomeFeedBus HomeFeedBus => _homeFeedBusInstance ??=
+        ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
 
     private GatewayService NewService() =>
-        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
+        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), HomeFeedBus,
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance);
