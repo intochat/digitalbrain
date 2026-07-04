@@ -1,8 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:cross_file/cross_file.dart';
+import 'package:desktop_drop/desktop_drop.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:digitalbrain_flutter/features/brain/voice_input.dart';
 import 'package:digitalbrain_flutter/grpc/digitalbrain.pbgrpc.dart';
 import 'package:digitalbrain_flutter/grpc/endpoint.dart';
 import 'package:digitalbrain_flutter/grpc/grpc_channel.dart';
@@ -94,6 +100,139 @@ class _ShellChatMessage {
       text = null;
 }
 
+@visibleForTesting
+const shellComposerAttachButtonKey = Key('shell-composer-attach');
+
+@visibleForTesting
+const shellComposerVoiceButtonKey = Key('shell-composer-voice');
+
+@visibleForTesting
+const shellDropOverlayKey = Key('shell-drop-overlay');
+
+@visibleForTesting
+String uploadFileName(XFile file) {
+  final explicitName = file.name.trim();
+  if (explicitName.isNotEmpty) return explicitName;
+
+  final path = file.path.trim();
+  if (path.isEmpty) return 'upload';
+
+  final parts = path.split(RegExp(r'[\\/]'));
+  final fallback = parts.isEmpty ? path : parts.last;
+  return fallback.trim().isEmpty ? 'upload' : fallback;
+}
+
+@visibleForTesting
+void appendTranscriptToComposer(
+  TextEditingController controller,
+  String transcript,
+) {
+  final text = transcript.trim();
+  if (text.isEmpty) return;
+
+  final existing = controller.text.trim();
+  controller.text = existing.isEmpty ? text : '$existing $text';
+  controller.selection = TextSelection.collapsed(
+    offset: controller.text.length,
+  );
+}
+
+@visibleForTesting
+Future<void> ingestDroppedFilesForShell(
+  Iterable<XFile> droppedFiles,
+  Future<void> Function(List<XFile> files) ingest,
+) async {
+  final files = droppedFiles
+      .where((file) => file is! DropItemDirectory)
+      .toList(growable: false);
+  if (files.isEmpty) return;
+  await ingest(files);
+}
+
+@visibleForTesting
+class ShellChatComposer extends StatelessWidget {
+  const ShellChatComposer({
+    super.key,
+    required this.controller,
+    required this.sending,
+    required this.onSend,
+    required this.onAttachFiles,
+    this.voiceInput,
+    this.status,
+  });
+
+  final TextEditingController controller;
+  final bool sending;
+  final VoidCallback? onSend;
+  final VoidCallback? onAttachFiles;
+  final Widget? voiceInput;
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = FTheme.of(context);
+    final statusText = status?.trim();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: t.colors.border, width: 0.5)),
+        color: t.colors.background,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (statusText != null && statusText.isNotEmpty) ...[
+            Text(
+              statusText,
+              style: t.typography.sm.copyWith(color: t.colors.mutedForeground),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              Tooltip(
+                message: 'Attach file',
+                child: FButton(
+                  key: shellComposerAttachButtonKey,
+                  onPress: onAttachFiles,
+                  child: const Icon(Icons.attach_file),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (voiceInput != null) ...[
+                KeyedSubtree(
+                  key: shellComposerVoiceButtonKey,
+                  child: voiceInput!,
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: FTextField(
+                  control: FTextFieldControl.managed(controller: controller),
+                  hint: 'Ask INO...',
+                  onSubmit: (_) => onSend?.call(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Send',
+                child: FButton(
+                  onPress: sending ? null : onSend,
+                  child: const Icon(Icons.send),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ForuiAppShellState extends State<ForuiAppShell> {
   final RfwRuntimeHost _rfwHost = RfwRuntimeHost();
   final TextEditingController _chatInput = TextEditingController();
@@ -111,7 +250,10 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   final Map<String, gw.RfwCardEnvelope> _surfacesByKind = {};
   String? _selectedTarget; // from tree only; no hardcoded default
   String? _feedStatus;
+  String? _composerStatus;
   bool _chatSending = false;
+  bool _draggingFiles = false;
+  bool _uploadingFiles = false;
 
   @override
   void initState() {
@@ -349,6 +491,164 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     });
   }
 
+  void _setComposerStatus(String? status) {
+    if (!mounted) return;
+    setState(() => _composerStatus = status);
+  }
+
+  void _handleVoiceTranscript(String transcript) {
+    setState(() {
+      appendTranscriptToComposer(_chatInput, transcript);
+      _composerStatus = 'Voice transcript inserted.';
+    });
+  }
+
+  Future<void> _pickFilesForUpload() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        dialogTitle: 'Attach file to INO',
+        allowMultiple: true,
+        withData: kIsWeb,
+        lockParentWindow: true,
+      );
+      if (result == null) return;
+
+      final files = <XFile>[];
+      for (final file in result.files) {
+        try {
+          files.add(file.xFile);
+        } catch (error) {
+          _setComposerStatus('Could not read ${file.name}: $error');
+        }
+      }
+      await _ingestFiles(files);
+    } catch (error) {
+      _setComposerStatus('File picker failed: $error');
+    }
+  }
+
+  Future<void> _ingestFiles(List<XFile> files) async {
+    if (files.isEmpty || _uploadingFiles) return;
+
+    setState(() {
+      _uploadingFiles = true;
+      _composerStatus = files.length == 1
+          ? 'Uploading ${uploadFileName(files.single)}...'
+          : 'Uploading ${files.length} files...';
+    });
+
+    try {
+      for (final file in files) {
+        final name = uploadFileName(file);
+        await _uploadFile(file);
+        if (!mounted) return;
+        setState(() {
+          _chatMessages.add(_ShellChatMessage.user('Attached $name'));
+          _composerStatus = 'Uploaded $name.';
+          _feedStatus = null;
+        });
+        _scrollChatToEnd();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _composerStatus = 'Upload failed: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingFiles = false);
+      }
+    }
+  }
+
+  Future<void> _uploadFile(XFile file) async {
+    final length = await file.length();
+    final request = http.MultipartRequest('POST', _uploadUri())
+      ..fields['clientId'] = _clientId
+      ..files.add(
+        http.MultipartFile(
+          'file',
+          file.openRead(),
+          length,
+          filename: uploadFileName(file),
+        ),
+      );
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final detail = response.body.trim();
+      throw StateError(
+        detail.isEmpty
+            ? 'HTTP ${response.statusCode}'
+            : 'HTTP ${response.statusCode}: $detail',
+      );
+    }
+  }
+
+  Uri _uploadUri() {
+    final (host, port, secure) = resolveKernelUploadEndpoint();
+    return Uri(
+      scheme: secure ? 'https' : 'http',
+      host: host,
+      port: port,
+      path: '/upload',
+    );
+  }
+
+  Widget? _buildVoiceInput() {
+    final client = _gatewayClient;
+    if (client == null) return null;
+
+    return VoiceInput(
+      client: client,
+      onTranscript: _handleVoiceTranscript,
+      onError: _setComposerStatus,
+    );
+  }
+
+  Widget _withFileDropTarget(Widget child) {
+    return DropTarget(
+      enable: _gatewayClient != null,
+      onDragEntered: (_) {
+        if (mounted) setState(() => _draggingFiles = true);
+      },
+      onDragExited: (_) {
+        if (mounted) setState(() => _draggingFiles = false);
+      },
+      onDragDone: (details) {
+        if (mounted) setState(() => _draggingFiles = false);
+        unawaited(ingestDroppedFilesForShell(details.files, _ingestFiles));
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          child,
+          if (_draggingFiles)
+            Positioned.fill(
+              key: shellDropOverlayKey,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: FTheme.of(
+                      context,
+                    ).colors.primary.withValues(alpha: 0.10),
+                    border: Border.all(
+                      color: FTheme.of(
+                        context,
+                      ).colors.primary.withValues(alpha: 0.45),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Center(child: Text('Drop files to attach')),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildChatBody(UiSurfaceTreeRenderer renderer) {
     final t = FTheme.of(context);
     return Column(
@@ -445,31 +745,15 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                   },
                 ),
         ),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: t.colors.border, width: 0.5)),
-            color: t.colors.background,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: FTextField(
-                  control: FTextFieldControl.managed(controller: _chatInput),
-                  hint: 'Ask INO...',
-                  onSubmit: (_) => _sendChat(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Tooltip(
-                message: 'Send',
-                child: FButton(
-                  onPress: _chatSending ? null : _sendChat,
-                  child: const Icon(Icons.send),
-                ),
-              ),
-            ],
-          ),
+        ShellChatComposer(
+          controller: _chatInput,
+          sending: _chatSending,
+          onSend: _sendChat,
+          onAttachFiles: _gatewayClient == null || _uploadingFiles
+              ? null
+              : _pickFilesForUpload,
+          voiceInput: _buildVoiceInput(),
+          status: _composerStatus,
         ),
       ],
     );
@@ -634,7 +918,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
           child: FScaffold(
             sidebar: sidebarWidget,
             header: headerWidget,
-            child: body,
+            child: _withFileDropTarget(body),
           ),
         ),
       );
@@ -703,7 +987,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
         header: const FHeader(title: Text('DigitalBrain')),
         sidebar:
             const SizedBox.shrink(), // sidebar + nav fully from emitted shell tree (neuron kit)
-        child: fallbackBody,
+        child: _withFileDropTarget(fallbackBody),
       ),
     );
   }

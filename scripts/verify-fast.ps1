@@ -56,7 +56,8 @@ $FlutterAnalyzeTargets = @(
     'lib\shell\forui_app_shell.dart',
     'lib\features\experience\experience_host_screen.dart',
     'lib\features\canvas\living_canvas_screen.dart',
-    'test\grpc\action_dispatch_test.dart'
+    'test\grpc\action_dispatch_test.dart',
+    'test\shell\forui_app_shell_test.dart'
 )
 
 $FlutterTestTargets = @(
@@ -201,7 +202,7 @@ try {
         }
     }
 
-    $kernelTestArgs = @('test', 'DigitalBrain.Tests\DigitalBrain.Tests.csproj')
+    $kernelTestArgs = @('test', 'DigitalBrain.Tests\DigitalBrain.Tests.csproj', '-m:1')
     if ($NoBuild) {
         $kernelTestArgs += '--no-build'
     }
@@ -211,7 +212,7 @@ try {
         Invoke-External 'dotnet' $kernelTestArgs
     }
 
-    $salesforceTestArgs = @('test', 'DigitalBrain.Salesforce.Tests\DigitalBrain.Salesforce.Tests.csproj')
+    $salesforceTestArgs = @('test', 'DigitalBrain.Salesforce.Tests\DigitalBrain.Salesforce.Tests.csproj', '-m:1')
     if ($NoBuild) {
         $salesforceTestArgs += '--no-build'
     }
