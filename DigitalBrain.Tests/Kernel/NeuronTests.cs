@@ -148,6 +148,23 @@ public class NeuronTests : NeuronTestBase
         Assert.Contains(tl, s => s is ListSurface ls && ls.Title == "Active Automations");
     }
 
+    [Fact]
+    public async Task RemoveReaction_RemovesAndEmitsSurface()
+    {
+        var auto = Grain<IAutomationNeuron>("automation-main");
+        await auto.GetTimelineAsync();
+
+        await auto.DefineReactionAsync("temp-reaction", "NeuronActivated", "temp", "return new[] { new Signal(\"TempFired\", null) };");
+        await auto.RemoveReactionAsync("temp-reaction");
+
+        var tl = await auto.GetTimelineAsync();
+        Assert.Contains(tl, s => s.Type == "ReactionRemoved");
+        // Surface should reflect removal (last surface has no temp)
+        var lastSurface = tl.OfType<ListSurface>().LastOrDefault(ls => ls.Title.Contains("Automations") || ls.Title.Contains("Reactions"));
+        Assert.NotNull(lastSurface);
+        Assert.DoesNotContain(lastSurface.Items, i => i.Contains("temp-reaction"));
+    }
+
     // Isolation test (bad script handling + continued execution) covered by design in ScriptRunner (catch) and grain.
     // Functional coverage via other activation tests.
 
