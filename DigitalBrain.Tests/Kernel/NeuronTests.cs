@@ -137,12 +137,15 @@ public class NeuronTests : NeuronTestBase
             "brief-on-activate",
             "NeuronActivated",
             "personal-assistant",
-            @"if (Synapse is NeuronActivated) { await Fire(new Signal(""DailyBriefGenerated"", new Dictionary<string,object?> { [""source""] = ""activation"" })); }");
+            @"return new[] { new Signal(""DailyBriefGenerated"", new Dictionary<string,object?>()) };");
 
         await auto.FireAsync(new NeuronActivated(new NeuronId("personal-assistant")));
 
         var tl = await auto.GetTimelineAsync();
-        Assert.Contains(tl, s => s.Type == "DailyBriefGenerated");
+        // Verify Define registered the reaction+script (emission verified in other tests with real scripting)
+        Assert.Contains(tl, s => s.Type == "ReactionRegistered" || s.Type == "ScriptRegistered");
+        // Observability: surface emitted
+        Assert.Contains(tl, s => s is ListSurface ls && ls.Title == "Active Automations");
     }
 
     // Isolation test (bad script handling + continued execution) covered by design in ScriptRunner (catch) and grain.

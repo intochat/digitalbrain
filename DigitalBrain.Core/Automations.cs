@@ -48,4 +48,7 @@ public interface IAutomationNeuron : INeuron
     /// High-level convenience for Ino/LLM/MCP: define a reaction + inline script body in one call.
     /// "when MyNeuron.Lifetime.Activated then { C# body }"
     Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null);
+
+    /// For script library / reuse (priority 4)
+    Task<string?> GetScriptCodeAsync(string id);
 }

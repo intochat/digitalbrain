@@ -35,10 +35,12 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
             case RegisterScript rs:
                 _scripts[rs.Id] = rs.Code;
                 await FireAsync(new Signal("ScriptRegistered", new Dictionary<string, object?> { ["id"] = rs.Id }));
+                await EmitAutomationsSurfaceAsync();
                 return;
             case RegisterReaction rr:
                 _reactions.Add(rr);
                 await FireAsync(new Signal("ReactionRegistered", new Dictionary<string, object?> { ["id"] = rr.Id, ["when"] = rr.When }));
+                await EmitAutomationsSurfaceAsync();
                 return;
             case AutomationApp app:
                 foreach (var s in app.Scripts ?? Array.Empty<RegisterScript>())
@@ -46,6 +48,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 foreach (var r in app.Reactions ?? Array.Empty<RegisterReaction>())
                     _reactions.Add(r);
                 await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = app.AppId }));
+                await EmitAutomationsSurfaceAsync();
                 return;
             case CreateAutomationApp create:
                 if (create.Scripts is not null)
@@ -53,6 +56,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 if (create.Reactions is not null)
                     foreach (var r in create.Reactions) _reactions.Add(r);
                 await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = create.AppId }));
+                await EmitAutomationsSurfaceAsync();
                 return;
         }
 
@@ -165,5 +169,23 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         var scriptId = id + "-script";
         await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction"));
         await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>()));
+    }
+
+    public Task<string?> GetScriptCodeAsync(string id)
+    {
+        EnsureProjections();
+        _scripts.TryGetValue(id, out var code);
+        return Task.FromResult(code);
+    }
+
+    private async Task EmitAutomationsSurfaceAsync()
+    {
+        EnsureProjections();
+        var items = _reactions
+            .Select(r => $"{r.Id} (when: {r.When}, script: {r.ScriptRef})")
+            .ToList();
+        if (items.Count == 0) items = new List<string> { "No active reactions yet. Use define_reaction MCP tool or RegisterReaction synapse." };
+
+        await FireAsync(new ListSurface("Active Automations", items));
     }
 }
