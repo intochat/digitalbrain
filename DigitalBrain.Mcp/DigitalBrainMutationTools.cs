@@ -126,6 +126,14 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         return details.ToString();
     }
 
+    [McpServerTool(Name = "remove_reaction"), Description("Remove a reaction by id.")]
+    public async Task<string> RemoveReaction([Description("Reaction id to remove")] string id)
+    {
+        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
+        await auto.RemoveReactionAsync(id);
+        return $"Removed reaction {id}.";
+    }
+
     [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]
     public async Task<string> RunClosedLoop(
         [Description("Loop type: ui | se")] string loopType,

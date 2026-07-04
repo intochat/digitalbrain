@@ -40,6 +40,9 @@ public record CreateAutomationApp(
     [property: Id(3)] IReadOnlyList<RegisterReaction>? Reactions = null)
     : Synapse(nameof(CreateAutomationApp), DateTimeOffset.UtcNow);
 
+[GenerateSerializer]
+public record RemoveReaction(string Id) : Synapse(nameof(RemoveReaction), DateTimeOffset.UtcNow);
+
 public interface IAutomationNeuron : INeuron
 {
     Task<IReadOnlyList<string>> ListActiveScriptsAsync();
@@ -51,4 +54,5 @@ public interface IAutomationNeuron : INeuron
 
     /// For script library / reuse (priority 4)
     Task<string?> GetScriptCodeAsync(string id);
+    Task RemoveReactionAsync(string id);
 }
