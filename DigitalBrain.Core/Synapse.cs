@@ -419,3 +419,19 @@ public record ClosedLoopCompleted(string LoopType, string Outcome, bool AppliedV
 
 [GenerateSerializer]
 public record PerformKernelSelfUpdate(string Version = "", int FailAtReplica = 0) : Synapse(nameof(PerformKernelSelfUpdate), DateTimeOffset.UtcNow);
+
+// Salesforce OAuth callback completion (MULTIUSER S1: grain-routed callback, replaces direct
+// Program.cs store IO so the completion always reaches the activation that started the flow).
+[GenerateSerializer]
+public record SalesforceOAuthCallback(
+    [property: Id(0)] string? Code,
+    [property: Id(1)] string? State,
+    [property: Id(2)] string? Error,
+    [property: Id(3)] string? ErrorDescription,
+    [property: Id(4)] string FallbackRedirectUri);
+
+[GenerateSerializer]
+public record SalesforceOAuthCallbackResult(
+    [property: Id(0)] bool Success,
+    [property: Id(1)] string Title,
+    [property: Id(2)] string Message);
