@@ -111,7 +111,11 @@ class _ExperienceHostScreenState extends State<ExperienceHostScreen> {
   }
 
   void _onSurfaceEvent(String name, Map<String, Object?> args) {
-    final envelope = buildActionEnvelope(name, args);
+    final envelope = buildActionEnvelope(
+      name,
+      args,
+      defaultClientId: _clientId,
+    );
     final client = _client;
     if (envelope == null || client == null) return;
     client

@@ -306,7 +306,12 @@ widget root = Panel(
   ) {
     debugPrint('Panel $panelId event: $name $args');
     final client = _client;
-    final envelope = buildPanelEventEnvelope(panelId, name, args);
+    final envelope = buildPanelEventEnvelope(
+      panelId,
+      name,
+      args,
+      defaultClientId: _clientId,
+    );
     if (envelope == null || client == null) return;
     client.send(envelope);
   }

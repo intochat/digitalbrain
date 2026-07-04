@@ -287,7 +287,11 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     // Fire the action's synapse over the UNARY Send RPC. The browser channel is
     // gRPC-Web, which has no client/bidi streaming, so EngageUiSession cannot carry
     // input — only unary + server-streaming work there. Send is the gRPC-Web-safe path.
-    final envelope = buildActionEnvelope(name, args);
+    final envelope = buildActionEnvelope(
+      name,
+      args,
+      defaultClientId: _clientId,
+    );
     final client = _gatewayClient;
     if (envelope != null && client != null) {
       client
