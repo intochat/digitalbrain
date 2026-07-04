@@ -55,6 +55,14 @@ Salesforce button-click request with no session was rejected `Unauthenticated`. 
 beyond expected client-disconnect noise and one pre-existing, unrelated `SystemStatusNeuron` self-awareness
 warning.
 
+**Security tradeoff:** `clientId` is a capability-bearing token with no unforgeability guarantee —
+client-generated, sent in the clear, not cryptographically random. A caller who obtains or guesses another
+connection's active `clientId` can both read that connection's feed and act as its logged-in user. This
+tradeoff is confirmed acceptable for this greenfield/pre-production installation by the plan's final review;
+real multi-tenant deployment will need feed subscription and identity resolution bound to an authenticated
+credential (not a client-chosen correlation id) before `clientId` is exposed beyond a trusted/single-tenant
+environment.
+
 ## 2026-07-04 — MULTIUSER Stage S2 (Identity Spine) + Stage S3 (Salesforce Per-User)
 
 Merged to master (subagent-driven, 9 tasks, plan
