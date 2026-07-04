@@ -108,6 +108,39 @@ public class GatewayServiceTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task InstallFromMarketplace_Resolves_Real_Buyer_From_ClientId_After_Login()
+    {
+        var svc = NewService();
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(LoginRequest),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                username = "install-clientid-user",
+                password = "correct horse battery staple",
+                clientId = "install-connection"
+            }))
+        }, TestContext());
+
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(InstallFromMarketplace),
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                packName = "nonexistent-pack-2",
+                version = "1.0",
+                clientId = "install-connection"
+            }))
+        }, TestContext());
+
+        var market = Grain<IMarketplaceNeuron>("market-main");
+        var timeline = await market.GetOutgoingTimelineAsync();
+        var install = Assert.Single(timeline.OfType<InstallFromMarketplace>(), i => i.PackName == "nonexistent-pack-2");
+        Assert.Equal("install-clientid-user", install.BuyerId);
+    }
+
+    [Fact]
     public async Task Ask_Ino_ReturnsNonEmptyReply()
     {
         var reply = await NewService().Ask(new AskRequest { NeuronId = "ino-main", Prompt = "hello" }, TestContext());
