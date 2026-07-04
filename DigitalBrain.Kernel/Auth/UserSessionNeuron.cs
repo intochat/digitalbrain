@@ -129,6 +129,48 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             Active: true));
     }
 
+    public Task<UserSessionState?> GetSessionByClientIdAsync(string clientId)
+    {
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            return Task.FromResult<UserSessionState?>(null);
+        }
+
+        var ended = OutgoingJournal
+            .Concat(IncomingJournal)
+            .OfType<UserSessionEnded>()
+            .Select(e => e.SessionId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var created = OutgoingJournal
+            .Concat(IncomingJournal)
+            .OfType<UserSessionCreated>()
+            .DistinctBy(s => s.SynapseId)
+            .Where(s => string.Equals(s.ClientId, clientId, StringComparison.Ordinal))
+            .Where(s => s.ExpiresAt > DateTimeOffset.UtcNow && !ended.Contains(s.SessionId))
+            .OrderBy(s => s.ExpiresAt)
+            .LastOrDefault();
+
+        if (created is null)
+        {
+            return Task.FromResult<UserSessionState?>(null);
+        }
+
+        var login = OutgoingJournal
+            .Concat(IncomingJournal)
+            .OfType<LoginSucceeded>()
+            .DistinctBy(s => s.SynapseId)
+            .LastOrDefault(s => string.Equals(s.SessionId, created.SessionId, StringComparison.Ordinal));
+
+        return Task.FromResult<UserSessionState?>(new UserSessionState(
+            created.UserId,
+            created.SessionId,
+            login?.DisplayName ?? created.UserId.Value,
+            login?.Roles ?? Array.Empty<string>(),
+            created.ExpiresAt,
+            Active: true));
+    }
+
     public Task<UiSurface> BuildLoginSurfaceAsync(string? clientId = null) =>
         Task.FromResult(LoginSurface(clientId: clientId));
 

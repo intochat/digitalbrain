@@ -3,6 +3,7 @@ namespace DigitalBrain.Core;
 public interface IUserSessionNeuron : INeuron, IHandle<LoginRequest>, IHandle<LogoutRequest>
 {
     Task<UserSessionState?> GetSessionAsync(string sessionId);
+    Task<UserSessionState?> GetSessionByClientIdAsync(string clientId);
     Task<UiSurface> BuildLoginSurfaceAsync(string? clientId = null);
 }
 
