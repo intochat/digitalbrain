@@ -300,11 +300,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         try
         {
-            var appValues = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
-            var userValues = await store.GetAsync(PackConfigScopes.ForUser(new UserId(userId)), SalesforceClientFactory.PackName);
-            var merged = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
-            foreach (var (key, value) in userValues)
-                merged[key] = value;
+            var merged = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, new NeuronScope(new UserId(userId), null));
             return SalesforceClientFactory.HasUsableCredential(merged);
         }
         catch (Exception ex)

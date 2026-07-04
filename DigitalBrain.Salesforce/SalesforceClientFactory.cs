@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using Salesforce.Force;
 using System.Security.Cryptography;
@@ -42,6 +43,20 @@ public static class SalesforceClientFactory
     {
         var values = await store.GetAsync(scope, PackName).ConfigureAwait(false);
         return new SalesforceApiClient(await CreateForceClientAsync(values).ConfigureAwait(false));
+    }
+
+    public static async Task<IReadOnlyDictionary<string, string>> GetMergedScopedValuesAsync(
+        IPackConfigStore store,
+        NeuronScope scope)
+    {
+        var appValues = await store.GetAsync(PackConfigScopes.App, PackName).ConfigureAwait(false);
+        var userValues = await store.GetAsync(PackConfigScopes.ForUser(scope.UserId), PackName).ConfigureAwait(false);
+
+        var merged = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in userValues)
+            merged[key] = value;
+
+        return merged;
     }
 
     public static async Task<ForceClient> CreateForceClientAsync(IReadOnlyDictionary<string, string> values)

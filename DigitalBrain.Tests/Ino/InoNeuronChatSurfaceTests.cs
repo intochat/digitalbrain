@@ -234,7 +234,7 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
         builder.ConfigureServices(services =>
         {
             services.AddPackConfigStore(blobsForKeyRing: null);
-            services.AddSingleton<ISalesforceApiClient, FailingSalesforceApiClient>();
+            services.AddSingleton<ISalesforceApiClientFactory>(new FailingSalesforceApiClientFactory());
         });
 
     [Fact]
@@ -306,6 +306,12 @@ internal sealed class FailingSalesforceApiClient : ISalesforceApiClient
 
     public Task<string[]> ListAccountsAsync(int maxResults, CancellationToken ct) =>
         throw new InvalidOperationException(SalesforceClientFactory.AuthenticationFailureMessage);
+}
+
+internal sealed class FailingSalesforceApiClientFactory : ISalesforceApiClientFactory
+{
+    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope) =>
+        Task.FromResult<ISalesforceApiClient>(new FailingSalesforceApiClient());
 }
 
 public interface IGoogleConfigWriter : INeuron

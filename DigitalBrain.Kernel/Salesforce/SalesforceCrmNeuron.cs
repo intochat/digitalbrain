@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using DigitalBrain.Salesforce;
 
 namespace DigitalBrain.Kernel.Salesforce;
@@ -6,12 +7,18 @@ namespace DigitalBrain.Kernel.Salesforce;
 public class SalesforceCrmNeuron(
     ILogger<SalesforceCrmNeuron> logger,
     NeuronJournals journals,
-    ISalesforceApiClient client)
+    ISalesforceApiClientFactory apiClientFactory)
     : Neuron(logger, journals), ISalesforceCrmNeuron
 {
-    public Task<string[]> QueryAsync(string soql, CancellationToken ct = default) =>
-        client.QueryAsync(soql, ct);
+    public async Task<string[]> QueryAsync(string soql, CancellationToken ct = default)
+    {
+        var client = await apiClientFactory.CreateAsync(Self.AsScope());
+        return await client.QueryAsync(soql, ct);
+    }
 
-    public Task<string[]> ListAccountsAsync(int maxResults = 20, CancellationToken ct = default) =>
-        client.ListAccountsAsync(maxResults, ct);
+    public async Task<string[]> ListAccountsAsync(int maxResults = 20, CancellationToken ct = default)
+    {
+        var client = await apiClientFactory.CreateAsync(Self.AsScope());
+        return await client.ListAccountsAsync(maxResults, ct);
+    }
 }
