@@ -40,6 +40,10 @@ public static class UiSurfaceRfwBridge
 
     public static RfwCard FromUiSurface(UiSurface surface, string emitter)
     {
+        var addressedSessionId = surface.Props.TryGetValue("sessionId", out var sessionIdValue) && sessionIdValue is not null
+            ? sessionIdValue.ToString()
+            : null;
+
         // If the surface already carries a full RFW or widget tree definition, honor it directly.
         if (surface.Kind == UiSurface.RfwKind || surface.Props.ContainsKey("source") || surface.Props.ContainsKey("rfwSource"))
         {
@@ -50,7 +54,7 @@ public static class UiSurfaceRfwBridge
             var correlation = surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var sid) && sid is string sidStr && sidStr.Length > 0
                 ? sidStr
                 : surface.CorrelationId ?? surface.SynapseId;
-            return new RfwCard(lib, root, dataJson) { CorrelationId = correlation };
+            return new RfwCard(lib, root, dataJson, addressedSessionId) { CorrelationId = correlation };
         }
 
         if (surface.Kind == UiSurface.WidgetTreeKind && surface.Props.TryGetValue("tree", out var treeObj))
@@ -69,7 +73,7 @@ public static class UiSurfaceRfwBridge
             var correlation = surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var sid) && sid is string sidStr && sidStr.Length > 0
                 ? sidStr
                 : surface.CorrelationId ?? surface.SynapseId;
-            return new RfwCard("digitalbrain", "WidgetTreeHost", JsonSerializer.Serialize(payload))
+            return new RfwCard("digitalbrain", "WidgetTreeHost", JsonSerializer.Serialize(payload), addressedSessionId)
             {
                 CorrelationId = correlation
             };
@@ -98,7 +102,7 @@ public static class UiSurfaceRfwBridge
             data[key] = value;
         }
 
-        return new RfwCard("digitalbrain", "root", JsonSerializer.Serialize(data))
+        return new RfwCard("digitalbrain", "root", JsonSerializer.Serialize(data), addressedSessionId)
         {
             CorrelationId = surface.CorrelationId ?? surface.SynapseId
         };
