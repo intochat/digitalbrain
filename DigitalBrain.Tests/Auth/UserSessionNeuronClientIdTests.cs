@@ -19,6 +19,24 @@ public class UserSessionNeuronClientIdTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task GetSessionByClientIdAsync_Returns_The_Latest_Active_Session_For_That_ClientId()
+    {
+        var session = Grain<IUserSessionNeuron>("session-clientid-latest");
+        const string clientId = "reused-connection";
+
+        await session.HandleAsync(new LoginRequest("clientid-latest-user", "correct horse battery staple", clientId));
+        var first = await session.GetSessionByClientIdAsync(clientId);
+        Assert.NotNull(first);
+
+        await session.HandleAsync(new LoginRequest("clientid-latest-user", "correct horse battery staple", clientId));
+        var latest = await session.GetSessionByClientIdAsync(clientId);
+
+        Assert.NotNull(latest);
+        Assert.Equal("clientid-latest-user", latest!.UserId.Value);
+        Assert.NotEqual(first!.SessionId, latest.SessionId);
+    }
+
+    [Fact]
     public async Task GetSessionByClientIdAsync_Returns_Null_For_An_Unknown_ClientId()
     {
         var session = Grain<IUserSessionNeuron>("session-main");
