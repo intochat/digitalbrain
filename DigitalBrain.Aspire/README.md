@@ -16,7 +16,10 @@ The kernel starts 3 instances by default (see DigitalBrainOptions.KernelReplicas
 ```csharp
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
-    options.LlmModel = "qwen2.5-coder:1.5b";
+    options.WithLLM<Qwen25Coder1_5B>().AsBalanced();
+    // options.WithEmbedding<YourEmbeddingModel>();
+    // options.WithVoice2Text<YourVoiceModel>();
+    // options.WithVectorDatabase(DigitalBrainProviderIds.Qdrant, "documents");
     options.UseLocalMarketplace = true;
     // KernelReplicas defaults to 3 for HA during updates/self-improvement
 });
