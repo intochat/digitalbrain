@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
+using DigitalBrain.Core.Models;
 
 namespace DigitalBrain.Aspire;
 
@@ -158,6 +159,7 @@ public static class DigitalBrainBuilderExtensions
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
         kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
             ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
+        kernel.WithModelRegistry(ctx);
 
         if (ctx.AzureOpenAIEndpoint is not null)
         {
@@ -174,6 +176,27 @@ public static class DigitalBrainBuilderExtensions
         }
 
         return kernel;
+    }
+
+    private static void WithModelRegistry(this IResourceBuilder<ProjectResource> kernel, DigitalBrainContext ctx)
+    {
+        if (ctx.ModelRegistry.DefaultLlm is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultLlm__Kind", DigitalBrainCapabilityKind.LargeLanguageModel.ToString());
+            kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultLlm__Provider", ctx.LlmProvider);
+            kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultLlm__Id", ctx.LlmModel);
+        }
+
+        for (var i = 0; i < ctx.ModelRegistry.Registrations.Count; i++)
+        {
+            var registration = ctx.ModelRegistry.Registrations[i];
+            var prefix = $"DigitalBrain__ModelRegistry__Registrations__{i}";
+            kernel.WithEnvironment($"{prefix}__Kind", registration.Model.Kind.ToString());
+            kernel.WithEnvironment($"{prefix}__Provider", registration.Model.Provider);
+            kernel.WithEnvironment($"{prefix}__Id", registration.Model.Id);
+            kernel.WithEnvironment($"{prefix}__DisplayName", registration.Model.DisplayName);
+            kernel.WithEnvironment($"{prefix}__Role", registration.Role.ToString());
+        }
     }
 
     public static int KernelWebPort(IDistributedApplicationBuilder builder)

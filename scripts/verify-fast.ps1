@@ -47,7 +47,8 @@ $KernelFilter = @(
     'FullyQualifiedName~UserSessionNeuronClientIdTests',
     'FullyQualifiedName~ExperienceStepDispatchTests',
     'FullyQualifiedName~InoNeuronChatSurfaceTests',
-    'FullyQualifiedName~DigitalBrainModelRegistryTests'
+    'FullyQualifiedName~DigitalBrainModelRegistryTests',
+    'FullyQualifiedName~ChatClientRegistrationTests'
 ) -join '|'
 
 $FlutterAnalyzeTargets = @(

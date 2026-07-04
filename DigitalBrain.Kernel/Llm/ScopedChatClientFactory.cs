@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using DigitalBrain.Core.Models;
 
 namespace DigitalBrain.Kernel.Llm;
 
@@ -8,9 +9,9 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
 {
     public IChatClient? Create(string provider, string? apiKey)
     {
-        var model = config["DigitalBrain:Llm:Model"] ?? "qwen2.5-coder:1.5b";
+        var options = DigitalBrainLlmRuntimeOptions.FromConfiguration(config);
 
-        if (string.Equals(provider, "openai", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(provider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrWhiteSpace(apiKey))
             {
@@ -18,14 +19,12 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
                 return null;
             }
 
-            var openAiModel = config["DigitalBrain:Llm:OpenAIModel"] ?? "gpt-4o-mini";
-            var openAiClient = new OpenAI.Chat.ChatClient(openAiModel, apiKey).AsIChatClient();
+            var openAiClient = new OpenAI.Chat.ChatClient(options.OpenAIModel, apiKey).AsIChatClient();
             return new ChatClientBuilder(openAiClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
         }
 
         // Default / "ollama": mirror DigitalBrainChat's Ollama wiring.
-        var endpoint = config["DigitalBrain:Llm:OllamaEndpoint"] ?? "http://localhost:11434";
-        var ollamaClient = new OllamaSharp.OllamaApiClient(new Uri(endpoint), model);
+        var ollamaClient = new OllamaSharp.OllamaApiClient(new Uri(options.OllamaEndpoint), options.Model);
         return new ChatClientBuilder(ollamaClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
     }
 }
