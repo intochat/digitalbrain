@@ -42,6 +42,32 @@ PKCE `code_verifier`), plus dead-code/comment cleanup (`SalesforceClientFactory.
 a redundant `UserSessionNeuron.IsValidUsernameCharset` guard, and stale comments in `HomeFeedBus.cs`/
 `GatewayService.cs`). Full solution `dotnet test` green throughout (0 failures).
 
+**Live bug found and mitigated same day (commit `50ed11e`):** the user reported "get my salesforce
+profile" hung on a spinner with no login button in the real running app immediately after this plan
+shipped. Root cause (via systematic debugging, not guessing): the Flutter client opens one long-lived
+`WatchHomeFeed` stream at startup, before login, and never learns/forwards the real login `sessionId` —
+so S2.3/S2.4's session-addressing silently dropped every post-login card (shell, chat replies, credential
+forms) for every real client connection. Separately, `chat_screen.dart` reuses the `"sessionId"` JSON key
+for a client-generated per-widget UI correlation token unrelated to authentication, which S2.5's
+`InoRequest` resolution broke by trying to treat it as a real session. Both are genuine conflations this
+plan's own design didn't anticipate, not implementation bugs — the plan's "sessionId" model assumed a
+real auth session everywhere that name appeared, but the pre-existing chat UI had already overloaded it
+as a routing token. Mitigated with a fail-open compatibility shim rather than a full redesign (user's
+explicit choice, to unblock immediately): `HomeFeedBus.FanLocal` only filters once a subscriber has
+registered a real session (none do yet, so it fails open exactly like pre-S2 behavior); `InoRequest`'s
+sessionId passes through unchanged instead of being resolved; Salesforce `AuthRequested` falls back to
+"anonymous" instead of hard-rejecting. Restores today's single-user functionality; defeats S2's P6a
+per-session isolation goal until a real fix lands (documented in the plan's "Known Limitations"). Applied
+live via `mcp__aspire__execute_resource_command` `rebuild` on all 3 kernel replicas — this is the
+sanctioned way to push a source change into a running Aspire environment without killing processes the
+user is actively testing against. Full solution tests green throughout (340/340 minus 6 pre-existing
+skips in `DigitalBrain.Tests`, 23/23 in `DigitalBrain.Salesforce.Tests`).
+
+**Follow-up not yet scoped:** the real fix needs either Flutter-side work (capture the real session after
+login, reconnect `WatchHomeFeed` with it) or a server-side addressing signal that doesn't collide with
+the pre-existing chat-correlation-token convention. Until then, P6a (per-session feed isolation) is not
+actually enforced in the running app.
+
 ## 2026-07-04 — MULTIUSER Stage S1: Salesforce OAuth callback grain-routing
 
 Merged to master (subagent-driven, plan `docs/superpowers/plans/2026-07-04-salesforce-oauth-callback-grain-routing.md`).

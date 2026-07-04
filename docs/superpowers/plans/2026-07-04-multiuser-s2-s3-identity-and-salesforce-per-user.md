@@ -1715,3 +1715,22 @@ this automatically. A future migration would need to purge the `access_token`/`r
 `instance_url` keys from the shared "default" scope on upgrade. Confirmed not applicable to this
 installation at time of shipping (2026-07-04) — no user had completed a real Salesforce OAuth flow
 through the old singleton model before this plan landed.
+
+**Client-side session propagation is not wired up yet (live bug found and mitigated 2026-07-04).** The
+Flutter client (`app/lib/shell/forui_app_shell.dart`, `app/lib/features/chat/chat_screen.dart`) opens one
+long-lived `WatchHomeFeed` stream at app startup, before login, and always calls it with an empty
+`WatchHomeFeedRequest()` — it never learns or forwards the real login `sessionId` `UserSessionCreated`
+returns, and never reconnects the stream after a successful login. Separately, `chat_screen.dart` reuses
+the JSON key `"sessionId"` for a client-generated, per-widget UI correlation token (`'chat-${Random()...}'`)
+that has nothing to do with authentication. S2.3/S2.4's session-addressing conflated these two concepts,
+which broke the live app entirely: every session-addressed card (post-login shell, installed bundles,
+chat replies, Salesforce/Google credential forms) was silently dropped, and Salesforce identity resolution
+always fell back to an unusable state. Mitigated with a fail-open compatibility shim (commit `50ed11e`):
+`HomeFeedBus.FanLocal` only enforces addressing once the subscriber has registered a real session (no
+client does yet, so today it fails open exactly like pre-S2 behavior); `GatewayService`'s `InoRequest`
+branch passes the client's sessionId through unchanged instead of resolving it; the Salesforce
+`AuthRequested` branch falls back to the shared "anonymous" identity instead of hard-rejecting. This
+restores today's single-user functionality but defeats S2's P6a security goal (per-session feed isolation)
+until a real fix lands. The real fix needs either: (a) Flutter-side work to capture the real session after
+login and reconnect `WatchHomeFeed` with it, or (b) a server-side addressing signal that doesn't collide
+with the pre-existing chat-correlation-token convention. Not scoped or estimated as part of this plan.
