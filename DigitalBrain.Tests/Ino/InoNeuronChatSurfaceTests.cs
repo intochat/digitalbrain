@@ -27,7 +27,7 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
 
         var surface = Assert.Single(timeline.OfType<UiSurface>());
         Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
-        Assert.Equal("session-1", surface.Props["sessionId"]);
+        Assert.Equal("session-1", surface.Props["clientId"]);
         Assert.Equal("assistant", surface.Props["role"]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
@@ -49,7 +49,7 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surface = Assert.Single((await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>());
         Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
-        Assert.Equal("session-gmail-auth", surface.Props["sessionId"]);
+        Assert.Equal("session-gmail-auth", surface.Props["clientId"]);
         Assert.Equal("assistant", surface.Props["role"]);
         Assert.Equal(UiSurfaceKinds.AuthButton, surface.Props["surfaceKind"]);
 
@@ -204,7 +204,7 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surface = Assert.Single((await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>());
-        Assert.Equal("session-gmail-ready", surface.Props["sessionId"]);
+        Assert.Equal("session-gmail-ready", surface.Props["clientId"]);
         Assert.Equal("Gmail", surface.Props[UiSurfaceKeys.Title]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
@@ -253,7 +253,7 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
         var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
         Assert.Contains(surfaces, surface =>
             surface.Kind == UiSurface.WidgetTreeKind &&
-            Equals(surface.Props["sessionId"], "session-salesforce-invalid") &&
+            Equals(surface.Props["clientId"], "session-salesforce-invalid") &&
             surface.Props.TryGetValue("tree", out var tree) &&
             tree is UiWidgetTree widgetTree &&
             FlattenText(widgetTree).Contains("Salesforce authentication failed"));

@@ -33,7 +33,7 @@ public class InoNeuronTabularDataTests : NeuronTestBase
 
         var surface = Assert.Single(timeline.OfType<UiSurface>());
         Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
-        Assert.Equal("session-1", surface.Props["sessionId"]);
+        Assert.Equal("session-1", surface.Props["clientId"]);
         Assert.Equal("assistant", surface.Props["role"]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);

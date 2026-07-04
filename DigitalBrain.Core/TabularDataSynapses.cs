@@ -8,4 +8,4 @@ public record TabularDataIngested(
     string HeadersJson,
     string RowsJson,
     string ColumnStatsJson,
-    string? SessionId = null) : Synapse(nameof(TabularDataIngested), DateTimeOffset.UtcNow);
+    string? ClientId = null) : Synapse(nameof(TabularDataIngested), DateTimeOffset.UtcNow);

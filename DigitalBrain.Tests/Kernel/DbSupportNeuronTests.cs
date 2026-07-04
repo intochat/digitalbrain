@@ -36,7 +36,7 @@ public class DbSupportNeuronTests : NeuronTestBase
         try
         {
             var db = Grain<IDbSupportNeuron>("db-test-inspect");
-            await db.FireAsync(new DbInspectSchema("budget", "sqlite", SourcePath: path, SessionId: "session-1"));
+            await db.FireAsync(new DbInspectSchema("budget", "sqlite", SourcePath: path, ClientId: "session-1"));
 
             var timeline = await db.GetTimelineAsync();
             var result = timeline.OfType<DbSchemaInspected>().LastOrDefault(s => s.ConnectionName == "budget");
@@ -44,7 +44,7 @@ public class DbSupportNeuronTests : NeuronTestBase
             Assert.NotNull(result);
             Assert.True(result!.Succeeded);
             Assert.Null(result.Error);
-            Assert.Equal("session-1", result.SessionId);
+            Assert.Equal("session-1", result.ClientId);
             Assert.NotNull(result.Schema);
             Assert.Contains(result.Schema!.Tables, table => table.Name == "accounts");
             Assert.Contains(result.Schema.Tables, table => table.Name == "transactions");

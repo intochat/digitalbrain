@@ -495,7 +495,7 @@ public static class MarketplaceUiSurfaces
                 : new Dictionary<string, object?>();
 
         props["userId"] = EffectiveUserId(userId);
-        props["sessionId"] = clientId;
+        props["clientId"] = clientId;
 
         if (string.Equals(action.TryGetValue(UiSurfaceKeys.SynapseType, out var type) ? type?.ToString() : null,
                 nameof(InstallFromMarketplace),

@@ -162,15 +162,10 @@ public sealed class GatewayService(
                 var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
                 var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var prompt = p.TryGetValue("prompt", out var pr) ? pr?.ToString() ?? "" : "";
-                // sessionId here is a client-generated per-widget UI correlation token (see chat_screen.dart's
-                // _sessionId), not a real login session — it has no authorization role, only routing a reply
-                // back to the right chat widget instance, so it is passed through verbatim rather than resolved
-                // against session-main (resolving it here previously broke that correlation entirely, since a
-                // correlation token never matches a real session and always collapsed to null).
-                var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
+                var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
 
                 var ino = grains.GetGrain<IInoNeuron>("ino-main");
-                await ino.FireAsync(new InoRequest(prompt, sessionId));
+                await ino.FireAsync(new InoRequest(prompt, clientId));
                 return request;
             }
 

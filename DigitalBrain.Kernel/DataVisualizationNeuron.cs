@@ -164,12 +164,12 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
         return g;
     }
 
-    private static UiSurface ScopeSurface(UiSurface surface, string? userId, string? sessionId)
+    private static UiSurface ScopeSurface(UiSurface surface, string? userId, string? clientId)
     {
         var props = new Dictionary<string, object?>(surface.Props)
         {
             ["userId"] = string.IsNullOrWhiteSpace(userId) ? "anonymous" : userId.Trim(),
-            ["sessionId"] = sessionId
+            ["clientId"] = clientId
         };
 
         return surface with { Props = props };
