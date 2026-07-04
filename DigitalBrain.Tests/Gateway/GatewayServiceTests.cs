@@ -330,7 +330,7 @@ public class GatewayServiceTests : NeuronTestBase
     public async Task Send_SalesforceAuthRequested_Routes_To_SalesforceAuthNeuron()
     {
         var svc = NewService();
-        const string clientId = "test";
+        const string myClientId = "salesforce-auth-connection";
 
         await svc.Send(new SynapseEnvelope
         {
@@ -339,19 +339,16 @@ public class GatewayServiceTests : NeuronTestBase
             {
                 username = "salesforce-auth-test-user",
                 password = "correct horse battery staple",
-                clientId
+                clientId = myClientId
             }))
         }, TestContext());
 
-        // The payload key is still "sessionId" (Task 6's rename, not done yet), but its value must now be the
-        // clientId from login above — ResolveSessionByClientIdAsync (renamed in Task 4) resolves by clientId,
-        // not by the real session id.
         await svc.Send(new SynapseEnvelope
         {
             TypeName = SalesforceSignals.AuthRequested,
             Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
             {
-                sessionId = clientId
+                clientId = myClientId
             }))
         }, TestContext());
 
@@ -359,14 +356,14 @@ public class GatewayServiceTests : NeuronTestBase
         var timeline = await auth.GetOutgoingTimelineAsync();
         var form = Assert.Single(timeline.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
         Assert.Equal("salesforce", form.Props["pack"]);
-        Assert.Equal(clientId, form.Props["sessionId"]);
+        Assert.Equal(myClientId, form.Props["clientId"]);
     }
 
     [Fact]
     public async Task Send_SalesforceAuthRequested_Routes_To_The_Callers_Own_UserKeyed_Grain()
     {
         var svc = NewService();
-        const string clientId = "test";
+        const string myClientId = "salesforce-connection";
 
         await svc.Send(new SynapseEnvelope
         {
@@ -375,19 +372,16 @@ public class GatewayServiceTests : NeuronTestBase
             {
                 username = "salesforce-test-user",
                 password = "correct horse battery staple",
-                clientId
+                clientId = myClientId
             }))
         }, TestContext());
 
-        // The payload key is still "sessionId" (Task 6's rename, not done yet), but its value must now be the
-        // clientId from login above — ResolveSessionByClientIdAsync (renamed in Task 4) resolves by clientId,
-        // not by the real session id.
         await svc.Send(new SynapseEnvelope
         {
             TypeName = SalesforceSignals.AuthRequested,
             Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
             {
-                sessionId = clientId
+                clientId = myClientId
             }))
         }, TestContext());
 
@@ -395,32 +389,24 @@ public class GatewayServiceTests : NeuronTestBase
         var timeline = await auth.GetOutgoingTimelineAsync();
         var form = Assert.Single(timeline.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
         Assert.Equal("salesforce", form.Props["pack"]);
-        Assert.Equal(clientId, form.Props["sessionId"]);
+        Assert.Equal(myClientId, form.Props["clientId"]);
     }
 
-    // TEMPORARY: falls back to the shared "anonymous" identity rather than rejecting, until the Flutter
-    // client can capture and forward its real login session here (it currently never does — see
-    // GatewayService.cs's AuthRequested branch comment and docs/superpowers/plans/2026-07-04-multiuser-s2-
-    // s3-identity-and-salesforce-per-user.md, "Known Limitations"). Restores today's single-user "Connect
-    // Salesforce" functionality.
     [Fact]
-    public async Task Send_SalesforceAuthRequested_Without_A_Session_Falls_Back_To_Anonymous()
+    public async Task Send_SalesforceAuthRequested_Without_A_Real_Session_Is_Rejected()
     {
         var svc = NewService();
 
-        await svc.Send(new SynapseEnvelope
+        var ex = await Assert.ThrowsAsync<RpcException>(() => svc.Send(new SynapseEnvelope
         {
             TypeName = SalesforceSignals.AuthRequested,
             Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
             {
-                sessionId = "not-a-real-session"
+                clientId = "never-logged-in-connection"
             }))
-        }, TestContext());
+        }, TestContext()));
 
-        var auth = Grain<ISalesforceAuthNeuron>(UserId.Anonymous.Value);
-        var timeline = await auth.GetOutgoingTimelineAsync();
-        var form = Assert.Single(timeline.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
-        Assert.Equal("salesforce", form.Props["pack"]);
+        Assert.Equal(StatusCode.Unauthenticated, ex.StatusCode);
     }
 
     [Fact]

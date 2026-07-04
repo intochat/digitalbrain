@@ -17,7 +17,7 @@ internal static class SalesforceAuthSurfaces
         new(SalesforceClientFactory.ApiVersionKey, "API Version (optional, e.g. v60.0)", PackConfigFieldKind.Text)
     ];
 
-    public static UiSurface CredentialForm(string emitter, string? sessionId = null, string? message = null)
+    public static UiSurface CredentialForm(string emitter, string? clientId = null, string? message = null)
     {
         var surface = ConfigFormSurface.Build(SalesforceClientFactory.PackName, Fields, emitter);
         var tree = AssertTree(surface.Props["tree"]);
@@ -43,8 +43,8 @@ internal static class SalesforceAuthSurfaces
                 ["pack"] = SalesforceClientFactory.PackName,
                 ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath
             };
-            if (!string.IsNullOrWhiteSpace(sessionId))
-                oauthButtonProps["sessionId"] = sessionId;
+            if (!string.IsNullOrWhiteSpace(clientId))
+                oauthButtonProps["clientId"] = clientId;
 
             children.Add(new(UiKitVocabulary.Button, oauthButtonProps));
             children.Add(new(UiKitVocabulary.Divider, new Dictionary<string, object?>()));
@@ -66,8 +66,8 @@ internal static class SalesforceAuthSurfaces
             ["tree"] = tree
         };
 
-        if (!string.IsNullOrWhiteSpace(sessionId))
-            props["sessionId"] = sessionId;
+        if (!string.IsNullOrWhiteSpace(clientId))
+            props["clientId"] = clientId;
 
         return surface with { Props = props };
     }

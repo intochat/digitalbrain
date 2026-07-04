@@ -30,7 +30,7 @@ public class SalesforceOAuthCrossSiloTests : NeuronTestBase
 
         await authOnSilo0.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-cross-silo",
+            ["clientId"] = "session-cross-silo",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
             [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
             [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",

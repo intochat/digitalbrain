@@ -28,7 +28,7 @@ public class SalesforceTwoUserOAuthIsolationTests : NeuronTestBase
 
         await alice.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-alice",
+            ["clientId"] = "session-alice",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
             [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
         })
@@ -36,7 +36,7 @@ public class SalesforceTwoUserOAuthIsolationTests : NeuronTestBase
 
         await bob.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
         {
-            ["sessionId"] = "session-bob",
+            ["clientId"] = "session-bob",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
             [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
         })

@@ -26,8 +26,8 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
             return;
         }
 
-        var sessionId = signal.Props.TryGetValue("sessionId", out var value) ? value?.ToString() : null;
-        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, sessionId);
+        var clientId = signal.Props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
+        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
 
         await FireAsync(surface);
         ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
@@ -188,8 +188,8 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
 
     private async Task PublishCredentialFormAsync(IReadOnlyDictionary<string, object?> props, string message)
     {
-        var sessionId = props.TryGetValue("sessionId", out var value) ? value?.ToString() : null;
-        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, sessionId, message);
+        var clientId = props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
+        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId, message);
 
         await FireAsync(surface);
         ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));

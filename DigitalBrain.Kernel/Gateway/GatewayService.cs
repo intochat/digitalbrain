@@ -93,18 +93,15 @@ public sealed class GatewayService(
             if (request.TypeName == SalesforceSignals.AuthRequested || request.TypeName.Contains(SalesforceSignals.AuthRequested, StringComparison.OrdinalIgnoreCase))
             {
                 var authProps = PayloadProps(request);
-                var authSessionId = authProps.TryGetValue("sessionId", out var authSid) ? authSid?.ToString() : null;
-                var authSession = await ResolveSessionByClientIdAsync(authSessionId);
-                // TEMPORARY: the Flutter client has no channel yet to forward its real login session here
-                // (see docs/superpowers/plans/2026-07-04-multiuser-s2-s3-identity-and-salesforce-per-user.md,
-                // "Known Limitations" / live-bug follow-up) — fall back to a consistent "anonymous" identity
-                // rather than hard-rejecting, restoring today's single-user functionality until the client is
-                // updated to capture and forward a real session.
-                var salesforceUserId = authSession?.UserId.Value ?? UserId.Anonymous.Value;
-                var auth = grains.GetGrain<ISalesforceAuthNeuron>(salesforceUserId);
+                var authClientId = authProps.TryGetValue("clientId", out var authCid) ? authCid?.ToString() : null;
+                var authSession = await ResolveSessionByClientIdAsync(authClientId);
+                if (authSession is null)
+                    throw new RpcException(new Status(StatusCode.Unauthenticated, "A real login session is required to connect Salesforce."));
+
+                var auth = grains.GetGrain<ISalesforceAuthNeuron>(authSession.UserId.Value);
                 var signal = new Signal(SalesforceSignals.AuthRequested, authProps)
                 {
-                    Receiver = new NeuronId(salesforceUserId)
+                    Receiver = new NeuronId(authSession.UserId.Value)
                 };
                 await auth.DeliverAsync(signal);
                 return request;
