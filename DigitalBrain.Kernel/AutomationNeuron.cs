@@ -58,6 +58,11 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = create.AppId }));
                 await EmitAutomationsSurfaceAsync();
                 return;
+            case RemoveReaction rm:
+                _reactions.RemoveAll(r => r.Id == rm.Id);
+                await FireAsync(new Signal("ReactionRemoved", new Dictionary<string, object?> { ["id"] = rm.Id }));
+                await EmitAutomationsSurfaceAsync();
+                return;
         }
 
         await TryExecuteMatchingAsync(synapse);
@@ -142,13 +147,24 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         foreach (var s in OutgoingJournal.Concat(IncomingJournal).OfType<RegisterScript>())
             _scripts[s.Id] = s.Code;
 
+        var removes = new HashSet<string>();
+        foreach (var rm in OutgoingJournal.Concat(IncomingJournal).OfType<RemoveReaction>())
+            removes.Add(rm.Id);
+
         foreach (var r in OutgoingJournal.Concat(IncomingJournal).OfType<RegisterReaction>())
-            _reactions.Add(r);
+        {
+            if (!removes.Contains(r.Id))
+                _reactions.Add(r);
+        }
 
         foreach (var a in OutgoingJournal.Concat(IncomingJournal).OfType<AutomationApp>())
         {
             if (a.Scripts != null) foreach (var s in a.Scripts) _scripts[s.Id] = s.Code;
-            if (a.Reactions != null) _reactions.AddRange(a.Reactions);
+            if (a.Reactions != null)
+            {
+                foreach (var r in a.Reactions)
+                    if (!removes.Contains(r.Id)) _reactions.Add(r);
+            }
         }
     }
 
@@ -176,6 +192,14 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         EnsureProjections();
         _scripts.TryGetValue(id, out var code);
         return Task.FromResult(code);
+    }
+
+    public async Task RemoveReactionAsync(string id)
+    {
+        EnsureProjections();
+        _reactions.RemoveAll(r => r.Id == id);
+        await FireAsync(new RemoveReaction(id));
+        await EmitAutomationsSurfaceAsync();
     }
 
     private async Task EmitAutomationsSurfaceAsync()
