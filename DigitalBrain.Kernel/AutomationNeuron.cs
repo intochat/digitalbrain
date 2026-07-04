@@ -168,16 +168,18 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         }
     }
 
-    public Task<IReadOnlyList<string>> ListActiveScriptsAsync()
+    public async Task<IReadOnlyList<string>> ListActiveScriptsAsync()
     {
         EnsureProjections();
-        return Task.FromResult((IReadOnlyList<string>)_scripts.Keys.ToList());
+        await EmitAutomationsSurfaceAsync(); // refresh surface on query
+        return _scripts.Keys.ToList();
     }
 
-    public Task<IReadOnlyList<string>> ListActiveReactionsAsync()
+    public async Task<IReadOnlyList<string>> ListActiveReactionsAsync()
     {
         EnsureProjections();
-        return Task.FromResult((IReadOnlyList<string>)_reactions.Select(r => r.Id).ToList());
+        await EmitAutomationsSurfaceAsync();
+        return _reactions.Select(r => r.Id).ToList();
     }
 
     public async Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null)
@@ -205,11 +207,17 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
     private async Task EmitAutomationsSurfaceAsync()
     {
         EnsureProjections();
-        var items = _reactions
-            .Select(r => $"{r.Id} (when: {r.When}, script: {r.ScriptRef})")
+        var reactionItems = _reactions
+            .Select(r => $"{r.Id}: when {r.When} -> {r.ScriptRef}")
             .ToList();
-        if (items.Count == 0) items = new List<string> { "No active reactions yet. Use define_reaction MCP tool or RegisterReaction synapse." };
+        var scriptItems = _scripts
+            .Select(kv => $"{kv.Key}: { (kv.Value.Length > 40 ? kv.Value.Substring(0,40) + "..." : kv.Value) }")
+            .ToList();
 
-        await FireAsync(new ListSurface("Active Automations", items));
+        if (reactionItems.Count == 0) reactionItems.Add("No active reactions. Define via MCP or synapses.");
+
+        await FireAsync(new ListSurface("Active Reactions", reactionItems));
+        if (scriptItems.Count > 0)
+            await FireAsync(new ListSurface("Active Scripts (library)", scriptItems));
     }
 }
