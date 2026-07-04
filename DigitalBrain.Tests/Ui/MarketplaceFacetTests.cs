@@ -75,4 +75,32 @@ public class MarketplaceFacetTests
         Assert.Single(items);
         Assert.Equal("a", items[0]["name"]);
     }
+
+    [Fact]
+    public void Tree_renders_salesforce_capability_card_actions()
+    {
+        var salesforcePack = MarketplaceSeeds.LocalUiPacks.Single(p =>
+            p.Name == MarketplaceUiSurfaces.SalesforceCapabilityPackName);
+
+        var surface = MarketplaceUiSurfaces.MarketplaceTreeSurface(
+            new[] { salesforcePack },
+            Array.Empty<NeuroPack>(),
+            tierFilter: null,
+            channelFilter: null,
+            emitter: "market-main",
+            userId: "alice",
+            sessionId: "client-1");
+
+        var tree = (UiWidgetTree)surface.Props["tree"]!;
+        var cards = Descend(tree).Where(node => node.Type == "fcard").ToList();
+        var buttons = Descend(tree)
+            .Where(node => node.Type == "fbutton")
+            .Select(node => node.Props[UiSurfaceKeys.Label]?.ToString())
+            .ToList();
+
+        Assert.Contains(cards, card => Equals(card.Props["title"], "Salesforce CRM"));
+        Assert.Contains("Enable", buttons);
+        Assert.Contains("Connect Salesforce", buttons);
+        Assert.Contains("Configure", buttons);
+    }
 }
