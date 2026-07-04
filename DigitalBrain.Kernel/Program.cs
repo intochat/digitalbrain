@@ -311,14 +311,15 @@ app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
     HttpRequest request,
     IGrainFactory grains) =>
 {
+    var state = request.Query["state"].FirstOrDefault();
     var callback = new SalesforceOAuthCallback(
         Code: request.Query["code"].FirstOrDefault(),
-        State: request.Query["state"].FirstOrDefault(),
+        State: state,
         Error: request.Query["error"].FirstOrDefault(),
         ErrorDescription: request.Query["error_description"].FirstOrDefault(),
         FallbackRedirectUri: SalesforceCallbackUri(request));
 
-    var auth = grains.GetGrain<ISalesforceAuthNeuron>("salesforce-auth-main");
+    var auth = grains.GetGrain<ISalesforceAuthNeuron>(SalesforceOAuthUserIdFromState(state));
     var result = await auth.CompleteOAuthAsync(callback);
 
     return Results.Content(
@@ -410,6 +411,18 @@ static string SalesforceCallbackUri(HttpRequest request) =>
     new UriBuilder(request.Scheme, request.Host.Host, request.Host.Port ?? -1, SalesforceClientFactory.DefaultCallbackPath)
         .Uri
         .ToString();
+
+// The callback is a cold, unauthenticated GET from Salesforce's redirect — it carries no session, only
+// code/state. StartOAuthAsync prefixes state with its own userId ("{userId}:{nonce}") so this endpoint can
+// route to the right per-user grain; the grain still exact-matches the FULL state string against its own
+// stored pending value, so CSRF protection is unchanged. This is NOT D-MU2's encrypted state (deferred to
+// S4) — a malformed/tampered state just fails to route to a real pending flow and fails closed.
+static string SalesforceOAuthUserIdFromState(string? state)
+{
+    if (string.IsNullOrWhiteSpace(state)) return "salesforce-auth-unknown";
+    var separatorIndex = state.LastIndexOf(':');
+    return separatorIndex > 0 ? state[..separatorIndex] : "salesforce-auth-unknown";
+}
 
 static string SalesforceCallbackPage(string title, string message)
 {

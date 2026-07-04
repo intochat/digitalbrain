@@ -92,10 +92,17 @@ public sealed class GatewayService(
 
             if (request.TypeName == SalesforceSignals.AuthRequested || request.TypeName.Contains(SalesforceSignals.AuthRequested, StringComparison.OrdinalIgnoreCase))
             {
-                var auth = grains.GetGrain<ISalesforceAuthNeuron>("salesforce-auth-main");
-                var signal = new Signal(SalesforceSignals.AuthRequested, PayloadProps(request))
+                var authProps = PayloadProps(request);
+                var authSessionId = authProps.TryGetValue("sessionId", out var authSid) ? authSid?.ToString() : null;
+                var authSession = await ResolveSessionAsync(authSessionId);
+                if (authSession is null)
+                    throw new RpcException(new Status(StatusCode.Unauthenticated, "Sign in before connecting Salesforce."));
+
+                var salesforceUserId = authSession.UserId.Value;
+                var auth = grains.GetGrain<ISalesforceAuthNeuron>(salesforceUserId);
+                var signal = new Signal(SalesforceSignals.AuthRequested, authProps)
                 {
-                    Receiver = new NeuronId("salesforce-auth-main")
+                    Receiver = new NeuronId(salesforceUserId)
                 };
                 await auth.DeliverAsync(signal);
                 return request;
