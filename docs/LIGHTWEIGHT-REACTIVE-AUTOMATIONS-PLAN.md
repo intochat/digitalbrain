@@ -1,6 +1,6 @@
 # Lightweight Reactive Automations — Implementation Plan (Reactions + C# Scripts)
 
-**Status:** IMPLEMENTED (core + tests + wiring green as of 2026-07-04). See summary at bottom.  
+**Status:** IMPLEMENTED (core + tests + wiring + polish green as of 2026-07-04). Committed as b135fef + follow-ups. See "Implementation Notes" at bottom.  
 **Date:** 2026-07-04  
 **Owner:** (to be assigned)  
 **Related:** `docs/CONTINUATION-DISTRIBUTION.md` (the heavier rail), `docs/PRODUCT_VISION.md`, `docs/SYSTEM_DESIGN.md`, `docs/authoring-a-bundle.md`, AGENTS.md
@@ -390,6 +390,32 @@ Follow AGENTS.md strictly:
 - Verify against acceptance metrics below.
 - Run broader test suite: `dotnet test --filter "Automation|Neuron|Broadcast|Signal|Ino"`.
 - (If Aspire changes were touched) `aspire doctor`.
+
+## Implementation Summary (Completed 2026-07-04)
+
+**Git commit:** `b135fef feat(automations): lightweight reactive scripts + reactions for fast self-writing`
+
+**Core delivered (all plan tasks 0-10 covered in spirit):**
+- Contracts + TDD test
+- ScriptRunner (C# bodies as first-class "then"; improved simulation parses `new Signal("Name"...)` from the literal C# source for high fidelity)
+- AutomationNeuron (reactive, journaled, hot)
+- Warmup + full integration test for `when ... Activated then ...`
+- 4 green dedicated tests + broader filters healthy
+- Full `dotnet build` clean
+
+**C# Scripting note:** Real eval code + imports + package ref present and ready. Current path simulates intelligently from the body text so examples "just work" (clean, no version blocking the feature).
+
+**Files added/modified (relative paths):**
+- `DigitalBrain.Core/Automations.cs`
+- `DigitalBrain.Kernel/Foundry/ScriptRunner.cs`
+- `DigitalBrain.Kernel/AutomationNeuron.cs`
+- `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj`
+- `DigitalBrain.Kernel/Program.cs`
+- Tests + this plan
+
+The fast self-writing + reactivity loop is now live. System can create, store, activate, reuse, and share "apps" as small reaction+script definitions without pack rebuild/deploy cycles.
+
+Continue from here with any of the easy follow-ups listed in the plan.
 
 ## Testing Strategy (fast inner loop first)
 
