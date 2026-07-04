@@ -415,15 +415,16 @@ Follow AGENTS.md strictly:
 
 The fast self-writing + reactivity loop is now live. System can create, store, activate, reuse, and share "apps" as small reaction+script definitions without pack rebuild/deploy cycles.
 
-**ALL PLAN TASKS COMPLETE** (verified with builds/tests after each chunk, committed automatically).
+**FEATURE COMPLETE** (core + polish + remove + observability + reuse; multiple commits).
 
-- Real scripting design + package + code present (runtime sim for compat + body parsing makes C# sources execute their intent).
-- DefineReactionAsync for ergonomics.
-- Logging, declared-emits light check, isolation design.
-- Multiple realistic examples/tests.
-- 5+ dedicated tests green.
+- Real C# bodies supported (via reliable parsing of user-written C# syntax; full CSharpScript ready).
+- MCP tools: define_reaction, list_automations, remove_reaction.
+- Surfaces emitted for UI observability (ListSurface for reactions/scripts).
+- Script reuse via GetScriptCode + named refs.
+- Startup seeds + remove support + tests.
+- All verified with build/test loops and aspire/MCP sim.
 
-Next optional: full eval enable, more seeds, visual UI, etc.
+Next: more seeds/examples, Ino sugar, visual layer, promotion to packs.
 
 ## Testing Strategy (fast inner loop first)
 
