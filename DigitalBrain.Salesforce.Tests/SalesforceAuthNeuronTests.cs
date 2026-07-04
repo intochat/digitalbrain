@@ -12,7 +12,12 @@ namespace DigitalBrain.Salesforce.Tests;
 public class SalesforceAuthNeuronTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>
-        builder.ConfigureServices(services => services.AddPackConfigStore(blobsForKeyRing: null));
+        builder.ConfigureServices(services =>
+        {
+            services.AddPackConfigStore(blobsForKeyRing: null);
+            services.AddSingleton<HttpMessageHandler>(
+                new FakeSalesforceTokenHandler("fake-access-token", "https://fake.my.salesforce.com"));
+        });
 
     [Fact]
     public async Task AuthRequested_Emits_Credential_Form()
@@ -117,6 +122,69 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         var pending = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
         Assert.True(pending.ContainsKey(SalesforceClientFactory.OAuthStateKey));
         Assert.True(pending.ContainsKey(SalesforceClientFactory.OAuthCodeVerifierKey));
+    }
+
+    [Fact]
+    public async Task CompleteOAuthAsync_With_Valid_Code_And_State_Stores_Tokens_And_Succeeds()
+    {
+        var writer = Grain<ISalesforceConnectedAppConfigWriter>("salesforce-connected-app-writer-complete");
+        await writer.StoreConnectedAppConfigAsync();
+
+        var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test-complete");
+        await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
+        {
+            ["sessionId"] = "session-complete",
+            ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+        })
+        { Receiver = new NeuronId("salesforce-auth-test-complete") });
+
+        var outgoing = await auth.GetOutgoingTimelineAsync();
+        var authUrlSignal = Assert.Single(outgoing.OfType<Signal>(), item => item.Name == SalesforceSignals.AuthUrl);
+        var url = Assert.IsType<string>(authUrlSignal.Props["url"]);
+        var state = FakeSalesforceTokenHandler.ExtractQueryValue(url, "state");
+
+        var result = await auth.CompleteOAuthAsync(new SalesforceOAuthCallback(
+            Code: "auth-code-1",
+            State: state,
+            Error: null,
+            ErrorDescription: null,
+            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+
+        Assert.True(result.Success);
+        Assert.Equal("Salesforce connected", result.Title);
+
+        var stored = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName);
+        Assert.Equal("fake-access-token", stored[SalesforceClientFactory.AccessTokenKey]);
+
+        var pendingAfter = await writer.ReadPackAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.OAuthPendingPackName);
+        Assert.False(pendingAfter.ContainsKey(SalesforceClientFactory.OAuthStateKey));
+    }
+
+    [Fact]
+    public async Task CompleteOAuthAsync_With_Mismatched_State_Fails_Without_Exchanging_Code()
+    {
+        var writer = Grain<ISalesforceConnectedAppConfigWriter>("salesforce-connected-app-writer-mismatch");
+        await writer.StoreConnectedAppConfigAsync();
+
+        var auth = Grain<ISalesforceAuthNeuron>("salesforce-auth-test-mismatch");
+        await auth.DeliverAsync(new Signal(SalesforceSignals.AuthRequested, new Dictionary<string, object?>
+        {
+            ["sessionId"] = "session-mismatch",
+            ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+        })
+        { Receiver = new NeuronId("salesforce-auth-test-mismatch") });
+
+        var result = await auth.CompleteOAuthAsync(new SalesforceOAuthCallback(
+            Code: "auth-code-1",
+            State: "wrong-state",
+            Error: null,
+            ErrorDescription: null,
+            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+
+        Assert.False(result.Success);
+        Assert.Equal("The callback state did not match the pending login.", result.Message);
     }
 
     private static IEnumerable<UiWidgetTree> FindNodes(UiWidgetTree tree)
