@@ -8,8 +8,9 @@ namespace DigitalBrain.Kernel.Config;
 public static class PackConfigServices
 {
     // Registers IPackConfigStore.
-    // Pass blobsForKeyRing (Aspire-hosted path) to share the DataProtection key ring across all replicas via
-    // blob storage — without it (integration tests, fast path) each process gets an ephemeral key ring.
+    // Pass blobsForKeyRing (Aspire-hosted path) to share both the DataProtection key ring and the pack-config
+    // backing store across all replicas via blob storage — without it (integration tests, fast path) each
+    // process gets an ephemeral key ring and in-memory (non-durable, non-shared) pack config.
     public static IServiceCollection AddPackConfigStore(
         this IServiceCollection services,
         BlobServiceClient? blobsForKeyRing = null)
@@ -29,13 +30,14 @@ public static class PackConfigServices
             dp.PersistKeysToAzureBlobStorage(container.GetBlobClient("dp-keys/keys.xml"));
         }
 
-        services.AddSingleton<IPackConfigBackingStore>(sp =>
-        {
-            var blobs = sp.GetService<BlobServiceClient>();
-            if (blobs is not null)
-                return new AzureBlobPackConfigBackingStore(blobs);
-            return new InMemoryPackConfigBackingStore();
-        });
+        // Reuse the explicitly-passed client (never resolve BlobServiceClient from DI here): Aspire's
+        // AzureComponent.AddClient registers an unkeyed null-sentinel for BlobServiceClient whenever ANY
+        // keyed registration for that type exists anywhere in the app (Program.cs keys one for grain
+        // storage) - so sp.GetService<BlobServiceClient>() always returns null in the real Aspire-hosted
+        // kernel, silently falling back to the in-memory backing store even in production.
+        services.AddSingleton<IPackConfigBackingStore>(_ => blobsForKeyRing is not null
+            ? new AzureBlobPackConfigBackingStore(blobsForKeyRing)
+            : new InMemoryPackConfigBackingStore());
 
         services.AddSingleton<IPackConfigStore, PackConfigStore>();
         return services;
