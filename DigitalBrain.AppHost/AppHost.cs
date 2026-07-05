@@ -10,10 +10,10 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
     options.WithLLM<Qwen25Coder1_5B>();
     options.WithEmbedding<NomicEmbedText>();
-    if (HasValue("DigitalBrain:Voice:Endpoint", "DIGITALBRAIN_VOICE_ENDPOINT"))
-    {
-        options.WithVoice2Text<Whisper1Local>();
-    }
+    // Local Whisper container is always present in run mode (see AddDigitalBrain), so this is safe to
+    // register unconditionally — WireKernelSilo's voice wiring falls back gracefully whether or not a real
+    // endpoint ends up set (manual override > local Whisper container > unset).
+    options.WithVoice2Text<Whisper1Local>();
     // To switch to Azure OpenAI, call options.WithLLM<Gpt4oMini>() instead — it needs the
     // azure-openai-endpoint/-key parameters wired below (see README "LLM provider switch").
     options.UseLocalMarketplace = true;
@@ -73,7 +73,3 @@ builder.Build().Run();
 static bool IsEnabled(string name) =>
     string.Equals(Environment.GetEnvironmentVariable(name), "true", StringComparison.OrdinalIgnoreCase)
     || string.Equals(Environment.GetEnvironmentVariable(name), "1", StringComparison.OrdinalIgnoreCase);
-
-bool HasValue(string configurationKey, string environmentKey) =>
-    !string.IsNullOrWhiteSpace(builder.Configuration[configurationKey])
-    || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(environmentKey));

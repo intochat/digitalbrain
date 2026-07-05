@@ -42,6 +42,9 @@ public sealed class AddDigitalBrainExecutionModeTests
         // nomic-embed-text pulled into the same Ollama container as qwen (see Task 15).
         var embed = Assert.Single(builder.Resources, r => r.Name == "embed");
         Assert.Equal("OllamaModelResource", embed.GetType().Name);
+
+        // Local Whisper (speaches) container for voice-to-text, always present in run mode (see Task 16).
+        Assert.Contains(builder.Resources, r => r.Name == "whisper" && r.GetType().Name == "ContainerResource");
     }
 
     [Fact]
@@ -63,5 +66,8 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         // No local Ollama container in publish mode, so no "embed" model resource either (see Task 15).
         Assert.DoesNotContain(builder.Resources, r => r.Name == "embed");
+
+        // No local Whisper container in publish mode either (see Task 16).
+        Assert.DoesNotContain(builder.Resources, r => r.Name == "whisper");
     }
 }
