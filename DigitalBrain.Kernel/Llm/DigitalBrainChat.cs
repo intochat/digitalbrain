@@ -32,7 +32,19 @@ public static class DigitalBrainChat
         }
         // No provider → no IChatClient registered; neurons fall back deterministically.
 
-        services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
+        var embeddingOptions = DigitalBrainEmbeddingRuntimeOptions.FromConfiguration(config);
+        if (string.Equals(embeddingOptions.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(embeddingOptions.Model))
+        {
+            var embeddingClient = new OllamaApiClient(new Uri(embeddingOptions.OllamaEndpoint), embeddingOptions.Model);
+            services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(embeddingClient);
+        }
+        else
+        {
+            // No embedding provider configured → NoOp fail-soft; HybridScorer (DigitalBrain.Context)
+            // detects its zero vectors and falls back to keyword recall.
+            services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
+        }
         return services;
     }
 }

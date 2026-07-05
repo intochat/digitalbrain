@@ -27,6 +27,10 @@ public sealed class DigitalBrainContext
     // (no local Ollama container — the else branch in AddDigitalBrain uses a connection-string placeholder).
     public EndpointReference? OllamaEndpoint { get; init; }
 
+    // Same Ollama container's http endpoint, for DigitalBrain__Embedding__OllamaEndpoint injection; null in
+    // publish mode for the same reason as OllamaEndpoint (no local Ollama container to point at).
+    public EndpointReference? EmbeddingOllamaEndpoint { get; init; }
+
     // Set only when LlmProvider is "azureopenai" (WithLLM<TModel>() where TModel.Provider == "azureopenai")
     public IResourceBuilder<ParameterResource>? AzureOpenAIEndpoint { get; init; }
     public IResourceBuilder<ParameterResource>? AzureOpenAIKey { get; init; }
@@ -96,6 +100,7 @@ public static class DigitalBrainBuilderExtensions
         const string ollamaFallbackModel = "qwen2.5-coder:1.5b";
         IResourceBuilder<IResourceWithConnectionString> qwen;
         EndpointReference? ollamaEndpoint = null;
+        EndpointReference? embeddingOllamaEndpoint = null;
         if (isRunMode)
         {
             var ollama = builder.AddOllama("ollama")
@@ -103,7 +108,11 @@ public static class DigitalBrainBuilderExtensions
                 .WithDataVolume()
                 .WithOpenWebUI();
             qwen = ollama.AddModel("qwen", ollamaFallbackModel);
+            ollama.AddModel("embed", "nomic-embed-text");
             ollamaEndpoint = ollama.GetEndpoint("http");
+            // Same container as qwen — Ollama serves every pulled model from one endpoint,
+            // selected by model name in the request, not by a per-model endpoint.
+            embeddingOllamaEndpoint = ollamaEndpoint;
         }
         else
         {
@@ -123,6 +132,7 @@ public static class DigitalBrainBuilderExtensions
             LlmModel = llmModel,
             LlmProvider = llmProvider,
             OllamaEndpoint = ollamaEndpoint,
+            EmbeddingOllamaEndpoint = embeddingOllamaEndpoint,
             AzureOpenAIEndpoint = azureOpenAIEndpoint,
             AzureOpenAIKey = azureOpenAIKey,
             EnableOrleansDashboard = options.EnableOrleansDashboard,
@@ -170,6 +180,11 @@ public static class DigitalBrainBuilderExtensions
             kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
                 ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
         }
+        if (ctx.EmbeddingOllamaEndpoint is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Embedding__OllamaEndpoint",
+                ReferenceExpression.Create($"http://{ctx.EmbeddingOllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.EmbeddingOllamaEndpoint.Property(EndpointProperty.Port)}"));
+        }
         kernel.WithModelRegistry(ctx);
 
         if (ctx.AzureOpenAIEndpoint is not null)
@@ -201,6 +216,13 @@ public static class DigitalBrainBuilderExtensions
             kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultLlm__Kind", DigitalBrainCapabilityKind.LargeLanguageModel.ToString());
             kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultLlm__Provider", ctx.LlmProvider);
             kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultLlm__Id", ctx.LlmModel);
+        }
+
+        if (ctx.ModelRegistry.DefaultEmbedding is { } defaultEmbedding)
+        {
+            kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultEmbedding__Kind", DigitalBrainCapabilityKind.Embedding.ToString());
+            kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultEmbedding__Provider", defaultEmbedding.Model.Provider);
+            kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultEmbedding__Id", defaultEmbedding.Model.Id);
         }
 
         for (var i = 0; i < ctx.ModelRegistry.Registrations.Count; i++)

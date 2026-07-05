@@ -101,6 +101,16 @@ public sealed class DigitalBrainModelRegistry
             x.Model.Kind == DigitalBrainCapabilityKind.VoiceToText);
 
     /// <summary>
+    /// Preferred embedding model for the context/RAG runtime consumer.
+    /// </summary>
+    public DigitalBrainModelRegistration? DefaultEmbedding =>
+        registrations.LastOrDefault(static x =>
+            x.Model.Kind == DigitalBrainCapabilityKind.Embedding &&
+            x.Role == DigitalBrainModelRole.Default)
+        ?? registrations.LastOrDefault(static x =>
+            x.Model.Kind == DigitalBrainCapabilityKind.Embedding);
+
+    /// <summary>
     /// Adds a provider/model registration and returns its index for later role updates.
     /// </summary>
     public int Register(DigitalBrainModelDescriptor model, DigitalBrainModelRole role)

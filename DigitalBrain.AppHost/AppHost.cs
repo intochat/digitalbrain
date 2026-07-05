@@ -9,6 +9,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
     options.WithLLM<Qwen25Coder1_5B>();
+    options.WithEmbedding<NomicEmbedText>();
     if (HasValue("DigitalBrain:Voice:Endpoint", "DIGITALBRAIN_VOICE_ENDPOINT"))
     {
         options.WithVoice2Text<Whisper1Local>();
