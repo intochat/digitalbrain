@@ -100,6 +100,17 @@ internal static class Program
             Tags = StandardTags("storage-account")
         });
 
+        // Sync blob container (M11 checkpoint-based local<->cloud sync, Task 20): checkpoint backup/restore
+        // blobs land here, scoped to the same storage account as clustering/grainstate/journal above — no new
+        // storage account needed. PublicAccess.None matches the account-level AllowBlobPublicAccess = false.
+        var syncContainer = new Storage.BlobContainer("digitalbrain-sync", new Storage.BlobContainerArgs
+        {
+            ContainerName = "sync",
+            AccountName = storage.Name,
+            ResourceGroupName = resourceGroup.Name,
+            PublicAccess = Storage.PublicAccess.None
+        });
+
         var storageKey = Storage.ListStorageAccountKeys.Invoke(new Storage.ListStorageAccountKeysInvokeArgs
         {
             ResourceGroupName = resourceGroup.Name,
