@@ -22,13 +22,14 @@ external HTTP — `api.digitalbrain.tech` no longer served), and the empty Deplo
 placeholder-image deploy are gone.
 
 ### Image registry
-**(Updated 2026-07-05 — superseded, was Docker Hub.)** Kernel and Telegram transport images live in
-**GHCR**: `ghcr.io/digitalbraintech/digitalbrain-kernel` and `ghcr.io/digitalbraintech/digitalbrain-telegram`
-(built via `dotnet publish -t:PublishContainer` in `.github/workflows/deploy.yml`, authenticated with
-`secrets.GITHUB_TOKEN` — no Docker Hub, no manual `docker push`). Packages are public, so ACA pulls
-without registry credentials (see the `KernelImageRepository`/`TelegramImageRepository` comment in
-`deploy/Program.cs`); if they're ever made private, add `RegistryCredentialsArgs` with a GitHub PAT
-(`read:packages`) instead.
+**(Updated 2026-07-05.)** Kernel and Telegram transport images live in **private Docker Hub** repos:
+`docker.io/vhorbachov/digitalbrain-kernel` and `docker.io/vhorbachov/digitalbrain-telegram` (built via
+`dotnet publish -t:PublishContainer` in `.github/workflows/deploy.yml`, pushed with
+`vars.DOCKERHUB_USERNAME` + `secrets.DOCKERHUB_TOKEN`). A GHCR-based flow was tried the same day and
+reverted in favor of Docker Hub (existing paid subscription there). Because the repos are private, ACA
+authenticates the pull too — `deploy/Program.cs`'s `KernelImageRepository`/`TelegramImageRepository`
+container apps both carry a `RegistryCredentialsArgs` (`server: docker.io`) referencing a
+`dockerhub-password` Container App secret sourced from the same `DOCKERHUB_TOKEN`.
 
 ### Kernel runtime
 The kernel now exposes an internal-only Http2 ingress on port 8080 serving the gRPC `DigitalBrainGateway` (Ask/Fire/Timeline/Health).
@@ -106,8 +107,9 @@ All changes committed and pushed to **master** (default branch renamed from main
    Capture and set AZURE_CLIENT_ID (and rotate if needed).
 
 2. **Rotate secrets** (if not already real values):
-   - ~~`gh secret set DOCKERHUB_TOKEN`~~ — no longer needed; `deploy.yml` now pushes to GHCR with
-     `secrets.GITHUB_TOKEN` (see "Image registry" above).
+   - `gh secret set DOCKERHUB_TOKEN` (needs at least read+write on `vhorbachov/digitalbrain-kernel` and
+     `-telegram` — write for CI's push, read for ACA's pull via `RegistryCredentialsArgs`; see "Image
+     registry" above).
    - Optionally rotate CHECKPOINT_KEY / PULUMI_PASSPHRASE and re-set.
 
 3. **Trigger/verify first run on master**:
@@ -119,4 +121,4 @@ NOTE: Because state is in azblob and OIDC + image push will use the GH secrets, 
 
 ### Pre-SP1 (2026-06-23) — superseded where noted by the SP1 entry above
 - **DNS:** remove the dangling `api` / `asuid.api` records at the registrar — they pointed to the old deleted gateway. SP2 attaches a fresh `api.digitalbrain.tech` custom domain to the now-public kernel ingress.
-- **CI (`deploy.yml`):** auto-deploy on `push:[master]` → `pulumi up`. Requires the azblob state migration above plus repo `DOCKERHUB_USERNAME` (var) + `DOCKERHUB_TOKEN` (secret) before enabling. **Superseded 2026-07-05:** the workflow now pushes to GHCR with `secrets.GITHUB_TOKEN`; no Docker Hub vars/secrets are used.
+- **CI (`deploy.yml`):** auto-deploy on `push:[master]` → `pulumi up`. Requires the azblob state migration above plus repo `DOCKERHUB_USERNAME` (var) + `DOCKERHUB_TOKEN` (secret) before enabling.
