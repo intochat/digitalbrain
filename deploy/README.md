@@ -9,7 +9,9 @@ The previous vendored DeploymentKit (hundreds of files) was deleted; this single
 current "deployment kit". See DEPLOY-STATUS.md for live resources and history.
 
 **Preferred deployment:** push to `master` (triggers `.github/workflows/deploy.yml` which builds, tests,
-pushes the kernel image to Docker Hub, then `pulumi up --stack dev` using OIDC + azblob state).
+pushes the kernel + Telegram transport images to GHCR (`ghcr.io/digitalbraintech/digitalbrain-kernel`,
+`-telegram`), authenticated via `secrets.GITHUB_TOKEN` (no Docker Hub involved), then `pulumi up --stack dev`
+using Azure OIDC + azblob state).
 
 - Stack: `dev`
 - Image tag driven by `imageTag` config or DIGITALBRAIN_IMAGE_TAG (workflow uses git sha or input)

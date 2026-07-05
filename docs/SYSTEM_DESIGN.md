@@ -89,7 +89,7 @@ Solution `Brain.slnx` lists 33 projects plus the in-repo Flutter client project 
 | `DigitalBrain.Pack.Contracts` | Executable pack contract layer — `IPackBehavior`, `PackManifest`, pack config fields, `PackEmission`, trust helpers, `ConfigurationProvided`/`ConfigFormSurface`, and `KitExperience`/`UiExperience`. References Core and UI contracts; Core does not reference this project. |
 | `DigitalBrain.SeedPacks` | Seed catalog assembly. Owns `MarketplaceSeeds` and embeds seed pack source such as `PersonalAssistantNeuron.cs` so concrete marketplace seed content no longer lives in `DigitalBrain.Core`. |
 | `DigitalBrain.Kernel` | The Orleans runtime (formerly "Silo"). `Microsoft.NET.Sdk.Web`, container-packaged. Subfolders: `Auth, Awesome, Company, Config, Context, Economics, Foundry, Gateway, Generated, Ino, Kernel, Llm, Marketplace, Protos, Sandbox, Sdk, Ui`. Owns embodiment (Foundry/Sandbox), LLM (Microsoft.Extensions.AI + Ollama/Azure OpenAI), Economics (Stripe + ECDSA licenses), Context (Qdrant), server-driven UI (`Ui`/`Protos`, bidirectional gRPC `UiGateway`), HA self-update. References every isolated ino project below for their interfaces/logic, and hosts the concrete `Neuron`-derived grain classes for Windows/Developer/Context/UiKit/Telegram.Channel/Google (see §1.3a). |
-| `DigitalBrain.Aspire` | Hosting SDK: `AddDigitalBrain`, `WireKernelSilo`, `WithMcp`, `WithOrleansDashboard`, `AddFlutterClient`, `WireTelegramTransport` — all in `DigitalBrainBuilderExtensions.cs`. Not itself an Aspire project resource (`IsAspireProjectResource=false`). |
+| `DigitalBrain.Aspire` | Hosting SDK: `AddDigitalBrain`/`WireKernelSilo` (`DigitalBrainBuilderExtensions.cs`), `AddFlutterClient`/`AddDefaultDevFlutterClient` (`FlutterAspireExtensions.cs`), `WireTelegramTransport` (`TelegramAspireExtensions.cs`), `AddSalesforceAppConfig` (`SalesforceAspireExtensions.cs`). Dashboard/MCP are enabled via `DigitalBrainOptions` defaults (`EnableOrleansDashboard`/`OrleansDashboardPort`/`EnableMcp`, default `true`/`8080`/`true`), not fluent calls. Not itself an Aspire project resource (`IsAspireProjectResource=false`). |
 | `DigitalBrain.Mcp` | MCP server (`Mcp`, an `Exe`, co-hosted on the kernel's Kestrel) exposing neuron tools (`DigitalBrainMutationTools.cs`, `DigitalBrainReadTools.cs`). References Core plus demo, UI, pack, and marketplace contracts for surface projection and pack authoring. |
 | `DigitalBrain.Telegram` | Pure shared library: transport-internal synapses (`TelegramMessageReceived`, `TelegramReplyRequested` — explicitly *not* journaled through the kernel) and `TelegramResponderNeuron`, a pure `IPackBehavior` pack. Fully self-contained — never derives from `Neuron`. References Core primitives plus pack contracts. |
 | `DigitalBrain.Telegram.Transport` | The actual ASP.NET Core webhook host — `/webhook` POST ingress, `/health`, gRPC-clients the kernel gateway. Deployed as its own container app (see 1.6). |
@@ -155,30 +155,42 @@ deliberate.
 ### 1.4 AppHost resource graph (current, `DigitalBrain.AppHost/AppHost.cs`)
 
 ```csharp
-builder.AddDigitalBrain("digitalbrain", options => {
-    LlmModel = "qwen2.5-coder:1.5b"; UseLocalMarketplace = true;
-}).WithOrleansDashboard(8080).WithMcp();                              // AppHost.cs:14-20
+var ctx = builder.AddDigitalBrain("digitalbrain", options =>
+{
+    options.WithLLM<Qwen25Coder1_5B>();
+    options.WithEmbedding<NomicEmbedText>();
+    options.WithVoice2Text<Whisper1Local>();
+    options.UseLocalMarketplace = true;
+});                                                                    // AppHost.cs:9-20
 ```
 
-`AddDigitalBrain` (`DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs:35-83`) provisions an Azure
-Storage emulator (`storage`) with a `clustering` table and `grainstate`/`journal` blob containers, an
-Orleans clustering service (`kernel`) backed by those, and an Ollama container (GPU-enabled, data
-volume) running the configured model. `WireKernelSilo` (lines 104-132) wires the kernel project to
-Orleans/clustering/grain-state/journal/LLM, adds `grpc` + `web` endpoints,
-`WithExternalHttpEndpoints()`, and **`WithReplicas(ctx.KernelReplicas)`** — default **3 replicas**
-(`DigitalBrainOptions.KernelReplicas`, line 210), overridable via `DIGITALBRAIN_KERNEL_REPLICAS`.
-Flutter client and MCP/Telegram are conditional:
+`AddDigitalBrain` (`DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs:59-178`) provisions an Azure
+Storage emulator (`storage`) with a `clustering` table and `grainstate`/`journal`/`sync` blob
+containers, an Orleans clustering service (`kernel`) backed by those, and — in run mode only — an
+Ollama container (GPU-enabled, data volume) plus a local Whisper container for voice-to-text.
+`WireKernelSilo` (lines 186-258) wires the kernel project to Orleans/clustering/grain-state/journal/LLM,
+adds `grpc` + `web` endpoints, `WithExternalHttpEndpoints()`, and **`WithReplicas(ctx.KernelReplicas)`**
+— default **3 replicas** (`DigitalBrainOptions.KernelReplicas`, line 375), overridable via
+`DIGITALBRAIN_KERNEL_REPLICAS`. Dashboard/MCP are enabled via `DigitalBrainOptions` defaults
+(`EnableOrleansDashboard`/`OrleansDashboardPort`/`EnableMcp`, lines 378-380 — default `true`/`8080`/
+`true`), not fluent post-calls on the returned context. Flutter client and MCP/Telegram are conditional:
 
-- **Flutter**: only added if `app/pubspec.yaml` resolves on disk (`ResolveDevFlutterAppPath`,
-  AppHost.cs:41-87) — `ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows")`, which runs
-  `flutter run -d windows` as an executable resource.
+- **Flutter**: `ctx.AddDefaultDevFlutterClient(kernel)` (`FlutterAspireExtensions.cs:37`) resolves
+  `app/pubspec.yaml` on disk (`ResolveDevFlutterAppPath`, same file, line 49) and returns `null` if it
+  can't be found — AppHost.cs throws `InvalidOperationException` in that case. It calls
+  `AddFlutterClient("flutter-ui", flutterPath, "windows")` internally, which runs `flutter run -d
+  windows` as an executable resource.
 - **MCP**: gated by `ctx.EnableMcp` (default true) — adds `DigitalBrain.Mcp` referencing the Orleans
   client + LLM.
 - **Telegram**: gated by env `DIGITALBRAIN_ENABLE_TELEGRAM` — adds `DigitalBrain.Telegram.Transport`
   as `telegram-bot`, wired via `ctx.WireTelegramTransport(...)`.
-All six extension methods (`AddDigitalBrain`, `WireKernelSilo`, `WithMcp`, `WithOrleansDashboard`,
-`AddFlutterClient`, `WireTelegramTransport`) live in `DigitalBrainBuilderExtensions.cs` and are real,
-not aspirational.
+
+These extension methods live across `DigitalBrain.Aspire`: `AddDigitalBrain`/`WireKernelSilo`
+(`DigitalBrainBuilderExtensions.cs`), `AddFlutterClient`/`AddDefaultDevFlutterClient`
+(`FlutterAspireExtensions.cs`), `WireTelegramTransport` (`TelegramAspireExtensions.cs`), and
+`AddSalesforceAppConfig`/`WithSalesforceAppConfig` (`SalesforceAspireExtensions.cs`) — all real, not
+aspirational. There is no `WithOrleansDashboard`/`WithMcp` fluent API; those were collapsed into the
+`DigitalBrainOptions` defaults above.
 
 ### 1.5 NeuroPack lifecycle: author → sign → publish → trust-gate → compile → embody → dispatch
 
