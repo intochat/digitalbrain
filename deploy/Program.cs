@@ -256,7 +256,9 @@ internal static class Program
                         }
                     }
                 },
-                Scale = new AppInputs.ScaleArgs { MinReplicas = 1, MaxReplicas = 5 }
+                Scale = new AppInputs.ScaleArgs { MinReplicas = 2, MaxReplicas = 5 },
+                // Give Orleans time to drain (deactivate grains, finish in-flight requests) on scale-in/redeploy before ACA SIGKILLs the pod.
+                TerminationGracePeriodSeconds = 90
             },
             Tags = StandardTags("container-app-jobs")
         }, AliasOldRuntimeParent());
