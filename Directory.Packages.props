@@ -56,6 +56,8 @@
     <!-- Context phase 2: vector store + document ingestion (latest verified) -->
     <PackageVersion Include="Qdrant.Client" Version="1.18.1" />
     <!-- Observability -->
+    <!-- Azure Monitor OTEL exporter for App Insights (Milestone M6/Task 13) — version verified via nuget.org 2026-07-05 -->
+    <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.5.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
