@@ -1,7 +1,8 @@
 name: Deploy Flutter Web
 
-# Builds the DigitalBrain Flutter client from app/ and publishes it to GitHub Pages at the
-# custom apex domain (digitalbrain.tech, set via app/web/CNAME).
+# Builds the DigitalBrain Flutter client from app/ and publishes it to Azure Static Web Apps
+# (digitalbrain-web-prod, provisioned by deploy/Program.cs), which serves the custom apex domain
+# digitalbrain.tech once DNS cutover completes (see docs/ARCHITECTURE-AND-PRODUCTION-PLAN.md M9 Task 17).
 
 on:
   push:
@@ -13,19 +14,14 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: deploy-flutter-web
   cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -44,11 +40,13 @@ jobs:
       - run: flutter build web --release --base-href "/" --no-tree-shake-icons
         working-directory: app
 
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
         with:
-          path: app/build/web
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: app/build/web
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
