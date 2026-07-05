@@ -46,7 +46,7 @@
     <PackageReference Include="Microsoft.Orleans.Persistence.Memory" />
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Streaming" />
-    <!-- Microsoft.Orleans.Dashboard added for .WithOrleansDashboard() - run 'dotnet add package Microsoft.Orleans.Dashboard' if needed for full UI -->
+    <!-- Microsoft.Orleans.Dashboard added for DigitalBrainOptions.EnableOrleansDashboard - run 'dotnet add package Microsoft.Orleans.Dashboard' if needed for full UI -->
     <ProjectReference Include="..\DigitalBrain.Context\DigitalBrain.Context.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Demo.Contracts\DigitalBrain.Demo.Contracts.csproj" />
