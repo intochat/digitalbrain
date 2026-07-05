@@ -3,6 +3,7 @@ using Pulumi;
 using Pulumi.AzureNative.Resources;
 using Storage = Pulumi.AzureNative.Storage;
 using StorageInputs = Pulumi.AzureNative.Storage.Inputs;
+using Authorization = Pulumi.AzureNative.Authorization;
 using Cognitive = Pulumi.AzureNative.CognitiveServices;
 using CognitiveInputs = Pulumi.AzureNative.CognitiveServices.Inputs;
 using OpInsights = Pulumi.AzureNative.OperationalInsights;
@@ -202,6 +203,10 @@ internal static class Program
             ResourceGroupName = resourceGroup.Name,
             Location = Region,
             ManagedEnvironmentId = containerEnvironment.Id,
+            // System-assigned identity backs the Storage Table/Blob Data Contributor role assignments below,
+            // letting Orleans clustering/grain-storage/journal authenticate via managed identity instead of
+            // the account key once DigitalBrain.Kernel's useManagedIdentity switch is live (Task 18, step 1/2).
+            Identity = new AppInputs.ManagedServiceIdentityArgs { Type = App.ManagedServiceIdentityType.SystemAssigned },
             Configuration = new AppInputs.ConfigurationArgs
             {
                 Ingress = new AppInputs.IngressArgs
@@ -253,6 +258,10 @@ internal static class Program
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__clustering", SecretRef = StorageConnectionSecret },
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__grainstate", SecretRef = StorageConnectionSecret },
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__journal", SecretRef = StorageConnectionSecret },
+                            // Read by DigitalBrain.Kernel/Program.cs to flip useManagedIdentity on. Never set in
+                            // Aspire/local config, so local dev + existing tests keep using the connection
+                            // strings above unchanged (shared-key access stays enabled until Task 18 step 5).
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Storage__AccountName", Value = storage.Name },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIEndpoint", Value = openAiEndpoint },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIKey", SecretRef = OpenAiKeySecret },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Checkpoint__Key", SecretRef = CheckpointKeySecret },
@@ -266,6 +275,22 @@ internal static class Program
             },
             Tags = StandardTags("container-app-jobs")
         }, AliasOldRuntimeParent());
+
+        // Grant the kernel's system-assigned identity data-plane access to the storage account (Task 18,
+        // step 2). GUIDs verified against Microsoft Learn's built-in-roles/storage.md source, not trusted
+        // from memory.
+        var kernelPrincipalId = kernelApp.Identity.Apply(identity => identity!.PrincipalId!);
+        GrantKernelStorageRole("kernel-storage-table-contributor", "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"); // Storage Table Data Contributor
+        GrantKernelStorageRole("kernel-storage-blob-contributor", "ba92f5b4-2d11-453d-a403-e96b0029c9fe"); // Storage Blob Data Contributor
+
+        void GrantKernelStorageRole(string resourceName, string roleDefinitionGuid) =>
+            _ = new Authorization.RoleAssignment(resourceName, new Authorization.RoleAssignmentArgs
+            {
+                PrincipalId = kernelPrincipalId,
+                PrincipalType = Authorization.PrincipalType.ServicePrincipal,
+                RoleDefinitionId = $"/providers/Microsoft.Authorization/roleDefinitions/{roleDefinitionGuid}",
+                Scope = storage.Id
+            });
 
         // The Telegram transport calls the kernel's gRPC gateway. The kernel app's external FQDN is reachable from
         // within the same ACA environment, so we build the address from LatestRevisionFqdn. Must be HTTPS
