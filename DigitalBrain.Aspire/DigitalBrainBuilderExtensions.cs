@@ -43,6 +43,7 @@ public sealed class DigitalBrainContext
     // Storage resources exposed so AppHost can wire WithReference on silo
     public required IResourceBuilder<AzureBlobStorageResource> GrainBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> JournalBlobs { get; init; }
+    public required IResourceBuilder<AzureBlobStorageResource> SyncBlobs { get; init; }
     public required IResourceBuilder<AzureTableStorageResource> ClusteringTable { get; init; }
 
     // For encapsulated dashboard + MCP (set from DigitalBrainOptions at construction, single source of truth)
@@ -92,6 +93,7 @@ public static class DigitalBrainBuilderExtensions
         var clusteringTable = storage.AddTables("clustering");
         var grainBlobs = storage.AddBlobs("grainstate");
         var journalBlobs = storage.AddBlobs("journal");
+        var syncBlobs = storage.AddBlobs("sync");
 
         var orleans = builder.AddOrleans("kernel")
             .WithClustering(clusteringTable)
@@ -170,6 +172,7 @@ public static class DigitalBrainBuilderExtensions
             EnableMcp = options.EnableMcp,
             GrainBlobs = grainBlobs,
             JournalBlobs = journalBlobs,
+            SyncBlobs = syncBlobs,
             ClusteringTable = clusteringTable
         };
     }
@@ -187,6 +190,7 @@ public static class DigitalBrainBuilderExtensions
             .WithReference(ctx.ClusteringTable)
             .WithReference(ctx.GrainBlobs)
             .WithReference(ctx.JournalBlobs)
+            .WithReference(ctx.SyncBlobs)
             .WithReference(ctx.Llm)
             .WithEndpoint(name: "grpc", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
             .WithEndpoint(

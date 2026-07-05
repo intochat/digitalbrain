@@ -45,6 +45,10 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         // Local Whisper (speaches) container for voice-to-text, always present in run mode (see Task 16).
         Assert.Contains(builder.Resources, r => r.Name == "whisper" && r.GetType().Name == "ContainerResource");
+
+        // Sync blob container (checkpoint backup/restore, M11 Task 20) — unconditional like grainstate/journal,
+        // not gated by isRunMode, but still present here as a regression guard for the resource wiring itself.
+        Assert.Contains(builder.Resources, r => r.Name == "sync" && r.GetType().Name == "AzureBlobStorageResource");
     }
 
     [Fact]
@@ -69,5 +73,9 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         // No local Whisper container in publish mode either (see Task 16).
         Assert.DoesNotContain(builder.Resources, r => r.Name == "whisper");
+
+        // Sync blob container still present in publish mode (AddAzureStorage produces a valid real-Azure
+        // resource on its own — same reasoning as grainstate/journal, see Task 20).
+        Assert.Contains(builder.Resources, r => r.Name == "sync" && r.GetType().Name == "AzureBlobStorageResource");
     }
 }
