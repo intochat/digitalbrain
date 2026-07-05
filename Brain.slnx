@@ -29,8 +29,8 @@
     <Project Path="DigitalBrain.Windows/DigitalBrain.Windows.csproj" />
   </Folder>
   <Folder Name="/hosts/">
-    <Project Path="NeuroOSPrototype.AppHost/NeuroOSPrototype.AppHost.csproj" />
-    <Project Path="NeuroOSPrototype.ServiceDefaults/NeuroOSPrototype.ServiceDefaults.csproj" />
+    <Project Path="DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+    <Project Path="DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
   </Folder>
   <Folder Name="/tests/">

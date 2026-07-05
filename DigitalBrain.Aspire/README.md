@@ -33,7 +33,7 @@ var clientApp = builder.AddProject<Projects.YourClient>("client")
     .WithReference(ctx.OrleansClient);
 ```
 
-See NeuroOSPrototype.AppHost/AppHost.cs for the canonical example (Flutter UI client, Telegram transport, and MCP wired as consumers of the kernel surfaces and synapses).
+See DigitalBrain.AppHost/AppHost.cs for the canonical example (Flutter UI client, Telegram transport, and MCP wired as consumers of the kernel surfaces and synapses).
 
 The returned context + resource enable future With* extensions while keeping the core model pure (UI events and surface updates remain Synapses delivered to neurons).
 

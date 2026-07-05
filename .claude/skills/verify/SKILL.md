@@ -8,7 +8,7 @@ description: Drive the real running DigitalBrain app (Aspire-hosted Orleans kern
 ## Launch
 
 ```bash
-aspire run --project NeuroOSPrototype.AppHost/NeuroOSPrototype.AppHost.csproj
+aspire run --project DigitalBrain.AppHost/DigitalBrain.AppHost.csproj
 ```
 
 Wait for the dashboard URL to print, then use the Aspire MCP tools (`mcp__aspire__select_apphost`,

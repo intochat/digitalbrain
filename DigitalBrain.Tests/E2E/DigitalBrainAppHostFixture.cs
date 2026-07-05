@@ -81,7 +81,7 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("DIGITALBRAIN_WEBROOT", E2EPrerequisites.WebBundleDir);
 
         // Resolve the AppHost entry point type from the referenced assembly without pulling duplicate Program symbols into global scope.
-        var appHostAssembly = Assembly.Load("NeuroOSPrototype.AppHost");
+        var appHostAssembly = Assembly.Load("DigitalBrain.AppHost");
         var programType = appHostAssembly.GetTypes().FirstOrDefault(t => t.Name == "Program")
                           ?? appHostAssembly.EntryPoint?.DeclaringType
                           ?? throw new InvalidOperationException("Could not locate AppHost Program type for DistributedApplicationTestingBuilder.");

@@ -38,7 +38,7 @@ param(
 # policies. This script checks external-process exit codes explicitly instead.
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$AppHost = 'NeuroOSPrototype.AppHost\NeuroOSPrototype.AppHost.csproj'
+$AppHost = 'DigitalBrain.AppHost\DigitalBrain.AppHost.csproj'
 $KernelFilter = @(
     'FullyQualifiedName~HomeFeedBusTests',
     'FullyQualifiedName~HomeFeedCrossSiloTests',
