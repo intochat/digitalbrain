@@ -291,7 +291,7 @@ public static class DigitalBrainBuilderExtensions
     // The DigitalBrain.UI.AspireFlutter (or equivalent) pack can later provide/override these resource bits.
     public static IResourceBuilder<ExecutableResource>? AddDefaultDevFlutterClient(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
-        var flutterPath = ResolveDevFlutterAppPath(ctx.ApplicationBuilder);
+        var flutterPath = ResolveDevFlutterAppPath(ctx.ApplicationBuilder.AppHostDirectory);
         if (string.IsNullOrEmpty(flutterPath))
             return null;
         return ctx.AddFlutterClient("flutter-ui", flutterPath, "windows")
@@ -299,35 +299,18 @@ public static class DigitalBrainBuilderExtensions
     }
 
     // Public so packs / other extensions can reuse the dev path resolution logic or provide alternatives.
-    public static string? ResolveDevFlutterAppPath(IDistributedApplicationBuilder b)
+    // Takes the app host directory directly (rather than IDistributedApplicationBuilder) so it's testable
+    // without any Aspire builder/test-double machinery.
+    public static string? ResolveDevFlutterAppPath(string appHostDirectory)
     {
         var flutterPathEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_FLUTTER_APP_PATH");
         if (!string.IsNullOrWhiteSpace(flutterPathEnv) && Directory.Exists(flutterPathEnv))
             return Path.GetFullPath(flutterPathEnv);
 
-        var appHostDir = b.AppHostDirectory;
-        var candidates = new[]
-        {
-            Path.GetFullPath(Path.Combine(appHostDir, "..", "app")),
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "app")),
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "app")),
-        };
-
-        foreach (var c in candidates)
-        {
-            if (Directory.Exists(c) && File.Exists(Path.Combine(c, "pubspec.yaml")))
-                return c;
-        }
-
-        var dir = new System.IO.DirectoryInfo(appHostDir);
-        for (int i = 0; i < 6 && dir != null; i++)
-        {
-            var candidate = Path.Combine(dir.FullName, "app");
-            if (Directory.Exists(candidate) && File.Exists(Path.Combine(candidate, "pubspec.yaml")))
-                return Path.GetFullPath(candidate);
-            dir = dir.Parent;
-        }
-        return null;
+        var canonicalPath = Path.GetFullPath(Path.Combine(appHostDirectory, "..", "app"));
+        return Directory.Exists(canonicalPath) && File.Exists(Path.Combine(canonicalPath, "pubspec.yaml"))
+            ? canonicalPath
+            : null;
     }
 }
 
