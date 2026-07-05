@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Runtime.Grpc;
@@ -35,7 +36,17 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
         {
             ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
         };
-        var grpcWebHandler = new GrpcWebHandler(GrpcWebMode.GrpcWeb, httpHandler);
+        // gRPC-Web is an HTTP/1.1-compatible transport (that's the point — browsers don't get to
+        // negotiate HTTP/2 for it either), but Grpc.Net.Client stamps every request's Version/
+        // VersionPolicy for HTTP/2 before it reaches any handler, overriding an HttpClient-level
+        // default. This endpoint answers a stamped-HTTP/2 gRPC-Web request with HTTP_1_1_REQUIRED
+        // (see the "web" endpoint's own doc comment on DigitalBrainAppHostFixture.GatewayHttpsUrl),
+        // so ForceHttp11Handler re-pins the version on the way out, after Grpc.Net.Client/GrpcWebHandler
+        // have already built the request but before it reaches the socket.
+        // GrpcWebMode.GrpcWebText (base64-framed), not the raw GrpcWeb mode: WatchHomeFeed below is a
+        // server-streaming RPC, and the Grpc.Net.Client.Web docs call out base64 framing as required
+        // for server streaming over gRPC-Web.
+        var grpcWebHandler = new GrpcWebHandler(GrpcWebMode.GrpcWebText, new ForceHttp11Handler(httpHandler));
         using var channel = GrpcChannel.ForAddress(_fx.GatewayHttpsUrl, new GrpcChannelOptions { HttpHandler = grpcWebHandler });
         var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
 
@@ -78,5 +89,15 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
         catch (RpcException) { }
         catch (OperationCanceledException) { }
         return false;
+    }
+
+    sealed class ForceHttp11Handler(HttpMessageHandler innerHandler) : DelegatingHandler(innerHandler)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            request.Version = HttpVersion.Version11;
+            request.VersionPolicy = HttpVersionPolicy.RequestVersionExact;
+            return base.SendAsync(request, cancellationToken);
+        }
     }
 }

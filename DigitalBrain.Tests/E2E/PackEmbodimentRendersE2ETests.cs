@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DigitalBrain.Runtime.Grpc;
 using Grpc.Core;
 
@@ -41,17 +40,19 @@ public sealed class PackEmbodimentRendersE2ETests(DigitalBrainAppHostFixture fix
         Assert.True(await delivered, $"Surface '{surfaceId}' was not delivered over WatchHomeFeed");
     }
 
+    // SurfaceDemoRequested's handler (GatewayService.InstallAndRunSurfaceDemoAsync) threads the
+    // incoming request's own CorrelationId straight through to every ActivityGraphSurface it
+    // broadcasts (SurfaceDemoRuntime.ActivityGraphSurface sets UiSurface.CorrelationId = correlationId,
+    // and UiSurfaceRfwBridge's default branch carries that onto RfwCardEnvelope.CorrelationId
+    // unchanged) — so matching on the envelope's own CorrelationId is exact, unlike the surface's
+    // internal "surfaceId" prop, which ActivityGraphSurface hardcodes to an unrelated constant.
     static async Task<bool> ReadForSurfaceIdAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string surfaceId, CancellationToken ct)
     {
         try
         {
             while (await stream.MoveNext(ct))
             {
-                var json = stream.Current.DataJson;
-                if (string.IsNullOrEmpty(json)) continue;
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("surfaceId", out var sid) && sid.GetString() == surfaceId)
-                    return true;
+                if (stream.Current.CorrelationId == surfaceId) return true;
             }
         }
         catch (RpcException) { }
