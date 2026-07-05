@@ -80,7 +80,9 @@ jobs:
       - name: Capture kernel FQDN
         id: kernel_fqdn
         working-directory: deploy
-        run: echo "fqdn=$(pulumi stack output kernelFqdn --stack dev)" >> "$GITHUB_OUTPUT"
+        run: |
+          fqdn=$(pulumi stack output kernelFqdn --stack dev)
+          echo "fqdn=$fqdn" >> "$GITHUB_OUTPUT"
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
           AZURE_STORAGE_ACCOUNT: digitalbrainstprod
