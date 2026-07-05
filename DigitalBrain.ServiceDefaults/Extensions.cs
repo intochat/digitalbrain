@@ -110,9 +110,11 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Mapped in every environment: ACA's liveness/readiness probes (Milestone M5/Task 11) hit these
-        // over the container's internal port, never through the external ingress, so there is no public
-        // exposure to gate on environment.
+        // Mapped in every environment - ACA's liveness/readiness probes (Milestone M5/Task 11) need to
+        // reach these. Note: today these share the same port and ingress as all other kernel traffic (no
+        // internal-only probe port exists yet), so /health and /alive are also reachable from the public
+        // FQDN once deployed - low risk since responses carry only up/down status and check names, no
+        // secrets, but worth revisiting if a tighter internal-only probe path is ever added.
         app.MapHealthChecks(HealthEndpointPath);
 
         app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
