@@ -11,7 +11,7 @@ public sealed class ResolveDevFlutterAppPathTests
         Directory.CreateDirectory(tempAppHostDir);
         try
         {
-            var result = DigitalBrainBuilderExtensions.ResolveDevFlutterAppPath(tempAppHostDir);
+            var result = FlutterAspireExtensions.ResolveDevFlutterAppPath(tempAppHostDir);
 
             Assert.Null(result);
         }
