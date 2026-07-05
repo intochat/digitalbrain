@@ -31,6 +31,11 @@ public sealed class DigitalBrainContext
     // publish mode for the same reason as OllamaEndpoint (no local Ollama container to point at).
     public EndpointReference? EmbeddingOllamaEndpoint { get; init; }
 
+    // Local Whisper (speaches) container http endpoint for DigitalBrain__Voice__Endpoint injection; null in
+    // publish mode (no local Whisper container — externally-hosted voice endpoints are wired via a manually
+    // configured DigitalBrain:Voice:Endpoint instead, same as prod LLM/embedding wiring).
+    public EndpointReference? WhisperEndpoint { get; init; }
+
     // Set only when LlmProvider is "azureopenai" (WithLLM<TModel>() where TModel.Provider == "azureopenai")
     public IResourceBuilder<ParameterResource>? AzureOpenAIEndpoint { get; init; }
     public IResourceBuilder<ParameterResource>? AzureOpenAIKey { get; init; }
@@ -119,6 +124,30 @@ public static class DigitalBrainBuilderExtensions
             qwen = builder.AddConnectionString("qwen");
         }
 
+        // Local Whisper server for voice-to-text (speech-to-text), same run-mode-only guard as Ollama above:
+        // `aspire publish` never emits this container into a publish manifest — prod voice endpoints are wired
+        // externally via a manually configured DigitalBrain:Voice:Endpoint (see WireKernelSilo).
+        //
+        // Image: ghcr.io/speaches-ai/speaches (the actively-maintained continuation of fedirz/faster-whisper-server,
+        // which was archived and renamed upstream — see https://github.com/speaches-ai/speaches). It genuinely
+        // speaks the OpenAI-compatible POST /v1/audio/transcriptions contract that VoiceTranscription.cs's
+        // OpenAICompatibleVoiceTranscriber calls, unlike onerahmet/openai-whisper-asr-webservice's non-OpenAI-shaped
+        // /asr route. The "-cpu" tag avoids requiring host GPU/CUDA drivers for local dev; swap to "latest-cuda" and
+        // add container GPU args if faster inference is needed. "whisper-1" (Whisper1Local.Id) resolves via
+        // speaches' built-in model alias map to Systran/faster-whisper-large-v3 with no extra config required.
+        EndpointReference? whisperEndpoint = null;
+        if (isRunMode)
+        {
+            var whisper = builder.AddContainer("whisper", "speaches-ai/speaches")
+                .WithImageRegistry("ghcr.io")
+                .WithImageTag("latest-cpu")
+                .WithEnvironment("ENABLE_UI", "false")
+                .WithEnvironment("WHISPER__COMPUTE_TYPE", "int8")
+                .WithHttpEndpoint(targetPort: 8000, name: "http")
+                .WithVolume("whisper-cache", "/home/ubuntu/.cache/huggingface/hub");
+            whisperEndpoint = whisper.GetEndpoint("http");
+        }
+
         return new DigitalBrainContext
         {
             Name = name,
@@ -133,6 +162,7 @@ public static class DigitalBrainBuilderExtensions
             LlmProvider = llmProvider,
             OllamaEndpoint = ollamaEndpoint,
             EmbeddingOllamaEndpoint = embeddingOllamaEndpoint,
+            WhisperEndpoint = whisperEndpoint,
             AzureOpenAIEndpoint = azureOpenAIEndpoint,
             AzureOpenAIKey = azureOpenAIKey,
             EnableOrleansDashboard = options.EnableOrleansDashboard,
@@ -177,13 +207,11 @@ public static class DigitalBrainBuilderExtensions
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
         if (ctx.OllamaEndpoint is not null)
         {
-            kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
-                ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
+            kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint", HttpUrl(ctx.OllamaEndpoint));
         }
         if (ctx.EmbeddingOllamaEndpoint is not null)
         {
-            kernel.WithEnvironment("DigitalBrain__Embedding__OllamaEndpoint",
-                ReferenceExpression.Create($"http://{ctx.EmbeddingOllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.EmbeddingOllamaEndpoint.Property(EndpointProperty.Port)}"));
+            kernel.WithEnvironment("DigitalBrain__Embedding__OllamaEndpoint", HttpUrl(ctx.EmbeddingOllamaEndpoint));
         }
         kernel.WithModelRegistry(ctx);
 
@@ -198,7 +226,23 @@ public static class DigitalBrainBuilderExtensions
 
         kernel.WithOptionalEnvironment("DigitalBrain:Voice:Provider", "DIGITALBRAIN_VOICE_PROVIDER", "DigitalBrain__Voice__Provider");
         kernel.WithOptionalEnvironment("DigitalBrain:Voice:Model", "DIGITALBRAIN_VOICE_MODEL", "DigitalBrain__Voice__Model");
-        kernel.WithOptionalEnvironment("DigitalBrain:Voice:Endpoint", "DIGITALBRAIN_VOICE_ENDPOINT", "DigitalBrain__Voice__Endpoint");
+
+        // A manually configured endpoint (e.g. an externally-hosted Whisper/OpenAI service) always wins, for
+        // backward compat with anyone already relying on it. Otherwise, default to the local Whisper container
+        // (see ctx.WhisperEndpoint above) whenever one is present (run mode only) — /v1 is the path segment
+        // speaches (ghcr.io/speaches-ai/speaches) exposes its OpenAI-compatible route under; TranscriptionEndpoint
+        // in VoiceTranscription.cs appends "/audio/transcriptions" on top of this base.
+        var manualVoiceEndpoint = ctx.ApplicationBuilder.Configuration["DigitalBrain:Voice:Endpoint"]
+            ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_VOICE_ENDPOINT");
+        if (!string.IsNullOrWhiteSpace(manualVoiceEndpoint))
+        {
+            kernel.WithEnvironment("DigitalBrain__Voice__Endpoint", manualVoiceEndpoint);
+        }
+        else if (ctx.WhisperEndpoint is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Voice__Endpoint", HttpUrl(ctx.WhisperEndpoint, "/v1"));
+        }
+
         kernel.WithOptionalEnvironment("DigitalBrain:Voice:ApiKey", "DIGITALBRAIN_VOICE_API_KEY", "DigitalBrain__Voice__ApiKey");
 
         if (ctx.EnableOrleansDashboard && ctx.OrleansDashboardPort.HasValue)
@@ -208,6 +252,12 @@ public static class DigitalBrainBuilderExtensions
 
         return kernel;
     }
+
+    // Builds "http://{host}:{port}{pathSuffix}" against a container endpoint discovered at orchestration time
+    // (Ollama, its embedding alias, or Whisper) — shared by the three call sites in WireKernelSilo above so the
+    // host/port interpolation lives in exactly one place.
+    private static ReferenceExpression HttpUrl(EndpointReference endpoint, string pathSuffix = "") =>
+        ReferenceExpression.Create($"http://{endpoint.Property(EndpointProperty.Host)}:{endpoint.Property(EndpointProperty.Port)}{pathSuffix}");
 
     private static void WithModelRegistry(this IResourceBuilder<ProjectResource> kernel, DigitalBrainContext ctx)
     {
