@@ -43,7 +43,9 @@ public static class KernelServices
     }
 
     // Registers the "sync" BlobContainerClient (Task 20's provisioned container, ConnectionStrings__sync locally/
-    // Aspire-hosted) and CheckpointBackupTrigger. Mirrors the useManagedIdentity branch Program.cs already uses
+    // Aspire-hosted), CheckpointBackupTrigger, and CheckpointRestoreTrigger (the cloud->local restore/bootstrap
+    // half, Task 22). Both triggers share this single BlobContainerClient registration. Mirrors the
+    // useManagedIdentity branch Program.cs already uses
     // for clustering/grainstate/journal/packConfigBlobs (Task 18): a real Azure storage account
     // (DigitalBrain:Storage:AccountName set — only true on the ACA deploy) authenticates via TokenCredential;
     // everywhere else (Aspire/local Azurite, tests) falls back to the injected connection string. Keeping "sync"
@@ -67,6 +69,7 @@ public static class KernelServices
             return blobServiceClient.GetBlobContainerClient("sync");
         });
         services.AddSingleton<CheckpointBackupTrigger>();
+        services.AddSingleton<CheckpointRestoreTrigger>();
         return services;
     }
 }
