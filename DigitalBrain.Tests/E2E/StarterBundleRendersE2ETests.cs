@@ -1,29 +1,51 @@
+using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Tests.Authoring;
+using Grpc.Core;
 
 namespace DigitalBrain.Tests.E2E;
 
 [Trait("Category", "E2E")]
 [Collection(nameof(DigitalBrainE2ECollection))]
-public sealed class StarterBundleRendersE2ETests(DigitalBrainBrowserFixture fixture)
+public sealed class StarterBundleRendersE2ETests(DigitalBrainAppHostFixture fixture)
 {
-    readonly DigitalBrainBrowserFixture _fx = fixture;
+    readonly DigitalBrainAppHostFixture _fx = fixture;
 
     [SkippableFact]
-    public async Task Starter_asks_then_echoes()
+    public async Task Starter_asks_then_echoes_over_the_real_wire()
     {
-        E2EPrerequisites.RequireRenderE2E();
+        E2EPrerequisites.RequireRealStackE2E();
 
-        var driver = new LiveRenderVerifier(
-            _fx, pack: StarterBundleSource.Pack, experienceId: StarterBundleSource.ExperienceId);
-        await driver.PublishAndInstallAsync(StarterBundleSource.Code, description: "Starter bundle");
-        await driver.OpenAsync();
+        await _fx.PublishPackAsync(StarterBundleSource.Pack, "1.0", code: StarterBundleSource.Code,
+            description: "Starter bundle");
+        await _fx.InstallPackAsync(StarterBundleSource.Pack, "1.0", buyer: "e2e-starter");
 
-        await driver.SendUserActionAsync("start");
-        await driver.AssertSurfaceRenderedAsync(StarterBundleSource.Hops.Ask);
+        using var channel = _fx.CreateGatewayGrpcChannel();
+        var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest(), cancellationToken: cts.Token);
+        await Task.Delay(750, cts.Token);
 
-        await driver.SendUserActionAsync(StarterBundleSource.Hops.Result, ("message", "ping"));
-        await driver.AssertSurfaceRenderedAsync(StarterBundleSource.Hops.Result);
+        var askDelivered = ReadForSurfaceIdAsync(feed.ResponseStream, StarterBundleSource.Hops.Ask, cts.Token);
+        await _fx.SendExperienceStepAsync(StarterBundleSource.Pack, StarterBundleSource.ExperienceId, "start");
+        Assert.True(await askDelivered, $"'{StarterBundleSource.Hops.Ask}' hop was not delivered over WatchHomeFeed");
 
-        await _fx.Page.Locator("text=You said: ping").WaitForAsync(new() { Timeout = 30_000 });
+        var resultDelivered = ReadForSurfaceIdAsync(feed.ResponseStream, StarterBundleSource.Hops.Result, cts.Token);
+        await _fx.SendExperienceStepAsync(StarterBundleSource.Pack, StarterBundleSource.ExperienceId,
+            StarterBundleSource.Hops.Result, new Dictionary<string, string> { ["message"] = "ping" });
+        Assert.True(await resultDelivered, $"'{StarterBundleSource.Hops.Result}' hop was not delivered over WatchHomeFeed");
+    }
+
+    static async Task<bool> ReadForSurfaceIdAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string surfaceId, CancellationToken ct)
+    {
+        try
+        {
+            while (await stream.MoveNext(ct))
+            {
+                if (stream.Current.CorrelationId == surfaceId) return true;
+            }
+        }
+        catch (RpcException) { }
+        catch (OperationCanceledException) { }
+        return false;
     }
 }

@@ -1,53 +1,82 @@
-using Microsoft.Playwright;
+using System.Text.Json;
+using DigitalBrain.Core;
+using DigitalBrain.Runtime.Grpc;
+using Google.Protobuf;
+using Grpc.Core;
+using Grpc.Net.Client;
+using Grpc.Net.Client.Web;
 
 namespace DigitalBrain.Tests.E2E;
 
-// Regression guard for the gRPC-Web action-dispatch fix: the browser uses gRPC-Web (no
-// client/bidi streaming), so kit/form actions must travel over the UNARY Send RPC, not the
-// bidirectional EngageUiSession. Before the fix, clicking Sign In sent the LoginRequest over
-// EngageUiSession, which gRPC-Web silently cannot carry, so nothing happened. This drives the
-// real login form in a real browser and asserts the signed-in shell renders.
+// Regression guard for the gRPC-Web action-dispatch fix: the browser uses gRPC-Web (no client/bidi
+// streaming), so kit/form actions must travel over the UNARY Send RPC, not the bidirectional
+// EngageUiSession. This drives a real login over a real GrpcWebHandler-wrapped channel (the same
+// transport wrapper a browser's gRPC-Web fetch implementation uses) against the real Aspire-hosted
+// kernel, and asserts the server-side signed-in broadcast reaches WatchHomeFeed.
+//
+// Narrower than before: this no longer exercises Flutter's own dispatch code, so it can't catch a
+// regression where the Flutter login button starts calling EngageUiSession again — only Flutter's own
+// widget/unit tests could catch that, and those are intentionally scoped to ui_kit only (see
+// docs/superpowers/specs/2026-07-05-e2e-testing-without-playwright-design.md). What this still proves:
+// the server's Send/LoginRequest path works end-to-end over the gRPC-Web transport.
 [Trait("Category", "E2E")]
 [Collection(nameof(DigitalBrainE2ECollection))]
-public sealed class LoginRendersE2ETests(DigitalBrainBrowserFixture fixture)
+public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
 {
-    readonly DigitalBrainBrowserFixture _fx = fixture;
+    readonly DigitalBrainAppHostFixture _fx = fixture;
 
     [SkippableFact]
-    public async Task Signing_in_dispatches_over_unary_send_and_renders_the_shell()
+    public async Task Login_over_grpc_web_send_broadcasts_signed_in_session()
     {
-        E2EPrerequisites.RequireRenderE2E();
+        E2EPrerequisites.RequireRealStackE2E();
 
-        // The shell at "/" shows the login surface (sent when WatchHomeFeed opens). Wait for the
-        // feed response so the stream is live before we interact (HomeFeedBus has no replay).
-        var shellUrl = _fx.GatewayHttpsUrl.TrimEnd('/') + "/#/";
-        await _fx.Page.RunAndWaitForResponseAsync(
-            () => _fx.Page.GotoAsync(shellUrl, new() { WaitUntil = WaitUntilState.Load }),
-            r => r.Url.Contains("WatchHomeFeed"),
-            new() { Timeout = 60_000 });
+        var clientId = "e2e-login-" + Guid.NewGuid().ToString("N")[..8];
+        var httpHandler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+        };
+        var grpcWebHandler = new GrpcWebHandler(GrpcWebMode.GrpcWeb, httpHandler);
+        using var channel = GrpcChannel.ForAddress(_fx.GatewayHttpsUrl, new GrpcChannelOptions { HttpHandler = grpcWebHandler });
+        var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
 
-        var shotDir = Path.Combine(AppContext.BaseDirectory, "e2e-screenshots");
-        Directory.CreateDirectory(shotDir);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest { ClientId = clientId }, cancellationToken: cts.Token);
+        var delivered = ReadForSignedInAsync(feed.ResponseStream, clientId, cts.Token);
+        await Task.Delay(750, cts.Token);
 
-        // First-user provisioning: on fresh state any credentials bootstrap the admin account.
-        var username = _fx.Page.Locator("[flt-semantics-identifier=\"field-username\"]");
-        await username.WaitForAsync(new() { Timeout = 60_000 });
-        await _fx.Page.ScreenshotAsync(new() { Path = Path.Combine(shotDir, "e2e-login-form.png") });
+        await client.SendAsync(new SynapseEnvelope
+        {
+            CorrelationId = "e2e-login",
+            TypeName = nameof(LoginRequest),
+            Payload = ByteString.CopyFromUtf8(JsonSerializer.Serialize(new
+            {
+                username = "e2e-admin",
+                password = "e2e-password",
+                clientId,
+            })),
+        }, cancellationToken: cts.Token);
 
-        await username.ClickAsync();
-        await _fx.Page.Keyboard.TypeAsync("e2e-admin");
+        Assert.True(await delivered, "Signed-in session broadcast was not delivered to WatchHomeFeed");
+    }
 
-        var password = _fx.Page.Locator("[flt-semantics-identifier=\"field-password\"]");
-        await password.ClickAsync();
-        await _fx.Page.Keyboard.TypeAsync("e2e-password");
-
-        await _fx.Page.Locator("[flt-semantics-identifier=\"form-submit\"]").ClickAsync();
-
-        // The signed-in shell tree only arrives over WatchHomeFeed AFTER the kernel handles the
-        // LoginRequest — i.e. only if the unary Send dispatch reached the server.
-        var shell = _fx.Page.Locator("[flt-semantics-identifier=\"app-shell-ready\"]");
-        await shell.WaitForAsync(new() { Timeout = 30_000 });
-        Assert.Equal(1, await shell.CountAsync());
-        await _fx.Page.ScreenshotAsync(new() { Path = Path.Combine(shotDir, "e2e-login-signed-in.png") });
+    static async Task<bool> ReadForSignedInAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string clientId, CancellationToken ct)
+    {
+        try
+        {
+            while (await stream.MoveNext(ct))
+            {
+                var json = stream.Current.DataJson;
+                if (string.IsNullOrEmpty(json)) continue;
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("status", out var status) && status.GetString() == "signed-in" &&
+                    doc.RootElement.TryGetProperty("clientId", out var cid) && cid.GetString() == clientId)
+                {
+                    return true;
+                }
+            }
+        }
+        catch (RpcException) { }
+        catch (OperationCanceledException) { }
+        return false;
     }
 }

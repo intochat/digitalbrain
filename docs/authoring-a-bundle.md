@@ -33,42 +33,25 @@ cd brain
 dotnet test DigitalBrain.Tests --filter "FullyQualifiedName~MyBundleTests"
 ```
 
-### 2. Render loop (tens of seconds, real Flutter) — run before publishing
+### 2. Real-stack loop (tens of seconds, real Aspire + real gRPC) — run before publishing
 
-`LiveRenderVerifier` publishes + installs your bundle into the full Aspire stack and drives
-the real Flutter renderer, asserting surfaces via Flutter Semantics and capturing screenshots.
+Publish + install your bundle into the full Aspire stack and drive it over a real gRPC
+`WatchHomeFeed`/`Send` call, asserting on the delivered `RfwCardEnvelope` payload — see
+`DigitalBrain.Tests/E2E/TravelPlanTripRendersE2ETests.cs` for the pattern. No browser, no Flutter
+build — Flutter's own rendering fidelity is covered separately by its `app/test/ui_kit/**` widget tests.
 
-Prerequisites (gated by `E2EPrerequisites.RequireRenderE2E()` so it skips unless you opt in):
+Gated by `E2EPrerequisites.RequireRealStackE2E()` so it skips unless you opt in:
 
 ```sh
-# 1. Build the Flutter web bundle once (non-constant IconData needs --no-tree-shake-icons):
-cd app
-flutter build web --release --no-tree-shake-icons --dart-define=DIGITALBRAIN_E2E=true
-
-# 2. Run the render E2E with the opt-in flag:
-cd ../brain
-RUN_FLUTTER_E2E=true dotnet test DigitalBrain.Tests --filter "FullyQualifiedName~MyBundleRendersE2ETests"
+cd brain
+RUN_REAL_STACK_E2E=true dotnet test DigitalBrain.Tests --filter "FullyQualifiedName~MyBundleRendersE2ETests"
 ```
 
 **One-time Visual Studio setup (recommended):** Test > Configure Run Settings > Select Solution
 Wide runsettings File > `e2e.runsettings`. After this, running any `E2E`-tagged test from Test
-Explorer already has `RUN_FLUTTER_E2E=true` and `FAST_UI_E2E=1` set — no terminal needed.
+Explorer already has `RUN_REAL_STACK_E2E=true` set — no terminal needed.
 
-**CLI equivalent**, if you'd rather not touch VS settings:
-
-```sh
-cd brain
-dotnet test DigitalBrain.Tests --settings e2e.runsettings --filter "FullyQualifiedName~MyBundleRendersE2ETests"
-```
-
-Other useful env flags (set manually, either way, when you want them):
-
-- `DIGITALBRAIN_E2E_HEADED=true` — force a visible browser (already the default outside CI).
-- `DIGITALBRAIN_E2E_SLOWMO=500` — slow Playwright actions (ms) so you can see each step.
-- `DIGITALBRAIN_E2E_REPLICAS=1` — kernel replicas for the test stack (default 1).
-
-While iterating visually you can also attach the dart MCP tools (`get_widget_tree`,
-`hot_reload`) to a running debug Flutter app.
+Other useful env flag: `DIGITALBRAIN_E2E_REPLICAS=1` — kernel replicas for the test stack (default 1).
 
 ### Warm dev cluster (fastest — skips the 30-120s Aspire boot)
 
@@ -98,8 +81,8 @@ there is no persisted store to clean up.
    for your entry hop.
 3. Edit your bundle source until the fast test is green.
 4. Copy `DigitalBrain.Tests/E2E/StarterBundleRendersE2ETests.cs`; run it from Test Explorer
-   (with `e2e.runsettings` wired up, per the Render loop section above) or with
-   `dotnet test --settings e2e.runsettings ...` to watch it render.
+   (with `e2e.runsettings` wired up, per the real-stack loop section above) or with
+   `RUN_REAL_STACK_E2E=true dotnet test --filter "~MyBundleRendersE2ETests"` to prove the real wire.
 5. When both are green, the bundle is publishable.
 
 ## Lightweight automations complement bundles
