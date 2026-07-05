@@ -44,7 +44,7 @@ if (ctx.EnableMcp)
     // Expose DigitalBrain MCP (stdio tools) as resource so aspire mcp call can discover registered tools: run_closed_loop, ask_ino, publish_to_marketplace, list_marketplace, etc.
     var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp")
         .WithReference(ctx.OrleansClient)
-        .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm);
+        .WithReference(ctx.Llm);
 }
 
 if (IsEnabled("DIGITALBRAIN_ENABLE_TELEGRAM"))
