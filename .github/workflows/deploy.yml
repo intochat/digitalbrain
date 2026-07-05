@@ -76,3 +76,24 @@ jobs:
           stack-name: dev
           work-dir: deploy
           cloud-url: azblob://pulumi-state
+
+      - name: Capture kernel FQDN
+        id: kernel_fqdn
+        working-directory: deploy
+        run: echo "fqdn=$(pulumi stack output kernelFqdn --stack dev)" >> "$GITHUB_OUTPUT"
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
+          AZURE_STORAGE_ACCOUNT: digitalbrainstprod
+
+      - name: Post-deploy smoke test
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS "https://${{ steps.kernel_fqdn.outputs.fqdn }}/health"; then
+              echo "Kernel healthy."
+              exit 0
+            fi
+            echo "Attempt $i: kernel not ready yet, retrying in 10s..."
+            sleep 10
+          done
+          echo "Kernel did not become healthy within 100s." >&2
+          exit 1
