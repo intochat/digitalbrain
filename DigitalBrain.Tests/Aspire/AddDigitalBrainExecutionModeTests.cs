@@ -38,6 +38,10 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         var qwen = Assert.Single(builder.Resources, r => r.Name == "qwen");
         Assert.Equal("OllamaModelResource", qwen.GetType().Name);
+
+        // nomic-embed-text pulled into the same Ollama container as qwen (see Task 15).
+        var embed = Assert.Single(builder.Resources, r => r.Name == "embed");
+        Assert.Equal("OllamaModelResource", embed.GetType().Name);
     }
 
     [Fact]
@@ -56,5 +60,8 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         var qwen = Assert.Single(builder.Resources, r => r.Name == "qwen");
         Assert.Equal("ConnectionStringParameterResource", qwen.GetType().Name);
+
+        // No local Ollama container in publish mode, so no "embed" model resource either (see Task 15).
+        Assert.DoesNotContain(builder.Resources, r => r.Name == "embed");
     }
 }
