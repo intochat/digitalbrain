@@ -116,7 +116,7 @@ Each milestone below maps 1:1 to a row of the old "Sequenced Checklist" so nothi
 
 **Steps:**
 
-- [ ] **Step 1: Replace the Docker Hub login + kernel publish steps with GHCR login + both images' publish steps**
+- [x] **Step 1: Replace the Docker Hub login + kernel publish steps with GHCR login + both images' publish steps**
 
 In `.github/workflows/deploy.yml`, replace lines 35-46:
 
@@ -160,7 +160,7 @@ with:
             -p:ContainerImageTag="${TAG}"
 ```
 
-- [ ] **Step 2: Point Pulumi at the GHCR image repositories**
+- [x] **Step 2: Point Pulumi at the GHCR image repositories**
 
 In `deploy/Program.cs`, replace lines 28-31:
 
@@ -181,7 +181,7 @@ with:
     private const string TelegramImageRepository = "ghcr.io/digitalbraintech/digitalbrain-telegram";
 ```
 
-- [ ] **Step 3: Make both GHCR packages public (first push only, one-time)**
+- [x] **Step 3: Make both GHCR packages public (first push only, one-time)**
 
 GHCR packages default to private on first push, which ACA cannot pull without registry credentials. After the first workflow run pushes the images once (Task 2 must also be done for the workflow to reach `pulumi up`, but the image-publish steps alone will succeed once GHCR login works), set both packages public:
 
@@ -192,7 +192,7 @@ gh api -X PATCH /orgs/digitalbraintech/packages/container/digitalbrain-telegram 
 
 If `digitalbraintech` is a personal account rather than an org, use `/user/packages/container/{name}` instead of `/orgs/digitalbraintech/packages/container/{name}`.
 
-- [ ] **Step 4: Verify locally that both projects still produce a valid container image target**
+- [x] **Step 4: Verify locally that both projects still produce a valid container image target**
 
 ```bash
 dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer -p:ContainerRegistry=ghcr.io -p:ContainerRepository=digitalbraintech/digitalbrain-kernel -p:ContainerImageTag=local-verify
@@ -200,14 +200,14 @@ dotnet publish DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.c
 ```
 Expected: both commands end with `Pushed image ... to registry` or a local-only build success (no registry push without login is fine — the goal here is confirming both `.csproj`s have `PublishContainer` support and no compile errors, not to actually push from a dev box).
 
-- [ ] **Step 5: Grep-confirm no remaining Docker Hub references**
+- [x] **Step 5: Grep-confirm no remaining Docker Hub references**
 
 ```bash
 grep -rn "docker.io\|DOCKERHUB" --include="*.yml" --include="*.cs" .github deploy
 ```
 Expected: zero matches.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .github/workflows/deploy.yml deploy/Program.cs
@@ -220,7 +220,7 @@ git commit -m "ci: switch container images from Docker Hub to GHCR, add Telegram
 
 **Steps:**
 
-- [ ] **Step 1: Create the Azure AD application and service principal**
+- [x] **Step 1: Create the Azure AD application and service principal**
 
 ```bash
 APP_ID=$(az ad app create --display-name "digitalbrain-deploy" --query appId -o tsv)
@@ -298,7 +298,7 @@ This must be done as one atomic task — a partial rename leaves the solution no
 
 **Steps:**
 
-- [ ] **Step 1: Rename the two project folders and their `.csproj` files with `git mv` (preserves history)**
+- [x] **Step 1: Rename the two project folders and their `.csproj` files with `git mv` (preserves history)**
 
 ```bash
 git mv NeuroOSPrototype.AppHost DigitalBrain.AppHost
@@ -307,7 +307,7 @@ git mv NeuroOSPrototype.ServiceDefaults DigitalBrain.ServiceDefaults
 git mv DigitalBrain.ServiceDefaults/NeuroOSPrototype.ServiceDefaults.csproj DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj
 ```
 
-- [ ] **Step 2: Fix the namespace in ServiceDefaults**
+- [x] **Step 2: Fix the namespace in ServiceDefaults**
 
 In `DigitalBrain.ServiceDefaults/Extensions.cs:11`, change:
 ```csharp
@@ -318,7 +318,7 @@ to:
 namespace DigitalBrain.ServiceDefaults;
 ```
 
-- [ ] **Step 3: Fix the `using` in Kernel's Program.cs**
+- [x] **Step 3: Fix the `using` in Kernel's Program.cs**
 
 In `DigitalBrain.Kernel/Program.cs:22`, change:
 ```csharp
@@ -329,7 +329,7 @@ to:
 using DigitalBrain.ServiceDefaults;
 ```
 
-- [ ] **Step 4: Fix the two `.csproj` ProjectReference paths**
+- [x] **Step 4: Fix the two `.csproj` ProjectReference paths**
 
 In `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj:65`, change:
 ```xml
@@ -349,7 +349,7 @@ to:
 <ProjectReference Include="..\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" Aliases="AppHostProject" />
 ```
 
-- [ ] **Step 5: Fix the `Assembly.Load` string in the E2E fixture**
+- [x] **Step 5: Fix the `Assembly.Load` string in the E2E fixture**
 
 In `DigitalBrain.Tests/E2E/DigitalBrainAppHostFixture.cs:84`, change:
 ```csharp
@@ -360,11 +360,11 @@ to:
 Assembly.Load("DigitalBrain.AppHost")
 ```
 
-- [ ] **Step 6: Fix `Brain.slnx`**
+- [x] **Step 6: Fix `Brain.slnx`**
 
 In `Brain.slnx:32-33`, update both project path strings from `NeuroOSPrototype.AppHost\NeuroOSPrototype.AppHost.csproj` / `NeuroOSPrototype.ServiceDefaults\NeuroOSPrototype.ServiceDefaults.csproj` to `DigitalBrain.AppHost\DigitalBrain.AppHost.csproj` / `DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj`.
 
-- [ ] **Step 7: Fix `aspire.config.json`**
+- [x] **Step 7: Fix `aspire.config.json`**
 
 In `aspire.config.json:2-4`, change:
 ```json
@@ -375,7 +375,7 @@ to:
 "appHost": { "path": "DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" }
 ```
 
-- [ ] **Step 8: Fix `scripts/verify-fast.ps1:41`**
+- [x] **Step 8: Fix `scripts/verify-fast.ps1:41`**
 
 Change:
 ```powershell
@@ -386,32 +386,32 @@ to:
 $AppHost = 'DigitalBrain.AppHost\DigitalBrain.AppHost.csproj'
 ```
 
-- [ ] **Step 9: Update remaining doc references**
+- [x] **Step 9: Update remaining doc references**
 
 Update every `NeuroOSPrototype` occurrence in `DigitalBrain.Aspire/README.md:36`, `README.md:19,98`, `docs/SYSTEM_DESIGN.md:104,155,308,366`, `demo/DEMO-SCRIPT.md:172`, `ARCHITECTURE_CLEANUP_PROPOSAL.md:126`, and `.claude/skills/verify/SKILL.md:11` to the corresponding `DigitalBrain.AppHost` / `DigitalBrain.ServiceDefaults` name.
 
-- [ ] **Step 10: Build the full solution**
+- [x] **Step 10: Build the full solution**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
 ```
 Expected: `Build succeeded. 0 Error(s)`.
 
-- [ ] **Step 11: Run the fast test lane (per this repo's CLAUDE.md convention: high severity, must be green)**
+- [x] **Step 11: Run the fast test lane (per this repo's CLAUDE.md convention: high severity, must be green)**
 
 ```bash
 dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualifiedName!~E2E"
 ```
 Expected: all tests pass, including `DigitalBrain.Tests` cases that reference `AppHostProject` (the alias, confirmed still valid via Step 4).
 
-- [ ] **Step 12: Grep-verify zero remaining references outside the intentionally-untouched historical plan**
+- [x] **Step 12: Grep-verify zero remaining references outside the intentionally-untouched historical plan**
 
 ```bash
 grep -rln "NeuroOSPrototype" --include="*.cs*" --include="*.json" --include="*.slnx" --include="*.yml" --include="*.md" --include="*.ps1" . | grep -v "docs/superpowers/plans/2026-07-04-salesforce-oauth-callback-grain-routing.md"
 ```
 Expected: empty output.
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 git add -A
@@ -432,13 +432,13 @@ git commit -m "rename: NeuroOSPrototype.AppHost/ServiceDefaults -> DigitalBrain.
 
 **Steps:**
 
-- [ ] **Step 1: List the exact files being moved (confirm the set before moving)**
+- [x] **Step 1: List the exact files being moved (confirm the set before moving)**
 
 ```bash
 ls CONTINUATION_PROMPT.md CONTINUITY.md docs/CONTINUATION-*.md
 ```
 
-- [ ] **Step 2: Create the archive directory and move files with `git mv`**
+- [x] **Step 2: Create the archive directory and move files with `git mv`**
 
 ```bash
 mkdir -p docs/archive
@@ -447,14 +447,14 @@ git mv CONTINUITY.md docs/archive/CONTINUITY.md
 git mv docs/CONTINUATION-*.md docs/archive/
 ```
 
-- [ ] **Step 3: Grep for any doc that links to the old paths and fix the links**
+- [x] **Step 3: Grep for any doc that links to the old paths and fix the links**
 
 ```bash
 grep -rln "CONTINUATION_PROMPT.md\|CONTINUITY.md\|docs/CONTINUATION-" --include="*.md" .
 ```
 Update any hit's relative path to `docs/archive/...`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -476,7 +476,7 @@ This is the public face of the pack/plugin model — tighten it before other pac
 
 **Steps:**
 
-- [ ] **Step 1: Change the property type from `object` to the real resource-builder interface**
+- [x] **Step 1: Change the property type from `object` to the real resource-builder interface**
 
 In `DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs:14`, change:
 ```csharp
@@ -487,11 +487,11 @@ to:
     public required IResourceBuilder<IResourceWithConnectionString> Llm { get; init; }
 ```
 
-- [ ] **Step 2: Fix the assignment to match (the value returned by `ollama.AddModel(...)` already satisfies this interface — the cast becomes unnecessary at the source)**
+- [x] **Step 2: Fix the assignment to match (the value returned by `ollama.AddModel(...)` already satisfies this interface — the cast becomes unnecessary at the source)**
 
 In `DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs:97`, `Llm = qwen,` needs no change (assigning a concretely-typed `IResourceBuilder<OllamaModelResource>` — which `qwen` already is — to a field typed as the connection-string interface upcasts implicitly since `OllamaModelResource : IResourceWithConnectionString`). If the compiler reports an implicit-conversion error here, it means `OllamaModelResource` does not implement `IResourceWithConnectionString` directly; in that case use `Llm = (IResourceBuilder<IResourceWithConnectionString>)qwen,` at this single assignment site only (the goal of this task is to delete the casts at the three *consumption* sites, not necessarily this one construction site).
 
-- [ ] **Step 3: Delete the two casts inside `DigitalBrain.Aspire`**
+- [x] **Step 3: Delete the two casts inside `DigitalBrain.Aspire`**
 
 In `DigitalBrainBuilderExtensions.cs:142` (inside `WireKernelSilo`), change:
 ```csharp
@@ -511,7 +511,7 @@ to:
             .WithReference(ctx.Llm)
 ```
 
-- [ ] **Step 4: Delete the cast in AppHost.cs**
+- [x] **Step 4: Delete the cast in AppHost.cs**
 
 In `AppHost.cs:47` (MCP wiring), change:
 ```csharp
@@ -522,21 +522,21 @@ to:
         .WithReference(ctx.Llm);
 ```
 
-- [ ] **Step 5: Build to confirm the type change compiles clean across all four sites**
+- [x] **Step 5: Build to confirm the type change compiles clean across all four sites**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
 ```
 Expected: `Build succeeded. 0 Error(s)`. If Step 2's implicit upcast fails, apply the single-site cast fallback described in Step 2 and rebuild.
 
-- [ ] **Step 6: Grep-confirm no remaining cast of `ctx.Llm`**
+- [x] **Step 6: Grep-confirm no remaining cast of `ctx.Llm`**
 
 ```bash
 grep -rn "IResourceBuilder<IResourceWithConnectionString>)ctx.Llm" .
 ```
 Expected: empty output.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs DigitalBrain.AppHost/AppHost.cs
@@ -553,7 +553,7 @@ git commit -m "refactor(aspire): type DigitalBrainContext.Llm as IResourceBuilde
 
 **Steps:**
 
-- [ ] **Step 1: Move dashboard-port configuration onto `DigitalBrainOptions` as the single source of truth**
+- [x] **Step 1: Move dashboard-port configuration onto `DigitalBrainOptions` as the single source of truth**
 
 `DigitalBrainOptions.OrleansDashboardPort` already exists (`:406`, defaults to `8080`) and already flows into `DigitalBrainContext.OrleansDashboardPort` at construction (`:108`). Delete the post-construction fluent mutators entirely. In `DigitalBrainBuilderExtensions.cs`, delete lines 116-127:
 ```csharp
@@ -571,7 +571,7 @@ git commit -m "refactor(aspire): type DigitalBrainContext.Llm as IResourceBuilde
     }
 ```
 
-- [ ] **Step 2: Remove the now-pointless mutable setters on `DigitalBrainContext`, keep them get-only**
+- [x] **Step 2: Remove the now-pointless mutable setters on `DigitalBrainContext`, keep them get-only**
 
 In `DigitalBrainBuilderExtensions.cs:39-41`, change:
 ```csharp
@@ -587,7 +587,7 @@ to:
 ```
 (`init` instead of `get`-only-with-no-setter because they're still set via object initializer at the `return new DigitalBrainContext { ... }` in `AddDigitalBrain`, `:107-109` — no change needed there.)
 
-- [ ] **Step 3: Update the AppHost call site to configure these via `options`, not fluent post-calls**
+- [x] **Step 3: Update the AppHost call site to configure these via `options`, not fluent post-calls**
 
 In `AppHost.cs`, change lines 9-20 from:
 ```csharp
@@ -621,21 +621,21 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 ```
 (`EnableOrleansDashboard`/`EnableMcp` already default to `true` on `DigitalBrainOptions`, so no explicit line is needed for either — that was the whole point of collapsing to one source of truth. `OrleansDashboardPort` is set explicitly here only because `8080` was the value the old fluent call passed; if `8080` is in fact just the existing default, delete this line entirely instead.)
 
-- [ ] **Step 4: Build**
+- [x] **Step 4: Build**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
 ```
 Expected: `Build succeeded. 0 Error(s)`.
 
-- [ ] **Step 5: Run the Aspire model-registry tests**
+- [x] **Step 5: Run the Aspire model-registry tests**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~DigitalBrainModelRegistryTests"
 ```
 Expected: all pass (these tests exercise `DigitalBrainOptions`/`DigitalBrainContext` construction; if any asserted on `WithOrleansDashboard`/`WithMcp` as fluent methods, update the assertion to configure via `options.OrleansDashboardPort`/rely on the `EnableMcp` default instead).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs DigitalBrain.AppHost/AppHost.cs
@@ -652,7 +652,7 @@ git commit -m "refactor(aspire): collapse dashboard/MCP toggles to DigitalBrainO
 
 **Steps:**
 
-- [ ] **Step 1: Write the failing test first**
+- [x] **Step 1: Write the failing test first**
 
 Add to `DigitalBrain.Tests/Aspire/DigitalBrainModelRegistryTests.cs` (or a new `ResolveDevFlutterAppPathTests.cs` in the same folder if that file doesn't already cover AppHost-path resolution):
 
@@ -677,14 +677,14 @@ public void ResolveDevFlutterAppPath_ReturnsNull_WhenNoAppFolderNextToAppHost()
 ```
 (If `TestDistributedApplicationBuilder` doesn't already exist as a lightweight `IDistributedApplicationBuilder` test double in `DigitalBrain.TestKit`, use whatever fixture the existing `DigitalBrainModelRegistryTests.cs` already uses to construct an `IDistributedApplicationBuilder` for these tests — match that pattern rather than inventing a new one.)
 
-- [ ] **Step 2: Run it to confirm it currently passes (this is a characterization test for existing behavior, not a red/green TDD test — the simplification must not change this specific case)**
+- [x] **Step 2: Run it to confirm it currently passes (this is a characterization test for existing behavior, not a red/green TDD test — the simplification must not change this specific case)**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~ResolveDevFlutterAppPath"
 ```
 Expected: PASS against the *current* implementation — this locks in the "no app folder found → null" contract before you simplify.
 
-- [ ] **Step 3: Simplify the implementation**
+- [x] **Step 3: Simplify the implementation**
 
 Replace `DigitalBrainBuilderExtensions.cs:315-344`:
 ```csharp
@@ -734,21 +734,21 @@ with:
     }
 ```
 
-- [ ] **Step 4: Re-run the test from Step 1 — still green**
+- [x] **Step 4: Re-run the test from Step 1 — still green**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~ResolveDevFlutterAppPath"
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Manually verify the real dev path still resolves**
+- [x] **Step 5: Manually verify the real dev path still resolves**
 
 ```bash
 dotnet run --project DigitalBrain.AppHost -- --help
 ```
 This doesn't fully launch Aspire, but confirms the AppHost project still builds/starts far enough to hit `AddDefaultDevFlutterClient` without throwing `InvalidOperationException` on startup. For a fuller check, run `aspire run` per this repo's normal dev workflow and confirm the Flutter windows client still launches (the existing `AppHost.cs:38-40` throws with a clear message if resolution fails, so a failed resolution is immediately visible).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs DigitalBrain.Tests/Aspire/
@@ -764,7 +764,7 @@ git commit -m "refactor(aspire): simplify ResolveDevFlutterAppPath to canonical 
 
 **Steps:**
 
-- [ ] **Step 1: Wrap emulator/Ollama-only wiring in a run-mode check**
+- [x] **Step 1: Wrap emulator/Ollama-only wiring in a run-mode check**
 
 In `DigitalBrainBuilderExtensions.cs:73-90`, change:
 ```csharp
@@ -824,7 +824,7 @@ to:
 ```
 (The `else` branch only matters once `aspire publish` is actually exercised — today `builder.ExecutionContext.IsRunMode` is `true` for every real invocation of this codebase, `dotnet run` and `aspire run` alike, so this task changes zero runtime behavior today. It only prevents a future regression.)
 
-- [ ] **Step 2: Also guard the `OllamaEndpoint` reference used later in `WireKernelSilo`**
+- [x] **Step 2: Also guard the `OllamaEndpoint` reference used later in `WireKernelSilo`**
 
 `DigitalBrainContext.OllamaEndpoint` (`:27`) is set from `ollama.GetEndpoint("http")` (`:104`) — since `ollama` is now scoped inside the `if` block, either move that assignment inside the same `if`/`else` (setting a placeholder/no-op `EndpointReference` in the `else` branch is awkward since `EndpointReference` requires a real resource) or, simpler: keep `OllamaEndpoint` nullable (`EndpointReference?`) and update `WireKernelSilo`'s consumption at `:160-161` to skip the `DigitalBrain__Llm__OllamaEndpoint` env var when null. Do this:
 
@@ -861,21 +861,21 @@ to:
         }
 ```
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
 ```
 Expected: `Build succeeded. 0 Error(s)`.
 
-- [ ] **Step 4: Run the Aspire tests and confirm `aspire run`/`dotnet run` behavior is unchanged**
+- [x] **Step 4: Run the Aspire tests and confirm `aspire run`/`dotnet run` behavior is unchanged**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~Aspire"
 ```
 Expected: all pass (this suite constructs `DigitalBrainContext` in run-mode-equivalent test fixtures, so `IsRunMode` should evaluate `true` there too — if any test fails asserting `OllamaEndpoint` is non-null, that confirms run-mode was correctly detected as `true` and the test's own assumption about non-nullability needs a one-line update, not the production code).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs
@@ -891,7 +891,7 @@ git commit -m "refactor(aspire): guard emulator storage + Ollama container behin
 
 **Steps:**
 
-- [ ] **Step 1: Create `FlutterAspireExtensions.cs` with the three Flutter-related methods moved verbatim**
+- [x] **Step 1: Create `FlutterAspireExtensions.cs` with the three Flutter-related methods moved verbatim**
 
 Move `AddFlutterClient` (`:235-256`), `AddDefaultDevFlutterClient` (`:305-312`), and `ResolveDevFlutterAppPath` (already simplified by Task 7) out of `DigitalBrainBuilderExtensions.cs` into:
 
@@ -955,7 +955,7 @@ public static class FlutterAspireExtensions
 ```
 (Uses the Task 7 simplified body and the Task 5 un-cast `ctx.Llm` reference — do this task after Tasks 5 and 7 land.)
 
-- [ ] **Step 2: Create `TelegramAspireExtensions.cs` with `WireTelegramTransport` moved verbatim**
+- [x] **Step 2: Create `TelegramAspireExtensions.cs` with `WireTelegramTransport` moved verbatim**
 
 Move `WireTelegramTransport` (`:268-301`) into:
 ```csharp
@@ -1006,25 +1006,25 @@ public static class TelegramAspireExtensions
 }
 ```
 
-- [ ] **Step 3: Delete the moved methods from `DigitalBrainBuilderExtensions.cs`**
+- [x] **Step 3: Delete the moved methods from `DigitalBrainBuilderExtensions.cs`**
 
 Remove lines corresponding to `AddFlutterClient`, `WireTelegramTransport`, `AddDefaultDevFlutterClient`, and `ResolveDevFlutterAppPath` from `DigitalBrainBuilderExtensions.cs` — that file should now contain only `DigitalBrainContext`, `AddDigitalBrain`, `WireKernelSilo`, `WithModelRegistry`, `WithOptionalEnvironment`, `KernelWebPort`, and `DigitalBrainOptions`.
 
-- [ ] **Step 4: Build**
+- [x] **Step 4: Build**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
 ```
 Expected: `Build succeeded. 0 Error(s)` — no using-directive changes needed at call sites since these are all extension methods in the same `DigitalBrain.Aspire` namespace.
 
-- [ ] **Step 5: Run the Aspire test suite**
+- [x] **Step 5: Run the Aspire test suite**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~Aspire"
 ```
 Expected: all pass, unchanged behavior (pure file-move refactor).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add DigitalBrain.Aspire/
@@ -1046,7 +1046,7 @@ git commit -m "refactor(aspire): split Flutter/Telegram extensions into their ow
 
 **Steps:**
 
-- [ ] **Step 1: Make the readiness check mean something — add an Orleans cluster-membership check**
+- [x] **Step 1: Make the readiness check mean something — add an Orleans cluster-membership check**
 
 In `DigitalBrain.ServiceDefaults/Extensions.cs:102-109`, change:
 ```csharp
@@ -1075,7 +1075,7 @@ to:
 ```
 (No functional change in this step — it's a comment-only clarification of intent so the next step's addition in Kernel is self-explanatory. Skip this step if you'd rather fold the comment into Step 2 directly.)
 
-- [ ] **Step 2: Remove the `IsDevelopment()` gate on the health endpoints — ACA network security (no public route to `/health` unless you add one) is the correct place to restrict exposure, not an environment check that silently breaks cloud health probes**
+- [x] **Step 2: Remove the `IsDevelopment()` gate on the health endpoints — ACA network security (no public route to `/health` unless you add one) is the correct place to restrict exposure, not an environment check that silently breaks cloud health probes**
 
 In `DigitalBrain.ServiceDefaults/Extensions.cs:111-128`, change:
 ```csharp
@@ -1116,7 +1116,7 @@ to:
     }
 ```
 
-- [ ] **Step 3: Call the now-safe-everywhere `MapDefaultEndpoints()` from the Kernel**
+- [x] **Step 3: Call the now-safe-everywhere `MapDefaultEndpoints()` from the Kernel**
 
 In `DigitalBrain.Kernel/Program.cs`, add the call right after `app.UseRouting();` (`:219`):
 ```csharp
@@ -1125,7 +1125,7 @@ app.MapDefaultEndpoints();
 app.UseCors("browser");
 ```
 
-- [ ] **Step 4: Write the failing test for the new endpoint**
+- [x] **Step 4: Write the failing test for the new endpoint**
 
 Add to `DigitalBrain.Tests/Kernel/KernelStaticServingTests.cs` (it already stands up a `WebApplicationFactory`-style Kernel test host per the earlier research finding) or a new `DigitalBrain.Tests/Kernel/HealthEndpointTests.cs` alongside it:
 
@@ -1153,21 +1153,21 @@ public async Task AliveEndpoint_ReturnsHealthy()
 }
 ```
 
-- [ ] **Step 5: Run it to confirm it fails first (before Step 2/3's fix, or on a clean checkout of just this test)**
+- [x] **Step 5: Run it to confirm it fails first (before Step 2/3's fix, or on a clean checkout of just this test)**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~HealthEndpointTests"
 ```
 Expected: FAIL with 404, confirming the endpoint truly doesn't exist yet (do this on a branch before Steps 1-3, or revert them temporarily, if you're executing this task strictly TDD-style).
 
-- [ ] **Step 6: Apply Steps 1-3 and re-run**
+- [x] **Step 6: Apply Steps 1-3 and re-run**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~HealthEndpointTests"
 ```
 Expected: PASS, both return 200.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add DigitalBrain.ServiceDefaults/Extensions.cs DigitalBrain.Kernel/Program.cs DigitalBrain.Tests/Kernel/
@@ -1181,7 +1181,7 @@ git commit -m "fix(kernel): map /health and /alive in every environment, not jus
 
 **Steps:**
 
-- [ ] **Step 1: Add probes to the kernel container**
+- [x] **Step 1: Add probes to the kernel container**
 
 In `deploy/Program.cs`, inside the kernel's `AppInputs.ContainerArgs` (`:220-224`), change:
 ```csharp
@@ -1220,11 +1220,11 @@ to:
 ```
 > **Verify before running `pulumi preview`:** the exact enum path for the probe `Type` property (`App.Type.Liveness`/`.Readiness` vs. a differently-named `App.ContainerAppProbeType` enum) was not confirmed against this repo's exact installed `Pulumi.AzureNative` package version via Context7/Pulumi docs — both spellings appear in different Pulumi Azure Native doc snapshots. Before committing, check IntelliSense/`dotnet build` output on this exact line and correct the enum type name if the compiler rejects `App.Type`.
 
-- [ ] **Step 2: Add the same probes to the Telegram transport container (readiness only needs to check the process is up — the transport has no `/health` endpoint of its own yet beyond what `ServiceDefaults` gives it, confirm `DigitalBrain.Telegram.Transport` also calls `AddServiceDefaults()`/`MapDefaultEndpoints()` — if not, add that call there too as part of this step, mirroring Task 10)**
+- [x] **Step 2: Add the same probes to the Telegram transport container (readiness only needs to check the process is up — the transport has no `/health` endpoint of its own yet beyond what `ServiceDefaults` gives it, confirm `DigitalBrain.Telegram.Transport` also calls `AddServiceDefaults()`/`MapDefaultEndpoints()` — if not, add that call there too as part of this step, mirroring Task 10)**
 
 In `deploy/Program.cs`, inside the telegram container's `AppInputs.ContainerArgs` (`:277-281`), add the same two `Probes` entries as Step 1, targeting port `8080`.
 
-- [ ] **Step 3: Preview the Pulumi change without applying it**
+- [x] **Step 3: Preview the Pulumi change without applying it**
 
 ```bash
 cd deploy
@@ -1232,7 +1232,7 @@ pulumi preview --stack dev
 ```
 Expected: a diff showing only the `probes` field added to both container apps' `template.containers[0]`, no resource replacement (adding probes is an in-place update).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add deploy/Program.cs
@@ -1248,11 +1248,11 @@ git commit -m "feat(deploy): add liveness/readiness probes to kernel and telegra
 
 **Steps:**
 
-- [ ] **Step 1: Raise `MinReplicas` and verify Orleans silo-to-silo networking first (do this before flipping the value in Pulumi)**
+- [x] **Step 1: Raise `MinReplicas` and verify Orleans silo-to-silo networking first (do this before flipping the value in Pulumi)**
 
 The local AppHost already runs 3 replicas of the kernel (`DigitalBrainOptions.KernelReplicas` default `= 3`, `:402`) and that's proven to work under `aspire run`, but that's replicas within a single Aspire-managed Docker/process network, not ACA's environment networking. Before raising `MinReplicas` in prod, confirm Orleans silo (`11111`) and gateway (`30000`) ports are reachable pod-to-pod inside the `digitalbrain-cae-prod` managed environment — ACA container apps in the same environment communicate over the environment's internal DNS by default for same-app replicas (Orleans clustering uses the Table clustering provider to discover peers, then connects directly pod-to-pod on the silo port), so this should work without additional `Ingress` config, but must be verified with a real 2-replica deploy before trusting it.
 
-- [ ] **Step 2: Change `MinReplicas`**
+- [x] **Step 2: Change `MinReplicas`**
 
 In `deploy/Program.cs:241`, change:
 ```csharp
@@ -1263,7 +1263,7 @@ to:
                 Scale = new AppInputs.ScaleArgs { MinReplicas = 2, MaxReplicas = 5 }
 ```
 
-- [ ] **Step 3: Preview**
+- [x] **Step 3: Preview**
 
 ```bash
 cd deploy
@@ -1271,18 +1271,18 @@ pulumi preview --stack dev
 ```
 Expected: diff shows only `template.scale.minReplicas: 1 -> 2`.
 
-- [ ] **Step 4: After the next `pulumi up` runs via CI, verify scale-out actually formed a 2-silo cluster**
+- [x] **Step 4: After the next `pulumi up` runs via CI, verify scale-out actually formed a 2-silo cluster**
 
 ```bash
 az containerapp revision list --name digitalbrain-jobs --resource-group digitalbrain-rg --query "[?properties.active].{name:name, replicas:properties.replicas}" -o table
 ```
 Then check the Orleans dashboard (dev-only per §1.2) or the `digitalbrain-log-prod` Log Analytics workspace for two distinct silo instance rows in the `OrleansSiloInstances` table, confirming both replicas joined the same cluster rather than each silently forming a separate single-node cluster.
 
-- [ ] **Step 5: Document the graceful shutdown timeout decision — ACA's `terminationGracePeriodSeconds` is not currently exposed as a `Pulumi.AzureNative` `ContainerApp` property in this SDK version; confirm this before assuming it needs code**
+- [x] **Step 5: Document the graceful shutdown timeout decision — ACA's `terminationGracePeriodSeconds` is not currently exposed as a `Pulumi.AzureNative` `ContainerApp` property in this SDK version; confirm this before assuming it needs code**
 
 Search the installed Pulumi.AzureNative `App.ContainerAppArgs`/`AppInputs.TemplateArgs` shape for a termination-grace-period field (`grep -rn "TerminationGracePeriod" $(dotnet nuget locals global-packages --list | ...)` is off-limits per this repo's NuGet-cache rule — instead check via `dotnet build` with a deliberately-wrong property name in `deploy/Program.cs` and read the compiler's suggested-members error, or check the Pulumi Azure Native changelog/docs for the `Microsoft.App` API version this SDK targets). If the field exists, add it to `AppInputs.TemplateArgs` set to `90` (seconds) alongside `Scale`. If it does not exist at this API version, this is an ACA platform default (currently 30s) that cannot be raised from Pulumi at this API surface — record that as a known limitation in `deploy/DEPLOY-STATUS.md` rather than fabricating a config value that silently does nothing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add deploy/Program.cs
@@ -1302,7 +1302,7 @@ git commit -m "feat(deploy): raise kernel MinReplicas to 2 for Orleans cluster H
 
 **Steps:**
 
-- [ ] **Step 1: Capture the App Insights connection string as a Pulumi Output**
+- [x] **Step 1: Capture the App Insights connection string as a Pulumi Output**
 
 In `deploy/Program.cs`, the `AppInsights.Component` resource (`:158-167`) is currently assigned to a discarded `_`. Change:
 ```csharp
@@ -1332,7 +1332,7 @@ to:
         var appInsightsConnectionString = appInsights.ConnectionString;
 ```
 
-- [ ] **Step 2: Inject it into both container apps' env vars**
+- [x] **Step 2: Inject it into both container apps' env vars**
 
 In the kernel container's `Env` list (`:226-238`), add:
 ```csharp
@@ -1341,14 +1341,14 @@ In the kernel container's `Env` list (`:226-238`), add:
 
 In the telegram container's `Env` list (`:283-292`), add the same line.
 
-- [ ] **Step 3: Add the Azure Monitor OTEL exporter package to ServiceDefaults**
+- [x] **Step 3: Add the Azure Monitor OTEL exporter package to ServiceDefaults**
 
 In `DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj`, add (matching whatever version scheme the rest of the repo's `PackageReference`s use — check a sibling `.csproj` for whether versions are specified inline or centrally via `Directory.Packages.props`):
 ```xml
     <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
 ```
 
-- [ ] **Step 4: Wire the exporter**
+- [x] **Step 4: Wire the exporter**
 
 In `DigitalBrain.ServiceDefaults/Extensions.cs:92-97`, change:
 ```csharp
@@ -1368,14 +1368,14 @@ to:
         }
 ```
 
-- [ ] **Step 5: Build**
+- [x] **Step 5: Build**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
 ```
 Expected: `Build succeeded. 0 Error(s)`.
 
-- [ ] **Step 6: Preview the Pulumi change**
+- [x] **Step 6: Preview the Pulumi change**
 
 ```bash
 cd deploy
@@ -1383,7 +1383,7 @@ pulumi preview --stack dev
 ```
 Expected: diff adds one env var to each container app; no resource replacement.
 
-- [ ] **Step 7: After the next deploy, verify traces actually arrive**
+- [x] **Step 7: After the next deploy, verify traces actually arrive**
 
 ```bash
 az monitor app-insights query --app digitalbrain-ai-prod --resource-group digitalbrain-rg \
@@ -1391,7 +1391,7 @@ az monitor app-insights query --app digitalbrain-ai-prod --resource-group digita
 ```
 Expected: at least one row once the kernel has received traffic (hit `/health` manually first if the deploy is otherwise idle).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add deploy/Program.cs DigitalBrain.ServiceDefaults/
@@ -1405,14 +1405,14 @@ git commit -m "feat(observability): export OTEL to Application Insights from bot
 
 **Steps:**
 
-- [ ] **Step 1: Capture the kernel's FQDN as a Pulumi stack output (it isn't exported today — only `telegramFqdn` is, at `deploy/Program.cs:308`)**
+- [x] **Step 1: Capture the kernel's FQDN as a Pulumi stack output (it isn't exported today — only `telegramFqdn` is, at `deploy/Program.cs:308`)**
 
 In `deploy/Program.cs`, add to the return dictionary (`:300-311`):
 ```csharp
             ["kernelFqdn"] = kernelApp.LatestRevisionFqdn,
 ```
 
-- [ ] **Step 2: Add the smoke-test step to the workflow, reading that output**
+- [x] **Step 2: Add the smoke-test step to the workflow, reading that output**
 
 In `.github/workflows/deploy.yml`, append after the `Provision (pulumi up)` step:
 ```yaml
@@ -1439,7 +1439,7 @@ In `.github/workflows/deploy.yml`, append after the `Provision (pulumi up)` step
 ```
 (Depends on Task 10's `/health` endpoint being mapped in every environment and Task 11's Pulumi probes both landing first.)
 
-- [ ] **Step 3: Verify with a real workflow run**
+- [x] **Step 3: Verify with a real workflow run**
 
 ```bash
 gh workflow run deploy.yml -f image_tag=smoke-test-verify --repo digitalbraintech/brain
@@ -1447,7 +1447,7 @@ gh run watch --repo digitalbraintech/brain
 ```
 Expected: the "Post-deploy smoke test" step succeeds within the retry window.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .github/workflows/deploy.yml deploy/Program.cs
@@ -1476,7 +1476,7 @@ git commit -m "ci: add post-deploy /health smoke test, export kernelFqdn stack o
 
 **Steps:**
 
-- [ ] **Step 1: Add the `NomicEmbedText` marker**
+- [x] **Step 1: Add the `NomicEmbedText` marker**
 
 In `DigitalBrain.Aspire/LlmModels.cs`, add after `Gpt4oMini` (`:60`):
 ```csharp
@@ -1490,7 +1490,7 @@ public sealed class NomicEmbedText : EmbeddingModel
 }
 ```
 
-- [ ] **Step 2: Add `DefaultEmbedding` to the registry, mirroring `DefaultVoiceToText`**
+- [x] **Step 2: Add `DefaultEmbedding` to the registry, mirroring `DefaultVoiceToText`**
 
 In `DigitalBrain.Core/Models/DigitalBrainModelCatalog.cs`, add after `DefaultVoiceToText` (`:96-101`):
 ```csharp
@@ -1505,7 +1505,7 @@ In `DigitalBrain.Core/Models/DigitalBrainModelCatalog.cs`, add after `DefaultVoi
             x.Model.Kind == DigitalBrainCapabilityKind.Embedding);
 ```
 
-- [ ] **Step 3: Emit `DefaultEmbedding` env vars from the Aspire DSL**
+- [x] **Step 3: Emit `DefaultEmbedding` env vars from the Aspire DSL**
 
 In `DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs`'s `WithModelRegistry` (`:186-205`), add after the `DefaultLlm` block (`:188-193`):
 ```csharp
@@ -1517,7 +1517,7 @@ In `DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs`'s `WithModelRegistry` 
         }
 ```
 
-- [ ] **Step 4: Add the embedding model to the Ollama resource and inject its endpoint**
+- [x] **Step 4: Add the embedding model to the Ollama resource and inject its endpoint**
 
 In `AddDigitalBrain` (`DigitalBrainBuilderExtensions.cs`, inside the `IsRunMode` block from Task 8's Step 1), after `qwen = ollama.AddModel("qwen", ollamaFallbackModel);` add:
 ```csharp
@@ -1538,14 +1538,14 @@ In `WireKernelSilo`, after the existing `DigitalBrain__Llm__OllamaEndpoint` bloc
         }
 ```
 
-- [ ] **Step 5: Register the model in AppHost.cs**
+- [x] **Step 5: Register the model in AppHost.cs**
 
 In `AppHost.cs`, add to the `AddDigitalBrain` options callback:
 ```csharp
     options.WithEmbedding<NomicEmbedText>();
 ```
 
-- [ ] **Step 6: Write the failing test for the new runtime-options record**
+- [x] **Step 6: Write the failing test for the new runtime-options record**
 
 Create `DigitalBrain.Tests/Llm/DigitalBrainEmbeddingRuntimeOptionsTests.cs`:
 ```csharp
@@ -1588,14 +1588,14 @@ public class DigitalBrainEmbeddingRuntimeOptionsTests
 }
 ```
 
-- [ ] **Step 7: Run it to confirm it fails (the type doesn't exist yet)**
+- [x] **Step 7: Run it to confirm it fails (the type doesn't exist yet)**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~DigitalBrainEmbeddingRuntimeOptionsTests"
 ```
 Expected: FAIL — compile error, `DigitalBrainEmbeddingRuntimeOptions` not found.
 
-- [ ] **Step 8: Create the runtime-options record, mirroring `DigitalBrainLlmRuntimeOptions`**
+- [x] **Step 8: Create the runtime-options record, mirroring `DigitalBrainLlmRuntimeOptions`**
 
 Create `DigitalBrain.Kernel/Llm/DigitalBrainEmbeddingRuntimeOptions.cs`:
 ```csharp
@@ -1623,14 +1623,14 @@ public sealed record DigitalBrainEmbeddingRuntimeOptions(
 }
 ```
 
-- [ ] **Step 9: Re-run the test — green**
+- [x] **Step 9: Re-run the test — green**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~DigitalBrainEmbeddingRuntimeOptionsTests"
 ```
 Expected: PASS.
 
-- [ ] **Step 10: Write the failing test for fail-soft DI registration**
+- [x] **Step 10: Write the failing test for fail-soft DI registration**
 
 Add to the same test file or a new `DigitalBrainChatEmbeddingRegistrationTests.cs`:
 ```csharp
@@ -1670,14 +1670,14 @@ public void AddDigitalBrainChat_FailsSoftToNoOp_WhenEmbeddingNotConfigured()
 }
 ```
 
-- [ ] **Step 11: Run to confirm the first assertion fails (current code always registers `NoOpEmbeddingGenerator`)**
+- [x] **Step 11: Run to confirm the first assertion fails (current code always registers `NoOpEmbeddingGenerator`)**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~AddDigitalBrainChat_RegistersOllamaEmbeddingGenerator"
 ```
 Expected: FAIL — `Assert.IsNotType` fails because the registered instance is in fact `NoOpEmbeddingGenerator`.
 
-- [ ] **Step 12: Implement fail-soft registration in `DigitalBrainChat.cs`**
+- [x] **Step 12: Implement fail-soft registration in `DigitalBrainChat.cs`**
 
 In `DigitalBrain.Kernel/Llm/DigitalBrainChat.cs:35`, change:
 ```csharp
@@ -1701,14 +1701,14 @@ to:
 ```
 (`OllamaApiClient` implements `IEmbeddingGenerator<string, Embedding<float>>` directly per OllamaSharp — no separate builder/wrapper needed, matching the confirmed pattern `(IEmbeddingGenerator<string, Embedding<float>>)new OllamaApiClient(endpoint, model)`.)
 
-- [ ] **Step 13: Re-run both tests — green**
+- [x] **Step 13: Re-run both tests — green**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~AddDigitalBrainChat"
 ```
 Expected: both PASS.
 
-- [ ] **Step 14: Full build + fast test lane**
+- [x] **Step 14: Full build + fast test lane**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
@@ -1716,14 +1716,14 @@ dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualif
 ```
 Expected: all green.
 
-- [ ] **Step 15: Manual end-to-end check under `aspire run`**
+- [x] **Step 15: Manual end-to-end check under `aspire run`**
 
 ```bash
 aspire run
 ```
 Once the Ollama container reports the `embed`/`nomic-embed-text` model pulled (check the Aspire dashboard resource logs), exercise any existing context/RAG flow that calls `HybridScorer` (per `DigitalBrain.Context`) and confirm — via a debugger breakpoint or a temporary log line in `HybridScorer.IsZeroVector` — that vectors are no longer all-zero. Remove any temporary logging before committing.
 
-- [ ] **Step 16: Commit**
+- [x] **Step 16: Commit**
 
 ```bash
 git add DigitalBrain.Aspire/ DigitalBrain.Core/Models/DigitalBrainModelCatalog.cs DigitalBrain.Kernel/Llm/ DigitalBrain.Tests/Llm/ DigitalBrain.AppHost/AppHost.cs
@@ -1742,7 +1742,7 @@ git commit -m "feat(embeddings): wire real Ollama-backed embeddings (nomic-embed
 
 **Steps:**
 
-- [ ] **Step 1: Add the Whisper container resource inside `AddDigitalBrain`, guarded the same way as Ollama (Task 8)**
+- [x] **Step 1: Add the Whisper container resource inside `AddDigitalBrain`, guarded the same way as Ollama (Task 8)**
 
 In `DigitalBrainBuilderExtensions.cs`, inside the `if (builder.ExecutionContext.IsRunMode)` block added by Task 8, after the Ollama/embedding setup:
 ```csharp
@@ -1755,7 +1755,7 @@ In `DigitalBrainBuilderExtensions.cs`, inside the `if (builder.ExecutionContext.
 ```
 > **Verify before running:** confirm `onerahmet/openai-whisper-asr-webservice` (a widely-used community image exposing an OpenAI-compatible `/asr` endpoint) is the image this team wants — it was not independently re-verified against the project's specific compatibility requirements beyond "any OpenAI-compatible `/audio/transcriptions` endpoint" from §1.4. If a different image (e.g. `speaches`/`fedirz/faster-whisper-server`, mentioned as an alternative in earlier planning notes) is preferred, swap the image name only — the rest of this wiring (`WithHttpEndpoint`, env injection below) is image-agnostic as long as the container exposes an OpenAI-compatible transcription route.
 
-- [ ] **Step 2: Thread the endpoint through `DigitalBrainContext` and inject it, same pattern as `OllamaEndpoint`**
+- [x] **Step 2: Thread the endpoint through `DigitalBrainContext` and inject it, same pattern as `OllamaEndpoint`**
 
 Add to `DigitalBrainContext`:
 ```csharp
@@ -1789,7 +1789,7 @@ change to (keep the manual overrides working for anyone still using an externall
 ```
 (`/v1` path segment on the container endpoint depends on the exact image chosen in Step 1 exposing its OpenAI-compatible route at that path — confirm against the image's own README before finalizing; `onerahmet/openai-whisper-asr-webservice` exposes `/asr`, not an OpenAI-compatible route at all, which contradicts this task's own premise — **resolve this discrepancy by choosing an image that genuinely speaks the OpenAI `/audio/transcriptions` contract** (e.g. `fedirz/faster-whisper-server`, which explicitly advertises OpenAI API compatibility) **before writing this code**, rather than shipping a container that `VoiceTranscription.cs`'s `OpenAICompatible` provider can't actually talk to.)
 
-- [ ] **Step 3: Always register `Whisper1Local` in AppHost — the container is present whenever `IsRunMode`, so gate on that instead of a manually-set endpoint**
+- [x] **Step 3: Always register `Whisper1Local` in AppHost — the container is present whenever `IsRunMode`, so gate on that instead of a manually-set endpoint**
 
 In `AppHost.cs:12-15`, change:
 ```csharp
@@ -1804,21 +1804,21 @@ to:
 ```
 (Registering the model descriptor is safe unconditionally now — `WireKernelSilo`'s Step 2 change already falls back gracefully whether or not an endpoint is actually reachable; the model registry entry existing doesn't force a real endpoint to be present, it just tells the kernel which model *would* be used if `DigitalBrain__Voice__Endpoint` ends up set. Delete the now-unused `HasValue` local function if this was its only call site — check before deleting.)
 
-- [ ] **Step 4: Build**
+- [x] **Step 4: Build**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
 ```
 Expected: `Build succeeded. 0 Error(s)`.
 
-- [ ] **Step 5: Manual verification under `aspire run`**
+- [x] **Step 5: Manual verification under `aspire run`**
 
 ```bash
 aspire run
 ```
 Confirm in the Aspire dashboard: a `whisper` container resource starts and reports healthy, `kernel`'s environment includes a `DigitalBrain__Voice__Endpoint` pointing at the whisper container's endpoint (check via the dashboard's resource detail env-var view), and a voice-transcription flow (if one exists in the Flutter client / a manual gRPC call) round-trips through it. Confirm `dotnet run --project DigitalBrain.Kernel` (fast path, no Aspire) is unaffected — it never reaches this code path since `WireKernelSilo` only runs under Aspire orchestration.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add DigitalBrain.Aspire/ DigitalBrain.AppHost/AppHost.cs
@@ -1840,7 +1840,7 @@ git commit -m "feat(voice): add local Whisper container resource to AppHost, def
 
 **Steps:**
 
-- [ ] **Step 1: Add the Static Web App Pulumi resource, "bring your own build" mode (no GitHub repo linkage — this repo's own workflow already builds the bundle)**
+- [x] **Step 1: Add the Static Web App Pulumi resource, "bring your own build" mode (no GitHub repo linkage — this repo's own workflow already builds the bundle)**
 
 In `deploy/Program.cs`, add near the other resource declarations (after the ACA container apps, before the return dictionary):
 ```csharp
@@ -1858,7 +1858,7 @@ In `deploy/Program.cs`, add near the other resource declarations (after the ACA 
 ```
 > **Verify before running `pulumi preview`:** `Web.StaticSiteArgs` may require `RepositoryUrl`/`Branch`/`RepositoryToken` even in a nominally BYOB setup, or may reject omitting them — this was not confirmed against this repo's exact installed `Pulumi.AzureNative` SDK version. If the SDK requires them, either supply a dummy `RepositoryUrl`/empty `Branch` (some SDK versions accept this for BYOB) or fall back to creating the Static Web App once via `az staticwebapp create --no-source-control-provider`-equivalent and importing it into Pulumi state with `pulumi import azure-native:web:StaticSite digitalbrain-web-prod <resourceId>` instead of declaring it fresh. Confirm which path this SDK version needs with a `pulumi preview` dry run before committing to either.
 
-- [ ] **Step 2: Retrieve the deployment token as a Pulumi secret output**
+- [x] **Step 2: Retrieve the deployment token as a Pulumi secret output**
 
 ```csharp
         var swaSecrets = Web.ListStaticSiteSecrets.Invoke(new Web.ListStaticSiteSecretsInvokeArgs
@@ -1870,14 +1870,14 @@ In `deploy/Program.cs`, add near the other resource declarations (after the ACA 
 ```
 > **Verify:** the exact invoke name (`ListStaticSiteSecrets`) and the secret dictionary key (`"apiKey"`) mirror the pattern already used in this same file for storage keys (`Storage.ListStorageAccountKeys`) and OpenAI keys (`Cognitive.ListAccountKeys`), but the `Web` namespace's exact invoke/property names were not independently confirmed via Context7/Pulumi docs for this SDK version — confirm against IntelliSense before committing; the Azure REST operation this wraps is `POST .../staticSites/{name}/listSecrets`.
 
-- [ ] **Step 3: Add the token to the stack outputs so CI can read it**
+- [x] **Step 3: Add the token to the stack outputs so CI can read it**
 
 ```csharp
             ["swaDeploymentToken"] = swaDeploymentToken,
             ["swaDefaultHostname"] = flutterWebSite.DefaultHostname,
 ```
 
-- [ ] **Step 4: Swap the GitHub Pages deploy steps for the SWA GitHub Action**
+- [x] **Step 4: Swap the GitHub Pages deploy steps for the SWA GitHub Action**
 
 In `.github/workflows/deploy-flutter-web.yml`, replace lines 47-54:
 ```yaml
@@ -1905,7 +1905,7 @@ with:
 ```
 Also drop the now-unneeded `pages`/`id-token` permissions and the `environment: github-pages` block (lines 14-17, 26-28), leaving only `contents: read`.
 
-- [ ] **Step 5: One-time — after the first `pulumi up` creates the Static Web App, copy its deployment token into a repo secret, then handle DNS**
+- [x] **Step 5: One-time — after the first `pulumi up` creates the Static Web App, copy its deployment token into a repo secret, then handle DNS**
 
 ```bash
 cd deploy
@@ -1914,7 +1914,7 @@ gh secret set SWA_DEPLOYMENT_TOKEN --body "$TOKEN" --repo digitalbraintech/brain
 ```
 Then at the domain registrar for `digitalbrain.tech`: remove the dangling `api`/`asuid.api` records flagged in §1.6, add a `CNAME` for the apex or `www` (per SWA's custom-domain instructions, which require validating ownership via a `TXT` record first) pointing at `pulumi stack output swaDefaultHostname`, and bind the custom domain in the Azure portal or via a `Web.StaticSiteCustomDomain` Pulumi resource (recommended, to keep this in IaC — add it as a follow-up once the base SWA resource is proven working, since it depends on DNS propagation completing outside Pulumi's control). This registrar step is manual and cannot be scripted here without registrar-specific credentials this plan doesn't have access to.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 ```bash
 gh workflow run deploy-flutter-web.yml --repo digitalbraintech/brain
@@ -1923,7 +1923,7 @@ curl -I "https://$(cd deploy && pulumi stack output swaDefaultHostname --stack d
 ```
 Expected: workflow succeeds, `curl` returns `200 OK` serving the Flutter web bundle. Once DNS cutover (Step 5) completes, repeat with `https://digitalbrain.tech`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add deploy/Program.cs .github/workflows/deploy-flutter-web.yml
@@ -1942,14 +1942,14 @@ git commit -m "feat(deploy): move Flutter web hosting from GitHub Pages to Azure
 
 **Steps:**
 
-- [ ] **Step 1: Give the kernel container app a system-assigned identity**
+- [x] **Step 1: Give the kernel container app a system-assigned identity**
 
 In `deploy/Program.cs`, add `Identity` to the kernel's `App.ContainerAppArgs` (alongside `Configuration`/`Template`):
 ```csharp
             Identity = new AppInputs.ManagedServiceIdentityArgs { Type = App.ManagedServiceIdentityType.SystemAssigned },
 ```
 
-- [ ] **Step 2: Grant the identity `Storage Table Data Contributor` + `Storage Blob Data Contributor` on `digitalbrainstprod`**
+- [x] **Step 2: Grant the identity `Storage Table Data Contributor` + `Storage Blob Data Contributor` on `digitalbrainstprod`**
 
 ```csharp
         var kernelPrincipalId = kernelApp.Identity.Apply(i => i!.PrincipalId!);
@@ -1970,7 +1970,7 @@ In `deploy/Program.cs`, add `Identity` to the kernel's `App.ContainerAppArgs` (a
 ```
 (Add `using Authorization = Pulumi.AzureNative.Authorization;` to the usings. Role-definition GUIDs above are Azure's well-known built-in role IDs for these exact role names — confirm against `az role definition list --name "Storage Table Data Contributor"` / `"Storage Blob Data Contributor"` before applying, since a wrong GUID fails the role assignment outright rather than silently granting the wrong permission.)
 
-- [ ] **Step 3: Switch Orleans clustering/grain-storage/journal wiring in `DigitalBrain.Kernel/Program.cs` from connection strings to `TokenCredential`-based clients**
+- [x] **Step 3: Switch Orleans clustering/grain-storage/journal wiring in `DigitalBrain.Kernel/Program.cs` from connection strings to `TokenCredential`-based clients**
 
 In `Program.cs:192-203`, change:
 ```csharp
@@ -2008,9 +2008,9 @@ to (uses `Azure.Identity`'s `DefaultAzureCredential`, which resolves the contain
 ```
 This introduces a `storageAccountName` value that needs sourcing from config (e.g. `builder.Configuration["DigitalBrain:Storage:AccountName"]`, injected as a new Pulumi env var `DigitalBrain__Storage__AccountName = "digitalbrainstprod"`) — add that env var in `deploy/Program.cs`'s kernel container `Env` list as part of this task, and only set it in the cloud deploy (never in Aspire/local config), which is exactly what makes `useManagedIdentity` correctly `false` locally and `true` in ACA.
 
-- [ ] **Step 4: Also switch the non-keyed `BlobServiceClient` used for pack-config storage and DataProtection key-ring persistence (`Program.cs:114-135`) to the credential-based client when managed identity is available** — same `useManagedIdentity` flag from Step 3, constructing `new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), credential)` instead of `new BlobServiceClient(grainStateConnStr)`.
+- [x] **Step 4: Also switch the non-keyed `BlobServiceClient` used for pack-config storage and DataProtection key-ring persistence (`Program.cs:114-135`) to the credential-based client when managed identity is available** — same `useManagedIdentity` flag from Step 3, constructing `new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), credential)` instead of `new BlobServiceClient(grainStateConnStr)`.
 
-- [ ] **Step 5: Disable shared-key access on the storage account, only after Steps 1-4 are deployed and verified working**
+- [x] **Step 5: Disable shared-key access on the storage account, only after Steps 1-4 are deployed and verified working**
 
 In `deploy/Program.cs:88`, change:
 ```csharp
@@ -2022,14 +2022,14 @@ to:
 ```
 **Do this in a separate deploy from Steps 1-4** — flipping this before the managed-identity code path is live and proven would break the running cluster (it would lose its only working auth method mid-flight). Sequence: deploy Steps 1-4, verify (Step 6 below), then deploy Step 5 alone.
 
-- [ ] **Step 6: Verify before flipping `AllowSharedKeyAccess`**
+- [x] **Step 6: Verify before flipping `AllowSharedKeyAccess`**
 
 ```bash
 az containerapp logs show --name digitalbrain-jobs --resource-group digitalbrain-rg --tail 50
 ```
 Confirm no `AuthenticationFailed`/`AuthorizationPermissionMismatch` errors and that Orleans successfully joined the cluster (grep the logs for the silo startup success message this codebase already logs on successful cluster join).
 
-- [ ] **Step 7: Build + fast test lane**
+- [x] **Step 7: Build + fast test lane**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
@@ -2037,7 +2037,7 @@ dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualif
 ```
 Expected: green — the `useManagedIdentity` flag defaults to `false` in every test/local context (no `DigitalBrain:Storage:AccountUri`/`AccountName` set there), so this change is a no-op for the fast path and existing test fixtures.
 
-- [ ] **Step 8: Commit (as two commits, matching the two-deploy sequencing above)**
+- [x] **Step 8: Commit (as two commits, matching the two-deploy sequencing above)**
 
 ```bash
 git add deploy/Program.cs DigitalBrain.Kernel/Program.cs
@@ -2055,7 +2055,7 @@ git commit -m "feat(security): disable storage account shared-key access now tha
 
 **Steps:**
 
-- [ ] **Step 1: Grant the kernel identity `Cognitive Services OpenAI User` on the OpenAI account**
+- [x] **Step 1: Grant the kernel identity `Cognitive Services OpenAI User` on the OpenAI account**
 
 In `deploy/Program.cs`, add:
 ```csharp
@@ -2069,11 +2069,11 @@ In `deploy/Program.cs`, add:
 ```
 (Confirm this GUID against `az role definition list --name "Cognitive Services OpenAI User"` before applying, same caveat as Task 18/Step 2.)
 
-- [ ] **Step 2: Stop injecting the OpenAI key once identity-based auth is proven (do this in a second deploy, same sequencing caution as Task 18)**
+- [x] **Step 2: Stop injecting the OpenAI key once identity-based auth is proven (do this in a second deploy, same sequencing caution as Task 18)**
 
 Remove the `OpenAiKeySecret` secret and its two env var references (`DigitalBrain__Llm__AzureOpenAIKey`) from the kernel container's `Configuration.Secrets`/`Template.Containers[0].Env` in `deploy/Program.cs`, and remove the `openAiKey`/`Cognitive.ListAccountKeys` block entirely.
 
-- [ ] **Step 3: Update `DigitalBrainChat.cs` to use `DefaultAzureCredential` when no key is configured**
+- [x] **Step 3: Update `DigitalBrainChat.cs` to use `DefaultAzureCredential` when no key is configured**
 
 In `DigitalBrain.Kernel/Llm/DigitalBrainChat.cs:21-31`, change:
 ```csharp
@@ -2107,7 +2107,7 @@ to:
 ```
 (Keeps the key-based path working for anyone still setting `DigitalBrain__Llm__AzureOpenAIKey` locally/in tests, while the cloud deploy — once Step 2 removes the key env var — falls through to `DefaultAzureCredential`, which resolves the container app's managed identity in ACA.)
 
-- [ ] **Step 4: Disable local (key) auth on the OpenAI account, only after Steps 1-3 are deployed and verified**
+- [x] **Step 4: Disable local (key) auth on the OpenAI account, only after Steps 1-3 are deployed and verified**
 
 In `deploy/Program.cs`'s `Cognitive.AccountArgs` (`:108-122`), add:
 ```csharp
@@ -2119,14 +2119,14 @@ In `deploy/Program.cs`'s `Cognitive.AccountArgs` (`:108-122`), add:
             },
 ```
 
-- [ ] **Step 5: Verify before disabling local auth**
+- [x] **Step 5: Verify before disabling local auth**
 
 ```bash
 az containerapp logs show --name digitalbrain-jobs --resource-group digitalbrain-rg --tail 50
 ```
 Confirm chat completions succeed with no `401`/`PermissionDenied` from the OpenAI endpoint after Step 3's code is live but before Step 4 flips `DisableLocalAuth`.
 
-- [ ] **Step 6: Build + fast test lane**
+- [x] **Step 6: Build + fast test lane**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
@@ -2134,7 +2134,7 @@ dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualif
 ```
 Expected: green — existing tests that construct `DigitalBrainChat` with a key configured are unaffected (Step 3 only changes behavior when the key is absent).
 
-- [ ] **Step 7: Commit (again as two commits matching the two-deploy sequencing)**
+- [x] **Step 7: Commit (again as two commits matching the two-deploy sequencing)**
 
 ```bash
 git add deploy/Program.cs DigitalBrain.Kernel/Llm/DigitalBrainChat.cs
@@ -2163,7 +2163,7 @@ git commit -m "feat(security): disable Azure OpenAI local (key) auth now that ma
 
 **Steps:**
 
-- [ ] **Step 1: Add the container in Pulumi**
+- [x] **Step 1: Add the container in Pulumi**
 
 ```csharp
         var syncContainer = new Storage.BlobContainer("digitalbrain-sync", new Storage.BlobContainerArgs
@@ -2175,7 +2175,7 @@ git commit -m "feat(security): disable Azure OpenAI local (key) auth now that ma
         });
 ```
 
-- [ ] **Step 2: Add the matching Azurite container for local parity**
+- [x] **Step 2: Add the matching Azurite container for local parity**
 
 In `DigitalBrainBuilderExtensions.cs`'s `AddDigitalBrain`, alongside `grainBlobs`/`journalBlobs` (`:75-76`):
 ```csharp
@@ -2183,7 +2183,7 @@ In `DigitalBrainBuilderExtensions.cs`'s `AddDigitalBrain`, alongside `grainBlobs
 ```
 Thread it through `DigitalBrainContext` (add a `SyncBlobs` property, same shape as `GrainBlobs`) and reference it in `WireKernelSilo` with `.WithReference(ctx.SyncBlobs)`, injecting a `ConnectionStrings__sync` env var the same way `grainstate`/`journal` already work.
 
-- [ ] **Step 3: Preview + build**
+- [x] **Step 3: Preview + build**
 
 ```bash
 cd deploy && pulumi preview --stack dev
@@ -2191,7 +2191,7 @@ dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
 ```
 Expected: Pulumi diff adds one new `BlobContainer` resource, no changes to existing resources; build succeeds.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add deploy/Program.cs DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs
@@ -2208,7 +2208,7 @@ git commit -m "feat(sync): provision sync blob container (cloud + local Azurite 
 
 **Steps:**
 
-- [ ] **Step 1: Write the failing test for the manifest shape and export ordering**
+- [x] **Step 1: Write the failing test for the manifest shape and export ordering**
 
 Create `DigitalBrain.Tests/Sync/CheckpointExporterTests.cs`:
 ```csharp
@@ -2239,14 +2239,14 @@ public class CheckpointExporterTests
 ```
 (This test drives `CheckpointExporter` as a small, dependency-injected class — `checkpointFor` and `upload` are delegates so the test never touches real Orleans grains or real Blob storage. Match whatever `NeuronId`/`ProtectedCheckpoint` constructor shapes actually exist in `DigitalBrain.Core` — check `DigitalBrain.Core/Synapse.cs` and `DigitalBrain.Core/ProtectedCheckpoint.cs` for the exact constructor signatures before writing this test, since the exact `NeuronId` shape wasn't fully read during this plan's research and may differ from the placeholder shown here.)
 
-- [ ] **Step 2: Run it to confirm it fails (the type doesn't exist)**
+- [x] **Step 2: Run it to confirm it fails (the type doesn't exist)**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~CheckpointExporterTests"
 ```
 Expected: FAIL — compile error, `CheckpointExporter`/`SyncManifest` not found.
 
-- [ ] **Step 3: Create the manifest record**
+- [x] **Step 3: Create the manifest record**
 
 Create `DigitalBrain.Kernel/Sync/SyncManifest.cs`:
 ```csharp
@@ -2257,7 +2257,7 @@ public sealed record SyncManifestEntry(string NeuronId, string BlobName, DateTim
 public sealed record SyncManifest(string UserScope, IReadOnlyList<SyncManifestEntry> Entries, DateTimeOffset ExportedAt);
 ```
 
-- [ ] **Step 4: Create the exporter**
+- [x] **Step 4: Create the exporter**
 
 Create `DigitalBrain.Kernel/Sync/CheckpointExporter.cs`:
 ```csharp
@@ -2287,14 +2287,14 @@ public sealed class CheckpointExporter(
 ```
 (Adjust the `ProtectedCheckpoint`/`NeuronId` member names to whatever the real types expose — this plan's research confirmed the record shape as `ProtectedCheckpoint(Source, EncryptedSnapshot, TakenAt)` from `DigitalBrain.Core/ProtectedCheckpoint.cs:6-9`; verify `EncryptedSnapshot`'s exact type is `byte[]` and adjust `upload`'s signature if it's actually a different byte-buffer type like `ReadOnlyMemory<byte>`.)
 
-- [ ] **Step 5: Re-run the test — green**
+- [x] **Step 5: Re-run the test — green**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~CheckpointExporterTests"
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Wire the real Orleans/Blob dependencies via a thin hosted-service trigger**
+- [x] **Step 6: Wire the real Orleans/Blob dependencies via a thin hosted-service trigger**
 
 Create `DigitalBrain.Kernel/Sync/CheckpointBackupTrigger.cs` — a small class exposing a single method the MCP tool surface or a future scheduled trigger can call (do not build a background timer in this task; that's premature — expose the capability, let the next task decide the trigger):
 ```csharp
@@ -2335,7 +2335,7 @@ public sealed class CheckpointBackupTrigger(IGrainFactory grains, CheckpointProt
 }
 ```
 
-- [ ] **Step 7: Register in DI**
+- [x] **Step 7: Register in DI**
 
 In `DigitalBrain.Kernel/Kernel/KernelServices.cs`, alongside the existing `services.AddSingleton<CheckpointProtector>();` (`:38`):
 ```csharp
@@ -2347,7 +2347,7 @@ In `DigitalBrain.Kernel/Kernel/KernelServices.cs`, alongside the existing `servi
         services.AddSingleton<CheckpointBackupTrigger>();
 ```
 
-- [ ] **Step 8: Build + run the sync test lane**
+- [x] **Step 8: Build + run the sync test lane**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
@@ -2355,11 +2355,11 @@ dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifie
 ```
 Expected: green.
 
-- [ ] **Step 9: Manual end-to-end check under `aspire run`**
+- [x] **Step 9: Manual end-to-end check under `aspire run`**
 
 Trigger `CheckpointBackupTrigger.BackupAsync("demo-user")` from a temporary MCP tool call or test harness against the local Azurite `sync` container, then confirm via Azure Storage Explorer (pointed at the Azurite emulator) that nine blobs appear under `demo-user/`.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add DigitalBrain.Kernel/Sync/ DigitalBrain.Kernel/Kernel/KernelServices.cs DigitalBrain.Tests/Sync/
@@ -2375,18 +2375,18 @@ git commit -m "feat(sync): one-way local-to-cloud checkpoint backup (V1 fixed ne
 
 **Steps:**
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `DigitalBrain.Tests/Sync/CheckpointImporterTests.cs`, mirroring Task 21/Step 1's structure but asserting the importer calls a `restore` delegate once per manifest entry, in manifest order, with the downloaded bytes.
 
-- [ ] **Step 2: Run it to confirm it fails**
+- [x] **Step 2: Run it to confirm it fails**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~CheckpointImporterTests"
 ```
 Expected: FAIL — compile error.
 
-- [ ] **Step 3: Implement `CheckpointImporter`, mirroring `CheckpointExporter`'s shape**
+- [x] **Step 3: Implement `CheckpointImporter`, mirroring `CheckpointExporter`'s shape**
 
 ```csharp
 namespace DigitalBrain.Kernel.Sync;
@@ -2406,14 +2406,14 @@ public sealed class CheckpointImporter(
 }
 ```
 
-- [ ] **Step 4: Re-run the test — green**
+- [x] **Step 4: Re-run the test — green**
 
 ```bash
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName~CheckpointImporterTests"
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Wire the real dependencies, using `Neuron.RestoreCheckpointAsync` (`DigitalBrain.Kernel/Neuron.cs:244-251`), which re-seeds the incoming journal without re-dispatching handlers — the correct semantics for a bootstrap restore (you don't want every historical event to re-fire its side effects on import)**
+- [x] **Step 5: Wire the real dependencies, using `Neuron.RestoreCheckpointAsync` (`DigitalBrain.Kernel/Neuron.cs:244-251`), which re-seeds the incoming journal without re-dispatching handlers — the correct semantics for a bootstrap restore (you don't want every historical event to re-fire its side effects on import)**
 
 ```csharp
 using Azure.Storage.Blobs;
@@ -2452,7 +2452,7 @@ public sealed class CheckpointRestoreTrigger(IGrainFactory grains, CheckpointPro
 }
 ```
 
-- [ ] **Step 6: Build + test**
+- [x] **Step 6: Build + test**
 
 ```bash
 dotnet build Brain.slnx -c Release -p:SkipFlutterBuild=true
@@ -2460,11 +2460,11 @@ dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifie
 ```
 Expected: green.
 
-- [ ] **Step 7: Manual end-to-end round-trip under `aspire run`**
+- [x] **Step 7: Manual end-to-end round-trip under `aspire run`**
 
 Backup a neuron with `CheckpointBackupTrigger` (Task 21), mutate its state further, then restore from the manifest with `CheckpointRestoreTrigger` and confirm (via the neuron's own timeline query, e.g. `GetTimelineAsync`) that its journal matches the backed-up snapshot rather than the post-mutation state.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add DigitalBrain.Kernel/Sync/CheckpointImporter.cs DigitalBrain.Kernel/Sync/CheckpointRestoreTrigger.cs DigitalBrain.Tests/Sync/
