@@ -344,6 +344,7 @@ internal static class Program
             ["openAiEndpoint"] = openAiEndpoint,
             ["chatDeployment"] = ChatDeploymentName,
             ["kernelApp"] = kernelApp.Name,
+            ["kernelFqdn"] = kernelApp.LatestRevisionFqdn,
             ["telegramApp"] = telegramTransport.Name,
             ["telegramFqdn"] = telegramTransport.LatestRevisionFqdn,
             ["imageTag"] = imageTag,
