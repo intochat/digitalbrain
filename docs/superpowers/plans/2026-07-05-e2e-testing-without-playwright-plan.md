@@ -25,8 +25,8 @@
 - `DigitalBrain.Tests/E2E/DigitalBrainBrowserFixture.cs`
 - `DigitalBrain.Tests/E2E/ExperienceFlowDriver.cs` (contains both the live `LiveRenderVerifier` class and the `[Obsolete]` `ExperienceFlowDriver` alias — one physical file, despite the two names)
 - `DigitalBrain.Tests/E2E/E2EPrerequisitesFreshnessTests.cs`
-- `DigitalBrain.Tests/E2E/HelloWorldRendersE2ETests.cs`, `SimpleColorPickerRendersE2ETests.cs`, `UiGalleryRendersE2ETests.cs` (dead stubs, zero test methods)
-- `DigitalBrain.Tests/Distribution/BundleManifestEmbodimentTests.cs`, `DigitalBrain.Tests/Ui/BundleHarnessTests.cs`, `DigitalBrain.Tests/Ui/SimpleColorPickerHarnessTests.cs` (dead stubs, zero test methods)
+- `DigitalBrain.Tests/E2E/HelloWorldRendersE2ETests.cs`, `SimpleColorPickerRendersE2ETests.cs`, `UiGalleryRendersE2ETests.cs` (dead stubs, zero test methods — deleted in Task 2, not Task 8: `SimpleColorPickerRendersE2ETests.cs` and `UiGalleryRendersE2ETests.cs` still carry a `DigitalBrainBrowserFixture fixture` primary-constructor parameter and field even with an empty body, so leaving them past the fixture's deletion would break the build with unplanned-for errors; `HelloWorldRendersE2ETests.cs` has no class left at all and would compile fine either way, but is deleted alongside its siblings for the same reason (it's the same kind of dead stub, in the same folder))
+- `DigitalBrain.Tests/Distribution/BundleManifestEmbodimentTests.cs`, `DigitalBrain.Tests/Ui/BundleHarnessTests.cs`, `DigitalBrain.Tests/Ui/SimpleColorPickerHarnessTests.cs` (dead stubs, zero test methods, no `DigitalBrainBrowserFixture` dependency — deleted in Task 8 as originally planned)
 - `app/test/features/experience/experience_match_test.dart`, `app/test/rfw_host/inline_rfw_surface_test.dart`, `app/test/rfw_host/rfw_semantics_test.dart`, `app/test/grpc/endpoint_test.dart`, `app/test/grpc/action_dispatch_test.dart`, `app/test/perf/perf_stream_test.dart` (pure business logic, zero widget pumping)
 - `app/test/features/experience/experience_hop_view_test.dart`, `app/test/features/experience/experience_hop_view_tree_test.dart` (their unique content is `ExperienceHopView`'s own branch-selection/semantics-wiring logic — exactly the business logic being dropped; their incidental "does a Text widget render" assertions are already covered by `app/test/ui_kit/ui_kit_widgets_test.dart`'s existing `UiKitText` coverage, confirmed during planning research — this is a refinement beyond the design doc's literal "rewrite" wording, called out explicitly because a rewrite would just be a redundant test)
 
@@ -39,8 +39,8 @@
 - `e2e.runsettings` — rename env var, drop the now-unused `FAST_UI_E2E` var (only consumer was the deleted `LiveRenderVerifier`)
 - `DigitalBrain.Tests/E2E/RenderRunSettingsTests.cs` → renamed `E2ERunSettingsTests.cs`, updated assertions
 - `DigitalBrain.Tests/E2E/DigitalBrainE2ECollection.cs` — retype to `ICollectionFixture<DigitalBrainAppHostFixture>`
-- `DigitalBrain.Tests/E2E/NativeGrpcGalleryDeliveryE2ETests.cs` — retype constructor fixture param
-- `DigitalBrain.Tests/E2E/TravelPlanTripRendersE2ETests.cs`, `PackEmbodimentRendersE2ETests.cs`, `LoginRendersE2ETests.cs` — full rewrite to gRPC-only
+- `DigitalBrain.Tests/E2E/NativeGrpcGalleryDeliveryE2ETests.cs`, `TravelServerFeedDiagnosticTests.cs` — retype constructor fixture param only (neither ever touched `Page`/`Browser`; discovered during Task 2 execution — missed in the original design pass)
+- `DigitalBrain.Tests/E2E/TravelPlanTripRendersE2ETests.cs`, `PackEmbodimentRendersE2ETests.cs`, `LoginRendersE2ETests.cs`, `StarterBundleRendersE2ETests.cs` — full rewrite to gRPC-only (`StarterBundleRendersE2ETests.cs` was missed in the original design pass — same `LiveRenderVerifier`/browser dependency as the other three, and it's the file `docs/authoring-a-bundle.md` tells new bundle authors to copy, so it needs the same treatment)
 - `docs/authoring-a-bundle.md` — drop the `flutter build web` prerequisite step, rename env var
 - `app/test/shell/forui_app_shell_test.dart` — trim to only the `ShellChatComposer` widget test
 - `app/test/features/experience/config_form_tree_test.dart`, `app/test/ui_kit/ui_gallery_hop_render_test.dart` — full rewrite to construct `ui_kit` widgets directly
@@ -138,24 +138,28 @@ uncommitted at this point — that's intentional, they belong in the test-suite 
 
 ---
 
-### Task 2: Delete the browser fixture and live-render verifier
+### Task 2: Delete the browser fixture, live-render verifier, and the 3 dead E2E stubs that reference it
 
 **Files:**
 - Delete: `DigitalBrain.Tests/E2E/DigitalBrainBrowserFixture.cs`
 - Delete: `DigitalBrain.Tests/E2E/ExperienceFlowDriver.cs`
+- Delete: `DigitalBrain.Tests/E2E/HelloWorldRendersE2ETests.cs`, `SimpleColorPickerRendersE2ETests.cs`, `UiGalleryRendersE2ETests.cs`
 
-**Interfaces:** none consumed yet — Task 4 retypes the two consumers (`DigitalBrainE2ECollection`, `NativeGrpcGalleryDeliveryE2ETests`) that reference `DigitalBrainBrowserFixture`; Tasks 5-7 rewrite the three consumers of `LiveRenderVerifier`. Do this deletion first so the compiler immediately flags every remaining reference — that list IS the rest of this plan's C# scope, so it doubles as a completeness check.
+**Interfaces:** none consumed yet — Task 4 retypes the consumers (`DigitalBrainE2ECollection`, `NativeGrpcGalleryDeliveryE2ETests`, `TravelServerFeedDiagnosticTests`) that reference `DigitalBrainBrowserFixture` but never touch `Page`/`Browser`; Tasks 5-7 and Task 4 rewrite the four consumers of `LiveRenderVerifier` (`TravelPlanTripRendersE2ETests`, `PackEmbodimentRendersE2ETests`, `LoginRendersE2ETests`, `StarterBundleRendersE2ETests`). Do this deletion first so the compiler immediately flags every remaining reference — that list IS the rest of this plan's C# scope, so it doubles as a completeness check.
 
-- [ ] **Step 1: Delete both files**
+The 3 dead E2E stubs are deleted here, not in Task 8, because `SimpleColorPickerRendersE2ETests.cs` and `UiGalleryRendersE2ETests.cs` still carry a `DigitalBrainBrowserFixture fixture` primary-constructor parameter and field even though their bodies are empty — leaving them until Task 8 would mean the build sits in an unexpectedly-broken state (more compile errors than this task's own verification step accounts for) between this task and Task 8. `HelloWorldRendersE2ETests.cs` has no class left at all so it wouldn't error either way, but it's the same kind of dead stub in the same folder, so it goes with its siblings.
+
+- [ ] **Step 1: Delete all 5 files**
 
 ```bash
 git rm DigitalBrain.Tests/E2E/DigitalBrainBrowserFixture.cs DigitalBrain.Tests/E2E/ExperienceFlowDriver.cs
+git rm DigitalBrain.Tests/E2E/HelloWorldRendersE2ETests.cs DigitalBrain.Tests/E2E/SimpleColorPickerRendersE2ETests.cs DigitalBrain.Tests/E2E/UiGalleryRendersE2ETests.cs
 ```
 
 - [ ] **Step 2: Confirm the compiler lists exactly the expected breakage**
 
 Run: `dotnet build DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release 2>&1 | grep -E "error|CS0"`
-Expected: `CS0246` (type not found) errors in exactly: `DigitalBrainE2ECollection.cs`, `NativeGrpcGalleryDeliveryE2ETests.cs`, `TravelPlanTripRendersE2ETests.cs`, `PackEmbodimentRendersE2ETests.cs`, `LoginRendersE2ETests.cs`. If any other file shows up, stop and investigate before continuing — it means something outside this plan's scope also depended on the deleted types.
+Expected: `CS0246` (type not found) errors in exactly these 7 files: `DigitalBrainE2ECollection.cs`, `NativeGrpcGalleryDeliveryE2ETests.cs`, `TravelServerFeedDiagnosticTests.cs`, `TravelPlanTripRendersE2ETests.cs`, `PackEmbodimentRendersE2ETests.cs`, `LoginRendersE2ETests.cs`, `StarterBundleRendersE2ETests.cs`. If any OTHER file shows up, stop and investigate before continuing — it means something outside this plan's now-corrected scope also depended on the deleted types.
 
 ---
 
@@ -293,18 +297,20 @@ public class E2ERunSettingsTests
 - [ ] **Step 6: Build to confirm this task's slice compiles**
 
 Run: `dotnet build DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release 2>&1 | grep -E "error|CS0"`
-Expected: the same 5 files from Task 2 Step 2 still show `CS0246` (they reference `DigitalBrainBrowserFixture`/`LiveRenderVerifier`, fixed in Tasks 4-7) — no NEW errors introduced by this task's changes.
+Expected: the same 7 files from Task 2 Step 2 still show `CS0246` (they reference `DigitalBrainBrowserFixture`/`LiveRenderVerifier`, fixed in Task 4-7) — no NEW errors introduced by this task's changes.
 
 ---
 
-### Task 4: Retype the E2E collection fixture and the native-gRPC test to the browser-free fixture
+### Task 4: Retype the pure-gRPC fixture consumers, and rewrite the Starter bundle's render test
 
 **Files:**
 - Modify: `DigitalBrain.Tests/E2E/DigitalBrainE2ECollection.cs`
-- Modify: `DigitalBrain.Tests/E2E/NativeGrpcGalleryDeliveryE2ETests.cs`
+- Modify: `DigitalBrain.Tests/E2E/NativeGrpcGalleryDeliveryE2ETests.cs`, `TravelServerFeedDiagnosticTests.cs` — retype only, no other change
+- Modify: `DigitalBrain.Tests/E2E/StarterBundleRendersE2ETests.cs` — full rewrite to gRPC-only
 
 **Interfaces:**
-- Consumes: `DigitalBrainAppHostFixture` (unchanged from Task 3 — `CreateGatewayGrpcChannel()`, `GatewayHttpsUrl`, `GrpcUrl`, `PublishPackAsync`, `InstallPackAsync`, `SendSynapseAsync`, `SendExperienceStepAsync`, all already defined in the existing file).
+- Consumes: `DigitalBrainAppHostFixture` (unchanged from Task 3 — `CreateGatewayGrpcChannel()`, `GatewayHttpsUrl`, `GrpcUrl`, `PublishPackAsync`, `InstallPackAsync`, `SendSynapseAsync`, `SendExperienceStepAsync`, all already defined in the existing file); `StarterBundleSource.Pack` (`"starter"`), `StarterBundleSource.ExperienceId` (`"starter"`), `StarterBundleSource.Hops.Ask` (`"ask"`), `StarterBundleSource.Hops.Result` (`"result"`) from `DigitalBrain.Tests/Authoring/StarterBundleSource.cs`.
+- Confirmed fact backing the `StarterBundleRendersE2ETests` rewrite: `StarterExperience` extends `KitExperience` (`DigitalBrain.Pack.Contracts/UiKit/KitExperience.cs:48`), whose hop-emission path calls `UiSurface.ForExperienceHopTree(experience.Id, experience.Id, hop.Id, screen, ...)` — the `WidgetTreeKind` sibling of `ForExperienceHop`. Per the same `UiSurfaceRfwBridge` fact already used for Task 7's `LoginRendersE2ETests` (the shell surface is also `WidgetTreeKind`), `RfwCardEnvelope.CorrelationId` equals the surfaceId (here, the hop id) for `WidgetTreeKind` surfaces too — so `"ask"` and `"result"` are exactly what to match on, the same shape as Task 5's Travel-hop assertions.
 
 - [ ] **Step 1: Retype the collection fixture**
 
@@ -335,10 +341,83 @@ public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainAppHostFixture
 ```
 No other change needed — this file never touched `Page`/`Browser`.
 
-- [ ] **Step 3: Build to confirm**
+- [ ] **Step 3: Retype `TravelServerFeedDiagnosticTests`'s constructor parameter the same way**
+
+In `DigitalBrain.Tests/E2E/TravelServerFeedDiagnosticTests.cs`, change:
+```csharp
+public sealed class TravelServerFeedDiagnosticTests(DigitalBrainBrowserFixture fixture, ITestOutputHelper output)
+{
+    readonly DigitalBrainBrowserFixture _fx = fixture;
+```
+to:
+```csharp
+public sealed class TravelServerFeedDiagnosticTests(DigitalBrainAppHostFixture fixture, ITestOutputHelper output)
+{
+    readonly DigitalBrainAppHostFixture _fx = fixture;
+```
+No other change needed — this file is already pure native-gRPC (it never touched `Page`/`Browser` either; it only declared the wrong fixture type).
+
+- [ ] **Step 4: Rewrite `StarterBundleRendersE2ETests.cs` to gRPC-only**
+
+Replace the file content with:
+```csharp
+using DigitalBrain.Runtime.Grpc;
+using DigitalBrain.Tests.Authoring;
+using Grpc.Core;
+
+namespace DigitalBrain.Tests.E2E;
+
+[Trait("Category", "E2E")]
+[Collection(nameof(DigitalBrainE2ECollection))]
+public sealed class StarterBundleRendersE2ETests(DigitalBrainAppHostFixture fixture)
+{
+    readonly DigitalBrainAppHostFixture _fx = fixture;
+
+    [SkippableFact]
+    public async Task Starter_asks_then_echoes_over_the_real_wire()
+    {
+        E2EPrerequisites.RequireRealStackE2E();
+
+        await _fx.PublishPackAsync(StarterBundleSource.Pack, "1.0", code: StarterBundleSource.Code,
+            description: "Starter bundle");
+        await _fx.InstallPackAsync(StarterBundleSource.Pack, "1.0", buyer: "e2e-starter");
+
+        using var channel = _fx.CreateGatewayGrpcChannel();
+        var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest(), cancellationToken: cts.Token);
+        await Task.Delay(750, cts.Token);
+
+        var askDelivered = ReadForSurfaceIdAsync(feed.ResponseStream, StarterBundleSource.Hops.Ask, cts.Token);
+        await _fx.SendExperienceStepAsync(StarterBundleSource.Pack, StarterBundleSource.ExperienceId, "start");
+        Assert.True(await askDelivered, $"'{StarterBundleSource.Hops.Ask}' hop was not delivered over WatchHomeFeed");
+
+        var resultDelivered = ReadForSurfaceIdAsync(feed.ResponseStream, StarterBundleSource.Hops.Result, cts.Token);
+        await _fx.SendExperienceStepAsync(StarterBundleSource.Pack, StarterBundleSource.ExperienceId,
+            StarterBundleSource.Hops.Result, new Dictionary<string, string> { ["message"] = "ping" });
+        Assert.True(await resultDelivered, $"'{StarterBundleSource.Hops.Result}' hop was not delivered over WatchHomeFeed");
+    }
+
+    static async Task<bool> ReadForSurfaceIdAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string surfaceId, CancellationToken ct)
+    {
+        try
+        {
+            while (await stream.MoveNext(ct))
+            {
+                if (stream.Current.CorrelationId == surfaceId) return true;
+            }
+        }
+        catch (RpcException) { }
+        catch (OperationCanceledException) { }
+        return false;
+    }
+}
+```
+
+- [ ] **Step 5: Build to confirm**
 
 Run: `dotnet build DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release 2>&1 | grep -E "error|CS0"`
-Expected: `TravelPlanTripRendersE2ETests.cs`, `PackEmbodimentRendersE2ETests.cs`, `LoginRendersE2ETests.cs` still error (fixed next); `NativeGrpcGalleryDeliveryE2ETests.cs` and `DigitalBrainE2ECollection.cs` no longer appear.
+Expected: `TravelPlanTripRendersE2ETests.cs`, `PackEmbodimentRendersE2ETests.cs`, `LoginRendersE2ETests.cs` still error (fixed next, Tasks 5-7); none of this task's 4 files appear anymore.
 
 Nothing to commit yet — all of Tasks 2-4's changes (plus 5-8) land in one test-suite commit at the
 end of Task 9, kept separate from Task 1's already-committed CI-only change.
@@ -611,18 +690,18 @@ Expected: zero errors across the whole project — this was the last file refere
 
 ---
 
-### Task 8: Delete the dead C# test stubs
+### Task 8: Delete the remaining dead C# test stubs
 
 **Files:**
-- Delete: `DigitalBrain.Tests/E2E/HelloWorldRendersE2ETests.cs`, `SimpleColorPickerRendersE2ETests.cs`, `UiGalleryRendersE2ETests.cs`
 - Delete: `DigitalBrain.Tests/Distribution/BundleManifestEmbodimentTests.cs`, `DigitalBrain.Tests/Ui/BundleHarnessTests.cs`, `DigitalBrain.Tests/Ui/SimpleColorPickerHarnessTests.cs`
 
-All six are confirmed (by full-repo sweep during planning) to contain zero `[Fact]`/`[Theory]`/`[SkippableFact]` methods — each is an empty class body with only a comment noting removed content.
+(The 3 dead E2E-folder stubs — `HelloWorldRendersE2ETests.cs`, `SimpleColorPickerRendersE2ETests.cs`, `UiGalleryRendersE2ETests.cs` — were already deleted in Task 2, moved earlier because two of them still referenced `DigitalBrainBrowserFixture` in their constructor and would have broken the build if left until this task.)
 
-- [ ] **Step 1: Delete all six**
+All three are confirmed (by full-repo sweep during planning) to contain zero `[Fact]`/`[Theory]`/`[SkippableFact]` methods — each is an empty class body with only a comment noting removed content, and none references `DigitalBrainBrowserFixture` or anything else deleted earlier in this plan.
+
+- [ ] **Step 1: Delete all three**
 
 ```bash
-git rm DigitalBrain.Tests/E2E/HelloWorldRendersE2ETests.cs DigitalBrain.Tests/E2E/SimpleColorPickerRendersE2ETests.cs DigitalBrain.Tests/E2E/UiGalleryRendersE2ETests.cs
 git rm DigitalBrain.Tests/Distribution/BundleManifestEmbodimentTests.cs DigitalBrain.Tests/Ui/BundleHarnessTests.cs DigitalBrain.Tests/Ui/SimpleColorPickerHarnessTests.cs
 ```
 
@@ -712,10 +791,12 @@ Change:
 ```
 to:
 ```markdown
-4. Copy `DigitalBrain.Tests/E2E/TravelPlanTripRendersE2ETests.cs` as a starting shape; run it from
-   Test Explorer (with `e2e.runsettings` wired up, per the real-stack loop section above) or with
+4. Copy `DigitalBrain.Tests/E2E/StarterBundleRendersE2ETests.cs`; run it from Test Explorer
+   (with `e2e.runsettings` wired up, per the real-stack loop section above) or with
    `RUN_REAL_STACK_E2E=true dotnet test --filter "~MyBundleRendersE2ETests"` to prove the real wire.
 ```
+(`StarterBundleRendersE2ETests.cs` itself gets rewritten to the same gRPC-only pattern in Task 4 —
+it stays the copy-me template, just without a browser.)
 
 - [ ] **Step 3: Commit everything from Tasks 2-9 as one test-suite commit**
 
@@ -723,8 +804,9 @@ to:
 git add DigitalBrain.Tests/DigitalBrain.Tests.csproj Directory.Packages.props
 git add DigitalBrain.Tests/E2E/ docs/authoring-a-bundle.md
 git add DigitalBrain.Tests/Distribution/BundleManifestEmbodimentTests.cs DigitalBrain.Tests/Ui/BundleHarnessTests.cs DigitalBrain.Tests/Ui/SimpleColorPickerHarnessTests.cs
-git status --short  # confirm: 6 stub deletions, DigitalBrainBrowserFixture.cs/ExperienceFlowDriver.cs/E2EPrerequisitesFreshnessTests.cs deletions,
-                     # RenderRunSettingsTests.cs -> E2ERunSettingsTests.cs rename, and the 3 rewritten *RendersE2ETests.cs files all show up —
+git status --short  # confirm: 3 remaining stub deletions (Task 8), DigitalBrainBrowserFixture.cs/ExperienceFlowDriver.cs/E2EPrerequisitesFreshnessTests.cs
+                     # deletions, the 3 E2E-folder stub deletions from Task 2, RenderRunSettingsTests.cs -> E2ERunSettingsTests.cs rename, and the
+                     # 4 rewritten *RendersE2ETests.cs files (Travel, PackEmbodiment, Login, Starter) all show up —
                      # nothing from .github/workflows/ should appear here (that's already committed in Task 1)
 git commit -m "test(e2e): replace Playwright-driven DOM E2E with real gRPC-wire assertions
 
@@ -737,7 +819,11 @@ backend now asserts on the same wire payload Flutter would consume,
 instead of a DOM proxy for it.
 
 Also deletes 6 pre-existing dead test stub files found during a repo-wide
-sweep (empty classes left behind by earlier pack-literal cleanups)."
+sweep (empty classes left behind by earlier pack-literal cleanups), and
+rewrites StarterBundleRendersE2ETests.cs and retypes
+TravelServerFeedDiagnosticTests.cs — both missed in the original design
+pass, surfaced by the compiler once DigitalBrainBrowserFixture was
+deleted."
 ```
 
 ---
