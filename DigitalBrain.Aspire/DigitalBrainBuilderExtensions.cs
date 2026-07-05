@@ -11,7 +11,7 @@ public sealed class DigitalBrainContext
     public required string Name { get; init; }
     public required IDistributedApplicationBuilder ApplicationBuilder { get; init; }
     public required OrleansService Orleans { get; init; }
-    public required object Llm { get; init; }
+    public required IResourceBuilder<IResourceWithConnectionString> Llm { get; init; }
     public required OrleansServiceClient OrleansClient { get; init; }
     public required int KernelReplicas { get; init; }
     public required bool UseLocalMarketplace { get; init; }
@@ -139,7 +139,7 @@ public static class DigitalBrainBuilderExtensions
             .WithReference(ctx.ClusteringTable)
             .WithReference(ctx.GrainBlobs)
             .WithReference(ctx.JournalBlobs)
-            .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm)
+            .WithReference(ctx.Llm)
             .WithEndpoint(name: "grpc", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
             .WithEndpoint(
                 name: "web",
@@ -250,7 +250,7 @@ public static class DigitalBrainBuilderExtensions
                 "-d",
                 target)
             .WithReference(ctx.OrleansClient)
-            .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm)
+            .WithReference(ctx.Llm)
             .WithEnvironment("DIGITALBRAIN_UI_PACK", "DigitalBrain.UI.AspireFlutter")
             .WithEnvironment("DIGITALBRAIN_UI_TIER1_RESTART_REQUIRED", "true");
     }
