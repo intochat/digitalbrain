@@ -71,8 +71,10 @@ public static class DigitalBrainBuilderExtensions
             azureOpenAIKey = builder.AddParameter("azure-openai-key", secret: true);
         }
 
+        var isRunMode = builder.ExecutionContext.IsRunMode;
+
         var storage = builder.AddAzureStorage("storage");
-        if (builder.ExecutionContext.IsRunMode)
+        if (isRunMode)
         {
             storage.RunAsEmulator();
         }
@@ -86,13 +88,13 @@ public static class DigitalBrainBuilderExtensions
 
         // Ollama always runs as the offline fallback (per DEMO-PLAN), independent of the chosen primary
         // provider — it must pull its own real model tag, never the primary provider's model/deployment
-        // name (e.g. an azureopenai deployment name like "gpt-4o-mini" is not a pullable Ollama tag).
-        // Run-mode only: `aspire publish` should never try to emit a local Ollama container into a publish
+        // name (e.g. an azureopenai deployment name like "gpt-4o-mini" is not a pullable Ollama tag). But
+        // only in run mode: `aspire publish` should never emit a local Ollama container into a publish
         // manifest — prod gets its LLM from Azure OpenAI via Pulumi, wired separately (see WireKernelSilo).
         const string ollamaFallbackModel = "qwen2.5-coder:1.5b";
         IResourceBuilder<IResourceWithConnectionString> qwen;
         EndpointReference? ollamaEndpoint = null;
-        if (builder.ExecutionContext.IsRunMode)
+        if (isRunMode)
         {
             var ollama = builder.AddOllama("ollama")
                 .WithGPUSupport()
