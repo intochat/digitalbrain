@@ -13,11 +13,10 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
     {
         options.WithVoice2Text<Whisper1Local>();
     }
-    // options.WithLLM<Gpt4oMini>(); // switch to Azure OpenAI when ready (needs azure-openai-endpoint/-key parameters)
+    // To switch to Azure OpenAI, call options.WithLLM<Gpt4oMini>() instead — it needs the
+    // azure-openai-endpoint/-key parameters wired below (see README "LLM provider switch").
     options.UseLocalMarketplace = true;
-})
-.WithOrleansDashboard(8080)
-.WithMcp();
+});
 
 // Service-to-service secret gating the secrets-returning GetPackConfig RPC. Shared (same value) between the
 // kernel and any internal transport that pulls pack config; NEVER injected into the Flutter client config, so a
