@@ -139,7 +139,11 @@ if (isAspireHosted)
     builder.AddAzureBlobServiceClient("grainstate", settings => settings.DisableHealthChecks = true);
 }
 
-builder.Services.AddDigitalBrainChat(builder.Configuration);
+// Reuses storageCredential (built once above) rather than letting AddDigitalBrainChat mint its own
+// DefaultAzureCredential — same "one credential per process" convention Task 18 established for the
+// storage consumers below; storageCredential is null outside the real ACA deploy, so this is a no-op
+// everywhere else and AddDigitalBrainChat falls back to constructing its own.
+builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
 builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
 builder.Services.AddSingleton<DigitalBrain.Kernel.Llm.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
 builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);

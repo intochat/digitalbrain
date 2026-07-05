@@ -277,19 +277,26 @@ internal static class Program
         }, AliasOldRuntimeParent());
 
         // Grant the kernel's system-assigned identity data-plane access to the storage account (Task 18,
-        // step 2). GUIDs verified against Microsoft Learn's built-in-roles/storage.md source, not trusted
-        // from memory.
+        // step 2) and to the OpenAI account (Task 19, step 1). GUIDs verified against Microsoft Learn's
+        // built-in-roles/storage.md and dotnet/ai/azure-ai-services-authentication.md sources, not trusted
+        // from memory. GrantKernelRole is generalized over the target scope (storage.Id vs openAi.Id) since
+        // both are just "system-assigned identity, one RBAC role, one resource scope" — no need for a second
+        // near-identical helper.
         var kernelPrincipalId = kernelApp.Identity.Apply(identity => identity!.PrincipalId!);
-        GrantKernelStorageRole("kernel-storage-table-contributor", "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"); // Storage Table Data Contributor
-        GrantKernelStorageRole("kernel-storage-blob-contributor", "ba92f5b4-2d11-453d-a403-e96b0029c9fe"); // Storage Blob Data Contributor
+        GrantKernelRole("kernel-storage-table-contributor", "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3", storage.Id); // Storage Table Data Contributor
+        GrantKernelRole("kernel-storage-blob-contributor", "ba92f5b4-2d11-453d-a403-e96b0029c9fe", storage.Id); // Storage Blob Data Contributor
+        // Kernel identity isn't granted access until this deploys; the key-based path (openAiKey/OpenAiKeySecret
+        // above) stays wired unchanged so DigitalBrainChat.cs's key branch keeps working until a verified,
+        // separate follow-up deploy removes the key and flips DisableLocalAuth (Task 19 steps 2/4, out of scope here).
+        GrantKernelRole("kernel-openai-user", "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd", openAi.Id); // Cognitive Services OpenAI User
 
-        void GrantKernelStorageRole(string resourceName, string roleDefinitionGuid) =>
+        void GrantKernelRole(string resourceName, string roleDefinitionGuid, Input<string> scope) =>
             _ = new Authorization.RoleAssignment(resourceName, new Authorization.RoleAssignmentArgs
             {
                 PrincipalId = kernelPrincipalId,
                 PrincipalType = Authorization.PrincipalType.ServicePrincipal,
                 RoleDefinitionId = $"/providers/Microsoft.Authorization/roleDefinitions/{roleDefinitionGuid}",
-                Scope = storage.Id
+                Scope = scope
             });
 
         // The Telegram transport calls the kernel's gRPC gateway. The kernel app's external FQDN is reachable from
