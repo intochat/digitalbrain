@@ -25,10 +25,11 @@ internal static class Program
     private const string EnvSuffix = "prod";
     private const string ChatDeploymentName = "chat";
 
-    // Images live in public Docker Hub. ACA pulls without registry creds because the repos are public;
-    // otherwise add AppInputs.RegistryCredentialsArgs (server=docker.io) with a Docker Hub access-token secret.
-    private const string KernelImageRepository = "docker.io/vhorbachov/digitalbrain-kernel";
-    private const string TelegramImageRepository = "docker.io/vhorbachov/digitalbrain-telegram";
+    // Images live in GHCR under the repo's own org. ACA pulls without registry creds only while the packages
+    // are public (Step 3); if you ever need to keep them private, add AppInputs.RegistryCredentialsArgs
+    // (server=ghcr.io) with a GitHub PAT that has read:packages scope, stored as a Pulumi secret.
+    private const string KernelImageRepository = "ghcr.io/digitalbraintech/digitalbrain-kernel";
+    private const string TelegramImageRepository = "ghcr.io/digitalbraintech/digitalbrain-telegram";
 
     // Container App secret names backing the NeuroOS runtime contract.
     private const string StorageConnectionSecret = "digitalbrain-storage-connection";

@@ -32,17 +32,25 @@ jobs:
       - name: Run tests
         run: dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualifiedName!~E2E"
 
-      - name: Log in to Docker Hub
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish kernel image
         run: |
           dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer \
-            -p:ContainerRegistry=docker.io \
-            -p:ContainerRepository=vhorbachov/digitalbrain-kernel \
+            -p:ContainerRegistry=ghcr.io \
+            -p:ContainerRepository=digitalbraintech/digitalbrain-kernel \
+            -p:ContainerImageTag="${TAG}"
+
+      - name: Publish Telegram transport image
+        run: |
+          dotnet publish DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj -c Release /t:PublishContainer \
+            -p:ContainerRegistry=ghcr.io \
+            -p:ContainerRepository=digitalbraintech/digitalbrain-telegram \
             -p:ContainerImageTag="${TAG}"
 
       - name: Azure login (OIDC)
