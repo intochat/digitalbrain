@@ -15,7 +15,6 @@ on:
 permissions:
   id-token: write
   contents: read
-  packages: write
 
 jobs:
   deploy:
@@ -32,25 +31,24 @@ jobs:
       - name: Run tests
         run: dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true --filter "FullyQualifiedName!~E2E"
 
-      - name: Log in to GHCR
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Publish kernel image
         run: |
           dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer \
-            -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=digitalbraintech/digitalbrain-kernel \
+            -p:ContainerRegistry=docker.io \
+            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel \
             -p:ContainerImageTag="${TAG}"
 
       - name: Publish Telegram transport image
         run: |
           dotnet publish DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj -c Release /t:PublishContainer \
-            -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=digitalbraintech/digitalbrain-telegram \
+            -p:ContainerRegistry=docker.io \
+            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-telegram \
             -p:ContainerImageTag="${TAG}"
 
       - name: Azure login (OIDC)
@@ -68,6 +66,9 @@ jobs:
           # AES checkpoint-encryption key, injected from a repo secret (never committed). The program reads
           # DIGITALBRAIN_CHECKPOINT_KEY and fails the deploy if absent (kernel fail-fasts in Production without it).
           DIGITALBRAIN_CHECKPOINT_KEY: ${{ secrets.CHECKPOINT_KEY }}
+          # Docker Hub PAT so ACA can authenticate pulling the private kernel/telegram images (see
+          # deploy/Program.cs's RegistryCredentialsArgs wiring).
+          DIGITALBRAIN_DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           # azblob://pulumi-state backend needs the storage account; the OIDC login above provides Azure AD auth
           # (the deploy identity needs Storage Blob Data Contributor on this account).
           AZURE_STORAGE_ACCOUNT: digitalbrainstprod
