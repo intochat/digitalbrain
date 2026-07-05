@@ -46,6 +46,9 @@
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.1.0" />
+    <!-- DefaultAzureCredential for the kernel's managed-identity storage path (Task 18) — was resolving
+         transitively/undeclared before; pinned explicitly now. Version verified via nuget.org 2026-07-05 -->
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <!-- MCP / LLM integration -->
     <PackageVersion Include="ModelContextProtocol" Version="1.4.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />

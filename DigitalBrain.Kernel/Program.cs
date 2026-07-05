@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using DigitalBrain.Core;
 using DigitalBrain.Context;
@@ -31,6 +32,21 @@ var builder = WebApplication.CreateBuilder(args);
 var isAspireHosted = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__clustering"))
     || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__grainstate"))
     || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__journal"));
+
+// Cloud-only sub-case of isAspireHosted: the deploy's Pulumi program sets DigitalBrain__Storage__AccountName
+// (only on the real ACA container app, never in Aspire/local config), so this is what actually distinguishes
+// "real Azure storage account, managed identity available" from "Aspire-hosted Azurite, no such concept" —
+// isAspireHosted alone can't do that since both take the connection-string-shaped env vars today.
+var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
+var useManagedIdentity = !string.IsNullOrWhiteSpace(storageAccountName);
+
+// Built once and reused by every managed-identity storage consumer below (packConfigBlobs, clustering, grain
+// storage, journal) rather than each constructing its own DefaultAzureCredential/endpoint Uri: keeps the
+// account-name-to-endpoint mapping in one place (no risk of one call site's suffix drifting from another's)
+// and avoids running DefaultAzureCredential's credential-chain probing more than once at startup.
+var storageCredential = useManagedIdentity ? new DefaultAzureCredential() : null;
+var storageTableServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.table.core.windows.net") : null;
+var storageBlobServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.blob.core.windows.net") : null;
 
 builder.AddServiceDefaults();
 
@@ -135,9 +151,16 @@ builder.Services.AddContextStore(builder.Configuration);
 BlobServiceClient? packConfigBlobs = null;
 if (isAspireHosted)
 {
-    var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
-    if (!string.IsNullOrEmpty(grainStateConnStr))
-        packConfigBlobs = new BlobServiceClient(grainStateConnStr);
+    if (useManagedIdentity)
+    {
+        packConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!);
+    }
+    else
+    {
+        var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
+        if (!string.IsNullOrEmpty(grainStateConnStr))
+            packConfigBlobs = new BlobServiceClient(grainStateConnStr);
+    }
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
 builder.Services.AddHostedService<SalesforceAppConfigSeeder>();
@@ -196,18 +219,45 @@ builder.UseOrleans(siloBuilder =>
             options.ClusterId = clusterId;
             options.ServiceId = serviceId;
         });
-        siloBuilder.UseAzureStorageClustering(options =>
-            options.ConfigureTableServiceClient(builder.Configuration.GetConnectionString("clustering")!));
-        siloBuilder.AddAzureBlobGrainStorage("Default", options =>
-            options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("grainstate")!));
         // Native ("orleans-binary") journal format, not UseJsonJournalFormat: a spike
         // (DigitalBrain.Tests/Spikes/JournalFormatSpikeTests.cs) proved native round-trips every Synapse
         // subtype through a real grain deactivation/reactivation with zero manual type registration, while
         // Orleans.Journaling.Json (still preview/experimental) throws ResolverTypeInfoOptionsNotCompatible
         // the moment it's actually exercised against Azure Blob storage - the exact untested scenario the
         // spike's own caveats flagged as a risk. See DigitalBrain.Tests/Spikes/README.md for the full record.
-        siloBuilder.AddAzureBlobJournalStorage(options =>
-            options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
+        if (useManagedIdentity)
+        {
+            // Real ACA deploy path once DigitalBrain__Storage__AccountName is set (Task 18): no account-key
+            // connection strings — storageCredential (DefaultAzureCredential, built once above) resolves the
+            // container app's system-assigned identity in ACA (falls back to az login/env-based auth for a
+            // locally az-authenticated run against the same account, though that combination isn't exercised
+            // by Aspire/local dev today). NOTE: RBAC role-assignment propagation can lag a freshly-created
+            // identity by several minutes — see deploy/Program.cs's kernel-storage-*-contributor
+            // RoleAssignments; if the silo fails to join the cluster right after a fresh deploy with
+            // AuthorizationPermissionMismatch, that lag (not a code bug) is the first thing to check per the
+            // brief's Step 6 verification.
+            //
+            // TableServiceClient/BlobServiceClient assigned directly rather than via ConfigureTableServiceClient/
+            // ConfigureBlobServiceClient(Uri, TokenCredential): those overloads are [Obsolete] on
+            // AzureStorageOperationOptions/AzureBlobStorageOptions in this Orleans version (confirmed against
+            // dotnet/orleans source), which explicitly says to set the property instead. AddAzureBlobJournalStorage's
+            // options type has no such deprecation, so it keeps using ConfigureBlobServiceClient below.
+            siloBuilder.UseAzureStorageClustering(options =>
+                options.TableServiceClient = new Azure.Data.Tables.TableServiceClient(storageTableServiceUri!, storageCredential!));
+            siloBuilder.AddAzureBlobGrainStorage("Default", options =>
+                options.BlobServiceClient = new BlobServiceClient(storageBlobServiceUri!, storageCredential!));
+            siloBuilder.AddAzureBlobJournalStorage(options =>
+                options.ConfigureBlobServiceClient(storageBlobServiceUri!, storageCredential!));
+        }
+        else
+        {
+            siloBuilder.UseAzureStorageClustering(options =>
+                options.ConfigureTableServiceClient(builder.Configuration.GetConnectionString("clustering")!));
+            siloBuilder.AddAzureBlobGrainStorage("Default", options =>
+                options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("grainstate")!));
+            siloBuilder.AddAzureBlobJournalStorage(options =>
+                options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
+        }
         siloBuilder.ConfigureServices(services =>
             services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary"));
     }
