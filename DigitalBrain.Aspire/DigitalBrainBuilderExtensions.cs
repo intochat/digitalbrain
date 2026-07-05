@@ -23,8 +23,9 @@ public sealed class DigitalBrainContext
     // The resolved LLM provider ("ollama" | "azureopenai"), set via DigitalBrainOptions.WithLLM<TModel>().
     public required string LlmProvider { get; init; }
 
-    // Ollama container http endpoint for DigitalBrain__Llm__OllamaEndpoint injection
-    public required EndpointReference OllamaEndpoint { get; init; }
+    // Ollama container http endpoint for DigitalBrain__Llm__OllamaEndpoint injection; null in publish mode
+    // (no local Ollama container — the else branch in AddDigitalBrain uses a connection-string placeholder).
+    public EndpointReference? OllamaEndpoint { get; init; }
 
     // Set only when LlmProvider is "azureopenai" (WithLLM<TModel>() where TModel.Provider == "azureopenai")
     public IResourceBuilder<ParameterResource>? AzureOpenAIEndpoint { get; init; }
@@ -70,7 +71,11 @@ public static class DigitalBrainBuilderExtensions
             azureOpenAIKey = builder.AddParameter("azure-openai-key", secret: true);
         }
 
-        var storage = builder.AddAzureStorage("storage").RunAsEmulator();
+        var storage = builder.AddAzureStorage("storage");
+        if (builder.ExecutionContext.IsRunMode)
+        {
+            storage.RunAsEmulator();
+        }
         var clusteringTable = storage.AddTables("clustering");
         var grainBlobs = storage.AddBlobs("grainstate");
         var journalBlobs = storage.AddBlobs("journal");
@@ -82,12 +87,24 @@ public static class DigitalBrainBuilderExtensions
         // Ollama always runs as the offline fallback (per DEMO-PLAN), independent of the chosen primary
         // provider — it must pull its own real model tag, never the primary provider's model/deployment
         // name (e.g. an azureopenai deployment name like "gpt-4o-mini" is not a pullable Ollama tag).
+        // Run-mode only: `aspire publish` should never try to emit a local Ollama container into a publish
+        // manifest — prod gets its LLM from Azure OpenAI via Pulumi, wired separately (see WireKernelSilo).
         const string ollamaFallbackModel = "qwen2.5-coder:1.5b";
-        var ollama = builder.AddOllama("ollama")
-            .WithGPUSupport()
-            .WithDataVolume()
-            .WithOpenWebUI();
-        var qwen = ollama.AddModel("qwen", ollamaFallbackModel);
+        IResourceBuilder<IResourceWithConnectionString> qwen;
+        EndpointReference? ollamaEndpoint = null;
+        if (builder.ExecutionContext.IsRunMode)
+        {
+            var ollama = builder.AddOllama("ollama")
+                .WithGPUSupport()
+                .WithDataVolume()
+                .WithOpenWebUI();
+            qwen = ollama.AddModel("qwen", ollamaFallbackModel);
+            ollamaEndpoint = ollama.GetEndpoint("http");
+        }
+        else
+        {
+            qwen = builder.AddConnectionString("qwen");
+        }
 
         return new DigitalBrainContext
         {
@@ -101,7 +118,7 @@ public static class DigitalBrainBuilderExtensions
             ModelRegistry = options.ModelRegistry.Snapshot(),
             LlmModel = llmModel,
             LlmProvider = llmProvider,
-            OllamaEndpoint = ollama.GetEndpoint("http"),
+            OllamaEndpoint = ollamaEndpoint,
             AzureOpenAIEndpoint = azureOpenAIEndpoint,
             AzureOpenAIKey = azureOpenAIKey,
             EnableOrleansDashboard = options.EnableOrleansDashboard,
@@ -144,8 +161,11 @@ public static class DigitalBrainBuilderExtensions
         // DigitalBrainOptions.WithLLM<TModel>() (see LlmModels.cs) rather than a hardcoded string.
         kernel.WithEnvironment("DigitalBrain__Llm__Provider", ctx.LlmProvider);
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
-        kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
-            ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
+        if (ctx.OllamaEndpoint is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
+                ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
+        }
         kernel.WithModelRegistry(ctx);
 
         if (ctx.AzureOpenAIEndpoint is not null)
