@@ -15,7 +15,6 @@ using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Gateway;
 
-[Collection("signal-sink-host")]
 public class GenericSendTests : NeuronTestBase
 {
     private HomeFeedBus? _homeFeedBusInstance;
@@ -113,9 +112,6 @@ public class GenericSendTests : NeuronTestBase
         Assert.NotNull(accepted);
     }
 }
-
-[CollectionDefinition("signal-sink-host", DisableParallelization = true)]
-public sealed class SignalSinkHostCollection;
 
 public interface ISignalSink : INeuron
 {

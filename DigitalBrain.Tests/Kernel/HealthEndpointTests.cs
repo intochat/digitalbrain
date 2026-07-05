@@ -3,13 +3,14 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace DigitalBrain.Tests.Kernel;
 
 [Collection("silo-host")]
-public class HealthEndpointTests
+public class HealthEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
+    private readonly WebApplicationFactory<Program> _factory = factory;
+
     [Fact]
     public async Task HealthEndpoint_ReturnsHealthy()
     {
-        using var factory = new WebApplicationFactory<Program>();
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
 
         var response = await client.GetAsync("/health");
 
@@ -19,8 +20,7 @@ public class HealthEndpointTests
     [Fact]
     public async Task AliveEndpoint_ReturnsHealthy()
     {
-        using var factory = new WebApplicationFactory<Program>();
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
 
         var response = await client.GetAsync("/alive");
 

@@ -12,7 +12,6 @@ namespace DigitalBrain.Tests.Gateway;
 // Proves the OUTBOUND mirror of generic Send: a broadcast Signal travels the DigitalBrainTimeline stream,
 // the per-silo SignalEgressStreamSubscriber forwards it into SignalEgressBus, and a filtered subscription
 // (the mechanism WatchSynapses streams to external transports) yields only the matching signal.
-[Collection("signal-egress-host")]
 public class WatchSynapsesTests : NeuronTestBase
 {
     private readonly SignalEgressBus _egressBus = new();
@@ -70,6 +69,3 @@ public class WatchSynapsesTests : NeuronTestBase
         }
     }
 }
-
-[CollectionDefinition("signal-egress-host", DisableParallelization = true)]
-public sealed class SignalEgressHostCollection;
