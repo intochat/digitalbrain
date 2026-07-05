@@ -13,7 +13,6 @@ namespace DigitalBrain.Tests.Telegram;
 
 // Verifies that GatewayService.Send routes a TelegramMessageReceived envelope
 // to the per-chat TelegramChatNeuron rather than broadcasting via IngressNeuron.
-[Collection("tg-routing-host")]
 public class TelegramDeepLinkRoutingTests : NeuronTestBase
 {
     private HomeFeedBus? _homeFeedBusInstance;
@@ -63,6 +62,3 @@ public class TelegramDeepLinkRoutingTests : NeuronTestBase
         Assert.Equal(envelope.CorrelationId, result.CorrelationId);
     }
 }
-
-[CollectionDefinition("tg-routing-host", DisableParallelization = true)]
-public sealed class TgRoutingHostCollection;
