@@ -29,7 +29,7 @@ public sealed class PackEmbodimentRendersE2ETests(DigitalBrainAppHostFixture fix
         var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest(), cancellationToken: cts.Token);
-        var delivered = ReadForSurfaceIdAsync(feed.ResponseStream, surfaceId, cts.Token);
+        var delivered = ReadForCorrelationIdAsync(feed.ResponseStream, surfaceId, cts.Token);
         await Task.Delay(750, cts.Token);
 
         await _fx.SendSynapseAsync(
@@ -46,13 +46,13 @@ public sealed class PackEmbodimentRendersE2ETests(DigitalBrainAppHostFixture fix
     // and UiSurfaceRfwBridge's default branch carries that onto RfwCardEnvelope.CorrelationId
     // unchanged) — so matching on the envelope's own CorrelationId is exact, unlike the surface's
     // internal "surfaceId" prop, which ActivityGraphSurface hardcodes to an unrelated constant.
-    static async Task<bool> ReadForSurfaceIdAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string surfaceId, CancellationToken ct)
+    static async Task<bool> ReadForCorrelationIdAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string expectedCorrelationId, CancellationToken ct)
     {
         try
         {
             while (await stream.MoveNext(ct))
             {
-                if (stream.Current.CorrelationId == surfaceId) return true;
+                if (stream.Current.CorrelationId == expectedCorrelationId) return true;
             }
         }
         catch (RpcException) { }
