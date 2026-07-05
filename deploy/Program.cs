@@ -223,6 +223,23 @@ internal static class Program
                         Name = "jobs",
                         Image = kernelImage,
                         Resources = new AppInputs.ContainerResourcesArgs { Cpu = 1.0, Memory = "2Gi" },
+                        Probes =
+                        {
+                            new AppInputs.ContainerAppProbeArgs
+                            {
+                                Type = App.Type.Liveness,
+                                HttpGet = new AppInputs.ContainerAppProbeHttpGetArgs { Path = "/alive", Port = 8080 },
+                                InitialDelaySeconds = 10,
+                                PeriodSeconds = 15
+                            },
+                            new AppInputs.ContainerAppProbeArgs
+                            {
+                                Type = App.Type.Readiness,
+                                HttpGet = new AppInputs.ContainerAppProbeHttpGetArgs { Path = "/health", Port = 8080 },
+                                InitialDelaySeconds = 10,
+                                PeriodSeconds = 15
+                            }
+                        },
                         Env =
                         {
                             new AppInputs.EnvironmentVarArgs { Name = "ASPNETCORE_ENVIRONMENT", Value = "Production" },
@@ -280,6 +297,23 @@ internal static class Program
                         Name = "telegram",
                         Image = telegramImage,
                         Resources = new AppInputs.ContainerResourcesArgs { Cpu = 0.25, Memory = "0.5Gi" },
+                        Probes =
+                        {
+                            new AppInputs.ContainerAppProbeArgs
+                            {
+                                Type = App.Type.Liveness,
+                                HttpGet = new AppInputs.ContainerAppProbeHttpGetArgs { Path = "/alive", Port = 8080 },
+                                InitialDelaySeconds = 10,
+                                PeriodSeconds = 15
+                            },
+                            new AppInputs.ContainerAppProbeArgs
+                            {
+                                Type = App.Type.Readiness,
+                                HttpGet = new AppInputs.ContainerAppProbeHttpGetArgs { Path = "/health", Port = 8080 },
+                                InitialDelaySeconds = 10,
+                                PeriodSeconds = 15
+                            }
+                        },
                         Env =
                         {
                             new AppInputs.EnvironmentVarArgs { Name = "ASPNETCORE_ENVIRONMENT", Value = "Production" },
