@@ -228,7 +228,7 @@ az ad sp create --id "$APP_ID"
 echo "APP_ID=$APP_ID"
 ```
 
-- [ ] **Step 2: Add the federated credential scoped to the deploy workflow on `master`**
+- [x] **Step 2: Add the federated credential scoped to the deploy workflow on `master`**
 
 ```bash
 az ad app federated-credential create --id "$APP_ID" --parameters '{
@@ -239,7 +239,7 @@ az ad app federated-credential create --id "$APP_ID" --parameters '{
 }'
 ```
 
-- [ ] **Step 3: Grant the minimum RBAC roles on the existing resource group and storage account**
+- [x] **Step 3: Grant the minimum RBAC roles on the existing resource group and storage account**
 
 ```bash
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
