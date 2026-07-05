@@ -156,7 +156,7 @@ internal static class Program
             Tags = StandardTags("log-analytics")
         });
 
-        _ = new AppInsights.Component("digitalbrain-ai-prod", new AppInsights.ComponentArgs
+        var appInsights = new AppInsights.Component("digitalbrain-ai-prod", new AppInsights.ComponentArgs
         {
             ResourceName = "digitalbrain-ai-prod",
             ResourceGroupName = resourceGroup.Name,
@@ -166,6 +166,7 @@ internal static class Program
             WorkspaceResourceId = workspace.Id,
             Tags = StandardTags("application-insights")
         });
+        var appInsightsConnectionString = appInsights.ConnectionString;
 
         var workspaceSharedKey = Output.CreateSecret(OpInsights.GetSharedKeys.Invoke(new OpInsights.GetSharedKeysInvokeArgs
         {
@@ -252,7 +253,8 @@ internal static class Program
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__journal", SecretRef = StorageConnectionSecret },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIEndpoint", Value = openAiEndpoint },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIKey", SecretRef = OpenAiKeySecret },
-                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Checkpoint__Key", SecretRef = CheckpointKeySecret }
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Checkpoint__Key", SecretRef = CheckpointKeySecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "APPLICATIONINSIGHTS_CONNECTION_STRING", Value = appInsightsConnectionString }
                         }
                     }
                 },
@@ -325,7 +327,8 @@ internal static class Program
                             new AppInputs.EnvironmentVarArgs { Name = "Telegram__BotToken", SecretRef = TelegramBotTokenSecret },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__InternalServiceKey", SecretRef = InternalServiceKeySecret },
                             new AppInputs.EnvironmentVarArgs { Name = "Telegram__PackName", Value = "DigitalBrain.Telegram.Responder" },
-                            new AppInputs.EnvironmentVarArgs { Name = "Telegram__ConfigScope", Value = "default" }
+                            new AppInputs.EnvironmentVarArgs { Name = "Telegram__ConfigScope", Value = "default" },
+                            new AppInputs.EnvironmentVarArgs { Name = "APPLICATIONINSIGHTS_CONNECTION_STRING", Value = appInsightsConnectionString }
                         }
                     }
                 },
