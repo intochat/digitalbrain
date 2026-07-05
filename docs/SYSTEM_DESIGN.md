@@ -374,10 +374,10 @@ for Orleans clustering/journal.
   2026-07-01-distribution-and-bundles.md` §11 marks it "decide on demand," not started. Phase 0 and
   all of Phase 1 (1a manifest, 1a catalog, 1b trust, 1b facet, 1c deep-link, 1d Telegram-deploy) have
   matching commits already on `master`.
-- `CONTINUITY.md`'s Bucket D entry calls out a **product gap that was found and fixed in the same
+- `docs/archive/CONTINUITY.md`'s Bucket D entry calls out a **product gap that was found and fixed in the same
   session**, not currently open: `GatewayService.Send` originally had no `PublishToMarketplace` case,
   so publishes silently no-opped (pack code was dropped) until the E2E test caught it.
-- Several "Deferred follow-ups (non-blocking)" appear scattered through `CONTINUITY.md` after most
+- Several "Deferred follow-ups (non-blocking)" appear scattered through `docs/archive/CONTINUITY.md` after most
   dated sections — e.g. trusted-publisher allowlist ergonomics, per-user vs per-install flow state,
   a possible `NeuroPack` → `Domain` rename, `ui:Gap` not being axis-aware, `ui:Sheet` missing a header
   slot. None of these block current functionality; they're backlog notes, not regressions.
@@ -451,14 +451,14 @@ Feature work happens on `spec/<feature-name>` branches, each paired with a
 `docs/specs/<date>-<feature-name>[-design].md` + `docs/plans/<date>-<feature-name>.md` while the work
 is in flight. **As of the 2026-07-02 repo cleanup, `docs/specs/` and `docs/plans/` are deleted once a
 branch merges** — the spec+plan pair is scratch that did its job (guiding the implementation and its
-review); the durable record of what shipped and why lives in git history and in `CONTINUITY.md`'s
+review); the durable record of what shipped and why lives in git history and in `docs/archive/CONTINUITY.md`'s
 round-by-round ledger, not in a permanently-growing docs tree. Both directories are recreated
 per-branch and removed again after merge; if you see them non-empty, work is in flight.
 
 `docs/` intentionally holds only a handful of durable, always-current documents: `PRODUCT_VISION.md`
 (what DigitalBrain is and who it's for), `SYSTEM_DESIGN.md` (this file — current architecture), and
 `authoring-a-bundle.md` (how to build a NeuroPack). Top-level `README.md`, `AGENTS.md`, and
-`CONTINUITY.md` sit outside `docs/`. Anything else under `docs/` is stale and should be deleted, not
+`docs/archive/CONTINUITY.md` sit outside `docs/`. Anything else under `docs/` is stale and should be deleted, not
 added to.
 
 ### 2.4 Authoring-loop tooling (what exists today for building a new bundle fast)

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fix the cross-replica OAuth callback race (P1 in `docs/CONTINUATION-MULTIUSER-IDENTITY.md`) by moving Salesforce token exchange and pending-state validation into `SalesforceAuthNeuron.CompleteOAuthAsync`, so the callback always resolves to the single Orleans activation that started the flow, regardless of which Kernel replica's Kestrel instance receives the HTTP request.
+**Goal:** Fix the cross-replica OAuth callback race (P1 in `docs/archive/CONTINUATION-MULTIUSER-IDENTITY.md`) by moving Salesforce token exchange and pending-state validation into `SalesforceAuthNeuron.CompleteOAuthAsync`, so the callback always resolves to the single Orleans activation that started the flow, regardless of which Kernel replica's Kestrel instance receives the HTTP request.
 
 **Architecture:** `Program.cs`'s `/salesforce-callback` minimal-API endpoint becomes a pure parse-and-route layer: it reads the query string, builds a `SalesforceOAuthCallback` value, and calls `ISalesforceAuthNeuron.CompleteOAuthAsync` on the well-known `"salesforce-auth-main"` grain. Orleans delivers that grain call to the single live activation no matter which replica's HTTP frontend accepted the request. All pending-state reads, state/nonce validation, and the Salesforce token exchange move inside the grain method — the endpoint no longer touches `IPackConfigStore` at all. A new optional `HttpMessageHandler` seam on `SalesforceClientFactory.ExchangeAuthorizationCodeAsync` lets tests fake the Salesforce token endpoint without real network I/O (avoids Windows HTTP.sys ACL issues with `HttpListener` and avoids adding new packages).
 
@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Grain keys stay exactly as they are today (`"salesforce-auth-main"`) — no per-user keying in this stage. Per-user keying is MULTIUSER stage S3, out of scope here.
-- Every new type that crosses a grain-interface boundary gets `[GenerateSerializer]` plus explicit sequential `[property: Id(n)]` on every member, starting at 0 — non-negotiable per the design doc's own risk notes (`docs/CONTINUATION-MULTIUSER-IDENTITY.md` §8), and matches this codebase's existing non-`Synapse` cross-grain records (`UserSessionState`, `DbSchemaModel` in `DigitalBrain.Core/Synapse.cs`).
+- Every new type that crosses a grain-interface boundary gets `[GenerateSerializer]` plus explicit sequential `[property: Id(n)]` on every member, starting at 0 — non-negotiable per the design doc's own risk notes (`docs/archive/CONTINUATION-MULTIUSER-IDENTITY.md` §8), and matches this codebase's existing non-`Synapse` cross-grain records (`UserSessionState`, `DbSchemaModel` in `DigitalBrain.Core/Synapse.cs`).
 - Tokens, refresh tokens, and pending PKCE material never enter a journal — only the encrypted `IPackConfigStore` holds them (invariant I3). Do not add journaled synapse types for OAuth completion in this stage; that belongs to the shared `OAuthFlowNeuron` abstraction in a later stage (S4), not here.
 - The old direct-store-IO code path in `Program.cs` must be **deleted**, not commented out or left dead — this is the plan's explicit acceptance bar.
 - No new NuGet packages. The `HttpMessageHandler` test seam uses only BCL types already available via the implicit `System.Net.Http` using.
@@ -580,9 +580,9 @@ Per project convention, validate via Aspire tooling before calling this done:
 - Hit `GET /salesforce-callback?error=access_denied&error_description=smoke-test` against the running Kernel endpoint and confirm it returns HTTP 400 with the "Salesforce login failed" page — this exercises the new parse-and-route endpoint end-to-end without needing real Salesforce credentials.
 - Stop the app host when done.
 
-- [ ] **Step 4: Update CONTINUITY.md**
+- [ ] **Step 4: Update docs/archive/CONTINUITY.md**
 
-Add a dated entry noting Stage S1 (grain-routed Salesforce OAuth callback) shipped, referencing this plan file and the acceptance test in Task 4.
+Add a dated entry noting Stage S1 (grain-routed Salesforce OAuth callback) shipped, referencing this plan file and the acceptance test in Task 4 to `docs/archive/CONTINUITY.md`.
 
 ---
 
@@ -592,4 +592,4 @@ Add a dated entry noting Stage S1 (grain-routed Salesforce OAuth callback) shipp
 - DataProtection-encrypted `state` (D-MU2) and the generic `/oauth/{provider}/callback` endpoint — MULTIUSER S4.
 - Journaled `OAuthFlowStarted`/`OAuthCompleted`/`OAuthFailed` synapse types — part of the shared `OAuthFlowNeuron` abstraction, MULTIUSER S4.
 - Google OAuth — untouched by this plan; MULTIUSER S4 builds it on the shared flow from scratch.
-- Whole-repo cleanup waves (D1-D4 in `docs/CONTINUATION-CLEANUP-SIMPLIFICATION.md`) — separate plan, run after this one per D-CL6's sequencing (S1 → cleanup → S2-S5).
+- Whole-repo cleanup waves (D1-D4 in `docs/archive/CONTINUATION-CLEANUP-SIMPLIFICATION.md`) — separate plan, run after this one per D-CL6's sequencing (S1 → cleanup → S2-S5).
