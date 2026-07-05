@@ -73,6 +73,8 @@ public static class DigitalBrainBuilderExtensions
 
         var isRunMode = builder.ExecutionContext.IsRunMode;
 
+        // No publish-mode else branch needed here (unlike Ollama below): AddAzureStorage already
+        // produces a valid real-Azure resource on its own — RunAsEmulator() is purely a run-mode add-on.
         var storage = builder.AddAzureStorage("storage");
         if (isRunMode)
         {
