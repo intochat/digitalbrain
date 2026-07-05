@@ -147,6 +147,7 @@ builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
 builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
 builder.Services.AddSingleton<DigitalBrain.Kernel.Llm.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
 builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
 builder.Services.AddEconomics(builder.Configuration);
 builder.Services.AddContextStore(builder.Configuration);
 
