@@ -2,9 +2,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Kernel.Llm;
 
-/// <summary>
-/// Resolved embedding-model runtime configuration consumed by the fail-soft embedding generator registration.
-/// </summary>
 public sealed record DigitalBrainEmbeddingRuntimeOptions(
     string? Provider,
     string? Model,

@@ -100,9 +100,6 @@ public sealed class DigitalBrainModelRegistry
         ?? registrations.LastOrDefault(static x =>
             x.Model.Kind == DigitalBrainCapabilityKind.VoiceToText);
 
-    /// <summary>
-    /// Preferred embedding model for the context/RAG runtime consumer.
-    /// </summary>
     public DigitalBrainModelRegistration? DefaultEmbedding =>
         registrations.LastOrDefault(static x =>
             x.Model.Kind == DigitalBrainCapabilityKind.Embedding &&
