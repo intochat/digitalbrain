@@ -3,7 +3,7 @@
 **Status:** ALL TASKS + ALL REMAINING OPEN ITEMS IMPLEMENTED (2026-07-05). One coherent pass. Full plan + 10 priorities complete. See "All Remaining Items" section.  
 **Date:** 2026-07-05  
 **Owner:** (to be assigned)  
-**Related:** `docs/CONTINUATION-DISTRIBUTION.md` (the heavier rail), `docs/PRODUCT_VISION.md`, `docs/SYSTEM_DESIGN.md`, `docs/authoring-a-bundle.md`, AGENTS.md
+**Related:** `docs/archive/CONTINUATION-DISTRIBUTION.md` (the heavier rail), `docs/PRODUCT_VISION.md`, `docs/SYSTEM_DESIGN.md`, `docs/authoring-a-bundle.md`, AGENTS.md
 
 ## TL;DR
 

@@ -3,10 +3,10 @@
 Status: DESIGN APPROVED-PENDING (this session, conversational approval — see "Approval trail" at the
 bottom). No implementation yet. Repo: `E:\brain`. Date: 2026-07-04.
 
-Supersedes the open design questions in `docs/CONTINUATION-MULTIUSER-FEED-ISOLATION.md` (§3 A-F). Read
+Supersedes the open design questions in `docs/archive/CONTINUATION-MULTIUSER-FEED-ISOLATION.md` (§3 A-F). Read
 that doc's §1-§2 for the full incident diagnosis and the current fail-open mitigation (commit `50ed11e`) —
-not re-derived here. Builds on `docs/CONTINUATION-MULTIUSER-IDENTITY.md` (invariants I1-I5) and
-`docs/CONTINUATION-MULTIUSER-S2-S3.md` (S2/S3 implementation this bug shipped in).
+not re-derived here. Builds on `docs/archive/CONTINUATION-MULTIUSER-IDENTITY.md` (invariants I1-I5) and
+`docs/archive/CONTINUATION-MULTIUSER-S2-S3.md` (S2/S3 implementation this bug shipped in).
 
 ---
 

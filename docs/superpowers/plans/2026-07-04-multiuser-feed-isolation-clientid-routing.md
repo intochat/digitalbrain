@@ -15,7 +15,7 @@
 - **Scoped out, explicitly not touched by this plan:** `InstallFromMarketplace.SessionId`, `RunTask`/`CancelTask`'s `SessionId` fields (`KernelTaskNeuron`), and `ExperienceUsed.SessionId` keep their current C# field name even though the value flowing through them becomes a `clientId` after Task 4. These are adjacent systems (marketplace, kernel tasks) not in the spec's explicit file list; renaming them is a reasonable future cleanup, not part of this plan. Do not expand scope to cover them.
 - Every new/changed synapse or cross-grain record keeps `[GenerateSerializer]`; this plan only renames existing record fields (`RfwCard.SessionId`, `InoRequest.SessionId`, `DbInspectSchema.SessionId`, `DbSchemaInspected.SessionId`) — no new fields are added to any of them, so no new `[Id(n)]` numbering is needed.
 - Full solution must build and `dotnet test Brain.slnx` must be 0 failures after every task (existing pre-existing skips aside — confirm the baseline skip count before Task 1 and don't let it grow).
-- Mandatory per this repo's own process rule (`docs/CONTINUATION-MULTIUSER-FEED-ISOLATION.md` §0, carried into the spec): the real Flutter app must be driven end-to-end before this is declared done (Task 9) — a green backend suite is exactly what gave false confidence last time.
+- Mandatory per this repo's own process rule (`docs/archive/CONTINUATION-MULTIUSER-FEED-ISOLATION.md` §0, carried into the spec): the real Flutter app must be driven end-to-end before this is declared done (Task 9) — a green backend suite is exactly what gave false confidence last time.
 
 ---
 
@@ -1634,8 +1634,8 @@ and never being addressable."
 ### Task 9: Full verification — build, test, real app, close out the incident doc
 
 **Files:**
-- Modify: `docs/CONTINUATION-MULTIUSER-FEED-ISOLATION.md` (status header)
-- Modify: `CONTINUITY.md` (new dated entry)
+- Modify: `docs/archive/CONTINUATION-MULTIUSER-FEED-ISOLATION.md` (status header)
+- Modify: `docs/archive/CONTINUITY.md` (new dated entry)
 
 - [ ] **Step 1: Full solution build and test**
 
@@ -1647,7 +1647,7 @@ Expected: 0 failures. Compare the skip count against the baseline noted before T
 
 - [ ] **Step 2: `aspire run` + real Flutter end-to-end drive**
 
-Per this repo's mandatory process rule (`CONTINUATION-MULTIUSER-FEED-ISOLATION.md` §0/§6) and the user's own standing instruction to always verify with `aspire run` after changes: start the AppHost via the Aspire MCP tools, then drive the actual Flutter app (not just backend tests):
+Per this repo's mandatory process rule (`docs/archive/CONTINUATION-MULTIUSER-FEED-ISOLATION.md` §0/§6) and the user's own standing instruction to always verify with `aspire run` after changes: start the AppHost via the Aspire MCP tools, then drive the actual Flutter app (not just backend tests):
 
 1. Launch/rebuild the AppHost (`mcp__aspire__execute_resource_command` rebuild, or `aspire run` if starting fresh) across all kernel replicas.
 2. Open the Flutter app, log in as a real user (or the seeded dev credentials in Development), confirm the signed-in shell, installed bundles, and task manager all render.
@@ -1659,7 +1659,7 @@ Use `mcp__aspire__list_console_logs`/`mcp__aspire__list_structured_logs` to conf
 
 - [ ] **Step 3: Close out the continuation doc**
 
-Edit `docs/CONTINUATION-MULTIUSER-FEED-ISOLATION.md`'s status line (line 3):
+Edit `docs/archive/CONTINUATION-MULTIUSER-FEED-ISOLATION.md`'s status line (line 3):
 ```markdown
 Status: RESOLVED — see docs/superpowers/specs/2026-07-04-multiuser-feed-isolation-design.md (design) and
 docs/superpowers/plans/2026-07-04-multiuser-feed-isolation-clientid-routing.md (implementation). Per-session
@@ -1667,13 +1667,13 @@ feed isolation (P6a) is enforced via per-clientId Orleans stream routing; the fa
 50ed11e has been fully reverted.
 ```
 
-- [ ] **Step 4: Add a `CONTINUITY.md` dated entry**
+- [ ] **Step 4: Add a `docs/archive/CONTINUITY.md` dated entry**
 
-Following this repo's existing convention (see the two `2026-07-04` entries already there), add a new entry at the top of `CONTINUITY.md` summarizing: what shipped (clientId as the single client-facing identity, Orleans-native per-clientId stream routing replacing `HomeFeedBus`'s hand-rolled dictionary and `HomeFeedStreamSubscriber`), the still-live bug it fixed beyond the original mitigation (Salesforce-via-chat identity resolution), and that the fail-open shim is fully reverted.
+Following this repo's existing convention (see the two `2026-07-04` entries already there), add a new entry at the top of `docs/archive/CONTINUITY.md` summarizing: what shipped (clientId as the single client-facing identity, Orleans-native per-clientId stream routing replacing `HomeFeedBus`'s hand-rolled dictionary and `HomeFeedStreamSubscriber`), the still-live bug it fixed beyond the original mitigation (Salesforce-via-chat identity resolution), and that the fail-open shim is fully reverted.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add docs/CONTINUATION-MULTIUSER-FEED-ISOLATION.md CONTINUITY.md
+git add docs/archive/CONTINUATION-MULTIUSER-FEED-ISOLATION.md docs/archive/CONTINUITY.md
 git commit -m "docs: close out multi-user feed isolation — clientId routing shipped, fail-open shim reverted"
 ```

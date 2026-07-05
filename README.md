@@ -59,7 +59,7 @@ See `Brain.slnx`, `aspire.config.json`, `Directory.Packages.props` (Aspire 13.4.
 
 ## UI Kit (Neurons + Synapses focus)
 
-See `docs/SYSTEM_DESIGN.md` for the current architecture and `CONTINUITY.md` for recent history.
+See `docs/SYSTEM_DESIGN.md` for the current architecture and `docs/archive/CONTINUITY.md` for recent history.
 
 - Grammar lives in `DigitalBrain.Ui.Contracts/UiSurfaces.cs` (`NeuronUiKit`, `UiKitVocabulary`, `UiWidgetTree`, `UiSurface.ForWidgetTree`...).
 - Runtime/sample surface builders live in `DigitalBrain.Ui.Runtime/UiSurfaceRuntime.cs` (`UiSurfaceSamples`, `UiSurfaceLiveData`).

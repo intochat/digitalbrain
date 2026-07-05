@@ -404,7 +404,7 @@ Recommendation:
 Pick one:
 
 - If active: add a small `docs/ACTIVE_WORK.md` index that names the branch/owner/status for each plan/spec.
-- If merged/stale: delete `docs/specs` and `docs/plans`, then roll any durable architectural facts into `docs/SYSTEM_DESIGN.md` or `CONTINUITY.md`.
+- If merged/stale: delete `docs/specs` and `docs/plans`, then roll any durable architectural facts into `docs/SYSTEM_DESIGN.md` or `docs/archive/CONTINUITY.md`.
 
 Expected result:
 
