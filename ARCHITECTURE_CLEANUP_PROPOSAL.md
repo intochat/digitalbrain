@@ -123,7 +123,7 @@ The line count is not a bug by itself. The problem is that the largest files sit
 
 `DigitalBrain.Kernel.csproj` references:
 
-- Product/integration projects: `DigitalBrain.Context`, `DigitalBrain.Core`, `DigitalBrain.Developer`, `DigitalBrain.Google`, `DigitalBrain.Mcp`, `DigitalBrain.Telegram.Channel`, `DigitalBrain.UiKit`, `DigitalBrain.Windows`, `NeuroOSPrototype.ServiceDefaults`.
+- Product/integration projects: `DigitalBrain.Context`, `DigitalBrain.Core`, `DigitalBrain.Developer`, `DigitalBrain.Google`, `DigitalBrain.Mcp`, `DigitalBrain.Telegram.Channel`, `DigitalBrain.UiKit`, `DigitalBrain.Windows`, `DigitalBrain.ServiceDefaults`.
 - Runtime packages: Orleans server, journaling, Azure storage, streaming, gRPC, MCP, Stripe, Roslyn, Azure OpenAI, Ollama, Microsoft.Extensions.AI.
 
 This creates a monolithic runtime host. Some dependency direction is correct: Kernel should host concrete grains. But the current project has too many policy decisions and feature areas in one deployable assembly.

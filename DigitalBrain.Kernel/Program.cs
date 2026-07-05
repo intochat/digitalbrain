@@ -19,7 +19,7 @@ using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Economics;
 using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Salesforce;
-using NeuroOSPrototype.ServiceDefaults;
+using DigitalBrain.ServiceDefaults;
 
 // Prototype silo host for DigitalBrain.
 // Aspire-hosted path: env vars ConnectionStrings__clustering / grainstate / journal are injected by Aspire.

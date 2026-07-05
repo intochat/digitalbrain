@@ -101,7 +101,7 @@ Solution `Brain.slnx` lists 33 projects plus the in-repo Flutter client project 
 | `DigitalBrain.Telegram.Channel` (+ `.Tests`) | Real-grain ino, interface-only (see §1.3a honest limitation). `ITelegramChatNeuron` interface — Core-only. `TelegramChatNeuron` grain class (stateful, journal-derived binding/routing) stays in Kernel. |
 | `DigitalBrain.Google` (+ `.Tests`) | Real-grain ino. `IGmailNeuron`/`IGoogleDriveNeuron`/`IGoogleCalendarNeuron` interfaces, `I*ApiClient` wrapper interfaces + real `Google*ApiClient` implementations, `GoogleCredentialFactory` — Core + `Google.Apis.*` only. Grain classes (`GmailNeuron`, `GoogleDriveNeuron`, `GoogleCalendarNeuron`, `GoogleAuthNeuron`) live in Kernel, not this project (the one correction the neuron-placement amendment made to the base spec). |
 | `DigitalBrain.Experience.PersonalAssistant` (+ `.Tests`) | Pure-pack ino. `PersonalAssistantNeuron : IPackBehavior` — multi-hop: recall Context → augmented `AskLlm` → text reply or visualize, composing Telegram+Context+LLM via generic `Signal` names. Fully self-contained — never derives from `Neuron`. References Core primitives plus pack contracts. Its source is embedded into `DigitalBrain.SeedPacks` and seeded into the marketplace at runtime (`MarketplaceSeeds.PersonalAssistantPackCode`). |
-| `NeuroOSPrototype.AppHost` + `NeuroOSPrototype.ServiceDefaults` | The Aspire host resource graph (below) and standard OTel/health/resilience defaults. |
+| `DigitalBrain.AppHost` + `DigitalBrain.ServiceDefaults` | The Aspire host resource graph (below) and standard OTel/health/resilience defaults. |
 | `DigitalBrain.Tests` | Reqnroll BDD + xUnit over a real Orleans `TestCluster`. See Part 2. |
 
 ### 1.3a Isolated inos: every integration's contract is a peer, not a Kernel internal
@@ -152,7 +152,7 @@ Google.Protobuf **3.31.0**; Stripe.net **50.0.0**; Qdrant.Client **1.18.1**;
 Azure.Extensions.AspNetCore.DataProtection.Blobs **1.5.3**. No `Version="*"` anywhere — updates are
 deliberate.
 
-### 1.4 AppHost resource graph (current, `NeuroOSPrototype.AppHost/AppHost.cs`)
+### 1.4 AppHost resource graph (current, `DigitalBrain.AppHost/AppHost.cs`)
 
 ```csharp
 builder.AddDigitalBrain("digitalbrain", options => {
@@ -305,7 +305,7 @@ the dev AppHost in prod — those would couple public ingress and channel scalin
 rolling restarts. Prod IaC (`brain/deploy`, Pulumi C#) provisions a separate `digitalbrain-telegram`
 ContainerApp with external HTTP ingress, alongside the `digitalbrain-jobs` kernel container app, Azure
 OpenAI (`gpt-4o-mini`), storage, and observability. `DIGITALBRAIN_ENABLE_TELEGRAM=true aspire run`
-(`NeuroOSPrototype.AppHost/AppHost.cs`) adds the same transport project as an Aspire resource and
+(`DigitalBrain.AppHost/AppHost.cs`) adds the same transport project as an Aspire resource and
 calls `WireTelegramTransport` — a dev-only mirror of the identical wiring, not a separate code path.
 
 ### 1.8 LLM integration: the `AskLlm` / `Signal` indirection
@@ -363,7 +363,7 @@ for Orleans clustering/journal.
   would link it into a real project the way it once linked `start.cs`, but that wiring step was never
   done, and `start.cs` itself was deleted without anyone finishing brain.cs's wiring or noticing
   QuickTest no longer built at all (`CS5001`, no source files left). All three were deleted rather than
-  repaired. The supported fast local-dev path is `aspire run` from `brain/` (`NeuroOSPrototype.AppHost`),
+  repaired. The supported fast local-dev path is `aspire run` from `brain/` (`DigitalBrain.AppHost`),
   which already has an equivalent-or-better resource graph (kernel, default Windows Flutter client,
   MCP, optional Telegram via env vars) than brain.cs ever reached.
 - **Resolved (2026-07-03): the E2E AppHost fixture waits for `"kernel"`.** The stale Silo→Kernel

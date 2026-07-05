@@ -169,7 +169,7 @@ named "sample.xlsx" correctly in run 1) but cannot reliably reason over the inje
    graph.
 
    Root cause is now pinned to exact lines, not inferred from behavior:
-   - `NeuroOSPrototype.AppHost/AppHost.cs:9-13` calls `builder.AddDigitalBrain("digitalbrain",
+   - `DigitalBrain.AppHost/AppHost.cs:9-13` calls `builder.AddDigitalBrain("digitalbrain",
      options => { options.LlmModel = "qwen2.5-coder:1.5b"; ... })` — it never calls
      `options.WithLLM<Gpt4oMini>()`, so `DigitalBrainOptions.LlmProvider` (default `"ollama"`,
      `DigitalBrainBuilderExtensions.cs:290`) is never switched to `"azureopenai"`. Because

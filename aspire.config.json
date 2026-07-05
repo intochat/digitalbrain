@@ -1,5 +1,5 @@
 {
   "appHost": {
-    "path": "NeuroOSPrototype.AppHost/NeuroOSPrototype.AppHost.csproj"
+    "path": "DigitalBrain.AppHost/DigitalBrain.AppHost.csproj"
   }
 }

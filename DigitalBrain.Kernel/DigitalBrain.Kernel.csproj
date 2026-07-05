@@ -62,7 +62,7 @@
     <ProjectReference Include="..\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
     <ProjectReference Include="..\DigitalBrain.UiKit\DigitalBrain.UiKit.csproj" />
     <ProjectReference Include="..\DigitalBrain.Windows\DigitalBrain.Windows.csproj" />
-    <ProjectReference Include="..\NeuroOSPrototype.ServiceDefaults\NeuroOSPrototype.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
