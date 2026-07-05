@@ -37,10 +37,13 @@ public class JournalFormatSpikeTests
             await cluster.GrainFactory.GetGrain<IManagementGrain>(0).ForceActivationCollection(TimeSpan.Zero);
 
             // The activation collector's sweep is asynchronous and not tied to ForceActivationCollection's
-            // return, so poll generously (observed to need more than 2s under load) rather than assume
-            // a fixed short delay -- this bounds total wait at 15s without hardcoding a fragile sleep.
+            // return, so poll generously rather than assume a fixed short delay -- this bounds total wait
+            // at 40s without hardcoding a fragile sleep. Observed to need more than 2s under load locally,
+            // and more than 15s on a contended shared CI runner (many concurrent TestCluster silos on a
+            // 2-vCPU GitHub-hosted runner) -- 40s gives that headroom without materially lengthening the
+            // suite when the sweep completes promptly, as it normally does.
             IReadOnlyList<Synapse> timelineAfterReactivation = [];
-            for (var attempt = 0; attempt < 75; attempt++)
+            for (var attempt = 0; attempt < 200; attempt++)
             {
                 timelineAfterReactivation = await grain.GetTimelineAsync();
                 if (timelineAfterReactivation.Count(s => s is NeuronActivated) > activationCountBeforeReactivation)
