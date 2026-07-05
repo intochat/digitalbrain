@@ -1,9 +1,14 @@
 using DigitalBrain.Runtime.Grpc;
+using DigitalBrain.ServiceDefaults;
 using DigitalBrain.Telegram.Transport;
 using Microsoft.Extensions.Options;
 using Telegram.BotAPI.GettingUpdates;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Same Aspire ServiceDefaults the kernel uses (Task 11: ACA's liveness/readiness probes need a real
+// /health + /alive mapped unconditionally, not the hand-rolled ok:true stub this used to have).
+builder.AddServiceDefaults();
 
 builder.Services.Configure<TelegramTransportOptions>(builder.Configuration.GetSection("Telegram"));
 // The internal service key lives under the shared DigitalBrain section (same key the kernel reads), not the
@@ -29,6 +34,8 @@ builder.Services.AddGrpcClient<DigitalBrainGateway.DigitalBrainGatewayClient>(o 
 builder.Services.AddHostedService<SynapseStreamConsumer>();
 
 var app = builder.Build();
+
+app.MapDefaultEndpoints();
 
 // Telegram POSTs Update payloads here. The optional secret-token header is
 // checked when WebhookSecretToken is configured. Forwarding is fire-and-forget
@@ -65,8 +72,6 @@ app.MapPost("/webhook", async (
     await forwarder.ForwardAsync(update, ct);
     return Results.Ok();
 });
-
-app.MapGet("/health", () => Results.Ok(new { ok = true }));
 
 await app.RunAsync();
 
