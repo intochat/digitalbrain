@@ -269,6 +269,13 @@ internal static class Program
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__clustering", SecretRef = StorageConnectionSecret },
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__grainstate", SecretRef = StorageConnectionSecret },
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__journal", SecretRef = StorageConnectionSecret },
+                            // Task 21: CheckpointBackupTrigger's "sync" BlobContainerClient (KernelServices.AddCheckpointSync)
+                            // falls back to this connection string whenever useManagedIdentity is false. It's set here
+                            // unconditionally (same StorageConnectionSecret as clustering/grainstate/journal — one storage
+                            // account) so it's never null even before useManagedIdentity's real-identity branch actually
+                            // runs; once DigitalBrain__Storage__AccountName below flips useManagedIdentity on, this var is
+                            // simply unused by that branch (harmless to leave set).
+                            new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__sync", SecretRef = StorageConnectionSecret },
                             // Read by DigitalBrain.Kernel/Program.cs to flip useManagedIdentity on. Never set in
                             // Aspire/local config, so local dev + existing tests keep using the connection
                             // strings above unchanged (shared-key access stays enabled until Task 18 step 5).
