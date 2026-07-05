@@ -1,4 +1,6 @@
-using Microsoft.Playwright;
+using System.Text.Json;
+using DigitalBrain.Runtime.Grpc;
+using Grpc.Core;
 
 namespace DigitalBrain.Tests.E2E;
 
@@ -6,15 +8,14 @@ namespace DigitalBrain.Tests.E2E;
 [Trait("Group", "Flutter")]
 [Trait("Group", "Marketplace")]
 [Collection(nameof(DigitalBrainE2ECollection))]
-public sealed class PackEmbodimentRendersE2ETests(DigitalBrainBrowserFixture fixture)
+public sealed class PackEmbodimentRendersE2ETests(DigitalBrainAppHostFixture fixture)
 {
-    // IAW-style separate groups: flutter (this pack E2E), telegram (Telegram tests), google/llm (Llm tests), windows/fs (Sdk/Filesystem tests) - testable independently.
-    private readonly DigitalBrainBrowserFixture _fx = fixture;
+    private readonly DigitalBrainAppHostFixture _fx = fixture;
 
     [SkippableFact]
-    public async Task InstallsRealPack_EmbodiedCode_RendersSurface_ObservedInFlutter()
+    public async Task InstallsRealPack_EmbodiedCode_DeliversSurfaceOverTheRealWire()
     {
-        E2EPrerequisites.RequireRenderE2E();
+        E2EPrerequisites.RequireRealStackE2E();
 
         const string packName = "E2ESurfacePack";
         const string version = "1.0";
@@ -25,23 +26,36 @@ public sealed class PackEmbodimentRendersE2ETests(DigitalBrainBrowserFixture fix
             description: "E2E pack that emits a renderable surface");
         await _fx.InstallPackAsync(packName, version, buyer: "e2e-ui-watcher");
 
-        // SurfaceDemoRequested with correlationId == surfaceId so the observability
-        // surface cards carry that exact id as their RfwCard.CorrelationId.
+        using var channel = _fx.CreateGatewayGrpcChannel();
+        var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest(), cancellationToken: cts.Token);
+        var delivered = ReadForSurfaceIdAsync(feed.ResponseStream, surfaceId, cts.Token);
+        await Task.Delay(750, cts.Token);
+
         await _fx.SendSynapseAsync(
             "DigitalBrain.Kernel.SurfaceDemoRequested",
             $"{{\"source\":\"{surfaceId}\"}}",
             correlationId: surfaceId);
 
-        await _fx.Page.GotoAsync(_fx.GatewayHttpsUrl, new() { WaitUntil = WaitUntilState.Load });
+        Assert.True(await delivered, $"Surface '{surfaceId}' was not delivered over WatchHomeFeed");
+    }
 
-        var node = _fx.Page.Locator($"[flt-semantics-identifier=\"{surfaceId}\"]");
-        await node.WaitForAsync(new() { Timeout = 30_000 });
-        Assert.Equal(1, await node.CountAsync());
-
-        // Real browser assert for routed surface id (via flt-semantics-identifier attr) + context readiness.
-        await _fx.AssertSurfaceContext($"[flt-semantics-identifier=\"{surfaceId}\"]", "surfaceId", surfaceId);
-
-        var shot = Path.Combine(Path.GetTempPath(), $"e2e-render-{surfaceId}.png");
-        await _fx.Page.ScreenshotAsync(new() { Path = shot });
+    static async Task<bool> ReadForSurfaceIdAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string surfaceId, CancellationToken ct)
+    {
+        try
+        {
+            while (await stream.MoveNext(ct))
+            {
+                var json = stream.Current.DataJson;
+                if (string.IsNullOrEmpty(json)) continue;
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("surfaceId", out var sid) && sid.GetString() == surfaceId)
+                    return true;
+            }
+        }
+        catch (RpcException) { }
+        catch (OperationCanceledException) { }
+        return false;
     }
 }

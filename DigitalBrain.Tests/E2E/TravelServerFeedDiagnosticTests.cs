@@ -11,15 +11,15 @@ namespace DigitalBrain.Tests.E2E;
 // not the Flutter render path.
 [Trait("Category", "E2E")]
 [Collection(nameof(DigitalBrainE2ECollection))]
-public sealed class TravelServerFeedDiagnosticTests(DigitalBrainBrowserFixture fixture, ITestOutputHelper output)
+public sealed class TravelServerFeedDiagnosticTests(DigitalBrainAppHostFixture fixture, ITestOutputHelper output)
 {
-    readonly DigitalBrainBrowserFixture _fx = fixture;
+    readonly DigitalBrainAppHostFixture _fx = fixture;
     readonly ITestOutputHelper _out = output;
 
     [SkippableFact]
     public async Task ExperienceStep_start_broadcasts_travel_intro_on_homefeed()
     {
-        E2EPrerequisites.RequireRenderE2E();
+        E2EPrerequisites.RequireRealStackE2E();
 
         await _fx.PublishPackAsync("travel", "1.0", code: TravelPackSource.Read(),
             description: "Travel domain — diagnostic");

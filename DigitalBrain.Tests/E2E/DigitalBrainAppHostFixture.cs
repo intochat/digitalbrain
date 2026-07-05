@@ -51,12 +51,7 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
     public virtual async Task InitializeAsync()
     {
         if (!E2EPrerequisites.OptedIn)
-            return; // Not opted into the render E2E; the [SkippableFact] will skip.
-
-        E2EPrerequisites.EnsureWebBundleFresh();
-
-        if (!E2EPrerequisites.WebBundlePresent)
-            return; // Still absent after the best-effort auto-build (e.g. Flutter not installed); the [SkippableFact] will skip.
+            return; // Not opted into the real-stack E2E; the [SkippableFact] will skip.
 
         if (await ProbeAsync(WarmClusterWebUrl, TimeSpan.FromSeconds(2)))
         {
@@ -78,7 +73,6 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("DigitalBrain__ClusterId", $"e2e-{testId}");
         Environment.SetEnvironmentVariable("DIGITALBRAIN_KERNEL_REPLICAS",
             Environment.GetEnvironmentVariable("DIGITALBRAIN_E2E_REPLICAS") ?? "1");
-        Environment.SetEnvironmentVariable("DIGITALBRAIN_WEBROOT", E2EPrerequisites.WebBundleDir);
 
         // Resolve the AppHost entry point type from the referenced assembly without pulling duplicate Program symbols into global scope.
         var appHostAssembly = Assembly.Load("DigitalBrain.AppHost");

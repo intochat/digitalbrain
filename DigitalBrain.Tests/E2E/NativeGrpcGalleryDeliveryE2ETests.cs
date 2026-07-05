@@ -11,14 +11,14 @@ namespace DigitalBrain.Tests.E2E;
 // Asserts the first ui-gallery hop is delivered back to the streaming client (cross-silo fanout included).
 [Trait("Category", "E2E")]
 [Collection(nameof(DigitalBrainE2ECollection))]
-public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainBrowserFixture fixture)
+public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainAppHostFixture fixture)
 {
-    readonly DigitalBrainBrowserFixture _fx = fixture;
+    readonly DigitalBrainAppHostFixture _fx = fixture;
 
     [SkippableFact]
     public async Task Gallery_start_hop_is_delivered_over_native_grpc()
     {
-        E2EPrerequisites.RequireRenderE2E();
+        E2EPrerequisites.RequireRealStackE2E();
 
         using var channel = _fx.CreateGatewayGrpcChannel();
         var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
