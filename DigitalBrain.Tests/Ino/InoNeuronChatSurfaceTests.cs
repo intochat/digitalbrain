@@ -265,11 +265,15 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
     [Fact]
     public async Task SalesforceIntent_WithInvalidCredential_Renders_Clear_Error_And_Credential_Form()
     {
+        const string clientId = "session-salesforce-invalid";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("salesforce-invalid-user", "correct horse battery staple", clientId));
+
         var config = Grain<ISalesforceConfigWriter>("salesforce-config-writer");
         await config.StoreSalesforceCredentialAsync();
 
         var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new InoRequest("Show my salesforce accounts", "session-salesforce-invalid"));
+        await ino.FireAsync(new InoRequest("Show my salesforce accounts", clientId));
 
         var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
         Assert.Contains("Salesforce authentication failed", response.Response);
@@ -278,14 +282,14 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
         var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
         Assert.Contains(surfaces, surface =>
             surface.Kind == UiSurface.WidgetTreeKind &&
-            Equals(surface.Props["clientId"], "session-salesforce-invalid") &&
+            Equals(surface.Props["clientId"], clientId) &&
             surface.Props.TryGetValue("tree", out var tree) &&
             tree is UiWidgetTree widgetTree &&
             FlattenText(widgetTree).Contains("Salesforce authentication failed"));
         Assert.Contains(surfaces, surface =>
             surface.Kind == ConfigFormSurface.Kind &&
             Equals(surface.Props["pack"], SalesforceClientFactory.PackName) &&
-            Equals(surface.Props["clientId"], "session-salesforce-invalid"));
+            Equals(surface.Props["clientId"], clientId));
     }
 
     private static string FlattenText(UiWidgetTree tree)
