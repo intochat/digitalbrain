@@ -35,10 +35,10 @@ public sealed class DigitalBrainContext
     public required IResourceBuilder<AzureBlobStorageResource> JournalBlobs { get; init; }
     public required IResourceBuilder<AzureTableStorageResource> ClusteringTable { get; init; }
 
-    // For encapsulated dashboard + MCP (WithOrleansDashboard / WithMcp)
-    public bool EnableOrleansDashboard { get; set; }
-    public int? OrleansDashboardPort { get; set; }
-    public bool EnableMcp { get; set; }
+    // For encapsulated dashboard + MCP (set from DigitalBrainOptions at construction, single source of truth)
+    public bool EnableOrleansDashboard { get; init; }
+    public int? OrleansDashboardPort { get; init; }
+    public bool EnableMcp { get; init; }
 }
 
 public static class DigitalBrainBuilderExtensions
@@ -111,19 +111,6 @@ public static class DigitalBrainBuilderExtensions
             JournalBlobs = journalBlobs,
             ClusteringTable = clusteringTable
         };
-    }
-
-    public static DigitalBrainContext WithOrleansDashboard(this DigitalBrainContext ctx, int? port = null)
-    {
-        ctx.EnableOrleansDashboard = true;
-        if (port.HasValue) ctx.OrleansDashboardPort = port;
-        return ctx;
-    }
-
-    public static DigitalBrainContext WithMcp(this DigitalBrainContext ctx, int? port = null)
-    {
-        ctx.EnableMcp = true;
-        return ctx;
     }
 
     /// <summary>
