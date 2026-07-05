@@ -113,7 +113,14 @@ if (isAspireHosted)
 
     // Non-keyed BlobServiceClient from grain storage for pack-config key ring persistence and blob backing.
     // Uses the same Azurite account as grain state but stores in a separate "pack-config" container.
-    builder.AddAzureBlobServiceClient("grainstate");
+    // Health check disabled: it shares the "grainstate" connection name with the keyed registration above,
+    // so Aspire's AzureComponent never actually adds an unkeyed BlobServiceClient to DI — only the keyed one
+    // exists — yet it still auto-registers an unkeyed health check ("Azure_BlobServiceClient") that calls
+    // GetRequiredService<BlobServiceClient>() (unkeyed) and throws InvalidOperationException, which
+    // DefaultHealthCheckService does not catch (only exceptions from CheckHealthAsync itself are caught),
+    // crashing /health with a 500. Orleans grain-storage/clustering failures already surface through the app
+    // failing to function, so this decorative check isn't needed to gate readiness.
+    builder.AddAzureBlobServiceClient("grainstate", settings => settings.DisableHealthChecks = true);
 }
 
 builder.Services.AddDigitalBrainChat(builder.Configuration);
