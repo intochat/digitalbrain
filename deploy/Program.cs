@@ -28,11 +28,13 @@ internal static class Program
     private const string EnvSuffix = "prod";
     private const string ChatDeploymentName = "chat";
 
-    // Images live in GHCR under the repo's own org. ACA pulls without registry creds only while the packages
-    // are public (Step 3); if you ever need to keep them private, add AppInputs.RegistryCredentialsArgs
-    // (server=ghcr.io) with a GitHub PAT that has read:packages scope, stored as a Pulumi secret.
-    private const string KernelImageRepository = "ghcr.io/digitalbraintech/digitalbrain-kernel";
-    private const string TelegramImageRepository = "ghcr.io/digitalbraintech/digitalbrain-telegram";
+    // Images live in private Docker Hub repos under the owner's personal account. ACA authenticates the pull
+    // via AppInputs.RegistryCredentialsArgs (server=docker.io) with a Docker Hub PAT stored as a Container App
+    // secret (DockerHubPasswordSecret below), since the repos are private.
+    private const string DockerHubUsername = "vhorbachov";
+    private const string DockerHubPasswordSecret = "dockerhub-password";
+    private const string KernelImageRepository = "docker.io/vhorbachov/digitalbrain-kernel";
+    private const string TelegramImageRepository = "docker.io/vhorbachov/digitalbrain-telegram";
 
     // Container App secret names backing the NeuroOS runtime contract.
     private const string StorageConnectionSecret = "digitalbrain-storage-connection";
@@ -72,6 +74,16 @@ internal static class Program
         //          pulumi config set --secret internalServiceKey <value>
         var telegramBotToken = config.GetSecret("telegramBotToken") ?? Output.CreateSecret(string.Empty);
         var internalServiceKey = config.GetSecret("internalServiceKey") ?? Output.CreateSecret(string.Empty);
+
+        // Docker Hub PAT (read scope is enough — ACA only pulls, never pushes) backing the private
+        // vhorbachov/digitalbrain-kernel and -telegram repos. Same CI-secret-or-local-config contract as
+        // checkpointKey above.
+        var dockerHubTokenEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_DOCKERHUB_TOKEN");
+        var dockerHubToken = config.GetSecret("dockerHubToken")
+            ?? (string.IsNullOrEmpty(dockerHubTokenEnv) ? null : Output.CreateSecret(dockerHubTokenEnv))
+            ?? throw new System.InvalidOperationException(
+                "Docker Hub token required: set env DIGITALBRAIN_DOCKERHUB_TOKEN (CI secret) " +
+                "or `pulumi config set --secret digitalbrain-deploy:dockerHubToken <PAT>` (local).");
 
         var resourceGroup = new ResourceGroup(ResourceGroupName, new ResourceGroupArgs
         {
@@ -230,7 +242,17 @@ internal static class Program
                 {
                     new AppInputs.SecretArgs { Name = StorageConnectionSecret, Value = storageConnectionString },
                     new AppInputs.SecretArgs { Name = OpenAiKeySecret, Value = openAiKey },
-                    new AppInputs.SecretArgs { Name = CheckpointKeySecret, Value = checkpointKey }
+                    new AppInputs.SecretArgs { Name = CheckpointKeySecret, Value = checkpointKey },
+                    new AppInputs.SecretArgs { Name = DockerHubPasswordSecret, Value = dockerHubToken }
+                },
+                Registries =
+                {
+                    new AppInputs.RegistryCredentialsArgs
+                    {
+                        Server = "docker.io",
+                        Username = DockerHubUsername,
+                        PasswordSecretRef = DockerHubPasswordSecret
+                    }
                 }
             },
             Template = new AppInputs.TemplateArgs
@@ -341,7 +363,17 @@ internal static class Program
                 Secrets =
                 {
                     new AppInputs.SecretArgs { Name = TelegramBotTokenSecret, Value = telegramBotToken },
-                    new AppInputs.SecretArgs { Name = InternalServiceKeySecret, Value = internalServiceKey }
+                    new AppInputs.SecretArgs { Name = InternalServiceKeySecret, Value = internalServiceKey },
+                    new AppInputs.SecretArgs { Name = DockerHubPasswordSecret, Value = dockerHubToken }
+                },
+                Registries =
+                {
+                    new AppInputs.RegistryCredentialsArgs
+                    {
+                        Server = "docker.io",
+                        Username = DockerHubUsername,
+                        PasswordSecretRef = DockerHubPasswordSecret
+                    }
                 }
             },
             Template = new AppInputs.TemplateArgs
