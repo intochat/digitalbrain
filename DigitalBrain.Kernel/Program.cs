@@ -217,6 +217,7 @@ builder.UseOrleans(siloBuilder =>
 var app = builder.Build();
 
 app.UseRouting();
+app.MapDefaultEndpoints();
 app.UseCors("browser");
 app.UseGrpcWeb(new GrpcWebOptions { DefaultEnabled = true });
 
