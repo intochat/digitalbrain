@@ -129,10 +129,10 @@ All creation/mutation of behavior (new automation, pack embodiment, generated co
 
 **Phase B: Google + Salesforce Polish + Modern Intent (highest product value)**
 - B1 (done): Introduced `InoIntentClassifier.cs` (fast keyword replacing Regex + async LLM structured via GetResponseAsync). Removed Regex from InoConnectorIntents. Wired LLM classify into Gmail/SF handlers + Handle* methods (confirmation before auth/fetch). 28 Ino/Gmail/SF tests green. Classifier available for all intents.
-- B2 (progress this turn): Gmail now supports summarize follow-up (LLM on bodies + recent context). Surfaces use Tile (richer per-item) + List + actions. All intents classifier-only. Capability registration on apply + grounding. Tests (incl. Gmail surface) green after Flatten update.
+- B2 (progress this turn): Gmail summarize follow-up (LLM) + Tile/List surfaces. All intents to classifier. Registry + registration (automation apply + marketplace install). RetrieveCapabilities (retrieval stub). Tests green.
 - B3/B4: "just chat" characterization tests + end-to-end.
 - Next: vector over capabilities (reuse Context), richer follow-ups (e.g. summarize last email using memory).
-- Verification this slice: build 0 errors, Ino tests passed (24+), aspire doctor clean. All intents classifier-only. Registry stub + Ino automation proposal staging.
+- Verification this slice: build 0 errors, relevant tests passed, aspire doctor clean. Registry + retrieval + registration on apply/install. Ino automation + G/SF follow-ups.
 
 **Phase C: Runtime User-Controlled LLM**
 - C1 (started): Global override via "system"/"llm" pack config (llm_provider + llm_key) now honored first in LlmResponderNeuron.Resolve (before per-ask or composition default). This is the persisted user-controlled mechanism (settable via existing config forms or future dedicated settings surface).
@@ -146,8 +146,8 @@ All creation/mutation of behavior (new automation, pack embodiment, generated co
 - Verification: build of Ui.Runtime clean.
 
 **Phase E: Simple Chat-to-Automation**
-- E1 (progress this turn): richer LLM prompt in Ino automation handler + cap registration on successful apply. Ino chat now proposes real staged automations.
-- E2/E3: Rail + staging in place. Next: better script gen + MCP call.
+- E1 (progress this turn): richer LLM prompt + cap registration on apply. Ino proposes staged automations from chat.
+- E2/E3: Proposals via rail. Next: MCP integration from Ino, feedback surfaces.
 - Verification: Ino tests green.
 
 Cross-cutting: All new behavior creation uses rail. Update docs.

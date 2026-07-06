@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Kernel.Ino;
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Marketplace.Contracts;
@@ -36,6 +37,13 @@ public sealed class MarketplaceInstallApplyHandler(
             grains,
             services.GetService<HomeFeedBus>(),
             logger);
+
+        // Register installed pack as capability for modern intent classifier / vector search
+        InoIntentClassifier.RegisterCapability(new InoIntentClassifier.Capability(
+            staged.Pack.Name,
+            $"Pack {staged.Pack.Name} v{staged.Pack.Version}: {staged.Pack.Description}",
+            new[] { $"use {staged.Pack.Name}", staged.Pack.Name.ToLowerInvariant() },
+            "pack"));
 
         return new SelfEvolutionApplyResult(
             proposal.ProposalId,

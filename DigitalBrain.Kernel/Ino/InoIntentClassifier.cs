@@ -96,12 +96,15 @@ public static class InoIntentClassifier
 
         try
         {
-            var caps = string.Join("\n", Capabilities.Select(c => $"- {c.Id}: {c.Description} (e.g. {string.Join(", ", c.Examples)})"));
+            // Simple retrieval (stub for vector over Context/Qdrant): keyword + examples match
+            var relevant = RetrieveCapabilities(prompt);
+            var capsText = string.Join("\n", relevant.Select(c => $"- {c.Id}: {c.Description} (e.g. {string.Join(", ", c.Examples)})"));
+
             const string sys = "You are an intent classifier for a personal AI assistant. " +
                                "Reply with ONLY a single JSON object: {\"intent\":\"gmail\",\"confidence\":0.92}. " +
-                               "Ground on these capabilities:\n";
+                               "Ground on these capabilities (use best match):\n";
 
-            var fullPrompt = sys + caps + "\nUser request: " + prompt;
+            var fullPrompt = sys + capsText + "\nUser request: " + prompt;
             var response = await chat.GetResponseAsync(fullPrompt);
 
             var text = response.Text?.Trim() ?? "";
@@ -115,6 +118,16 @@ public static class InoIntentClassifier
         {
             return fast;
         }
+    }
+
+    public static List<Capability> RetrieveCapabilities(string prompt)
+    {
+        var p = prompt.ToLowerInvariant();
+        return Capabilities
+            .Where(c => p.Contains(c.Id) || c.Examples.Any(e => p.Contains(e.ToLowerInvariant())))
+            .OrderByDescending(c => p.Contains(c.Id) ? 2 : 1)
+            .Take(5)
+            .ToList();
     }
 
     private static Classification? TryParseClassification(string text)
