@@ -2,6 +2,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Demo.Runtime;
+using DigitalBrain.Ino;
 using DigitalBrain.Marketplace.Contracts;
 using System.Reflection;
 
@@ -215,6 +216,24 @@ public class CoreBoundaryTests
     }
 
     [Fact]
+    public void Ino_Integration_Owns_Assistant_Reasoning_Not_Kernel_Orleans()
+    {
+        Assert.Equal("DigitalBrain.Ino", typeof(InoIntentClassifier).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Ino", typeof(IInoCapabilityRecall).Assembly.GetName().Name);
+
+        var references = InoReferenceNames();
+        var forbiddenReferences = references
+            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) ||
+                name.StartsWith("Orleans", StringComparison.Ordinal) ||
+                name.StartsWith("Microsoft.Orleans", StringComparison.Ordinal) ||
+                name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) ||
+                name.StartsWith("Microsoft.Extensions.Hosting", StringComparison.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(forbiddenReferences);
+    }
+    [Fact]
     public void Ui_Runtime_Depends_On_Core_And_Ui_Contracts_Not_Marketplace_Runtime_Host_Or_Integrations()
     {
         var references = UiRuntimeReferenceNames();
@@ -306,6 +325,8 @@ public class CoreBoundaryTests
 
     private static string[] UiRuntimeReferenceNames() => ReferenceNames(typeof(UiSurfaceLiveData).Assembly);
 
+    private static string[] InoReferenceNames() => ReferenceNames(typeof(InoIntentClassifier).Assembly);
+
     private static string[] DemoContractsReferenceNames() => ReferenceNames(typeof(DemoMessageSynapse).Assembly);
 
     private static string[] DemoRuntimeReferenceNames() => ReferenceNames(typeof(SurfaceDemoRuntime).Assembly);
@@ -337,4 +358,5 @@ public class CoreBoundaryTests
             .Cast<string>()
             .ToArray();
 }
+
 

@@ -144,3 +144,7 @@ aspire doctor
 
 ---
 *Generated from analysis + current code inspection. Follow AGENTS.md for execution.*
+
+## 12. Implementation Progress
+
+- Ino split boundary implemented: `DigitalBrain.Ino` now owns assistant AI options, intent classification, and the `IInoCapabilityRecall` abstraction. Kernel owns the Orleans/Context adapter (`KernelInoCapabilityRecall`) and registers it for production/test kernels. Architecture tests pin that `DigitalBrain.Ino` does not reference Kernel, Context, or Orleans runtime packages.
