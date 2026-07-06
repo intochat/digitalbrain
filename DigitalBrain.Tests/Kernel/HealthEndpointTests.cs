@@ -1,11 +1,11 @@
-using Microsoft.AspNetCore.Mvc.Testing;
+using DigitalBrain.Tests.TestSupport;
 
 namespace DigitalBrain.Tests.Kernel;
 
 [Collection("kernel-host")]
-public class HealthEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests(KernelWebApplicationFactory factory)
 {
-    private readonly WebApplicationFactory<Program> _factory = factory;
+    private readonly KernelWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task HealthEndpoint_ReturnsHealthy()

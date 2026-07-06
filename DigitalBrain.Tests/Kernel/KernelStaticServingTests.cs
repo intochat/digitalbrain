@@ -1,3 +1,4 @@
+using DigitalBrain.Tests.TestSupport;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalBrain.Tests.Kernel;
@@ -13,7 +14,7 @@ public class KernelStaticServingTests
         await File.WriteAllTextAsync(Path.Combine(webRoot, "index.html"), "<!doctype html><title>db-e2e-marker</title>");
         try
         {
-            using var factory = new WebApplicationFactory<Program>()
+            using var factory = new KernelWebApplicationFactory()
                 .WithWebHostBuilder(b => b.UseSetting("DIGITALBRAIN_WEBROOT", webRoot));
             using var client = factory.CreateClient();
 
@@ -33,7 +34,7 @@ public class KernelStaticServingTests
     [Fact]
     public async Task Without_WebRoot_Root_Is_Not_Served_As_Index()
     {
-        using var factory = new WebApplicationFactory<Program>();
+        using var factory = new KernelWebApplicationFactory();
         using var client = factory.CreateClient();
         var resp = await client.GetAsync("/");
         Assert.NotEqual(System.Net.HttpStatusCode.OK, resp.StatusCode);

@@ -1,14 +1,14 @@
 using DigitalBrain.Runtime.Grpc;
+using DigitalBrain.Tests.TestSupport;
 using Grpc.Net.Client;
 using Grpc.Net.Client.Web;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalBrain.Tests.Kernel;
 
 [Collection("kernel-host")]
-public class KernelGrpcWebTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class KernelGrpcWebTests(KernelWebApplicationFactory factory)
 {
-    private readonly WebApplicationFactory<Program> _factory = factory;
+    private readonly KernelWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task Health_Over_GrpcWeb_Succeeds()
