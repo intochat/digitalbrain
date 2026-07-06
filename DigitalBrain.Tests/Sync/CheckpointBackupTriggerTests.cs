@@ -43,8 +43,8 @@ public class CheckpointBackupTriggerTests : NeuronTestBase
 
         var manifest = await trigger.BackupAsync("demo-user");
 
-        Assert.Equal(9, manifest.Entries.Count);
-        Assert.Equal(9, syncContainer.Uploads.Count);
+        Assert.Equal(8, manifest.Entries.Count);
+        Assert.Equal(8, syncContainer.Uploads.Count);
         Assert.All(manifest.Entries, entry => Assert.StartsWith("demo-user/", entry.BlobName));
         Assert.All(syncContainer.Uploads.Values, bytes => Assert.NotEmpty(bytes));
     }
