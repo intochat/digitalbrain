@@ -13,7 +13,8 @@ public class TrustedSeedInstallTests : NeuronTestBase
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "true"
+                ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "true",
+                ["DigitalBrain:Marketplace:TrustedLocalInstallBypass"] = "true"
             })
             .Build();
         services.AddSingleton<IConfiguration>(configuration);

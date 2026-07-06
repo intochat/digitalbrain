@@ -17,12 +17,14 @@ namespace DigitalBrain.Tests.Features
     
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Reqnroll", "3.0.0.0")]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
+    [global::Xunit.TraitAttribute("Category", "cluster")]
     public partial class XPostTriggersABitcoinPriceAlertOnTelegramFeature : object, global::Xunit.IClassFixture<XPostTriggersABitcoinPriceAlertOnTelegramFeature.FixtureData>, global::Xunit.IAsyncLifetime
     {
         
         private global::Reqnroll.ITestRunner testRunner;
         
-        private static string[] featureTags = ((string[])(null));
+        private static string[] featureTags = new string[] {
+                "cluster"};
         
         private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "X post triggers a Bitcoin price alert on Telegram", "\tAs a user\r\n\tI want DigitalBrain to react to a new X post from a watched author\r\n" +
                 "\tSo that it checks the Bitcoin price and sends me a Telegram alert", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
@@ -151,7 +153,7 @@ namespace DigitalBrain.Tests.Features
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("X post from watched author triggers a Bitcoin price alert on Telegram", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 7
+#line 8
  this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -161,16 +163,16 @@ namespace DigitalBrain.Tests.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 8
+#line 9
   await testRunner.GivenAsync("the X-Bitcoin-Telegram demo pack is installed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 9
+#line 10
   await testRunner.AndAsync("the egress bus is watching \"TelegramReplyRequested\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 10
+#line 11
   await testRunner.WhenAsync("a simulated X post from \"elon\" arrives for chat 7 with text \"big news\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 11
+#line 12
   await testRunner.ThenAsync("a \"TelegramReplyRequested\" reply for chat 7 with text \"New post from elon. Bitcoi" +
                         "n price right now: $61,234.56\" reaches the egress bus", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden

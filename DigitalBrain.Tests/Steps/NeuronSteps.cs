@@ -335,7 +335,8 @@ public class NeuronSteps : IAsyncDisposable
                         new ConfigurationBuilder()
                             .AddInMemoryCollection(new Dictionary<string, string?>
                             {
-                                ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
+                                ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false",
+                                ["DigitalBrain:Marketplace:TrustedLocalInstallBypass"] = "true"
                             })
                             .Build());
                 });

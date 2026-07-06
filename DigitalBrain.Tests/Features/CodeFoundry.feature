@@ -1,3 +1,4 @@
+@cluster
 Feature: Runtime Code Foundry
 
 Scenario: Code generation produces a CodeGenerated synapse

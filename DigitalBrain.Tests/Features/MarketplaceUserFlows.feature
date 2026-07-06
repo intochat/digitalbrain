@@ -1,3 +1,4 @@
+@cluster
 Feature: Marketplace User Flows (core distribution + local fallback + commission)
 	As a user of DigitalBrain
 	I want the marketplace distribution, commissions and local-only security modes to work

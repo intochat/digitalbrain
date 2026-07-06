@@ -17,12 +17,14 @@ namespace DigitalBrain.Tests.Features
     
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Reqnroll", "3.0.0.0")]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
+    [global::Xunit.TraitAttribute("Category", "cluster")]
     public partial class MarketplaceUserFlowsCoreDistributionLocalFallbackCommissionFeature : object, global::Xunit.IClassFixture<MarketplaceUserFlowsCoreDistributionLocalFallbackCommissionFeature.FixtureData>, global::Xunit.IAsyncLifetime
     {
         
         private global::Reqnroll.ITestRunner testRunner;
         
-        private static string[] featureTags = ((string[])(null));
+        private static string[] featureTags = new string[] {
+                "cluster"};
         
         private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Marketplace User Flows (core distribution + local fallback + commission)", "\tAs a user of DigitalBrain\r\n\tI want the marketplace distribution, commissions and" +
                 " local-only security modes to work\r\n\tSo that kernel runs standalone while privat" +
@@ -150,7 +152,7 @@ namespace DigitalBrain.Tests.Features
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Publish then install flow (core distribution chain exercised)", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 9
+#line 10
 this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -160,11 +162,11 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
             else
             {
                 await this.ScenarioStartAsync();
-#line 10
+#line 11
  await testRunner.WhenAsync("I publish, a simulated other brain installs and uses the pack \"UserFlowTestPack\" " +
                         "version \"1.0\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 11
+#line 12
  await testRunner.ThenAsync("the timeline contains these synapse types in causal order: ExperienceUsed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }

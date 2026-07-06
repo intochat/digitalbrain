@@ -37,7 +37,7 @@ See `Brain.slnx`, `aspire.config.json`, `Directory.Packages.props` (Aspire 13.4.
 4. Accelerate (fast targeted feedback).
 5. Automate last.
 
-**Fast inner loop**: `dotnet build && dotnet test --filter "..."` (protocol/unit/step/UI contracts).
+**Fast inner loop**: `dotnet build && dotnet test --filter "Category!=cluster"` (protocol/unit/UI contracts); use narrower `FullyQualifiedName~...` filters when editing a specific slice.
 
 **Aspire/hosting**: use MCP tools (`aspire__doctor`, `aspire__list_resources`, `aspire__execute_resource_command` to restart flutter-ui/kernel, `aspire__list_console_logs`) or `aspire` CLI. Prefer targeted commands.
 

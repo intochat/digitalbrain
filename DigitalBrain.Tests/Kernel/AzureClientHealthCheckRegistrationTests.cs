@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Tests.Kernel;
 
@@ -10,13 +11,11 @@ namespace DigitalBrain.Tests.Kernel;
 // grainstate/journal, so it takes the isAspireHosted=false branch and never calls
 // AddKeyedAzureTableServiceClient / AddKeyedAzureBlobServiceClient / AddAzureBlobServiceClient at all --
 // the exact registrations that were at fault. This test instead replicates Program.cs's isAspireHosted=true
-// Azure client wiring directly against a bare IHostApplicationBuilder. No Kestrel/Orleans/real Azurite is
-// needed: the bug was a pure DI-resolution failure inside the health check's registration factory, which
-// fires before any network call is attempted, so it reproduces (and stays fixed) without live storage.
+// Azure client wiring directly against a bare IHostApplicationBuilder.
 public class AzureClientHealthCheckRegistrationTests
 {
     [Fact]
-    public async Task AspireHostedBlobServiceClientRegistrations_HealthChecksDoNotThrow()
+    public void AspireHostedBlobServiceClientRegistrations_HealthCheckFactoriesResolveWithoutNetwork()
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration["ConnectionStrings:clustering"] = "UseDevelopmentStorage=true";
@@ -28,22 +27,20 @@ public class AzureClientHealthCheckRegistrationTests
         builder.AddAzureBlobServiceClient("grainstate", settings => settings.DisableHealthChecks = true);
 
         using var host = builder.Build();
-        var healthCheckService = host.Services.GetRequiredService<HealthCheckService>();
+        var options = host.Services.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
+        var registrations = options.Registrations;
 
-        // Before the fix, this threw InvalidOperationException ("No service for type
-        // 'Azure.Storage.Blobs.BlobServiceClient' has been registered"): the unkeyed
-        // AddAzureBlobServiceClient("grainstate") call shares its connection name with the keyed
-        // registration above, so Aspire never adds an unkeyed BlobServiceClient to DI -- only the keyed
-        // one exists -- yet it still auto-registered an unkeyed health check that resolved
-        // GetRequiredService<BlobServiceClient>(). DefaultHealthCheckService only catches exceptions
-        // thrown by a check's own CheckHealthAsync, not ones thrown while constructing the check, so this
-        // surfaced as an unhandled 500 rather than an "Unhealthy" report entry. Azurite isn't running here,
-        // so the still-enabled keyed checks may legitimately report Unhealthy from a failed connection --
-        // what must not happen is an unhandled throw out of CheckHealthAsync itself.
-        var report = await healthCheckService.CheckHealthAsync();
+        Assert.Contains(registrations, registration => registration.Name == "Azure_TableServiceClient_clustering");
+        Assert.Contains(registrations, registration => registration.Name == "Azure_BlobServiceClient_grainstate");
+        Assert.DoesNotContain(registrations, registration => registration.Name == "Azure_BlobServiceClient");
 
-        Assert.True(report.Entries.ContainsKey("Azure_TableServiceClient_clustering"));
-        Assert.True(report.Entries.ContainsKey("Azure_BlobServiceClient_grainstate"));
-        Assert.False(report.Entries.ContainsKey("Azure_BlobServiceClient"), "the unkeyed blob health check must stay disabled");
+        // Before the fix, the unkeyed blob health-check factory resolved GetRequiredService<BlobServiceClient>()
+        // and threw before DefaultHealthCheckService could convert the problem into an Unhealthy entry. Constructing
+        // factories catches that DI bug without executing CheckHealthAsync(), which would perform real Azure SDK
+        // calls against missing local Azurite (127.0.0.1:10000) and spam retry stack traces into successful runs.
+        foreach (var registration in registrations)
+        {
+            Assert.NotNull(registration.Factory(host.Services));
+        }
     }
 }
