@@ -105,13 +105,19 @@ class DigitalBrainTelemetry {
         return '${Uri.base.origin}/otlp';
       }
     }
-    // Native: Aspire injects OTEL_EXPORTER_OTLP_ENDPOINT directly
     final otlpEndpoint = getEnv('OTEL_EXPORTER_OTLP_ENDPOINT');
-    if (otlpEndpoint != null && otlpEndpoint.isNotEmpty) {
+    final otlpProtocol = getEnv('OTEL_EXPORTER_OTLP_PROTOCOL')?.toLowerCase();
+    if (otlpEndpoint != null &&
+        otlpEndpoint.isNotEmpty &&
+        otlpProtocol != 'grpc') {
       return otlpEndpoint.replaceAll(RegExp(r'/+$'), '');
     }
-    // Fallback: route through the kernel's /otlp/* proxy if available
-    final kernelUrl = getEnv('services__kernel__https__0');
+    // Route through the kernel's /otlp/* proxy when Aspire exposes a gRPC
+    // collector or when the Flutter executable only has service references.
+    final kernelUrl =
+        getEnv('services__kernel__web__0') ??
+        getEnv('KERNEL_WEB') ??
+        getEnv('services__kernel__https__0');
     if (kernelUrl != null && kernelUrl.isNotEmpty) {
       return '${kernelUrl.replaceAll(RegExp(r'/+$'), '')}/otlp';
     }
