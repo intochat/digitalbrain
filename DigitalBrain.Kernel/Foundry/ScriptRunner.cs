@@ -25,6 +25,7 @@ public static class ScriptRunner
             typeof(Synapse).Assembly,
             typeof(Signal).Assembly,
             typeof(NeuronId).Assembly,
+            typeof(PackEmission).Assembly,
             typeof(System.Collections.Generic.List<>).Assembly,
             typeof(ListSurface).Assembly)  // enables Ui surfaces (ListSurface, AutomationSurface) from scripts
         .AddImports("System", "System.Collections.Generic", "System.Threading.Tasks", "DigitalBrain.Core", "DigitalBrain.Core.Distribution");
