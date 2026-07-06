@@ -9,7 +9,7 @@ using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Ui.Runtime;
 
 // Read-only DigitalBrain MCP tools: observe cluster state without side effects. Safe to expose over the
-// kernel's HTTP transport (remotely reachable). Mutation tools live in DigitalBrainMutationTools (stdio-only).
+// kernel's direct-run HTTP transport. Mutation tools live in DigitalBrainMutationTools.
 [McpServerToolType]
 public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainToolsBase(grains)
 {

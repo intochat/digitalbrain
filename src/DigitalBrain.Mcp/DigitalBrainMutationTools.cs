@@ -9,8 +9,7 @@ namespace DigitalBrain.Mcp;
 using DigitalBrain.Ui.Contracts;
 
 // Mutating DigitalBrain MCP tools: fire side-effecting synapses, spend LLM tokens, or change marketplace/cluster
-// state. Registered on the stdio transport only (local/trusted); withheld from the kernel's HTTP transport
-// pending a remote auth decision.
+// state. Registered on trusted local stdio clients and on the dedicated local Aspire MCP host.
 [McpServerToolType]
 public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBrainToolsBase(grains)
 {
