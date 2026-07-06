@@ -5,19 +5,15 @@ name: Deploy Flutter Web
 # digitalbrain.tech once DNS cutover completes (see docs/ARCHITECTURE-AND-PRODUCTION-PLAN.md M9 Task 17).
 
 on:
-  push:
-    branches: [master, main]
-    paths:
-      - "app/**"
-      - ".github/workflows/deploy-flutter-web.yml"
-  workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-flutter-web
-  cancel-in-progress: true
+  group: deploy-flutter-web-production
+  cancel-in-progress: false
 
 jobs:
   deploy:

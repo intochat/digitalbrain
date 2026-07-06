@@ -1,24 +1,23 @@
 name: deploy
 
-# Deploy is manual while CI hardens. The workflow still builds and pushes the kernel image,
-# then runs `pulumi up` for the minimal runtime stack when explicitly dispatched.
+# Deployment is release-gated: publish a GitHub Release to build the images and run Pulumi.
 on:
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Container image tag to build and deploy'
-        required: false
-        default: 'latest'
+  release:
+    types: [published]
 
 permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      TAG: "${{ inputs.image_tag || github.sha }}"
+      TAG: "${{ github.event.release.tag_name }}"
     steps:
       - uses: actions/checkout@v4
 
