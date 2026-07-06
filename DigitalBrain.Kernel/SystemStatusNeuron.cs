@@ -3,7 +3,7 @@ using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using System.Reflection;
-using Microsoft.CodeAnalysis;
+
 namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.systemstatus.v1")]
@@ -18,15 +18,32 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         await FireAsync(new SystemLaunched("digitalbrain", DateTimeOffset.UtcNow));
         await FireAsync(new SystemStatusChanged("kernel", "launched"));
 
+        // In tests we do not poll; avoid background loops and repeated MCP attempts that log noise.
+        if (IsTestMode()) return;
+
         _pollCts = new CancellationTokenSource();
         _ = Task.Run(() => PollLoop(_pollCts.Token));
     }
 
+    private static bool IsTestMode() =>
+        string.Equals(Environment.GetEnvironmentVariable("DIGITALBRAIN_TEST_MODE"), "true", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Testing", StringComparison.OrdinalIgnoreCase);
+
     private async Task TryConnectMcpAsync(CancellationToken ct)
     {
         if (_mcp != null) return;
+        if (IsTestMode())
+        {
+            // Tests run without Aspire MCP / CLI available; self-awareness is telemetry + LLM only. No spawn, no long cancel.
+            await FireAsync(new SystemStatusChanged("aspire-mcp", "unavailable"));
+            return;
+        }
+
         try
         {
+            using var shortCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            shortCts.CancelAfter(TimeSpan.FromSeconds(3));
+
             var workDir = ResolveAppHostDir() ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_APPHOST_DIR") ?? AppContext.BaseDirectory;
 
             _mcp = await McpClient.CreateAsync(
@@ -36,14 +53,19 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
                     Command = "aspire",
                     Arguments = ["agent", "mcp"],
                     WorkingDirectory = workDir
-                }), cancellationToken: ct);
+                }), cancellationToken: shortCts.Token);
 
-            var tools = await _mcp.ListToolsAsync(cancellationToken: ct);
+            var tools = await _mcp.ListToolsAsync(cancellationToken: shortCts.Token);
             var toolNames = string.Join(",", tools.Select(t => t.Name));
             Logger.LogInformation("SystemStatus connected to Aspire MCP ({Count} tools: {Names}) from {Dir}", tools.Count, toolNames, workDir);
             await FireAsync(new SystemStatusChanged("aspire-mcp", "connected", $"tools={tools.Count}"));
 
-            await PollHealthAsync(ct);
+            await PollHealthAsync(shortCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected in constrained envs or shutdown; do not spam warnings.
+            await FireAsync(new SystemStatusChanged("aspire-mcp", "unavailable"));
         }
         catch (Exception ex)
         {

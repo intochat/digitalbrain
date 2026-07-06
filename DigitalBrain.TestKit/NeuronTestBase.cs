@@ -4,6 +4,7 @@ using Xunit;
 
 namespace DigitalBrain.TestKit;
 
+[Trait("Category", "cluster")]
 public abstract class NeuronTestBase : IAsyncLifetime
 {
     private TestDigitalBrain _brain = null!;

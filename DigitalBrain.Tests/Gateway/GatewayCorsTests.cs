@@ -1,11 +1,11 @@
-using Microsoft.AspNetCore.Mvc.Testing;
+using DigitalBrain.Tests.TestSupport;
 
 namespace DigitalBrain.Tests.Gateway;
 
 [Collection("kernel-host")]
-public class GatewayCorsTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class GatewayCorsTests(KernelWebApplicationFactory factory)
 {
-    private readonly WebApplicationFactory<Program> _factory = factory;
+    private readonly KernelWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task Preflight_FromBrowserOrigin_AllowsOriginOnGrpcRoute()

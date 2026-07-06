@@ -1,16 +1,16 @@
 using DigitalBrain.Runtime.Grpc;
+using DigitalBrain.Tests.TestSupport;
 using Grpc.Net.Client;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalBrain.Tests.Gateway;
 
 [Collection("kernel-host")]
-public class GatewayGrpcWireTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
+public class GatewayGrpcWireTests : IDisposable
 {
     private readonly GrpcChannel _channel;
     private readonly DigitalBrainGateway.DigitalBrainGatewayClient _client;
 
-    public GatewayGrpcWireTests(WebApplicationFactory<Program> factory)
+    public GatewayGrpcWireTests(KernelWebApplicationFactory factory)
     {
         _channel = GrpcChannel.ForAddress(factory.Server.BaseAddress, new GrpcChannelOptions
         {

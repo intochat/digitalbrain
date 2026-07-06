@@ -405,8 +405,12 @@ if (serveWebBundle)
 }
 
 // Bootstrap self-awareness (SystemStatusNeuron will connect MCP + fire Launched on activate)
+// Skipped entirely in test mode (DIGITALBRAIN_TEST_MODE=true or Testing env) to keep tests fast + quiet.
+// The warmup activates grains + runs automation seed scripts + can trigger MCP which is undesired in unit/integration.
 var grainFactory = app.Services.GetService<IGrainFactory>();
-if (grainFactory != null)
+var isTestMode = string.Equals(Environment.GetEnvironmentVariable("DIGITALBRAIN_TEST_MODE"), "true", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(app.Environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase);
+if (grainFactory != null && !isTestMode)
 {
     app.Lifetime.ApplicationStarted.Register(() =>
     {

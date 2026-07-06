@@ -19,6 +19,9 @@ public sealed class TestDigitalBrain(
 
     public async Task InitializeAsync()
     {
+        // Ensure grains and SystemStatus skip heavy MCP / warmup side effects inside cluster tests.
+        Environment.SetEnvironmentVariable("DIGITALBRAIN_TEST_MODE", "true");
+
         var builder = new TestClusterBuilder(initialSilosCount: _initialSilosCount);
         builder.AddSiloBuilderConfigurator<NeuronTestKernelConfigurator>();
 
