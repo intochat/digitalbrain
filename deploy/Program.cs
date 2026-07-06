@@ -66,13 +66,22 @@ internal static class Program
                 "Checkpoint key required: set env DIGITALBRAIN_CHECKPOINT_KEY (CI secret) " +
                 "or `pulumi config set --secret digitalbrain-deploy:checkpointKey <base64-32-bytes>` (local).");
 
-        // Telegram transport secrets. GetSecret returns null when not set so a token-less deploy boots idle
-        // (transport skips webhook setup when BotToken is empty — same contract as Aspire dev wiring).
-        // Set via: pulumi config set --secret telegramBotToken <value>
-        //          pulumi config set --secret internalServiceKey <value>
-        var telegramBotToken = config.GetSecret("telegramBotToken") ?? Output.CreateSecret(string.Empty);
-        var internalServiceKey = config.GetSecret("internalServiceKey") ?? Output.CreateSecret(string.Empty);
+        // Telegram transport is optional in production. Do not emit empty ACA secrets; Container Apps rejects
+        // secrets whose value is empty. Set env DIGITALBRAIN_TELEGRAM_BOT_TOKEN / DIGITALBRAIN_INTERNAL_SERVICE_KEY
+        // in CI, or matching Pulumi secrets, to deploy the transport.
+        var telegramBotTokenEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_TELEGRAM_BOT_TOKEN");
+        var telegramBotToken = config.GetSecret("telegramBotToken")
+            ?? (string.IsNullOrWhiteSpace(telegramBotTokenEnv) ? null : Output.CreateSecret(telegramBotTokenEnv));
+        var internalServiceKeyEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_INTERNAL_SERVICE_KEY");
+        var internalServiceKey = config.GetSecret("internalServiceKey")
+            ?? (string.IsNullOrWhiteSpace(internalServiceKeyEnv) ? null : Output.CreateSecret(internalServiceKeyEnv));
 
+        if (telegramBotToken is not null && internalServiceKey is null)
+        {
+            throw new System.InvalidOperationException(
+                "Telegram deploy requires an internal service key: set env DIGITALBRAIN_INTERNAL_SERVICE_KEY " +
+                "or `pulumi config set --secret digitalbrain-deploy:internalServiceKey <value>`.");
+        }
         // Docker Hub PAT (read scope is enough — ACA only pulls, never pushes) backing the private
         // vhorbachov/digitalbrain-kernel and -telegram repos. Same CI-secret-or-local-config contract as
         // checkpointKey above.
@@ -343,28 +352,31 @@ internal static class Program
         // "DigitalBrain:GatewayAddress" (colon separator, mirrored in transport Program.cs).
         var kernelGatewayAddress = kernelApp.LatestRevisionFqdn.Apply(fqdn => $"https://{fqdn}");
 
-        var telegramTransport = new App.ContainerApp("digitalbrain-telegram", new App.ContainerAppArgs
+        App.ContainerApp? telegramTransport = null;
+        if (telegramBotToken is not null)
         {
-            ContainerAppName = "digitalbrain-telegram",
-            ResourceGroupName = resourceGroup.Name,
-            Location = Region,
-            ManagedEnvironmentId = containerEnvironment.Id,
-            Configuration = new AppInputs.ConfigurationArgs
+            telegramTransport = new App.ContainerApp("digitalbrain-telegram", new App.ContainerAppArgs
             {
-                // External ingress so Telegram's servers can POST to /webhook.
-                Ingress = new AppInputs.IngressArgs
+                ContainerAppName = "digitalbrain-telegram",
+                ResourceGroupName = resourceGroup.Name,
+                Location = Region,
+                ManagedEnvironmentId = containerEnvironment.Id,
+                Configuration = new AppInputs.ConfigurationArgs
                 {
-                    External = true,
-                    TargetPort = 8080,
-                    Transport = "Http"
-                },
-                Secrets =
+                    // External ingress so Telegram's servers can POST to /webhook.
+                    Ingress = new AppInputs.IngressArgs
+                    {
+                        External = true,
+                        TargetPort = 8080,
+                        Transport = "Http"
+                    },
+                    Secrets =
                 {
                     new AppInputs.SecretArgs { Name = TelegramBotTokenSecret, Value = telegramBotToken },
-                    new AppInputs.SecretArgs { Name = InternalServiceKeySecret, Value = internalServiceKey },
+                    new AppInputs.SecretArgs { Name = InternalServiceKeySecret, Value = internalServiceKey! },
                     new AppInputs.SecretArgs { Name = DockerHubPasswordSecret, Value = dockerHubToken }
                 },
-                Registries =
+                    Registries =
                 {
                     new AppInputs.RegistryCredentialsArgs
                     {
@@ -373,10 +385,10 @@ internal static class Program
                         PasswordSecretRef = DockerHubPasswordSecret
                     }
                 }
-            },
-            Template = new AppInputs.TemplateArgs
-            {
-                Containers =
+                },
+                Template = new AppInputs.TemplateArgs
+                {
+                    Containers =
                 {
                     new AppInputs.ContainerArgs
                     {
@@ -414,10 +426,11 @@ internal static class Program
                         }
                     }
                 },
-                Scale = new AppInputs.ScaleArgs { MinReplicas = 1, MaxReplicas = 3 }
-            },
-            Tags = StandardTags("container-app-telegram")
-        });
+                    Scale = new AppInputs.ScaleArgs { MinReplicas = 1, MaxReplicas = 3 }
+                },
+                Tags = StandardTags("container-app-telegram")
+            });
+        }
 
         return new Dictionary<string, object?>
         {
@@ -427,8 +440,8 @@ internal static class Program
             ["chatDeployment"] = ChatDeploymentName,
             ["kernelApp"] = kernelApp.Name,
             ["kernelFqdn"] = kernelApp.LatestRevisionFqdn,
-            ["telegramApp"] = telegramTransport.Name,
-            ["telegramFqdn"] = telegramTransport.LatestRevisionFqdn,
+            ["telegramApp"] = telegramTransport?.Name,
+            ["telegramFqdn"] = telegramTransport?.LatestRevisionFqdn,
             ["imageTag"] = imageTag,
             ["environment"] = EnvSuffix
         };
