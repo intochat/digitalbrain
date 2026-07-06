@@ -13,25 +13,30 @@ public static class UiKitGallery
         var items = new List<UiWidgetTree>
         {
             new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = title }),
-            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "Demonstration of core components from UiKitVocabulary." }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "Live demonstration of the official DigitalBrain UI kit (UiKitVocabulary + NeuronUiKit). Chat 'show gallery' or 'uikit gallery' to Ino to refresh." }),
 
-            BuildDemo(UiKitVocabulary.Text, "Text", new() { ["text"] = "Sample text content" }),
+            BuildDemo(UiKitVocabulary.Heading, "Heading", new() { ["text"] = "Section Heading" }),
+            BuildDemo(UiKitVocabulary.Text, "Text", new() { ["text"] = "Sample text content from the kit." }),
             BuildDemo(UiKitVocabulary.TextField, "TextField", new() { ["label"] = "Name", ["value"] = "example" }),
             BuildDemo(UiKitVocabulary.Button, "Button", new() { ["label"] = "Click me" }),
             BuildDemo(UiKitVocabulary.Panel, "Panel", new() { ["title"] = "Panel title" }),
             BuildDemo(UiKitVocabulary.Checkbox, "Checkbox", new() { ["label"] = "Enabled", ["checked"] = true }),
             BuildDemo(UiKitVocabulary.Switch, "Switch", new() { ["label"] = "Active", ["value"] = false }),
-            BuildDemo(UiKitVocabulary.Select, "Select", new() { ["label"] = "Choose", ["options"] = new[] { "One", "Two" } }),
-            BuildDemo(UiKitVocabulary.List, "List", new() { ["items"] = new[] { "Item A", "Item B" } }),
-            BuildDemo(UiKitVocabulary.Table, "Table", new() { ["columns"] = new[] { "Col1", "Col2" }, ["rows"] = new object[] { new[] { "a", "b" } } }),
-            BuildDemo(UiKitVocabulary.GraphCanvas, "Graph", new() { ["title"] = "Sample graph" }),
-            BuildDemo(UiKitVocabulary.Row, "Row", new() { ["children"] = "demo" }),
-            BuildDemo(UiKitVocabulary.Column, "Column", new() { ["children"] = "demo" }),
-            BuildDemo(UiKitVocabulary.Dialog, "Dialog", new() { ["title"] = "Demo Dialog" }),
-            BuildDemo(UiKitVocabulary.Toast, "Toast", new() { ["message"] = "Hello from gallery" }),
+            BuildDemo(UiKitVocabulary.Select, "Select", new() { ["label"] = "Choose", ["options"] = new[] { "One", "Two", "Three" } }),
+            BuildDemo(UiKitVocabulary.List, "List", new() { ["items"] = new[] { "Item A", "Item B", "Item C" } }),
+            BuildDemo(UiKitVocabulary.Tile, "Tile", new() { ["title"] = "Tile Title", ["subtitle"] = "Subtitle with actions" }),
+            BuildDemo(UiKitVocabulary.Badge, "Badge", new() { ["text"] = "New" }),
+            BuildDemo(UiKitVocabulary.Table, "Table", new() { ["columns"] = new[] { "Col1", "Col2" }, ["rows"] = new object[] { new[] { "a", "b" }, new[] { "c", "d" } } }),
+            BuildDemo(UiKitVocabulary.GraphCanvas, "GraphCanvas", new() { ["title"] = "Sample graph" }),
+            BuildDemo(UiKitVocabulary.Row, "Row layout", new() {  }),
+            BuildDemo(UiKitVocabulary.Column, "Column layout", new() {  }),
+            BuildDemo(UiKitVocabulary.Divider, "Divider", new() { }),
+            BuildDemo(UiKitVocabulary.Avatar, "Avatar", new() { ["fallback"] = "IN" }),
+            BuildDemo(UiKitVocabulary.Alert, "Alert", new() { ["title"] = "Info", ["description"] = "This is a kit alert." }),
+            BuildDemo(UiKitVocabulary.Progress, "Progress", new() { ["value"] = 0.65 }),
 
             new(UiKitVocabulary.Gap, new Dictionary<string, object?>()),
-            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "More components (Row/Column, Dialog, Toast, etc.) follow the same UiWidgetTree pattern." }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "All components are server-driven via UiWidgetTree. Use in packs with KitExperience or emit from neurons. Ino can generate more." }),
         };
 
         return new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), items);

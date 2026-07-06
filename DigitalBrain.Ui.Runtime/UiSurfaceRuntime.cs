@@ -1,3 +1,5 @@
+using DigitalBrain.Core;
+
 namespace DigitalBrain.Core;
 
 public static class UiSurfaceSamples
@@ -148,17 +150,36 @@ public static class UiSurfaceSamples
                         {
                             ["clientId"] = clientId
                         }),
-                    ["tree"] = new UiWidgetTree(
-                        NeuronUiKit.Form,
-                        new Dictionary<string, object?>
+                    ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), new List<UiWidgetTree>
+                    {
+                        new UiWidgetTree(
+                            NeuronUiKit.Form,
+                            new Dictionary<string, object?>
+                            {
+                                ["title"] = "Sign In",
+                                ["submitLabel"] = "Sign in",
+                                ["error"] = error,
+                                [UiSurfaceKeys.SynapseType] = nameof(LoginRequest),
+                                ["clientId"] = clientId,
+                                ["fields"] = Fields()
+                            }),
+                        new UiWidgetTree(UiKitVocabulary.Divider, new Dictionary<string, object?>()),
+                        new UiWidgetTree(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Or connect accounts" }),
+                        new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
                         {
-                            ["title"] = "Sign In",
-                            ["submitLabel"] = "Sign in",
-                            ["error"] = error,
-                            [UiSurfaceKeys.SynapseType] = nameof(LoginRequest),
-                            ["clientId"] = clientId,
-                            ["fields"] = Fields()
+                            ["label"] = "Login via Google",
+                            ["icon"] = "google",
+                            ["synapseType"] = GoogleSignals.AuthRequested,
+                            ["clientId"] = clientId
+                        }),
+                        new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
+                        {
+                            ["label"] = "Login via Salesforce",
+                            ["icon"] = "salesforce",
+                            ["synapseType"] = SalesforceSignals.AuthRequested,
+                            ["clientId"] = clientId
                         })
+                    })
                 }));
     }
 
