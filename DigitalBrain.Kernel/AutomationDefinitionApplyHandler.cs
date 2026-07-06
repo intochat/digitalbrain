@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Kernel.Ino;
+using DigitalBrain.Ino;
 using DigitalBrain.Kernel.SelfEvolution;
 
 namespace DigitalBrain.Kernel;
