@@ -20,6 +20,10 @@ import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
 import 'app_session.dart';
 import 'digitalbrain_client_scope.dart';
 
+part 'shell_chat_composer.dart';
+part 'shell_file_ingest.dart';
+part 'surface_classification.dart';
+
 /// Dynamic NeuroUI shell. Subscribes to WatchHomeFeed and renders chrome + nav + body
 /// entirely from live UiSurface / widget-tree / rfw surfaces emitted by neurons.
 /// This is the thin host: no static nav list in the final state.
@@ -32,62 +36,6 @@ class ForuiAppShell extends StatefulWidget {
   State<ForuiAppShell> createState() => _ForuiAppShellState();
 }
 
-/// Surface kinds that should immediately become the visible shell body the moment
-/// they arrive over the home-feed stream, mirroring the existing gallery auto-switch
-/// a few lines below. Returns the `_selectedTarget` to switch to, or null if [kind]
-/// shouldn't trigger an auto-switch. A plain top-level function (not a method) so it's
-/// unit-testable without pumping the full widget tree or mocking the gRPC connection.
-String? autoSwitchTargetForKind(String kind) {
-  if (kind == 'pack-config-form') return kind;
-  return null;
-}
-
-enum SurfaceDisposition { shell, chat, content, toast, ignore }
-
-String surfaceKindOf(Map<String, Object?> data) =>
-    (data['kind'] ?? data['surfaceKind'] ?? '').toString();
-
-SurfaceDisposition classifySurface(Map<String, Object?> data) {
-  final kind = surfaceKindOf(data).toLowerCase();
-  if (kind == 'toast' || kind == 'notification' || kind.contains('toast')) {
-    return SurfaceDisposition.toast;
-  }
-  if (isShellSurface(data)) return SurfaceDisposition.shell;
-  if (isChatSurface(data)) return SurfaceDisposition.chat;
-  if (kind.isNotEmpty) return SurfaceDisposition.content;
-  return SurfaceDisposition.ignore;
-}
-
-bool isChatSurface(Map<String, Object?> data) =>
-    data['role'] == 'assistant' && data['tree'] is Map;
-
-bool isShellSurface(Map<String, Object?> data) {
-  final kind = surfaceKindOf(data).toLowerCase();
-  if (kind == 'app-shell' || kind.contains('shell')) return true;
-  if (data['activeContent'] != null) return true;
-
-  final treeNode = data['tree'];
-  if (treeNode is! Map) return false;
-  if (treeNode['activeContent'] != null) return true;
-
-  final props = treeNode['Props'];
-  if (props is Map && props['activeContent'] != null) return true;
-
-  final type =
-      treeNode['Type']?.toString().toLowerCase() ??
-      treeNode['type']?.toString().toLowerCase() ??
-      '';
-  return type.contains('scaffold') || type == 'app-shell';
-}
-
-bool shellChatIsSelected(String location, String? selectedTarget) {
-  final target = (selectedTarget ?? '').trim().toLowerCase();
-  return location == '/chat' ||
-      target == 'chat' ||
-      target == '/chat' ||
-      target.contains('ino');
-}
-
 class _ShellChatMessage {
   final bool isUser;
   final String? text;
@@ -98,140 +46,6 @@ class _ShellChatMessage {
   const _ShellChatMessage.assistant(Map<String, Object?> this.tree)
     : isUser = false,
       text = null;
-}
-
-@visibleForTesting
-const shellComposerAttachButtonKey = Key('shell-composer-attach');
-
-@visibleForTesting
-const shellComposerVoiceButtonKey = Key('shell-composer-voice');
-
-@visibleForTesting
-const shellDropOverlayKey = Key('shell-drop-overlay');
-
-@visibleForTesting
-String uploadFileName(XFile file) {
-  final explicitName = file.name.trim();
-  if (explicitName.isNotEmpty) return explicitName;
-
-  final path = file.path.trim();
-  if (path.isEmpty) return 'upload';
-
-  final parts = path.split(RegExp(r'[\\/]'));
-  final fallback = parts.isEmpty ? path : parts.last;
-  return fallback.trim().isEmpty ? 'upload' : fallback;
-}
-
-@visibleForTesting
-void appendTranscriptToComposer(
-  TextEditingController controller,
-  String transcript,
-) {
-  final text = transcript.trim();
-  if (text.isEmpty) return;
-
-  final existing = controller.text.trim();
-  controller.text = existing.isEmpty ? text : '$existing $text';
-  controller.selection = TextSelection.collapsed(
-    offset: controller.text.length,
-  );
-}
-
-@visibleForTesting
-Future<void> ingestDroppedFilesForShell(
-  Iterable<XFile> droppedFiles,
-  Future<void> Function(List<XFile> files) ingest,
-) async {
-  final files = droppedFiles
-      .where((file) => file is! DropItemDirectory)
-      .toList(growable: false);
-  if (files.isEmpty) return;
-  await ingest(files);
-}
-
-@visibleForTesting
-class ShellChatComposer extends StatelessWidget {
-  const ShellChatComposer({
-    super.key,
-    required this.controller,
-    required this.sending,
-    required this.onSend,
-    required this.onAttachFiles,
-    this.voiceInput,
-    this.status,
-  });
-
-  final TextEditingController controller;
-  final bool sending;
-  final VoidCallback? onSend;
-  final VoidCallback? onAttachFiles;
-  final Widget? voiceInput;
-  final String? status;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = FTheme.of(context);
-    final statusText = status?.trim();
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: t.colors.border, width: 0.5)),
-        color: t.colors.background,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (statusText != null && statusText.isNotEmpty) ...[
-            Text(
-              statusText,
-              style: t.typography.sm.copyWith(color: t.colors.mutedForeground),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-          ],
-          Row(
-            children: [
-              Tooltip(
-                message: 'Attach file',
-                child: FButton(
-                  key: shellComposerAttachButtonKey,
-                  onPress: onAttachFiles,
-                  child: const Icon(Icons.attach_file),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (voiceInput != null) ...[
-                KeyedSubtree(
-                  key: shellComposerVoiceButtonKey,
-                  child: voiceInput!,
-                ),
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: FTextField(
-                  control: FTextFieldControl.managed(controller: controller),
-                  hint: 'Ask INO...',
-                  onSubmit: (_) => onSend?.call(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Tooltip(
-                message: 'Send',
-                child: FButton(
-                  onPress: sending ? null : onSend,
-                  child: const Icon(Icons.send),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ForuiAppShellState extends State<ForuiAppShell> {
@@ -739,7 +553,10 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                   Container(
                                     width: 28,
                                     height: 28,
-                                    margin: const EdgeInsets.only(right: 8, top: 2),
+                                    margin: const EdgeInsets.only(
+                                      right: 8,
+                                      top: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: t.colors.primary,
                                       shape: BoxShape.circle,
