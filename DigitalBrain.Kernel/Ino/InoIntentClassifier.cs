@@ -49,13 +49,14 @@ public static class InoIntentClassifier
             if (parts.Length > 1) query = parts[1].Trim().Split(' ').FirstOrDefault();
         }
 
-        // Gmail / email family
-        if (p.Contains("gmail") || p.Contains("email") || p.Contains("inbox") || p.Contains("mailbox"))
-            return new("gmail", 0.85, query, max);
-
-        // Salesforce / CRM
+        // Salesforce / CRM (check before gmail to allow cross "salesforce ... last email" follow-ups)
         if (p.Contains("salesforce") || p.Contains("crm"))
-            return new("salesforce", 0.85, query, max);
+            return new("salesforce", 0.88, query, max);
+
+        // Gmail / email family (avoid stealing explicit salesforce cross follow-ups)
+        if (p.Contains("gmail") || p.Contains("inbox") || p.Contains("mailbox") ||
+            (p.Contains("email") && !p.Contains("salesforce") && !p.Contains("crm")))
+            return new("gmail", 0.85, query, max);
 
         // Existing static intents (kept for compatibility)
         if (p.Contains("bitcoin") && p.Contains("price"))
@@ -96,8 +97,9 @@ public static class InoIntentClassifier
 
         try
         {
-            // Simple retrieval (stub for vector over Context/Qdrant): keyword + examples match
-            var relevant = RetrieveCapabilities(prompt);
+            // Retrieval using Context vector (caps remembered as memories via InoNeuron) + keyword fallback.
+            // This is the basic vector index for Slice B.
+            var relevant = await RetrieveCapabilitiesAsync(prompt, services);
             var capsText = string.Join("\n", relevant.Select(c => $"- {c.Id}: {c.Description} (e.g. {string.Join(", ", c.Examples)})"));
 
             const string sys = "You are an intent classifier for a personal AI assistant. " +
@@ -120,14 +122,62 @@ public static class InoIntentClassifier
         }
     }
 
-    public static List<Capability> RetrieveCapabilities(string prompt)
+    // Sync version for backward compat (keyword only).
+    public static List<Capability> RetrieveCapabilities(string prompt) =>
+        RetrieveCapabilitiesAsync(prompt, null).GetAwaiter().GetResult();
+
+    public static async Task<List<Capability>> RetrieveCapabilitiesAsync(string prompt, IServiceProvider? services = null)
     {
         var p = prompt.ToLowerInvariant();
-        return Capabilities
+        // Keyword fallback (always fast and reliable)
+        var keyword = Capabilities
             .Where(c => p.Contains(c.Id) || c.Examples.Any(e => p.Contains(e.ToLowerInvariant())))
             .OrderByDescending(c => p.Contains(c.Id) ? 2 : 1)
             .Take(5)
             .ToList();
+
+        var vectorCaps = new List<Capability>();
+        if (services != null)
+        {
+            try
+            {
+                // Resolve grain factory to reach ContextNeuron (vector store + hybrid recall)
+                // Caps are remembered on Ino activate as "capability:ID ..." texts with embeddings.
+                var gf = services.GetService(typeof(Orleans.IGrainFactory)) as Orleans.IGrainFactory;
+                if (gf != null)
+                {
+                    var ctx = gf.GetGrain<DigitalBrain.Context.IContextNeuron>("context-main");
+                    // Use the user prompt; embeddings + HybridScorer will find semantically close capability memories.
+                    var recalled = await ctx.RecallAsync(prompt, top: 5);
+                    foreach (var text in recalled ?? Array.Empty<string>())
+                    {
+                        // Parse remembered format: "capability:ID description examples:... tier:..."
+                        var idMatch = System.Text.RegularExpressions.Regex.Match(text, @"capability:(\S+)");
+                        if (idMatch.Success)
+                        {
+                            var id = idMatch.Groups[1].Value;
+                            var cap = Capabilities.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
+                            if (cap != null && !vectorCaps.Any(c => c.Id == cap.Id))
+                                vectorCaps.Add(cap);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Context / vector optional; degrade to keyword (as documented in IContextNeuron)
+            }
+        }
+
+        // Merge keyword + vector results, dedup, take top-k for LLM grounding.
+        var combined = keyword
+            .Concat(vectorCaps)
+            .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .Take(5)
+            .ToList();
+
+        return combined;
     }
 
     private static Classification? TryParseClassification(string text)

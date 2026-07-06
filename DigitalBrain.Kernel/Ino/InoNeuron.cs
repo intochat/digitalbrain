@@ -4,6 +4,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Core.UiKit;
+using DigitalBrain.Context;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Kernel.Kernel;
@@ -30,6 +31,34 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     public override async Task OnActivateAsync(CancellationToken ct)
     {
         await base.OnActivateAsync(ct);
+        LoadCapabilitiesFromJournal();
+        await RememberCapabilitiesAsync();
+    }
+
+    private async Task RememberCapabilitiesAsync()
+    {
+        try
+        {
+            var context = GrainFactory.GetGrain<IContextNeuron>("context-main");
+            foreach (var cap in InoIntentClassifier.Capabilities)
+            {
+                var text = $"capability:{cap.Id} {cap.Description} examples:{string.Join(" ", cap.Examples)} tier:{cap.Tier}";
+                // Remember will embed via Context and store as MemoryStored for vector recall
+                await context.RememberAsync(text);
+            }
+        }
+        catch { /* context optional for classifier grounding */ }
+    }
+
+    private void LoadCapabilitiesFromJournal()
+    {
+        var regs = OutgoingJournal.Concat(IncomingJournal)
+            .OfType<CapabilityRegistered>();
+        foreach (var reg in regs)
+        {
+            InoIntentClassifier.RegisterCapability(new InoIntentClassifier.Capability(
+                reg.Id, reg.Description, reg.Examples.ToArray(), reg.Tier));
+        }
     }
 
     public async Task HandleAsync(InoRequest req)
@@ -42,6 +71,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             await DeliverUiKitGallerySurfaceAsync(req.ClientId, workspaceId);
             await FireAsync(new InoResponse(req.Prompt, "UiKit component gallery:", []));
+            return;
+        }
+
+        // Handle set-llm commands from settings surface buttons (they classify as llm_settings due to "llm" keyword, so check sets first)
+        var pForCheck = req.Prompt.ToLowerInvariant();
+        if (pForCheck.Contains("set-llm") || pForCheck.Contains("use qwen") || pForCheck.Contains("use local") || pForCheck.Contains("use gpt") || pForCheck.Contains("use azure"))
+        {
+            await HandleLlmSetCommandAsync(req, workspaceId);
             return;
         }
 
@@ -112,6 +149,57 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     internal async Task HandleGenericIntentAsync(InoRequest req, string workspaceId)
     {
+        var p = req.Prompt.ToLowerInvariant();
+        bool gmailFollowupSummarize = (p.Contains("summar") || p.Contains("brief") || p.Contains("what was")) &&
+            (p.Contains("last") || p.Contains("previous") || p.Contains("that") || p.Contains("it") || p.Contains("the one") || p.Contains("previous one")) &&
+            (p.Contains("email") || p.Contains("gmail") || p.Contains("mail"));
+
+        if (!gmailFollowupSummarize)
+        {
+            // Cross-turn: "summarize that one" after prior gmail context in journal (no keyword required in this turn)
+            var lastGmailish = IncomingJournal.OfType<InoRequest>().TakeLast(3).Any(r => InoConnectorIntents.IsGmail(r.Prompt));
+            var hasGmailMem = IncomingJournal.Concat(OutgoingJournal).OfType<MemorySummary>()
+                .TakeLast(5).Any(m => (m.Topic ?? "").ToLowerInvariant().Contains("gmail") || (m.Topic ?? "").ToLowerInvariant().Contains("email"));
+            if ((p.Contains("summar") || p.Contains("brief")) && (lastGmailish || hasGmailMem))
+                gmailFollowupSummarize = true;
+        }
+
+        if (gmailFollowupSummarize)
+        {
+            var lastBodies = GetLastGmailBodiesFromJournal(workspaceId);
+            if (!string.IsNullOrWhiteSpace(lastBodies))
+            {
+                var sum = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + lastBodies, "");
+                await FireAsync(new InoResponse(req.Prompt, "Summary of last Gmail: " + sum, []));
+                await DeliverReplySurfaceAsync("Summary of previous Gmail messages:\n" + sum, req.ClientId, workspaceId);
+                await CreateMemorySummaryAsync(workspaceId);
+                return;
+            }
+        }
+
+        // Cross G->SF followup via generic (if classify didn't route to salesforce handler)
+        bool crossGmailToSf = (p.Contains("salesforce") || p.Contains("crm") || p.Contains("account")) &&
+                              (p.Contains("last email") || p.Contains("previous email") || p.Contains("related") || p.Contains("from the email"));
+        if (crossGmailToSf)
+        {
+            var lastGmail = GetLastGmailBodiesFromJournal(workspaceId);
+            if (!string.IsNullOrWhiteSpace(lastGmail))
+            {
+                var suggestion = await ReasonWithLlmAsync("Relate this Gmail to Salesforce context. Email:\n" + lastGmail + "\nRequest: " + req.Prompt, "");
+                await FireAsync(new InoResponse(req.Prompt, "Cross Gmail->SF (journal): " + suggestion, []));
+                await DeliverReplySurfaceAsync(suggestion, req.ClientId, workspaceId);
+                await CreateMemorySummaryAsync(workspaceId);
+                return;
+            }
+        }
+
+        // Fallback for text "set llm" prompts (button sets are handled early via HandleLlmSetCommandAsync)
+        if (p.Contains("set-llm") || p.Contains("use qwen") || p.Contains("use local") || p.Contains("use gpt") || p.Contains("use azure"))
+        {
+            await HandleLlmSetCommandAsync(req, workspaceId);
+            return;
+        }
+
         var ctx = await BuildContextAsync(req.Prompt, workspaceId);
         var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx);
         var replyPlan = BuildReplyPlan(req.Prompt, rawReply);
@@ -291,6 +379,22 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
+        var p = req.Prompt.ToLowerInvariant();
+        bool isSummarizeFollowup = (p.Contains("summar") || p.Contains("brief") || p.Contains("what was")) &&
+                                   (p.Contains("last") || p.Contains("previous") || p.Contains("that") || p.Contains("it") || p.Contains("the one") || p.Contains("previous one"));
+
+        if (isSummarizeFollowup)
+        {
+            var lastBodies = GetLastGmailBodiesFromJournal(workspaceId);
+            if (!string.IsNullOrWhiteSpace(lastBodies))
+            {
+                var sum = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + lastBodies, "");
+                await FireAsync(new InoResponse(req.Prompt, "Summary of last Gmail: " + sum, []));
+                await DeliverReplySurfaceAsync("Summary of previous Gmail messages:\n" + sum, req.ClientId, workspaceId);
+                return;
+            }
+        }
+
         if (!await HasGoogleCredentialAsync())
         {
             _pendingGmailRequest = req;
@@ -312,6 +416,40 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             await HandleGenericIntentAsync(req, workspaceId);
             return;
+        }
+
+        var p = req.Prompt.ToLowerInvariant();
+        bool isSummarizeFollowup = (p.Contains("summar") || p.Contains("brief") || p.Contains("what was")) &&
+                                   (p.Contains("last") || p.Contains("previous") || p.Contains("that") || p.Contains("it") || p.Contains("the one") || p.Contains("previous one"));
+
+        if (isSummarizeFollowup)
+        {
+            var last = GetLastSalesforceFromJournal(workspaceId);
+            if (!string.IsNullOrWhiteSpace(last))
+            {
+                var sum = await ReasonWithLlmAsync("Provide a concise summary of these Salesforce accounts:\n" + last, "");
+                await FireAsync(new InoResponse(req.Prompt, "Summary of last Salesforce: " + sum, []));
+                await DeliverReplySurfaceAsync("Summary of previous Salesforce data:\n" + sum, req.ClientId, workspaceId);
+                return;
+            }
+        }
+
+        // Richer G/SF follow-up: "related to last email" / cross from Gmail journal without needing SF cred/fetch
+        bool isGmailRelatedSf = (p.Contains("related") || p.Contains("from the email") || p.Contains("last email") || p.Contains("previous email")) &&
+                                (p.Contains("salesforce") || p.Contains("crm") || p.Contains("account"));
+        if (isGmailRelatedSf)
+        {
+            var lastGmail = GetLastGmailBodiesFromJournal(workspaceId);
+            if (!string.IsNullOrWhiteSpace(lastGmail))
+            {
+                var suggestion = await ReasonWithLlmAsync(
+                    "User wants Salesforce CRM info related to this recent Gmail. Last email content:\n" + lastGmail + "\n\nUser request: " + req.Prompt +
+                    "\n\nProvide a concise helpful response (suggest matching accounts/topics, key names/companies from the email). If fetching live data is needed later, note it.", "");
+                await FireAsync(new InoResponse(req.Prompt, "Related to last email (using journal): " + suggestion, []));
+                await DeliverReplySurfaceAsync("Based on previous Gmail + Salesforce context:\n" + suggestion, req.ClientId, workspaceId);
+                await CreateMemorySummaryAsync(workspaceId);
+                return;
+            }
         }
 
         var salesforceSession = await ResolveSessionAsync(req.ClientId);
@@ -344,13 +482,25 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var ctx = await BuildContextAsync(req.Prompt, workspaceId);
         var llmPrompt = "You are helping create a safe DigitalBrain automation. Given the user request, output ONLY valid JSON with: when (e.g. 'Signal:GmailMessageReceived' or 'NeuronActivated'), target (grain key or null), script (short valid C# that returns Signal[] or does simple Fire, no unsafe code), rationale.\nExample good script: return new[] { new Signal(\"EmailSummarized\", new Dictionary<string,object?>{[\"to\"] = \"salesforce\"}) };\nUser request: " + req.Prompt;
         var raw = await ReasonWithLlmAsync(llmPrompt, ctx);
-        // naive parse for demo (in prod use structured)
+        // simple JSON-ish parse for demo (production would use structured output)
         string when = "NeuronActivated";
         string? target = null;
         string script = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from chat\" }) };";
         if (raw.Contains("Gmail") || raw.Contains("email")) when = "Signal:GmailMessageReceived";
-        if (raw.Contains("salesforce")) when = "Signal:SalesforceQueryReady"; // example
-        // for now simple
+        else if (raw.Contains("salesforce") || raw.Contains("crm")) when = "Signal:SalesforceQueryReady";
+        // extract script if present in raw
+        if (raw.Contains("script") && raw.Contains("return"))
+        {
+            var start = raw.IndexOf("return");
+            var end = raw.IndexOf(';', start);
+            if (end > start) script = raw.Substring(start, end - start + 1).Trim();
+        }
+        if (raw.Contains("\"when\"")) 
+        {
+            // very crude
+            var wmatch = System.Text.RegularExpressions.Regex.Match(raw, @"""when""\s*:\s*""([^""]+)""");
+            if (wmatch.Success) when = wmatch.Groups[1].Value;
+        }
         var autoId = "chat-auto-" + Guid.NewGuid().ToString("N")[..8];
         var proposalId = "automation-" + Guid.NewGuid().ToString("N");
         var scriptId = autoId + "-script";
@@ -517,12 +667,23 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var reply = GmailReplyText(summaries);
         await FireAsync(new InoResponse(req.Prompt, reply, []));
 
-        string? summary = null;
-        var p = req.Prompt.ToLowerInvariant();
-        if ((p.Contains("summar") || p.Contains("brief")) && summaries.Count > 0)
+        if (summaries.Count > 0)
         {
             var bodies = string.Join("\n---\n", summaries.Select(s => s.Body));
-            summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + bodies, "");
+            await FireAsync(new MemorySummary("last-gmail", bodies, DateTimeOffset.UtcNow, workspaceId));
+        }
+
+        string? summary = null;
+        var p = req.Prompt.ToLowerInvariant();
+        if ((p.Contains("summar") || p.Contains("brief")))
+        {
+            string bodiesToSummarize = summaries.Count > 0 
+                ? string.Join("\n---\n", summaries.Select(s => s.Body))
+                : GetLastGmailBodiesFromJournal(workspaceId) ?? "";
+            if (!string.IsNullOrWhiteSpace(bodiesToSummarize))
+            {
+                summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + bodiesToSummarize, "");
+            }
         }
 
         await DeliverGmailMessagesSurfaceAsync(summaries, req.ClientId, workspaceId, summary);
@@ -566,6 +727,12 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var reply = SalesforceReplyText(records);
         await FireAsync(new InoResponse(req.Prompt, reply, []));
+
+        if (records.Length > 0)
+        {
+            await FireAsync(new MemorySummary("last-salesforce", string.Join("\n", records), DateTimeOffset.UtcNow, workspaceId));
+        }
+
         await DeliverSalesforceRecordsSurfaceAsync(records, req.ClientId, workspaceId);
     }
 
@@ -610,7 +777,18 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             children.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
             {
                 ["label"] = "Summarize last message",
-                ["action"] = "summarize-gmail"
+                ["synapseType"] = nameof(InoRequest),
+                ["prompt"] = "summarize the last email",
+                ["clientId"] = clientId,
+                ["workspaceId"] = workspaceId
+            }));
+            children.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
+            {
+                ["label"] = "Find related in Salesforce",
+                ["synapseType"] = nameof(InoRequest),
+                ["prompt"] = "find salesforce accounts related to the last email",
+                ["clientId"] = clientId,
+                ["workspaceId"] = workspaceId
             }));
         }
 
@@ -658,8 +836,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             children.Add(new UiWidgetTree(UiKitVocabulary.List, new Dictionary<string, object?> { ["items"] = listItems }));
             children.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
             {
-                ["label"] = "Add note for first account",
-                ["action"] = "salesforce-note"
+                ["label"] = "Summarize last Salesforce",
+                ["synapseType"] = nameof(InoRequest),
+                ["prompt"] = "summarize the last salesforce",
+                ["clientId"] = clientId,
+                ["workspaceId"] = workspaceId
             }));
         }
 
@@ -700,9 +881,27 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private async Task DeliverLlmSettingsSurfaceAsync(string? clientId, string? workspaceId = null)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
+
+        string current = "default (Aspire composition or global IChatClient)";
+        var store = ServiceProvider.GetService<IPackConfigStore>();
+        if (store != null)
+        {
+            try
+            {
+                var sys = await store.GetAsync("system", "llm");
+                if (sys.TryGetValue("llm_provider", out var prov) && !string.IsNullOrWhiteSpace(prov))
+                    current = prov;
+            }
+            catch { /* optional */ }
+        }
+
         var children = new List<UiWidgetTree>
         {
             new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "LLM / Model Settings" }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = $"Current active provider: {current}"
+            }),
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
                 ["text"] = "Current global selection is driven by 'system' pack config (llm_provider / llm_key) or Aspire composition default."
@@ -713,21 +912,27 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             }),
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
-                ["text"] = "To change: set pack config for scope 'system', pack 'llm' with llm_provider and llm_key (if needed)."
+                ["text"] = "Click a button below to change (persisted to system/llm config and affects LlmResponder + Ino)."
             }),
             new(UiKitVocabulary.Button, new Dictionary<string, object?>
             {
                 ["label"] = "Use Local Qwen (default dev)",
-                ["action"] = "set-llm:qwen"
+                ["synapseType"] = nameof(InoRequest),
+                ["prompt"] = "set-llm:qwen",
+                ["clientId"] = clientId,
+                ["workspaceId"] = workspaceId
             }),
             new(UiKitVocabulary.Button, new Dictionary<string, object?>
             {
                 ["label"] = "Use Azure gpt-4o-mini",
-                ["action"] = "set-llm:gpt4o"
+                ["synapseType"] = nameof(InoRequest),
+                ["prompt"] = "set-llm:gpt4o",
+                ["clientId"] = clientId,
+                ["workspaceId"] = workspaceId
             }),
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
-                ["text"] = "Changes affect LlmResponder, Ino reasoning, etc. (persisted via pack config)."
+                ["text"] = "Changes take effect immediately for new requests."
             })
         };
 
@@ -744,6 +949,45 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
         await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
+    private async Task HandleLlmSetCommandAsync(InoRequest req, string workspaceId)
+    {
+        var p = req.Prompt.ToLowerInvariant();
+        var store = ServiceProvider.GetService<IPackConfigStore>();
+        if (store == null)
+        {
+            await FireAsync(new InoResponse(req.Prompt, "No config store available to change LLM.", []));
+            return;
+        }
+
+        string provider = "ollama";
+        string key = "";
+        if (p.Contains("gpt") || p.Contains("azure") || p.Contains("gpt4o"))
+        {
+            provider = "azureopenai";
+        }
+        else if (p.Contains("qwen") || p.Contains("local") || p.Contains("ollama"))
+        {
+            provider = "ollama";
+        }
+        // Support "set-llm:provider" syntax from buttons
+        if (p.Contains("set-llm:"))
+        {
+            var idx = p.IndexOf("set-llm:") + 8;
+            var val = p.Substring(idx).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+            if (val.Contains("qwen") || val.Contains("ollama") || val == "local") provider = "ollama";
+            else if (val.Contains("gpt") || val.Contains("azure")) provider = "azureopenai";
+        }
+
+        await store.SetAsync("system", "llm", new Dictionary<string, string> { ["llm_provider"] = provider, ["llm_key"] = key });
+
+        await FireAsync(new InoResponse(req.Prompt, $"LLM provider set to {provider}.", []));
+        await DeliverReplySurfaceAsync($"Active LLM updated to {provider} via system config. New requests will use it.", req.ClientId, workspaceId);
+
+        // Refresh the settings surface so user sees the current value updated (feedback)
+        await DeliverLlmSettingsSurfaceAsync(req.ClientId, workspaceId);
+        await CreateMemorySummaryAsync(workspaceId);
     }
 
     private async Task DeliverGraphSurfaceAsync(UiWidgetTree tree, string? clientId, string? workspaceId, string title, string surfaceId)
@@ -1052,6 +1296,90 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0,30) : topic, summaryText, DateTimeOffset.UtcNow, workspaceId);
             await FireAsync(mem);
         }
+    }
+
+    private string? GetLastGmailBodiesFromJournal(string? workspaceId)
+    {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+        var recentMem = IncomingJournal.Concat(OutgoingJournal)
+            .OfType<MemorySummary>()
+            .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId &&
+                        !string.IsNullOrWhiteSpace(m.Summary) &&
+                        (string.IsNullOrWhiteSpace(m.Topic) ||
+                         m.Topic.ToLowerInvariant().Contains("gmail") ||
+                         m.Topic.ToLowerInvariant().Contains("email") ||
+                         m.Topic.ToLowerInvariant().Contains("last-gmail") ||
+                         m.Topic.ToLowerInvariant().Contains("mail")))
+            .OrderByDescending(m => m.Timestamp)
+            .FirstOrDefault();
+        if (recentMem != null) return recentMem.Summary;
+
+        // Explicitly support lookup last GmailMessagesReady (per plan) + associated context
+        var lastGmailReady = IncomingJournal.Concat(OutgoingJournal)
+            .OfType<Signal>()
+            .Where(s => s.Name == GoogleSignals.GmailMessagesReady &&
+                        WorkspaceIds.Effective(s.Props.TryGetValue("workspaceId", out var w) ? w?.ToString() : null) == workspaceId)
+            .OrderByDescending(s => s.Timestamp)
+            .FirstOrDefault();
+        if (lastGmailReady != null)
+        {
+            // Prefer a nearby or recent gmail mem; else synthesize note from signal
+            var nearbyMem = IncomingJournal.Concat(OutgoingJournal)
+                .OfType<MemorySummary>()
+                .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId && !string.IsNullOrWhiteSpace(m.Summary) &&
+                            (m.Topic?.ToLowerInvariant().Contains("gmail") == true || m.Topic?.ToLowerInvariant().Contains("email") == true))
+                .OrderByDescending(m => m.Timestamp)
+                .FirstOrDefault();
+            if (nearbyMem != null) return nearbyMem.Summary;
+
+            var count = lastGmailReady.Props.TryGetValue("count", out var c) ? c?.ToString() : "?";
+            return $"[from GmailMessagesReady signal] {count} messages fetched recently (ids: {lastGmailReady.Props.GetValueOrDefault("messageIds")}). Use prior journal summaries for body details.";
+        }
+
+        // Cross-turn: if last relevant request was gmail-ish, return most recent memory summary as fallback context
+        var lastRelevantReq = IncomingJournal.OfType<InoRequest>()
+            .LastOrDefault(r => InoConnectorIntents.IsGmail(r.Prompt) || InoConnectorIntents.IsSalesforce(r.Prompt));
+        if (lastRelevantReq != null)
+        {
+            var lastAnyMem = IncomingJournal.Concat(OutgoingJournal)
+                .OfType<MemorySummary>()
+                .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId && !string.IsNullOrWhiteSpace(m.Summary))
+                .OrderByDescending(m => m.Timestamp)
+                .FirstOrDefault();
+            return lastAnyMem?.Summary;
+        }
+        return null;
+    }
+
+    private string? GetLastSalesforceFromJournal(string? workspaceId)
+    {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+        var recentMem = IncomingJournal.Concat(OutgoingJournal)
+            .OfType<MemorySummary>()
+            .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId &&
+                        !string.IsNullOrWhiteSpace(m.Summary) &&
+                        (string.IsNullOrWhiteSpace(m.Topic) ||
+                         m.Topic.ToLowerInvariant().Contains("salesforce") ||
+                         m.Topic.ToLowerInvariant().Contains("crm") ||
+                         m.Topic.ToLowerInvariant().Contains("last-salesforce") ||
+                         m.Topic.ToLowerInvariant().Contains("account")))
+            .OrderByDescending(m => m.Timestamp)
+            .FirstOrDefault();
+        if (recentMem != null) return recentMem.Summary;
+
+        // Cross-turn fallback using most recent mem for workspace if prior SF request seen
+        var lastSfReq = IncomingJournal.OfType<InoRequest>()
+            .LastOrDefault(r => InoConnectorIntents.IsSalesforce(r.Prompt));
+        if (lastSfReq != null)
+        {
+            var lastAnyMem = IncomingJournal.Concat(OutgoingJournal)
+                .OfType<MemorySummary>()
+                .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId && !string.IsNullOrWhiteSpace(m.Summary))
+                .OrderByDescending(m => m.Timestamp)
+                .FirstOrDefault();
+            return lastAnyMem?.Summary;
+        }
+        return null;
     }
 }
 
