@@ -8,5 +8,6 @@ namespace DigitalBrain.Google;
 [Alias("DigitalBrain.Google.IGoogleAuthNeuron")]
 public interface IGoogleAuthNeuron : INeuron, IHandle<Signal>
 {
+    [Alias("CompleteOAuthAsync")]
     Task<GoogleOAuthCallbackResult> CompleteOAuthAsync(GoogleOAuthCallback callback);
 }

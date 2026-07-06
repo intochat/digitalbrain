@@ -14,12 +14,9 @@ internal static class GoogleServiceRegistration
         services.AddScoped(sp => BuildGoogleCredential(sp, GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName));
         services.AddScoped<DigitalBrain.Google.IGmailApiClient>(sp =>
             new DigitalBrain.Google.GoogleGmailApiClient(sp.GetRequiredService<GoogleApisAuth.OAuth2.UserCredential>()));
-
         return services;
     }
 
-    // Reads client_id/client_secret/refresh_token from pack config (default scope + "google" pack) and builds UserCredential.
-    // Uses GoogleClientFactory keys for consistency. Throws early if no refresh token (user must complete sign-in).
     private static GoogleApisAuth.OAuth2.UserCredential BuildGoogleCredential(IServiceProvider sp, string scope, string pack)
     {
         var store = sp.GetRequiredService<IPackConfigStore>();
@@ -29,13 +26,9 @@ internal static class GoogleServiceRegistration
             !values.TryGetValue(GoogleClientFactory.ClientSecretKey, out var clientSecret) ||
             !values.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var refreshToken))
         {
-            throw new InvalidOperationException(
-                $"Google pack config (scope '{scope}', pack '{pack}') is missing client_id/client_secret/refresh_token. " +
-                "Complete \"Sign in with Google\" before using Gmail neurons.");
+            throw new InvalidOperationException($"Google pack config (scope '{scope}', pack '{pack}') is missing keys. Complete sign in.");
         }
 
-        return DigitalBrain.Google.GoogleCredentialFactory.FromRefreshToken(
-            clientId, clientSecret, refreshToken,
-            GoogleApisGmail.v1.GmailService.ScopeConstants.MailGoogleCom);
+        return DigitalBrain.Google.GoogleCredentialFactory.FromRefreshToken(clientId, clientSecret, refreshToken, GoogleApisGmail.v1.GmailService.ScopeConstants.MailGoogleCom);
     }
 }

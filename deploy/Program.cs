@@ -11,8 +11,6 @@ using OpInsightsInputs = Pulumi.AzureNative.OperationalInsights.Inputs;
 using AppInsights = Pulumi.AzureNative.ApplicationInsights;
 using App = Pulumi.AzureNative.App;
 using AppInputs = Pulumi.AzureNative.App.Inputs;
-using Web = Pulumi.AzureNative.Web;
-using WebInputs = Pulumi.AzureNative.Web.Inputs;
 
 namespace DigitalBrain.Deploy;
 
@@ -55,8 +53,8 @@ internal static class Program
     private static IDictionary<string, object?> Provision()
     {
         var config = new Config();
-        var imageTag = config.Get("imageTag")
-            ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
+        var imageTag = Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
+            ?? config.Get("imageTag")
             ?? "latest";
 
         // CI injects the AES checkpoint-encryption key as a secret env var (from a GitHub Actions secret) so it
@@ -421,29 +419,6 @@ internal static class Program
             Tags = StandardTags("container-app-telegram")
         });
 
-        // Flutter web bundle host. "Bring your own build" mode: no RepositoryUrl/Branch/RepositoryToken —
-        // this repo's own deploy-flutter-web.yml workflow builds app/build/web and uploads it directly via
-        // Azure/static-web-apps-deploy@v1, so the Static Web App is never linked to a GitHub repo in Azure.
-        // Those repository-integration fields are optional on StaticSiteArgs; omitting them compiles fine and
-        // just leaves the resource without Azure-managed CI (which we don't want — CI already lives in Actions).
-        var flutterWebSite = new Web.StaticSite("digitalbrain-web-prod", new Web.StaticSiteArgs
-        {
-            Name = "digitalbrain-web-prod",
-            ResourceGroupName = resourceGroup.Name,
-            Location = Region,
-            Sku = new WebInputs.SkuDescriptionArgs { Name = "Free", Tier = "Free" },
-            Tags = StandardTags("static-web-app")
-        });
-
-        // CI reads this stack output (see swaDeploymentToken below) into the SWA_DEPLOYMENT_TOKEN repo secret
-        // that Azure/static-web-apps-deploy@v1 authenticates uploads with.
-        var swaSecrets = Web.ListStaticSiteSecrets.Invoke(new Web.ListStaticSiteSecretsInvokeArgs
-        {
-            Name = flutterWebSite.Name,
-            ResourceGroupName = resourceGroup.Name
-        });
-        var swaDeploymentToken = Output.CreateSecret(swaSecrets.Apply(s => s.Properties["apiKey"]));
-
         return new Dictionary<string, object?>
         {
             ["resourceGroup"] = resourceGroup.Name,
@@ -455,9 +430,7 @@ internal static class Program
             ["telegramApp"] = telegramTransport.Name,
             ["telegramFqdn"] = telegramTransport.LatestRevisionFqdn,
             ["imageTag"] = imageTag,
-            ["environment"] = EnvSuffix,
-            ["swaDeploymentToken"] = swaDeploymentToken,
-            ["swaDefaultHostname"] = flutterWebSite.DefaultHostname
+            ["environment"] = EnvSuffix
         };
     }
 

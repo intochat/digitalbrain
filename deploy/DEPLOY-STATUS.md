@@ -31,6 +31,9 @@ authenticates the pull too — `deploy/Program.cs`'s `KernelImageRepository`/`Te
 container apps both carry a `RegistryCredentialsArgs` (`server: docker.io`) referencing a
 `dockerhub-password` Container App secret sourced from the same `DOCKERHUB_TOKEN`.
 
+### Flutter web hosting
+Flutter web is deployed to Azure Static Web Apps (`digitalbrain-web-prod`) from the release workflow. The workflow creates the SWA resource with `az staticwebapp create` if it is missing, reads the deployment token with `az staticwebapp secrets list`, and uploads `app/build/web` with `Azure/static-web-apps-deploy@v1`. The Pulumi Azure Native `StaticSite` path was removed because the current SDK/API rejected the source-control-free payload for this app.
+
 ### Kernel runtime
 The kernel now exposes an internal-only Http2 ingress on port 8080 serving the gRPC `DigitalBrainGateway` (Ask/Fire/Timeline/Health).
 
@@ -45,7 +48,7 @@ Container App secret) plus `DigitalBrain__Llm__AzureOpenAIEndpoint/AzureOpenAIKe
   Kept resources reuse their original logical names so they match the existing state; the environment + kernel app carry
   an `Alias { ParentUrn = ...DeploymentKitApp::digitalbrain-app-runtime-prod }` so Pass 1 re-parented them
   to the stack root **in place** (no destructive replace).
-- Image tag comes from `pulumi config imageTag` (default in `Pulumi.dev.yaml`) or `DIGITALBRAIN_IMAGE_TAG`.
+- Image tag comes from `DIGITALBRAIN_IMAGE_TAG` in CI (release tag), falling back to `pulumi config imageTag` for local verification.
 - No Key Vault, ACR, gateway, monitoring agents, or placeholder phase.
 
 ## Environment for local `pulumi` (off the user profile)
@@ -117,7 +120,7 @@ All changes committed and pushed to **master** (default branch renamed from main
    - Use `gh run list --workflow deploy.yml --limit 3` and `gh run watch` to observe.
    - After green: verify container boots (no checkpoint crash), gRPC-Web CORS preflight returns ACA *, Health over the FQDN.
 
-NOTE: Because state is in azblob and OIDC + image push will use the GH secrets, **all future deploys (incl. imageTag changes) MUST go through `git push origin master` or workflow_dispatch. No local `pulumi up` for prod.**
+NOTE: Because state is in azblob and OIDC + image push use GH secrets, **all future prod deploys MUST go through a published GitHub Release.** Push/PR CI only validates. No local `pulumi up` for prod.
 
 ### Pre-SP1 (2026-06-23) — superseded where noted by the SP1 entry above
 - **DNS:** remove the dangling `api` / `asuid.api` records at the registrar — they pointed to the old deleted gateway. SP2 attaches a fresh `api.digitalbrain.tech` custom domain to the now-public kernel ingress.

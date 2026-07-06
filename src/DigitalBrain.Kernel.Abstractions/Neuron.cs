@@ -1,6 +1,8 @@
 using DigitalBrain.Core;
 using Orleans.Journaling;
 using Orleans.Streams;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
