@@ -1248,7 +1248,7 @@ git commit -m "feat(deploy): add liveness/readiness probes to kernel and telegra
 
 **Steps:**
 
-- [x] **Step 1: Raise `MinReplicas` and verify Orleans silo-to-silo networking first (do this before flipping the value in Pulumi)**
+- [x] **Step 1: Raise `MinReplicas` and verify Orleans silo-to-silo networking first (do this before flipping the value in Pulumi)** (note: product rename to kernel complete; technical terms remain)
 
 The local AppHost already runs 3 replicas of the kernel (`DigitalBrainOptions.KernelReplicas` default `= 3`, `:402`) and that's proven to work under `aspire run`, but that's replicas within a single Aspire-managed Docker/process network, not ACA's environment networking. Before raising `MinReplicas` in prod, confirm Orleans silo (`11111`) and gateway (`30000`) ports are reachable pod-to-pod inside the `digitalbrain-cae-prod` managed environment — ACA container apps in the same environment communicate over the environment's internal DNS by default for same-app replicas (Orleans clustering uses the Table clustering provider to discover peers, then connects directly pod-to-pod on the silo port), so this should work without additional `Ingress` config, but must be verified with a real 2-replica deploy before trusting it.
 
