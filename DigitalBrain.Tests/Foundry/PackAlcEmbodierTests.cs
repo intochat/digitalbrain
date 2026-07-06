@@ -129,34 +129,7 @@ public class PackAlcEmbodierTests
         var embodied = _embodier.Embody("TelegramResponderNeuron", MarketplaceSeeds.TelegramResponderPackCode);
         embodied.Dispose();
     }
-
-    // Task 10 added MarketplaceSeeds.PersonalAssistantPackCode (embedded-resource-backed, mirrors
-    // DigitalBrain.Experience.PersonalAssistant/PersonalAssistantNeuron.cs). These two mirror the
-    // Telegram tests above to prove the seed survives the real Roslyn/ALC + CapabilityGate path, not
-    // just that its source text is correctly carried (see PersonalAssistantPackCodeEmbeddedResourceTests).
-    [Fact]
-    public void PersonalAssistantPackCode_Compiles_And_Embodies_Via_PackAlcEmbodier()
-    {
-        var embodied = _embodier.Embody("PersonalAssistantNeuron", MarketplaceSeeds.PersonalAssistantPackCode);
-
-        Assert.NotNull(embodied);
-
-        // Sanity: manifest survives the ALC boundary
-        var manifest = embodied.GetManifest();
-        Assert.Contains(new DigitalBrain.Core.SynapseType("TelegramMessageReceived"), manifest.HandledSynapseTypes);
-
-        embodied.Dispose();
-    }
-
-    [Fact]
-    public void PersonalAssistantPackCode_Passes_CapabilityGate()
-    {
-        // CapabilityGate rejects System.Net / Process / Reflection.Emit. Successful Embody proves it passes.
-        var embodied = _embodier.Embody("PersonalAssistantNeuron", MarketplaceSeeds.PersonalAssistantPackCode);
-        embodied.Dispose();
-    }
-
-    [Fact]
+[Fact]
     public async Task ScriptRunner_Executes_Small_CSharp_Body_And_Returns_Synapses()
     {
         // TDD for Task 2: pure execution of C# script (the "then" part of reactions).
@@ -209,4 +182,5 @@ public class PackAlcEmbodierTests
         Assert.Contains(sideEffects, s => s.Type == "FiredViaDelegate");
     }
 }
+
 

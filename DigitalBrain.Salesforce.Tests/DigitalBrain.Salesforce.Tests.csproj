@@ -7,8 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
-    <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
+    <ProjectReference Include="..\integrations\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
+    <ProjectReference Include="..\..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,3 +18,4 @@
   </ItemGroup>
 
 </Project>
+
