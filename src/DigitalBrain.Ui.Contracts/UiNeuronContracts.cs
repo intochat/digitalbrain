@@ -1,4 +1,6 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Ui.Contracts;
+
+using DigitalBrain.Core;
 
 public interface IUserSessionNeuron : INeuron, IHandle<LoginRequest>, IHandle<LogoutRequest>
 {

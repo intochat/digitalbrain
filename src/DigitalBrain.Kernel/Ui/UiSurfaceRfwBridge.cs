@@ -1,8 +1,10 @@
 using System.Text.Json;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
 
 namespace DigitalBrain.Kernel.Ui;
+
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 
 public static class UiSurfaceRfwBridge
 {

@@ -1,11 +1,17 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Foundry;
 using Microsoft.Extensions.AI;
 using Microsoft.CodeAnalysis;
 using DigitalBrain.Core.Distribution;
 using DigitalBrain.Kernel.Ui;
 namespace DigitalBrain.Kernel;
+
+using DigitalBrain.Pack.Contracts;
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
+
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 
 [GrainType("digitalbrain.generated")]
 public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IGeneratedNeuron, IHandle<NeuronTelemetry>
@@ -57,8 +63,8 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         switch (synapse)
         {
-            case DemoMessageSynapse msg:
-                Logger.LogInformation("Generated handled message: {Text}", msg.Text);
+            case Signal sig when sig.Name == "DemoMessage":
+                Logger.LogInformation("Generated handled demo message");
                 break;
             case ExperienceUsed used:
                 await UseExperienceAsync(used);

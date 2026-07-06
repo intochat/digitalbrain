@@ -8,6 +8,11 @@ using System.Text.Json;
 
 namespace DigitalBrain.Kernel;
 
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Runtime;
+
+using DigitalBrain.Ui.Contracts;
+
 [GrainType("digitalbrain.data-visualization.v1")]
 public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IChartNeuron, IDataVisualizationNeuron
 {

@@ -2,8 +2,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Core.Ui;
-using DigitalBrain.Core.UiKit;
 using DigitalBrain.Context;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel.Salesforce;
@@ -16,6 +14,8 @@ using Microsoft.Extensions.AI;
 using DigitalBrain.Ino;
 
 namespace DigitalBrain.Kernel.Ino;
+
+using DigitalBrain.Ui.Contracts;
 
 // INO: ultra-context personal assistant neuron.
 // Uses dual journals as primary memory (recent + full history), spawns KernelTasks for actions,

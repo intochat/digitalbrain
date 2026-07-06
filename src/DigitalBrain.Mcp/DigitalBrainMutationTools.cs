@@ -6,6 +6,8 @@ using System.Text.Json;
 
 namespace DigitalBrain.Mcp;
 
+using DigitalBrain.Ui.Contracts;
+
 // Mutating DigitalBrain MCP tools: fire side-effecting synapses, spend LLM tokens, or change marketplace/cluster
 // state. Registered on the stdio transport only (local/trusted); withheld from the kernel's HTTP transport
 // pending a remote auth decision.
@@ -32,8 +34,9 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         [Description("The text or payload for the synapse (for DemoMessageSynapse)")] string text)
     {
         var neuron = ResolveNeuron(neuronId);
-        await neuron.FireAsync(new DemoMessageSynapse(text));
-        return $"Successfully fired DemoMessageSynapse with text '{text}' to neuron '{neuronId}'.";
+        // DemoMessageSynapse removed as trash (Demo projects deleted). Using generic signal for demo compatibility.
+        await neuron.FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["text"] = text }));
+        return $"Successfully fired demo signal with text '{text}' to neuron '{neuronId}'.";
     }
 
     [McpServerTool(Name = "simulate_x_post"), Description("Simulate a new X (Twitter) post from an author, for demo/testing automations that react to XPostReceived. No real X API call is made.")]
@@ -455,8 +458,8 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
             default:
             {
                 var target = ReadString(props, "neuronId") ?? defaultNeuronId;
-                await ResolveNeuron(target).FireAsync(new DemoMessageSynapse(actionJson));
-                return $"Forwarded unrecognized UI action '{synapseType}' to {target} as DemoMessageSynapse.";
+                await ResolveNeuron(target).FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["payload"] = actionJson }));
+                return $"Forwarded unrecognized UI action '{synapseType}' to {target} as generic signal.";
             }
         }
     }

@@ -4,6 +4,10 @@ using DigitalBrain.Salesforce;
 
 namespace DigitalBrain.Kernel.Salesforce;
 
+using DigitalBrain.Pack.Contracts;
+
+using DigitalBrain.Ui.Contracts;
+
 internal static class SalesforceAuthSurfaces
 {
     private static readonly PackConfigField[] Fields =

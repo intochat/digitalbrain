@@ -1,7 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Core.Ui;
-using DigitalBrain.Demo.Runtime;
+
 using DigitalBrain.Google;
 using DigitalBrain.Kernel.Auth;
 using DigitalBrain.Kernel.Ui;
@@ -12,6 +11,12 @@ using DigitalBrain.Telegram;
 using Grpc.Core;
 
 namespace DigitalBrain.Kernel.Gateway;
+
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Runtime;
+
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 
 public sealed class GatewayService(
     IGrainFactory grains,
@@ -176,7 +181,7 @@ public sealed class GatewayService(
         try
         {
             var neuron = NeuronResolver.Resolve(grains, request.NeuronId);
-            await neuron.FireAsync(new DemoMessageSynapse(request.Text));
+            await neuron.FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["text"] = request.Text }));
             return new FireReply { Accepted = true };
         }
         catch (ArgumentException ex)
@@ -212,7 +217,7 @@ public sealed class GatewayService(
                 {
                     Type = s.Type,
                     Timestamp = s.Timestamp.ToString("O"),
-                    Text = s is DemoMessageSynapse demo ? demo.Text : (s.ToString() ?? string.Empty)
+                    Text = s is DigitalBrain.Core.Signal sig && sig.Props != null && sig.Props.TryGetValue("text", out var t) ? t?.ToString() ?? s.ToString() : (s.ToString() ?? string.Empty)
                 });
             }
             return reply;
@@ -294,49 +299,9 @@ public sealed class GatewayService(
 
     private async Task InstallAndRunSurfaceDemoAsync(string correlationId)
     {
-        var requestCorrelationId = string.IsNullOrWhiteSpace(correlationId)
-            ? Guid.NewGuid().ToString("N")
-            : correlationId;
-
-        var pack = SurfaceDemoRuntime.SignedPack();
-        var marketplace = grains.GetGrain<IMarketplaceNeuron>("market-ui-demo");
-        var generated = grains.GetGrain<IGeneratedNeuron>(SurfaceDemoRuntime.GeneratedNeuronKey);
-
-        await PublishSurfaceDemoGraphAsync(requestCorrelationId, "request accepted");
-
-        await marketplace.FireAsync(new PublishToMarketplace(
-            pack.Name,
-            pack.Version,
-            pack.Code,
-            pack.OwnerId,
-            pack.IsPrivate,
-            pack.CommissionRate,
-            pack.Description,
-            pack.AuthorPublicKeyBase64,
-            pack.SignatureBase64)
-        {
-            CorrelationId = requestCorrelationId
-        });
-
-        await PublishSurfaceDemoGraphAsync(requestCorrelationId, "signed pack published to marketplace");
-
-        await marketplace.FireAsync(new InstallFromMarketplace(pack.Name, pack.Version, BuyerId: "flutter-demo")
-        {
-            CorrelationId = requestCorrelationId
-        });
-
-        await PublishSurfaceDemoGraphAsync(requestCorrelationId, "pack installed into generated neuron");
-
-        var demoText = string.IsNullOrWhiteSpace(correlationId)
-            ? "flutter-live-demo"
-            : correlationId;
-        await generated.FireAsync(new DemoMessageSynapse(demoText)
-        {
-            CorrelationId = requestCorrelationId
-        });
-
-        var generatedTimeline = await generated.GetOutgoingTimelineAsync();
-        await PublishSurfaceDemoGraphAsync(requestCorrelationId, "journaled response and surface update observed", generatedTimeline);
+        // SurfaceDemo (Demo projects) removed as trash. Stubbed.
+        logger.LogDebug("InstallAndRunSurfaceDemoAsync skipped (trash removal) for {CorrelationId}", correlationId);
+        await Task.CompletedTask;
     }
 
     private async Task PublishSurfaceDemoGraphAsync(
@@ -344,18 +309,9 @@ public sealed class GatewayService(
         string phase,
         IReadOnlyList<Synapse>? generatedTimeline = null)
     {
-        var surface = SurfaceDemoRuntime.ActivityGraphSurface(correlationId, phase, generatedTimeline);
-        var observability = grains.GetGrain<IObservabilityNeuron>(SurfaceDemoRuntime.ObservabilityNeuronKey);
-        try
-        {
-            await observability.FireAsync(surface);
-            logger.LogInformation("Published journaled surface demo graph phase={Phase} correlation={CorrelationId}", phase, correlationId);
-        }
-        catch (Exception ex) when (IsObservabilityJournalUnavailable(ex))
-        {
-            logger.LogWarning(ex, "Observability neuron unavailable; streaming graph surface without blocking phase={Phase} correlation={CorrelationId}", phase, correlationId);
-            await homeFeedBus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, "digitalbrain.gateway"));
-        }
+        // Demo surface graph (SurfaceDemoRuntime) removed as trash. No-op for now.
+        logger.LogDebug("Demo graph publish skipped (trash removal) phase={Phase} correlation={CorrelationId}", phase, correlationId);
+        await Task.CompletedTask;
     }
 
     private static bool IsObservabilityJournalUnavailable(Exception exception) =>

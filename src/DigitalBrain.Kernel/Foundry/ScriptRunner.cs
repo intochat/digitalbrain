@@ -7,6 +7,8 @@ using Microsoft.CodeAnalysis.Scripting;
 
 namespace DigitalBrain.Kernel.Foundry;
 
+using DigitalBrain.Ui.Contracts;
+
 /// C# script executor for reactive automations.
 /// Authors write tiny real C# bodies against ScriptGlobals (Synapse, Self, Fire).
 /// Supports "return new[] { ... };" and side-effect "await Fire(...);".

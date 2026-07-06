@@ -1,6 +1,7 @@
 namespace DigitalBrain.Marketplace.Contracts;
 
 using DigitalBrain.Core;
+using DigitalBrain.Ui.Contracts;
 
 internal static class MarketplaceActionGenerator
 {

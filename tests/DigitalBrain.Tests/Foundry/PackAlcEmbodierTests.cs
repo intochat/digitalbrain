@@ -51,17 +51,18 @@ public class PackAlcEmbodierTests
                 public string Respond(string input) => "fallback:" + input;
 
                 public DigitalBrain.Core.Distribution.PackManifest GetManifest() =>
-                    new(new[] { new DigitalBrain.Core.SynapseType(nameof(DigitalBrain.Core.DemoMessageSynapse)) });
+                    new(new[] { new DigitalBrain.Core.SynapseType("TestMessageSynapse") });
 
                 public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
-                    synapse is DigitalBrain.Core.DemoMessageSynapse;
+                    synapse is DigitalBrain.Core.Signal;
 
                 public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
                 {
-                    var message = (DigitalBrain.Core.DemoMessageSynapse)synapse;
+                    var sig = (DigitalBrain.Core.Signal)synapse;
+                    var text = sig.Payload?["text"]?.ToString() ?? "";
                     return new DigitalBrain.Core.Synapse[]
                     {
-                        new DigitalBrain.Core.Distribution.PackEmission("", message.Text, "typed:" + message.Text)
+                        new DigitalBrain.Core.Distribution.PackEmission("", text, "typed:" + text)
                     };
                 }
             }
@@ -69,9 +70,9 @@ public class PackAlcEmbodierTests
 
         var pack = _embodier.Embody("TypedPack", code);
 
-        Assert.Contains(new DigitalBrain.Core.SynapseType(nameof(DemoMessageSynapse)), pack.GetManifest().HandledSynapseTypes);
-        Assert.True(pack.CanHandle(new DemoMessageSynapse("hello")));
-        var emission = Assert.IsType<PackEmission>(Assert.Single(pack.Handle(new DemoMessageSynapse("hello"))));
+        Assert.Contains(new DigitalBrain.Core.SynapseType("TestMessageSynapse"), pack.GetManifest().HandledSynapseTypes);
+        Assert.True(pack.CanHandle(new DigitalBrain.Core.Signal("TestMessageSynapse", new System.Collections.Generic.Dictionary<string, object?> { ["text"] = "hello" })));
+        var emission = Assert.IsType<PackEmission>(Assert.Single(pack.Handle(new DigitalBrain.Core.Signal("TestMessageSynapse", new System.Collections.Generic.Dictionary<string, object?> { ["text"] = "hello" }))));
         Assert.Equal("hello", emission.Input);
         Assert.Equal("typed:hello", emission.Output);
 

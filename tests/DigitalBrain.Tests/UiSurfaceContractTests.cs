@@ -58,7 +58,7 @@ public class UiSurfaceContractTests
     {
         var userInput = UiSurfaceSamples.UserInput();
         AssertSynapseAction(userInput.Props["submitAction"], nameof(InoRequest));
-        AssertSynapseAction(userInput.Props["cancelAction"], nameof(DemoMessageSynapse));
+        AssertSynapseAction(userInput.Props["cancelAction"], "TestMessageSynapse");
 
         var login = UiSurfaceSamples.Login();
         AssertSynapseAction(login.Props["submitAction"], nameof(LoginRequest));

@@ -1,8 +1,10 @@
 using System.Text.Json;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
 
 namespace DigitalBrain.Kernel.Ui;
+
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 
 // The Chat neuron (server-driven UI). On a data-visualization request it emits an RfwCard, journals it as
 // conversation history, and broadcasts it to the live Home feed (HomeFeedBus) for streaming to clients.

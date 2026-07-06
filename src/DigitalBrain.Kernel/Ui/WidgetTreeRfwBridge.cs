@@ -1,8 +1,10 @@
 using System.Text.Json;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
 
 namespace DigitalBrain.Kernel.Ui;
+
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 
 // Bridges a raw widget-tree UiSurface (surface.Kind == WidgetTreeKind) into the RfwCard the Flutter
 // WidgetTreeHost renders, carrying the experience/session markers a chat client needs to key its own replies.
