@@ -1,6 +1,8 @@
+using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
+using DigitalBrain.Ui.Contracts;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Pack.Contracts;
 
 // Fired by the host (or UI layer) once the user has filled in all RequiredConfig fields for a pack.
 // Secret values in Values must never be logged.

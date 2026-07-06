@@ -5,6 +5,8 @@ using DigitalBrain.Kernel.Market;
 
 namespace DigitalBrain.Kernel.Gateway;
 
+using DigitalBrain.Ui.Contracts;
+
 public static class NeuronResolver
 {
     public static INeuron Resolve(IGrainFactory grains, string neuronId)
@@ -31,7 +33,7 @@ public static class NeuronResolver
             "market-data-main" => grains.GetGrain<IMarketDataNeuron>(neuronId),
             "session-main" => grains.GetGrain<IUserSessionNeuron>(neuronId),
             "status-main" => grains.GetGrain<ISystemStatus>(neuronId),
-            _ => grains.GetGrain<IDemoNeuron>(neuronId)
+            _ => grains.GetGrain<IGeneratedNeuron>(neuronId) // Demo removed as trash
         };
     }
 }

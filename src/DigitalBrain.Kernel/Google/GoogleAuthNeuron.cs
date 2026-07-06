@@ -3,6 +3,8 @@ using DigitalBrain.Google;
 
 namespace DigitalBrain.Kernel.Google;
 
+using DigitalBrain.Ui.Contracts;
+
 [GrainType("digitalbrain.google.auth.v1")]
 public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IGoogleAuthNeuron

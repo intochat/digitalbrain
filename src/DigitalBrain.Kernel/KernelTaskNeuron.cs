@@ -1,9 +1,11 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Ui;
 using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel;
+
+using DigitalBrain.Ui.Contracts.Ui;
+using DigitalBrain.Ui.Runtime;
 
 [GrainType("kernel.task.v1")]
 public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IKernelTask

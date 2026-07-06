@@ -14,6 +14,7 @@ using DigitalBrain.Kernel.Uploads;
 using DigitalBrain.Kernel.Ino;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Kernel.Voice;
+using DigitalBrain.Ui.Contracts;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
 using Orleans.Configuration;

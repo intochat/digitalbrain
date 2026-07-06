@@ -5,6 +5,8 @@ using DigitalBrain.Salesforce;
 
 namespace DigitalBrain.Kernel.Salesforce;
 
+using DigitalBrain.Ui.Contracts;
+
 [GrainType("digitalbrain.salesforce.auth.v1")]
 public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), ISalesforceAuthNeuron

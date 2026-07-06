@@ -1,5 +1,7 @@
 namespace DigitalBrain.Marketplace.Contracts;
 
+using DigitalBrain.Ui.Contracts;
+
 using DigitalBrain.Core;
 
 public static class MarketplaceUiSurfaces

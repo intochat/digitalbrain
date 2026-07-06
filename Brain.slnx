@@ -7,8 +7,7 @@
   <Folder Name="/src/">
     <Project Path="src/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/DigitalBrain.Core/DigitalBrain.Core.csproj" />
-    <Project Path="src/DigitalBrain.Demo.Contracts/DigitalBrain.Demo.Contracts.csproj" />
-    <Project Path="src/DigitalBrain.Demo.Runtime/DigitalBrain.Demo.Runtime.csproj" />
+
     <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/DigitalBrain.Marketplace.Contracts/DigitalBrain.Marketplace.Contracts.csproj" />
     <Project Path="src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />

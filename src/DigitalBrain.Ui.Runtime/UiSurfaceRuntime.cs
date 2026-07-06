@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
+using DigitalBrain.Ui.Contracts;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Ui.Runtime;
 
 public static class UiSurfaceSamples
 {

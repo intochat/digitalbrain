@@ -4,6 +4,8 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel.Ui;
 
+using DigitalBrain.Ui.Contracts;
+
 [GrainType("digitalbrain.flutter-ui.v1")]
 public sealed class FlutterUiNeuron(ILogger<FlutterUiNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IFlutterUiNeuron
 {

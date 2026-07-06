@@ -2,6 +2,8 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Ui.Runtime;
 
+using DigitalBrain.Ui.Contracts;
+
 /// Simple browsable UiKit component gallery builder.
 /// Emits a UiWidgetTree showcasing the main vocabulary items (server-driven).
 /// Intended for use by Ino, a dedicated gallery experience, or marketplace ui-kit pack.

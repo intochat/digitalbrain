@@ -1,7 +1,9 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
 
-namespace DigitalBrain.Core.UiKit;
+namespace DigitalBrain.Pack.Contracts.UiKit;
+
+using DigitalBrain.Ui.Contracts;
 
 // Base for a typed-C# UI app authored against the ui: kit. Subclasses implement Define() with the fluent builder.
 // The base owns the ExperienceStep state machine, accumulates flow state, and emits each hop as a widget-tree surface.

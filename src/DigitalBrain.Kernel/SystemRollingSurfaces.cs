@@ -2,6 +2,8 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel;
 
+using DigitalBrain.Ui.Contracts;
+
 /// <summary>
 /// Thin helper for declarative rolling update surfaces (extracted from SystemNeurons for tidy logic).
 /// All properties are UiSurface driven; hosts render.

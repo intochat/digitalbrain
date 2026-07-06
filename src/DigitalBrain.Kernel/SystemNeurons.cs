@@ -1,11 +1,14 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Ui.Contracts.Ui;
+using DigitalBrain.Ui.Runtime;
 using Microsoft.Extensions.AI;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
 namespace DigitalBrain.Kernel;
+
+using DigitalBrain.Ui.Contracts;
 
 public static class KernelPack
 {

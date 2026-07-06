@@ -80,7 +80,7 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
             "llm-main" => Grains.GetGrain<ILlmNeuron>(neuronId),
             "market-main" => Grains.GetGrain<IMarketplaceNeuron>(neuronId),
             "status-main" => Grains.GetGrain<ISystemStatus>(neuronId),
-            _ => Grains.GetGrain<IDemoNeuron>(neuronId)
+            _ => Grains.GetGrain<IGeneratedNeuron>(neuronId) // DemoNeuron removed as trash; using Generated as fallback
         };
     }
 

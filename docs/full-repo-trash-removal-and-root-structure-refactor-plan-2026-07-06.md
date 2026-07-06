@@ -100,6 +100,14 @@ brain/
 - Ino integration committed.
 - Run full baseline above.
 
+### Phase 1 & 2 Progress (Completed in recent slices)
+- integrations/ and hosts/ grouping completed in prior commits (Context, Google, Ino, Salesforce, Telegram; AppHost, ServiceDefaults, Telegram.Transport).
+- src/ and tests/ physical moves completed (Core, Kernel, Aspire, Mcp, all *Contracts, SeedPacks, Ui.*, Demo.*, all *Tests + TestKit + DigitalBrain.Tests).
+- All relative ProjectReferences and Brain.slnx updated.
+- Legacy namespace pollution cleaned up (Ui.Contracts, Pack.Contracts, etc. now use correct namespaces; added required usings across Kernel, tests, etc.).
+- Build now succeeds, non-cluster tests green, aspire doctor passes.
+- Namespace correction was a larger effort than anticipated due to previous "everything under DigitalBrain.Core" pattern.
+
 ### Phase 1: Quick Deletes (Safest, Highest Signal)
 - Delete `DigitalBrain.Experience.PersonalAssistant/` + `.Tests/`
   - Update `Brain.slnx`
@@ -131,13 +139,14 @@ Sub-phases (one group at a time):
 - Also fix any hard-coded paths in workflows, docs, test settings, Pulumi, etc.
 - After moves: `dotnet restore`, full build, targeted tests.
 
-### Phase 3: Deeper Trash + Polish
+### Phase 3: Deeper Trash + Polish (Next)
 - Audit remaining using the trash-analysis table + `rg` for dead symbols.
 - Decide on Demo.* (keep or move to samples?).
 - Further splits inside Ino/Kernel if needed (per previous self-evo plan).
 - Clean `Directory.Packages.props` (latest versions).
 - Update architecture docs to reflect new tree.
 - Remove any remaining "silo" naming, prototype journals where safe.
+- Root polish: move clutter .md to docs/, clean .claude/ if local-only, add STRUCTURE.md.
 
 ### Phase 4: Verification & Automation
 - Full non-E2E test suite.
@@ -160,12 +169,14 @@ Sub-phases (one group at a time):
 - Docs reflect reality.
 - Follows AGENTS.md (net deletions, fast loop preserved).
 
-## 7. Next Actions
-1. Review/approve this plan (or specific phases).
-2. `git checkout -b cleanup/root-refactor-2026-07-06`
-3. Execute Phase 1 (deletes) + commit.
-4. Proceed phase-by-phase with verifications.
-5. When touching wiring: use aspire MCP tools.
+## 7. Next Actions (Updated)
+- Phase 1-2 (grouping + namespace cleanup): **COMPLETE** (verified build + tests + doctor green).
+- Slice 3 (Trash): Target Demo.* and any obvious low-value items.
+- Polish: Root cleanup, STRUCTURE.md, doc updates.
+- Ino/self-evolution boundary audit.
+- Final full verification.
+
+Progress tracked in commits. Follow AGENTS.md fast loop on every change.
 
 This aligns the entire repo with the "self-evolving OS where even Ino is a pluggable integration with its own AI config".
 

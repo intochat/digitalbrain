@@ -4,6 +4,8 @@ using Orleans.Streams;
 
 namespace DigitalBrain.Kernel;
 
+using DigitalBrain.Ui.Contracts;
+
 /// The reactive host for lightweight automations (reactions + scripts).
 /// Always subscribes to the global timeline so it can react to NeuronActivated,
 /// Signals, and other synapses without requiring static IHandle<> declarations.

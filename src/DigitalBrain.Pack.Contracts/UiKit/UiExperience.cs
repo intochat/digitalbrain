@@ -1,6 +1,8 @@
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Core.UiKit;
+namespace DigitalBrain.Pack.Contracts.UiKit;
+
+using DigitalBrain.Ui.Contracts;
 
 // Author-facing fluent definition of an experience: an ordered set of named hops, the first of which is the entry.
 public sealed class UiExperience

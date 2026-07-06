@@ -1,4 +1,7 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Ui.Runtime;
+
+using DigitalBrain.Core;
+using DigitalBrain.Ui.Contracts;
 
 public static class DbSchemaGraphMapper
 {

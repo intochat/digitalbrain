@@ -1,6 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Demo.Runtime;
+
 using DigitalBrain.Google;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Salesforce;
@@ -8,6 +8,9 @@ using DigitalBrain.Telegram;
 using Grpc.Core;
 
 namespace DigitalBrain.Kernel.Gateway;
+
+using DigitalBrain.Pack.Contracts;
+using DigitalBrain.Ui.Contracts;
 
 internal sealed record GatewaySendContext(
     IGrainFactory Grains,
@@ -47,7 +50,7 @@ internal sealed class GatewayDemoSendHandler : IGatewaySendHandler
 {
     public async Task<bool> TryHandleAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
-        if (request.TypeName != SurfaceDemoRuntime.RequestType)
+        if (request.TypeName != "SurfaceDemoRequested") // Demo removed as trash
         {
             return false;
         }

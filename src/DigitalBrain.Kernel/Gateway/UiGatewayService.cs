@@ -6,6 +6,8 @@ using Grpc.Core;
 
 namespace DigitalBrain.Kernel.Gateway;
 
+using DigitalBrain.Ui.Contracts;
+
 // Bidirectional UI session handler. Complements WatchHomeFeed (one-way RfwCard stream).
 // Supports interactive canvas (DRAG, CLICK etc from RFW onEvent) and kernel signals back (viewport, future rfw/sound).
 // Inputs from kit nodes (neuron:ActionButton etc) now dispatch to real typed synapses via action descriptors in payload.
@@ -36,7 +38,7 @@ public sealed class UiGatewayService(
                 else if (!string.IsNullOrWhiteSpace(input.TargetNeuronId))
                 {
                     var neuron = NeuronResolver.Resolve(grainFactory, input.TargetNeuronId);
-                    await neuron.FireAsync(new DemoMessageSynapse("ui-input:" + input.ElementId));
+                    await neuron.FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["text"] = "ui-input:" + input.ElementId }));
                 }
 
                 var signal = new UiStateSignal
@@ -90,7 +92,7 @@ public sealed class UiGatewayService(
         {
             // generic from shell/kit event
             var n = NeuronResolver.Resolve(grainFactory, "ino-main");
-            await n.FireAsync(new DemoMessageSynapse(payloadJson));
+            await n.FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["payload"] = payloadJson }));
             return;
         }
 
@@ -133,9 +135,9 @@ public sealed class UiGatewayService(
                 if (!string.IsNullOrWhiteSpace(res))
                     await grainFactory.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new RestartResource(res));
                 return;
-            case nameof(DemoMessageSynapse):
+            case "DemoMessage":
                 var demoText = GetProp(props, "text") ?? GetProp(props, "prompt") ?? payloadJson;
-                await grainFactory.GetGrain<IDemoNeuron>("demo-main").FireAsync(new DemoMessageSynapse(demoText));
+                await grainFactory.GetGrain<IGeneratedNeuron>("generated-demo").FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["text"] = demoText }));
                 return;
             case nameof(ExperienceUsed):
                 var expPack = GetProp(props, "packName") ?? GetProp(props, "name") ?? GetProp(props, "bundleName") ?? "";
@@ -165,7 +167,7 @@ public sealed class UiGatewayService(
                 return;
             default:
                 var target = GetProp(props, "neuronId") ?? "ino-main";
-                await NeuronResolver.Resolve(grainFactory, target).FireAsync(new DemoMessageSynapse(payloadJson));
+                await NeuronResolver.Resolve(grainFactory, target).FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["payload"] = payloadJson }));
                 return;
         }
     }

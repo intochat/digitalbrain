@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
-using DigitalBrain.Core.Ui;
 using Orleans.Streams;
 
 namespace DigitalBrain.Kernel.Ui;
+
+using DigitalBrain.Ui.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 
 // Server-driven-UI backbone. BroadcastAsync publishes an RfwCard onto an Orleans stream keyed by the card's
 // ClientId (or a well-known unaddressed key when ClientId is null); Orleans's own pub-sub delivers it to

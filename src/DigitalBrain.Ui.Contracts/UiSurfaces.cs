@@ -1,5 +1,6 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Ui.Contracts;
 
+using DigitalBrain.Core;
 using System.Text.Json.Nodes;
 
 [GenerateSerializer]
