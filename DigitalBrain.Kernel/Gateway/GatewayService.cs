@@ -8,7 +8,7 @@ using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Kernel.Voice;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Salesforce;
-using DigitalBrain.Telegram.Channel;
+using DigitalBrain.Telegram;
 using Grpc.Core;
 
 namespace DigitalBrain.Kernel.Gateway;
@@ -30,213 +30,23 @@ public sealed class GatewayService(
     {
         try
         {
-            if (request.TypeName == SurfaceDemoRuntime.RequestType)
-            {
-                await InstallAndRunSurfaceDemoAsync(request.CorrelationId);
-                return request;
-            }
+            var sendContext = new GatewaySendContext(
+                grains,
+                configuration,
+                environment,
+                logger,
+                packConfigStore,
+                ResolveSessionByClientIdAsync,
+                InstallAndRunSurfaceDemoAsync);
 
-            // Publish a pack to the marketplace. Payload carries the pack fields (and optional signature).
-            // Without this, "PublishToMarketplace" fell through to the generic fallback and the pack code was
-            // dropped, so nothing could later be installed/embodied.
-            if (request.TypeName == nameof(PublishToMarketplace) || request.TypeName.Contains("PublishToMarketplace", StringComparison.OrdinalIgnoreCase))
+            foreach (var handler in GatewaySendHandlers.Default)
             {
-                var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
-                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
-                string Field(string key, string fallback = "") => p.TryGetValue(key, out var v) ? v?.ToString() ?? fallback : fallback;
-                var packName = Field("packName", Field("name", request.CorrelationId));
-                var isPrivate = bool.TryParse(Field("isPrivate"), out var priv) && priv;
-                var commissionRate = double.TryParse(Field("commissionRate"), System.Globalization.CultureInfo.InvariantCulture, out var cr) ? cr : 0.10;
-                var price = decimal.TryParse(Field("price"), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var pr) ? pr : 0m;
-                await market.FireAsync(new PublishToMarketplace(
-                    packName, Field("version"), Field("code"), Field("ownerId", "anonymous"),
-                    isPrivate, commissionRate, Field("description"),
-                    Field("authorPublicKeyBase64"), Field("signatureBase64"), price));
-                return request;
-            }
-
-            // Generic surface action dispatch (from UI kit RFW events / descriptors).
-            // Supports install from MarketplaceList + run experiences from InstalledBundles via neurons/synapses.
-            if (request.TypeName == nameof(InstallFromMarketplace) || request.TypeName.Contains("InstallFromMarketplace", StringComparison.OrdinalIgnoreCase))
-            {
-                var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
-                // payload json carries props (packName/version from surface action); buyerId is server-resolved below
-                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
-                var packName = p.TryGetValue("packName", out var pn) ? pn?.ToString() ?? p.GetValueOrDefault("name")?.ToString() ?? "" : "";
-                var ver = p.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "";
-                var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
-                var installSession = await ResolveSessionByClientIdAsync(clientId);
-                var buyer = installSession?.UserId.Value ?? "anonymous";
-                if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId; // fallback
-                await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer, clientId));
-                return request;
-            }
-
-            if (request.TypeName == GoogleSignals.AuthRequested || request.TypeName.Contains(GoogleSignals.AuthRequested, StringComparison.OrdinalIgnoreCase))
-            {
-                var auth = grains.GetGrain<IGoogleAuthNeuron>("google-auth-main");
-                var signal = new Signal(GoogleSignals.AuthRequested, GatewayPayload.PayloadProps(request))
+                if (await handler.TryHandleAsync(request, context, sendContext))
                 {
-                    Receiver = new NeuronId("google-auth-main")
-                };
-                await auth.DeliverAsync(signal);
-                return request;
+                    return request;
+                }
             }
 
-            if (request.TypeName == GoogleSignals.AuthCompleted || request.TypeName.Contains(GoogleSignals.AuthCompleted, StringComparison.OrdinalIgnoreCase))
-            {
-                var key = string.IsNullOrWhiteSpace(request.CorrelationId)
-                    ? "google-auth-completed"
-                    : request.CorrelationId;
-                var authCompletedIngress = grains.GetGrain<IIngressNeuron>(key);
-                await authCompletedIngress.IngestAsync(GoogleSignals.AuthCompleted, GatewayPayload.PayloadProps(request));
-                return request;
-            }
-
-            if (request.TypeName == SalesforceSignals.AuthRequested || request.TypeName.Contains(SalesforceSignals.AuthRequested, StringComparison.OrdinalIgnoreCase))
-            {
-                var authProps = GatewayPayload.PayloadProps(request);
-                var authClientId = authProps.TryGetValue("clientId", out var authCid) ? authCid?.ToString() : null;
-                var authSession = await ResolveSessionByClientIdAsync(authClientId);
-                if (authSession is null)
-                    throw new RpcException(new Status(StatusCode.Unauthenticated, "A real login session is required to connect Salesforce."));
-
-                var auth = grains.GetGrain<ISalesforceAuthNeuron>(authSession.UserId.Value);
-                var signal = new Signal(SalesforceSignals.AuthRequested, authProps)
-                {
-                    Receiver = new NeuronId(authSession.UserId.Value)
-                };
-                await auth.DeliverAsync(signal);
-                return request;
-            }
-
-            // A submitted config form round-trips here. Persist the field values for the pack via the encrypted
-            // config store. The values may include secrets, so they are NEVER logged.
-            if (request.TypeName == nameof(ConfigurationProvided))
-            {
-                if (packConfigStore is null)
-                    throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pack config store is not configured."));
-
-                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
-                string? Field(string key) => p.TryGetValue(key, out var v) ? v?.ToString() : null;
-
-                var pack = Field("pack") ?? Field("packName") ?? request.CorrelationId;
-                var scope = Field("scope") ?? PackConfigScopes.App;
-
-                // The scope must be either the shared app-level slot every reader (responder pack, LlmResponderNeuron,
-                // Telegram transport) actually pulls from, or the caller's OWN resolved per-user slot — never an
-                // arbitrary/other-user scope, per P6b.
-                var configSession = await ResolveSessionByClientIdAsync(Field("clientId"));
-                var callerOwnScope = configSession is not null ? PackConfigScopes.ForUser(configSession.UserId) : null;
-                if (scope != PackConfigScopes.App && scope != callerOwnScope)
-                    throw new RpcException(new Status(StatusCode.PermissionDenied, $"Scope '{scope}' is not permitted for this caller."));
-
-                var controlKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    "pack", "packName", "scope", "clientId", "buyerId", "userId", "workspaceId", "synapseType", "eventName"
-                };
-                var values = p
-                    .Where(kv => !controlKeys.Contains(kv.Key))
-                    .ToDictionary(kv => kv.Key, kv => kv.Value?.ToString() ?? string.Empty);
-
-                await packConfigStore.SetAsync(scope, pack, values);
-                logger.LogInformation("Stored configuration for pack {Pack} ({FieldCount} fields).", pack, values.Count);
-
-                // Non-secret notification only: subscribers learn config changed and re-PULL the values
-                // point-to-point via GetPackConfig. The stored values (which may be secrets) are NOT broadcast.
-                var notifyKey = string.IsNullOrWhiteSpace(request.CorrelationId)
-                    ? $"pack-configured-{scope}-{pack}"
-                    : request.CorrelationId;
-                var notifyIngress = grains.GetGrain<IIngressNeuron>(notifyKey);
-                await notifyIngress.IngestAsync("PackConfigured", new Dictionary<string, object?>
-                {
-                    ["pack"] = pack,
-                    ["scope"] = scope
-                });
-                return request;
-            }
-
-            if (request.TypeName == nameof(InoRequest) || request.TypeName.Contains("InoRequest", StringComparison.OrdinalIgnoreCase))
-            {
-                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
-                var prompt = p.TryGetValue("prompt", out var pr) ? pr?.ToString() ?? "" : "";
-                var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
-                var workspaceId = p.TryGetValue("workspaceId", out var wid) ? wid?.ToString() : null;
-
-                var ino = grains.GetGrain<IInoNeuron>("ino-main");
-                await ino.FireAsync(new InoRequest(prompt, clientId, workspaceId));
-                return request;
-            }
-
-            if (request.TypeName == nameof(LoginRequest) || request.TypeName.Contains("LoginRequest", StringComparison.OrdinalIgnoreCase))
-            {
-                var session = grains.GetGrain<IUserSessionNeuron>("session-main");
-                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
-                var username = p.TryGetValue("username", out var u) ? u?.ToString() ?? "" : "";
-                var password = p.TryGetValue("password", out var pw) ? pw?.ToString() ?? "" : "";
-                var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
-                await session.FireAsync(new LoginRequest(username, password, clientId));
-                return request;
-            }
-
-            if (request.TypeName == nameof(LogoutRequest) || request.TypeName.Contains("LogoutRequest", StringComparison.OrdinalIgnoreCase))
-            {
-                var session = grains.GetGrain<IUserSessionNeuron>("session-main");
-                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
-                var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
-                var logoutSession = await ResolveSessionByClientIdAsync(clientId);
-                await session.FireAsync(new LogoutRequest(logoutSession?.SessionId ?? "", clientId));
-                return request;
-            }
-
-            if (request.TypeName == nameof(ExperienceStep) || request.TypeName.Contains("ExperienceStep", StringComparison.OrdinalIgnoreCase))
-            {
-                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(payloadStr) ?? new();
-                var pack = p.GetValueOrDefault("pack", "");
-                var experienceId = p.GetValueOrDefault("experienceId", "");
-                var eventName = p.GetValueOrDefault("eventName", "start");
-                var args = p.Where(kv => kv.Key is not ("pack" or "experienceId" or "eventName" or "synapseType"))
-                            .ToDictionary(kv => kv.Key, kv => kv.Value);
-                var generated = grains.GetGrain<IGeneratedNeuron>("generated-" + pack.ToLowerInvariant());
-                await generated.FireAsync(new ExperienceStep(pack, experienceId, eventName, args));
-                return request;
-            }
-
-            // Generic fallback: any unknown type_name becomes a named Signal broadcast on the cluster timeline.
-            // This path is INTERNAL-ONLY. Trusted in-cluster transports (the Telegram transport) present the shared
-            // InternalServiceKey to fire arbitrary named synapses; an untrusted browser on the same external ingress
-            // must not, or it could forge egress/reply signals (e.g. TelegramReplyRequested → arbitrary outbound
-            // Telegram messages) or spoof inbound events. The known surface-action branches above stay open to the
-            // Flutter client; only this arbitrary-type path is gated (same key + fail-closed rules as GetPackConfig).
-            if (string.IsNullOrWhiteSpace(request.TypeName))
-                throw new RpcException(new Status(StatusCode.InvalidArgument, "Empty synapse type"));
-
-            GatewayInternalAuth.Enforce(configuration, environment, logger, context, nameof(Send));
-
-            var payloadJson = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-            var rawProps = string.IsNullOrWhiteSpace(payloadJson)
-                ? new Dictionary<string, object?>()
-                : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? new();
-            var signalProps = GatewayPayload.NormalizeJsonProps(rawProps);
-
-            if (string.Equals(request.TypeName, TelegramSignals.MessageReceived, StringComparison.Ordinal)
-                && signalProps.TryGetValue("chatId", out var chatIdValue) && chatIdValue is not null)
-            {
-                var chatKey = "tg-chat-" + Convert.ToInt64(chatIdValue);
-                var chat = grains.GetGrain<ITelegramChatNeuron>(chatKey);
-                await chat.DeliverAsync(new Signal(request.TypeName, signalProps));
-                return request;
-            }
-
-            var ingress = grains.GetGrain<IIngressNeuron>(request.CorrelationId);
-            await ingress.IngestAsync(request.TypeName, signalProps);
             return request;
         }
         catch (RpcException)
@@ -551,4 +361,5 @@ public sealed class GatewayService(
     private static bool IsObservabilityJournalUnavailable(Exception exception) =>
         exception.GetBaseException().Message.Contains("state journal stream writer is not initialized", StringComparison.OrdinalIgnoreCase);
 }
+
 

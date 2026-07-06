@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.TestKit;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Reqnroll;
@@ -149,7 +150,7 @@ public class CodeFoundrySteps : IAsyncDisposable
     public async Task WhenISubmitFoundryRequest(string spec, string tier)
     {
         var parsed = Enum.Parse<TargetTier>(tier);
-        await _currentGrain!.FireAsync(new FoundryRequest(spec, parsed));
+        await _currentGrain!.FireAsync(new FoundryRequest(spec, parsed, AutoApply: true));
         _timeline = await _currentGrain.GetTimelineAsync();
     }
 
@@ -188,7 +189,15 @@ public class CodeFoundrySteps : IAsyncDisposable
                     services.AddSingleton<ICodeExecutor, InProcessAlcExecutor>();
                     services.AddSingleton<IBuildRunner>(runner);
                     services.AddSingleton<IResourceController>(new DigitalBrain.Tests.Foundry.FakeResourceController());
+                    services.AddSingleton<IConfiguration>(
+                        new ConfigurationBuilder()
+                            .AddInMemoryCollection(new Dictionary<string, string?>
+                            {
+                                ["DigitalBrain:Foundry:TrustedAutoApply"] = "true"
+                            })
+                            .Build());
                 });
         }
     }
 }
+

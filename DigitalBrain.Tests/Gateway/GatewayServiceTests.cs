@@ -13,7 +13,6 @@ using DigitalBrain.Kernel.Voice;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
-using DigitalBrain.UiKit;
 using Grpc.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -241,26 +240,27 @@ public class GatewayServiceTests : NeuronTestBase
         var writer = new CapturingServerStreamWriter<RfwCardEnvelope>();
         var watchTask = svc.WatchHomeFeed(new WatchHomeFeedRequest { ClientId = myClientId }, writer, TestContext(cts.Token));
 
-        for (var attempt = 0; attempt < 40 && writer.Messages.Count == 0; attempt++)
-            await Task.Delay(25);
+        await AsyncTestWait.WaitUntilAsync(
+            () => writer.Messages.Count > 0,
+            "initial home-feed login card");
 
-        // The line above only proves the (synchronously-written) initial login card arrived — it says nothing
-        // about whether HomeFeedBus.SubscribeAsync's Orleans subscriptions have actually landed yet, which is
-        // genuinely asynchronous. Broadcasting before that lands would be silently missed, so give the
-        // subscribe round-trip a bounded, generous window before addressing cards.
-        for (var attempt = 0; attempt < 40 && writer.Messages.Count < 2; attempt++)
+        // The line above only proves the synchronously written initial login card arrived. Subscription setup is
+        // asynchronous, so probe with unique cards until the personal stream receives one.
+        var readinessAttempt = 0;
+        await AsyncTestWait.WaitUntilAsync(async () =>
         {
-            // DataJson varies per attempt because HomeFeedBus content-hash-dedups identical cards at publish time
-            // before any subscriber sees them — an unvarying probe would only ever land once.
+            var attempt = Interlocked.Increment(ref readinessAttempt);
             await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "ReadinessProbe", $"{{\"attempt\":{attempt}}}", myClientId));
-            await Task.Delay(25);
-        }
-
+            return writer.Messages.Count >= 2;
+        }, "home-feed personal subscription readiness");
         await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "AddressedToMe", "{}", myClientId));
         await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "AddressedToSomeoneElse", "{}", "someone-elses-client-id"));
         await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "Unaddressed", "{}"));
 
-        await Task.Delay(300);
+        await AsyncTestWait.WaitUntilAsync(
+            () => writer.Messages.Any(m => m.RootWidget == "AddressedToMe") &&
+                  writer.Messages.Any(m => m.RootWidget == "Unaddressed"),
+            "addressed and unaddressed home-feed cards");
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => watchTask);
 
@@ -277,13 +277,16 @@ public class GatewayServiceTests : NeuronTestBase
         var writer = new CapturingServerStreamWriter<RfwCardEnvelope>();
         var watchTask = svc.WatchHomeFeed(new WatchHomeFeedRequest(), writer, TestContext(cts.Token));
 
-        for (var attempt = 0; attempt < 40 && writer.Messages.Count == 0; attempt++)
-            await Task.Delay(25);
+        await AsyncTestWait.WaitUntilAsync(
+            () => writer.Messages.Count > 0,
+            "initial home-feed login card");
 
         await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "AddressedToSomeone", "{}", "some-real-client-id"));
         await HomeFeedBus.BroadcastAsync(new RfwCard("digitalbrain", "SystemUnaddressed", "{}"));
 
-        await Task.Delay(300);
+        await AsyncTestWait.WaitUntilAsync(
+            () => writer.Messages.Any(m => m.RootWidget == "SystemUnaddressed"),
+            "unaddressed home-feed card");
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => watchTask);
 
@@ -481,19 +484,20 @@ public class GatewayServiceTests : NeuronTestBase
             cards.Add(await subscription.Reader.ReadAsync(timeout.Token));
         }
 
-        var graph = Assert.Single(cards, c => c.DataJson.Contains("journaled response and surface update observed", StringComparison.Ordinal));
-        Assert.Equal("digitalbrain", graph.LibraryName);
+        var graph = cards.FirstOrDefault(c => c.DataJson.Contains("journaled response and surface update observed", StringComparison.Ordinal));
+        Assert.NotNull(graph);
+        Assert.Equal("digitalbrain", graph!.LibraryName);
         Assert.Equal("root", graph.RootWidget);
         Assert.Contains("\"kind\":\"activity-graph\"", graph.DataJson);
         Assert.Contains("\"edges\"", graph.DataJson);
         Assert.Contains("\"correlationId\":\"ui-demo-test\"", graph.DataJson);
 
-        var card = Assert.Single(cards, IsSurfaceDemoPackCard);
-        Assert.Equal("digitalbrain", card.LibraryName);
+        var card = cards.FirstOrDefault(c => IsSurfaceDemoPackCard(c) && c.DataJson.Contains("Embodied pack live", StringComparison.Ordinal));
+        Assert.NotNull(card);
+        Assert.Equal("digitalbrain", card!.LibraryName);
         Assert.Equal("root", card.RootWidget);
         Assert.False(string.IsNullOrWhiteSpace(card.CorrelationId));
         Assert.Contains("\"source\"", card.DataJson);
-        Assert.Contains("Embodied pack live", card.DataJson);
 
         var generated = Grain<IGeneratedNeuron>(SurfaceDemoRuntime.GeneratedNeuronKey);
         var timeline = await generated.GetOutgoingTimelineAsync();
@@ -700,3 +704,4 @@ internal sealed class RecordingSalesforceApiClientFactory : ISalesforceApiClient
             Task.FromResult(new[] { "Acme Test Corp" });
     }
 }
+

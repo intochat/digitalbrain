@@ -85,7 +85,7 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         return "Cluster activity sent for 3D visualization.";
     }
 
-    [McpServerTool(Name = "define_reaction"), Description("Define or update a reactive automation. when=NeuronActivated|Signal:Foo|*, script is real C# using return new[] or await Fire. Example: when=NeuronActivated, script='return new[] { new Signal(\"MySignal\", null) };' ")]
+    [McpServerTool(Name = "define_reaction"), Description("Stage a reactive automation for approval. when=NeuronActivated|Signal:Foo|*, script is real executable C# and is not activated until a SelfEvolutionDecision approves it.")]
     public async Task<string> DefineReaction(
         [Description("Unique id for the reaction")] string id,
         [Description("Condition e.g. 'NeuronActivated' or 'Signal:MySignal'")] string when,
@@ -93,21 +93,45 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         [Description("The C# script body (real executable C#; supports return [...] and await Fire)")] string scriptCode,
         [Description("Optional scope for multi-user (default='default' = global)")] string scope = "default")
     {
-        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
-        // For scoped, use direct records so scope is honored (DefineReactionAsync defaults global for compat)
-        if (scope != "default")
-        {
-            var sid = id + "-script";
-            await auto.FireAsync(new RegisterScript(sid, scriptCode, "via-mcp", Array.Empty<string>(), scope));
-            await auto.FireAsync(new RegisterReaction(id, when, sid, target, Array.Empty<string>(), scope));
-        }
-        else
-        {
-            await auto.DefineReactionAsync(id, when, target, scriptCode);
-        }
-        return $"Defined reaction '{id}' (when={when}, target={target ?? "any"}, scope={scope}).";
+        var proposalId = await StageAutomationDefinitionAsync(id, when, target, scriptCode, scope, "define_reaction");
+        return $"Staged reaction '{id}' for approval as proposal '{proposalId}' (when={when}, target={target ?? "any"}, scope={scope}).";
     }
 
+    private async Task<string> StageAutomationDefinitionAsync(
+        string id,
+        string when,
+        string? target,
+        string scriptCode,
+        string scope,
+        string source)
+    {
+        const string automationNeuronId = "automation-main";
+        var proposalId = "automation-" + Guid.NewGuid().ToString("N");
+        var scriptId = id + "-script";
+        var script = new RegisterScript(scriptId, scriptCode, $"via-mcp:{source}", Array.Empty<string>(), scope);
+        var reaction = new RegisterReaction(id, when, scriptId, target, Array.Empty<string>(), scope);
+
+        var auto = Grains.GetGrain<IAutomationNeuron>(automationNeuronId);
+        await auto.FireAsync(new AutomationDefinitionStaged(proposalId, automationNeuronId, script, reaction));
+
+        var approval = Grains.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+        await approval.DeliverAsync(new SelfEvolutionProposal(
+            ProposalId: proposalId,
+            Scope: $"automation:{scope}",
+            Rationale: $"MCP {source}: define reaction {id} when {when}.",
+            ProposedChange: $"Register script {scriptId} and reaction {id} targeting {target ?? "any"}.",
+            ApplyVia: SelfEvolutionApplyVia.AutomationDefineReaction,
+            Risk: SelfEvolutionRisk.InProcessCode,
+            RequiresHumanApproval: true,
+            RollbackPlan: $"Remove reaction {id} and script {scriptId} if approval apply fails verification.",
+            Origin: automationNeuronId)
+        {
+            Receiver = new NeuronId(SelfEvolutionNeuronIds.Main),
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return proposalId;
+    }
     [McpServerTool(Name = "list_automations"), Description("List currently active reactions and scripts (surface-friendly). Use define_reaction or create_automation_from_description to add. Supports script reuse by id.")]
     public async Task<string> ListAutomations()
     {
@@ -151,7 +175,6 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         [Description("Natural language description of the when-then automation")] string description,
         [Description("Optional explicit id, otherwise derived")] string? id = null)
     {
-        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
         // Minimal heuristic parser for common patterns; produces real executable C# body.
         var lower = description.ToLowerInvariant();
         string when = "NeuronActivated";
@@ -179,8 +202,8 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         }
 
         var autoId = id ?? "natural-" + Guid.NewGuid().ToString("N")[..8];
-        await auto.DefineReactionAsync(autoId, when, target, script);
-        return $"Created automation '{autoId}' from description. when={when} target={target ?? "any"}. Real C# body: {script}";
+        var proposalId = await StageAutomationDefinitionAsync(autoId, when, target, script, "default", "create_automation_from_description");
+        return $"Staged automation '{autoId}' for approval as proposal '{proposalId}'. when={when} target={target ?? "any"}. Real C# body: {script}";
     }
 
     [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]
@@ -204,7 +227,7 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
     public async Task<string> RunCodeFoundry(
         [Description("English spec of the code to generate")] string spec,
         [Description("'Run' for Tier-1 in-process, 'Deploy' for Tier-2 durable")] string tier = "Run",
-        [Description("Apply automatically")] bool autoApply = true)
+        [Description("Apply automatically (requires trusted kernel config; default stages approval only)")] bool autoApply = false)
     {
         var parsedTier = string.Equals(tier, "Deploy", StringComparison.OrdinalIgnoreCase)
             ? TargetTier.Deploy
@@ -395,3 +418,5 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         return $"Promotion requested for {packName}@{version} covering {ids.Count} reactions. Watch for AutomationPromoted + crystallized signal.";
     }
 }
+
+

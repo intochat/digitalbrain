@@ -5,6 +5,7 @@ using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
+using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Kernel.Ui;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -41,6 +42,10 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddScoped<NeuronJournals>();
                 services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
                 services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, MarketplaceInstallApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
                 services.AddSingleton<IVectorStore, InMemoryVectorStore>();
@@ -55,9 +60,14 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                     new ConfigurationBuilder()
                         .AddInMemoryCollection(new Dictionary<string, string?>
                         {
-                            ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
+                            ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false",
+                            ["DigitalBrain:Marketplace:TrustedLocalInstallBypass"] = "true"
                         })
                         .Build());
             });
     }
 }
+
+
+
+

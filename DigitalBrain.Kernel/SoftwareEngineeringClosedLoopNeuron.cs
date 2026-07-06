@@ -84,7 +84,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
         const string applyVia = "aspire-mcp";
 
         await FireAsync(new SystemModificationProposed("aspire", "closedloop", analysis, applyVia));
-        await FireAsync(new SelfEvolutionProposal(
+        var proposal = new SelfEvolutionProposal(
             ProposalId: "closedloop-" + req.SynapseId,
             Scope: "kernel",
             Rationale: $"ClosedLoop {req.LoopType}: {req.Prompt}",
@@ -93,7 +93,16 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             Risk: SelfEvolutionRisk.KernelRestart,
             RequiresHumanApproval: true,
             RollbackPlan: "Create a checkpoint before apply; use rolling rollback if verification fails.",
-            Origin: Self.Value));
+            Origin: Self.Value)
+        {
+            Sender = Self,
+            Receiver = new NeuronId(SelfEvolutionNeuronIds.Main),
+            Timestamp = DateTimeOffset.UtcNow,
+            CorrelationId = CurrentCause?.CorrelationId ?? CurrentCause?.SynapseId,
+            CausationId = CurrentCause?.SynapseId
+        };
+
+        await GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main).DeliverAsync(proposal);
     }
 
     private bool ShouldInspectAspireMcp()

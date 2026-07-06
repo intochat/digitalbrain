@@ -1,6 +1,5 @@
 using DigitalBrain.Core;
 using DigitalBrain.TestKit;
-using DigitalBrain.UiKit;
 
 namespace DigitalBrain.Tests.Ino;
 
@@ -95,3 +94,4 @@ public class InoNeuronGraphCanvasTests : NeuronTestBase
         "session-1",
         WorkspaceId: "finance");
 }
+

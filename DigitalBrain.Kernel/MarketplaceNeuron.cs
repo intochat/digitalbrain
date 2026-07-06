@@ -2,6 +2,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Economics;
 using DigitalBrain.Core.Trust;
 using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Marketplace.Contracts;
 using Microsoft.Extensions.AI;
@@ -126,39 +127,47 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
         }
 
         var commissionAmount = 0.0;
-        await FireAsync(new CommissionTaken(
-            pack.Name,
-            pack.Version,
-            cmd.BuyerId,
-            pack.OwnerId,
-            pack.CommissionRate,
-            commissionAmount));
+        var staged = new MarketplaceInstallStaged(
+            ProposalId: "marketplace-install-" + Guid.NewGuid().ToString("N"),
+            MarketplaceNeuronId: Self.Value,
+            Pack: pack,
+            BuyerId: cmd.BuyerId,
+            SessionId: cmd.SessionId,
+            CommissionAmount: commissionAmount);
+        await FireAsync(staged);
 
-        await FireAsync(new NeuroPackInstalled(pack));
-
-        if (string.Equals(cmd.PackName, KernelPack.Name, StringComparison.OrdinalIgnoreCase))
+        if (TrustedLocalInstallBypass)
         {
-            var aspire = GrainFactory.GetGrain<IAspireNeuron>("aspire-main");
-            await aspire.FireAsync(new PerformKernelSelfUpdate(cmd.Version));
+            await MarketplaceInstallActivation.ApplyAsync(
+                staged,
+                synapse => FireAsync(synapse),
+                GrainFactory,
+                ServiceProvider.GetService<HomeFeedBus>(),
+                Logger);
+            return;
         }
 
-        var genKey = "generated-" + pack.Name.ToLowerInvariant();
-        var generated = GrainFactory.GetGrain<IGeneratedNeuron>(genKey);
-        await generated.DeliverAsync(new NeuroPackInstalled(pack));
-        await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated", cmd.BuyerId, cmd.SessionId));
-
-        var pub = new List<NeuroPack> { pack };
-        var inst = new List<NeuroPack> { pack };
-        var refInst = MarketplaceUiSurfaces.InstalledBundlesFromPacks(pub, inst, cmd.BuyerId, cmd.SessionId);
-        await FireAsync(refInst);
-        var bus2 = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus2 != null)
+        var proposal = new SelfEvolutionProposal(
+            ProposalId: staged.ProposalId,
+            Scope: "marketplace",
+            Rationale: $"Install marketplace pack {pack.Name}@{pack.Version} for {cmd.BuyerId}.",
+            ProposedChange: $"Activate pack {pack.Name}@{pack.Version} and deliver it to the generated-neuron host.",
+            ApplyVia: MarketplaceInstallApplyHandler.ApplyViaId,
+            Risk: SelfEvolutionRisk.PackInstall,
+            RequiresHumanApproval: true,
+            RollbackPlan: "Remove the generated pack activation and restore the previous installed-bundles surface if verification fails.",
+            Origin: Self.Value)
         {
-            await bus2.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(refInst, Self.Value));
-        }
+            Sender = Self,
+            Receiver = new NeuronId(SelfEvolutionNeuronIds.Main),
+            Timestamp = DateTimeOffset.UtcNow,
+            CorrelationId = CurrentCause?.CorrelationId ?? CurrentCause?.SynapseId,
+            CausationId = CurrentCause?.SynapseId
+        };
 
-        Logger.LogInformation("Marketplace INSTALL {Key} by {Buyer}. Commission {Rate:P0} taken for seller {Seller}.",
-            cmd.PackName + "@" + cmd.Version, cmd.BuyerId, pack.CommissionRate, pack.OwnerId);
+        await GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main).DeliverAsync(proposal);
+        Logger.LogInformation("Marketplace install staged for approval: {Key} by {Buyer} proposal={ProposalId}",
+            cmd.PackName + "@" + cmd.Version, cmd.BuyerId, staged.ProposalId);
     }
 
     public async Task HandleAsync(ListPublished _cmd)
@@ -228,6 +237,8 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
     private bool RejectUnsignedPacks =>
         ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:RejectUnsignedPacks", true) ?? true;
 
+    private bool TrustedLocalInstallBypass =>
+        ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:TrustedLocalInstallBypass", false) ?? false;
     private bool GatePublishing =>
         ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:GatePublishing", false) ?? false;
 
@@ -242,3 +253,4 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
     }
 
 }
+

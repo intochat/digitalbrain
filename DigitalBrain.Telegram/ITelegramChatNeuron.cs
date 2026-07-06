@@ -1,6 +1,6 @@
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Telegram.Channel;
+namespace DigitalBrain.Telegram;
 
 public interface ITelegramChatNeuron : IChannelNeuron
 {

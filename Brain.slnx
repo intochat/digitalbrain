@@ -19,14 +19,10 @@
   </Folder>
   <Folder Name="/integrations/">
     <Project Path="DigitalBrain.Context/DigitalBrain.Context.csproj" />
-    <Project Path="DigitalBrain.Developer/DigitalBrain.Developer.csproj" />
     <Project Path="DigitalBrain.Experience.PersonalAssistant/DigitalBrain.Experience.PersonalAssistant.csproj" />
     <Project Path="DigitalBrain.Google/DigitalBrain.Google.csproj" />
     <Project Path="DigitalBrain.Salesforce/DigitalBrain.Salesforce.csproj" />
     <Project Path="DigitalBrain.Telegram/DigitalBrain.Telegram.csproj" />
-    <Project Path="DigitalBrain.Telegram.Channel/DigitalBrain.Telegram.Channel.csproj" />
-    <Project Path="DigitalBrain.UiKit/DigitalBrain.UiKit.csproj" />
-    <Project Path="DigitalBrain.Windows/DigitalBrain.Windows.csproj" />
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
@@ -35,20 +31,19 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj" />
-    <Project Path="DigitalBrain.Developer.Tests/DigitalBrain.Developer.Tests.csproj" />
     <Project Path="DigitalBrain.Experience.PersonalAssistant.Tests/DigitalBrain.Experience.PersonalAssistant.Tests.csproj" />
     <Project Path="DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj" />
     <Project Path="DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
-    <Project Path="DigitalBrain.Telegram.Channel.Tests/DigitalBrain.Telegram.Channel.Tests.csproj" />
     <Project Path="DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />
     <Project Path="DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
     <Project Path="DigitalBrain.TestKit.Tests/DigitalBrain.TestKit.Tests.csproj" />
     <Project Path="DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
-    <Project Path="DigitalBrain.UiKit.Tests/DigitalBrain.UiKit.Tests.csproj" />
-    <Project Path="DigitalBrain.Windows.Tests/DigitalBrain.Windows.Tests.csproj" />
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
   </Folder>
 </Solution>
+
+
+
 

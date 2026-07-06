@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.UiKit;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
@@ -20,3 +19,4 @@ public sealed class FlutterUiNeuron(ILogger<FlutterUiNeuron> logger, NeuronJourn
         Logger.LogInformation("FlutterUiNeuron handled UiSurface kind={Kind}", surface.Kind);
     }
 }
+

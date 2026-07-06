@@ -3,7 +3,6 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Core.UiKit;
 using DigitalBrain.TestKit;
-using DigitalBrain.UiKit;
 
 namespace DigitalBrain.Tests.Ino;
 
@@ -71,3 +70,4 @@ public class InoNeuronTabularDataTests : NeuronTestBase
             m.WorkspaceId == "finance");
     }
 }
+

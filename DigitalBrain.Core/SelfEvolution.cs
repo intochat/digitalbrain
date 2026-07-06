@@ -37,6 +37,40 @@ public record SelfEvolutionProposal(
     [property: Id(8)] string Origin,
     [property: Id(9)] DateTimeOffset? ExpiresAt = null) : Synapse(nameof(SelfEvolutionProposal), DateTimeOffset.UtcNow);
 
+public static class SelfEvolutionNeuronIds
+{
+    public const string Main = "self-evolution-main";
+}
+
+public static class SelfEvolutionApplyVia
+{
+    public const string MarketplaceInstall = "marketplace.install";
+    public const string AutomationDefineReaction = "automation.define-reaction";
+    public const string FoundryRun = "foundry.run";
+    public const string FoundryDeploy = "foundry.deploy";
+}
+
+public interface ISelfEvolutionNeuron : INeuron, IHandle<SelfEvolutionProposal>, IHandle<SelfEvolutionDecision> { }
+
+/// <summary>A valid proposal entered the approval queue and is awaiting a decision.</summary>
+[GenerateSerializer]
+public record SelfEvolutionProposalPending(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string ApplyVia,
+    [property: Id(2)] SelfEvolutionRisk Risk) : Synapse(nameof(SelfEvolutionProposalPending), DateTimeOffset.UtcNow);
+
+/// <summary>A malformed or duplicate proposal was recorded but not made approvable.</summary>
+[GenerateSerializer]
+public record SelfEvolutionProposalRejected(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string Reason) : Synapse(nameof(SelfEvolutionProposalRejected), DateTimeOffset.UtcNow);
+
+/// <summary>A proposal expired before it could be approved.</summary>
+[GenerateSerializer]
+public record SelfEvolutionProposalExpired(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] DateTimeOffset? ExpiresAt) : Synapse(nameof(SelfEvolutionProposalExpired), DateTimeOffset.UtcNow);
+
 /// <summary>
 /// The explicit approve/reject decision for a staged <see cref="SelfEvolutionProposal"/>.
 /// <paramref name="DecidedBy"/> identifies the approver (user id or system principal) so the
@@ -48,3 +82,33 @@ public record SelfEvolutionDecision(
     [property: Id(1)] bool Approved,
     [property: Id(2)] string DecidedBy,
     [property: Id(3)] string Reason = "") : Synapse(nameof(SelfEvolutionDecision), DateTimeOffset.UtcNow);
+
+/// <summary>A decision passed validation and was recorded against a pending proposal.</summary>
+[GenerateSerializer]
+public record SelfEvolutionDecisionRecorded(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] bool Approved,
+    [property: Id(2)] string DecidedBy,
+    [property: Id(3)] string Reason = "") : Synapse(nameof(SelfEvolutionDecisionRecorded), DateTimeOffset.UtcNow);
+
+/// <summary>A decision was ignored because it did not match an approvable pending proposal.</summary>
+[GenerateSerializer]
+public record SelfEvolutionDecisionRejected(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string Reason) : Synapse(nameof(SelfEvolutionDecisionRejected), DateTimeOffset.UtcNow);
+
+/// <summary>The journaled result returned by an allowlisted self-evolution apply handler.</summary>
+[GenerateSerializer]
+public record SelfEvolutionApplyResult(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string ApplyVia,
+    [property: Id(2)] bool Succeeded,
+    [property: Id(3)] string Details,
+    [property: Id(4)] string? RollbackCheckpointId = null) : Synapse(nameof(SelfEvolutionApplyResult), DateTimeOffset.UtcNow);
+/// <summary>An approved apply failed and a concrete checkpoint is available for rollback.</summary>
+[GenerateSerializer]
+public record SelfEvolutionRollbackRequired(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string ApplyVia,
+    [property: Id(2)] string CheckpointId,
+    [property: Id(3)] string Reason) : Synapse(nameof(SelfEvolutionRollbackRequired), DateTimeOffset.UtcNow);

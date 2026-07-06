@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Telegram.Channel;
+using DigitalBrain.Telegram;
 
 namespace DigitalBrain.Kernel;
 
@@ -98,3 +98,4 @@ public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, Neuro
         return true;
     }
 }
+

@@ -7,7 +7,6 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Salesforce;
 using DigitalBrain.TestKit;
-using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
@@ -381,3 +380,4 @@ internal sealed class RecordingGmailApiClient : IGmailApiClient
     public Task SendMessageAsync(string to, string subject, string body, CancellationToken ct) =>
         throw new NotSupportedException("Send is not used by INO Gmail read tests.");
 }
+

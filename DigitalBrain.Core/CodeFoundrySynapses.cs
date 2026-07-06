@@ -53,13 +53,23 @@ public record KernelRestartRequested(
 public record FoundryRequest(
     [property: Id(0)] string Spec,
     [property: Id(1)] TargetTier Tier,
-    [property: Id(2)] bool AutoApply = true) : Synapse(nameof(FoundryRequest), DateTimeOffset.UtcNow);
+    [property: Id(2)] bool AutoApply = false) : Synapse(nameof(FoundryRequest), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record FoundryCheckpointed(
     [property: Id(0)] string Spec,
     [property: Id(1)] string CheckpointId) : Synapse(nameof(FoundryCheckpointed), DateTimeOffset.UtcNow);
 
+[GenerateSerializer]
+public record FoundryApplyStaged(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string FoundryNeuronId,
+    [property: Id(2)] string Spec,
+    [property: Id(3)] TargetTier Tier,
+    [property: Id(4)] string Source,
+    [property: Id(5)] IReadOnlyList<string> RequiredRefs,
+    [property: Id(6)] string CheckpointId,
+    [property: Id(7)] string ModuleName = "") : Synapse(nameof(FoundryApplyStaged), DateTimeOffset.UtcNow);
 [GenerateSerializer]
 public record FoundryCompleted(
     [property: Id(0)] string Spec,
@@ -77,3 +87,6 @@ public interface ICodeGenNeuron : INeuron, IHandle<GenerateCode> { }
 public interface ICodeRunNeuron : INeuron, IHandle<RunGeneratedCode> { }
 public interface ICodeDeployNeuron : INeuron, IHandle<DeployGeneratedCode> { }
 public interface ICodeFoundryLoopNeuron : INeuron, IHandle<FoundryRequest> { }
+
+
+

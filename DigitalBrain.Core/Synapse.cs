@@ -47,8 +47,8 @@ public interface IAspireNeuron : INeuron, IHandle<StartDistributedApp>, IHandle<
 
 // Thin common marker for channel neurons (Telegram, Flutter UI, etc.) per item 13.
 // Allows discovery and shared patterns (e.g. CorrelationId/CausationId for reply context across channels).
-// No methods yet – keeps it thin; specific contracts now live in their peer ino projects
-// (ITelegramChatNeuron in DigitalBrain.Telegram.Channel, IFlutterUiNeuron in DigitalBrain.UiKit), not Core.
+// No methods yet - keeps it thin; specific contracts live in feature contract assemblies
+// (ITelegramChatNeuron in DigitalBrain.Telegram, IFlutterUiNeuron in DigitalBrain.Ui.Contracts), not Core.
 public interface IChannelNeuron : INeuron
 {
 }
@@ -409,3 +409,4 @@ public record SalesforceOAuthCallbackResult(
     [property: Id(0)] bool Success,
     [property: Id(1)] string Title,
     [property: Id(2)] string Message);
+
