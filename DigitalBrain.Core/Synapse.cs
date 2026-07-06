@@ -148,6 +148,12 @@ public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
 public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataIngested>, IHandle<DbSchemaInspected>
 {
     Task<string> AskAsync(string prompt);
+
+    /// <summary>
+    /// Rich interaction entrypoint. Returns the common InoInteractResult contract.
+    /// This is the primary surface for MCP agents and verification tests.
+    /// </summary>
+    Task<InoInteractResult> InteractAsync(InoInteractRequest request);
 }
 
 // Self-awareness: SystemStatus + proposals (MVP for auto diagnose + simulate fix)
@@ -227,6 +233,57 @@ public record MemorySummary(
     string Summary,
     DateTimeOffset At,
     string? WorkspaceId = null) : Synapse(nameof(MemorySummary), At);
+
+// =============================================================================
+// INO rich interaction contract (MCP agents, external CLIs, test verification)
+// This is the common standard for driving + observing INO.
+// Product goal: external agents (Claude, Grok, Codex, tests) can reliably verify
+// that new features (direct answers, automation-as-apps, proposals, scoping, rail)
+// continue to work at live time.
+// =============================================================================
+
+/// <summary>
+/// Structured action that an agent (or UI) can take next against INO or the system.
+/// </summary>
+[GenerateSerializer]
+public record InoAction(
+    string Label,
+    string? FollowUpPrompt = null,           // natural language to send back as InoRequest
+    string? SynapseType = null,
+    IReadOnlyDictionary<string, object?>? Props = null
+);
+
+/// <summary>
+/// Request for a rich, observable interaction with INO.
+/// </summary>
+[GenerateSerializer]
+public record InoInteractRequest(
+    string Prompt,
+    string? ClientId = null,
+    string? WorkspaceId = null,
+    bool IncludeProposals = true,
+    bool IncludeActions = true,
+    int MaxHistory = 5
+) : Synapse(nameof(InoInteractRequest), DateTimeOffset.UtcNow);
+
+/// <summary>
+/// The standardized result of interacting with INO.
+/// Used by MCP, agent harnesses, and contract tests to verify behavior.
+/// </summary>
+[GenerateSerializer]
+public record InoInteractResult(
+    string Prompt,
+    string ResponseText,                     // the direct user-visible answer (key for "no more I'll start..." regression)
+    string? ClassifiedIntent = null,
+    double IntentConfidence = 0.0,
+    string? ClientId = null,
+    string? WorkspaceId = null,
+    IReadOnlyList<string> UsedTaskIds = null!,
+    IReadOnlyList<string> RecentMemoryTopics = null!,
+    IReadOnlyList<InoAction> AvailableActions = null!,   // "Run now", "Approve", "Summarize last", etc.
+    IReadOnlyList<SelfEvolutionProposalPending> PendingProposals = null!,
+    DateTimeOffset Timestamp = default
+) : Synapse(nameof(InoInteractResult), Timestamp);
 
 // NuGet + Roslyn architect for closed loops (SEClosedLoopNeuron).
 [GenerateSerializer]

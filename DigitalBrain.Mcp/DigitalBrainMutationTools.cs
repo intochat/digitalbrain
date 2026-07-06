@@ -48,9 +48,89 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         return $"Simulated X post from '{author}' broadcast as XPostReceived (chatId {chatId}).";
     }
 
-    [McpServerTool(Name = "ask_ino"), Description("Ask the INO AI assistant (uses ContextNeuron for smart management).")]
-    public Task<string> AskIno([Description("Prompt for INO navigation/assistant")] string prompt)
-        => Grains.GetGrain<IInoNeuron>("ino-main").AskAsync(prompt);
+    [McpServerTool(Name = "ino_interact"), Description(@"Primary structured interaction with INO using the common InoInteractResult contract.
+
+This is the recommended way for external agents (Claude Code, Codex, Grok CLI, tests) to talk to INO and verify system behavior live.
+
+- Uses the full new architecture (direct answers, intent classifier, scoped journals, automation proposals as apps, self-evo rail).
+- Returns ResponseText (the actual answer), ClassifiedIntent, AvailableActions (Run/Approve buttons etc.), PendingProposals, memories.
+- Always pass a stable client_id for isolated verification sessions.
+
+Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run loops.")]
+    public async Task<string> InoInteract(
+        [Description("The prompt to INO")] string prompt,
+        [Description("Stable client/actor id for scoping and verification (use different ones for different test scenarios)")] string client_id = "mcp-agent",
+        [Description("Workspace")] string? workspace_id = null,
+        [Description("Include proposal and action data")] bool include_proposals = true)
+    {
+        var ino = Grains.GetGrain<IInoNeuron>("ino-main");
+        var req = new InoInteractRequest(prompt, client_id, workspace_id, include_proposals, true);
+        var result = await ino.InteractAsync(req);
+        return JsonSerializer.Serialize(result, SurfaceJsonOptions);
+    }
+
+    // Legacy thin wrapper kept for compatibility
+    [McpServerTool(Name = "ask_ino"), Description("Simple string version of ino_interact. Prefer ino_interact for rich verification.")]
+    public async Task<string> AskIno(string prompt, string client_id = "mcp-default", string? workspace_id = null)
+    {
+        var resultJson = await InoInteract(prompt, client_id, workspace_id);
+        // Extract just the text for simple callers
+        using var doc = JsonDocument.Parse(resultJson);
+        if (doc.RootElement.TryGetProperty("ResponseText", out var txt))
+            return txt.GetString() ?? resultJson;
+        return resultJson;
+    }
+
+    [McpServerTool(Name = "ino_list_proposals"), Description("List recent staged SelfEvolutionProposals (automations, packs, code changes). Essential for testing the approval rail after creating automations via INO.")]
+    public async Task<string> InoListProposals([Description("Optional client scope")] string client_id = "mcp-default")
+    {
+        var selfEvo = Grains.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+        var pending = (await selfEvo.GetTimelineAsync()).OfType<SelfEvolutionProposalPending>().TakeLast(5);
+        return JsonSerializer.Serialize(pending.Select(p => new { p.ProposalId, p.ApplyVia, p.Risk }), SurfaceJsonOptions);
+    }
+
+    [McpServerTool(Name = "ino_approve_proposal"), Description("Approve a staged proposal (SelfEvolutionDecision). Completes the 'INO creates automation → human/agent approves → activated' flow from the new architecture.")]
+    public async Task<string> InoApproveProposal(
+        [Description("The proposal id returned from ask_ino or ino_list_proposals")] string proposal_id,
+        [Description("Who is approving (for audit)")] string decided_by = "mcp-agent",
+        [Description("Client id for context")] string client_id = "mcp-default")
+    {
+        var selfEvo = Grains.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+        await selfEvo.DeliverAsync(new SelfEvolutionDecision(proposal_id, Approved: true, DecidedBy: decided_by, Reason: "Approved via MCP by external agent"));
+        return $"Approved proposal {proposal_id} as {decided_by}. Check automation list or timeline for activation.";
+    }
+
+    [McpServerTool(Name = "ino_list_automations"), Description("List active automations/reactions (the 'apps' INO can create and run).")]
+    public async Task<string> InoListAutomations()
+    {
+        // Reuse the existing good implementation
+        return await ListAutomations();
+    }
+
+    [McpServerTool(Name = "ino_show_gallery"), Description("Trigger INO to deliver the live UiKit component gallery surface. Great for testing the gallery path in the new architecture.")]
+    public async Task<string> InoShowGallery([Description("Client id")] string client_id = "mcp-default")
+    {
+        var ino = Grains.GetGrain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("uikit gallery", client_id));
+        return "Gallery intent fired to INO. The surface should have been emitted (check get_workbench_surfaces or UI).";
+    }
+
+    [McpServerTool(Name = "ino_get_status"), Description("Quick status of INO + key system parts (recent activity, connected concepts). Useful for agents to understand current brain state before acting.")]
+    public async Task<string> InoGetStatus([Description("Client id for scoped view")] string client_id = "mcp-default")
+    {
+        var ino = Grains.GetGrain<IInoNeuron>("ino-main");
+        var tl = await ino.GetOutgoingTimelineAsync();
+
+        var lastResponses = tl.OfType<InoResponse>().TakeLast(3).Select(r => r.Response.Substring(0, Math.Min(120, r.Response.Length)));
+        var mems = tl.OfType<MemorySummary>().TakeLast(3).Select(m => m.Topic);
+
+        return JsonSerializer.Serialize(new
+        {
+            last_responses = lastResponses,
+            recent_memory = mems,
+            note = "INO is the central personal assistant. Use ask_ino for most interactions."
+        }, SurfaceJsonOptions);
+    }
 
     [McpServerTool(Name = "update_context_filter"), Description("Update ContextNeuron (e.g. when a UI filter changes so INO sees it).")]
     public async Task<string> UpdateContextFilter(
