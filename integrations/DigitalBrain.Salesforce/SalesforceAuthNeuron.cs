@@ -2,6 +2,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
+using UiContracts = DigitalBrain.Ui.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,11 @@ using Microsoft.Extensions.Logging;
 public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), ISalesforceAuthNeuron
 {
-    public static object SignInSurface() => new object();
+    public static UiContracts.AuthButtonSurface SignInSurface() => new(
+        Provider: "salesforce",
+        Label: "Connect Salesforce",
+        Icon: "salesforce",
+        Action: SalesforceSignals.AuthRequested);
 
     public async Task HandleAsync(Signal signal)
     {
@@ -24,8 +29,8 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         }
 
         var clientId = signal.Props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
-        // Surface form stubbed for redesign build; in full impl would Fire the UiSurface
-        await FireAsync(new Signal("credential-form", new Dictionary<string, object?> { ["clientId"] = clientId }));
+        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
+        await FireAsync(surface);
     }
 
     private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props)
@@ -190,7 +195,7 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         var clientId = props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId, message);
 
-        await FireAsync(new Signal("credential-form", new Dictionary<string, object?> { ["clientId"] = clientId, ["message"] = message }));
+        await FireAsync(surface);
     }
 
     private static bool IsOAuthStart(IReadOnlyDictionary<string, object?> props) =>

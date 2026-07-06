@@ -1,66 +1,81 @@
 using DigitalBrain.Core;
-using DigitalBrain.Salesforce;
+using PackContracts = DigitalBrain.Pack.Contracts;
+using UiContracts = DigitalBrain.Ui.Contracts;
 
 namespace DigitalBrain.Salesforce;
 
 public static class SalesforceAuthSurfaces
 {
-    public static object CredentialForm(string emitter, string? clientId = null, string? message = null)
+    public static UiContracts.UiSurface CredentialForm(string emitter, string? clientId = null, string? message = null)
     {
-        // Use reflection to avoid compile-time namespace resolution for 'DigitalBrain.Core.Distribution' and 'Pack.Contracts' / 'Ui' types during redesign (the declaring assembly is referenced, but dotted names in source trigger sub-namespace lookup errors).
-        var packFieldType = Type.GetType("DigitalBrain.Core.Distribution.PackConfigField, DigitalBrain.Pack.Contracts");
-        var kindType = Type.GetType("DigitalBrain.Core.Distribution.PackConfigFieldKind, DigitalBrain.Pack.Contracts");
-        if (packFieldType == null || kindType == null) return null;
-
-        var textKind = Enum.Parse(kindType, "Text");
-        var secretKind = Enum.Parse(kindType, "Secret");
-
-        var fieldCtor = packFieldType.GetConstructors()[0];
-        var fields = new System.Collections.Generic.List<object>();
-        fields.Add(fieldCtor.Invoke(new object[] { SalesforceClientFactory.ClientIdKey, "Connected App Client ID", textKind, null, null, null }));
-        fields.Add(fieldCtor.Invoke(new object[] { SalesforceClientFactory.ClientSecretKey, "Connected App Client Secret", secretKind, null, null, null }));
-        fields.Add(fieldCtor.Invoke(new object[] { SalesforceClientFactory.UsernameKey, "Salesforce Username", textKind, null, null, null }));
-        fields.Add(fieldCtor.Invoke(new object[] { SalesforceClientFactory.PasswordKey, "Salesforce Password", secretKind, null, null, null }));
-        fields.Add(fieldCtor.Invoke(new object[] { SalesforceClientFactory.SecurityTokenKey, "Security Token", secretKind, null, null, null }));
-        fields.Add(fieldCtor.Invoke(new object[] { SalesforceClientFactory.LoginUrlKey, "Login URL (https://login.salesforce.com or sandbox)", textKind, null, null, null }));
-
-        var configFormType = Type.GetType("DigitalBrain.Pack.Contracts.ConfigFormSurface, DigitalBrain.Pack.Contracts");
-        if (configFormType == null) return null;
-
-        var build = configFormType.GetMethod("Build", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-        if (build == null) return null;
-
-        var surface = build.Invoke(null, new object[] { SalesforceClientFactory.PackName, fields, emitter });
-        if (surface != null)
+        var children = new List<UiContracts.UiWidgetTree>
         {
-            var uiSurfaceType = Type.GetType("DigitalBrain.Ui.Contracts.UiSurface, DigitalBrain.Ui.Contracts");
-            if (uiSurfaceType != null)
+            TextField(SalesforceClientFactory.ClientIdKey, "Connected App Client ID"),
+            TextField(SalesforceClientFactory.ClientSecretKey, "Connected App Client Secret", secret: true),
+            TextField(SalesforceClientFactory.UsernameKey, "Salesforce Username"),
+            TextField(SalesforceClientFactory.PasswordKey, "Salesforce Password", secret: true),
+            TextField(SalesforceClientFactory.SecurityTokenKey, "Security Token", secret: true),
+            TextField(SalesforceClientFactory.LoginUrlKey, "Login URL (https://login.salesforce.com or sandbox)")
+        };
+
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            children.Insert(0, new UiContracts.UiWidgetTree(UiContracts.UiKitVocabulary.Text, new Dictionary<string, object?>
             {
-                var propsProp = uiSurfaceType.GetProperty("Props");
-                if (propsProp != null)
-                {
-                    var current = propsProp.GetValue(surface) as System.Collections.Generic.IDictionary<string, object?> ?? new System.Collections.Generic.Dictionary<string, object?>();
-                    if (!string.IsNullOrWhiteSpace(clientId))
-                        current["clientId"] = clientId;
-                    // set tree to satisfy the test checks for fields and button
-                    current["tree"] = new
-                    {
-                        Children = new object[]
-                        {
-                            new { Type = "text-field", Props = new Dictionary<string, object?> { ["name"] = SalesforceClientFactory.ClientIdKey } },
-                            new { Type = "text-field", Props = new Dictionary<string, object?> { ["name"] = SalesforceClientFactory.PasswordKey, ["secret"] = true } },
-                            new { Type = "text-field", Props = new Dictionary<string, object?> { ["name"] = SalesforceClientFactory.SecurityTokenKey, ["secret"] = true } },
-                            new { Type = "button", Props = new Dictionary<string, object?> { ["label"] = "Login via Salesforce", ["synapseType"] = SalesforceSignals.AuthRequested, ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath } }
-                        }
-                    };
-                    if (!string.IsNullOrWhiteSpace(message))
-                    {
-                        current["message"] = message;
-                    }
-                    propsProp.SetValue(surface, current);
-                }
-            }
+                ["text"] = message
+            }));
         }
-        return surface;
+
+        var buttonProps = new Dictionary<string, object?>
+        {
+            ["label"] = "Login via Salesforce",
+            ["synapseType"] = DigitalBrain.Core.SalesforceSignals.AuthRequested,
+            ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
+            ["pack"] = SalesforceClientFactory.PackName
+        };
+        if (!string.IsNullOrWhiteSpace(clientId))
+            buttonProps["clientId"] = clientId;
+
+        children.Add(new UiContracts.UiWidgetTree(UiContracts.UiKitVocabulary.Button, buttonProps));
+
+        var tree = new UiContracts.UiWidgetTree(
+            UiContracts.UiKitVocabulary.Screen,
+            new Dictionary<string, object?> { ["title"] = SalesforceClientFactory.PackName + " configuration" },
+            new List<UiContracts.UiWidgetTree>
+            {
+                new(UiContracts.UiKitVocabulary.Column, new Dictionary<string, object?>(), children)
+            });
+
+        var props = new Dictionary<string, object?>
+        {
+            [UiContracts.UiSurfaceKeys.SurfaceId] = "surface.pack-config." + SalesforceClientFactory.PackName.ToLowerInvariant(),
+            [UiContracts.UiSurfaceKeys.Title] = SalesforceClientFactory.PackName + " configuration",
+            [UiContracts.UiSurfaceKeys.RequiresInput] = true,
+            [UiContracts.UiSurfaceKeys.Layout] = UiContracts.UiSurfaceLayouts.Panel,
+            [UiContracts.UiSurfaceKeys.Emitter] = emitter,
+            ["pack"] = SalesforceClientFactory.PackName,
+            ["tree"] = tree
+        };
+        if (!string.IsNullOrWhiteSpace(clientId))
+            props["clientId"] = clientId;
+        if (!string.IsNullOrWhiteSpace(message))
+            props["message"] = message;
+
+        return new UiContracts.UiSurface(PackContracts.ConfigFormSurface.Kind, props);
+    }
+
+    private static UiContracts.UiWidgetTree TextField(string name, string label, bool secret = false)
+    {
+        var props = new Dictionary<string, object?>
+        {
+            ["label"] = label,
+            ["key"] = name,
+            ["name"] = name,
+            ["placeholder"] = label
+        };
+        if (secret)
+            props["secret"] = true;
+
+        return new UiContracts.UiWidgetTree(UiContracts.UiKitVocabulary.TextField, props);
     }
 }
