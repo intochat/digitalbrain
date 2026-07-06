@@ -16,6 +16,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: production
     env:
       TAG: "${{ github.event.release.tag_name }}"
     steps:
@@ -98,6 +100,45 @@ jobs:
           PULUMI_BACKEND_URL: azblob://pulumi-state
           AZURE_STORAGE_ACCOUNT: digitalbrainstprod
 
+      - name: Capture Static Web Apps deployment settings
+        id: swa
+        working-directory: deploy
+        run: |
+          token=$(pulumi stack output swaDeploymentToken --stack dev --show-secrets)
+          hostname=$(pulumi stack output swaDefaultHostname --stack dev)
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+          echo "hostname=$hostname" >> "$GITHUB_OUTPUT"
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
+          PULUMI_BACKEND_URL: azblob://pulumi-state
+          AZURE_STORAGE_ACCOUNT: digitalbrainstprod
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+        working-directory: app
+
+      # Served at the apex custom domain, so base href is "/". Flutter's default
+      # hash URL strategy resolves routes client-side without a custom 404.html.
+      # --no-tree-shake-icons: the app uses non-constant IconData, which blocks icon tree-shaking.
+      - run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run
+        working-directory: app
+
+      - name: Deploy Flutter web to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: app/build/web
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
+
       - name: Post-deploy smoke test
         run: |
           for i in $(seq 1 10); do
@@ -109,4 +150,17 @@ jobs:
             sleep 10
           done
           echo "Kernel did not become healthy within 100s." >&2
+          exit 1
+
+      - name: Static Web Apps smoke test
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsSI "https://${{ steps.swa.outputs.hostname }}/" >/dev/null; then
+              echo "Static Web App healthy."
+              exit 0
+            fi
+            echo "Attempt $i: static web app not ready yet, retrying in 10s..."
+            sleep 10
+          done
+          echo "Static Web App did not become reachable within 100s." >&2
           exit 1
