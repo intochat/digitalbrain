@@ -61,18 +61,21 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     if (isAspireHosted)
     {
+        var webPort = Environment.GetEnvironmentVariable("DIGITALBRAIN_WEB_PORT");
+        var hasWebEndpoint = int.TryParse(webPort, out var webEndpointPort);
+
         var grpcPorts = (Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS") ?? string.Empty)
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         foreach (var grpcPort in grpcPorts)
         {
-            if (int.TryParse(grpcPort, out var grpcEndpointPort))
+            if (int.TryParse(grpcPort, out var grpcEndpointPort) &&
+                (!hasWebEndpoint || grpcEndpointPort != webEndpointPort))
             {
                 options.ListenAnyIP(grpcEndpointPort, listen => listen.Protocols = HttpProtocols.Http2);
             }
         }
 
-        var webPort = Environment.GetEnvironmentVariable("DIGITALBRAIN_WEB_PORT");
-        if (int.TryParse(webPort, out var webEndpointPort))
+        if (hasWebEndpoint)
         {
             options.ListenAnyIP(webEndpointPort, listen => listen.Protocols = HttpProtocols.Http1AndHttp2);
         }
