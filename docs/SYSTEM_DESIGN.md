@@ -65,7 +65,7 @@ Broadcast delivery (`OnNextAsync`, lines 144-147) calls `SynapseDispatch.Dispatc
 `TryHandleViaDeclaredInterfaceAsync` (`Neuron.cs:278-301`), reached via `DeliverAsync` (lines
 239-271).
 
-The real silo registers the stream provider in production, not just tests:
+The real Orleans silo (in the kernel) registers the stream provider in production, not just tests:
 `Program.cs:164` — `siloBuilder.AddMemoryStreams("DigitalBrainTimeline")`.
 
 Proof of actual N+1 fan-out: `DigitalBrain.Tests/Kernel/BroadcastReactivityTests.cs`, scenario
@@ -88,7 +88,7 @@ Solution `Brain.slnx` lists 33 projects plus the in-repo Flutter client project 
 | `DigitalBrain.Ui.Runtime` | Runtime/sample UI projection helpers — `UiSurfaceSamples` and `UiSurfaceLiveData`. References only Core primitives plus UI contracts so samples/live-data builders do not accumulate in the schema assembly. |
 | `DigitalBrain.Pack.Contracts` | Executable pack contract layer — `IPackBehavior`, `PackManifest`, pack config fields, `PackEmission`, trust helpers, `ConfigurationProvided`/`ConfigFormSurface`, and `KitExperience`/`UiExperience`. References Core and UI contracts; Core does not reference this project. |
 | `DigitalBrain.SeedPacks` | Seed catalog assembly. Owns `MarketplaceSeeds` and embeds seed pack source such as `PersonalAssistantNeuron.cs` so concrete marketplace seed content no longer lives in `DigitalBrain.Core`. |
-| `DigitalBrain.Kernel` | The Orleans runtime (formerly "Silo"). `Microsoft.NET.Sdk.Web`, container-packaged. Subfolders: `Auth, Awesome, Company, Config, Context, Economics, Foundry, Gateway, Generated, Ino, Kernel, Llm, Marketplace, Protos, Sandbox, Sdk, Ui`. Owns embodiment (Foundry/Sandbox), LLM (Microsoft.Extensions.AI + Ollama/Azure OpenAI), Economics (Stripe + ECDSA licenses), Context (Qdrant), server-driven UI (`Ui`/`Protos`, bidirectional gRPC `UiGateway`), HA self-update. References every isolated ino project below for their interfaces/logic, and hosts the concrete `Neuron`-derived grain classes for Windows/Developer/Context/UiKit/Telegram.Channel/Google (see §1.3a). |
+| `DigitalBrain.Kernel` | The Orleans runtime (product rename from "Silo" complete; technical Orleans terms like siloBuilder remain). `Microsoft.NET.Sdk.Web`, container-packaged. Subfolders: `Auth, Company, Config, Context, Economics, Foundry, Gateway, Generated, Ino, Kernel, Llm, Marketplace, Protos, Sandbox, Sdk, Ui`. Owns embodiment (Foundry/Sandbox), LLM (Microsoft.Extensions.AI + Ollama/Azure OpenAI), Economics (Stripe + ECDSA licenses), Context (Qdrant), server-driven UI (`Ui`/`Protos`, bidirectional gRPC `UiGateway`), HA self-update. References every isolated ino project below for their interfaces/logic, and hosts the concrete `Neuron`-derived grain classes for Windows/Developer/Context/UiKit/Telegram.Channel/Google (see §1.3a). |
 | `DigitalBrain.Aspire` | Hosting SDK: `AddDigitalBrain`/`WireKernelSilo` (`DigitalBrainBuilderExtensions.cs`), `AddFlutterClient`/`AddDefaultDevFlutterClient` (`FlutterAspireExtensions.cs`), `WireTelegramTransport` (`TelegramAspireExtensions.cs`), `AddSalesforceAppConfig` (`SalesforceAspireExtensions.cs`). Dashboard/MCP are enabled via `DigitalBrainOptions` defaults (`EnableOrleansDashboard`/`OrleansDashboardPort`/`EnableMcp`, default `true`/`8080`/`true`), not fluent calls. Not itself an Aspire project resource (`IsAspireProjectResource=false`). |
 | `DigitalBrain.Mcp` | MCP server (`Mcp`, an `Exe`, co-hosted on the kernel's Kestrel) exposing neuron tools (`DigitalBrainMutationTools.cs`, `DigitalBrainReadTools.cs`). References Core plus demo, UI, pack, and marketplace contracts for surface projection and pack authoring. |
 | `DigitalBrain.Telegram` | Pure shared library: transport-internal synapses (`TelegramMessageReceived`, `TelegramReplyRequested` — explicitly *not* journaled through the kernel) and `TelegramResponderNeuron`, a pure `IPackBehavior` pack. Fully self-contained — never derives from `Neuron`. References Core primitives plus pack contracts. |
@@ -245,7 +245,7 @@ entitlement.
   `OnNextAsync` (924-931) tries `_embodied.CanHandle`/`Handle` first, then falls back to the base
   static-`IHandle<T>` path. This is the concrete "N+1" mechanism: installing a new pack adds a new
   `GeneratedNeuron` subscriber to the same global broadcast stream, so an existing broadcast synapse
-  now reaches one more handler with zero silo restart.
+  now reaches one more handler with zero kernel restart.
 
 ### 1.6 Bundle / Manifest layer
 
@@ -378,7 +378,7 @@ for Orleans clustering/journal.
   repaired. The supported fast local-dev path is `aspire run` from `brain/` (`DigitalBrain.AppHost`),
   which already has an equivalent-or-better resource graph (kernel, default Windows Flutter client,
   MCP, optional Telegram via env vars) than brain.cs ever reached.
-- **Resolved (2026-07-03): the E2E AppHost fixture waits for `"kernel"`.** The stale Silo→Kernel
+- **Resolved (2026-07-03): the E2E AppHost fixture waits for `"kernel"`.** The stale Silo→Kernel rename is complete in product code (Orleans technical terms like siloBuilder remain).
   rename gap documented in earlier continuity notes no longer applies; `DigitalBrainAppHostFixture`
   waits for the AppHost resource named `"kernel"` before resolving `web` and `grpc` endpoints.
 - **Distribution & Bundles Phase 2 (open publishing, untrusted-code sandbox, BYO-token branded bots,
@@ -435,14 +435,14 @@ blanket "always Context7 first" rule.
 
 `DigitalBrain.Tests` uses **Reqnroll** (`Reqnroll`, `Reqnroll.Tools.MsBuild.Generation`,
 `Reqnroll.xUnit` in the `.csproj`) over a real Orleans `TestCluster` (referenced in 33+ files); the
-shared fixture is `DigitalBrain.Tests/TestSupport/NeuronTestSiloConfigurator.cs`.
+shared fixture is `DigitalBrain.Tests/TestSupport/NeuronTestKernelConfigurator.cs`.
 
-`.feature` files are flat under `Features/` — only **5 total**: `AwesomeSoftware20.feature`,
+`.feature` files are flat under `Features/` — only **4 total** (AwesomeSoftware20.feature removed as dead experiment trash):
 `CodeFoundry.feature`, `NeuronCore.feature`, `MarketplaceUserFlows.feature`, `TelegramExperience.feature`.
 Concern-based organization instead lives
 in the plain-C#-test folder structure, not the `.feature` tree: `Kernel/`, `Economics/`, `Context/`,
 `Ui/`, `Mcp/`, `E2E/` (the largest, ~20 files including a `Packs/` subfolder), `Gateway/`, `Trust/`,
-`Distribution/`, `Telegram/`, `Domains/`, `Foundry/`, `Sdk/`, `Awesome/`, `Company/`, `Auth/`, `Llm/`,
+`Distribution/`, `Telegram/`, `Domains/`, `Foundry/`, `Sdk/`, `Company/`, `Auth/`, `Llm/`,
 `Protocol/`, `Sandbox/`, `Steps/` (Reqnroll step definitions), `TestSupport/`. In practice most new
 coverage is plain xUnit facts against the `TestCluster`, with Reqnroll reserved for the handful of
 narrative BDD scenarios.

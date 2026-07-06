@@ -19,7 +19,6 @@ public interface INeuron : IGrainWithStringKey
     Task<NeuronId> BranchAsync(Checkpoint checkpoint);
     Task RestoreCheckpointAsync(Checkpoint checkpoint);
 
-    // Identifies which silo currently hosts this activation, so callers (tests, ops tooling) can prove
-    // cross-silo placement/delivery instead of assuming it.
+    // Orleans diagnostic: which activation host (silo) currently owns this grain. Used in cross-activation tests.
     Task<string> GetSiloIdentityAsync();
 }

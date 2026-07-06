@@ -24,7 +24,7 @@ using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Gateway;
 
-[Collection("silo-host")]
+[Collection("kernel-host")]
 public class GatewayServiceTests : NeuronTestBase
 {
     private HomeFeedBus? _homeFeedBusInstance;

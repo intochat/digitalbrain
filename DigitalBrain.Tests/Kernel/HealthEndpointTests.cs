@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalBrain.Tests.Kernel;
 
-[Collection("silo-host")]
+[Collection("kernel-host")]
 public class HealthEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory = factory;

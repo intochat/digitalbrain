@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalBrain.Tests.Kernel;
 
-[Collection("silo-host")]
+[Collection("kernel-host")]
 public class KernelStaticServingTests
 {
     [Fact]

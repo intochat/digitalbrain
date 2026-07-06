@@ -43,7 +43,7 @@ public sealed class GatewayService(
             {
                 var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
                 var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
+                var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 string Field(string key, string fallback = "") => p.TryGetValue(key, out var v) ? v?.ToString() ?? fallback : fallback;
                 var packName = Field("packName", Field("name", request.CorrelationId));
                 var isPrivate = bool.TryParse(Field("isPrivate"), out var priv) && priv;
@@ -63,7 +63,7 @@ public sealed class GatewayService(
                 var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
                 // payload json carries props (packName/version from surface action); buyerId is server-resolved below
                 var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
+                var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var packName = p.TryGetValue("packName", out var pn) ? pn?.ToString() ?? p.GetValueOrDefault("name")?.ToString() ?? "" : "";
                 var ver = p.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "";
                 var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
@@ -77,7 +77,7 @@ public sealed class GatewayService(
             if (request.TypeName == GoogleSignals.AuthRequested || request.TypeName.Contains(GoogleSignals.AuthRequested, StringComparison.OrdinalIgnoreCase))
             {
                 var auth = grains.GetGrain<IGoogleAuthNeuron>("google-auth-main");
-                var signal = new Signal(GoogleSignals.AuthRequested, PayloadProps(request))
+                var signal = new Signal(GoogleSignals.AuthRequested, GatewayPayload.PayloadProps(request))
                 {
                     Receiver = new NeuronId("google-auth-main")
                 };
@@ -91,13 +91,13 @@ public sealed class GatewayService(
                     ? "google-auth-completed"
                     : request.CorrelationId;
                 var authCompletedIngress = grains.GetGrain<IIngressNeuron>(key);
-                await authCompletedIngress.IngestAsync(GoogleSignals.AuthCompleted, PayloadProps(request));
+                await authCompletedIngress.IngestAsync(GoogleSignals.AuthCompleted, GatewayPayload.PayloadProps(request));
                 return request;
             }
 
             if (request.TypeName == SalesforceSignals.AuthRequested || request.TypeName.Contains(SalesforceSignals.AuthRequested, StringComparison.OrdinalIgnoreCase))
             {
-                var authProps = PayloadProps(request);
+                var authProps = GatewayPayload.PayloadProps(request);
                 var authClientId = authProps.TryGetValue("clientId", out var authCid) ? authCid?.ToString() : null;
                 var authSession = await ResolveSessionByClientIdAsync(authClientId);
                 if (authSession is null)
@@ -120,7 +120,7 @@ public sealed class GatewayService(
                     throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pack config store is not configured."));
 
                 var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
+                var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 string? Field(string key) => p.TryGetValue(key, out var v) ? v?.ToString() : null;
 
                 var pack = Field("pack") ?? Field("packName") ?? request.CorrelationId;
@@ -162,7 +162,7 @@ public sealed class GatewayService(
             if (request.TypeName == nameof(InoRequest) || request.TypeName.Contains("InoRequest", StringComparison.OrdinalIgnoreCase))
             {
                 var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-                var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
+                var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
                 var prompt = p.TryGetValue("prompt", out var pr) ? pr?.ToString() ?? "" : "";
                 var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
                 var workspaceId = p.TryGetValue("workspaceId", out var wid) ? wid?.ToString() : null;
@@ -218,13 +218,13 @@ public sealed class GatewayService(
             if (string.IsNullOrWhiteSpace(request.TypeName))
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "Empty synapse type"));
 
-            EnforceInternalCaller(context);
+            GatewayInternalAuth.Enforce(configuration, environment, logger, context, nameof(Send));
 
             var payloadJson = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
             var rawProps = string.IsNullOrWhiteSpace(payloadJson)
                 ? new Dictionary<string, object?>()
                 : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? new();
-            var signalProps = NormalizeJsonProps(rawProps);
+            var signalProps = GatewayPayload.NormalizeJsonProps(rawProps);
 
             if (string.Equals(request.TypeName, TelegramSignals.MessageReceived, StringComparison.Ordinal)
                 && signalProps.TryGetValue("chatId", out var chatIdValue) && chatIdValue is not null)
@@ -308,7 +308,7 @@ public sealed class GatewayService(
     // browser, which is not given the key) may pull decrypted secrets.
     public override async Task<PackConfigReply> GetPackConfig(GetPackConfigRequest request, ServerCallContext context)
     {
-        EnforceInternalCaller(context);
+        GatewayInternalAuth.Enforce(configuration, environment, logger, context, nameof(GetPackConfig));
 
         if (packConfigStore is null)
             throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pack config store is not configured."));
@@ -322,72 +322,6 @@ public sealed class GatewayService(
         return reply;
     }
 
-    // gRPC metadata header carrying the shared service-to-service secret. Lower-case per gRPC ASCII-header rules.
-    internal const string InternalKeyHeader = "x-internal-key";
-
-    // Reject any caller that cannot prove it is an internal transport. The kernel is configured with a shared
-    // InternalServiceKey (injected as an env param to both the kernel and the internal transport); the transport
-    // presents it as the x-internal-key metadata header. Constant-time compare avoids leaking the key by timing.
-    // When NO key is configured: allow only in Development (local "clone + run" convenience), deny otherwise — so a
-    // misconfigured production kernel fails closed rather than exposing secrets to the open ingress.
-    private void EnforceInternalCaller(ServerCallContext context)
-    {
-        var configuredKey = configuration["DigitalBrain:InternalServiceKey"];
-
-        if (string.IsNullOrEmpty(configuredKey))
-        {
-            if (environment.IsDevelopment())
-                return;
-            logger.LogError("GetPackConfig denied: no InternalServiceKey configured outside Development.");
-            throw new RpcException(new Status(StatusCode.Unauthenticated, "internal only"));
-        }
-
-        var presented = context.RequestHeaders.GetValue(InternalKeyHeader);
-        if (presented is null || !FixedTimeEquals(presented, configuredKey))
-            throw new RpcException(new Status(StatusCode.Unauthenticated, "internal only"));
-    }
-
-    private static bool FixedTimeEquals(string a, string b) =>
-        System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(a), System.Text.Encoding.UTF8.GetBytes(b));
-
-    // Surface-action payloads arrive from both Flutter (camelCase) and test/native callers (PascalCase).
-    // A case-insensitive view lets one set of key lookups serve both without silent misses.
-    private static Dictionary<string, object?> CaseInsensitive(Dictionary<string, object?>? source) =>
-        new(source ?? new(), StringComparer.OrdinalIgnoreCase);
-
-    // STJ deserializes JSON numbers/booleans as JsonElement when the target type is object?.
-    // Unwrap them to CLR primitives so Signal consumers read int/long/double/bool/string directly.
-    private static Dictionary<string, object?> NormalizeJsonProps(Dictionary<string, object?> raw)
-    {
-        var result = new Dictionary<string, object?>(raw.Count, StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, value) in raw)
-        {
-            result[key] = value is System.Text.Json.JsonElement el ? UnwrapElement(el) : value;
-        }
-        return result;
-    }
-
-    private static Dictionary<string, object?> PayloadProps(SynapseEnvelope request)
-    {
-        var payloadJson = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-        if (string.IsNullOrWhiteSpace(payloadJson))
-            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-
-        var raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? new();
-        return NormalizeJsonProps(raw);
-    }
-
-    private static object? UnwrapElement(System.Text.Json.JsonElement el) => el.ValueKind switch
-    {
-        System.Text.Json.JsonValueKind.True => true,
-        System.Text.Json.JsonValueKind.False => false,
-        System.Text.Json.JsonValueKind.Null or System.Text.Json.JsonValueKind.Undefined => null,
-        System.Text.Json.JsonValueKind.Number => el.TryGetInt64(out var l) ? (object)l : el.GetDouble(),
-        System.Text.Json.JsonValueKind.Object => el.GetRawText(),
-        System.Text.Json.JsonValueKind.Array => el.GetRawText(),
-        _ => el.GetString()
-    };
 
     private static Task WriteCardAsync(
         IServerStreamWriter<RfwCardEnvelope> responseStream,

@@ -12,7 +12,7 @@ namespace DigitalBrain.Mcp;
 [McpServerToolType]
 public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBrainToolsBase(grains)
 {
-    [McpServerTool(Name = "ask_llm_neuron"), Description("Ask the LLM neuron (powered by local Qwen/Ollama) a question or prompt. Returns the response. Requires the cluster (silo + ollama) to be running.")]
+    [McpServerTool(Name = "ask_llm_neuron"), Description("Ask the LLM neuron (powered by local Qwen/Ollama) a question or prompt. Returns the response. Requires the kernel cluster and Ollama to be running.")]
     public async Task<string> AskLlmNeuron(
         [Description("The prompt or question to send to the LLM neuron")] string prompt,
         [Description("Optional preferred model, e.g. 'qwen2.5-coder:1.5b'")] string? preferredModel = null)
@@ -51,14 +51,6 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
     [McpServerTool(Name = "ask_ino"), Description("Ask the INO AI assistant (uses ContextNeuron for smart management).")]
     public Task<string> AskIno([Description("Prompt for INO navigation/assistant")] string prompt)
         => Grains.GetGrain<IInoNeuron>("ino-main").AskAsync(prompt);
-
-    [McpServerTool(Name = "ino_code_editor"), Description("Interact with the INOCodeEditor neuron for visual editing/running of pack code.")]
-    public async Task<string> InoCodeEditor([Description("Editor ID")] string id, [Description("Code or command")] string code)
-    {
-        var editor = Grains.GetGrain<IInoCodeEditor>("ino-editor-main");
-        await editor.FireAsync(new InoCodeEdit(id, code));
-        return $"INOCodeEditor received edit for {id}. Run to execute.";
-    }
 
     [McpServerTool(Name = "update_context_filter"), Description("Update ContextNeuron (e.g. when a UI filter changes so INO sees it).")]
     public async Task<string> UpdateContextFilter(

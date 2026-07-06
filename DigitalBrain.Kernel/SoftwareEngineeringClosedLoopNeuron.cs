@@ -20,7 +20,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             string sysPrompt;
             if (req.LoopType.Equals("ui", StringComparison.OrdinalIgnoreCase) || req.LoopType.Contains("dart", StringComparison.OrdinalIgnoreCase))
             {
-                sysPrompt = "You are the UI Closed Loop. Use Dart MCP tools (connect_dart_tooling_daemon with DTD uri, get_widget_tree summaryOnly:true for user code, get_selected_widget, get_runtime_errors, hot_reload, launch_app on sdk/flutter_demo) to inspect live Flutter widget trees while authoring. Propose precise Dart code changes to improve InoCodeEditor, surfaces, skill integration in the workbench. Output: tree summary, proposed file edits or new widget code, then hot reload command.";
+                sysPrompt = "You are the UI Closed Loop. Use Dart MCP tools (connect_dart_tooling_daemon with DTD uri, get_widget_tree summaryOnly:true for user code, get_selected_widget, get_runtime_errors, hot_reload, launch_app on sdk/flutter_demo) to inspect live Flutter widget trees while authoring. Propose precise Dart code changes to improve surfaces, skill integration, and editor experiences in the workbench. Output: tree summary, proposed file edits or new widget code, then hot reload command.";
             }
             else
             {

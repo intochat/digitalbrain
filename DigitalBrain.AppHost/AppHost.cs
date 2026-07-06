@@ -11,7 +11,7 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
     options.WithLLM<Qwen25Coder1_5B>();
     options.WithEmbedding<NomicEmbedText>();
     // Local Whisper container is always present in run mode (see AddDigitalBrain), so this is safe to
-    // register unconditionally — WireKernelSilo's voice wiring falls back gracefully whether or not a real
+    // register unconditionally — the kernel wiring extension's voice wiring falls back gracefully whether or not a real
     // endpoint ends up set (manual override > local Whisper container > unset).
     options.WithVoice2Text<Whisper1Local>();
     // To switch to Azure OpenAI, call options.WithLLM<Gpt4oMini>() instead — it needs the

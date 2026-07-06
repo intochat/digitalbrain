@@ -16,7 +16,7 @@ public sealed class ChatFileAttachmentSteps : IAsyncDisposable
     public ChatFileAttachmentSteps()
     {
         var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
+        builder.AddSiloBuilderConfigurator<NeuronTestKernelConfigurator>();
         _cluster = builder.Build();
         _cluster.DeployAsync().GetAwaiter().GetResult();
     }
