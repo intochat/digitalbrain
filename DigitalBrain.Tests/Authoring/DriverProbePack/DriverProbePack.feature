@@ -1,3 +1,4 @@
+@cluster
 Feature: Driver probe pack
   As a pack author
   I want a minimal pack proven by the shared Reqnroll vocabulary

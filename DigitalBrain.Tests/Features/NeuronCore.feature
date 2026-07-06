@@ -1,3 +1,4 @@
+@cluster
 Feature: DigitalBrain Neuron Core
 
 Scenario: Sending a synapse journals it and is replayable

@@ -17,12 +17,14 @@ namespace DigitalBrain.Tests.Features
     
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Reqnroll", "3.0.0.0")]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
+    [global::Xunit.TraitAttribute("Category", "cluster")]
     public partial class PackConfigFormOnInstallSlice2_Config_DrivenExperienceFeature : object, global::Xunit.IClassFixture<PackConfigFormOnInstallSlice2_Config_DrivenExperienceFeature.FixtureData>, global::Xunit.IAsyncLifetime
     {
         
         private global::Reqnroll.ITestRunner testRunner;
         
-        private static string[] featureTags = ((string[])(null));
+        private static string[] featureTags = new string[] {
+                "cluster"};
         
         private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Pack config form on install (Slice 2 - config-driven experience)", "\tAs a user installing a pack that declares RequiredConfig\r\n\tI want the kernel to " +
                 "render an in-app config form on install\r\n\tSo that submitting it persists my valu" +
@@ -153,7 +155,7 @@ namespace DigitalBrain.Tests.Features
                     "ues", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 7
+#line 8
  this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -163,21 +165,21 @@ namespace DigitalBrain.Tests.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 8
+#line 9
   await testRunner.GivenAsync("a generic pack \"GenericConfiguredPack\" declaring 3 required config fields", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 9
+#line 10
   await testRunner.WhenAsync("I publish and install the pack", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 10
+#line 11
   await testRunner.ThenAsync("a config form surface is emitted whose tree contains the fields \"telegram_token\"," +
                         " \"llm_provider\", \"llm_key\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 11
+#line 12
   await testRunner.WhenAsync("I submit configuration for the pack with token \"tok-123\", provider \"openai\", key " +
                         "\"sk-secret\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 12
+#line 13
   await testRunner.ThenAsync("the pack config store returns token \"tok-123\", provider \"openai\", key \"sk-secret\"" +
                         "", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
@@ -205,7 +207,7 @@ namespace DigitalBrain.Tests.Features
                     "bed LLM to an egress reply", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 15
+#line 16
  this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -215,28 +217,28 @@ namespace DigitalBrain.Tests.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 16
+#line 17
   await testRunner.GivenAsync("the Telegram responder experience is installed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 17
+#line 18
   await testRunner.ThenAsync("the install emits a config form whose tree contains the fields \"telegram_token\", " +
                         "\"llm_provider\", \"llm_key\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 18
+#line 19
   await testRunner.WhenAsync("I provide the Telegram configuration token \"tok-123\", provider \"openai\", key \"sk-" +
                         "secret\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 19
+#line 20
   await testRunner.AndAsync("the LLM responder is active and the egress bus is watching \"TelegramReplyRequeste" +
                         "d\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 20
+#line 21
   await testRunner.AndAsync("a Telegram message arrives for chat 7 with text \"hi\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 21
+#line 22
   await testRunner.ThenAsync("the embodied pack emits an AskLlm for \"hi\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 22
+#line 23
   await testRunner.AndAsync("a \"TelegramReplyRequested\" reply for chat 7 with text \"ANSWER:hi\" reaches the egr" +
                         "ess bus", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
@@ -261,7 +263,7 @@ namespace DigitalBrain.Tests.Features
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("N+1 reactivity - two packs both react to one broadcast with no restart", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 25
+#line 26
  this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -271,24 +273,24 @@ namespace DigitalBrain.Tests.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 26
+#line 27
   await testRunner.GivenAsync("both the Telegram responder and the keyword watcher are installed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 27
+#line 28
   await testRunner.AndAsync("I provide the Telegram configuration token \"tok-123\", provider \"openai\", key \"sk-" +
                         "secret\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 28
+#line 29
   await testRunner.AndAsync("the LLM responder is active and the egress bus is watching \"TelegramReplyRequeste" +
                         "d\" and \"ReminderScheduled\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 29
+#line 30
   await testRunner.WhenAsync("a Telegram message with text \"remind me to call mom\" is ingested for chat 7", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 30
+#line 31
   await testRunner.ThenAsync("a \"TelegramReplyRequested\" reply for chat 7 reaches the egress bus", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 31
+#line 32
   await testRunner.AndAsync("a \"ReminderScheduled\" signal for chat 7 reaches the egress bus", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }

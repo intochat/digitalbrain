@@ -1,3 +1,4 @@
+@cluster
 Feature: X post triggers a Bitcoin price alert on Telegram
 	As a user
 	I want DigitalBrain to react to a new X post from a watched author

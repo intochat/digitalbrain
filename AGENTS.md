@@ -14,7 +14,7 @@ This file is the single, slim source of guidance for AI agents and contributors.
 
 ## Current rules (post-reform)
 
-- **Fast inner loop (default)**: `dotnet build && dotnet test --filter "..."`. Do this for Protocol changes, unit logic, step defs, pure C# edits.
+- **Fast inner loop (default)**: `dotnet build && dotnet test --filter "Category!=cluster"`. Use narrower `FullyQualifiedName~...` filters for touched protocol/unit/step/UI-contract code. Full cluster suites are deliberate validation, not the default edit loop.
 - **Aspire changes** (AppHost model, wiring, resource graph, observability): use the aspire MCP tools (list_apphosts, doctor, resource commands, logs) or `aspire` CLI. Prefer targeted resource commands over full restart.
 - **Full distributed validation** (Ollama + replicas + end-to-end features): run intentionally before major PRs or when self-awareness / LLM flows are touched. Not after every edit.
 - **Package versions**: Centralized in `Directory.Packages.props`. No more `Version="*"`. Updates are deliberate (not on every restore).

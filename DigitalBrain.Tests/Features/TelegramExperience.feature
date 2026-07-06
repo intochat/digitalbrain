@@ -1,3 +1,4 @@
+@cluster
 Feature: Pack config form on install (Slice 2 - config-driven experience)
 	As a user installing a pack that declares RequiredConfig
 	I want the kernel to render an in-app config form on install

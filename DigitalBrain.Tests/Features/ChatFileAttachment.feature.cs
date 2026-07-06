@@ -17,12 +17,14 @@ namespace DigitalBrain.Tests.Features
     
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Reqnroll", "3.0.0.0")]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
+    [global::Xunit.TraitAttribute("Category", "cluster")]
     public partial class ChatFileAttachmentsVisualizedWithUIKitTablesFeature : object, global::Xunit.IClassFixture<ChatFileAttachmentsVisualizedWithUIKitTablesFeature.FixtureData>, global::Xunit.IAsyncLifetime
     {
         
         private global::Reqnroll.ITestRunner testRunner;
         
-        private static string[] featureTags = ((string[])(null));
+        private static string[] featureTags = new string[] {
+                "cluster"};
         
         private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Chat file attachments visualized with UI kit tables", "  As a user chatting with the system\r\n  I want to drag and drop an Excel (or tabu" +
                 "lar) file into chat\r\n  So that it is visualized immediately as a clean UI kit ta" +
@@ -146,7 +148,7 @@ namespace DigitalBrain.Tests.Features
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Dropping a simple sales Excel renders a uikit table surface", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 8
+#line 9
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -156,7 +158,7 @@ namespace DigitalBrain.Tests.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 9
+#line 10
     await testRunner.GivenAsync("a chat session \"sales-chat\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
                 global::Reqnroll.Table table1 = new global::Reqnroll.Table(new string[] {
@@ -175,19 +177,19 @@ namespace DigitalBrain.Tests.Features
                             "Mar",
                             "13800",
                             "48"});
-#line 10
+#line 11
     await testRunner.WhenAsync("the user drops a file named \"q2-sales.xlsx\" with the following tabular data:", ((string)(null)), table1, "When ");
 #line hidden
-#line 15
+#line 16
     await testRunner.ThenAsync("the timeline contains a TableSurface for the chat", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 16
+#line 17
     await testRunner.AndAsync("the table surface has columns \"Month\", \"Revenue\", \"Units\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 17
+#line 18
     await testRunner.AndAsync("the table surface has 3 data rows", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 18
+#line 19
     await testRunner.AndAsync("the first row starts with \"Jan\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -205,7 +207,7 @@ namespace DigitalBrain.Tests.Features
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Table from dropped file is usable by the assistant", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 20
+#line 21
   this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -215,19 +217,19 @@ namespace DigitalBrain.Tests.Features
             else
             {
                 await this.ScenarioStartAsync();
-#line 21
+#line 22
     await testRunner.GivenAsync("a chat session \"sales-chat\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 22
+#line 23
     await testRunner.AndAsync("the user previously dropped \"q2-sales.xlsx\" with 3 months of data", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 23
+#line 24
     await testRunner.WhenAsync("I ask \"what was the best month by revenue\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 24
+#line 25
     await testRunner.ThenAsync("the assistant response references the table data from the attachment", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 25
+#line 26
     await testRunner.AndAsync("no error surfaces are emitted", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }

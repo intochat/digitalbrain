@@ -1,3 +1,4 @@
+@cluster
 Feature: Chat file attachments visualized with UI kit tables
 
   As a user chatting with the system
