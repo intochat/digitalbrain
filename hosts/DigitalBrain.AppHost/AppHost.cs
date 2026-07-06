@@ -28,11 +28,13 @@ var internalServiceKey = builder.AddParameter(
     () => builder.Configuration["Parameters:internal-service-key"] ?? Guid.NewGuid().ToString("N"),
     secret: true);
 var salesforceAppConfig = builder.AddSalesforceAppConfig();
+var googleAppConfig = builder.AddGoogleAppConfig();
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);  // Provides kernel cool features out of box (marketplace, surfaces, journals, 3 replicas HA, LLM for built-ins) via the Aspire package.
 kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
+kernel.WithGoogleAppConfig(googleAppConfig);
 
 // Default Windows Flutter thin client on local `aspire run` (P0 item 1+12).
 // Full UI logic remains in marketplace NeuroPack. Uses shared dev default helper (extracted to Aspire ext; pack can override later).

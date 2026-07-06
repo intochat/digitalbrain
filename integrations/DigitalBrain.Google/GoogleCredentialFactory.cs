@@ -17,19 +17,18 @@ public static class GoogleCredentialFactory
         return new UserCredential(flow, "digitalbrain-user", token);
     }
 
-    /// <summary>
-    /// Generates the Google OAuth consent URL for the given client and scopes.
-    /// Client is responsible for launching the URL and handling the redirect/callback.
-    /// </summary>
     public static string CreateAuthorizationUrl(string clientId, string clientSecret, string redirectUri, params string[] scopes)
     {
         var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
         {
             ClientSecrets = new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret },
-            Scopes = scopes
+            Scopes = scopes.Length > 0 ? scopes : new[] { GoogleClientFactory.DefaultGmailScope }
         });
 
         var codeRequest = flow.CreateAuthorizationCodeRequest(redirectUri);
-        return codeRequest.Build().AbsoluteUri;
+        var baseUrl = codeRequest.Build().AbsoluteUri;
+        // Append offline + consent to ensure refresh_token is returned (library request does not set them by default).
+        var separator = baseUrl.Contains('?') ? "&" : "?";
+        return baseUrl + separator + "access_type=offline&prompt=consent";
     }
 }
