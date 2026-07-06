@@ -19,7 +19,6 @@
   </Folder>
   <Folder Name="/integrations/">
     <Project Path="DigitalBrain.Context/DigitalBrain.Context.csproj" />
-    <Project Path="DigitalBrain.Experience.PersonalAssistant/DigitalBrain.Experience.PersonalAssistant.csproj" />
     <Project Path="DigitalBrain.Google/DigitalBrain.Google.csproj" />
     <Project Path="DigitalBrain.Ino/DigitalBrain.Ino.csproj" />
     <Project Path="DigitalBrain.Salesforce/DigitalBrain.Salesforce.csproj" />
@@ -31,7 +30,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj" />
-    <Project Path="DigitalBrain.Experience.PersonalAssistant.Tests/DigitalBrain.Experience.PersonalAssistant.Tests.csproj" />
     <Project Path="DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj" />
     <Project Path="DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
     <Project Path="DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />
