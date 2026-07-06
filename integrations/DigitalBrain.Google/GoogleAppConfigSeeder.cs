@@ -1,10 +1,12 @@
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace DigitalBrain.Kernel.Google;
+namespace DigitalBrain.Google;
 
-internal sealed class GoogleAppConfigSeeder(
+public sealed class GoogleAppConfigSeeder(
     IConfiguration configuration,
     IPackConfigStore store,
     ILogger<GoogleAppConfigSeeder> logger)

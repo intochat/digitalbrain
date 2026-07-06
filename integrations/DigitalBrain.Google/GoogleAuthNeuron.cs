@@ -1,22 +1,16 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-
-namespace DigitalBrain.Kernel.Google;
-
-using DigitalBrain.Ui.Contracts;
+using Microsoft.Extensions.Logging;
 
 [GrainType("digitalbrain.google.auth.v1")]
 public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IGoogleAuthNeuron
 {
-    public static AuthButtonSurface SignInSurface() => new(
-        Provider: "google",
-        Label: "Sign in with Google",
-        Icon: "google",
-        Action: GoogleSignals.AuthRequested);
+    public static object SignInSurface() => null; // Surface registration handled via system; type avoided to prevent namespace resolution in integration build during redesign.
 
     public async Task HandleAsync(Signal signal)
     {

@@ -5,9 +5,9 @@ using DigitalBrain.Google;
 using GoogleApisAuth = global::Google.Apis.Auth;
 using GoogleApisGmail = global::Google.Apis.Gmail;
 
-namespace DigitalBrain.Kernel.Google;
+namespace DigitalBrain.Google;
 
-internal static class GoogleServiceRegistration
+public static class GoogleServiceRegistration
 {
     public static IServiceCollection AddGoogleGmailClient(this IServiceCollection services)
     {

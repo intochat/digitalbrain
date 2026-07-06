@@ -172,14 +172,14 @@ if (isAspireHosted)
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
 builder.Services.AddHostedService<DigitalBrain.Kernel.Salesforce.SalesforceAppConfigSeeder>();
-builder.Services.AddHostedService<DigitalBrain.Kernel.Google.GoogleAppConfigSeeder>();
+builder.Services.AddHostedService<DigitalBrain.Google.GoogleAppConfigSeeder>();
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
 
 // Google Gmail API client: one UserCredential per grain activation, built from the pack config
 // (scope "default", pack "google" with client_id/client_secret/refresh_token). Scoped because Orleans
 // creates a DI scope per grain activation. Uses GoogleClientFactory constants for keys.
-DigitalBrain.Kernel.Google.GoogleServiceRegistration.AddGoogleGmailClient(builder.Services);
+DigitalBrain.Google.GoogleServiceRegistration.AddGoogleGmailClient(builder.Services);
 // Salesforce CRM REST API client: built lazily per call from the shared app-level connected-app config
 // ("default" scope) merged with the calling grain's own per-user token scope ("user:{userId}"). Singleton
 // (not scoped) because, unlike the old eager factory, it no longer resolves a client at grain-activation
