@@ -7,11 +7,9 @@ using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
-using DigitalBrain.Kernel.Google;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Uploads;
-using DigitalBrain.Kernel.Ino;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Kernel.Voice;
 using DigitalBrain.Ui.Contracts;
@@ -22,7 +20,6 @@ using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Economics;
-using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Ino;
@@ -174,7 +171,7 @@ if (isAspireHosted)
     }
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
-builder.Services.AddHostedService<SalesforceAppConfigSeeder>();
+builder.Services.AddHostedService<DigitalBrain.Kernel.Salesforce.SalesforceAppConfigSeeder>();
 builder.Services.AddHostedService<DigitalBrain.Kernel.Google.GoogleAppConfigSeeder>();
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
@@ -182,7 +179,7 @@ builder.Services.AddSingleton<SkillPackSynthesizer>();
 // Google Gmail API client: one UserCredential per grain activation, built from the pack config
 // (scope "default", pack "google" with client_id/client_secret/refresh_token). Scoped because Orleans
 // creates a DI scope per grain activation. Uses GoogleClientFactory constants for keys.
-builder.Services.AddGoogleGmailClient();
+DigitalBrain.Kernel.Google.GoogleServiceRegistration.AddGoogleGmailClient(builder.Services);
 // Salesforce CRM REST API client: built lazily per call from the shared app-level connected-app config
 // ("default" scope) merged with the calling grain's own per-user token scope ("user:{userId}"). Singleton
 // (not scoped) because, unlike the old eager factory, it no longer resolves a client at grain-activation
@@ -196,7 +193,7 @@ builder.Services.AddDigitalBrainOtlpForwardClient();
 // Owns its AI config (provider, model, system prompts, temperature) so the assistant logic
 // can evolve independently and be "plugged" into the kernel host.
 builder.Services.AddInoAi(builder.Configuration.GetSection("Ino:AI"));
-builder.Services.AddSingleton<IInoCapabilityRecall, KernelInoCapabilityRecall>();
+builder.Services.AddSingleton<IInoCapabilityRecall, DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall>();
 
 // Proxy to private marketplace (new separate repo) when enabled.
 // Register the stub here; real impl uses HttpClient to the marketplace service.
