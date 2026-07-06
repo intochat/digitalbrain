@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Kernel.Ino;
 using DigitalBrain.Kernel.SelfEvolution;
 
 namespace DigitalBrain.Kernel;
@@ -29,6 +30,13 @@ public sealed class AutomationDefinitionApplyHandler(IGrainFactory grains) : ISe
 
         await automation.FireAsync(staged.Script);
         await automation.FireAsync(staged.Reaction);
+
+        // Register capability for intent classifier / future vector index (part of modern intent arch)
+        InoIntentClassifier.RegisterCapability(new InoIntentClassifier.Capability(
+            staged.Reaction.Id,
+            $"Automation: when {staged.Reaction.When} target {staged.Reaction.Target}",
+            new[] { proposal.Rationale ?? "" },
+            "automation"));
 
         return new SelfEvolutionApplyResult(
             proposal.ProposalId,

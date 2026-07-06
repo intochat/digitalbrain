@@ -175,29 +175,31 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
         [Description("Natural language description of the when-then automation")] string description,
         [Description("Optional explicit id, otherwise derived")] string? id = null)
     {
-        // Minimal heuristic parser for common patterns; produces real executable C# body.
+        // Improved heuristic (less regex). For full LLM-driven, Ino should parse NL to structured before calling (using classifier + LLM).
         var lower = description.ToLowerInvariant();
         string when = "NeuronActivated";
         string? target = null;
         string script = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from natural\" }) };";
 
-        if (lower.Contains("signal:") || lower.Contains("on signal"))
+        if (lower.Contains("signal:") || lower.Contains("on signal") || lower.Contains("gmail") || lower.Contains("email"))
         {
-            var sigMatch = System.Text.RegularExpressions.Regex.Match(description, @"Signal[:\s]+([A-Za-z0-9_]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            var sig = sigMatch.Success ? sigMatch.Groups[1].Value : "CustomSignal";
-            when = $"Signal:{sig}";
+            if (lower.Contains("gmail") || lower.Contains("email")) 
+                when = "Signal:GmailMessageReceived";
+            else
+                when = "Signal:CustomSignal";
         }
-        else if (lower.Contains("activate") || lower.Contains("activated"))
+        else if (lower.Contains("activate") || lower.Contains("activated") || lower.Contains("salesforce"))
         {
             when = "NeuronActivated";
             if (lower.Contains("personal-assistant") || lower.Contains("assistant")) target = "personal-assistant";
-            else if (lower.Contains("myneuron") || lower.Contains("target")) target = "target-neuron";
+            else if (lower.Contains("salesforce")) target = "salesforce";
         }
 
-        if (lower.Contains("emit") || lower.Contains("dailybrief") || lower.Contains("signal"))
+        if (lower.Contains("emit") || lower.Contains("dailybrief") || lower.Contains("signal") || lower.Contains("summarize"))
         {
-            var emitMatch = System.Text.RegularExpressions.Regex.Match(description, @"emit\s+([A-Za-z0-9_]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            var emitName = emitMatch.Success ? emitMatch.Groups[1].Value : "AutomationTriggered";
+            string emitName = "AutomationTriggered";
+            if (lower.Contains("summarize")) emitName = "Summarized";
+            else if (lower.Contains("brief")) emitName = "DailyBriefGenerated";
             script = $"return new[] {{ new Signal(\"{emitName}\", new Dictionary<string,object?> {{ [\"from\"] = \"automation\", [\"target\"] = \"{target ?? "any"}\" }}) }};";
         }
 

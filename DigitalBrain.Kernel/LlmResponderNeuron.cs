@@ -23,17 +23,42 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
 
     private async Task<IChatClient?> ResolveChatClientAsync(AskLlm ask)
     {
-        if (ask.ConfigPack is null)
-            return ServiceProvider.GetService<IChatClient>();
-
         var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
         var store = ServiceProvider.GetService<IPackConfigStore>();
+        var global = ServiceProvider.GetService<IChatClient>();
+
+        // User-controlled global override via "system" pack config (llm_provider / llm_key).
+        // This is the first-class persisted selection path (Phase C). Falls back to ask-specific or composition default.
+        if (store is not null && factory is not null)
+        {
+            try
+            {
+                var sys = await store.GetAsync("system", "llm");
+                if (sys.TryGetValue("llm_provider", out var sysProvider) && !string.IsNullOrWhiteSpace(sysProvider))
+                {
+                    sys.TryGetValue("llm_key", out var sysKey);
+                    var k = (sysProvider, string.IsNullOrEmpty(sysKey) ? null : sysKey);
+                    if (!_scopedClients.TryGetValue(k, out var sysClient))
+                    {
+                        sysClient = factory.Create(sysProvider, k.Item2);
+                        if (sysClient is not null)
+                            _scopedClients[k] = sysClient;
+                    }
+                    if (sysClient is not null) return sysClient;
+                }
+            }
+            catch { /* config optional */ }
+        }
+
+        if (ask.ConfigPack is null)
+            return global;
+
         if (factory is null || store is null)
-            return ServiceProvider.GetService<IChatClient>();
+            return global;
 
         var values = await store.GetAsync(ask.ConfigScope ?? "default", ask.ConfigPack);
         if (!values.TryGetValue("llm_provider", out var provider) || string.IsNullOrWhiteSpace(provider))
-            return ServiceProvider.GetService<IChatClient>();
+            return global;
 
         values.TryGetValue("llm_key", out var apiKey);
         var key = (provider, string.IsNullOrEmpty(apiKey) ? null : apiKey);
@@ -41,7 +66,7 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
         {
             client = factory.Create(provider, key.Item2);
             if (client is null)
-                return ServiceProvider.GetService<IChatClient>();
+                return global;
             _scopedClients[key] = client;
         }
 
