@@ -5,17 +5,17 @@
     <Project Path="app/Flutter.proj" Type="C#" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
-    <Project Path="DigitalBrain.Core/DigitalBrain.Core.csproj" />
-    <Project Path="DigitalBrain.Demo.Contracts/DigitalBrain.Demo.Contracts.csproj" />
-    <Project Path="DigitalBrain.Demo.Runtime/DigitalBrain.Demo.Runtime.csproj" />
-    <Project Path="DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-    <Project Path="DigitalBrain.Marketplace.Contracts/DigitalBrain.Marketplace.Contracts.csproj" />
-    <Project Path="DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-    <Project Path="DigitalBrain.Pack.Contracts/DigitalBrain.Pack.Contracts.csproj" />
-    <Project Path="DigitalBrain.SeedPacks/DigitalBrain.SeedPacks.csproj" />
-    <Project Path="DigitalBrain.Ui.Contracts/DigitalBrain.Ui.Contracts.csproj" />
-    <Project Path="DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj" />
+    <Project Path="src/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <Project Path="src/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <Project Path="src/DigitalBrain.Demo.Contracts/DigitalBrain.Demo.Contracts.csproj" />
+    <Project Path="src/DigitalBrain.Demo.Runtime/DigitalBrain.Demo.Runtime.csproj" />
+    <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <Project Path="src/DigitalBrain.Marketplace.Contracts/DigitalBrain.Marketplace.Contracts.csproj" />
+    <Project Path="src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
+    <Project Path="src/DigitalBrain.Pack.Contracts/DigitalBrain.Pack.Contracts.csproj" />
+    <Project Path="src/DigitalBrain.SeedPacks/DigitalBrain.SeedPacks.csproj" />
+    <Project Path="src/DigitalBrain.Ui.Contracts/DigitalBrain.Ui.Contracts.csproj" />
+    <Project Path="src/DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj" />
   </Folder>
   <Folder Name="/integrations/">
     <Project Path="integrations/DigitalBrain.Context/DigitalBrain.Context.csproj" />
@@ -30,12 +30,12 @@
     <Project Path="hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj" />
-    <Project Path="DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj" />
-    <Project Path="DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
-    <Project Path="DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />
-    <Project Path="DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
-    <Project Path="DigitalBrain.TestKit.Tests/DigitalBrain.TestKit.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
+    <Project Path="tests/DigitalBrain.TestKit.Tests/DigitalBrain.TestKit.Tests.csproj" />
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />

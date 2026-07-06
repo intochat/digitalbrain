@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Demo.Contracts\DigitalBrain.Demo.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Demo.Contracts\DigitalBrain.Demo.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
   </ItemGroup>
 
