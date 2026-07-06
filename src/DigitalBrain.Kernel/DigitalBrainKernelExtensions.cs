@@ -1,5 +1,5 @@
 using DigitalBrain.Kernel.Company;
-using DigitalBrain.Ino;
+using Ino = DigitalBrain.Ino;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
@@ -25,7 +25,9 @@ public static class DigitalBrainKernelExtensions
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
-                services.AddSingleton<IInoCapabilityRecall, DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall>();
+                var inoRecallType = Type.GetType("DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall");
+if (inoRecallType != null)
+    services.AddSingleton(typeof(Ino.IInoCapabilityRecall), inoRecallType);
             });
 
             // Built-in neurons discovered automatically.
