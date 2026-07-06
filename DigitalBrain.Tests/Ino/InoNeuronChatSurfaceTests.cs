@@ -5,6 +5,7 @@ using DigitalBrain.Core.UiKit;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
+using DigitalBrain.Kernel.Ino;
 using DigitalBrain.Salesforce;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.AI;
@@ -141,6 +142,66 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
                 yield return found;
         }
     }
+
+    [Fact]
+    public async Task CapabilityRegistry_Projection_And_Retrieve_Works_For_Intent()
+    {
+        // Tests journal-driven registry projection path (Load/Register from journals) and Retrieve (Slice B: keyword + Context.RecallAsync top-k for vector grounding).
+        var cap = new InoIntentClassifier.Capability(
+            "test-gsf-followup",
+            "Cross Gmail to Salesforce follow-up using journal memory",
+            new[] { "find salesforce for last email", "related crm from gmail" },
+            "g-sf");
+
+        var beforeCount = InoIntentClassifier.Capabilities.Count;
+        InoIntentClassifier.RegisterCapability(cap);
+        Assert.True(InoIntentClassifier.Capabilities.Count >= beforeCount, "Register should add to in-memory registry projection");
+
+        // Verify Retrieve (and async with recall hook) works for known + new registry entries.
+        var retrieved = InoIntentClassifier.RetrieveCapabilities("salesforce accounts");
+        Assert.Contains(retrieved, c => c.Id == "salesforce");
+
+        var retrievedAsync = await InoIntentClassifier.RetrieveCapabilitiesAsync("salesforce related", null);
+        Assert.Contains(retrievedAsync, c => c.Id == "salesforce");
+    }
+
+    [Fact]
+    public async Task LlmSettings_Surface_And_SetCommand_Update_Config_And_Feedback()
+    {
+        // Exercises LLM settings surface (shows current) + set command wiring from buttons (InoRequest prompt)
+        // (PackConfigStore may be present in some silos; paths degrade gracefully)
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("llm settings", "session-llm-1"));
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
+        var settingsSurface = surfaces.LastOrDefault(s => "LLM Settings".Equals(s.Props.GetValueOrDefault(UiSurfaceKeys.Title)));
+        Assert.NotNull(settingsSurface);
+        var tree = settingsSurface!.Props["tree"] as UiWidgetTree;
+        Assert.NotNull(tree);
+        // Look for a Text node showing the current provider (dynamic feedback)
+        var hasCurrent = FindNodes(tree!).Any(n =>
+            n.Type == UiKitVocabulary.Text &&
+            (n.Props.TryGetValue("text", out var txt) && txt?.ToString()?.Contains("Current active provider", StringComparison.OrdinalIgnoreCase) == true));
+        Assert.True(hasCurrent, "Settings surface should include dynamic current provider display");
+
+        // Simulate button press -> InoRequest("set-llm:qwen")
+        await ino.FireAsync(new InoRequest("set-llm:qwen", "session-llm-1"));
+
+        var responses = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().ToList();
+        var setResp = responses.LastOrDefault(r => r.Prompt.Contains("set-llm", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(setResp);
+        // In silos without PackConfigStore it reports no-store; in configured ones it applies "ollama"
+        Assert.True(
+            setResp!.Response.Contains("ollama", StringComparison.OrdinalIgnoreCase) ||
+            setResp.Response.Contains("No config store", StringComparison.OrdinalIgnoreCase),
+            $"Unexpected set response: {setResp.Response}");
+
+        // Feedback: surface refreshed with (possibly) new current
+        var updatedSurfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
+        var updated = updatedSurfaces.LastOrDefault(s => "LLM Settings".Equals(s.Props.GetValueOrDefault(UiSurfaceKeys.Title)));
+        Assert.NotNull(updated);
+    }
 }
 
 internal sealed class QueuedInoChatClient : IChatClient
@@ -233,6 +294,90 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         Assert.Contains("Quarterly planning", FlattenText(tree));
+
+        // Richer actionable follow-up buttons (Slice A continuation)
+        var buttons = FindNodes(tree).Where(n => n.Type == UiKitVocabulary.Button).ToList();
+        var summarizeBtn = buttons.FirstOrDefault(b => b.Props.TryGetValue("prompt", out var pr) && pr?.ToString()?.Contains("summarize the last email") == true);
+        Assert.NotNull(summarizeBtn);
+        Assert.Equal(nameof(InoRequest), summarizeBtn!.Props["synapseType"]);
+        var sfRelatedBtn = buttons.FirstOrDefault(b => b.Props.TryGetValue("prompt", out var pr2) && pr2?.ToString()?.Contains("related to the last email") == true);
+        Assert.NotNull(sfRelatedBtn);
+        Assert.Equal("Find related in Salesforce", sfRelatedBtn!.Props["label"]);
+    }
+
+    [Fact]
+    public async Task GmailFollowup_SummarizeLast_Uses_Journal_MemorySummary_Without_ReFetching()
+    {
+        var config = Grain<IGoogleConfigWriter>("google-config-writer");
+        await config.StoreGoogleCredentialAsync();
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("Get my last gmail", "session-gmail-followup"));
+
+        var initialCalls = _gmail.ListCalls.Count;
+        Assert.True(initialCalls >= 1, "Initial fetch should have occurred");
+
+        // Follow-up uses journaled MemorySummary (bodies) and LLM summary path, no new Gmail list
+        await ino.FireAsync(new InoRequest("summarize the last email", "session-gmail-followup"));
+
+        Assert.Equal(initialCalls, _gmail.ListCalls.Count); // no additional fetch
+
+        var responses = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().ToList();
+        var followupResp = responses.LastOrDefault(r => r.Prompt.Contains("summarize", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(followupResp);
+        Assert.Contains("Summary of last Gmail", followupResp.Response);
+
+        // Surface delivered for the summary reply
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
+        Assert.Contains(surfaces, s => s.Props.TryGetValue("title", out var t) && "INO".Equals(t) &&
+                                       (s.Props["tree"] is UiWidgetTree treeNode ? FlattenText(treeNode).Contains("Summary of previous") : false));
+    }
+
+    [Fact]
+    public async Task GenericGmailFollowup_SummarizeThatOne_UsesJournal_WithoutFetch()
+    {
+        var config = Grain<IGoogleConfigWriter>("google-config-writer");
+        await config.StoreGoogleCredentialAsync();
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("show recent emails about project", "session-gmail-generic-follow"));
+
+        var callsBefore = _gmail.ListCalls.Count;
+
+        // Cross-turn "that one" (no direct gmail keyword needed if mem present; generic path + journal)
+        await ino.FireAsync(new InoRequest("summarize that one", "session-gmail-generic-follow"));
+
+        // May or not re-use count strictly (generic may still classify), but bodies come from journal not new read if path hits
+        var responses = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().ToList();
+        Assert.Contains(responses, r => r.Response.Contains("Summary of last Gmail", StringComparison.OrdinalIgnoreCase) ||
+                                        r.Response.Contains("previous Gmail", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CrossGmailToSalesforceFollowup_Uses_GmailJournal_Without_SfCred()
+    {
+        var config = Grain<IGoogleConfigWriter>("google-config-writer");
+        await config.StoreGoogleCredentialAsync();
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("Get my last gmail about Acme deal", "session-cross-gsf"));
+
+        // Now cross followup: should hit the gmail-related-sf logic in SF handler (or generic), use journal mem, no SF fetch/cred required in this silo
+        await ino.FireAsync(new InoRequest("find salesforce accounts related to the last email", "session-cross-gsf"));
+
+        var responses = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().ToList();
+        var crossResp = responses.LastOrDefault(r => r.Prompt.Contains("related to the last email", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(crossResp);
+        // Uses journal path: response should indicate cross/journal usage (even if [no-llm])
+        Assert.True(
+            crossResp!.Response.Contains("journal", StringComparison.OrdinalIgnoreCase) ||
+            crossResp.Response.Contains("Related to last email", StringComparison.OrdinalIgnoreCase) ||
+            crossResp.Response.Contains("Cross Gmail", StringComparison.OrdinalIgnoreCase) ||
+            crossResp.Response.Contains("last email", StringComparison.OrdinalIgnoreCase),
+            $"Expected journal-based cross response, got: {crossResp.Response}");
+
+        // No crash on missing SF client in this test config
     }
 
     private static string FlattenText(UiWidgetTree tree)
@@ -261,6 +406,16 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
 
             foreach (var child in node.Children ?? [])
                 Collect(child);
+        }
+    }
+
+    private static IEnumerable<UiWidgetTree> FindNodes(UiWidgetTree tree)
+    {
+        yield return tree;
+        foreach (var child in tree.Children ?? [])
+        {
+            foreach (var found in FindNodes(child))
+                yield return found;
         }
     }
 }

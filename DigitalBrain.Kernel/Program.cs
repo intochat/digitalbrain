@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
 using Orleans.Configuration;
 using Orleans.Journaling;
+using Orleans.Journaling.Json;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Economics;
 using DigitalBrain.Kernel.Salesforce;
@@ -220,12 +221,10 @@ builder.UseOrleans(siloBuilder =>
             options.ClusterId = clusterId;
             options.ServiceId = serviceId;
         });
-        // Native ("orleans-binary") journal format, not UseJsonJournalFormat: a spike
-        // (DigitalBrain.Tests/Spikes/JournalFormatSpikeTests.cs) proved native round-trips every Synapse
-        // subtype through a real grain deactivation/reactivation with zero manual type registration, while
-        // Orleans.Journaling.Json (still preview/experimental) throws ResolverTypeInfoOptionsNotCompatible
-        // the moment it's actually exercised against Azure Blob storage - the exact untested scenario the
-        // spike's own caveats flagged as a risk. See DigitalBrain.Tests/Spikes/README.md for the full record.
+        // Use Orleans' documented JSON Lines journal format. JournalJson supplies System.Text.Json
+        // polymorphism metadata for Synapse subtypes through JsonJournalOptions.AddTypeInfoResolver,
+        // avoiding the previous source-generated-context options mismatch and the legacy binary format's
+        // dependence on every record member being Orleans-[Id] annotated.
         if (useManagedIdentity)
         {
             // Real ACA deploy path once DigitalBrain__Storage__AccountName is set (Task 18): no account-key
@@ -259,8 +258,7 @@ builder.UseOrleans(siloBuilder =>
             siloBuilder.AddAzureBlobJournalStorage(options =>
                 options.BlobServiceClient = new BlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
         }
-        siloBuilder.ConfigureServices(services =>
-            services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary"));
+        siloBuilder.UseJsonJournalFormat(JournalJson.Configure);
     }
 
     siloBuilder.AddMemoryStreams("HomeFeed");

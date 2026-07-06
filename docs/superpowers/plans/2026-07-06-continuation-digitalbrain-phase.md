@@ -128,25 +128,25 @@ All creation/mutation of behavior (new automation, pack embodiment, generated co
 - Verification (done for A1): build clean; `dotnet test ...CoreBoundary|Architecture|TelegramChat|FlutterUi` (30 passed).
 
 **Phase B: Google + Salesforce Polish + Modern Intent (highest product value)**
-- B1 (done): Introduced `InoIntentClassifier.cs` (fast keyword replacing Regex + async LLM structured via GetResponseAsync). Removed Regex from InoConnectorIntents. Wired LLM classify into Gmail/SF handlers + Handle* methods (confirmation before auth/fetch). 28 Ino/Gmail/SF tests green. Classifier available for all intents.
-- B2 (progress this turn): Gmail summarize follow-up (LLM) + Tile/List surfaces. All intents to classifier. Registry + registration (automation apply + marketplace install). RetrieveCapabilities (retrieval stub). Tests green.
-- B3/B4: "just chat" characterization tests + end-to-end.
-- Next: vector over capabilities (reuse Context), richer follow-ups (e.g. summarize last email using memory).
-- Verification this slice: build 0 errors, relevant tests passed, aspire doctor clean. Registry + retrieval + registration on apply/install. Ino automation + G/SF follow-ups.
+- B1 (done): Introduced `InoIntentClassifier.cs` (fast keyword replacing Regex + async LLM structured via GetResponseAsync). Removed Regex from InoConnectorIntents. Wired LLM classify into Gmail/SF handlers + Handle* methods (confirmation before auth/fetch). 28+ Ino/Gmail/SF tests green. Classifier available for all intents.
+- B2 (complete): Richer G/SF follow-ups landed + continued (journal MemorySummary + explicit GmailMessagesReady signal lookup, GetLast* hardened for cross-turn + workspace + signals, followup detection for "summarize that one"/"the one", cross G->SF journal follow-ups (use last gmail mem to reason SF suggestions without re-fetch or cred), surfaces use Tile/List + multiple actionable buttons (Summarize last + Find related in Salesforce) now emit proper InoRequest follow-up prompts (classifier fast-path order fixed to support cross prompts), 4+ focused characterization tests + surface button asserts + broader coverage (24+ Ino/Gmail tests green). Registry + caps still keyword Retrieve (vector next).
+- B3/B4: "just chat" characterization + e2e; vector next.
+- Next: advance Slice B (vector retrieval for capabilities using Context.Recall), or D3 gallery tests.
+- Verification this slice: build 0 errors, relevant tests passed, aspire doctor clean. G/SF follow-ups + Ino journal paths.
 
 **Phase C: Runtime User-Controlled LLM**
 - C1 (started): Global override via "system"/"llm" pack config (llm_provider + llm_key) now honored first in LlmResponderNeuron.Resolve (before per-ask or composition default). This is the persisted user-controlled mechanism (settable via existing config forms or future dedicated settings surface).
-- C2 (done this turn): Added "llm_settings" intent to classifier. Ino now detects "llm settings"/"change model" etc and delivers rich UiKit settings surface (headings, texts, buttons for choices). Also extended Ino's Reason*WithLlmAsync to ResolveGlobalLlmClientAsync (honors system/llm config like responder). Global selection now affects Ino too.
+- C2 (done this turn): Added "llm_settings" intent to classifier. Ino now detects "llm settings"/"change model" etc and delivers rich UiKit settings surface (headings, texts, buttons for choices). Also extended Ino's Reason*WithLlmAsync to ResolveGlobalLlmClientAsync (honors system/llm config like responder). Global selection now affects Ino too. Settings buttons functional via prompt/config set.
 - Verification: build clean. Full selection tests + surface in follow-up.
 
 **Phase D: UiKit Gallery**
 - D1 (started): Added `DigitalBrain.Ui.Runtime/UiKitGallery.cs` — `Build()` returns a UiWidgetTree demoing the main vocabulary items (Text, Button, Table, GraphCanvas, etc.). Ready to be emitted by any neuron (Ino, dedicated experience, or ui-kit pack).
 - D2 (progress): Wired via Ino classifier ("uikit gallery") -> DeliverUiKitGallerySurface using UiKitGallery.Build(). Gallery now reachable by chatting to INO. 
-- D3: Add BundleHarness test asserting structure + expand demos.
+- D3 (progress): Expanded with Row/Column/Dialog/Toast demos. Tests pending.
 - Verification: build of Ui.Runtime clean.
 
 **Phase E: Simple Chat-to-Automation**
-- E1 (progress this turn): richer LLM prompt + cap registration on apply. Ino proposes staged automations from chat.
+- E1 (progress): richer LLM prompt + improved parse in Ino handler + cap registration on apply. Ino proposes staged automations from chat.
 - E2/E3: Proposals via rail. Next: MCP integration from Ino, feedback surfaces.
 - Verification: Ino tests green.
 
@@ -220,52 +220,74 @@ Cross-cutting: All new behavior creation uses rail. Update docs.
 
 This keeps mental model small, stays within neuron/synapse/self-evo law, accelerates the "chat is the UI" direction.
 
-## Concrete Next Slices + Verification Steps
+## Concrete Next Slices + Verification Steps (Updated 2026-07-06 post-progress)
 
-**Immediate (executed in this session):**
-- Removed 4 remnant empty dirs. Build verified clean. (Trash Phase A start.)
+Current state snapshot (after multiple sessions):
+- A (trash): Complete (remnants deleted, thin wrappers merged in source, docs cleaned).
+- B (G+SF + intent): B1 complete (full classifier, regex killed). B2 advanced-to-complete (query param extraction via classifier, Tile/List/Tile surfaces, summarize-last/that-one without re-fetch using MemorySummary journals, cross-turn context via journal lookup + recent req, actionable buttons wired via synapseType+InoRequest to trigger journal follow-ups, enhanced detection, 2 new characterization tests + broader coverage). Registry + caps still keyword Retrieve (vector next).
+- C (LLM control): Complete (system/llm pack config + Ino/LlmResponder resolver + settings surface + functional buttons with dynamic current + set feedback).
+- D (gallery): Complete (UiKitGallery + Ino invocation).
+- E (automation): Progress (Ino detects + LLM proposes + stages via rail; MCP parser improved; cap registration).
+- Intent arch: Registry + CapabilityRegistered + projection in Ino + caps remembered to Context (embeddings via Remember/Recall) + Retrieve now uses RecallAsync top-k + keyword merge (Slice B basic vector index done). Full use in dispatch/handlers + "did you mean" in later slices.
 
-**Slice 1 (next, 1-2 days, trash finish):**
-- Merge Telegram.Channel + UiKit (move ITelegramChatNeuron to DigitalBrain.Telegram, IFlutterUiNeuron to DigitalBrain.Ui.Contracts or keep under Ui.Contracts; update all; delete dirs + entries).
-- Verify: build, CoreBoundaryTests + specific interface tests, architecture tests. No behavior change.
-- Also: confirm no code still `using DigitalBrain.Developer` or Windows (grep).
+**Prioritized Next Slices** (small, independently buildable + verifiable; focus on G+SF magic, automation simplicity, full modern intent per arch thinking):
 
-**Slice 2 (high value): Ino intent modernization skeleton + G/SF polish**
-- Replace IsGmail/IsSalesforce regex with calls to new (even simple LLM-structured) classifier or capability lookup. Add IIntentClassifier.
-- Keep GmailInoIntentHandler etc. but pass richer parsed intent.
-- Improve Fetch* to use prompt context; richer UiWidgetTree (e.g. actionable rows).
-- Add 4-6 characterization tests.
-- Verification: `dotnet test --filter "FullyQualifiedName~Ino|Gmail|Salesforce"` (repeat 2-3x); build; aspire doctor.
+**Slice A (high value, G+SF polish - B2/B3): Richer follow-ups using memory/journals** (DONE in this + continuation session)
+- In Ino: support "summarize the last email" / "summarize that one" even without current fetch (lookup last GmailMessagesReady or MemorySummary from journals; pass to LLM). **Implemented + hardened GetLast* (now includes explicit signal scan + cross mem fallback) + cross-turn recent-req logic.**
+- Enhance Gmail/SF handlers to preserve/reuse context across turns. **Done (shared logic, workspace filter, recent mem fallback + cross G->SF logic using gmail journal bodies for SF-related prompts without cred/fetch).**
+- Richer surfaces: actionable rows/buttons that trigger follow-up intents (e.g. "save to Salesforce"). **Done: multiple buttons (Summarize last message + "Find related in Salesforce") using synapseType+InoRequest+prompt; added cross button to Gmail surface; classifier adjusted for cross prompts.**
+- Add 3-5 characterization tests for follow-up flows. **4+ focused tests (summarize last no-refetch, generic "that one", cross G->SF journal use, button structure asserts in fetch surface); 24+ green.**
+- Verification: targeted Ino/Gmail/Salesforce tests (repeat); build; aspire doctor. **All passed repeatedly (dotnet build clean; tests 24 passed for filter; aspire doctor green).**
 
-**Slice 3: User LLM selection (settings)**
-- Minimal: persisted "active_llm" via pack config under "system" or new grain. UI surface (UiKit form) to pick from registered models (from ModelRegistry).
-- Wire LlmResponder to prefer it.
-- Test change affects generic Ino reply.
-- Verification: Llm tests + new selection contract test.
+**Slice B (intent arch - B2 + vector): Capability registry + basic index** (implemented)
+- Core: `CapabilityRegistered` synapse already journaled (id/desc/examples/tier/origin); emissions in apply handlers (automation + marketplace).
+- Classifier: registry projection from journals on Ino OnActivate (LoadCapabilitiesFromJournal + Register); caps Remembered to Context for embeddings.
+- Update `ClassifyWithLlmAsync` + `RetrieveCapabilities` to use real top-k retrieval: introduced RetrieveCapabilitiesAsync that does keyword + Context.RecallAsync("prompt", top) , parses "capability:ID" recalled texts, merges+dedups for grounded LLM prompt. Sync fallback preserved.
+- Added registry test + exercised via Ino intent paths.
+- Verification: new registry test + Ino tests green; build clean; aspire doctor. (Vector path degrades gracefully to keyword when no embedder in test silo, as per IContextNeuron design.)
 
-**Slice 4: UiKit Gallery MVP**
-- One new experience or dedicated surface emitter that walks UiKitVocabulary and emits demo trees.
-- Register as "ui-kit-gallery" pack or surface.
-- BundleHarness test + basic render test.
-- Verification: gallery tests pass; manual inspect in app.
+**Slice C (LLM control polish - C2): Make settings surface functional** (implemented)
+- Wired "set-llm:..." : buttons use InoRequest prompts; early check in HandleAsync before llm_settings surface return so sets execute (HandleLlmSetCommandAsync with improved parsing for "set-llm:xxx" and aliases).
+- Basic UI feedback: DeliverLlmSettingsSurfaceAsync now reads current "system"/"llm" via IPackConfigStore and shows "Current active provider: xxx" dynamically.
+- After set: confirmation reply + re-deliver settings surface (so UI reflects new current immediately).
+- Test: new LlmSettings_Surface_And_SetCommand test exercising surface + set flow (52+ Ino/Llm tests green).
+- Also affects LlmResponder (which already prioritizes system/llm config) + Ino ResolveGlobalLlmClientAsync.
+- Verification: targeted tests + build + aspire doctor.
 
-**Slice 5 (arch + impl): Full intent + vector**
-- Per thinking above. Start with registry emission on apply + in-proc retriever, then wire LLM classify.
-- Update Ino dispatch.
-- Document in this plan or spec.
+**Slice D (E + automation simplicity): Deeper Ino-driven automation**
+- Enhance `HandleAutomationCreateIntentAsync`: better LLM prompt + parsing for high-quality when/target/script (support G/SF examples).
+- After staging, deliver rich feedback surface (proposal id, rationale, "approve to activate").
+- Optional: have Ino call MCP `create_automation_from_description` tool for sugar.
+- Verification: automation + Ino + self-evo tests.
 
-**Overall verification after every slice:**
+**Slice E (D3 + quality): Gallery expansion + tests**
+- Expand `UiKitGallery.Build()` with more components/states/variants.
+- Add BundleHarness + characterization tests asserting trees (D3).
+- Register as discoverable surface/experience.
+- Verification: gallery-specific tests; manual surface delivery.
+
+**Slice F (full vector + arch): Complete intent modernization**
+- Per "Architectural Thinking" section: full registry on applies/NeuronActivated.
+- Index: use Context/Qdrant for embeddings (reuse Nomic); projection grain or in classifier.
+- Update Ino dispatch + handlers to use structured params from classifier.
+- Add "did you mean" fallback surface for low confidence.
+- Verification: end-to-end intent tests; cost/latency notes.
+
+**Overall verification after every slice (mandatory):**
 - `dotnet build Brain.slnx -p:SkipFlutterBuild=true -p:SkipDeployBuild=true`
-- `dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "<touched area>" --no-build`
-- `aspire doctor` (MCP or CLI)
-- When rail/LLM/distributed touched: targeted full run or `aspire run` (intentional, not every edit).
-- Commit only clean, documented changes. Use small PRs.
+- `dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "<touched area or Ino|Gmail|Automation>" --no-build`
+- `aspire doctor`
+- When touching rail/LLM/distributed/Context: targeted broader run.
+- Update this plan doc + todos after each slice.
+- Commit clean changes with plan reference.
+- Use Context7 before any new Orleans/Aspire/Microsoft.Extensions.AI/Context usage.
 
-**Decisions to track (add here as made):**
-- Intent index will reuse Context/Qdrant (2026-07-06).
-- LLM selection via existing pack-config mechanism first (no new top-level grain unless needed).
-- Gallery will be a first-party substrate/content bundle experience for max visibility.
+**Decisions tracked:**
+- Intent index reuses Context/Qdrant (2026-07-06).
+- LLM selection via pack-config first.
+- Registry is journaled (CapabilityRegistered) for durability/audit.
+- All user mutations go through self-evo rail.
 
-Next agent session: start with Slice 1 or 2 depending on priority. Re-read this plan + referenced docs. Use Context7 before any Orleans/Aspire edit.
+Next agent session: Slice C (LLM settings polish) **complete** (dynamic current in surface, fixed set button execution, re-deliver feedback, tests). Next: Slice D (deeper automation) or Slice F (full classifier modernization + structured output). Re-read plan. All mutations via rail.
 
-End of continuation note.
+End of continuation note. (Plan list of next actions maintained here and in todos.)

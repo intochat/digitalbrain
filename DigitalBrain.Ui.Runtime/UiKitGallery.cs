@@ -25,6 +25,10 @@ public static class UiKitGallery
             BuildDemo(UiKitVocabulary.List, "List", new() { ["items"] = new[] { "Item A", "Item B" } }),
             BuildDemo(UiKitVocabulary.Table, "Table", new() { ["columns"] = new[] { "Col1", "Col2" }, ["rows"] = new object[] { new[] { "a", "b" } } }),
             BuildDemo(UiKitVocabulary.GraphCanvas, "Graph", new() { ["title"] = "Sample graph" }),
+            BuildDemo(UiKitVocabulary.Row, "Row", new() { ["children"] = "demo" }),
+            BuildDemo(UiKitVocabulary.Column, "Column", new() { ["children"] = "demo" }),
+            BuildDemo(UiKitVocabulary.Dialog, "Dialog", new() { ["title"] = "Demo Dialog" }),
+            BuildDemo(UiKitVocabulary.Toast, "Toast", new() { ["message"] = "Hello from gallery" }),
 
             new(UiKitVocabulary.Gap, new Dictionary<string, object?>()),
             new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "More components (Row/Column, Dialog, Toast, etc.) follow the same UiWidgetTree pattern." }),
