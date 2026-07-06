@@ -36,7 +36,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\integrations\DigitalBrain.Telegram\DigitalBrain.Telegram.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Telegram.Transport\DigitalBrain.Telegram.Transport.csproj" Aliases="TransportAssembly" />
+    <ProjectReference Include="..\hosts\DigitalBrain.Telegram.Transport\DigitalBrain.Telegram.Transport.csproj" Aliases="TransportAssembly" />
     <PackageReference Include="Telegram.BotAPI" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Demo.Contracts\DigitalBrain.Demo.Contracts.csproj" />
@@ -51,7 +51,7 @@
     <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
     <!-- For E2E collection fixture: boot the real Aspire AppHost model (alias to avoid Program type clash with the kernel host) -->
-    <ProjectReference Include="..\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" Aliases="AppHostProject" Condition="'$(EnableAppHostTests)' == 'true'" />
+    <ProjectReference Include="..\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" Aliases="AppHostProject" Condition="'$(EnableAppHostTests)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup>

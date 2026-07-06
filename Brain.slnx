@@ -25,8 +25,9 @@
     <Project Path="integrations/DigitalBrain.Telegram/DigitalBrain.Telegram.csproj" />
   </Folder>
   <Folder Name="/hosts/">
-    <Project Path="DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
-    <Project Path="DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
+    <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+    <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
+    <Project Path="hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj" />

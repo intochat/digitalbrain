@@ -20,7 +20,7 @@
 
   <!-- Core for centralized signal consts (TelegramSignals). Transport is thin adapter only; never references Kernel. -->
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <!-- Gives the transport a real /health + /alive (Task 11: ACA probes need these mapped unconditionally,
          mirroring the kernel's Task 10 wiring) instead of the old hand-rolled ok:true stub. -->
     <ProjectReference Include="..\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
@@ -33,7 +33,7 @@
     surface is consumed — the transport never references DigitalBrain.Kernel.
   -->
   <ItemGroup>
-    <Protobuf Include="..\DigitalBrain.Kernel\Protos\digitalbrain.proto"
+    <Protobuf Include="..\..\DigitalBrain.Kernel\Protos\digitalbrain.proto"
               Link="Protos\digitalbrain.proto"
               GrpcServices="Client" />
   </ItemGroup>
