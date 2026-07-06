@@ -22,7 +22,7 @@ public sealed class TestDigitalBrain(
         var builder = new TestClusterBuilder(initialSilosCount: _initialSilosCount);
         builder.AddSiloBuilderConfigurator<NeuronTestKernelConfigurator>();
 
-        // AddSiloBuilderConfigurator<T>() / AddClientBuilderConfigurator<T>() require parameterless T:
+        // AddSiloBuilderConfigurator<T>() / AddClientBuilderConfigurator<T>() require parameterless T: (Orleans technical)
         // Orleans stores T's AssemblyQualifiedName and reflectively Activator.CreateInstance()s it inside
         // the test host process, so a closure-capturing configurator instance can't be passed directly.
         // Bridge the captured delegates through AsyncLocals that the Extend* configurators read when
