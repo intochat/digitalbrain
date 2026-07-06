@@ -1,9 +1,12 @@
 using DigitalBrain.Core.Config;
 using DigitalBrain.Salesforce;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
-namespace DigitalBrain.Kernel.Salesforce;
+namespace DigitalBrain.Salesforce;
 
-internal sealed class SalesforceAppConfigSeeder(
+public sealed class SalesforceAppConfigSeeder(
     IConfiguration configuration,
     IPackConfigStore store,
     ILogger<SalesforceAppConfigSeeder> logger)

@@ -171,7 +171,7 @@ if (isAspireHosted)
     }
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
-builder.Services.AddHostedService<DigitalBrain.Kernel.Salesforce.SalesforceAppConfigSeeder>();
+builder.Services.AddHostedService<DigitalBrain.Salesforce.SalesforceAppConfigSeeder>();
 builder.Services.AddHostedService<DigitalBrain.Google.GoogleAppConfigSeeder>();
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
