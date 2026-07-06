@@ -8,7 +8,6 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Llm;
-using DigitalBrain.Salesforce;
 using DigitalBrain.Ui.Runtime;
 using Microsoft.Extensions.AI;
 using DigitalBrain.Ino;
