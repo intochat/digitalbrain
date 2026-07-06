@@ -24,7 +24,7 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
     // KernelReplicas defaults to 3 for HA during updates/self-improvement
 });
 
-// Wire the kernel silo using the context — this provides the cool built-in kernel features
+// Wire the kernel resource using the context — this provides the cool built-in kernel features
 // (marketplace, embodiment, journals with causation, UI surfaces, tasks, self-status, 3-replica HA) out of the box.
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);

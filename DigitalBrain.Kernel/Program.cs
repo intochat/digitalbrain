@@ -22,7 +22,7 @@ using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Salesforce;
 using DigitalBrain.ServiceDefaults;
 
-// Prototype silo host for DigitalBrain.
+// Kernel host for DigitalBrain (Aspire + Orleans).
 // Aspire-hosted path: env vars ConnectionStrings__clustering / grainstate / journal are injected by Aspire.
 // Fast path (dotnet run --project DigitalBrain.Kernel): none of those env vars present → localhost clustering + in-memory journals.
 
@@ -120,7 +120,7 @@ if (isAspireHosted)
 {
     // Cloud host (standalone ACA): bind the journal BlobServiceClient from ConnectionStrings__journal here;
     // clustering + grain storage are wired directly in UseOrleans below from their connection strings. (Under an
-    // Aspire AppHost those would be wired by WithClustering/WithGrainStorage; in ACA the silo configures Orleans itself.)
+    // Aspire AppHost those would be wired by WithClustering/WithGrainStorage; in ACA the kernel configures Orleans itself.)
     var clusteringServiceKey = Environment.GetEnvironmentVariable("Orleans__Clustering__ServiceKey") ?? "clustering";
     var grainStorageServiceKey = Environment.GetEnvironmentVariable("Orleans__GrainStorage__Default__ServiceKey") ?? "grainstate";
 
@@ -257,11 +257,11 @@ builder.UseOrleans(siloBuilder =>
         else
         {
             siloBuilder.UseAzureStorageClustering(options =>
-                options.ConfigureTableServiceClient(builder.Configuration.GetConnectionString("clustering")!));
+                options.TableServiceClient = new Azure.Data.Tables.TableServiceClient(builder.Configuration.GetConnectionString("clustering")!));
             siloBuilder.AddAzureBlobGrainStorage("Default", options =>
-                options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("grainstate")!));
+                options.BlobServiceClient = new BlobServiceClient(builder.Configuration.GetConnectionString("grainstate")!));
             siloBuilder.AddAzureBlobJournalStorage(options =>
-                options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
+                options.BlobServiceClient = new BlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
         }
         siloBuilder.ConfigureServices(services =>
             services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary"));
@@ -420,7 +420,6 @@ if (grainFactory != null)
             {
                 var status = grainFactory.GetGrain<ISystemStatus>("status-main");
                 await status.GetTimelineAsync();
-                await grainFactory.GetGrain<IInoCodeEditor>("ino-editor-main").GetTimelineAsync();
                 await grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
                 await grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
                 await grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();

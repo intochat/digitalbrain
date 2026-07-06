@@ -40,7 +40,7 @@ public sealed class DigitalBrainContext
     public IResourceBuilder<ParameterResource>? AzureOpenAIEndpoint { get; init; }
     public IResourceBuilder<ParameterResource>? AzureOpenAIKey { get; init; }
 
-    // Storage resources exposed so AppHost can wire WithReference on silo
+    // Storage resources exposed so AppHost can wire WithReference on kernel
     public required IResourceBuilder<AzureBlobStorageResource> GrainBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> JournalBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> SyncBlobs { get; init; }
@@ -103,7 +103,7 @@ public static class DigitalBrainBuilderExtensions
         // provider — it must pull its own real model tag, never the primary provider's model/deployment
         // name (e.g. an azureopenai deployment name like "gpt-4o-mini" is not a pullable Ollama tag). But
         // only in run mode: `aspire publish` should never emit a local Ollama container into a publish
-        // manifest — prod gets its LLM from Azure OpenAI via Pulumi, wired separately (see WireKernelSilo).
+        // manifest — prod gets its LLM from Azure OpenAI via Pulumi, wired separately (see WireKernelSilo method).
         const string ollamaFallbackModel = "qwen2.5-coder:1.5b";
         IResourceBuilder<IResourceWithConnectionString> qwen;
         EndpointReference? ollamaEndpoint = null;
@@ -181,7 +181,7 @@ public static class DigitalBrainBuilderExtensions
     /// Wires a kernel project with the core kernel features out of the box:
     /// marketplace, dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
     /// This makes the kernel (company brain) provide built-in capabilities (embodiment, status, tasks, etc.)
-    /// immediately when the silo starts.
+    /// immediately when the kernel starts.
     /// </summary>
     public static IResourceBuilder<ProjectResource> WireKernelSilo(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
@@ -258,7 +258,7 @@ public static class DigitalBrainBuilderExtensions
     }
 
     // Builds "http://{host}:{port}{pathSuffix}" against a container endpoint discovered at orchestration time
-    // (Ollama, its embedding alias, or Whisper) — shared by the three call sites in WireKernelSilo above so the
+    // (Ollama, its embedding alias, or Whisper) — shared by the three call sites in WireKernelSilo method above so the
     // host/port interpolation lives in exactly one place.
     private static ReferenceExpression HttpUrl(EndpointReference endpoint, string pathSuffix = "") =>
         ReferenceExpression.Create($"http://{endpoint.Property(EndpointProperty.Host)}:{endpoint.Property(EndpointProperty.Port)}{pathSuffix}");

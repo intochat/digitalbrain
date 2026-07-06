@@ -11,11 +11,11 @@ namespace DigitalBrain.Mcp;
 public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainToolsBase(grains)
 {
     [McpServerTool(Name = "ping_digitalbrain"), Description("Simple ping tool to verify MCP connection to DigitalBrain server works. Always returns success.")]
-    public static string PingDigitalBrain() => "DigitalBrain MCP connected successfully. Cluster interaction tools ready when silo is running.";
+    public static string PingDigitalBrain() => "DigitalBrain MCP connected successfully. Cluster interaction tools ready when kernel is running.";
 
     [McpServerTool(Name = "get_timeline"), Description("Get recent timeline (synapses) for a neuron. Useful to see history, responses, published packs etc.")]
     public async Task<string> GetTimeline(
-        [Description("Neuron ID to query, e.g. 'llm-main', 'market-main', 'compiler-main'")] string neuronId,
+        [Description("Neuron ID to query, e.g. 'llm-main', 'market-main', 'status-main'")] string neuronId,
         [Description("Max number of recent entries")] int maxEntries = 10)
     {
         var neuron = ResolveNeuron(neuronId);

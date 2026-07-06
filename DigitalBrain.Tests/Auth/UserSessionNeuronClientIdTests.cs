@@ -3,7 +3,7 @@ using DigitalBrain.TestKit;
 
 namespace DigitalBrain.Tests.Auth;
 
-[Collection("silo-host")]
+[Collection("kernel-host")]
 public class UserSessionNeuronClientIdTests : NeuronTestBase
 {
     [Fact]

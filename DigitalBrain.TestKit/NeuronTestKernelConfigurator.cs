@@ -26,7 +26,7 @@ internal sealed class NoOpScopedChatClientFactory : IScopedChatClientFactory
 
 // Shared TestCluster silo wiring: in-memory dual journals + the pack embodiment engine.
 // Reused by every TestCluster-based test so the prototype journal + Foundry services are configured once.
-public sealed class NeuronTestSiloConfigurator : ISiloConfigurator
+public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder)
     {

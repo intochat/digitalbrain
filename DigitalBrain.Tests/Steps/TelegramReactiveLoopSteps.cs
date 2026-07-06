@@ -294,7 +294,7 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
     // Telegram-specific extras go here: a deterministic global IChatClient (NeuronTestSiloConfigurator's
     // IScopedChatClientFactory is a no-op, so LlmResponderNeuron falls back to this global client), and this
     // scenario's own SignalEgressBus/IPackConfigStore instances — registered after (so they win last-
-    // registration-wins resolution over) NeuronTestSiloConfigurator's own SignalEgressBus, so the silo's
+    // registration-wins resolution over) NeuronTestKernelConfigurator's own SignalEgressBus, so the kernel's
     // SignalEgressStreamSubscriber and this class's _egressSubscription observe the same bus.
     protected override void ConfigureSilo(ISiloBuilder builder) => builder
         .ConfigureServices(services =>

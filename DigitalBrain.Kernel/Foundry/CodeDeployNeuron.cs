@@ -41,7 +41,7 @@ public class CodeDeployNeuron(ILogger<CodeDeployNeuron> logger, NeuronJournals j
     private static void CommitSource(string moduleName, string source)
     {
         var dir = Path.Combine(AppContext.BaseDirectory, "Generated");
-        // Resolve to the source tree Generated folder when running from the silo project.
+        // Resolve to the source tree Generated folder when running from the kernel project.
         var projectGenerated = Path.Combine(Directory.GetCurrentDirectory(), "Generated");
         var target = Directory.Exists(projectGenerated) ? projectGenerated : dir;
         Directory.CreateDirectory(target);

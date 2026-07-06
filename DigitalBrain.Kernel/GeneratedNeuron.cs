@@ -10,7 +10,9 @@ namespace DigitalBrain.Kernel;
 [GrainType("digitalbrain.generated")]
 public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IGeneratedNeuron, IHandle<NeuronTelemetry>
 {
-    private EmbodiedPack? _embodied;
+    private GeneratedPackRuntime? _packRuntime;
+
+    private GeneratedPackRuntime PackRuntime => _packRuntime ??= new GeneratedPackRuntime(ServiceProvider, Logger);
 
     public Task HandleAsync(NeuronTelemetry telemetry) => Task.CompletedTask;
 
@@ -29,9 +31,8 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
     public override Task OnDeactivateAsync(Orleans.DeactivationReason reason, CancellationToken cancellationToken)
     {
-        var toUnload = _embodied;
-        _embodied = null;
-        toUnload?.Dispose();
+        _packRuntime?.Dispose();
+        _packRuntime = null;
         return base.OnDeactivateAsync(reason, cancellationToken);
     }
 
@@ -44,7 +45,7 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         switch (synapse)
         {
             case NeuroPackInstalled installed:
-                TryEmbody(installed.Pack);
+                PackRuntime.Install(installed.Pack);
                 await EmitConfigFormIfRequiredAsync();
                 return;
         }
@@ -65,98 +66,59 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         }
     }
 
-    private void TryEmbody(NeuroPack pack)
-    {
-        if (string.IsNullOrWhiteSpace(pack.Code))
-            return;
-
-        var embodier = ServiceProvider.GetService<IPackEmbodiment>();
-        if (embodier is null)
-        {
-            Logger.LogWarning("No IPackEmbodiment registered; pack '{Pack}' will use the LLM fallback.", pack.Name);
-            return;
-        }
-
-        try
-        {
-            _embodied?.Dispose();
-            _embodied = embodier.Embody(pack.Name, pack.Code);
-            Logger.LogInformation("GeneratedNeuron EMBODIED pack {Name}@{Ver} as real compiled C#.", pack.Name, pack.Version);
-        }
-        catch (PackEmbodimentException ex)
-        {
-            _embodied = null;
-            Logger.LogWarning(ex, "Pack '{Pack}' is not a compilable IPackBehavior; using LLM fallback on use.", pack.Name);
-        }
-    }
-
     private async Task EmitConfigFormIfRequiredAsync()
     {
-        if (_embodied is null) return;
+        var embodied = PackRuntime.Current;
+        if (embodied is null) return;
 
-        var required = _embodied.GetManifest().RequiredConfig;
+        var required = embodied.GetManifest().RequiredConfig;
         if (required is null || required.Count == 0) return;
 
-        var surface = ConfigFormSurface.Build(_embodied.PackName, required, Self.Value);
+        var surface = ConfigFormSurface.Build(embodied.PackName, required, Self.Value);
         await FireAsync(surface);
         if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
         {
             await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
         }
-        Logger.LogInformation("GeneratedNeuron emitted config form for pack '{Pack}' ({FieldCount} fields).", _embodied.PackName, required.Count);
+        Logger.LogInformation("GeneratedNeuron emitted config form for pack '{Pack}' ({FieldCount} fields).", embodied.PackName, required.Count);
     }
 
-    private void EnsureEmbodied()
-    {
-        if (_embodied is not null) return;
-        var last = OutgoingJournal.Concat(IncomingJournal).OfType<NeuroPackInstalled>().LastOrDefault();
-        if (last is not null)
-        {
-            TryEmbody(last.Pack);
-            return;
-        }
-        const string generatedPrefix = "generated-";
-        var packName = this.GetPrimaryKeyString() ?? string.Empty;
-        if (packName.StartsWith(generatedPrefix, StringComparison.OrdinalIgnoreCase))
-            packName = packName[generatedPrefix.Length..];
-        var seed = MarketplaceSeeds.LocalUiPacks.FirstOrDefault(pack =>
-            string.Equals(pack.Name, packName, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(pack.Code));
-        if (seed is not null)
-            TryEmbody(seed);
-    }
+    private void EnsureEmbodied() =>
+        PackRuntime.Ensure(OutgoingJournal.Concat(IncomingJournal), this.GetPrimaryKeyString() ?? string.Empty);
 
     private async Task<bool> TryDispatchEmbodiedAsync(Synapse synapse)
     {
         EnsureEmbodied();
-        if (_embodied is null || !_embodied.CanHandle(synapse))
+        var embodied = PackRuntime.Current;
+        if (embodied is null || !embodied.CanHandle(synapse))
         {
             return false;
         }
 
-        var manifest = _embodied.GetManifest();
+        var manifest = embodied.GetManifest();
         IReadOnlyList<Synapse> outputs;
         try
         {
-            outputs = _embodied.Handle(synapse);
+            outputs = embodied.Handle(synapse);
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "Embodied pack '{Pack}' failed while handling {SynapseType}.", _embodied.PackName, synapse.Type);
-            await FireAsync(new PackEmission(_embodied.PackName, synapse.Type, "pack-error:" + ex.GetBaseException().Message));
+            Logger.LogWarning(ex, "Embodied pack '{Pack}' failed while handling {SynapseType}.", embodied.PackName, synapse.Type);
+            await FireAsync(new PackEmission(embodied.PackName, synapse.Type, "pack-error:" + ex.GetBaseException().Message));
             return true;
         }
 
         foreach (var output in outputs)
         {
-            var normalized = NormalizePackOutput(_embodied.PackName, output);
+            var normalized = NormalizePackOutput(embodied.PackName, output);
             await Broadcast(normalized);
-            await BroadcastPackSurfaceAsync(normalized, _embodied.PackName);
+            await BroadcastPackSurfaceAsync(normalized, embodied.PackName);
         }
 
         Logger.LogInformation(
             "GeneratedNeuron dispatched {SynapseType} to embodied pack '{Pack}' (manifest: {ManifestTypes}) and emitted {Count} synapse(s).",
             synapse.Type,
-            _embodied.PackName,
+            embodied.PackName,
             string.Join(',', manifest.HandledSynapseTypes.Select(t => t.Value)),
             outputs.Count);
         return true;
@@ -201,11 +163,12 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         EnsureEmbodied();
 
-        if (_embodied is not null)
+        var embodied = PackRuntime.Current;
+        if (embodied is not null)
         {
-            var output = _embodied.Respond(used.Action);
-            await FireAsync(new PackEmission(_embodied.PackName, used.Action, output));
-            Logger.LogInformation("GeneratedNeuron ran embodied pack '{Pack}' for action '{Action}'", _embodied.PackName, used.Action);
+            var output = embodied.Respond(used.Action);
+            await FireAsync(new PackEmission(embodied.PackName, used.Action, output));
+            Logger.LogInformation("GeneratedNeuron ran embodied pack '{Pack}' for action '{Action}'", embodied.PackName, used.Action);
             if (used.Action is "open" or "emit-test-surface" or "self-test")
             {
                 var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, new List<UiWidgetTree> { new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live from embodied " + used.Pack }) });

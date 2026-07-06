@@ -30,12 +30,6 @@ public record Synapse(
 }
 
 [GenerateSerializer]
-public record CreateNeuronRequest(string Description, string Language = "csharp") : Synapse(nameof(CreateNeuronRequest), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record NeuronCodeGenerated(string Description, string GeneratedCodeSnippet) : Synapse(nameof(NeuronCodeGenerated), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
 public record NeuronTelemetry(NeuronId Neuron, string Event, int Count = 1) : Synapse(nameof(NeuronTelemetry), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
@@ -49,8 +43,6 @@ public record ExperienceUsed(
     string? SessionId = null) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
 
 // Core system neuron interfaces (everything is a Neuron)
-public interface ICompiler : INeuron, IHandle<CreateNeuronRequest> { }
-
 public interface IAspireNeuron : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
 
 // Thin common marker for channel neurons (Telegram, Flutter UI, etc.) per item 13.
@@ -145,17 +137,6 @@ public record LlmResponse(string Prompt, string Response, string ModelUsed) : Sy
 
 public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
 
-// Awesome Software Engineering domain - testing two teams creating simple apps
-[GenerateSerializer]
-public record CreateSimpleApp(string Team, string Description, string Language = "csharp") : Synapse(nameof(CreateSimpleApp), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record SimpleAppCreated(string Team, string AppName, string GeneratedCode) : Synapse(nameof(SimpleAppCreated), DateTimeOffset.UtcNow);
-
-public interface ISoftwareEngineeringTeam : INeuron, IHandle<CreateSimpleApp> { }
-
-public interface ISoftware20Team : ISoftwareEngineeringTeam { }
-
 public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataIngested>, IHandle<DbSchemaInspected>
 {
     Task<string> AskAsync(string prompt);
@@ -239,13 +220,6 @@ public record MemorySummary(
     DateTimeOffset At,
     string? WorkspaceId = null) : Synapse(nameof(MemorySummary), At);
 
-// INO Code Editor neuron - for visual editing and execution of INO code
-[GenerateSerializer]
-public record InoCodeEdit(string EditorId, string Code, string Language = "ino") : Synapse(nameof(InoCodeEdit), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record InoCodeRun(string EditorId, string Result) : Synapse(nameof(InoCodeRun), DateTimeOffset.UtcNow);
-
 // NuGet + Roslyn architect for closed loops (SEClosedLoopNeuron).
 [GenerateSerializer]
 public record NuGetCommand(string Action, string Target, string Args = "") : Synapse(nameof(NuGetCommand), DateTimeOffset.UtcNow);
@@ -268,19 +242,9 @@ public record ClosedLoopRequest(string LoopType, string Prompt) : Synapse(nameof
 
 public interface IClosedLoopNeuron : INeuron, IHandle<ClosedLoopRequest>, IHandle<ExperienceUsed> { }
 
-[GenerateSerializer]
-public record InoCodeSave(string EditorId, string Code, string ExperienceName, string Description = "") : Synapse(nameof(InoCodeSave), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record InoCodeExecute(string EditorId, string Code, string Instruction) : Synapse(nameof(InoCodeExecute), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record InoCodeApplySkill(string EditorId, string SkillPackName) : Synapse(nameof(InoCodeApplySkill), DateTimeOffset.UtcNow);
-
+// Skill injection from marketplace packs (used by INO assistant for awareness of installed behaviors).
 [GenerateSerializer]
 public record SkillContextInjected(string SkillPackName, string Description, string Code) : Synapse(nameof(SkillContextInjected), DateTimeOffset.UtcNow);
-
-public interface IInoCodeEditor : INeuron, IHandle<InoCodeEdit>, IHandle<InoCodeRun>, IHandle<InoCodeSave>, IHandle<InoCodeExecute>, IHandle<InoCodeApplySkill> { }
 
 // Smart ContextNeuron for INO - manages chat, agent, filter, cluster contexts like context providers
 [GenerateSerializer]

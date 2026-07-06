@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace DigitalBrain.Mcp;
 
 // Shared, transport-agnostic helpers for the DigitalBrain MCP tool surfaces. Reached through an in-process
-// IGrainFactory when co-hosted in the silo (HTTP) and the Orleans-client IGrainFactory in the stdio server.
+// IGrainFactory when co-hosted in the kernel (HTTP) and the Orleans-client IGrainFactory in the stdio server.
 // No fabricated fallbacks: real responses or honest errors only.
 public abstract class DigitalBrainToolsBase(IGrainFactory grains)
 {
@@ -69,7 +69,6 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
         {
             "aspire-main" => Grains.GetGrain<IAspireNeuron>(neuronId),
             "closedloop-main" => Grains.GetGrain<IClosedLoopNeuron>(neuronId),
-            "compiler-main" => Grains.GetGrain<ICompiler>(neuronId),
             "context-main" => Grains.GetGrain<INeuron>(neuronId),
             "company-main" => Grains.GetGrain<ICompanyKnowledgeNeuron>(neuronId),
             "company-skill-main" => Grains.GetGrain<ICompanySkillOrchestratorNeuron>(neuronId),
@@ -77,7 +76,6 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
             _ when neuronId.StartsWith("chart-", StringComparison.OrdinalIgnoreCase) => Grains.GetGrain<IChartNeuron>(neuronId),
             "db-main" => Grains.GetGrain<IDbSupportNeuron>(neuronId),
             "foundry-main" => Grains.GetGrain<ICodeFoundryLoopNeuron>(neuronId),
-            "ino-editor-main" => Grains.GetGrain<IInoCodeEditor>(neuronId),
             "ino-main" => Grains.GetGrain<IInoNeuron>(neuronId),
             "llm-main" => Grains.GetGrain<ILlmNeuron>(neuronId),
             "market-main" => Grains.GetGrain<IMarketplaceNeuron>(neuronId),

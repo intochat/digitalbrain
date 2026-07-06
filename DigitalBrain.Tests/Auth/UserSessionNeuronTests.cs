@@ -7,7 +7,7 @@ using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Auth;
 
-[Collection("silo-host")]
+[Collection("kernel-host")]
 public sealed class UserSessionNeuronTests : NeuronTestBase
 {
     [Fact]

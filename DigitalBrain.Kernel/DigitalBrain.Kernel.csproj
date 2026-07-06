@@ -12,7 +12,7 @@
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerRepository>digitalbrain-kernel</ContainerRepository>
     <!-- noble-chiseled not yet published for .NET 11 preview; use standard preview base -->
-    <!-- aspnet base: the silo transitively references Microsoft.AspNetCore.App (Aspire ServiceDefaults /
+    <!-- aspnet base: the kernel transitively references Microsoft.AspNetCore.App (Aspire ServiceDefaults /
          health checks / OpenTelemetry), so the plain runtime image fails to launch it. -->
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
     <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>

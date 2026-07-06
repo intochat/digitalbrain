@@ -4,7 +4,7 @@ using DigitalBrain.Core;
 namespace DigitalBrain.Kernel.Kernel;
 
 // AES-GCM protector with a shared symmetric key. Cross-platform and round-trips across silo nodes (unlike DPAPI),
-// so it fits the distributed Aspire/ACA silo. The key is supplied from config (Key Vault in cloud).
+// so it fits the distributed Aspire/ACA kernel. The key is supplied from config (Key Vault in cloud).
 public sealed class AesNeuronStateProtector : INeuronStateProtector
 {
     private const int NonceSize = 12;  // AES-GCM standard nonce

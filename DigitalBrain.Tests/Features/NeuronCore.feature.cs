@@ -105,7 +105,7 @@ namespace DigitalBrain.Tests.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/NeuronCore.feature.ndjson", 13);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/NeuronCore.feature.ndjson", 10);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -241,15 +241,15 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Compiler meta-neuron generates code from English description")]
+        [global::Xunit.SkippableFactAttribute(DisplayName="Meta optimizer tracks telemetry and proposes wiring improvements")]
         [global::Xunit.TraitAttribute("FeatureTitle", "DigitalBrain Neuron Core")]
-        [global::Xunit.TraitAttribute("Description", "Compiler meta-neuron generates code from English description")]
-        public async global::System.Threading.Tasks.Task CompilerMeta_NeuronGeneratesCodeFromEnglishDescription()
+        [global::Xunit.TraitAttribute("Description", "Meta optimizer tracks telemetry and proposes wiring improvements")]
+        public async global::System.Threading.Tasks.Task MetaOptimizerTracksTelemetryAndProposesWiringImprovements()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "3";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Compiler meta-neuron generates code from English description", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Meta optimizer tracks telemetry and proposes wiring improvements", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 20
@@ -263,105 +263,16 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
             {
                 await this.ScenarioStartAsync();
 #line 21
-  await testRunner.GivenAsync("a compiler neuron \"compiler1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 22
-  await testRunner.WhenAsync("I send create neuron request \"analyze emails with chart output\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 23
-  await testRunner.ThenAsync("the timeline contains a NeuronCodeGenerated", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::Xunit.SkippableFactAttribute(DisplayName="Meta optimizer tracks telemetry and proposes wiring improvements")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "DigitalBrain Neuron Core")]
-        [global::Xunit.TraitAttribute("Description", "Meta optimizer tracks telemetry and proposes wiring improvements")]
-        public async global::System.Threading.Tasks.Task MetaOptimizerTracksTelemetryAndProposesWiringImprovements()
-        {
-            string[] tagsOfScenario = ((string[])(null));
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "4";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Meta optimizer tracks telemetry and proposes wiring improvements", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 25
-this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 26
   await testRunner.GivenAsync("a meta optimizer neuron \"optimizer1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 27
+#line 22
   await testRunner.AndAsync("a demo neuron \"demo-opt\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 28
+#line 23
   await testRunner.WhenAsync("I fire multiple messages to trigger telemetry", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 29
+#line 24
   await testRunner.ThenAsync("the timeline contains a WiringOptimizationProposed", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::Xunit.SkippableFactAttribute(DisplayName="Full grok create-neuron flow: create -> publish to marketplace -> download/instal" +
-            "l -> use")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "DigitalBrain Neuron Core")]
-        [global::Xunit.TraitAttribute("Description", "Full grok create-neuron flow: create -> publish to marketplace -> download/instal" +
-            "l -> use")]
-        public async global::System.Threading.Tasks.Task FullGrokCreate_NeuronFlowCreate_PublishToMarketplace_DownloadInstall_Use()
-        {
-            string[] tagsOfScenario = ((string[])(null));
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "5";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Full grok create-neuron flow: create -> publish to marketplace -> download/instal" +
-                    "l -> use", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 31
-this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 32
-  await testRunner.GivenAsync("a marketplace neuron \"market-main\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 33
-  await testRunner.GivenAsync("a compiler neuron \"compiler-flow\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 34
-  await testRunner.WhenAsync("I send create neuron request \"grok email analyzer chart\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 35
-  await testRunner.ThenAsync("the timeline contains a NeuronCodeGenerated", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 36
-  await testRunner.WhenAsync("I publish pack \"Generated-grokemailanalyzerchart\" version \"0.1-dev\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 37
-  await testRunner.AndAsync("I request published list", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-#line 38
-  await testRunner.ThenAsync("the timeline contains a PublishedList", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 39
-  await testRunner.WhenAsync("I download/install the pack \"Generated-grokemailanalyzerchart\" version \"0.1-dev\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 40
-  await testRunner.ThenAsync("the timeline contains a NeuroPackInstalled", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -376,12 +287,12 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "6";
+            string pickleIndex = "4";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Simulate a causal scene with ordered synapse sequence and replay (Durable journal" +
                     ")", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 42
+#line 26
 this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -391,69 +302,21 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
             else
             {
                 await this.ScenarioStartAsync();
-#line 43
+#line 27
   await testRunner.GivenAsync("a demo neuron \"scene-demo\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 44
+#line 28
   await testRunner.WhenAsync("I fire a DemoMessageSynapse with text \"step-1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 45
+#line 29
   await testRunner.AndAsync("I fire a DemoMessageSynapse with text \"step-2\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 46
+#line 30
   await testRunner.ThenAsync("the timeline contains these synapse types in causal order: DemoMessageSynapse, De" +
                         "moMessageSynapse", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 47
+#line 31
   await testRunner.AndAsync("replaying shows the message", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
-#line hidden
-            }
-            await this.ScenarioCleanupAsync();
-        }
-        
-        [global::Xunit.SkippableFactAttribute(DisplayName="Harness simulates other-brain publish-install-use flow via Marketplace contract")]
-        [global::Xunit.TraitAttribute("FeatureTitle", "DigitalBrain Neuron Core")]
-        [global::Xunit.TraitAttribute("Description", "Harness simulates other-brain publish-install-use flow via Marketplace contract")]
-        public async global::System.Threading.Tasks.Task HarnessSimulatesOther_BrainPublish_Install_UseFlowViaMarketplaceContract()
-        {
-            string[] tagsOfScenario = ((string[])(null));
-            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "7";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Harness simulates other-brain publish-install-use flow via Marketplace contract", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
-            string[] tagsOfRule = ((string[])(null));
-            global::Reqnroll.RuleInfo ruleInfo = null;
-#line 49
-this.ScenarioInitialize(scenarioInfo, ruleInfo);
-#line hidden
-            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
-            {
-                await testRunner.SkipScenarioAsync();
-            }
-            else
-            {
-                await this.ScenarioStartAsync();
-#line 50
-  await testRunner.GivenAsync("a marketplace neuron \"market-main\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 51
-  await testRunner.GivenAsync("a compiler neuron \"compiler-harness\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
-#line hidden
-#line 52
-  await testRunner.WhenAsync("I send create neuron request \"email analyzer for other brain\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 53
-  await testRunner.ThenAsync("the timeline contains a NeuronCodeGenerated", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 54
-  await testRunner.WhenAsync("I publish, a simulated other brain installs and uses the pack \"Generated-emailana" +
-                        "lyzerforotherbrain\" version \"0.1-sim\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
-#line hidden
-#line 55
-  await testRunner.ThenAsync("the timeline contains a PublishedList", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
-#line hidden
-#line 56
-  await testRunner.AndAsync("the generated neuron for pack \"Generated-emailanalyzerforotherbrain\" received an " +
-                        "ExperienceUsed", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
@@ -466,11 +329,11 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "8";
+            string pickleIndex = "5";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("System self-awareness with status, fix proposal and simulation", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 58
+#line 33
 this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -480,16 +343,16 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
             else
             {
                 await this.ScenarioStartAsync();
-#line 59
+#line 34
   await testRunner.GivenAsync("a system status neuron \"status-self\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 60
+#line 35
   await testRunner.WhenAsync("I fire a bad status for component \"kernel\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 61
+#line 36
   await testRunner.ThenAsync("the timeline contains a FixProposal", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 62
+#line 37
   await testRunner.AndAsync("the timeline contains a SimulationResult with success true", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -505,12 +368,12 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "9";
+            string pickleIndex = "6";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Kernel self-update publishes as pre-installed pack then performs explicit rolling" +
                     " update (drain/verify/rejoin per replica using checkpoints + causal lineage)", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 64
+#line 39
 this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -520,49 +383,49 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
             else
             {
                 await this.ScenarioStartAsync();
-#line 65
+#line 40
   await testRunner.GivenAsync("a marketplace neuron \"market-kupdate\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 66
+#line 41
   await testRunner.GivenAsync("an aspire orchestrator neuron \"aspire-main\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 67
+#line 42
   await testRunner.WhenAsync("I publish pack \"kernel\" version \"rolling-2026.6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 68
+#line 43
   await testRunner.AndAsync("I download/install the pack \"kernel\" version \"rolling-2026.6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 69
+#line 44
   await testRunner.AndAsync("I fire a StartDistributedApp for \"kernel\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 70
+#line 45
   await testRunner.ThenAsync("the timeline contains a NeuroPackInstalled", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 71
+#line 46
   await testRunner.AndAsync("the timeline contains a DistributedAppStarted", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 72
+#line 47
   await testRunner.AndAsync("the timeline contains a UiSurface", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 73
+#line 48
   await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-dashboard\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 74
+#line 49
   await testRunner.WhenAsync("I publish pack \"kernel\" version \"rolling-2026.6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 75
+#line 50
   await testRunner.AndAsync("I download/install the pack \"kernel\" version \"rolling-2026.6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 76
+#line 51
   await testRunner.AndAsync("I trigger kernel self update", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 77
+#line 52
   await testRunner.ThenAsync("the timeline contains a UiSurface of kind \"kernel-rolling-drain\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 78
+#line 53
   await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-rolling-verify\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 79
+#line 54
   await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-rolling-complete\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
@@ -578,12 +441,12 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
-            string pickleIndex = "10";
+            string pickleIndex = "7";
             global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Kernel treated as first-class versioned pack emits only segregated surfaces (core" +
                     " stays universal)", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
-#line 82
+#line 57
 this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
             if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
@@ -593,25 +456,25 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
             else
             {
                 await this.ScenarioStartAsync();
-#line 83
+#line 58
   await testRunner.GivenAsync("a marketplace neuron \"market-kseg\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 84
+#line 59
   await testRunner.GivenAsync("an aspire orchestrator neuron \"aspire-kseg\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
-#line 85
+#line 60
   await testRunner.WhenAsync("I publish pack \"kernel\" version \"0.3.0\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
-#line 86
+#line 61
   await testRunner.AndAsync("I download/install the pack \"kernel\" version \"0.3.0\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 87
+#line 62
   await testRunner.AndAsync("I fire a StartDistributedApp for \"kernel-seg\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
-#line 88
+#line 63
   await testRunner.ThenAsync("the timeline contains a NeuroPackInstalled", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
-#line 89
+#line 64
   await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-dashboard\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }

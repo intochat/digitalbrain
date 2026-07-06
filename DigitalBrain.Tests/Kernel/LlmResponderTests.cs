@@ -44,7 +44,7 @@ internal sealed class AnswerPrefixChatClient : IChatClient
 }
 
 // Test-local configurator: registers the fake IChatClient on top of the always-applied base silo wiring;
-// kept separate from NeuronTestSiloConfigurator so other NeuronTestBase subclasses that don't apply this
+// kept separate from NeuronTestKernelConfigurator so other NeuronTestBase subclasses that don't apply this
 // ConfigureSilo override get no IChatClient (their deterministic fallback).
 public sealed class LlmResponderSiloConfigurator : ISiloConfigurator
 {

@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalBrain.Tests.Gateway;
 
-[Collection("silo-host")]
+[Collection("kernel-host")]
 public class GatewayCorsTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory = factory;

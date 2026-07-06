@@ -30,7 +30,7 @@
 | Layer | Projects | Notes |
 |---|---|---|
 | Orchestration (Aspire) | `NeuroOSPrototype.AppHost`, `NeuroOSPrototype.ServiceDefaults`, `DigitalBrain.Aspire` | AppHost is thin; all wiring lives in the `DigitalBrain.Aspire` DSL ("plugin" layer). Renamed in Milestone M2 below. |
-| Runtime host | `DigitalBrain.Kernel` | Orleans silo + gRPC/gRPC-Web gateway + web bundle host — the one deployable backend image |
+| Runtime host | `DigitalBrain.Kernel` | Orleans runtime + gRPC/gRPC-Web gateway + web bundle host — the one deployable backend image |
 | Stable contracts | `DigitalBrain.Core`, `DigitalBrain.Pack.Contracts`, `DigitalBrain.Marketplace.Contracts`, `DigitalBrain.Ui.Contracts`, `DigitalBrain.Demo.Contracts` | Phase-2 Core split in progress (see `ARCHITECTURE_CLEANUP_PROPOSAL.md`) |
 | Runtime libs | `DigitalBrain.Context` (RAG/hybrid scorer), `DigitalBrain.Ui.Runtime`, `DigitalBrain.Demo.Runtime`, `DigitalBrain.UiKit`, `DigitalBrain.SeedPacks` | |
 | Integrations (packs) | `DigitalBrain.Telegram[.Channel/.Transport]`, `DigitalBrain.Google`, `DigitalBrain.Salesforce`, `DigitalBrain.Windows`, `DigitalBrain.Developer`, `DigitalBrain.Mcp`, `DigitalBrain.Experience.PersonalAssistant` | Telegram.Transport is a second deployable |
@@ -85,7 +85,7 @@ Pulumi.AzureNative program (`deploy/Program.cs`), stack `dev`, state in `azblob:
 - `digitalbrainopenaiprod` (S0) + deployment `chat` = gpt-4o-mini GlobalStandard cap 10
 - `digitalbrain-log-prod` + `digitalbrain-ai-prod` (Log Analytics + App Insights — App Insights exists but nothing sends to it yet, see Milestone M6)
 - `digitalbrain-cae-prod` ACA managed environment
-- `digitalbrain-jobs` container app — **the kernel silo**, external ingress `Auto` (HTTP/1.1 + h2 → gRPC-Web + native gRPC), port 8080, 1 CPU / 2Gi, scale 1–5, secrets: storage conn string, OpenAI key, checkpoint AES key
+- `digitalbrain-jobs` container app — **the kernel**, external ingress `Auto` (HTTP/1.1 + h2 → gRPC-Web + native gRPC), port 8080, 1 CPU / 2Gi, scale 1–5, secrets: storage conn string, OpenAI key, checkpoint AES key
 - `digitalbrain-telegram` container app — external `/webhook` ingress, 0.25 CPU / 0.5Gi, scale 1–3
 
 CI/CD: `.github/workflows/deploy.yml` on push to master → `dotnet test Brain.slnx` (skip Flutter, skip E2E) → `dotnet publish -t:PublishContainer` → **public Docker Hub** `vhorbachov/digitalbrain-kernel` → Azure OIDC login → `pulumi up`. All prod deploys go through GitHub Actions only.

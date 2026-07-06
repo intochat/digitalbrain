@@ -77,13 +77,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             }
         }
 
-        if (IsGmailIntent(req.Prompt))
+        if (InoConnectorIntents.IsGmail(req.Prompt))
         {
             await HandleGmailIntentAsync(req);
             return;
         }
 
-        if (IsSalesforceIntent(req.Prompt))
+        if (InoConnectorIntents.IsSalesforce(req.Prompt))
         {
             await HandleSalesforceIntentAsync(req);
             return;
@@ -118,7 +118,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             string.Equals(pack?.ToString(), SalesforceClientFactory.PackName, StringComparison.OrdinalIgnoreCase))
         {
             var pendingSalesforce = _pendingSalesforceRequest
-                ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => IsSalesforceIntent(r.Prompt));
+                ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => InoConnectorIntents.IsSalesforce(r.Prompt));
 
             if (pendingSalesforce is not null)
             {
@@ -137,7 +137,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
 
         var pending = _pendingGmailRequest
-            ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => IsGmailIntent(r.Prompt));
+            ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => InoConnectorIntents.IsGmail(r.Prompt));
 
         if (pending is null || !await HasGoogleCredentialAsync())
             return;
@@ -403,7 +403,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private async Task FetchRecentGmailAsync(InoRequest req)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
-        var maxResults = GmailResultCount(req.Prompt);
+        var maxResults = InoConnectorIntents.ResultCount(req.Prompt);
         await Broadcast(new Signal(GoogleSignals.GmailFetchRequested, new Dictionary<string, object?>
         {
             ["prompt"] = req.Prompt,
@@ -438,7 +438,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private async Task FetchSalesforceAccountsAsync(InoRequest req, string salesforceUserId)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
-        var maxResults = SalesforceResultCount(req.Prompt);
+        var maxResults = InoConnectorIntents.ResultCount(req.Prompt);
         await Broadcast(new Signal(SalesforceSignals.QueryRequested, new Dictionary<string, object?>
         {
             ["prompt"] = req.Prompt,
@@ -607,11 +607,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             .Select(p => p.Pack.Name + "@" + p.Pack.Version);
         var skillCtx = string.Join(";", skills.Concat(packs));
 
-        // Recent editor activity for INO awareness of live edits.
-        var edits = OutgoingJournal.Concat(IncomingJournal).OfType<InoCodeEdit>().TakeLast(1).Select(e => "edit:" + (e.Code.Length > 80 ? e.Code[..80] : e.Code));
-        var editorCtx = string.Join(";", edits);
-
-        return $"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nskills:{skillCtx}\neditor:{editorCtx}";
+        return $"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nskills:{skillCtx}";
     }
 
     private DbSchemaInspected? LatestSuccessfulSchema(string? clientId, string? workspaceId)
@@ -649,20 +645,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                p.Contains("show db");
     }
 
-    private static bool IsGmailIntent(string prompt) =>
-        GmailIntentRegex().IsMatch(prompt);
-
-    private static int GmailResultCount(string prompt)
-    {
-        var p = prompt.ToLowerInvariant();
-        return p.Contains("last") || p.Contains("latest") || p.Contains("most recent") ? 1 : 5;
-    }
-
-    private static int SalesforceResultCount(string prompt)
-    {
-        var p = prompt.ToLowerInvariant();
-        return p.Contains("last") || p.Contains("latest") || p.Contains("most recent") ? 1 : 5;
-    }
 
     private static string GmailReplyText(IReadOnlyList<GmailMessageSummary> messages)
     {
@@ -743,16 +725,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         new(@"(?:""[^""]+\.(?:db|sqlite|sqlite3)""|'[^']+\.(?:db|sqlite|sqlite3)'|[A-Za-z]:\\[^\s""']+\.(?:db|sqlite|sqlite3))",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    private static Regex GmailIntentRegex() =>
-        new(@"\b(gmail|email|e-mail|mailbox|inbox)\b",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
-    private static bool IsSalesforceIntent(string prompt) =>
-        SalesforceIntentRegex().IsMatch(prompt);
-
-    private static Regex SalesforceIntentRegex() =>
-        new(@"\b(salesforce|crm)\b",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static string SchemaReplyText(DbSchemaInspected inspected) =>
         inspected.Succeeded && inspected.Schema is not null

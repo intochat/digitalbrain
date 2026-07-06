@@ -12,7 +12,7 @@ public sealed class CheckpointBackupTrigger(IGrainFactory grains, CheckpointProt
     // general per-user neuron enumeration (no such registry exists yet).
     private static readonly string[] V1NeuronIds =
     [
-        "status-main", "ino-main", "ino-editor-main", "context-main",
+        "status-main", "ino-main", "context-main",
         "db-main", "chart-main", "session-main", "automation-main", "market-data-main"
     ];
 

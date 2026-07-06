@@ -12,7 +12,7 @@ using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Kernel;
 
-[Collection("silo-host")]
+[Collection("kernel-host")]
 public class ExperienceStepDispatchTests : NeuronTestBase
 {
     private HomeFeedBus? _homeFeedBusInstance;

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalBrain.Tests.Gateway;
 
-[Collection("silo-host")]
+[Collection("kernel-host")]
 public class GatewayGrpcWireTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
 {
     private readonly GrpcChannel _channel;

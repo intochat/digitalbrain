@@ -20,7 +20,7 @@ public sealed class TestDigitalBrain(
     public async Task InitializeAsync()
     {
         var builder = new TestClusterBuilder(initialSilosCount: _initialSilosCount);
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
+        builder.AddSiloBuilderConfigurator<NeuronTestKernelConfigurator>();
 
         // AddSiloBuilderConfigurator<T>() / AddClientBuilderConfigurator<T>() require parameterless T:
         // Orleans stores T's AssemblyQualifiedName and reflectively Activator.CreateInstance()s it inside
