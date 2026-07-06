@@ -1,11 +1,14 @@
 using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+
 namespace DigitalBrain.Kernel;
 
 public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClosedLoopNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IClosedLoopNeuron
 {
+    private const string AspireInspectionEnabledKey = "DigitalBrain:ClosedLoop:InspectAspireMcp";
     private McpClient? _aspireMcp;
 
     public async Task HandleAsync(ClosedLoopRequest req)
@@ -42,21 +45,25 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
 
         await FireAsync(new ClosedLoopCompleted(req.LoopType, analysis.Length > 20 ? analysis : "processed", false));
 
-        var shouldAttemptAspireApply =
+        var shouldStageSelfEvolution =
             !req.LoopType.Contains("ui", StringComparison.OrdinalIgnoreCase) &&
             (analysis.Contains("restart", StringComparison.OrdinalIgnoreCase) ||
              analysis.Contains("apply", StringComparison.OrdinalIgnoreCase));
 
-        if (shouldAttemptAspireApply)
+        if (shouldStageSelfEvolution)
         {
+            await StageSelfEvolutionProposalAsync(req, analysis);
+
+            if (!ShouldInspectAspireMcp())
+                return;
+
             await EnsureAspireMcpAsync();
             if (_aspireMcp != null)
             {
                 try
                 {
                     var res = await CallAspireMcpAsync("list_resources");
-                    await FireAsync(new SystemModificationProposed("aspire", "closedloop", analysis, "aspire-mcp"));
-                    Logger.LogInformation("ClosedLoop would apply via Aspire MCP on resources: {Res}", res.Substring(0, Math.Min(200, res.Length)));
+                    Logger.LogInformation("ClosedLoop staged self-evolution proposal with Aspire resources visible: {Res}", res.Substring(0, Math.Min(200, res.Length)));
                 }
                 catch { }
             }
@@ -70,6 +77,29 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             Logger.LogInformation("ClosedLoop embodied from pack {Pack}", used.Pack);
             await FireAsync(new ClosedLoopRequest(used.Pack.Contains("UI") ? "ui" : "se", "Embodied pack activation: begin closed improvement loop"));
         }
+    }
+
+    private async Task StageSelfEvolutionProposalAsync(ClosedLoopRequest req, string analysis)
+    {
+        const string applyVia = "aspire-mcp";
+
+        await FireAsync(new SystemModificationProposed("aspire", "closedloop", analysis, applyVia));
+        await FireAsync(new SelfEvolutionProposal(
+            ProposalId: "closedloop-" + req.SynapseId,
+            Scope: "kernel",
+            Rationale: $"ClosedLoop {req.LoopType}: {req.Prompt}",
+            ProposedChange: analysis,
+            ApplyVia: applyVia,
+            Risk: SelfEvolutionRisk.KernelRestart,
+            RequiresHumanApproval: true,
+            RollbackPlan: "Create a checkpoint before apply; use rolling rollback if verification fails.",
+            Origin: Self.Value));
+    }
+
+    private bool ShouldInspectAspireMcp()
+    {
+        var config = ServiceProvider.GetService<IConfiguration>();
+        return config?.GetValue(AspireInspectionEnabledKey, true) ?? true;
     }
 
     private async Task EnsureAspireMcpAsync()
@@ -107,5 +137,3 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
         return res.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "no-data";
     }
 }
-
-
