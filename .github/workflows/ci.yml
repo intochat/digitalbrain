@@ -23,10 +23,4 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      # Brain.slnx is the canonical solution. SkipFlutterBuild keeps the in-repo Flutter client
-      # reference visible in headless .NET jobs without running Flutter.
-      # SkipDeployBuild excludes the Pulumi deploy project from the test build graph (safe because
-      # the deploy job uses separate pulumi/actions which runs the deploy/ program via Automation API).
-      # E2E specs are gated out of headless CI, mirroring the documented
-      # "DigitalBrain.Tests excluding gated E2E" verification.
-      - run: dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true -p:SkipDeployBuild=true --filter "FullyQualifiedName!~E2E"
+      - run: dotnet test Brain.slnx

@@ -99,6 +99,14 @@ public record UserSessionEnded(
     string ClientId) : Synapse(nameof(UserSessionEnded), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+public record CapabilityRegistered(
+    string Id,
+    string Description,
+    IReadOnlyList<string> Examples,
+    string Tier,
+    string? Origin = null) : Synapse(nameof(CapabilityRegistered), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
 public record LocalUserRegistered(
     UserId UserId,
     string Username,

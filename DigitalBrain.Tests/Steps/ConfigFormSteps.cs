@@ -24,7 +24,7 @@ public class ConfigFormSteps : IAsyncDisposable
     // Shared so the in-cluster grains and the out-of-cluster GatewayService write/read the SAME backing store.
     private static IPackConfigStore SharedConfigStore = null!;
 
-    private readonly TestCluster _cluster;
+    private readonly InProcessTestCluster _cluster;
     private string _packName = "";
     private const string Scope = "config-form-user";
     private string? _configScope;
@@ -37,13 +37,13 @@ public class ConfigFormSteps : IAsyncDisposable
         services.AddSingleton<IPackConfigStore, PackConfigStore>();
         SharedConfigStore = services.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
 
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<ConfigFormSiloConfig>();
+        var builder = new InProcessTestClusterBuilder();
+        builder.ConfigureSilo((_, siloBuilder) => new ConfigFormSiloConfig().Configure(siloBuilder));
         _cluster = builder.Build();
         _cluster.DeployAsync().GetAwaiter().GetResult();
     }
 
-    public async ValueTask DisposeAsync() => await _cluster.StopAllSilosAsync();
+    public async ValueTask DisposeAsync() => await _cluster.DisposeAsync();
 
     // A domain-neutral pack with three RequiredConfig fields: a Text, a Choice, and a Secret.
     private static string ConfiguredPackSource(string packName)
@@ -90,7 +90,7 @@ public class ConfigFormSteps : IAsyncDisposable
     [When(@"I publish and install the pack")]
     public async Task WhenIPublishAndInstallThePack()
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-config-form");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-config-form");
         await market.FireAsync(new PublishToMarketplace(
             _packName, "1.0", Code: ConfiguredPackSource(_packName), OwnerId: "tester", IsPrivate: false, CommissionRate: 0.0));
         await market.FireAsync(new InstallFromMarketplace(_packName, "1.0", BuyerId: Scope));
@@ -99,7 +99,7 @@ public class ConfigFormSteps : IAsyncDisposable
     [Then(@"a config form surface is emitted whose tree contains the fields ""(.*)"", ""(.*)"", ""(.*)""")]
     public async Task ThenAConfigFormSurfaceIsEmitted(string field1, string field2, string field3)
     {
-        var gen = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("generated-" + _packName.ToLowerInvariant());
+        var gen = _cluster.Client.GetGrain<IGeneratedNeuron>("generated-" + _packName.ToLowerInvariant());
 
         UiSurface? form = null;
         for (var attempt = 0; attempt < 40 && form is null; attempt++)
@@ -128,7 +128,7 @@ public class ConfigFormSteps : IAsyncDisposable
     public async Task WhenISubmitConfiguration(string token, string provider, string key)
     {
         var gateway = new GatewayService(
-            _cluster.GrainFactory,
+            _cluster.Client,
             new ConfigurationBuilder().Build(),
             ((InProcessSiloHandle)_cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>(),
             new SignalEgressBus(),

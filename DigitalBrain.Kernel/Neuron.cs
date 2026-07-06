@@ -1,12 +1,18 @@
 using DigitalBrain.Core;
 using Orleans.Journaling;
 using Orleans.Streams;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
 namespace DigitalBrain.Kernel;
+
+public sealed class NeuronLifecycleOptions
+{
+    public bool JournalActivationMarkers { get; set; }
+}
 
 public sealed class NeuronJournals(
     [FromKeyedServices("in-journal")] IDurableList<Synapse> incoming,
@@ -31,6 +37,8 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     // The synapse currently being handled (the cause of anything fired while handling it), exposed so
     // subclasses doing manual point-to-point delivery can preserve causal lineage on stamped synapses.
     protected Synapse? CurrentCause => _currentCause;
+
+    protected DateTimeOffset ActivatedAt { get; private set; }
 
     protected NeuronId Self => new(this.GetPrimaryKeyString() ?? this.GetGrainId().ToString());
 
@@ -85,13 +93,22 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             throw new InvalidOperationException($"Journal not ready on activation for {Self}.", ex);
         }
 
-        try
+        ActivatedAt = DateTimeOffset.UtcNow;
+
+        // Activation records are lifecycle metadata, not user synapse handling. Avoid durable writes
+        // during Orleans journal recovery; only the prototype/in-memory harness opts into this marker.
+        if (ServiceProvider.GetService<IOptions<NeuronLifecycleOptions>>()?.Value.JournalActivationMarkers == true)
         {
-            await FireAsync(new NeuronActivated(Self));
-        }
-        catch (Exception ex) when (IsJournalWriterUninitialized(ex))
-        {
-            Logger.LogWarning(ex, "Activation marker was not journaled for {Neuron}; continuing so the first real synapse can initialize the journal.", Self);
+            try
+            {
+                AddToJournal(ref _outgoingSynapses, "out-journal", new NeuronActivated(Self).Stamp(Self));
+                await WriteJournalStateAsync();
+                NeuronInstrumentation.SynapsesOut.Add(1);
+            }
+            catch (Exception ex) when (IsJournalWriterUninitialized(ex))
+            {
+                Logger.LogWarning(ex, "Activation marker was not journaled for {Neuron}; continuing so the first real synapse can initialize the journal.", Self);
+            }
         }
 
         await SubscribeTimelineIfNeeded();
@@ -340,4 +357,3 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         public static readonly Histogram<double> HandleDuration = Meter.CreateHistogram<double>("db.handle.duration");
     }
 }
-

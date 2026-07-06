@@ -15,7 +15,7 @@ using Orleans.TestingHost;
 
 namespace DigitalBrain.TestKit;
 
-// No-op scoped factory for shared test clusters: always defers to the global IChatClient by returning null.
+// No-op scoped factory for in-process test clusters: always defers to the global IChatClient by returning null.
 // Prevents shared-config tests from acquiring a hidden Ollama/OpenAI network dependency.
 // Tests that need the recording factory override this via their own ISiloConfigurator.
 internal sealed class NoOpScopedChatClientFactory : IScopedChatClientFactory
@@ -23,8 +23,8 @@ internal sealed class NoOpScopedChatClientFactory : IScopedChatClientFactory
     public IChatClient? Create(string provider, string? apiKey) => null;
 }
 
-// Shared TestCluster kernel wiring: in-memory dual journals + the pack embodiment engine.
-// Reused by every TestCluster-based test so the prototype journal + Foundry services are configured once.
+// Shared in-process cluster kernel wiring: in-memory dual journals + the pack embodiment engine.
+// Reused by cluster-backed tests so the prototype journal + Foundry services stay consistent.
 public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder)
@@ -40,6 +40,7 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
                 services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
                 services.AddScoped<NeuronJournals>();
+                services.Configure<NeuronLifecycleOptions>(options => options.JournalActivationMarkers = true);
                 services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
                 services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, MarketplaceInstallApplyHandler>();
@@ -67,7 +68,4 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
             });
     }
 }
-
-
-
 

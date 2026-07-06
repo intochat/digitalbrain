@@ -13,7 +13,7 @@ public abstract class NeuronTestBase : IAsyncLifetime
     protected virtual void ConfigureClient(IClientBuilder builder) { }
     protected virtual short InitialSilosCount => 1;
 
-    protected TestCluster Cluster => _brain.Cluster;
+    protected TestDigitalBrainCluster Cluster => _brain.Cluster;
 
     // Public (not protected) so TestGrainFactory — a top-level adapter outside this class hierarchy —
     // can resolve grains on behalf of test-authored MCP tool instances.

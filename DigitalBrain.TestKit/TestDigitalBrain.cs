@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using Microsoft.Extensions.Configuration;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -13,34 +13,25 @@ public sealed class TestDigitalBrain(
     private readonly Action<ISiloBuilder>? _extendSilo = extendSilo;
     private readonly Action<IClientBuilder>? _extendClient = extendClient;
     private readonly short _initialSilosCount = initialSilosCount;
-    private TestCluster? _cluster;
+    private InProcessTestCluster? _cluster;
 
-    public TestCluster Cluster => _cluster!;
+    public TestDigitalBrainCluster Cluster => new(_cluster!);
 
     public async Task InitializeAsync()
     {
         // Ensure grains and SystemStatus skip heavy MCP / warmup side effects inside cluster tests.
         Environment.SetEnvironmentVariable("DIGITALBRAIN_TEST_MODE", "true");
 
-        var builder = new TestClusterBuilder(initialSilosCount: _initialSilosCount);
-        builder.AddSiloBuilderConfigurator<NeuronTestKernelConfigurator>();
-
-        // AddSiloBuilderConfigurator<T>() / AddClientBuilderConfigurator<T>() require parameterless T: (Orleans technical)
-        // Orleans stores T's AssemblyQualifiedName and reflectively Activator.CreateInstance()s it inside
-        // the test host process, so a closure-capturing configurator instance can't be passed directly.
-        // Bridge the captured delegates through AsyncLocals that the Extend* configurators read when
-        // Orleans reflectively constructs them during builder.Build()/DeployAsync() below, on this same
-        // async flow.
-        if (_extendSilo is not null)
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: _initialSilosCount);
+        builder.ConfigureSilo((_, siloBuilder) =>
         {
-            builder.AddSiloBuilderConfigurator<ExtendSiloConfigurator>();
-            ExtendSiloConfigurator.Current.Value = _extendSilo;
-        }
+            new NeuronTestKernelConfigurator().Configure(siloBuilder);
+            _extendSilo?.Invoke(siloBuilder);
+        });
 
         if (_extendClient is not null)
         {
-            builder.AddClientBuilderConfigurator<ExtendClientBuilderConfigurator>();
-            ExtendClientBuilderConfigurator.Current.Value = _extendClient;
+            builder.ConfigureClient(clientBuilder => _extendClient(clientBuilder));
         }
 
         _cluster = builder.Build();
@@ -50,11 +41,11 @@ public sealed class TestDigitalBrain(
     public async Task DisposeAsync()
     {
         if (_cluster is not null)
-            await _cluster.StopAllSilosAsync();
+            await _cluster.DisposeAsync();
     }
 
     public TGrain Grain<TGrain>(string key) where TGrain : IGrainWithStringKey =>
-        _cluster!.GrainFactory.GetGrain<TGrain>(key);
+        Cluster.GrainFactory.GetGrain<TGrain>(key);
 
     public Task FireAsync<T>(T synapse) where T : Synapse =>
         Grain<INeuron>(synapse.SynapseId.ToString()).DeliverAsync(synapse);
@@ -63,19 +54,16 @@ public sealed class TestDigitalBrain(
         synapse.Receiver is { } r
             ? Grain<INeuron>(r.Value).DeliverAsync(synapse)
             : throw new InvalidOperationException("DeliverAsync requires synapse.Receiver to be set.");
+}
 
-    private sealed class ExtendSiloConfigurator : ISiloConfigurator
-    {
-        public static readonly AsyncLocal<Action<ISiloBuilder>?> Current = new();
+public sealed class TestDigitalBrainCluster(InProcessTestCluster cluster)
+{
+    public InProcessTestCluster Inner => cluster;
+    public IReadOnlyList<InProcessSiloHandle> Silos => cluster.Silos;
+    public IClusterClient Client => cluster.Client;
+    public IGrainFactory GrainFactory => cluster.Client;
 
-        public void Configure(ISiloBuilder siloBuilder) => Current.Value?.Invoke(siloBuilder);
-    }
+    public Task DeactivateAsync(IAddressable grain) => cluster.DeactivateAsync(grain);
 
-    private sealed class ExtendClientBuilderConfigurator : IClientBuilderConfigurator
-    {
-        public static readonly AsyncLocal<Action<IClientBuilder>?> Current = new();
-
-        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) =>
-            Current.Value?.Invoke(clientBuilder);
-    }
+    public Task StopAllSilosAsync() => cluster.StopAllSilosAsync();
 }

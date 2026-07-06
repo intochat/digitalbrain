@@ -11,7 +11,7 @@ namespace DigitalBrain.Tests.Steps;
 [Binding]
 public class CodeFoundrySteps : IAsyncDisposable
 {
-    private readonly TestCluster _cluster;
+    private readonly InProcessTestCluster _cluster;
     private readonly DigitalBrain.Tests.Foundry.FakeBuildRunner _sharedBuildRunner = new();
     private INeuron? _currentGrain;
     private IReadOnlyList<Synapse>? _timeline;
@@ -19,19 +19,19 @@ public class CodeFoundrySteps : IAsyncDisposable
     public CodeFoundrySteps()
     {
         FoundrySiloConfig.BuildRunner = _sharedBuildRunner;
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<FoundrySiloConfig>();
+        var builder = new InProcessTestClusterBuilder();
+        builder.ConfigureSilo((_, siloBuilder) => new FoundrySiloConfig().Configure(siloBuilder));
         _cluster = builder.Build();
         _cluster.DeployAsync().GetAwaiter().GetResult();
         FoundrySiloConfig.BuildRunner = null;
     }
 
-    public async ValueTask DisposeAsync() => await _cluster.StopAllSilosAsync();
+    public async ValueTask DisposeAsync() => await _cluster.DisposeAsync();
 
     [Given(@"a code gen neuron ""(.*)""")]
     public async Task GivenACodeGenNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<ICodeGenNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<ICodeGenNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
@@ -53,7 +53,7 @@ public class CodeFoundrySteps : IAsyncDisposable
     [Given(@"a code run neuron ""(.*)""")]
     public async Task GivenACodeRunNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<ICodeRunNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<ICodeRunNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
@@ -100,7 +100,7 @@ public class CodeFoundrySteps : IAsyncDisposable
     public async Task GivenACodeDeployNeuron(string id, string mode)
     {
         _sharedBuildRunner.NextResult = mode == "succeeding";
-        _currentGrain = _cluster.GrainFactory.GetGrain<ICodeDeployNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<ICodeDeployNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
@@ -142,7 +142,7 @@ public class CodeFoundrySteps : IAsyncDisposable
     [Given(@"a foundry loop neuron ""(.*)""")]
     public async Task GivenAFoundryLoopNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<ICodeFoundryLoopNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<ICodeFoundryLoopNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
@@ -200,4 +200,3 @@ public class CodeFoundrySteps : IAsyncDisposable
         }
     }
 }
-
