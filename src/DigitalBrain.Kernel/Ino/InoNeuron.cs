@@ -682,8 +682,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task DeliverSalesforceCredentialSurfaceAsync(string? clientId, string? workspaceId = null)
     {
-        // Stubbed (Salesforce surface is object in integration)
-        await Broadcast(new Signal("salesforce-credential-form", new Dictionary<string, object?> { ["clientId"] = clientId }));
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
     }
 
     private async Task FetchRecentGmailAsync(InoRequest req)
