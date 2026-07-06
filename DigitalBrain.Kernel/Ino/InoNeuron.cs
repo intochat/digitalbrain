@@ -13,6 +13,7 @@ using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Ui.Runtime;
 using Microsoft.Extensions.AI;
+using DigitalBrain.Ino;
 
 namespace DigitalBrain.Kernel.Ino;
 

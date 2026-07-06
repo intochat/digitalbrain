@@ -1,9 +1,11 @@
 using DigitalBrain.Context;
 using DigitalBrain.Core;
+using DigitalBrain.Ino;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Ino;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Kernel.Ui;
@@ -48,6 +50,7 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
+                services.AddSingleton<IInoCapabilityRecall, KernelInoCapabilityRecall>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
                 services.AddSingleton<IVectorStore, InMemoryVectorStore>();
                 services.AddSingleton<DocumentIngestor>();

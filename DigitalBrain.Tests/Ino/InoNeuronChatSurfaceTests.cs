@@ -5,7 +5,7 @@ using DigitalBrain.Core.UiKit;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
-using DigitalBrain.Kernel.Ino;
+using DigitalBrain.Ino;
 using DigitalBrain.Salesforce;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.AI;

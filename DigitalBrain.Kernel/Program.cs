@@ -11,6 +11,7 @@ using DigitalBrain.Kernel.Google;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Uploads;
+using DigitalBrain.Kernel.Ino;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Kernel.Voice;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -23,6 +24,7 @@ using DigitalBrain.Kernel.Economics;
 using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Salesforce;
+using DigitalBrain.Ino;
 using DigitalBrain.ServiceDefaults;
 
 // Kernel host for DigitalBrain (Aspire + Orleans).
@@ -182,6 +184,12 @@ builder.Services.AddGoogleGmailClient();
 // time — SalesforceCrmNeuron calls CreateAsync explicitly per method with its own NeuronScope, so "user
 // hasn't connected yet" is a normal per-call condition instead of an activation-time throw.
 builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
+
+// Ino (personal AI assistant) as pluggable integration.
+// Owns its AI config (provider, model, system prompts, temperature) so the assistant logic
+// can evolve independently and be "plugged" into the kernel host.
+builder.Services.AddInoAi(builder.Configuration.GetSection("Ino:AI"));
+builder.Services.AddSingleton<IInoCapabilityRecall, KernelInoCapabilityRecall>();
 
 // Proxy to private marketplace (new separate repo) when enabled.
 // Register the stub here; real impl uses HttpClient to the marketplace service.

@@ -1,5 +1,7 @@
 using DigitalBrain.Kernel.Company;
+using DigitalBrain.Ino;
 using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Ino;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
 using Microsoft.Extensions.AI;
@@ -24,6 +26,7 @@ public static class DigitalBrainKernelExtensions
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
+                services.AddSingleton<IInoCapabilityRecall, KernelInoCapabilityRecall>();
             });
 
             // Built-in neurons discovered automatically.

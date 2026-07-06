@@ -45,6 +45,12 @@
     <!-- LLM abstraction (IChatClient) -->
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
+    <!-- For Ino integration AI config (IConfigurationSection binding) -->
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.9" />
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.1.0" />
     <!-- DefaultAzureCredential for the kernel's managed-identity storage path (Task 18) — was resolving
          transitively/undeclared before; pinned explicitly now. Version verified via nuget.org 2026-07-05 -->
