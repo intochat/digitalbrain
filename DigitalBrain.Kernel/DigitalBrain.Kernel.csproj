@@ -47,18 +47,18 @@
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Streaming" />
     <!-- Microsoft.Orleans.Dashboard added for DigitalBrainOptions.EnableOrleansDashboard - run 'dotnet add package Microsoft.Orleans.Dashboard' if needed for full UI -->
-    <ProjectReference Include="..\DigitalBrain.Context\DigitalBrain.Context.csproj" />
+    <ProjectReference Include="..\integrations\DigitalBrain.Context\DigitalBrain.Context.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Demo.Contracts\DigitalBrain.Demo.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Demo.Runtime\DigitalBrain.Demo.Runtime.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Google\DigitalBrain.Google.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Ino\DigitalBrain.Ino.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
+    <ProjectReference Include="..\integrations\DigitalBrain.Google\DigitalBrain.Google.csproj" />
+    <ProjectReference Include="..\integrations\DigitalBrain.Ino\DigitalBrain.Ino.csproj" />
+    <ProjectReference Include="..\integrations\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
     <ProjectReference Include="..\DigitalBrain.Marketplace.Contracts\DigitalBrain.Marketplace.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.SeedPacks\DigitalBrain.SeedPacks.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Telegram\DigitalBrain.Telegram.csproj" />
+    <ProjectReference Include="..\integrations\DigitalBrain.Telegram\DigitalBrain.Telegram.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
     <ProjectReference Include="..\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
@@ -74,6 +74,7 @@
     <Protobuf Include="Protos\uigateway.proto" GrpcServices="Server" />
   </ItemGroup>
 </Project>
+
 
 
 

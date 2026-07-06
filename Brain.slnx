@@ -18,11 +18,11 @@
     <Project Path="DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj" />
   </Folder>
   <Folder Name="/integrations/">
-    <Project Path="DigitalBrain.Context/DigitalBrain.Context.csproj" />
-    <Project Path="DigitalBrain.Google/DigitalBrain.Google.csproj" />
-    <Project Path="DigitalBrain.Ino/DigitalBrain.Ino.csproj" />
-    <Project Path="DigitalBrain.Salesforce/DigitalBrain.Salesforce.csproj" />
-    <Project Path="DigitalBrain.Telegram/DigitalBrain.Telegram.csproj" />
+    <Project Path="integrations/DigitalBrain.Context/DigitalBrain.Context.csproj" />
+    <Project Path="integrations/DigitalBrain.Google/DigitalBrain.Google.csproj" />
+    <Project Path="integrations/DigitalBrain.Ino/DigitalBrain.Ino.csproj" />
+    <Project Path="integrations/DigitalBrain.Salesforce/DigitalBrain.Salesforce.csproj" />
+    <Project Path="integrations/DigitalBrain.Telegram/DigitalBrain.Telegram.csproj" />
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
