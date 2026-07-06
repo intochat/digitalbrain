@@ -94,9 +94,9 @@ builder.Services.AddCors(options => options.AddPolicy("browser", policy => polic
 builder.Services.AddSingleton<HomeFeedBus>();
 
 // Signal egress fanout: neurons broadcast Signals on the timeline; WatchSynapses gRPC subscribers stream them
-// filtered by type name. The per-silo SignalEgressStreamSubscriber (wired into the silo below) forwards Signals
+// filtered by type name. The per-silo SignalEgressStreamSubscriber (wired into the kernel below) forwards Signals
 // from the DigitalBrainTimeline stream to the SignalEgressBus. Like HomeFeed (proven in
-// HomeFeedCrossSiloTests), Orleans MemoryStream explicit subscriptions deliver cluster-wide — every silo's
+// HomeFeedCrossSiloTests), Orleans MemoryStream explicit subscriptions deliver cluster-wide — every kernel's (silo's)
 // subscriber receives every Signal regardless of which replica it was broadcast on.
 builder.Services.AddSingleton<SignalEgressBus>();
 
@@ -215,7 +215,7 @@ builder.UseOrleans(siloBuilder =>
     else
     {
         // Cloud path: wire Orleans clustering (Table) + grain storage (Blob) from the injected connection strings,
-        // then the durable Blob journal. A stable cluster/service id lets the silo rejoin the same cluster on restart.
+        // then the durable Blob journal. A stable cluster/service id lets the kernel (Orleans silo) rejoin the same cluster on restart.
         var clusterId = builder.Configuration["Orleans:ClusterId"] ?? "digitalbrain";
         var serviceId = builder.Configuration["Orleans:ServiceId"] ?? "digitalbrain";
 
@@ -238,7 +238,7 @@ builder.UseOrleans(siloBuilder =>
             // locally az-authenticated run against the same account, though that combination isn't exercised
             // by Aspire/local dev today). NOTE: RBAC role-assignment propagation can lag a freshly-created
             // identity by several minutes — see deploy/Program.cs's kernel-storage-*-contributor
-            // RoleAssignments; if the silo fails to join the cluster right after a fresh deploy with
+            // RoleAssignments; if the silo (kernel) fails to join the cluster right after a fresh deploy with
             // AuthorizationPermissionMismatch, that lag (not a code bug) is the first thing to check per the
             // brief's Step 6 verification.
             //
