@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\integrations\DigitalBrain.Context\DigitalBrain.Context.csproj" />
-    <ProjectReference Include="..\..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
+    <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
   </ItemGroup>
 
   <ItemGroup>
