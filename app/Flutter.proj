@@ -18,7 +18,7 @@
     <FlutterCli Condition="'$(FlutterCli)' == ''">flutter</FlutterCli>
     <FlutterProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</FlutterProjectDir>
     <FlutterWebOutputDir>$(FlutterProjectDir)\build\web</FlutterWebOutputDir>
-    <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">false</SkipFlutterBuild>
+    <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">true</SkipFlutterBuild>
     <!-- No .NET assets/restore for pure coordination .proj (dart/flutter sources only). Prevents NETSDK1004 when referenced from .slnx. -->
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>

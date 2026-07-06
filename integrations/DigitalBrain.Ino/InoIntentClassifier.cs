@@ -42,7 +42,7 @@ public static class InoIntentClassifier
         else if (p.Contains("5") || p.Contains("few")) max = 5;
 
         string? query = null;
-        if (p.Contains(" from ")) 
+        if (p.Contains(" from "))
         {
             var parts = prompt.Split(new[] { " from ", " From " }, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length > 1) query = parts[1].Trim().Split(' ').FirstOrDefault();
@@ -69,7 +69,7 @@ public static class InoIntentClassifier
         if (p.Contains("uikit") || p.Contains("ui kit") || (p.Contains("gallery") && p.Contains("component")))
             return new("uikit_gallery", 0.9);
 
-        if (p.Contains("llm") || p.Contains("model") || p.Contains("settings") || 
+        if (p.Contains("llm") || p.Contains("model") || p.Contains("settings") ||
             p.Contains("change llm") || p.Contains("use qwen") || p.Contains("use gpt") || p.Contains("openai"))
             return new("llm_settings", 0.85);
 

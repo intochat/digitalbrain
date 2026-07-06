@@ -23,4 +23,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - run: dotnet test Brain.slnx
+      - run: dotnet restore Brain.slnx
+
+      - run: dotnet format whitespace Brain.slnx --verify-no-changes --no-restore --verbosity minimal
+
+      - run: dotnet test Brain.slnx --no-restore

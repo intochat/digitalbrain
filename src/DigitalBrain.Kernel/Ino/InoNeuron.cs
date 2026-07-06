@@ -746,7 +746,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var p = req.Prompt.ToLowerInvariant();
         if ((p.Contains("summar") || p.Contains("brief")))
         {
-            string bodiesToSummarize = summaries.Count > 0 
+            string bodiesToSummarize = summaries.Count > 0
                 ? string.Join("\n---\n", summaries.Select(s => s.Body))
                 : GetLastGmailBodiesFromJournal(workspaceId) ?? "";
             if (!string.IsNullOrWhiteSpace(bodiesToSummarize))
@@ -1540,7 +1540,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (summaryText.Length > 10)
         {
             var topic = summaryText.Split('.')[0].Trim();
-            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0,30) : topic, summaryText, DateTimeOffset.UtcNow, workspaceId);
+            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0, 30) : topic, summaryText, DateTimeOffset.UtcNow, workspaceId);
             await FireAsync(mem);
         }
     }

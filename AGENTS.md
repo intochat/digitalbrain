@@ -14,7 +14,10 @@ This file is the single, slim source of guidance for AI agents and contributors.
 
 ## Current rules (post-reform)
 
-- **Fast inner loop (default)**: `dotnet build && dotnet test --filter "Category!=cluster"`. Use narrower `FullyQualifiedName~...` filters for touched protocol/unit/step/UI-contract code. Full cluster suites are deliberate validation, not the default edit loop.
+- **Fast inner loop (default)**: `dotnet build && dotnet test`.
+  - No `-p:Skip*` flags needed anymore (defaults are in `Directory.Build.props`).
+  - No `--filter` by default (plain `dotnet test` from root).
+  - Use narrower filters only when debugging specific tests: `dotnet test --filter "FullyQualifiedName~Something"`.
 - **Aspire changes** (AppHost model, wiring, resource graph, observability): use the aspire MCP tools (list_apphosts, doctor, resource commands, logs) or `aspire` CLI. Prefer targeted resource commands over full restart.
 - **Full distributed validation** (Ollama + replicas + end-to-end features): run intentionally before major PRs or when self-awareness / LLM flows are touched. Not after every edit.
 - **Package versions**: Centralized in `Directory.Packages.props`. No more `Version="*"`. Updates are deliberate (not on every restore).
@@ -30,7 +33,7 @@ This file is the single, slim source of guidance for AI agents and contributors.
 ## Verification after changes
 
 - `dotnet build`
-- `dotnet test`
+- `dotnet test` (from root, no extra flags)
 - `aspire doctor` (MCP or CLI)
 - When the plan calls for it: targeted full run + feature specs.
 - **Authoring a bundle:** follow the test-first loop in [`docs/authoring-a-bundle.md`](docs/authoring-a-bundle.md) — define the bundle once as pack source, drive it with `BundleHarness` (fast) and `LiveRenderVerifier` (render).

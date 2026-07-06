@@ -86,13 +86,13 @@ brain/
 1. **Make requirements less dumb**: Question "must keep every demo pack". PersonalAssistant was useful once; now duplicate. Flat root was "convenient" but hurts long-term.
 2. **Delete**: PersonalAssistant (and similar), root .md clutter, any proven-dead after searches. Delete >> add.
 3. **Simplify**: Group by role (src vs integrations). One canonical layout.
-4. **Accelerate**: Small phases. Fast `dotnet build && dotnet test --filter "Category!=cluster"` after every group of moves/deletes. Use slnx folders as we go.
+4. **Accelerate**: Small phases. Fast `dotnet build && dotnet test` after every group of moves/deletes (plain commands from root; filters and -p:Skip* no longer needed by default). Use slnx folders as we go.
 5. **Automate**: Scripted ref updates if possible; rely on build to catch broken ProjectReferences.
 
 ## 4. Phased Execution Plan (Delete-Heavy, Verifiable)
 **Rule**: After every logical chunk:
-- `dotnet build Brain.slnx -p:SkipFlutterBuild=true -p:SkipDeployBuild=true`
-- `dotnet test ... --filter "relevant|Ino|SelfEvolution|Architecture" --no-build`
+- `dotnet build`
+- `dotnet test` (plain, no filter)
 - `aspire doctor` (MCP)
 - `git status --ignored --short` to confirm no new junk.
 
@@ -165,7 +165,7 @@ Sub-phases (one group at a time):
 - Root `ls` shows only ~8-10 essential items (app, deploy, docs, src, integrations, hosts, tests, .github, key files).
 - No `DigitalBrain.Experience.PersonalAssistant` (or justified if kept).
 - All Ino logic + config properly in `integrations/DigitalBrain.Ino/`.
-- `dotnet build` + key tests green.
+- `dotnet build` + `dotnet test` (plain from root) green.
 - Docs reflect reality.
 - Follows AGENTS.md (net deletions, fast loop preserved).
 

@@ -95,7 +95,9 @@ public sealed class UiHop
     {
         Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Select, new Dictionary<string, object?>
         {
-            ["name"] = name, ["options"] = options, ["label"] = label ?? string.Empty
+            ["name"] = name,
+            ["options"] = options,
+            ["label"] = label ?? string.Empty
         }));
         return this;
     }
@@ -104,7 +106,9 @@ public sealed class UiHop
     {
         Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.RadioGroup, new Dictionary<string, object?>
         {
-            ["name"] = name, ["options"] = options, ["label"] = label ?? string.Empty
+            ["name"] = name,
+            ["options"] = options,
+            ["label"] = label ?? string.Empty
         }));
         return this;
     }
@@ -113,7 +117,10 @@ public sealed class UiHop
     {
         Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Slider, new Dictionary<string, object?>
         {
-            ["name"] = name, ["min"] = min, ["max"] = max, ["label"] = label ?? string.Empty
+            ["name"] = name,
+            ["min"] = min,
+            ["max"] = max,
+            ["label"] = label ?? string.Empty
         }));
         return this;
     }
@@ -122,7 +129,8 @@ public sealed class UiHop
     {
         Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.DateField, new Dictionary<string, object?>
         {
-            ["name"] = name, ["label"] = label ?? string.Empty
+            ["name"] = name,
+            ["label"] = label ?? string.Empty
         }));
         return this;
     }
@@ -179,7 +187,8 @@ public sealed class UiHop
     {
         Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Avatar, new Dictionary<string, object?>
         {
-            ["imageUrl"] = imageUrl ?? string.Empty, ["fallback"] = fallback ?? string.Empty
+            ["imageUrl"] = imageUrl ?? string.Empty,
+            ["fallback"] = fallback ?? string.Empty
         }));
         return this;
     }
@@ -214,7 +223,8 @@ public sealed class UiHop
     {
         Factories.Add(_ => new UiWidgetTree(UiKitVocabulary.Alert, new Dictionary<string, object?>
         {
-            ["title"] = title, ["subtitle"] = subtitle ?? string.Empty
+            ["title"] = title,
+            ["subtitle"] = subtitle ?? string.Empty
         }));
         return this;
     }

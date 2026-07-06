@@ -1,7 +1,8 @@
 <Solution>
   <Folder Name="/clients/">
-    <!-- Flutter client integration. CI invokes this solution with SkipFlutterBuild=true so
-         headless .NET jobs keep the client visible without running Flutter. -->
+    <!-- Flutter client integration.
+         By default (via Directory.Build.props) we SkipFlutterBuild=true so normal `dotnet build/test`
+         stays fast and doesn't require Flutter CLI. CI or full builds can override with -p:SkipFlutterBuild=false. -->
     <Project Path="app/Flutter.proj" Type="C#" />
   </Folder>
   <Folder Name="/src/">

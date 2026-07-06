@@ -27,7 +27,7 @@ $env:PULUMI_HOME = 'E:/tools/pulumi-home'
 $env:PULUMI_CONFIG_PASSPHRASE = 'digitalbrain-dryrun'
 $env:AZURE_STORAGE_ACCOUNT = 'digitalbrainstprod'
 # ... full env + pulumi login azblob://pulumi-state ...
-dotnet run --project DigitalBrain.Deploy.csproj -- up --stack dev -- --image-tag sp1
+dotnet run --project deploy/DigitalBrain.Deploy.csproj -- up --stack dev -- --image-tag sp1
 ```
 
 The project is included in `Brain.slnx` under `/deploy/`.

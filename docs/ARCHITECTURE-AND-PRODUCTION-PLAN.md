@@ -129,7 +129,7 @@ In `.github/workflows/deploy.yml`, replace lines 35-46:
 
       - name: Publish kernel image
         run: |
-          dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer \
+          dotnet publish src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer \
             -p:ContainerRegistry=docker.io \
             -p:ContainerRepository=vhorbachov/digitalbrain-kernel \
             -p:ContainerImageTag="${TAG}"
@@ -147,14 +147,14 @@ with:
 
       - name: Publish kernel image
         run: |
-          dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer \
+          dotnet publish src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer \
             -p:ContainerRegistry=ghcr.io \
             -p:ContainerRepository=digitalbraintech/digitalbrain-kernel \
             -p:ContainerImageTag="${TAG}"
 
       - name: Publish Telegram transport image
         run: |
-          dotnet publish DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj -c Release /t:PublishContainer \
+          dotnet publish hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj -c Release /t:PublishContainer \
             -p:ContainerRegistry=ghcr.io \
             -p:ContainerRepository=digitalbraintech/digitalbrain-telegram \
             -p:ContainerImageTag="${TAG}"
@@ -195,8 +195,8 @@ If `digitalbraintech` is a personal account rather than an org, use `/user/packa
 - [x] **Step 4: Verify locally that both projects still produce a valid container image target**
 
 ```bash
-dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer -p:ContainerRegistry=ghcr.io -p:ContainerRepository=digitalbraintech/digitalbrain-kernel -p:ContainerImageTag=local-verify
-dotnet publish DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj -c Release /t:PublishContainer -p:ContainerRegistry=ghcr.io -p:ContainerRepository=digitalbraintech/digitalbrain-telegram -p:ContainerImageTag=local-verify
+dotnet publish src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer -p:ContainerRegistry=ghcr.io -p:ContainerRepository=digitalbraintech/digitalbrain-kernel -p:ContainerImageTag=local-verify
+dotnet publish hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj -c Release /t:PublishContainer -p:ContainerRegistry=ghcr.io -p:ContainerRepository=digitalbraintech/digitalbrain-telegram -p:ContainerImageTag=local-verify
 ```
 Expected: both commands end with `Pushed image ... to registry` or a local-only build success (no registry push without login is fine — the goal here is confirming both `.csproj`s have `PublishContainer` support and no compile errors, not to actually push from a dev box).
 

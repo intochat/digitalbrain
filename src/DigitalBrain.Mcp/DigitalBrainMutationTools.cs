@@ -232,7 +232,7 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         foreach (var s in scripts)
         {
             var code = await auto.GetScriptCodeAsync(s);
-            details.AppendLine($"  - {s}: {(code?.Length > 50 ? code.Substring(0,50) + "..." : code)}");
+            details.AppendLine($"  - {s}: {(code?.Length > 50 ? code.Substring(0, 50) + "..." : code)}");
         }
         // Rich library view (priority 4)
         var lib = await auto.ListScriptLibraryAsync();
@@ -266,7 +266,7 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
 
         if (lower.Contains("signal:") || lower.Contains("on signal") || lower.Contains("gmail") || lower.Contains("email"))
         {
-            if (lower.Contains("gmail") || lower.Contains("email")) 
+            if (lower.Contains("gmail") || lower.Contains("email"))
                 when = "Signal:GmailMessageReceived";
             else
                 when = "Signal:CustomSignal";
@@ -407,60 +407,60 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         switch (synapseType)
         {
             case "RunKernelTask":
-            {
-                // UI action string kept as "RunKernelTask" for surface compat; message type is now the generic core protocol
-                var taskId = ReadString(props, "taskId") ?? "task-" + Guid.NewGuid().ToString("N")[..8];
-                var description = ReadString(props, "description") ?? ReadString(props, "prompt") ?? "Run task";
-                await Grains.GetGrain<INeuron>(taskId).FireAsync(new RunTask(taskId, description));
-                return $"Fired RunTask for {taskId}.";
-            }
+                {
+                    // UI action string kept as "RunKernelTask" for surface compat; message type is now the generic core protocol
+                    var taskId = ReadString(props, "taskId") ?? "task-" + Guid.NewGuid().ToString("N")[..8];
+                    var description = ReadString(props, "description") ?? ReadString(props, "prompt") ?? "Run task";
+                    await Grains.GetGrain<INeuron>(taskId).FireAsync(new RunTask(taskId, description));
+                    return $"Fired RunTask for {taskId}.";
+                }
             case "CancelKernelTask":
-            {
-                var taskId = ReadString(props, "taskId");
-                if (string.IsNullOrWhiteSpace(taskId)) return "CancelTask action requires props.taskId.";
-                await Grains.GetGrain<INeuron>(taskId).FireAsync(new CancelTask(taskId));
-                return $"Fired CancelTask for {taskId}.";
-            }
+                {
+                    var taskId = ReadString(props, "taskId");
+                    if (string.IsNullOrWhiteSpace(taskId)) return "CancelTask action requires props.taskId.";
+                    await Grains.GetGrain<INeuron>(taskId).FireAsync(new CancelTask(taskId));
+                    return $"Fired CancelTask for {taskId}.";
+                }
             case nameof(InoRequest):
-            {
-                var prompt = ReadString(props, "prompt") ?? ReadString(props, "text");
-                if (string.IsNullOrWhiteSpace(prompt)) return "InoRequest action requires props.prompt.";
-                var sessionId = ReadString(props, "sessionId");
-                await Grains.GetGrain<IInoNeuron>("ino-main").FireAsync(new InoRequest(prompt, sessionId));
-                return "Fired InoRequest.";
-            }
+                {
+                    var prompt = ReadString(props, "prompt") ?? ReadString(props, "text");
+                    if (string.IsNullOrWhiteSpace(prompt)) return "InoRequest action requires props.prompt.";
+                    var sessionId = ReadString(props, "sessionId");
+                    await Grains.GetGrain<IInoNeuron>("ino-main").FireAsync(new InoRequest(prompt, sessionId));
+                    return "Fired InoRequest.";
+                }
             case nameof(InstallFromMarketplace):
-            {
-                var packName = ReadString(props, "packName");
-                var version = ReadString(props, "version") ?? "0.1.0";
-                var buyerId = ReadString(props, "buyerId") ?? "current-user";
-                if (string.IsNullOrWhiteSpace(packName)) return "InstallFromMarketplace action requires props.packName.";
-                await Grains.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new InstallFromMarketplace(packName, version, buyerId));
-                return $"Fired InstallFromMarketplace for {packName}@{version}.";
-            }
+                {
+                    var packName = ReadString(props, "packName");
+                    var version = ReadString(props, "version") ?? "0.1.0";
+                    var buyerId = ReadString(props, "buyerId") ?? "current-user";
+                    if (string.IsNullOrWhiteSpace(packName)) return "InstallFromMarketplace action requires props.packName.";
+                    await Grains.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new InstallFromMarketplace(packName, version, buyerId));
+                    return $"Fired InstallFromMarketplace for {packName}@{version}.";
+                }
             case nameof(ListPublished):
                 await Grains.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new ListPublished());
                 return "Fired ListPublished.";
             case nameof(RestartResource):
-            {
-                var resourceName = ReadString(props, "resourceName");
-                if (string.IsNullOrWhiteSpace(resourceName)) return "RestartResource action requires props.resourceName.";
-                await Grains.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new RestartResource(resourceName));
-                return $"Fired RestartResource for {resourceName}.";
-            }
+                {
+                    var resourceName = ReadString(props, "resourceName");
+                    if (string.IsNullOrWhiteSpace(resourceName)) return "RestartResource action requires props.resourceName.";
+                    await Grains.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new RestartResource(resourceName));
+                    return $"Fired RestartResource for {resourceName}.";
+                }
             case nameof(ClosedLoopRequest):
-            {
-                var loopType = ReadString(props, "loopType") ?? "ui";
-                var prompt = ReadString(props, "prompt") ?? "Run installed closed loop";
-                await Grains.GetGrain<IClosedLoopNeuron>("closedloop-main").FireAsync(new ClosedLoopRequest(loopType, prompt));
-                return $"Fired ClosedLoopRequest for {loopType}.";
-            }
+                {
+                    var loopType = ReadString(props, "loopType") ?? "ui";
+                    var prompt = ReadString(props, "prompt") ?? "Run installed closed loop";
+                    await Grains.GetGrain<IClosedLoopNeuron>("closedloop-main").FireAsync(new ClosedLoopRequest(loopType, prompt));
+                    return $"Fired ClosedLoopRequest for {loopType}.";
+                }
             default:
-            {
-                var target = ReadString(props, "neuronId") ?? defaultNeuronId;
-                await ResolveNeuron(target).FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["payload"] = actionJson }));
-                return $"Forwarded unrecognized UI action '{synapseType}' to {target} as generic signal.";
-            }
+                {
+                    var target = ReadString(props, "neuronId") ?? defaultNeuronId;
+                    await ResolveNeuron(target).FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["payload"] = actionJson }));
+                    return $"Forwarded unrecognized UI action '{synapseType}' to {target} as generic signal.";
+                }
         }
     }
 
