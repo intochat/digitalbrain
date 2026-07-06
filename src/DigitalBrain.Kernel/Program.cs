@@ -186,6 +186,8 @@ builder.Services.AddGoogleGmailClient();
 // hasn't connected yet" is a normal per-call condition instead of an activation-time throw.
 builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
 
+builder.Services.AddDigitalBrainOtlpForwardClient();
+
 // Ino (personal AI assistant) as pluggable integration.
 // Owns its AI config (provider, model, system prompts, temperature) so the assistant logic
 // can evolve independently and be "plugged" into the kernel host.
@@ -395,6 +397,8 @@ app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
         "text/html",
         statusCode: result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
 });
+
+app.MapDigitalBrainOtlpProxy();
 
 if (!isAspireHosted)
 {
