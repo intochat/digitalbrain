@@ -21,6 +21,7 @@ namespace DigitalBrain.Tests.Gateway;
 // Task 7b store-and-PULL: a submitted config persists encrypted, GetPackConfig returns the DECRYPTED
 // values point-to-point, and the broadcast carries only a NON-SECRET PackConfigured notification — the
 // token never reaches the egress timeline. Mirrors WatchSynapsesTests' egress wiring.
+[Collection("pack-config-pull-host")]
 public class PackConfigPullTests : NeuronTestBase
 {
     private readonly SignalEgressBus _egressBus = new();
@@ -192,3 +193,6 @@ public class PackConfigPullTests : NeuronTestBase
         Assert.Equal("123:ABC", reply.Values["telegram_token"]);
     }
 }
+
+[CollectionDefinition("pack-config-pull-host", DisableParallelization = true)]
+public sealed class PackConfigPullHostCollection;
