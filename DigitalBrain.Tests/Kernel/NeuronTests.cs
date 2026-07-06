@@ -1,7 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
 using DigitalBrain.Core.Trust;
-using DigitalBrain.Developer;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
@@ -582,71 +581,6 @@ public class NeuronTests : NeuronTestBase
         Assert.Equal(input.CorrelationId, surface.CorrelationId);
         Assert.NotEqual(input.SynapseId, surface.SynapseId);
         Assert.Equal("generated-surfacepack", surface.Sender?.Value);
-    }
-
-    [Fact]
-    public async Task GitNeuron_Commits_And_Derives_Metrics_From_Journal()
-    {
-        var repo = Path.Combine(Path.GetTempPath(), "dbgit-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(repo);
-        try
-        {
-            RunGit("init -b main", repo);
-            RunGit("config user.email test@example.com", repo);
-            RunGit("config user.name Tester", repo);
-            RunGit("config commit.gpgsign false", repo);
-            await File.WriteAllTextAsync(Path.Combine(repo, "file.txt"), "hello");
-
-            var git = Grain<IGitNeuron>("git-test");
-
-            var status = await git.StatusAsync(repo);
-            Assert.Contains("file.txt", status);
-
-            await git.CommitAsync(repo, "add file");
-
-            var log = await git.LogAsync(repo);
-            Assert.Single(log);
-            Assert.Contains("add file", log[0]);
-
-            var metrics = await git.GetMetricsAsync();
-            Assert.Equal(1, metrics.TotalCommits);
-            Assert.Equal(0, metrics.TotalReverts);
-            Assert.True(metrics.LastCommit > DateTimeOffset.MinValue);
-        }
-        finally
-        {
-            TryDeleteDir(repo);
-        }
-    }
-
-    private static void RunGit(string args, string cwd)
-    {
-        var psi = new System.Diagnostics.ProcessStartInfo("git", args)
-        {
-            WorkingDirectory = cwd,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        using var p = System.Diagnostics.Process.Start(psi)!;
-        p.WaitForExit();
-    }
-
-    private static void TryDeleteDir(string dir)
-    {
-        try
-        {
-            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
-        }
-        catch (IOException)
-        {
-            // Best-effort temp cleanup: Windows can briefly lock .git pack files. Not a test failure.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Same as above — read-only .git objects on some platforms.
-        }
     }
 
     private sealed class IsolatedReplayTest : NeuronTests

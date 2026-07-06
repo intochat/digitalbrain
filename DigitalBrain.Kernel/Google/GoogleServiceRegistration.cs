@@ -3,27 +3,21 @@ using Microsoft.Extensions.DependencyInjection;
 
 using GoogleApisAuth = global::Google.Apis.Auth;
 using GoogleApisGmail = global::Google.Apis.Gmail;
-using GoogleApisDrive = global::Google.Apis.Drive;
-using GoogleApisCalendar = global::Google.Apis.Calendar;
 
 namespace DigitalBrain.Kernel.Google;
 
 internal static class GoogleServiceRegistration
 {
-    public static IServiceCollection AddGoogleWorkspaceClients(this IServiceCollection services)
+    public static IServiceCollection AddGoogleGmailClient(this IServiceCollection services)
     {
         services.AddScoped(sp => BuildGoogleCredential(sp, "google", "default"));
         services.AddScoped<DigitalBrain.Google.IGmailApiClient>(sp =>
             new DigitalBrain.Google.GoogleGmailApiClient(sp.GetRequiredService<GoogleApisAuth.OAuth2.UserCredential>()));
-        services.AddScoped<DigitalBrain.Google.IGoogleDriveApiClient>(sp =>
-            new DigitalBrain.Google.GoogleDriveApiClient(sp.GetRequiredService<GoogleApisAuth.OAuth2.UserCredential>()));
-        services.AddScoped<DigitalBrain.Google.IGoogleCalendarApiClient>(sp =>
-            new DigitalBrain.Google.GoogleCalendarApiClient(sp.GetRequiredService<GoogleApisAuth.OAuth2.UserCredential>()));
 
         return services;
     }
 
-    // Reads client_id/client_secret/refresh_token from the given pack-config scope/pack and builds a UserCredential.
+    // Reads client_id/client_secret/refresh_token from the given pack-config scope/pack and builds a Gmail UserCredential.
     // Config not yet provided throws so grain activation fails fast and loudly rather than constructing a client
     // that will 401 on first real call.
     private static GoogleApisAuth.OAuth2.UserCredential BuildGoogleCredential(IServiceProvider sp, string pack, string scope)
@@ -42,8 +36,6 @@ internal static class GoogleServiceRegistration
 
         return DigitalBrain.Google.GoogleCredentialFactory.FromRefreshToken(
             clientId, clientSecret, refreshToken,
-            GoogleApisGmail.v1.GmailService.ScopeConstants.MailGoogleCom,
-            GoogleApisDrive.v3.DriveService.ScopeConstants.Drive,
-            GoogleApisCalendar.v3.CalendarService.ScopeConstants.Calendar);
+            GoogleApisGmail.v1.GmailService.ScopeConstants.MailGoogleCom);
     }
 }

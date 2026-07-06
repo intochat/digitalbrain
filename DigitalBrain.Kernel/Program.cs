@@ -7,6 +7,7 @@ using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Google;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Uploads;
@@ -90,7 +91,7 @@ builder.Services.AddCors(options => options.AddPolicy("browser", policy => polic
 
 // Server-driven UI fanout: neurons broadcast RfwCards; each WatchHomeFeed gRPC call subscribes directly to
 // its own per-clientId Orleans stream plus the shared unaddressed stream (see HomeFeedBus.SubscribeAsync) —
-// Orleans's own pub-sub delivers cross-silo, no per-silo relay needed.
+// Orleans's own pub-sub delivers cross-silo, no per-silo relay needed. (silo here is Orleans term)
 builder.Services.AddSingleton<HomeFeedBus>();
 
 // Signal egress fanout: neurons broadcast Signals on the timeline; WatchSynapses gRPC subscribers stream them
@@ -100,12 +101,8 @@ builder.Services.AddSingleton<HomeFeedBus>();
 // subscriber receives every Signal regardless of which replica it was broadcast on.
 builder.Services.AddSingleton<SignalEgressBus>();
 
-// FileSystemNeuron delegates its System.IO logic to this ino-hosted, Orleans-free plain class.
-builder.Services.AddSingleton<DigitalBrain.Windows.FileSystemOperations>();
 builder.Services.AddSingleton<SqliteSchemaInspector>();
 
-// RoslynNeuron delegates its MSBuildWorkspace analysis logic to this ino-hosted, Orleans-free plain class.
-builder.Services.AddSingleton<DigitalBrain.Developer.RoslynAnalysisService>();
 builder.Services.AddHttpClient<DigitalBrain.Kernel.Market.IMarketDataApiClient, DigitalBrain.Kernel.Market.CoinGeckoApiClient>();
 
 // Co-host the MCP tool surface in-process. Only read-only tools are exposed over HTTP (remotely reachable);
@@ -172,20 +169,11 @@ builder.Services.AddHostedService<SalesforceAppConfigSeeder>();
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
 
-// Google Gmail/Drive/Calendar API clients: one UserCredential per grain activation, built from the "google"/
-// "default" pack config scope (client_id/client_secret/refresh_token), mirroring LlmResponderNeuron's per-scope
-// IPackConfigStore resolution. Scoped (not singleton) because Orleans creates one DI scope per grain activation,
-// so each GmailNeuron/GoogleDriveNeuron/GoogleCalendarNeuron activation resolves its own credential/service.
-// GetAwaiter().GetResult() is safe here: grain activation runs on thread-pool threads with no captured
-// SynchronizationContext, so there is no deadlock risk (the same reasoning ASP.NET Core middleware relies on).
-builder.Services.AddScoped(sp => BuildGoogleCredential(sp, "google", "default"));
-builder.Services.AddScoped<DigitalBrain.Google.IGmailApiClient>(sp =>
-    new DigitalBrain.Google.GoogleGmailApiClient(sp.GetRequiredService<Google.Apis.Auth.OAuth2.UserCredential>()));
-builder.Services.AddScoped<DigitalBrain.Google.IGoogleDriveApiClient>(sp =>
-    new DigitalBrain.Google.GoogleDriveApiClient(sp.GetRequiredService<Google.Apis.Auth.OAuth2.UserCredential>()));
-builder.Services.AddScoped<DigitalBrain.Google.IGoogleCalendarApiClient>(sp =>
-    new DigitalBrain.Google.GoogleCalendarApiClient(sp.GetRequiredService<Google.Apis.Auth.OAuth2.UserCredential>()));
-
+// Google Gmail API client: one UserCredential per grain activation, built from the "google"/"default" pack
+// config scope (client_id/client_secret/refresh_token), mirroring LlmResponderNeuron's per-scope
+// IPackConfigStore resolution. Scoped (not singleton) because Orleans creates one DI scope per grain
+// activation (same pattern as LlmResponderNeuron).
+builder.Services.AddGoogleGmailClient();
 // Salesforce CRM REST API client: built lazily per call from the shared app-level connected-app config
 // ("default" scope) merged with the calling grain's own per-user token scope ("user:{userId}"). Singleton
 // (not scoped) because, unlike the old eager factory, it no longer resolves a client at grain-activation
@@ -477,30 +465,6 @@ if (grainFactory != null)
 
 app.Run();
 
-// Reads client_id/client_secret/refresh_token from the given pack-config scope/pack and builds a UserCredential.
-// Config not yet provided (first run, before "Sign in with Google" completes) throws so grain activation fails
-// fast and loudly rather than silently constructing a service that will 401 on first real call — mirrors
-// LlmResponderNeuron's fallback-to-null shape being unavailable here since UserCredential is non-nullable.
-static Google.Apis.Auth.OAuth2.UserCredential BuildGoogleCredential(IServiceProvider sp, string pack, string scope)
-{
-    var store = sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>();
-    var values = store.GetAsync(scope, pack).GetAwaiter().GetResult();
-
-    if (!values.TryGetValue("client_id", out var clientId) ||
-        !values.TryGetValue("client_secret", out var clientSecret) ||
-        !values.TryGetValue("refresh_token", out var refreshToken))
-    {
-        throw new InvalidOperationException(
-            $"Google pack config (scope '{scope}', pack '{pack}') is missing client_id/client_secret/refresh_token. " +
-            "Complete \"Sign in with Google\" before using Gmail/Drive/Calendar neurons.");
-    }
-
-    return DigitalBrain.Google.GoogleCredentialFactory.FromRefreshToken(
-        clientId, clientSecret, refreshToken,
-        Google.Apis.Gmail.v1.GmailService.ScopeConstants.MailGoogleCom,
-        Google.Apis.Drive.v3.DriveService.ScopeConstants.Drive,
-        Google.Apis.Calendar.v3.CalendarService.ScopeConstants.Calendar);
-}
 
 static string SalesforceCallbackUri(HttpRequest request) =>
     new UriBuilder(request.Scheme, request.Host.Host, request.Host.Port ?? -1, SalesforceClientFactory.DefaultCallbackPath)
