@@ -55,6 +55,9 @@ class NeuronVectorLogo extends StatelessWidget {
     } else if (normalized.contains('google')) {
       iconData = SimpleIcons.google;
       iconColor = SimpleIconColors.google;
+    } else if (normalized.contains('salesforce') || normalized.contains('crm')) {
+      iconData = SimpleIcons.salesforce;
+      iconColor = const Color(0xFF00A1E0); // Salesforce blue
     } else if (normalized.contains('travel') || normalized.contains('tripadvisor')) {
       iconData = SimpleIcons.tripadvisor;
       iconColor = SimpleIconColors.tripadvisor;

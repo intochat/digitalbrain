@@ -178,6 +178,7 @@ class ShellChatComposer extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: t.colors.border, width: 0.5)),
         color: t.colors.background,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -708,8 +709,8 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                     return Padding(
                       padding: EdgeInsets.only(
                         bottom: 12,
-                        left: message.isUser ? 48 : 0,
-                        right: message.isUser ? 0 : 48,
+                        left: message.isUser ? 56 : 0,
+                        right: message.isUser ? 0 : 56,
                       ),
                       child: Align(
                         alignment: message.isUser
@@ -723,7 +724,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: t.colors.primary,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Text(
                                   message.text!,
@@ -732,29 +733,53 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                   ),
                                 ),
                               )
-                            : Container(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 720,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: t.colors.card,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: t.colors.border,
-                                    width: 0.5,
+                            : Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    margin: const EdgeInsets.only(right: 8, top: 2),
+                                    decoration: BoxDecoration(
+                                      color: t.colors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      'I',
+                                      style: t.typography.sm.copyWith(
+                                        color: t.colors.primaryForeground,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                child: renderer.build(
-                                  message.tree!,
-                                  _handleSurfaceEvent,
-                                  rfwHost: _rfwHost,
-                                  onNavSelected: _goTo,
-                                  activeTarget: _selectedTarget,
-                                ),
+                                  Flexible(
+                                    child: Container(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 680,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: t.colors.card,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: t.colors.border,
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                      child: renderer.build(
+                                        message.tree!,
+                                        _handleSurfaceEvent,
+                                        rfwHost: _rfwHost,
+                                        onNavSelected: _goTo,
+                                        activeTarget: _selectedTarget,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                       ),
                     );
