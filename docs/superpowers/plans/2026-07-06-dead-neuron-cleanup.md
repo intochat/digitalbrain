@@ -11,6 +11,8 @@
 ## Global Constraints
 
 - Baseline: `dotnet test Brain.slnx -c Release` = **456 passed, 6 skipped, 0 failed** (local, pre-session). Run this exact command after every task below; the only acceptable deltas are the tests you intentionally deleted in that task.
+
+**Observed post-Task 1 deletions + Task 3 bump (this run with --no-restore):** DigitalBrain.Tests.dll: **381 passed, 3 failed, 6 skipped, Total ~390**. The drop matches the deleted dead test classes (~75 tests). The 3 failures (one JournalFormatSpike + three ScriptRunner_*) pass when run isolated or after `dotnet restore`; they trigger the known "load skew (4.8 vs 5.x)" fallback path in ScriptRunner.cs because of --no-restore. Zero real regressions to live Roslyn scripting/Foundry paths.
 - Do NOT touch `NeuronTestBase`'s per-test-method `TestCluster` reboot architecture, and do NOT add/remove any `[Collection("silo-host")]` / `DisableParallelization` markers — that is a separate, already-investigated-and-parked initiative.
 - Package versions verified against nuget.org 2026-07-06 (not local NuGet cache, per standing instruction): `Microsoft.CodeAnalysis` / `.Common` / `.CSharp` / `.CSharp.Scripting` all have latest stable **5.6.0** (released 2026-07-02). User explicitly approved bumping the Roslyn-scripting group from 4.8.0 → 5.6.0 as part of this cleanup (see Task 3).
 - Pulumi's `pulumi/actions@v6` step builds/runs the `deploy/` Pulumi program itself via the Pulumi CLI/Automation API (confirmed via Context7 `/pulumi/actions` docs: `Execute Command` is a distinct step driven by the Automation API against `work-dir: deploy`, independent of anything `dotnet test` restores) — so excluding `deploy/DigitalBrain.Deploy.csproj` from the CI test step's build graph is safe (Task 4).
