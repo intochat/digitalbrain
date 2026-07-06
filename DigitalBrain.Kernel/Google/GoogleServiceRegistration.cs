@@ -31,7 +31,7 @@ internal static class GoogleServiceRegistration
         {
             throw new InvalidOperationException(
                 $"Google pack config (scope '{scope}', pack '{pack}') is missing client_id/client_secret/refresh_token. " +
-                "Complete \"Sign in with Google\" before using Gmail/Drive/Calendar neurons.");
+                "Complete \"Sign in with Google\" before using Gmail neurons.");
         }
 
         return DigitalBrain.Google.GoogleCredentialFactory.FromRefreshToken(

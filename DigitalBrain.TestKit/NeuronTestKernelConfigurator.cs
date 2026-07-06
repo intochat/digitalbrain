@@ -22,7 +22,7 @@ internal sealed class NoOpScopedChatClientFactory : IScopedChatClientFactory
     public IChatClient? Create(string provider, string? apiKey) => null;
 }
 
-// Shared TestCluster silo wiring: in-memory dual journals + the pack embodiment engine.
+// Shared TestCluster kernel wiring: in-memory dual journals + the pack embodiment engine.
 // Reused by every TestCluster-based test so the prototype journal + Foundry services are configured once.
 public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
 {
