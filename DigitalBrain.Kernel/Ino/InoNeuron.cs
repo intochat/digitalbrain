@@ -82,6 +82,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
+        // Approve via chat: "approve proposal <id>" or "approve that automation" routes to decision (rail)
+        if (pForCheck.Contains("approve") && (pForCheck.Contains("proposal") || pForCheck.Contains("automation") || pForCheck.Contains("self-evolution")))
+        {
+            await HandleApproveProposalIntentAsync(req, workspaceId);
+            return;
+        }
+
         if (cls.Intent == "llm_settings")
         {
             await DeliverLlmSettingsSurfaceAsync(req.ClientId, workspaceId);
@@ -478,29 +485,79 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
 
-        // Use LLM to turn NL into automation proposal (radical simplicity)
-        var ctx = await BuildContextAsync(req.Prompt, workspaceId);
-        var llmPrompt = "You are helping create a safe DigitalBrain automation. Given the user request, output ONLY valid JSON with: when (e.g. 'Signal:GmailMessageReceived' or 'NeuronActivated'), target (grain key or null), script (short valid C# that returns Signal[] or does simple Fire, no unsafe code), rationale.\nExample good script: return new[] { new Signal(\"EmailSummarized\", new Dictionary<string,object?>{[\"to\"] = \"salesforce\"}) };\nUser request: " + req.Prompt;
-        var raw = await ReasonWithLlmAsync(llmPrompt, ctx);
-        // simple JSON-ish parse for demo (production would use structured output)
+        // Structured LLM extraction for high quality automation (Gmail/SF examples supported).
+        // Use direct chat for clean JSON output (generic Reason wrapper may add prose).
+        string raw;
+        var chat = await ResolveGlobalLlmClientAsync() ?? ServiceProvider.GetService<IChatClient>();
+        if (chat is not null)
+        {
+            var specPrompt =
+                "You are a precise automation designer for DigitalBrain. " +
+                "Turn the user request into a safe reaction. " +
+                "Reply with ONLY minified JSON and nothing else (no code fences, no prose):\n" +
+                "{\"when\":\"Signal:GmailMessageReceived\",\"target\":null,\"script\":\"return new[] { new Signal(\\\"EmailSummarized\\\", new Dictionary<string,object?>{[\\\"summary\\\"]=\\\"...\\\"}) }; \",\"rationale\":\"short reason\"}\n" +
+                "Rules: when must be Signal:GmailMessageReceived (for gmail), Signal:SalesforceQueryReady (for sf/crm), or NeuronActivated. " +
+                "script: short safe C# returning Signal[] (example uses realistic emitted signals for follow-on G/SF glue). No file system, loops or unsafe. " +
+                "User request: " + req.Prompt;
+            var resp = await chat.GetResponseAsync(specPrompt);
+            raw = resp.Text?.Trim() ?? "";
+        }
+        else
+        {
+            var ctx = await BuildContextAsync(req.Prompt, workspaceId);
+            var llmPrompt = "You are helping create a safe DigitalBrain automation. Output ONLY the JSON: {\"when\":\"...\",\"target\":null,\"script\":\"...\",\"rationale\":\"...\"}. User: " + req.Prompt;
+            raw = await ReasonWithLlmAsync(llmPrompt, ctx);
+        }
+
+        // Robust parse preferring JSON, with keyword fallback for G/SF.
         string when = "NeuronActivated";
         string? target = null;
         string script = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from chat\" }) };";
-        if (raw.Contains("Gmail") || raw.Contains("email")) when = "Signal:GmailMessageReceived";
-        else if (raw.Contains("salesforce") || raw.Contains("crm")) when = "Signal:SalesforceQueryReady";
-        // extract script if present in raw
-        if (raw.Contains("script") && raw.Contains("return"))
+        string rationale = $"Automation proposed from: {req.Prompt}";
+
+        // Try JSON first (supports structured output from LLM)
+        try
         {
-            var start = raw.IndexOf("return");
-            var end = raw.IndexOf(';', start);
-            if (end > start) script = raw.Substring(start, end - start + 1).Trim();
+            var jsonText = raw;
+            if (jsonText.Contains("```"))
+            {
+                // strip common fences
+                var start = jsonText.IndexOf('{');
+                var end = jsonText.LastIndexOf('}');
+                if (start >= 0 && end > start) jsonText = jsonText.Substring(start, end - start + 1);
+            }
+            using var doc = JsonDocument.Parse(jsonText);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("when", out var wEl) && wEl.ValueKind == JsonValueKind.String)
+                when = wEl.GetString() ?? when;
+            if (root.TryGetProperty("target", out var tEl) && tEl.ValueKind == JsonValueKind.String)
+                target = tEl.GetString();
+            if (root.TryGetProperty("script", out var scEl) && scEl.ValueKind == JsonValueKind.String)
+                script = scEl.GetString() ?? script;
+            if (root.TryGetProperty("rationale", out var rEl) && rEl.ValueKind == JsonValueKind.String)
+                rationale = rEl.GetString() ?? rationale;
         }
-        if (raw.Contains("\"when\"")) 
+        catch
         {
-            // very crude
-            var wmatch = System.Text.RegularExpressions.Regex.Match(raw, @"""when""\s*:\s*""([^""]+)""");
-            if (wmatch.Success) when = wmatch.Groups[1].Value;
+            // Fallbacks for G/SF and crude extract
+            if (raw.Contains("Gmail", StringComparison.OrdinalIgnoreCase) || raw.Contains("email", StringComparison.OrdinalIgnoreCase))
+                when = "Signal:GmailMessageReceived";
+            else if (raw.Contains("salesforce", StringComparison.OrdinalIgnoreCase) || raw.Contains("crm", StringComparison.OrdinalIgnoreCase))
+                when = "Signal:SalesforceQueryReady";
+
+            if (raw.Contains("return", StringComparison.OrdinalIgnoreCase))
+            {
+                var start = raw.IndexOf("return", StringComparison.OrdinalIgnoreCase);
+                var end = raw.IndexOf(';', start);
+                if (end > start) script = raw.Substring(start, end - start + 1).Trim();
+            }
+            if (raw.Contains("\"when\"", StringComparison.OrdinalIgnoreCase))
+            {
+                var wmatch = System.Text.RegularExpressions.Regex.Match(raw, @"""when""\s*:\s*""([^""]+)""");
+                if (wmatch.Success) when = wmatch.Groups[1].Value;
+            }
         }
+
         var autoId = "chat-auto-" + Guid.NewGuid().ToString("N")[..8];
         var proposalId = "automation-" + Guid.NewGuid().ToString("N");
         var scriptId = autoId + "-script";
@@ -514,20 +571,20 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await approval.DeliverAsync(new SelfEvolutionProposal(
             ProposalId: proposalId,
             Scope: "automation:default",
-            Rationale: $"Ino chat: {req.Prompt}",
-            ProposedChange: $"Register automation {autoId}",
+            Rationale: rationale,
+            ProposedChange: $"Register automation {autoId} (when={when})",
             ApplyVia: SelfEvolutionApplyVia.AutomationDefineReaction,
             Risk: SelfEvolutionRisk.InProcessCode,
             RequiresHumanApproval: true,
-            RollbackPlan: "Remove reaction and script if fails.",
+            RollbackPlan: "Remove reaction and script if fails or on explicit rollback.",
             Origin: "automation-main")
         {
             Sender = Self,
             Receiver = new NeuronId(SelfEvolutionNeuronIds.Main)
         });
 
-        await FireAsync(new InoResponse(req.Prompt, $"Staged automation proposal {proposalId} for approval (when={when}).", []));
-        await DeliverReplySurfaceAsync($"Automation proposal created. Approve via self-evolution to activate.", req.ClientId, workspaceId);
+        await FireAsync(new InoResponse(req.Prompt, $"Staged automation proposal {proposalId} (when={when}).", []));
+        await DeliverAutomationProposalSurfaceAsync(proposalId, rationale, when, script, req.ClientId, workspaceId);
     }
 
     private async Task<bool> HasGoogleCredentialAsync()
@@ -988,6 +1045,108 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         // Refresh the settings surface so user sees the current value updated (feedback)
         await DeliverLlmSettingsSurfaceAsync(req.ClientId, workspaceId);
         await CreateMemorySummaryAsync(workspaceId);
+    }
+
+    private async Task HandleApproveProposalIntentAsync(InoRequest req, string workspaceId)
+    {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+        var p = req.Prompt.ToLowerInvariant();
+
+        // Extract proposal id from prompt e.g. "approve proposal automation-abc123" or "approve that one"
+        string? proposalId = null;
+        if (p.Contains("automation-"))
+        {
+            var idx = p.IndexOf("automation-");
+            var candidate = p.Substring(idx).Split(' ', '\n', '\t', '.', ',', ':')[0].Trim();
+            if (candidate.StartsWith("automation-")) proposalId = candidate;
+        }
+        else if (p.Contains("proposal "))
+        {
+            var parts = req.Prompt.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                if (parts[i].ToLowerInvariant() == "proposal" && parts[i + 1].StartsWith("automation-", StringComparison.OrdinalIgnoreCase))
+                {
+                    proposalId = parts[i + 1];
+                    break;
+                }
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(proposalId))
+        {
+            // last pending automation proposal from journal as fallback
+            var lastProposal = IncomingJournal.Concat(OutgoingJournal)
+                .OfType<SelfEvolutionProposal>()
+                .Where(pr => pr.ApplyVia == SelfEvolutionApplyVia.AutomationDefineReaction)
+                .OrderByDescending(pr => pr.Timestamp)
+                .FirstOrDefault();
+            proposalId = lastProposal?.ProposalId;
+        }
+
+        if (string.IsNullOrWhiteSpace(proposalId))
+        {
+            await DeliverReplySurfaceAsync("No proposal id found to approve. Say 'approve proposal automation-xxxx'.", req.ClientId, workspaceId);
+            return;
+        }
+
+        try
+        {
+            var approvalGrain = GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+            await approvalGrain.DeliverAsync(new SelfEvolutionDecision(proposalId, Approved: true, DecidedBy: "user-via-ino", Reason: "Approved from Ino chat"));
+            await FireAsync(new InoResponse(req.Prompt, $"Approved proposal {proposalId}.", []));
+            await DeliverReplySurfaceAsync($"Proposal {proposalId} approved. It will activate if the apply handler succeeds.", req.ClientId, workspaceId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to deliver approval decision for {Proposal}", proposalId);
+            await DeliverReplySurfaceAsync($"Could not record approval for {proposalId}. Check self-evolution status.", req.ClientId, workspaceId);
+        }
+    }
+
+    private async Task DeliverAutomationProposalSurfaceAsync(string proposalId, string rationale, string when, string script, string? clientId, string? workspaceId = null)
+    {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+
+        var children = new List<UiWidgetTree>
+        {
+            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Automation Proposal (staged)" }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = $"Proposal ID: {proposalId}" }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = $"When: {when}" }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = $"Rationale: {TrimForSurface(rationale)}" }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "Script (preview):" }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = TrimForSurface(script) }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "All automations go through the self-evolution rail. Approve to activate."
+            }),
+            new(UiKitVocabulary.Button, new Dictionary<string, object?>
+            {
+                ["label"] = "Approve to activate",
+                ["synapseType"] = nameof(InoRequest),
+                ["prompt"] = $"approve proposal {proposalId}",
+                ["clientId"] = clientId,
+                ["workspaceId"] = workspaceId
+            }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "Or say in chat: 'approve proposal " + proposalId + "'"
+            })
+        };
+
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), children),
+            [UiSurfaceKeys.Title] = "Automation Proposal",
+            [UiSurfaceKeys.SurfaceId] = $"surface.automation.proposal.{proposalId}",
+            ["role"] = "assistant",
+            ["workspaceId"] = workspaceId
+        };
+        if (clientId is not null) props["clientId"] = clientId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
     }
 
     private async Task DeliverGraphSurfaceAsync(UiWidgetTree tree, string? clientId, string? workspaceId, string title, string surfaceId)
