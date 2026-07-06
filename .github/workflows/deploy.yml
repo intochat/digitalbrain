@@ -100,19 +100,25 @@ jobs:
           PULUMI_BACKEND_URL: azblob://pulumi-state
           AZURE_STORAGE_ACCOUNT: digitalbrainstprod
 
-      - name: Capture Static Web Apps deployment settings
+      - name: Ensure Azure Static Web App
         id: swa
-        working-directory: deploy
+        shell: bash
         run: |
-          token=$(pulumi stack output swaDeploymentToken --stack dev --show-secrets)
-          hostname=$(pulumi stack output swaDefaultHostname --stack dev)
+          set -euo pipefail
+          if ! az staticwebapp show --name digitalbrain-web-prod --resource-group digitalbrain-rg >/dev/null 2>&1; then
+            az staticwebapp create \
+              --name digitalbrain-web-prod \
+              --resource-group digitalbrain-rg \
+              --location westeurope \
+              --sku Free \
+              --tags Environment=prod Project=Application Owner=Application-DevOps CorrelationId=unknown CreatedBy=GitHubActions ManagedBy=GitHubActions ResourceType=static-web-app >/dev/null
+          fi
+
+          token=$(az staticwebapp secrets list --name digitalbrain-web-prod --query "properties.apiKey" -o tsv)
+          hostname=$(az staticwebapp show --name digitalbrain-web-prod --resource-group digitalbrain-rg --query "defaultHostname" -o tsv)
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
           echo "hostname=$hostname" >> "$GITHUB_OUTPUT"
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
-          PULUMI_BACKEND_URL: azblob://pulumi-state
-          AZURE_STORAGE_ACCOUNT: digitalbrainstprod
 
       - uses: subosito/flutter-action@v2
         with:

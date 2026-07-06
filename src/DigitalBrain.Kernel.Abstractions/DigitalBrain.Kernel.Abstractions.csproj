@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DigitalBrain.Kernel</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Core" />
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Microsoft.Orleans.Streaming" />
+  </ItemGroup>
+
+</Project>

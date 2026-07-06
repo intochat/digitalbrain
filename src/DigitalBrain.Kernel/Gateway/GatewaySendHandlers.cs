@@ -149,10 +149,16 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
 
     private static async Task HandleGoogleAuthRequestedAsync(SynapseEnvelope request, GatewaySendContext context)
     {
-        var auth = context.Grains.GetGrain<IGoogleAuthNeuron>("google-auth-main");
-        var signal = new Signal(GoogleSignals.AuthRequested, GatewayPayload.PayloadProps(request))
+        var authProps = GatewayPayload.PayloadProps(request);
+        var authClientId = authProps.TryGetValue("clientId", out var authCid) ? authCid?.ToString() : null;
+        var authSession = await context.ResolveSessionByClientIdAsync(authClientId);
+        if (authSession is null)
+            throw new RpcException(new Status(StatusCode.Unauthenticated, "A real login session is required to connect Google."));
+
+        var auth = context.Grains.GetGrain<IGoogleAuthNeuron>(authSession.UserId.Value);
+        var signal = new Signal(GoogleSignals.AuthRequested, authProps)
         {
-            Receiver = new NeuronId("google-auth-main")
+            Receiver = new NeuronId(authSession.UserId.Value)
         };
         await auth.DeliverAsync(signal);
     }

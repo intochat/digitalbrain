@@ -49,6 +49,7 @@
     <!-- Microsoft.Orleans.Dashboard added for DigitalBrainOptions.EnableOrleansDashboard - run 'dotnet add package Microsoft.Orleans.Dashboard' if needed for full UI -->
     <ProjectReference Include="..\..\integrations\DigitalBrain.Context\DigitalBrain.Context.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
 
     <ProjectReference Include="..\..\integrations\DigitalBrain.Google\DigitalBrain.Google.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Ino\DigitalBrain.Ino.csproj" />
