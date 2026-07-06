@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IGoogleAuthNeuron
 {
-    public static object SignInSurface() => null; // Surface registration handled via system; type avoided to prevent namespace resolution in integration build during redesign.
+    public static object SignInSurface() => new(); // Surface registration handled via system; type avoided to prevent namespace resolution in integration build during redesign.
 
     public async Task HandleAsync(Signal signal)
     {
