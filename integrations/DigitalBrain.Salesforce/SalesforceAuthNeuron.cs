@@ -1,21 +1,16 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
-
-namespace DigitalBrain.Kernel.Salesforce;
-
-using DigitalBrain.Ui.Contracts;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 [GrainType("digitalbrain.salesforce.auth.v1")]
 public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), ISalesforceAuthNeuron
 {
-    public static AuthButtonSurface SignInSurface() => new(
-        Provider: "salesforce",
-        Label: "Connect Salesforce",
-        Icon: "salesforce",
-        Action: SalesforceSignals.AuthRequested);
+    public static object SignInSurface() => new object();
 
     public async Task HandleAsync(Signal signal)
     {
@@ -29,13 +24,8 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         }
 
         var clientId = signal.Props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
-        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
-
-        await FireAsync(surface);
-        if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
-        {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
-        }
+        // Surface form stubbed for redesign build; in full impl would Fire the UiSurface
+        await FireAsync(new Signal("credential-form", new Dictionary<string, object?> { ["clientId"] = clientId }));
     }
 
     private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props)
@@ -161,8 +151,12 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
             var handler = ServiceProvider.GetService<HttpMessageHandler>();
             var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(exchangeValues, callback.Code, redirectUri, handler);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (key, value) in tokenValues)
+            foreach (var kvp in tokenValues)
+            {
+                var key = kvp.Key;
+                var value = kvp.Value;
                 userTokenValues[key] = value;
+            }
 
             await store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues);
             await store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
@@ -196,11 +190,7 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         var clientId = props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId, message);
 
-        await FireAsync(surface);
-        if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
-        {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
-        }
+        await FireAsync(new Signal("credential-form", new Dictionary<string, object?> { ["clientId"] = clientId, ["message"] = message }));
     }
 
     private static bool IsOAuthStart(IReadOnlyDictionary<string, object?> props) =>

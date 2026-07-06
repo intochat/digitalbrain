@@ -1,7 +1,9 @@
 using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
+using Microsoft.Extensions.Logging;
 
-namespace DigitalBrain.Kernel.Salesforce;
+namespace DigitalBrain.Salesforce;
 
 [GrainType("digitalbrain.salesforce.crm.v1")]
 public class SalesforceCrmNeuron(

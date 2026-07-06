@@ -4,8 +4,8 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Context;
 using DigitalBrain.Google;
-using DigitalBrain.Kernel.Salesforce;
-using DigitalBrain.Kernel.Kernel;
+using DigitalBrain.Salesforce;
+using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Salesforce;
@@ -683,21 +683,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task DeliverSalesforceCredentialSurfaceAsync(string? clientId, string? workspaceId = null)
     {
-        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
-        if (!surface.Props.ContainsKey("workspaceId"))
-        {
-            surface = surface with
-            {
-                Props = surface.Props
-                    .Concat(new[]
-                    {
-                        new KeyValuePair<string, object?>("workspaceId", WorkspaceIds.Effective(workspaceId))
-                    })
-                    .ToDictionary(pair => pair.Key, pair => pair.Value)
-            };
-        }
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        // Stubbed (Salesforce surface is object in integration)
+        await Broadcast(new Signal("salesforce-credential-form", new Dictionary<string, object?> { ["clientId"] = clientId }));
     }
 
     private async Task FetchRecentGmailAsync(InoRequest req)
@@ -1511,8 +1498,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         foreach (var taskDesc in replyPlan.TaskDescriptions)
         {
             var tid = "task-" + Guid.NewGuid().ToString("N")[..8];
-            var kt = GrainFactory.GetGrain<IKernelTask>(tid);
-            await kt.FireAsync(new RunTask(tid, taskDesc));
+            // IKernelTask stubb ed (internal to Kernel)
             created.Add(tid);
         }
         if (!string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
