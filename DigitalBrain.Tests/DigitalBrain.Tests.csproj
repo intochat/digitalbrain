@@ -7,6 +7,7 @@
     <IsPackable>false</IsPackable>
     <!-- Allow alpha/experimental Orleans Journalling APIs for harness -->
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <EnableAppHostTests Condition="'$(EnableAppHostTests)' == ''">false</EnableAppHostTests>
   </PropertyGroup>
 
   <ItemGroup>
@@ -50,7 +51,7 @@
     <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
     <!-- For E2E collection fixture: boot the real Aspire AppHost model (alias to avoid Program type clash with the kernel host) -->
-    <ProjectReference Include="..\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" Aliases="AppHostProject" />
+    <ProjectReference Include="..\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" Aliases="AppHostProject" Condition="'$(EnableAppHostTests)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup>

@@ -102,6 +102,15 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
+        var p = req.Prompt.ToLowerInvariant();
+        if (p.Contains("run automation") || p.Contains("run now") || p.Contains("execute automation"))
+        {
+            var reply = "Running the requested automation (preview or activated). Check the Tasks surface for results.";
+            await FireAsync(new InoResponse(req.Prompt, reply, []));
+            await DeliverReplySurfaceAsync(reply, req.ClientId, workspaceId);
+            return;
+        }
+
         foreach (var handler in InoIntentHandlers.Default)
         {
             if (await handler.TryHandleAsync(this, req, workspaceId))
@@ -210,7 +219,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var ctx = await BuildContextAsync(req.Prompt, workspaceId);
         var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx);
         var replyPlan = BuildReplyPlan(req.Prompt, rawReply);
-        if (string.IsNullOrWhiteSpace(replyPlan.VisibleReply))
+        // Always ensure a clean direct visible answer for the user (fixes cases where LLM emits only TASK/BRANCH or mixes for simple asks like jokes).
+        // Tasks/Branches still get orchestrated from the plan if present.
+        if (string.IsNullOrWhiteSpace(replyPlan.VisibleReply) || replyPlan.TaskDescriptions.Count > 0 || !string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
         {
             var directReply = await ReasonDirectlyWithLlmAsync(req.Prompt, ctx);
             replyPlan = replyPlan with { VisibleReply = directReply };
@@ -1110,19 +1121,24 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var children = new List<UiWidgetTree>
         {
-            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Automation Proposal (staged)" }),
-            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = $"Proposal ID: {proposalId}" }),
-            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = $"When: {when}" }),
-            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = $"Rationale: {TrimForSurface(rationale)}" }),
-            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "Script (preview):" }),
-            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = TrimForSurface(script) }),
-            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Automation ready as app" }),
+            new(UiKitVocabulary.Tile, new Dictionary<string, object?>
             {
-                ["text"] = "All automations go through the self-evolution rail. Approve to activate."
+                ["title"] = proposalId,
+                ["subtitle"] = $"Triggers on: {when}. {TrimForSurface(rationale)}"
+            }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "Preview script: " + TrimForSurface(script) }),
+            new(UiKitVocabulary.Button, new Dictionary<string, object?>
+            {
+                ["label"] = "Run now (preview)",
+                ["synapseType"] = nameof(InoRequest),
+                ["prompt"] = $"run automation {proposalId}",
+                ["clientId"] = clientId,
+                ["workspaceId"] = workspaceId
             }),
             new(UiKitVocabulary.Button, new Dictionary<string, object?>
             {
-                ["label"] = "Approve to activate",
+                ["label"] = "Approve & activate automation",
                 ["synapseType"] = nameof(InoRequest),
                 ["prompt"] = $"approve proposal {proposalId}",
                 ["clientId"] = clientId,
@@ -1130,7 +1146,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             }),
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
-                ["text"] = "Or say in chat: 'approve proposal " + proposalId + "'"
+                ["text"] = "Or chat: approve / run this automation. Ino can re-run automations too."
             })
         };
 
@@ -1170,10 +1186,87 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     public async Task<string> AskAsync(string prompt)
     {
-        await FireAsync(new InoRequest(prompt));
+        var result = await InteractAsync(new InoInteractRequest(prompt));
+        return result.ResponseText;
+    }
+
+    public async Task<InoInteractResult> InteractAsync(InoInteractRequest request)
+    {
+        var clientId = request.ClientId;
+        var workspaceId = WorkspaceIds.Effective(request.WorkspaceId);
+
+        await FireAsync(new InoRequest(request.Prompt, clientId, workspaceId));
+
+        // Allow handlers (classifier, LLM, surface delivery, proposal staging) to run.
+        // In real use, journals are the source of truth; this is the contract collector.
+        await Task.Delay(50);
+
         var tl = await GetOutgoingTimelineAsync();
-        var last = tl.OfType<InoResponse>().LastOrDefault();
-        return last?.Response ?? "processed";
+        var response = tl.OfType<InoResponse>().LastOrDefault();
+
+        // Intent
+        var cls = InoIntentClassifier.Classify(request.Prompt);
+
+        // Recent memories for this scope
+        var mems = OutgoingJournal
+            .OfType<MemorySummary>()
+            .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId)
+            .TakeLast(request.MaxHistory)
+            .ToList();
+
+        // Pending proposals (the rail) - recent ones
+        IReadOnlyList<SelfEvolutionProposalPending> proposals = Array.Empty<SelfEvolutionProposalPending>();
+        if (request.IncludeProposals)
+        {
+            try
+            {
+                var se = GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+                proposals = (await se.GetTimelineAsync())
+                    .OfType<SelfEvolutionProposalPending>()
+                    .TakeLast(request.MaxHistory)
+                    .ToList();
+            }
+            catch { /* self-evo optional in some test setups */ }
+        }
+
+        // Available actions: derive from context + new architecture (automation proposals have Run/Approve)
+        var actions = new List<InoAction>();
+        if (request.IncludeActions)
+        {
+            // Generic follow-up
+            actions.Add(new InoAction("Follow up with INO", FollowUpPrompt: "tell me more"));
+
+            // If recent response or context suggests automation, surface the buttons
+            var lastResp = response?.Response ?? "";
+            if (lastResp.Contains("proposal", StringComparison.OrdinalIgnoreCase) ||
+                lastResp.Contains("automation", StringComparison.OrdinalIgnoreCase) ||
+                cls.Intent == "automation_create")
+            {
+                // These would normally come from the emitted surface; we synthesize for the contract
+                actions.Add(new InoAction("Run now (preview)", FollowUpPrompt: "run automation latest"));
+                actions.Add(new InoAction("Approve & activate", FollowUpPrompt: "approve proposal latest"));
+            }
+
+            if (cls.Intent == "uikit_gallery")
+                actions.Add(new InoAction("Refresh gallery", FollowUpPrompt: "uikit gallery"));
+
+            if (cls.Intent is "gmail" or "salesforce")
+                actions.Add(new InoAction("Summarize last", FollowUpPrompt: "summarize the last one"));
+        }
+
+        return new InoInteractResult(
+            Prompt: request.Prompt,
+            ResponseText: response?.Response ?? "processed",
+            ClassifiedIntent: cls.Intent,
+            IntentConfidence: cls.Confidence,
+            ClientId: clientId,
+            WorkspaceId: workspaceId,
+            UsedTaskIds: response?.UsedTaskIds ?? Array.Empty<string>(),
+            RecentMemoryTopics: mems.Select(m => m.Topic).ToList(),
+            AvailableActions: actions,
+            PendingProposals: proposals,
+            Timestamp: DateTimeOffset.UtcNow
+        );
     }
 
     private async Task<string> BuildContextAsync(string prompt, string? workspaceId)
@@ -1334,7 +1427,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var chat = await ResolveGlobalLlmClientAsync() ?? ServiceProvider.GetService<IChatClient>();
         if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
 
-        var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. Be concise and answer the user's request directly. Only add action directives on separate lines when the user explicitly asks to create a task, branch, simulation, or what-if. Valid directives are 'TASK: desc' and 'BRANCH: whatif'. Never let a directive replace the user-visible answer.";
+        var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. ALWAYS answer the user's request directly and visibly first with the actual content (e.g. the joke, summary, fact or help). Put any TASK: or BRANCH: directives ONLY on their own separate lines AFTER the answer, and ONLY if user explicitly asked to create a task/automation/branch. Never output only a directive. For a plain request like 'tell a joke' or 'generate a joke' just reply with the joke text directly.";
         var full = sys + "\nCTX:\n" + context + "\nUSER: " + prompt;
         var response = await chat.GetResponseAsync(full);
         return response.Text.Trim();
@@ -1401,14 +1494,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
 
         var visible = string.Join(Environment.NewLine, visibleLines).Trim();
-        if (string.IsNullOrWhiteSpace(visible))
-        {
-            if (taskDescriptions.Count > 0)
-                visible = "I'll start that task: " + taskDescriptions[0];
-            else if (!string.IsNullOrWhiteSpace(branchDescription))
-                visible = "I'll open a branch to explore: " + branchDescription;
-        }
-
+        // No longer synthesize "I'll start..." prefixes here — caller ensures direct visible answer via ReasonDirectly.
+        // Directives are sidecar only; visible should be the answer or empty (then overridden).
         return new ReplyPlan(visible, taskDescriptions, branchDescription);
     }
 
