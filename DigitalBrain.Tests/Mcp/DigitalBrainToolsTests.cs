@@ -6,7 +6,7 @@ using DigitalBrain.TestKit;
 namespace DigitalBrain.Tests.Mcp;
 
 // The MCP tools are co-hosted in the silo and resolve grains via an in-process IGrainFactory.
-// These tests exercise that exact path (TestCluster grain factory) without an HTTP transport.
+// These tests exercise that exact path without an HTTP transport.
 public class DigitalBrainToolsTests : NeuronTestBase
 {
     [Fact]

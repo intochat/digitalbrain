@@ -39,11 +39,14 @@ public sealed class MarketplaceInstallApplyHandler(
             logger);
 
         // Register installed pack as capability for modern intent classifier / vector search
-        InoIntentClassifier.RegisterCapability(new InoIntentClassifier.Capability(
+        var cap = new InoIntentClassifier.Capability(
             staged.Pack.Name,
             $"Pack {staged.Pack.Name} v{staged.Pack.Version}: {staged.Pack.Description}",
             new[] { $"use {staged.Pack.Name}", staged.Pack.Name.ToLowerInvariant() },
-            "pack"));
+            "pack");
+        InoIntentClassifier.RegisterCapability(cap);
+
+        await marketplace.FireAsync(new CapabilityRegistered(cap.Id, cap.Description, cap.Examples, cap.Tier, staged.Pack.Name));
 
         return new SelfEvolutionApplyResult(
             proposal.ProposalId,

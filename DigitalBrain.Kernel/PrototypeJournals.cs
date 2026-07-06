@@ -26,8 +26,8 @@ internal static class DigitalBrainJournalConfig
                 (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Core.Synapse>());
             services.AddKeyedScoped<IDurableList<DigitalBrain.Core.Synapse>>("out-journal",
                 (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Core.Synapse>());
+            services.Configure<DigitalBrain.Kernel.NeuronLifecycleOptions>(options => options.JournalActivationMarkers = true);
             services.AddSingleton<IJournaledStateManager, PrototypeJournaledStateManager>();
         });
     }
 }
-

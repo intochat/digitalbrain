@@ -11,62 +11,62 @@ namespace DigitalBrain.Tests.Steps;
 [Binding]
 public class NeuronSteps : IAsyncDisposable
 {
-    private readonly TestCluster _cluster;
+    private readonly InProcessTestCluster _cluster;
     private INeuron? _currentGrain;
     private IReadOnlyList<Synapse>? _timeline;
 
     public NeuronSteps()
     {
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<SimpleSiloConfig>();
+        var builder = new InProcessTestClusterBuilder();
+        builder.ConfigureSilo((_, siloBuilder) => new SimpleSiloConfig().Configure(siloBuilder));
         _cluster = builder.Build();
         _cluster.DeployAsync().GetAwaiter().GetResult();
     }
 
     public async ValueTask DisposeAsync()
     {
-        await _cluster.StopAllSilosAsync();
+        await _cluster.DisposeAsync();
     }
 
     [Given(@"a demo neuron ""(.*)""")]
     public async Task GivenADemoNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<IDemoNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<IDemoNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
     [Given(@"an aspire orchestrator neuron ""(.*)""")]
     public async Task GivenAnAspireOrchestratorNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<IAspireNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<IAspireNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
     [Given(@"a marketplace neuron ""(.*)""")]
     public async Task GivenAMarketplaceNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<IMarketplaceNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
     [Given(@"a company skill orchestrator neuron ""(.*)""")]
     public async Task GivenACompanySkillOrchestratorNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<ICompanySkillOrchestratorNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<ICompanySkillOrchestratorNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
     [Given(@"a meta optimizer neuron ""(.*)""")]
     public async Task GivenAMetaOptimizerNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<IMetaOptimizerNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<IMetaOptimizerNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
     [Given(@"a system status neuron ""(.*)""")]
     public async Task GivenASystemStatusNeuron(string id)
     {
-        _currentGrain = _cluster.GrainFactory.GetGrain<ISystemStatus>(id);
+        _currentGrain = _cluster.Client.GetGrain<ISystemStatus>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
@@ -79,8 +79,8 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"I fire multiple messages to trigger telemetry")]
     public async Task WhenIFireMultipleMessagesToTriggerTelemetry()
     {
-        var demo = _cluster.GrainFactory.GetGrain<IDemoNeuron>("demo-opt");
-        var optimizer = _cluster.GrainFactory.GetGrain<IMetaOptimizerNeuron>("optimizer1");
+        var demo = _cluster.Client.GetGrain<IDemoNeuron>("demo-opt");
+        var optimizer = _cluster.Client.GetGrain<IMetaOptimizerNeuron>("optimizer1");
         for (int i = 0; i < 6; i++)
         {
             await demo.FireAsync(new DemoMessageSynapse($"msg-{i}"));
@@ -98,13 +98,13 @@ public class NeuronSteps : IAsyncDisposable
     private async Task SimulatePublishInstallUse(string packName, string version)
     {
         // Simulate "other brain" connecting to marketplace contract
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         await market.FireAsync(new PublishToMarketplace(packName, version));
         await market.FireAsync(new ListPublished());  // so PublishedList appears for harness asserts
         await market.FireAsync(new InstallFromMarketplace(packName, version));
         // Activate the GeneratedNeuron (as if downloaded/installed) and use it
         var genKey = "generated-" + packName.ToLower();
-        var gen = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>(genKey);
+        var gen = _cluster.Client.GetGrain<IGeneratedNeuron>(genKey);
         await gen.FireAsync(new ExperienceUsed(packName, "simulated-use-by-other-brain"));
         // Point harness current to the generated so Then timeline checks see the ExperienceUsed (market journals publish/install, generated journals the use).
         _currentGrain = gen;
@@ -125,14 +125,14 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"I publish pack ""(.*)"" version ""(.*)""")]
     public async Task WhenIPublishPackVersion(string pack, string ver)
     {
-        var targetMarket = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var targetMarket = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         await targetMarket!.FireAsync(new PublishToMarketplace(pack, ver));
     }
 
     [When(@"I download/install the pack ""(.*)"" version ""(.*)""")]
     public async Task WhenIDownloadInstallThePack(string pack, string ver)
     {
-        var targetMarket = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var targetMarket = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         await targetMarket!.FireAsync(new InstallFromMarketplace(pack, ver));
         // activation fire to gen skipped in test to avoid timeout/hang; TUI and real use demonstrates it
     }
@@ -140,7 +140,7 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"I create company skill ""(.*)""")]
     public async Task WhenICreateCompanySkill(string name)
     {
-        var orch = _cluster.GrainFactory.GetGrain<ICompanySkillOrchestratorNeuron>("company-skill-main");
+        var orch = _cluster.Client.GetGrain<ICompanySkillOrchestratorNeuron>("company-skill-main");
         await orch.FireAsync(new CreateCompanySkill(name));
         _currentGrain = orch;
     }
@@ -148,7 +148,7 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"I trigger kernel self update")]
     public async Task WhenITriggerKernelSelfUpdate()
     {
-        var aspire = _cluster.GrainFactory.GetGrain<IAspireNeuron>("aspire-kupdate");
+        var aspire = _cluster.Client.GetGrain<IAspireNeuron>("aspire-kupdate");
         // Pack-driven: fire the command (exercises handler) + emit surfaces using consts for reliable assertion.
         await aspire.FireAsync(new DigitalBrain.Core.PerformKernelSelfUpdate("rolling-2026.6"));
         var checkpoint = await aspire.CreateCheckpointAsync();
@@ -206,7 +206,7 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"I request published list")]
     public async Task WhenIRequestPublishedList()
     {
-        var target = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var target = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         await target!.FireAsync(new ListPublished());
     }
 
@@ -227,7 +227,7 @@ public class NeuronSteps : IAsyncDisposable
     [Then(@"the timeline contains a PublishedList")]
     public async Task ThenTheTimelineContainsAPublishedList()
     {
-        var mkt = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var mkt = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         _timeline = await mkt.GetTimelineAsync();
         Assert.Contains(_timeline, s => s.Type == nameof(PublishedList));
     }
@@ -252,7 +252,7 @@ public class NeuronSteps : IAsyncDisposable
     [Then(@"the timeline contains a WiringOptimizationProposed")]
     public async Task ThenTheTimelineContainsAWiringOptimizationProposed()
     {
-        var opt = _cluster.GrainFactory.GetGrain<IMetaOptimizerNeuron>("optimizer1");
+        var opt = _cluster.Client.GetGrain<IMetaOptimizerNeuron>("optimizer1");
         _timeline = await opt.GetTimelineAsync();
         Assert.Contains(_timeline, s => s.Type == nameof(WiringOptimizationProposed));
     }
@@ -260,7 +260,7 @@ public class NeuronSteps : IAsyncDisposable
     [Then(@"the timeline contains a NeuroPackInstalled")]
     public async Task ThenTheTimelineContainsANeuroPackInstalledForFlow()
     {
-        var mkt = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var mkt = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         _timeline = await mkt.GetTimelineAsync();
         Assert.Contains(_timeline, s => s.Type == nameof(NeuroPackInstalled));
     }
@@ -283,7 +283,7 @@ public class NeuronSteps : IAsyncDisposable
     public async Task ThenGeneratedNeuronReceivedExperienceUsed(string pack)
     {
         var genKey = "generated-" + pack.ToLower();
-        var gen = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>(genKey);
+        var gen = _cluster.Client.GetGrain<IGeneratedNeuron>(genKey);
         var tl = await gen.GetTimelineAsync();
         Assert.Contains(tl, s => s.Type == nameof(ExperienceUsed));
     }
@@ -291,7 +291,7 @@ public class NeuronSteps : IAsyncDisposable
     [Then(@"the timeline contains a ExperienceUsed")]
     public async Task ThenTheTimelineContainsAExperienceUsed()
     {
-        var mkt = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var mkt = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         _timeline = await mkt.GetTimelineAsync();
         Assert.Contains(_timeline, s => s.Type == nameof(ExperienceUsed));
     }
@@ -355,7 +355,7 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"alice publishes pack ""(.*)"" version ""(.*)"" with commission (.*) owned by ""(.*)""")]
     public async Task WhenAlicePublishesWithCommission(string pack, string ver, double rate, string owner)
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         var cmd = new PublishToMarketplace(pack, ver, Code: "public class P : IPackBehavior { public string Respond(string s) => \"ok\"; }", OwnerId: owner, IsPrivate: false, CommissionRate: rate);
         await market.FireAsync(cmd);
     }
@@ -363,7 +363,7 @@ public class NeuronSteps : IAsyncDisposable
     [Then(@"the pack appears in the published list")]
     public async Task ThenThePackAppearsInPublishedList()
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         await market.FireAsync(new ListPublished());
         // The PublishedList synapse is on timeline; simple existence check
         var timeline = await market.GetTimelineAsync();
@@ -373,14 +373,14 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"bob installs ""(.*)"" ""(.*)"" as buyer ""(.*)""")]
     public async Task WhenBobInstalls(string pack, string ver, string buyer)
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         await market.FireAsync(new InstallFromMarketplace(pack, ver, buyer));
     }
 
     [Then(@"a NeuroPackInstalled event is emitted")]
     public async Task ThenANeuroPackInstalledEventIsEmitted()
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         var timeline = await market.GetTimelineAsync();
         Assert.Contains(timeline, s => s is NeuroPackInstalled);
     }
@@ -388,7 +388,7 @@ public class NeuronSteps : IAsyncDisposable
     [Then(@"a CommissionTaken event is emitted for seller ""(.*)"" rate (.*)")]
     public async Task ThenACommissionTakenEventForSeller(string seller, double rate)
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         var timeline = await market.GetTimelineAsync();
         var found = timeline.OfType<CommissionTaken>().FirstOrDefault(c => c.SellerId == seller);
         Assert.NotNull(found);
@@ -399,7 +399,7 @@ public class NeuronSteps : IAsyncDisposable
     public async Task ThenThePackEmbodiesAndPackEmissionAppears()
     {
         // Existing Simulate path already produces PackEmission via GeneratedNeuron; here we just assert presence after install
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         var timeline = await market.GetTimelineAsync();
         Assert.Contains(timeline, s => s is PackEmission || s.Type == "PackEmission");
     }
@@ -407,7 +407,7 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"eve tries to publish a pack containing ""(.*)""")]
     public async Task WhenEveTriesToPublishInjection(string badContent)
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         // The security decision currently lives in the new private marketplace service skeleton.
         // For this vertical in kernel tests we simulate the rejection by attempting publish then checking logs / no emission.
         // In full hybrid test the remote would call ISecurityPolicyService.ScanOnPublish.
@@ -432,14 +432,14 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"the marketplace lists published packs")]
     public async Task WhenTheMarketplaceListsPublishedPacks()
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         await market.FireAsync(new ListPublished());
     }
 
     [Then(@"it returns the seeded LocalUiPacks without contacting any remote service")]
     public async Task ThenItReturnsSeededLocalUiPacksWithoutRemote()
     {
-        var market = _cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
+        var market = _cluster.Client.GetGrain<IMarketplaceNeuron>("market-main");
         var timeline = await market.GetTimelineAsync();
         var list = timeline.OfType<PublishedList>().LastOrDefault();
         Assert.NotNull(list);

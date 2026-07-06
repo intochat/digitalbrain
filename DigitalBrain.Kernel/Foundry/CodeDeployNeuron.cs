@@ -33,9 +33,7 @@ public class CodeDeployNeuron(ILogger<CodeDeployNeuron> logger, NeuronJournals j
     private bool RestartPending()
     {
         var lastRestart = OutgoingJournal.OfType<KernelRestartRequested>().LastOrDefault();
-        if (lastRestart is null) return false;
-        var lastActivated = OutgoingJournal.OfType<NeuronActivated>().LastOrDefault();
-        return lastActivated is null || lastRestart.Timestamp >= lastActivated.Timestamp;
+        return lastRestart is not null && lastRestart.Timestamp >= ActivatedAt;
     }
 
     private static void CommitSource(string moduleName, string source)
@@ -48,4 +46,3 @@ public class CodeDeployNeuron(ILogger<CodeDeployNeuron> logger, NeuronJournals j
         File.WriteAllText(Path.Combine(target, moduleName + ".cs"), source);
     }
 }
-

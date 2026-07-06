@@ -59,7 +59,7 @@ This is a good pattern and the right seam for "packs provide their own Aspire bi
 |---|---|---|
 | Clustering | `UseLocalhostClustering()` | `UseAzureStorageClustering` (Table `OrleansSiloInstances`) |
 | Grain storage | Memory (`AddMemoryGrainStorageAsDefault`) | `AddAzureBlobGrainStorage("Default")` |
-| Journal | In-memory prototype journals (`ConfigurePrototypeJournals`) | `AddAzureBlobJournalStorage`, `orleans-binary` format (JSON journal format proven broken by spike — see `DigitalBrain.Tests/Spikes/`) |
+| Journal | In-memory prototype journals (`ConfigurePrototypeJournals`) | `AddAzureBlobJournalStorage` with Orleans JSON Lines via `UseJsonJournalFormat(JournalJson.Configure)`; polymorphic `Synapse` metadata is supplied through `JsonJournalOptions.AddTypeInfoResolver` |
 | Cluster identity | — | `Orleans:ClusterId/ServiceId` = `digitalbrain` (stable rejoin) |
 
 Both paths: memory streams (`HomeFeed`, `DigitalBrainTimeline`), memory `PubSubStore` (Program.cs:208-210, **applies to both paths uniformly** — this is the streams-durability gap tracked in Milestone M12), Foundry, gRPC gateway (`GatewayService`/`UiGatewayService`, `Program.cs:232-233`) with gRPC-Web + CORS for browsers, and optional static web bundle serving via `DIGITALBRAIN_WEBROOT` (`Program.cs:223-230`).
