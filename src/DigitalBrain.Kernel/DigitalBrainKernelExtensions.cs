@@ -26,8 +26,8 @@ public static class DigitalBrainKernelExtensions
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 var inoRecallType = Type.GetType("DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall");
-if (inoRecallType != null)
-    services.AddSingleton(typeof(Ino.IInoCapabilityRecall), inoRecallType);
+                if (inoRecallType != null)
+                    services.AddSingleton(typeof(Ino.IInoCapabilityRecall), inoRecallType);
             });
 
             // Built-in neurons discovered automatically.

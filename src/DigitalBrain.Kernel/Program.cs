@@ -195,7 +195,7 @@ builder.Services.AddDigitalBrainOtlpForwardClient();
 DigitalBrain.Ino.InoServiceRegistration.AddInoAi(builder.Services, builder.Configuration.GetSection("Ino:AI"));
 var inoRecallType = Type.GetType("DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall");
 if (inoRecallType != null)
-    builder.Services.AddSingleton(typeof(Ino.IInoCapabilityRecall), inoRecallType);
+    builder.Services.AddSingleton(typeof(DigitalBrain.Ino.IInoCapabilityRecall), inoRecallType);
 
 // Proxy to private marketplace (new separate repo) when enabled.
 // Register the stub here; real impl uses HttpClient to the marketplace service.
