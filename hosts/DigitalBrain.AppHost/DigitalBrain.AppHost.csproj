@@ -12,13 +12,13 @@
     <PackageReference Include="Aspire.Hosting.Orleans" />
     <PackageReference Include="Aspire.Hosting.Azure.Storage" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
-    <ProjectReference Include="..\..\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\DigitalBrain.Telegram.Transport\DigitalBrain.Telegram.Transport.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">
-    <ProjectReference Include="..\..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
   </ItemGroup>
 
 </Project>
