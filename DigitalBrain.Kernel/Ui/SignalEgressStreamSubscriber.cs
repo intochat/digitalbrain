@@ -51,7 +51,7 @@ internal sealed class SignalEgressStreamSubscriber(
 public static class SignalEgressStreamSubscriberRegistration
 {
     // Registers the per-silo Signal egress stream pump as a silo lifecycle participant. Call inside the silo's
-    // service container (UseOrleans / ISiloConfigurator) — the silo discovers it and subscribes once it reaches Active.
+    // service container (UseOrleans / ISiloConfigurator) — the kernel (Orleans silo) discovers it and subscribes once it reaches Active.
     public static IServiceCollection AddSignalEgressStreamSubscriber(this IServiceCollection services) =>
         services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SignalEgressStreamSubscriber>();
 }
