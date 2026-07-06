@@ -53,6 +53,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 
     private NeuroPack MaterializeManifest(NeuroPack pack)
     {
+        if (pack.Manifest is not null) return pack;
         if (string.IsNullOrEmpty(pack.Code)) return pack;
 
         var embodiment = ServiceProvider.GetService<IPackEmbodiment>();

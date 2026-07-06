@@ -25,7 +25,6 @@
     <Project Path="DigitalBrain.Telegram/DigitalBrain.Telegram.csproj" />
   </Folder>
   <Folder Name="/hosts/">
-    <Project Path="DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
   </Folder>
@@ -37,7 +36,6 @@
     <Project Path="DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />
     <Project Path="DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
     <Project Path="DigitalBrain.TestKit.Tests/DigitalBrain.TestKit.Tests.csproj" />
-    <Project Path="DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />

@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
@@ -14,6 +15,7 @@ public sealed class TestDigitalBrain(
     private readonly Action<IClientBuilder>? _extendClient = extendClient;
     private readonly short _initialSilosCount = initialSilosCount;
     private InProcessTestCluster? _cluster;
+    private static readonly TimeSpan TestClusterResponseTimeout = TimeSpan.FromMinutes(2);
 
     public TestDigitalBrainCluster Cluster => new(_cluster!);
 
@@ -25,14 +27,16 @@ public sealed class TestDigitalBrain(
         var builder = new InProcessTestClusterBuilder(initialSilosCount: _initialSilosCount);
         builder.ConfigureSilo((_, siloBuilder) =>
         {
+            ConfigureMessagingTimeout(siloBuilder);
             new NeuronTestKernelConfigurator().Configure(siloBuilder);
             _extendSilo?.Invoke(siloBuilder);
         });
 
-        if (_extendClient is not null)
+        builder.ConfigureClient(clientBuilder =>
         {
-            builder.ConfigureClient(clientBuilder => _extendClient(clientBuilder));
-        }
+            ConfigureMessagingTimeout(clientBuilder);
+            _extendClient?.Invoke(clientBuilder);
+        });
 
         _cluster = builder.Build();
         await _cluster.DeployAsync();
@@ -54,6 +58,12 @@ public sealed class TestDigitalBrain(
         synapse.Receiver is { } r
             ? Grain<INeuron>(r.Value).DeliverAsync(synapse)
             : throw new InvalidOperationException("DeliverAsync requires synapse.Receiver to be set.");
+
+    private static void ConfigureMessagingTimeout(ISiloBuilder builder) =>
+        builder.Configure<MessagingOptions>(options => options.ResponseTimeout = TestClusterResponseTimeout);
+
+    private static void ConfigureMessagingTimeout(IClientBuilder builder) =>
+        builder.Configure<MessagingOptions>(options => options.ResponseTimeout = TestClusterResponseTimeout);
 }
 
 public sealed class TestDigitalBrainCluster(InProcessTestCluster cluster)
