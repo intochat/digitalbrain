@@ -73,16 +73,14 @@ public sealed class ScopedAskLlmEmitter(Microsoft.Extensions.Logging.ILogger<Sco
 }
 
 // Wires the global AnswerPrefixChatClient (proves it is NOT used on the scoped path), a real
-// in-memory PackConfigStore, and the recording scoped factory shared via a static so the test can assert on it.
-public sealed class ScopedLlmResponderSiloConfigurator : ISiloConfigurator
+// in-memory PackConfigStore, and a per-test recording scoped factory.
+public sealed class ScopedLlmResponderSiloConfigurator(RecordingScopedChatClientFactory factory) : ISiloConfigurator
 {
-    public static readonly RecordingScopedChatClientFactory Factory = new();
-
     public void Configure(ISiloBuilder siloBuilder) =>
         siloBuilder.ConfigureServices(services =>
         {
             services.AddSingleton<IChatClient, AnswerPrefixChatClient>();
-            services.AddSingleton<IScopedChatClientFactory>(Factory);
+            services.AddSingleton<IScopedChatClientFactory>(factory);
             services.AddPackConfigStore(blobsForKeyRing: null);
         });
 }
@@ -101,29 +99,27 @@ public sealed class NullScopedChatClientFactory : IScopedChatClientFactory
 
 // Wires the NullScopedChatClientFactory + global AnswerPrefixChatClient + real in-memory PackConfigStore.
 // The null factory forces the responder to fall back to the global client.
-public sealed class NullScopedLlmResponderSiloConfigurator : ISiloConfigurator
+public sealed class NullScopedLlmResponderSiloConfigurator(NullScopedChatClientFactory factory) : ISiloConfigurator
 {
-    public static readonly NullScopedChatClientFactory Factory = new();
-
     public void Configure(ISiloBuilder siloBuilder) =>
         siloBuilder.ConfigureServices(services =>
         {
             services.AddSingleton<IChatClient, AnswerPrefixChatClient>();
-            services.AddSingleton<IScopedChatClientFactory>(Factory);
+            services.AddSingleton<IScopedChatClientFactory>(factory);
             services.AddPackConfigStore(blobsForKeyRing: null);
         });
 }
 
 public class LlmResponderScopedConfigTests : NeuronTestBase
 {
+    private readonly RecordingScopedChatClientFactory _factory = new();
+
     protected override void ConfigureSilo(ISiloBuilder builder) =>
-        new ScopedLlmResponderSiloConfigurator().Configure(builder);
+        new ScopedLlmResponderSiloConfigurator(_factory).Configure(builder);
 
     [Fact]
     public async Task AskLlm_with_ConfigPack_uses_scoped_client_from_stored_provider_and_key()
     {
-        ScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
-
         const string pack = "DigitalBrain.Telegram.Responder";
         const string scope = "default";
 
@@ -150,7 +146,7 @@ public class LlmResponderScopedConfigTests : NeuronTestBase
         Assert.NotNull(signal);
         Assert.Equal("SCOPED:hi", signal.Props["text"]);
 
-        var request = Assert.Single(ScopedLlmResponderSiloConfigurator.Factory.Requests);
+        var request = Assert.Single(_factory.Requests);
         Assert.Equal("openai", request.Provider);
         Assert.Equal("sk-test", request.ApiKey);
     }
@@ -158,8 +154,6 @@ public class LlmResponderScopedConfigTests : NeuronTestBase
     [Fact]
     public async Task AskLlm_without_ConfigPack_uses_global_client()
     {
-        ScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
-
         var responder = Grain<ILlmResponderNeuron>("responder-global-1");
         await responder.GetTimelineAsync();
 
@@ -177,7 +171,7 @@ public class LlmResponderScopedConfigTests : NeuronTestBase
 
         Assert.NotNull(signal);
         Assert.Equal("ANSWER:hi", signal.Props["text"]);
-        Assert.Empty(ScopedLlmResponderSiloConfigurator.Factory.Requests);
+        Assert.Empty(_factory.Requests);
     }
 
     // NullScopedLlmResponderSiloConfigurator is mutually exclusive with ScopedLlmResponderSiloConfigurator
@@ -185,14 +179,14 @@ public class LlmResponderScopedConfigTests : NeuronTestBase
     // its own ConfigureSilo instead of inheriting the outer one.
     public sealed class NullScopedFactoryFallbackTests : NeuronTestBase
     {
+        private readonly NullScopedChatClientFactory _factory = new();
+
         protected override void ConfigureSilo(ISiloBuilder builder) =>
-            new NullScopedLlmResponderSiloConfigurator().Configure(builder);
+            new NullScopedLlmResponderSiloConfigurator(_factory).Configure(builder);
 
         [Fact]
         public async Task AskLlm_scoped_factory_returns_null_falls_back_to_global_client()
         {
-            NullScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
-
             const string pack = "DigitalBrain.Telegram.Responder";
             const string scope = "default";
 
@@ -221,7 +215,7 @@ public class LlmResponderScopedConfigTests : NeuronTestBase
             Assert.NotNull(signal);
             Assert.Equal("ANSWER:hi", signal.Props["text"]);
             // Factory was called (it attempted to build) but returned null.
-            var request = Assert.Single(NullScopedLlmResponderSiloConfigurator.Factory.Requests);
+            var request = Assert.Single(_factory.Requests);
             Assert.Equal("openai", request.Provider);
         }
     }

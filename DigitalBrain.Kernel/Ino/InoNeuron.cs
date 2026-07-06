@@ -9,7 +9,6 @@ using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Market;
 using DigitalBrain.Salesforce;
-using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Kernel.Ino;
@@ -34,61 +33,60 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     public async Task HandleAsync(InoRequest req)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
-        if (IsBitcoinPriceIntent(req.Prompt))
+        foreach (var handler in InoIntentHandlers.Default)
         {
-            var price = await GrainFactory.GetGrain<IMarketDataNeuron>("market-data-main").GetBitcoinPriceUsdAsync();
-            var priceReply = $"The current Bitcoin price is {price}.";
-            await FireAsync(new InoResponse(req.Prompt, priceReply, []));
-            await DeliverReplySurfaceAsync(priceReply, req.ClientId, workspaceId);
-            return;
-        }
-
-        if (IsTwoObjectRelationIntent(req.Prompt))
-        {
-            await FireAsync(new InoResponse(req.Prompt, "Rendered a relation graph.", []));
-            await DeliverGraphSurfaceAsync(
-                DbSchemaGraphMapper.RelationOfTwoObjectsTree(),
-                req.ClientId,
-                workspaceId,
-                "Object relation",
-                "surface.graph.relation");
-            return;
-        }
-
-        if (IsSchemaVisualizationIntent(req.Prompt))
-        {
-            if (TryExtractDatabasePath(req.Prompt, out var databasePath))
+            if (await handler.TryHandleAsync(this, req, workspaceId))
             {
-                var inspected = await InspectReferencedDatabaseAsync(databasePath, req.ClientId, workspaceId);
-                if (inspected is not null)
-                {
-                    await FireAsync(new InoResponse(req.Prompt, SchemaReplyText(inspected), []));
-                    await FireAsync(inspected);
-                    return;
-                }
-            }
-
-            var latest = LatestSuccessfulSchema(req.ClientId, workspaceId);
-            if (latest?.Schema is not null)
-            {
-                await FireAsync(new InoResponse(req.Prompt, "Rendered the most recent database schema.", []));
-                await ProcessSchemaInspectedAsync(latest, req.ClientId ?? latest.ClientId, workspaceId);
                 return;
             }
         }
+    }
 
-        if (InoConnectorIntents.IsGmail(req.Prompt))
+    internal async Task HandleBitcoinPriceIntentAsync(InoRequest req, string workspaceId)
+    {
+        var price = await GrainFactory.GetGrain<IMarketDataNeuron>("market-data-main").GetBitcoinPriceUsdAsync();
+        var priceReply = $"The current Bitcoin price is {price}.";
+        await FireAsync(new InoResponse(req.Prompt, priceReply, []));
+        await DeliverReplySurfaceAsync(priceReply, req.ClientId, workspaceId);
+    }
+
+    internal async Task HandleRelationGraphIntentAsync(InoRequest req, string workspaceId)
+    {
+        await FireAsync(new InoResponse(req.Prompt, "Rendered a relation graph.", []));
+        await DeliverGraphSurfaceAsync(
+            DbSchemaGraphMapper.RelationOfTwoObjectsTree(),
+            req.ClientId,
+            workspaceId,
+            "Object relation",
+            "surface.graph.relation");
+    }
+
+    internal async Task<bool> TryHandleSchemaVisualizationIntentAsync(InoRequest req, string workspaceId)
+    {
+        if (TryExtractDatabasePath(req.Prompt, out var databasePath))
         {
-            await HandleGmailIntentAsync(req);
-            return;
+            var inspected = await InspectReferencedDatabaseAsync(databasePath, req.ClientId, workspaceId);
+            if (inspected is not null)
+            {
+                await FireAsync(new InoResponse(req.Prompt, SchemaReplyText(inspected), []));
+                await FireAsync(inspected);
+                return true;
+            }
         }
 
-        if (InoConnectorIntents.IsSalesforce(req.Prompt))
+        var latest = LatestSuccessfulSchema(req.ClientId, workspaceId);
+        if (latest?.Schema is not null)
         {
-            await HandleSalesforceIntentAsync(req);
-            return;
+            await FireAsync(new InoResponse(req.Prompt, "Rendered the most recent database schema.", []));
+            await ProcessSchemaInspectedAsync(latest, req.ClientId ?? latest.ClientId, workspaceId);
+            return true;
         }
 
+        return false;
+    }
+
+    internal async Task HandleGenericIntentAsync(InoRequest req, string workspaceId)
+    {
         var ctx = await BuildContextAsync(req.Prompt, workspaceId);
         var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx);
         var replyPlan = BuildReplyPlan(req.Prompt, rawReply);
@@ -106,11 +104,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         // Compress recent activity to long-term memory summary (journal driven).
         await CreateMemorySummaryAsync(workspaceId);
     }
-
-    private static bool IsBitcoinPriceIntent(string prompt) =>
-        prompt.Contains("bitcoin", StringComparison.OrdinalIgnoreCase) &&
-        prompt.Contains("price", StringComparison.OrdinalIgnoreCase);
-
     public async Task HandleAsync(Signal signal)
     {
         if (signal.Name == "PackConfigured" &&
@@ -259,7 +252,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface));
     }
 
-    private async Task HandleGmailIntentAsync(InoRequest req)
+    internal async Task HandleGmailIntentAsync(InoRequest req)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         if (!await HasGoogleCredentialAsync())
@@ -274,7 +267,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await FetchRecentGmailAsync(req);
     }
 
-    private async Task HandleSalesforceIntentAsync(InoRequest req)
+    internal async Task HandleSalesforceIntentAsync(InoRequest req)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         var salesforceSession = await ResolveSessionAsync(req.ClientId);
@@ -635,15 +628,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return schemas[^1];
     }
 
-    private static bool IsSchemaVisualizationIntent(string prompt)
-    {
-        var p = prompt.ToLowerInvariant();
-        return p.Contains("schema") ||
-               p.Contains("visualize database") ||
-               p.Contains("visualize db") ||
-               p.Contains("show database") ||
-               p.Contains("show db");
-    }
 
 
     private static string GmailReplyText(IReadOnlyList<GmailMessageSummary> messages)
@@ -697,13 +681,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return text.Length <= 280 ? text : text[..277] + "...";
     }
 
-    private static bool IsTwoObjectRelationIntent(string prompt)
-    {
-        var p = prompt.ToLowerInvariant();
-        return (p.Contains("draw") || p.Contains("show") || p.Contains("visualize")) &&
-               p.Contains("relation") &&
-               (p.Contains("2 objects") || p.Contains("two objects") || p.Contains("object"));
-    }
 
     private static bool TryExtractDatabasePath(string prompt, out string path)
     {
@@ -863,3 +840,4 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 }
+

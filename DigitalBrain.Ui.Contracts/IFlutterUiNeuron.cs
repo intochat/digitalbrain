@@ -1,6 +1,4 @@
-using DigitalBrain.Core;
-
-namespace DigitalBrain.UiKit;
+namespace DigitalBrain.Core;
 
 public interface IFlutterUiNeuron : IChannelNeuron, IHandle<UiSurface>
 {

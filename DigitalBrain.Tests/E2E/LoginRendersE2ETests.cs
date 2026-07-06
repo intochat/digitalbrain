@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Runtime.Grpc;
+using DigitalBrain.Tests.TestSupport;
 using Google.Protobuf;
 using Grpc.Core;
 using Grpc.Net.Client;
@@ -52,8 +53,14 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest { ClientId = clientId }, cancellationToken: cts.Token);
-        var delivered = ReadForSignedInAsync(feed.ResponseStream, clientId, cts.Token);
-        await Task.Delay(750, cts.Token);
+        var streamReady = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var delivered = ReadForSignedInAsync(feed.ResponseStream, clientId, streamReady, cts.Token);
+        await AsyncTestWait.WaitUntilAsync(
+            () => streamReady.Task.IsCompleted,
+            "WatchHomeFeed initial login card",
+            timeout: TimeSpan.FromSeconds(10),
+            cancellationToken: cts.Token);
+        await streamReady.Task;
 
         await client.SendAsync(new SynapseEnvelope
         {
@@ -70,12 +77,13 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
         Assert.True(await delivered, "Signed-in session broadcast was not delivered to WatchHomeFeed");
     }
 
-    static async Task<bool> ReadForSignedInAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string clientId, CancellationToken ct)
+    static async Task<bool> ReadForSignedInAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string clientId, TaskCompletionSource<bool> streamReady, CancellationToken ct)
     {
         try
         {
             while (await stream.MoveNext(ct))
             {
+                streamReady.TrySetResult(true);
                 var json = stream.Current.DataJson;
                 if (string.IsNullOrEmpty(json)) continue;
                 using var doc = JsonDocument.Parse(json);
@@ -86,8 +94,8 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
                 }
             }
         }
-        catch (RpcException) { }
-        catch (OperationCanceledException) { }
+        catch (RpcException ex) { streamReady.TrySetException(ex); }
+        catch (OperationCanceledException ex) { streamReady.TrySetCanceled(ex.CancellationToken); }
         return false;
     }
 

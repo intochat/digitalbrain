@@ -1,7 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel.Ui;
-using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
@@ -75,19 +74,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
 
         for (int replica = 1; replica <= 3; replica++)
         {
-            var drainProps = new Dictionary<string, object?>
-            {
-                [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingDrain}-{replica}",
-                [UiSurfaceKeys.Emitter] = Self.Value,
-                [UiSurfaceKeys.Title] = $"Drain Replica {replica}/3",
-                [UiSurfaceKeys.Priority] = 70 + replica,
-                [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
-                ["replica"] = replica,
-                ["phase"] = "draining",
-                ["version"] = version,
-                ["checkpointId"] = preUpdateCheckpoint.SynapseId
-            };
-            await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingDrain, drainProps));
+            await FireAsync(SystemRollingSurfaces.CreateDrain(replica, version, preUpdateCheckpoint.SynapseId, Self.Value));
             if (bus is not null)
             {
                 await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingDrainCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "draining", version })));
@@ -101,19 +88,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
             var verifyFailed = cmd.FailAtReplica == replica;
             var verifyPhase = verifyFailed ? "verify-failed" : "verified";
 
-            var verifyProps = new Dictionary<string, object?>
-            {
-                [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingVerify}-{replica}",
-                [UiSurfaceKeys.Emitter] = Self.Value,
-                [UiSurfaceKeys.Title] = $"Verify Replica {replica}/3",
-                [UiSurfaceKeys.Priority] = 70 + replica,
-                [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
-                ["replica"] = replica,
-                ["phase"] = verifyPhase,
-                ["version"] = version,
-                ["lineageEvents"] = lineageCount
-            };
-            await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingVerify, verifyProps));
+            await FireAsync(SystemRollingSurfaces.CreateVerify(replica, version, verifyPhase, lineageCount, Self.Value));
             if (bus is not null)
             {
                 await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingVerifyCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = verifyPhase, version, lineageEvents = lineageCount })));
@@ -122,20 +97,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
             if (verifyFailed)
             {
                 await RestoreCheckpointAsync(preUpdateCheckpoint);
-                var rollbackProps = new Dictionary<string, object?>
-                {
-                    [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingRollback}-{replica}",
-                    [UiSurfaceKeys.Emitter] = Self.Value,
-                    [UiSurfaceKeys.Title] = $"Rollback at Replica {replica}/3",
-                    [UiSurfaceKeys.Priority] = 90,
-                    [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
-                    ["replica"] = replica,
-                    ["phase"] = "rolledback",
-                    ["version"] = version,
-                    ["checkpointId"] = preUpdateCheckpoint.SynapseId,
-                    ["reason"] = "verify-failed"
-                };
-                await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingRollback, rollbackProps));
+                await FireAsync(SystemRollingSurfaces.CreateRollback(replica, version, preUpdateCheckpoint.SynapseId, Self.Value));
                 if (bus is not null)
                 {
                     await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingRollbackCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "rolledback", version })));
@@ -150,21 +112,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
             await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelUpdateStatusCard", statusData));
         }
 
-        var completeProps = new Dictionary<string, object?>
-        {
-            [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingComplete}-{version}",
-            [UiSurfaceKeys.Emitter] = Self.Value,
-            [UiSurfaceKeys.Title] = "Kernel Rolling Update",
-            [UiSurfaceKeys.Priority] = 80,
-            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
-            ["version"] = version,
-            ["strategy"] = "one-replica-at-a-time",
-            ["checkpointId"] = preUpdateCheckpoint.SynapseId,
-            ["status"] = "complete",
-            ["replicasProcessed"] = 3,
-            ["lineageEvents"] = lineageCount
-        };
-        await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingComplete, completeProps));
+        await FireAsync(SystemRollingSurfaces.CreateComplete(version, preUpdateCheckpoint.SynapseId, lineageCount, Self.Value));
     }
 }
 
@@ -244,6 +192,7 @@ public class MetaOptimizerNeuron(ILogger<MetaOptimizerNeuron> logger, NeuronJour
         return Task.CompletedTask;
     }
 }
+
 
 
 

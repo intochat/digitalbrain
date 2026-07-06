@@ -43,6 +43,14 @@ public record CreateAutomationApp(
     : Synapse(nameof(CreateAutomationApp), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+public record AutomationDefinitionStaged(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string AutomationNeuronId,
+    [property: Id(2)] RegisterScript Script,
+    [property: Id(3)] RegisterReaction Reaction)
+    : Synapse(nameof(AutomationDefinitionStaged), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
 public record RemoveReaction(string Id) : Synapse(nameof(RemoveReaction), DateTimeOffset.UtcNow);
 
 /// Thin promotion bridge (priority 6): take reactions/scripts and emit a seed that pack pipeline can consume.
@@ -63,8 +71,8 @@ public interface IAutomationNeuron : INeuron
     Task<IReadOnlyList<string>> ListActiveScriptsAsync();
     Task<IReadOnlyList<string>> ListActiveReactionsAsync();
 
-    /// High-level convenience for Ino/LLM/MCP: define a reaction + inline script body in one call.
-    /// "when MyNeuron.Lifetime.Activated then { C# body }"
+    /// Trusted/bootstrap convenience: define a reaction + inline script body in one call.
+    /// User/MCP-created executable C# must stage AutomationDefinitionStaged through the self-evolution rail first.
     Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null);
 
     /// Get script source by id for library/reuse (documented for surfaces + MCP).
@@ -86,3 +94,4 @@ public record ScriptLibraryEntry(
     [property: Id(3)] IReadOnlyList<string> DeclaredEmits,
     [property: Id(4)] int UsageCount
 );
+

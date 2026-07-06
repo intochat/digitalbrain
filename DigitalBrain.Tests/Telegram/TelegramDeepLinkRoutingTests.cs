@@ -1,7 +1,7 @@
 using DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Runtime.Grpc;
-using DigitalBrain.Telegram.Channel;
+using DigitalBrain.Telegram;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
@@ -66,3 +66,4 @@ public class TelegramDeepLinkRoutingTests : NeuronTestBase
 
 [CollectionDefinition("tg-routing-host", DisableParallelization = true)]
 public sealed class TgRoutingHostCollection;
+

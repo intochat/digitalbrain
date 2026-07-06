@@ -1,6 +1,7 @@
 using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
+using DigitalBrain.Kernel.SelfEvolution;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Kernel;
@@ -17,6 +18,13 @@ public static class DigitalBrainKernelExtensions
             // Centralized prototype journals (single source in PrototypeJournals).
             siloBuilder.ConfigurePrototypeJournals();
             siloBuilder.AddFoundry();
+            siloBuilder.ConfigureServices(services =>
+            {
+                services.AddSingleton<ISelfEvolutionApplyHandler, MarketplaceInstallApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
+            });
 
             // Built-in neurons discovered automatically.
         });
@@ -34,3 +42,7 @@ public static class DigitalBrainKernelExtensions
         return builder;
     }
 }
+
+
+
+

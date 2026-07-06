@@ -2,7 +2,7 @@ using DigitalBrain.Core;
 using DigitalBrain.TestKit;
 using Xunit;
 
-namespace DigitalBrain.UiKit.Tests;
+namespace DigitalBrain.Tests.Ui;
 
 // Closes a pre-existing gap: IFlutterUiNeuron had no direct test before this plan — it was
 // only exercised indirectly inside a Telegram test.
@@ -23,3 +23,4 @@ public class FlutterUiNeuronTests : NeuronTestBase
         Assert.Contains(incoming, s => s is UiSurface delivered && delivered.Kind == "test-kind");
     }
 }
+

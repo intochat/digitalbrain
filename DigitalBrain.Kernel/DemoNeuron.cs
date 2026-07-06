@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.UiKit;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
@@ -37,3 +36,4 @@ public class DemoNeuron(ILogger<DemoNeuron> logger, NeuronJournals journals) : N
 }
 
 // DemoMessageSynapse lives in DigitalBrain.Demo.Contracts for CLI/shared sample use.
+

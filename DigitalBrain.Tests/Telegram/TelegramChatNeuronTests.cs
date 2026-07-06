@@ -1,9 +1,9 @@
 using DigitalBrain.Core;
+using DigitalBrain.Telegram;
 using DigitalBrain.TestKit;
-using DigitalBrain.UiKit;
 using Xunit;
 
-namespace DigitalBrain.Telegram.Channel.Tests;
+namespace DigitalBrain.Tests.Telegram;
 
 public class TelegramChatNeuronTests : NeuronTestBase
 {
@@ -126,3 +126,5 @@ public class TelegramChatNeuronTests : NeuronTestBase
         Assert.Contains(flIncoming, s => s is UiSurface u && u.Props.TryGetValue("channelContext", out var cc) && (cc?.ToString()?.Contains("tg") ?? false));
     }
 }
+
+

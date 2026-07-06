@@ -1,7 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Ui;
-using DigitalBrain.UiKit;
 
 namespace DigitalBrain.Kernel.Ui;
 
@@ -35,4 +34,5 @@ public class ChatNeuron(ILogger<ChatNeuron> logger, NeuronJournals journals) : N
     public Task<RfwCard[]> GetConversationAsync()
         => Task.FromResult(OutgoingJournal.OfType<RfwCard>().ToArray());
 }
+
 

@@ -29,6 +29,22 @@ public class SelfEvolutionContractTests
         Assert.Equal(SelfEvolutionRisk.KernelRestart, proposal.Risk);
     }
 
+
+    [Fact]
+    public void Rollback_required_records_the_checkpoint_to_restore()
+    {
+        var rollback = new SelfEvolutionRollbackRequired(
+            ProposalId: "p-1",
+            ApplyVia: SelfEvolutionApplyVia.FoundryDeploy,
+            CheckpointId: "checkpoint-1",
+            Reason: "build failed");
+
+        Assert.Equal(nameof(SelfEvolutionRollbackRequired), rollback.Type);
+        Assert.Equal("p-1", rollback.ProposalId);
+        Assert.Equal("checkpoint-1", rollback.CheckpointId);
+        Assert.False(string.IsNullOrWhiteSpace(rollback.Reason));
+    }
+
     [Fact]
     public void Decision_records_who_consented_to_which_proposal()
     {
@@ -41,3 +57,5 @@ public class SelfEvolutionContractTests
         Assert.Equal(string.Empty, decision.Reason); // reason optional, never null
     }
 }
+
+

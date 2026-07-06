@@ -20,6 +20,7 @@ using Orleans.Journaling;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Economics;
 using DigitalBrain.Kernel.Salesforce;
+using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Salesforce;
 using DigitalBrain.ServiceDefaults;
 
@@ -191,7 +192,14 @@ if (useRemote)
 
 builder.UseOrleans(siloBuilder =>
 {
-    siloBuilder.ConfigureServices(services => services.AddScoped<NeuronJournals>());
+    siloBuilder.ConfigureServices(services =>
+    {
+        services.AddScoped<NeuronJournals>();
+        services.AddSingleton<ISelfEvolutionApplyHandler, MarketplaceInstallApplyHandler>();
+        services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
+        services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
+        services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
+    });
 
     if (!isAspireHosted)
     {
@@ -423,6 +431,9 @@ if (grainFactory != null)
                 var automation = grainFactory.GetGrain<IAutomationNeuron>("automation-main");
                 await automation.GetTimelineAsync();
 
+                // Trusted bootstrap seeds: these are built-in startup definitions, not user/MCP-authored
+                // mutations, so they intentionally use AutomationNeuron's low-level registration API.
+                // User-created executable automations are staged through SelfEvolutionProposal instead.
                 // High-quality seeds (priority 5): real C# bodies, useful behaviors, script sharing.
                 // 1. Auto-emit UiSurface on activation (immediate UI value)
                 await automation.DefineReactionAsync(
@@ -509,4 +520,10 @@ static string SalesforceCallbackPage(string title, string message)
 }
 
 public partial class Program;
+
+
+
+
+
+
 

@@ -8,12 +8,12 @@ namespace DigitalBrain.Kernel;
 /// </summary>
 public static class SystemRollingSurfaces
 {
-    public static UiSurface CreateDrain(int replica, string version, string checkpointId)
+    public static UiSurface CreateDrain(int replica, string version, string checkpointId, string emitter = "aspire-orchestrator")
     {
         var props = new Dictionary<string, object?>
         {
             [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingDrain}-{replica}",
-            [UiSurfaceKeys.Emitter] = "aspire-orchestrator", // will be stamped by caller
+            [UiSurfaceKeys.Emitter] = emitter,
             [UiSurfaceKeys.Title] = $"Drain Replica {replica}/3",
             [UiSurfaceKeys.Priority] = 70 + replica,
             [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
@@ -25,12 +25,12 @@ public static class SystemRollingSurfaces
         return new UiSurface(KernelUiSurfaceKinds.RollingDrain, props);
     }
 
-    public static UiSurface CreateVerify(int replica, string version, string phase, int lineageEvents)
+    public static UiSurface CreateVerify(int replica, string version, string phase, int lineageEvents, string emitter = "aspire-orchestrator")
     {
         var props = new Dictionary<string, object?>
         {
             [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingVerify}-{replica}",
-            [UiSurfaceKeys.Emitter] = "aspire-orchestrator",
+            [UiSurfaceKeys.Emitter] = emitter,
             [UiSurfaceKeys.Title] = $"Verify Replica {replica}/3",
             [UiSurfaceKeys.Priority] = 70 + replica,
             [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
@@ -42,12 +42,12 @@ public static class SystemRollingSurfaces
         return new UiSurface(KernelUiSurfaceKinds.RollingVerify, props);
     }
 
-    public static UiSurface CreateRollback(int replica, string version, string checkpointId)
+    public static UiSurface CreateRollback(int replica, string version, string checkpointId, string emitter = "aspire-orchestrator")
     {
         var props = new Dictionary<string, object?>
         {
             [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingRollback}-{replica}",
-            [UiSurfaceKeys.Emitter] = "aspire-orchestrator",
+            [UiSurfaceKeys.Emitter] = emitter,
             [UiSurfaceKeys.Title] = $"Rollback at Replica {replica}/3",
             [UiSurfaceKeys.Priority] = 90,
             [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
@@ -60,12 +60,12 @@ public static class SystemRollingSurfaces
         return new UiSurface(KernelUiSurfaceKinds.RollingRollback, props);
     }
 
-    public static UiSurface CreateComplete(string version, string checkpointId, int lineageEvents)
+    public static UiSurface CreateComplete(string version, string checkpointId, int lineageEvents, string emitter = "aspire-orchestrator")
     {
         var props = new Dictionary<string, object?>
         {
             [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingComplete}-{version}",
-            [UiSurfaceKeys.Emitter] = "aspire-orchestrator",
+            [UiSurfaceKeys.Emitter] = emitter,
             [UiSurfaceKeys.Title] = "Kernel Rolling Update",
             [UiSurfaceKeys.Priority] = 80,
             [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,

@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
 using System.Collections.Concurrent;
 using System.Globalization;
@@ -275,3 +274,4 @@ public static class DataChartBuilder
         private static bool IsNum(object? v) => v is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal || (v is string s && double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out _));
     }
 }
+

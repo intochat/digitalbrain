@@ -50,6 +50,16 @@ public record InstallFromMarketplace(
 public record NeuroPackInstalled(NeuroPack Pack) : Synapse(nameof(NeuroPackInstalled), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+public record MarketplaceInstallStaged(
+    string ProposalId,
+    string MarketplaceNeuronId,
+    NeuroPack Pack,
+    string BuyerId,
+    string? SessionId,
+    double CommissionAmount
+) : Synapse(nameof(MarketplaceInstallStaged), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
 public record PublishedList(IReadOnlyList<NeuroPack> Packs) : Synapse(nameof(PublishedList), DateTimeOffset.UtcNow);
 
 // Commission event - fired on successful install to support marketplace economics.
@@ -62,3 +72,4 @@ public record CommissionTaken(
     double CommissionRate,
     double CommissionAmount
 ) : Synapse(nameof(CommissionTaken), default);
+
