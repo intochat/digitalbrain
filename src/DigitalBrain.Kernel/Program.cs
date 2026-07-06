@@ -529,12 +529,3 @@ static string SalesforceCallbackPage(string title, string message)
         </html>
         """;
 }
-
-public partial class Program;
-
-
-
-
-
-
-

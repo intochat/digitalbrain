@@ -5,6 +5,7 @@ namespace DigitalBrain.Core;
 // A NeuroPack is the distributable unit: metadata + code + ownership + monetization info.
 // This enables private marketplace + commissions without keeping pack identity in Core.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.NeuroPack")]
 public record NeuroPack(
     [property: Id(0)] string Name,
     [property: Id(1)] string Version,

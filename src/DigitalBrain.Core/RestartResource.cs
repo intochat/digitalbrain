@@ -1,6 +1,7 @@
 namespace DigitalBrain.Core;
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.RestartResource")]
 public record RestartResource(
     string ResourceName,
     bool IsRollingUpdate = false,

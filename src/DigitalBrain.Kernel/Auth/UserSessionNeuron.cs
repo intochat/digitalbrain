@@ -8,7 +8,6 @@ namespace DigitalBrain.Kernel.Auth;
 using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Ui.Runtime;
 
-using DigitalBrain.Ui.Contracts;
 
 [GrainType("digitalbrain.user-session.v1")]
 public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IUserSessionNeuron

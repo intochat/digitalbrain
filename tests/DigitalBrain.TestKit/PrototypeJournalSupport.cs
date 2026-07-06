@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Journaling;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journaling - only for tests/prototype
@@ -16,7 +17,7 @@ public sealed class TestJournaledStateManager : IJournaledStateManager
 {
     public ValueTask InitializeAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
     public void RegisterState(string stateId, IJournaledState state) { }
-    public bool TryGetState(string stateId, out IJournaledState? state)
+    public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
     {
         state = null;
         return false;

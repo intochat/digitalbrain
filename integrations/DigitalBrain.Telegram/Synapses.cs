@@ -5,6 +5,7 @@ namespace DigitalBrain.Telegram;
 // They are NOT journaled through the kernel — they do NOT belong in JournalJsonContext.
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Telegram.TelegramMessageReceived")]
 public record TelegramMessageReceived(
     [property: Id(0)] long ChatId,
     [property: Id(1)] long FromUserId,
@@ -13,6 +14,7 @@ public record TelegramMessageReceived(
     : DigitalBrain.Core.Synapse(nameof(TelegramMessageReceived), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Telegram.TelegramReplyRequested")]
 public record TelegramReplyRequested(
     [property: Id(0)] long ChatId,
     [property: Id(1)] string Text,

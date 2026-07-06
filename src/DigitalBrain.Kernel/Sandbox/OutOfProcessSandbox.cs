@@ -17,7 +17,7 @@ public sealed class OutOfProcessSandbox : ISandboxedExecutor
     public async Task<SandboxResult> RunAsync(string source, CancellationToken ct = default)
     {
         var assemblyName = "sandbox_" + Guid.NewGuid().ToString("N");
-        var tree = CSharpSyntaxTree.ParseText(source);
+        var tree = CSharpSyntaxTree.ParseText(source, cancellationToken: ct);
         var compilation = CSharpCompilation.Create(
             assemblyName,
             [tree],
@@ -39,7 +39,7 @@ public sealed class OutOfProcessSandbox : ISandboxedExecutor
 
             EmitResult emit;
             using (var stream = new FileStream(dllPath, FileMode.Create))
-                emit = compilation.Emit(stream);
+                emit = compilation.Emit(stream, cancellationToken: ct);
 
             if (!emit.Success)
             {

@@ -1,14 +1,17 @@
 namespace DigitalBrain.Core;
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.FilterMarketplace")]
 public record FilterMarketplace(
     [property: Id(0)] string? Tier = null,
     [property: Id(1)] string? Channel = null
 ) : Synapse(nameof(FilterMarketplace), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.ListPublished")]
 public record ListPublished() : Synapse(nameof(ListPublished), DateTimeOffset.UtcNow);
 
+[Alias("DigitalBrain.Core.IMarketplaceNeuron")]
 public interface IMarketplaceNeuron : INeuron, IHandle<PublishToMarketplace>, IHandle<InstallFromMarketplace>, IHandle<ListPublished>, IHandle<FilterMarketplace>;
 
 // Remote client contract for the private marketplace service (new repo).
@@ -25,6 +28,7 @@ public interface IRemoteMarketplaceClient
 // Richer publish/install commands that carry full pack data for real marketplace behavior.
 // Old simple constructors still work via defaults for minimal compat during transition.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.PublishToMarketplace")]
 public record PublishToMarketplace(
     string PackName,
     string Version,
@@ -39,6 +43,7 @@ public record PublishToMarketplace(
 ) : Synapse(nameof(PublishToMarketplace), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.InstallFromMarketplace")]
 public record InstallFromMarketplace(
     string PackName,
     string Version,
@@ -47,9 +52,11 @@ public record InstallFromMarketplace(
 ) : Synapse(nameof(InstallFromMarketplace), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.NeuroPackInstalled")]
 public record NeuroPackInstalled(NeuroPack Pack) : Synapse(nameof(NeuroPackInstalled), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.MarketplaceInstallStaged")]
 public record MarketplaceInstallStaged(
     string ProposalId,
     string MarketplaceNeuronId,
@@ -60,10 +67,12 @@ public record MarketplaceInstallStaged(
 ) : Synapse(nameof(MarketplaceInstallStaged), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.PublishedList")]
 public record PublishedList(IReadOnlyList<NeuroPack> Packs) : Synapse(nameof(PublishedList), DateTimeOffset.UtcNow);
 
 // Commission event - fired on successful install to support marketplace economics.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.CommissionTaken")]
 public record CommissionTaken(
     string PackName,
     string Version,

@@ -3,6 +3,7 @@ namespace DigitalBrain.Core;
 // Fired after a dropped Excel/CSV file is parsed server-side (see DigitalBrain.Kernel.TabularData.TabularDataParser).
 // Headers/Rows/ColumnStats travel as JSON strings so this synapse stays a plain flat record for Orleans transport.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.TabularDataIngested")]
 public record TabularDataIngested(
     string FileName,
     string HeadersJson,

@@ -22,7 +22,7 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         if (IsTestMode()) return;
 
         _pollCts = new CancellationTokenSource();
-        _ = Task.Run(() => PollLoop(_pollCts.Token));
+        _ = Task.Run(() => PollLoop(_pollCts.Token), _pollCts.Token);
     }
 
     private static bool IsTestMode() =>
@@ -99,7 +99,7 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
     private async Task PollHealthAsync(CancellationToken ct)
     {
         if (_mcp == null) return;
-        var resources = await CallMcpAsync("list_resources", ct);
+        var resources = await CallMcpAsync("list_resources", ct: ct);
         if (resources.Contains("Failed", StringComparison.OrdinalIgnoreCase) || resources.Contains("Unhealthy", StringComparison.OrdinalIgnoreCase) || resources.Contains("Exited", StringComparison.OrdinalIgnoreCase))
         {
             await FireAsync(new SystemStatusChanged("aspire", "unhealthy", resources));
@@ -165,12 +165,12 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         {
             try
             {
-                var resources = await CallMcpAsync("list_resources", ct);
+                var resources = await CallMcpAsync("list_resources", ct: ct);
                 var logs = await CallMcpAsync("list_structured_logs", new { resourceName = bad.Component }, ct);
                 var traces = await CallMcpAsync("list_traces", new { resourceName = bad.Component }, ct);
 
                 var prompt = $"Analyze this DigitalBrain failure. Component: {bad.Component} Status: {bad.Status}. Resources: {resources}. Logs: {logs}. Traces: {traces}. Propose one minimal actionable fix (e.g. restart resource or config change).";
-                var response = await chat.GetResponseAsync(prompt);
+                var response = await chat.GetResponseAsync(prompt, cancellationToken: ct);
                 analysis = response.Text.Trim();
             }
             catch { /* fall through */ }
@@ -235,4 +235,3 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
             $"checkpoint replay: {checkpoint.Count} entries. before={before} after={after}. fix='{proposedFix}'. result={(differentAndHealthy ? "different+healthy" : "no improvement")}.");
     }
 }
-

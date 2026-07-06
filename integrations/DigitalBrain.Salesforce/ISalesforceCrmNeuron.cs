@@ -3,6 +3,7 @@ using DigitalBrain.Core.Sdk;
 
 namespace DigitalBrain.Salesforce;
 
+[Alias("DigitalBrain.Salesforce.ISalesforceCrmNeuron")]
 public interface ISalesforceCrmNeuron : IAgent
 {
     static string IAgent.AgentDisplayName => "Salesforce CRM";
@@ -19,8 +20,10 @@ public interface ISalesforceCrmNeuron : IAgent
         """;
 
     [Description("Run a read-only SOQL query and return JSON records.")]
+    [Alias("QueryAsync")]
     Task<string[]> QueryAsync(string soql, CancellationToken ct = default);
 
     [Description("List Salesforce Account records, up to maxResults.")]
+    [Alias("ListAccountsAsync")]
     Task<string[]> ListAccountsAsync(int maxResults = 20, CancellationToken ct = default);
 }

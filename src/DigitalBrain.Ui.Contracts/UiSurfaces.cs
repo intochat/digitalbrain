@@ -4,6 +4,7 @@ using DigitalBrain.Core;
 using System.Text.Json.Nodes;
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.UiSurface")]
 public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props) : Synapse(nameof(UiSurface), DateTimeOffset.UtcNow)
 {
     public const string RfwKind = "rfw";
@@ -101,6 +102,7 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
 /// Uses NeuronUiKit (neuron:*) and forui:* names (forui:FScaffold, forui:FAutocomplete, forui:FSidebar etc) + rfw escapes.
 /// Renderer maps to ForUI widgets and sends events back as synapses. Client is thin host.
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.UiWidgetTree")]
 public record UiWidgetTree(
     [property: Id(0)] string Type, // "app-shell", NeuronUiKit.Menu, "forui:FScaffold", "forui:FAutocomplete", "list", "rfw", ...
     [property: Id(1)] IReadOnlyDictionary<string, object?> Props,
@@ -199,6 +201,7 @@ public static class UiKitVocabulary
 }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.CanvasGraphSpec")]
 public record CanvasGraphSpec(
     [property: Id(0)] string Title,
     [property: Id(1)] IReadOnlyList<CanvasGraphNode> Nodes,
@@ -219,6 +222,7 @@ public record CanvasGraphSpec(
 }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.CanvasGraphNode")]
 public record CanvasGraphNode(
     [property: Id(0)] string Id,
     [property: Id(1)] string Label,
@@ -239,6 +243,7 @@ public record CanvasGraphNode(
 }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.CanvasGraphField")]
 public record CanvasGraphField(
     [property: Id(0)] string Name,
     [property: Id(1)] string? Type = null,
@@ -257,6 +262,7 @@ public record CanvasGraphField(
 }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.CanvasGraphEdge")]
 public record CanvasGraphEdge(
     [property: Id(0)] string Id,
     [property: Id(1)] string From,
@@ -277,6 +283,7 @@ public record CanvasGraphEdge(
 }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.CanvasGraphGroup")]
 public record CanvasGraphGroup(
     [property: Id(0)] string Id,
     [property: Id(1)] string Label,
@@ -291,6 +298,7 @@ public record CanvasGraphGroup(
 }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.ChartSpec")]
 public record ChartSpec(
     [property: Id(0)] string Title,
     [property: Id(1)] string ChartType,
@@ -321,6 +329,7 @@ public record ChartSpec(
 // Rich grammar-of-graphics spec for first-class interactive charts (maps directly to graphic package on client).
 // Variables, marks, and selections are expressed as simple serializable structures.
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.GraphicSpec")]
 public record GraphicSpec(
     [property: Id(0)] string Title,
     [property: Id(1)] IReadOnlyList<IReadOnlyDictionary<string, object?>> Data,
@@ -411,6 +420,7 @@ public static class UiSurfaceActions
 /// Auth button surface. GmailDigest etc. return this so the UI kit knows to show Google icon + wire OAuth.
 /// </summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.AuthButtonSurface")]
 public record AuthButtonSurface(
     string Provider,
     string Label,
@@ -428,6 +438,7 @@ public record AuthButtonSurface(
 /// Simple list surface for tasks / marketplace items etc.
 /// </summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.ListSurface")]
 public record ListSurface(
     string Title,
     IReadOnlyList<string> Items
@@ -440,6 +451,7 @@ public record ListSurface(
 /// Dedicated surface for lightweight automations observability (reactions + scripts + last exec info).
 /// Emitted by AutomationNeuron on register/remove/execute/query. Consumable by UI/HomeFeed.
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.AutomationSurface")]
 public record AutomationSurface(
     IReadOnlyList<ReactionView> Reactions,
     IReadOnlyList<ScriptView> Scripts,
@@ -452,6 +464,7 @@ public record AutomationSurface(
 });
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.ReactionView")]
 public record ReactionView(
     [property: Id(0)] string Id,
     [property: Id(1)] string When,
@@ -461,6 +474,7 @@ public record ReactionView(
 );
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.ScriptView")]
 public record ScriptView(
     [property: Id(0)] string Id,
     [property: Id(1)] string Description,
@@ -472,6 +486,7 @@ public record ScriptView(
 /// A future editor emits the same RegisterScript/RegisterReaction records; this is just observable surface.
 /// Rfw / Flutter can render from the nodes/edges.
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.AutomationGraphSurface")]
 public record AutomationGraphSurface(
     [property: Id(0)] string Title,
     [property: Id(1)] IReadOnlyList<AutomationGraphNode> Nodes,
@@ -486,6 +501,7 @@ public record AutomationGraphSurface(
 });
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.AutomationGraphNode")]
 public record AutomationGraphNode(
     [property: Id(0)] string Id,
     [property: Id(1)] string Kind, // "reaction" | "script"
@@ -494,6 +510,7 @@ public record AutomationGraphNode(
 );
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.AutomationGraphEdge")]
 public record AutomationGraphEdge(
     [property: Id(0)] string From,
     [property: Id(1)] string To,
@@ -505,6 +522,7 @@ public record AutomationGraphEdge(
 /// Columns and rows are string data for simple, self-explanatory rendering.
 /// </summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.TableSurface")]
 public record TableSurface(
     string Title,
     IReadOnlyList<string> Columns,
@@ -520,6 +538,7 @@ public record TableSurface(
 /// IDE / code edit surface for live INO modification + execute.
 /// </summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Ui.Contracts.IdeSurface")]
 public record IdeSurface(
     string Title,
     string InitialCode,

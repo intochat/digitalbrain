@@ -286,7 +286,7 @@ public sealed class XBitcoinTelegramDemoNeuron : IPackBehavior
     /// For developer workflow: publish a new kernel version (triggers self-update on install).
     /// Packaging a kernel "version" in dev is primarily the version bump + description; actual binary ships via Aspire/container.
     /// </summary>
-    public static PublishToMarketplace KernelPublishCommand(string version = null) =>
+    public static PublishToMarketplace KernelPublishCommand(string? version = null) =>
         new(
             PackName: "kernel",
             Version: version ?? "0.3.1-dev",
