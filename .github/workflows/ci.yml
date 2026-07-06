@@ -1,9 +1,15 @@
 name: ci
 
 on:
-  pull_request:
   push:
-    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-test:
@@ -27,6 +33,6 @@ jobs:
 
       - run: dotnet format whitespace Brain.slnx --verify-no-changes --no-restore --verbosity minimal
 
-      - run: dotnet build Brain.slnx --no-restore -p:SkipDeployBuild=true
+      - run: dotnet build Brain.slnx --no-restore
 
-      - run: dotnet test Brain.slnx --no-restore -p:SkipDeployBuild=true
+      - run: dotnet test Brain.slnx --no-restore
