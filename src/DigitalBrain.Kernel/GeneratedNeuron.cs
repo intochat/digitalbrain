@@ -10,8 +10,6 @@ using DigitalBrain.Pack.Contracts;
 using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Ui.Contracts.Ui;
 
-using DigitalBrain.Ui.Contracts;
-using DigitalBrain.Ui.Contracts.Ui;
 
 [GrainType("digitalbrain.generated")]
 public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IGeneratedNeuron, IHandle<NeuronTelemetry>

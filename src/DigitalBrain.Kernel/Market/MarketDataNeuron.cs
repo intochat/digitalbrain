@@ -2,8 +2,10 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel.Market;
 
+[Alias("DigitalBrain.Kernel.Market.IMarketDataNeuron")]
 public interface IMarketDataNeuron : INeuron, IHandle<Signal>
 {
+    [Alias("GetBitcoinPriceUsdAsync")]
     Task<string> GetBitcoinPriceUsdAsync();
 }
 

@@ -245,9 +245,12 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
     }
 }
 
+[Alias("DigitalBrain.Salesforce.Tests.ISalesforceConnectedAppConfigWriter")]
 public interface ISalesforceConnectedAppConfigWriter : INeuron
 {
+    [Alias("StoreConnectedAppConfigAsync")]
     Task StoreConnectedAppConfigAsync();
+    [Alias("ReadPackAsync")]
     Task<IReadOnlyDictionary<string, string>> ReadPackAsync(string scope, string pack);
 }
 
@@ -271,19 +274,4 @@ public sealed class SalesforceConnectedAppConfigWriter(
     public Task<IReadOnlyDictionary<string, string>> ReadPackAsync(string scope, string pack) =>
         ServiceProvider.GetRequiredService<IPackConfigStore>().GetAsync(scope, pack);
 
-    // Stubs for INeuron checkpoint/self-evolution APIs (not exercised by these config writer tests).
-    public ValueTask<Checkpoint> CreateCheckpointAsync() => throw new NotImplementedException();
-    public Task<NeuronId> BranchAsync(Checkpoint checkpoint) => throw new NotImplementedException();
-    public Task RestoreCheckpointAsync(Checkpoint checkpoint) => throw new NotImplementedException();
-    public Task<string> GetSiloIdentityAsync() => Task.FromResult("test-silo");
-
-    // Additional INeuron members (test double stubs).
-    public Task DeliverAsync(Synapse synapse) => Task.CompletedTask;
-    public Task<IReadOnlyList<Synapse>> GetIncomingTimelineAsync() => Task.FromResult<IReadOnlyList<Synapse>>(Array.Empty<Synapse>());
-    public Task<IReadOnlyList<Synapse>> GetOutgoingTimelineAsync() => Task.FromResult<IReadOnlyList<Synapse>>(Array.Empty<Synapse>());
-    public Task<IReadOnlyList<Synapse>> GetCausalLineageAsync(string correlationId) => Task.FromResult<IReadOnlyList<Synapse>>(Array.Empty<Synapse>());
-    public Task<IReadOnlyList<Synapse>> GetTimelineForCorrelationAsync(string correlationId) => Task.FromResult<IReadOnlyList<Synapse>>(Array.Empty<Synapse>());
-
-    public ValueTask FireAsync<T>(T payload) where T : Synapse => ValueTask.CompletedTask;
-    public Task<IReadOnlyList<Synapse>> GetTimelineAsync() => Task.FromResult<IReadOnlyList<Synapse>>(Array.Empty<Synapse>());
 }

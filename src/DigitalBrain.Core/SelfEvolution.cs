@@ -25,6 +25,7 @@ public enum SelfEvolutionRisk
 /// the proposed change until a matching <see cref="SelfEvolutionDecision"/> approves it.
 /// </summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionProposal")]
 public record SelfEvolutionProposal(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] string Scope,
@@ -50,10 +51,12 @@ public static class SelfEvolutionApplyVia
     public const string FoundryDeploy = "foundry.deploy";
 }
 
+[Alias("DigitalBrain.Core.ISelfEvolutionNeuron")]
 public interface ISelfEvolutionNeuron : INeuron, IHandle<SelfEvolutionProposal>, IHandle<SelfEvolutionDecision> { }
 
 /// <summary>A valid proposal entered the approval queue and is awaiting a decision.</summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionProposalPending")]
 public record SelfEvolutionProposalPending(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] string ApplyVia,
@@ -61,12 +64,14 @@ public record SelfEvolutionProposalPending(
 
 /// <summary>A malformed or duplicate proposal was recorded but not made approvable.</summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionProposalRejected")]
 public record SelfEvolutionProposalRejected(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] string Reason) : Synapse(nameof(SelfEvolutionProposalRejected), DateTimeOffset.UtcNow);
 
 /// <summary>A proposal expired before it could be approved.</summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionProposalExpired")]
 public record SelfEvolutionProposalExpired(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] DateTimeOffset? ExpiresAt) : Synapse(nameof(SelfEvolutionProposalExpired), DateTimeOffset.UtcNow);
@@ -77,6 +82,7 @@ public record SelfEvolutionProposalExpired(
 /// journal records who consented to the change.
 /// </summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionDecision")]
 public record SelfEvolutionDecision(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] bool Approved,
@@ -85,6 +91,7 @@ public record SelfEvolutionDecision(
 
 /// <summary>A decision passed validation and was recorded against a pending proposal.</summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionDecisionRecorded")]
 public record SelfEvolutionDecisionRecorded(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] bool Approved,
@@ -93,12 +100,14 @@ public record SelfEvolutionDecisionRecorded(
 
 /// <summary>A decision was ignored because it did not match an approvable pending proposal.</summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionDecisionRejected")]
 public record SelfEvolutionDecisionRejected(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] string Reason) : Synapse(nameof(SelfEvolutionDecisionRejected), DateTimeOffset.UtcNow);
 
 /// <summary>The journaled result returned by an allowlisted self-evolution apply handler.</summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionApplyResult")]
 public record SelfEvolutionApplyResult(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] string ApplyVia,
@@ -107,6 +116,7 @@ public record SelfEvolutionApplyResult(
     [property: Id(4)] string? RollbackCheckpointId = null) : Synapse(nameof(SelfEvolutionApplyResult), DateTimeOffset.UtcNow);
 /// <summary>An approved apply failed and a concrete checkpoint is available for rollback.</summary>
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.SelfEvolutionRollbackRequired")]
 public record SelfEvolutionRollbackRequired(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] string ApplyVia,

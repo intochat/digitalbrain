@@ -3,6 +3,7 @@ namespace DigitalBrain.Core;
 // An encrypted checkpoint: the (Orleans-serialized) synapse snapshot protected at rest.
 // Round-trips to/from a Checkpoint via CheckpointProtector.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.ProtectedCheckpoint")]
 public record ProtectedCheckpoint(
     [property: Id(0)] NeuronId Source,
     [property: Id(1)] byte[] EncryptedSnapshot,

@@ -3,6 +3,7 @@ using DigitalBrain.Core.Sdk;
 
 namespace DigitalBrain.Google;
 
+[Alias("DigitalBrain.Google.IGmailNeuron")]
 public interface IGmailNeuron : IAgent
 {
     static string IAgent.AgentDisplayName => "Gmail";
@@ -19,11 +20,14 @@ public interface IGmailNeuron : IAgent
         """;
 
     [Description("List messages matching a Gmail search query, up to maxResults.")]
+    [Alias("ListMessagesAsync")]
     Task<string[]> ListMessagesAsync(string query, int maxResults = 20, CancellationToken ct = default);
 
     [Description("Read a single message's body by its Gmail message id.")]
+    [Alias("ReadMessageAsync")]
     Task<string> ReadMessageAsync(string messageId, CancellationToken ct = default);
 
     [Description("Send an email. Mutates the user's mailbox.")]
+    [Alias("SendMessageAsync")]
     Task SendMessageAsync(string to, string subject, string body, CancellationToken ct = default);
 }

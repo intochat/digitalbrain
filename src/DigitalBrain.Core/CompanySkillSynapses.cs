@@ -5,6 +5,7 @@ namespace DigitalBrain.Core;
 // Minimal structured spec for a company process. Output of crystallization.
 // Used as input to skill pack synthesis. Narrow to refund-style processes first.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.ProcessSpec")]
 public sealed record ProcessSpec(
     string ProcessName,
     ImmutableArray<string> TriggerSynapseTypes,
@@ -15,17 +16,21 @@ public sealed record ProcessSpec(
     ImmutableArray<string> RequiredCapabilities);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.DecisionPoint")]
 public sealed record DecisionPoint(string Condition, string TruePath, string FalsePath);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.CrystallizeProcess")]
 public record CrystallizeProcess(string ProcessName, ImmutableArray<string> SourceQueries) : Synapse(nameof(CrystallizeProcess), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.ProcessSpecCrystallized")]
 public record ProcessSpecCrystallized(ProcessSpec Spec, ImmutableArray<string> EvidenceRefs) : Synapse(nameof(ProcessSpecCrystallized), DateTimeOffset.UtcNow);
 
 // Canonical typed contracts for the first company skill vertical (RefundHandling).
 // These are part of the living map: the skill emits them; journals capture with full causation.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.RefundRequested")]
 public sealed record RefundRequested(
     string RequestId,
     decimal Amount,
@@ -34,18 +39,23 @@ public sealed record RefundRequested(
     int DaysSincePurchase = 0) : Synapse(nameof(RefundRequested), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.RefundApproved")]
 public sealed record RefundApproved(string RequestId, decimal ApprovedAmount, string ReasonCode)
     : Synapse(nameof(RefundApproved), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.RefundDenied")]
 public sealed record RefundDenied(string RequestId, string DenialReason)
     : Synapse(nameof(RefundDenied), DateTimeOffset.UtcNow);
 
 // Orchestration commands for automated company skill creation (ingest -> crystallize -> synthesize -> verify -> install).
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.CreateCompanySkill")]
 public record CreateCompanySkill(string ProcessName) : Synapse(nameof(CreateCompanySkill), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.CompanySkillCreationResult")]
 public record CompanySkillCreationResult(string ProcessName, string Version, bool Success, string Details) : Synapse(nameof(CompanySkillCreationResult), DateTimeOffset.UtcNow);
 
+[Alias("DigitalBrain.Core.ICompanySkillOrchestratorNeuron")]
 public interface ICompanySkillOrchestratorNeuron : INeuron, IHandle<CreateCompanySkill> { }

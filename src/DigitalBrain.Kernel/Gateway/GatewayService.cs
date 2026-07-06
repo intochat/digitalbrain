@@ -15,7 +15,6 @@ namespace DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Ui.Runtime;
 
-using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Ui.Contracts.Ui;
 
 public sealed class GatewayService(

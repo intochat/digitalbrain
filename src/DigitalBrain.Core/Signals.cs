@@ -43,10 +43,12 @@ public static class ContextSignals
 }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.Signal")]
 public record Signal(string Name, IReadOnlyDictionary<string, object?> Props)
     : Synapse(Name, DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.AskLlm")]
 public record AskLlm(
     [property: Id(0)] string Prompt,
     [property: Id(1)] string ReplyType,
@@ -58,6 +60,7 @@ public record AskLlm(
     [property: Id(4)] string? ConfigScope = null)
     : Synapse(nameof(AskLlm), DateTimeOffset.UtcNow);
 
+[Alias("DigitalBrain.Core.ILlmResponderNeuron")]
 public interface ILlmResponderNeuron : INeuron, IHandle<AskLlm>
 {
     // Well-known singleton key. Broadcasts only reach already-activated grains, so production activates
@@ -69,7 +72,9 @@ public interface ILlmResponderNeuron : INeuron, IHandle<AskLlm>
 // Contract only (implementation is DigitalBrain.Kernel.Gateway.IngressNeuron). Lives in Core, like every
 // other neuron interface Mcp.Tools depends on, so MCP tools can resolve it without a ProjectReference to
 // Kernel (Kernel already references Mcp.Tools, so the reverse edge would be circular).
+[Alias("DigitalBrain.Core.IIngressNeuron")]
 public interface IIngressNeuron : INeuron
 {
+    [Alias("IngestAsync")]
     Task IngestAsync(string signalName, IReadOnlyDictionary<string, object?> props);
 }

@@ -7,11 +7,13 @@ public enum BundleTier { Substrate, Channel, Content }
 public enum BundleChannel { InApp, Telegram, Web }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.Distribution.ExperienceRef")]
 public record ExperienceRef(
     [property: Id(0)] string ExperienceId,
     [property: Id(1)] string EntryEvent = "start");
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.Distribution.BundleDependency")]
 public record BundleDependency(
     [property: Id(0)] string PackName,
     [property: Id(1)] string MinVersion);
@@ -20,6 +22,7 @@ public record BundleDependency(
 // materialization facets by tier/channel without forcing the primitive Core assembly to know packs.
 // PackManifest stays separate: it carries dispatch (HandledSynapseTypes) and config requirements.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.Distribution.BundleManifest")]
 public record BundleManifest(
     [property: Id(0)] BundleTier Tier,
     [property: Id(1)] ExperienceRef? EntryExperience,

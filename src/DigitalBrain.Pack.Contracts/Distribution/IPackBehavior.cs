@@ -5,6 +5,7 @@ namespace DigitalBrain.Core.Distribution;
 public enum PackConfigFieldKind { Text, Secret, Choice }
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.Distribution.PackConfigField")]
 public record PackConfigField(
     [property: Id(0)] string Key,
     [property: Id(1)] string Label,
@@ -18,6 +19,7 @@ public record PackConfigField(
 // CapabilityGate and dispatched to by the host GeneratedNeuron. This is the typed-C# replacement for the old
 // LLM "personality" stub - the pack IS C#, never .ino. A pack assembly references only stable protocol packages.
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.Distribution.PackManifest")]
 public record PackManifest(
     [property: Id(0)] IReadOnlyList<SynapseType> HandledSynapseTypes,
     [property: Id(1)] IReadOnlyList<PackConfigField>? RequiredConfig = null);
@@ -47,5 +49,6 @@ public interface IPackBehavior
 // Fired by the host when an embodied pack's REAL compiled code produces output. Its presence on the timeline
 // is the proof that install -> compile -> ALC load -> dispatch actually ran the pack (vs. the LLM fallback).
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.Distribution.PackEmission")]
 public record PackEmission(string Pack, string Input, string Output)
     : Synapse(nameof(PackEmission), DateTimeOffset.UtcNow);

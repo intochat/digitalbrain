@@ -6,6 +6,7 @@ namespace DigitalBrain.Core.Sdk;
 // NeuronAgentMetadata.ReadFrom<TContract>() with no reflection at the call site.
 // Pattern harvested from IAW (E:\DigitalBrainTech\IAW Core/Contracts/IAgent.cs), slimmed to drop the
 // LLM-chat/scheduling surface — infra neurons are request/response, not conversational.
+[Alias("DigitalBrain.Core.Sdk.IAgent")]
 public interface IAgent : INeuron
 {
     static virtual string AgentDisplayName => "";

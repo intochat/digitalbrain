@@ -74,6 +74,3 @@ app.MapPost("/webhook", async (
 });
 
 await app.RunAsync();
-
-// Exposed so WebApplicationFactory<Program> can host the transport in-process for the contract tests.
-public partial class Program;

@@ -47,5 +47,10 @@ public sealed class QdrantVectorStore(QdrantClient client) : IVectorStore
     }
 
     // Stable point id from the record's string id (so re-ingesting the same chunk updates, not duplicates).
-    private static Guid DeterministicGuid(string id) => new(MD5.HashData(Encoding.UTF8.GetBytes(id)));
+    private static Guid DeterministicGuid(string id)
+    {
+        Span<byte> guidBytes = stackalloc byte[16];
+        SHA256.HashData(Encoding.UTF8.GetBytes(id)).AsSpan(0, guidBytes.Length).CopyTo(guidBytes);
+        return new Guid(guidBytes);
+    }
 }
