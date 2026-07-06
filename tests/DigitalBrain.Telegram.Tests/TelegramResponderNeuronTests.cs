@@ -23,8 +23,8 @@ public class TelegramResponderNeuronTests
         Assert.NotNull(manifest.RequiredConfig);
         Assert.Equal(3, manifest.RequiredConfig!.Count);
         Assert.Contains(manifest.RequiredConfig, f => f.Key == "telegram_token" && f.Kind == PackConfigFieldKind.Secret);
-        Assert.Contains(manifest.RequiredConfig, f => f.Key == "llm_provider"   && f.Kind == PackConfigFieldKind.Choice);
-        Assert.Contains(manifest.RequiredConfig, f => f.Key == "llm_key"        && f.DependsOnKey == "llm_provider" && f.DependsOnValue == "openai");
+        Assert.Contains(manifest.RequiredConfig, f => f.Key == "llm_provider" && f.Kind == PackConfigFieldKind.Choice);
+        Assert.Contains(manifest.RequiredConfig, f => f.Key == "llm_key" && f.DependsOnKey == "llm_provider" && f.DependsOnValue == "openai");
     }
 
     [Fact]
@@ -37,9 +37,9 @@ public class TelegramResponderNeuronTests
         var results = neuron.Handle(signal);
 
         var ask = Assert.IsType<AskLlm>(Assert.Single(results));
-        Assert.Equal("hi",                      ask.Prompt);
-        Assert.Equal("TelegramReplyRequested",  ask.ReplyType);
-        Assert.Equal(7L,                        ask.ReplyProps["chatId"]);
+        Assert.Equal("hi", ask.Prompt);
+        Assert.Equal("TelegramReplyRequested", ask.ReplyType);
+        Assert.Equal(7L, ask.ReplyProps["chatId"]);
     }
 
     [Fact]

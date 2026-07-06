@@ -30,8 +30,8 @@ public sealed class TelegramResponderNeuron : IPackBehavior
         if (synapse is not Signal s || s.Name != TelegramSignals.MessageReceived)
             return Array.Empty<Synapse>();
 
-        var text    = s.Props.TryGetValue("text",   out var t) ? t?.ToString() ?? "" : "";
-        var chatId  = s.Props.TryGetValue("chatId", out var c) ? c : null;
+        var text = s.Props.TryGetValue("text", out var t) ? t?.ToString() ?? "" : "";
+        var chatId = s.Props.TryGetValue("chatId", out var c) ? c : null;
 
         return new Synapse[]
         {

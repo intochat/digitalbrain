@@ -34,7 +34,7 @@ public sealed class CompanySkillOrchestratorNeuron(ILogger<CompanySkillOrchestra
         var context = GrainFactory.GetGrain<IContextNeuron>("context-main");
         var fragments = await context.RecallAsync($"how to handle {processName} process decisions", top: 6);
 
-        var crystallizer = ServiceProvider.GetService<ProcessCrystallizer>() 
+        var crystallizer = ServiceProvider.GetService<ProcessCrystallizer>()
             ?? new ProcessCrystallizer(ServiceProvider.GetService<IChatClient>());
         var crystallized = await crystallizer.CrystallizeAsync(processName, fragments);
 

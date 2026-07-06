@@ -67,13 +67,13 @@ public static class SalesforceClientFactory
         var tokenEndpoint = TokenEndpoint(loginUrl);
 
         var token = await RequestTokenAsync(tokenEndpoint, new Dictionary<string, string>
-            {
-                ["grant_type"] = "password",
-                ["client_id"] = clientId,
-                ["client_secret"] = clientSecret,
-                ["username"] = username,
-                ["password"] = passwordWithToken
-            })
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = clientId,
+            ["client_secret"] = clientSecret,
+            ["username"] = username,
+            ["password"] = passwordWithToken
+        })
             .ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.InstanceUrl))
         {
@@ -145,13 +145,13 @@ public static class SalesforceClientFactory
             : redirectUri;
 
         var form = new Dictionary<string, string>
-            {
-                ["grant_type"] = "authorization_code",
-                ["code"] = code,
-                ["client_id"] = clientId,
-                ["client_secret"] = clientSecret,
-                ["redirect_uri"] = effectiveRedirectUri
-            };
+        {
+            ["grant_type"] = "authorization_code",
+            ["code"] = code,
+            ["client_id"] = clientId,
+            ["client_secret"] = clientSecret,
+            ["redirect_uri"] = effectiveRedirectUri
+        };
         if (values.TryGetValue(OAuthCodeVerifierKey, out var codeVerifier) &&
             !string.IsNullOrWhiteSpace(codeVerifier))
         {
@@ -269,12 +269,12 @@ public static class SalesforceClientFactory
             var clientSecret = Required(values, ClientSecretKey);
             var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
             var token = await RequestTokenAsync(TokenEndpoint(loginUrl), new Dictionary<string, string>
-                {
-                    ["grant_type"] = "refresh_token",
-                    ["refresh_token"] = Required(values, RefreshTokenKey),
-                    ["client_id"] = clientId,
-                    ["client_secret"] = clientSecret
-                })
+            {
+                ["grant_type"] = "refresh_token",
+                ["refresh_token"] = Required(values, RefreshTokenKey),
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret
+            })
                 .ConfigureAwait(false);
 
             var instanceUrl = string.IsNullOrWhiteSpace(token.InstanceUrl)
