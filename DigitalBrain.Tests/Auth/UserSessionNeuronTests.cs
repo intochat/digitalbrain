@@ -76,8 +76,9 @@ public sealed class UserSessionNeuronTests : NeuronTestBase
         AssertSynapseAction(surface.Props["submitAction"], nameof(LoginRequest));
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
-        Assert.Equal(NeuronUiKit.Form, tree.Type);
-        Assert.Equal(nameof(LoginRequest), tree.Props[UiSurfaceKeys.SynapseType]);
+        var form = Assert.Single(FindNodes(tree), node => node.Type == NeuronUiKit.Form);
+        Assert.Equal(nameof(LoginRequest), form.Props[UiSurfaceKeys.SynapseType]);
+        Assert.Equal("test-client", form.Props["clientId"]);
     }
 
     // Proves the actual bug this task's plan fixes: after a real login, the signed-in shell surface
@@ -132,5 +133,18 @@ public sealed class UserSessionNeuronTests : NeuronTestBase
         var action = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(value);
         Assert.Equal(expectedSynapseType, action[UiSurfaceKeys.SynapseType]);
         Assert.True(action.ContainsKey(UiSurfaceKeys.Props));
+    }
+
+    private static IEnumerable<UiWidgetTree> FindNodes(UiWidgetTree tree)
+    {
+        yield return tree;
+
+        foreach (var child in tree.Children ?? [])
+        {
+            foreach (var found in FindNodes(child))
+            {
+                yield return found;
+            }
+        }
     }
 }

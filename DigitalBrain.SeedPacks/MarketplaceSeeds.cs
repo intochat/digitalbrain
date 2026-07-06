@@ -255,7 +255,8 @@ public sealed class XBitcoinTelegramDemoNeuron : IPackBehavior
             false,
             0.05,
             TelegramResponderPackCode,
-            "Telegram bot responder: receives TelegramMessageReceived signals, emits AskLlm to the LLM layer, configurable for Ollama or OpenAI. Install via marketplace, supply token and LLM config."),
+            "Telegram bot responder: receives TelegramMessageReceived signals, emits AskLlm to the LLM layer, configurable for Ollama or OpenAI. Install via marketplace, supply token and LLM config.",
+            Manifest: new(BundleTier.Channel, null, new[] { BundleChannel.Telegram })),
 
         new NeuroPack(
             "DigitalBrain.Experience.PersonalAssistant",
@@ -279,7 +280,8 @@ public sealed class XBitcoinTelegramDemoNeuron : IPackBehavior
             false,
             0.0,
             KeywordWatcherPackCode,
-            "Keyword watcher: listens for TelegramMessageReceived, emits ReminderScheduled when the text starts with 'remind me'."),
+            "Keyword watcher: listens for TelegramMessageReceived, emits ReminderScheduled when the text starts with 'remind me'.",
+            Manifest: new(BundleTier.Channel, null, new[] { BundleChannel.Telegram })),
 
         new NeuroPack(
             "DigitalBrain.Experience.XBitcoinTelegramDemo",
