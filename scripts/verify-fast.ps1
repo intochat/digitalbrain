@@ -41,7 +41,7 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $AppHost = 'DigitalBrain.AppHost\DigitalBrain.AppHost.csproj'
 $KernelFilter = @(
     'FullyQualifiedName~HomeFeedBusTests',
-    'FullyQualifiedName~HomeFeedCrossSiloTests',
+    'FullyQualifiedName~HomeFeedCrossSiloTests',  # cross-silo is Orleans technical (test name kept per proposal)
     'FullyQualifiedName~GatewayServiceTests',
     'FullyQualifiedName~UserSessionNeuronTests',
     'FullyQualifiedName~UserSessionNeuronClientIdTests',
