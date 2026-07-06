@@ -1,3 +1,4 @@
+using Aspire.Hosting;
 using DigitalBrain.Aspire;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -41,10 +42,15 @@ var flutter = ctx.AddDefaultDevFlutterClient(kernel)
 
 if (ctx.EnableMcp)
 {
-    // Expose DigitalBrain MCP (stdio tools) as resource so aspire mcp call can discover registered tools: run_closed_loop, ask_ino, publish_to_marketplace, list_marketplace, etc.
-    var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp")
+#pragma warning disable ASPIREMCP001
+    // Dedicated single-replica HTTP MCP resource; avoids stateful MCP sessions going through the replicated kernel proxy.
+    builder.AddProject<Projects.DigitalBrain_Mcp>("mcp")
         .WithReference(ctx.OrleansClient)
-        .WithReference(ctx.Llm);
+        .WithReference(ctx.Llm)
+        .WithEnvironment("DIGITALBRAIN_MCP_TRANSPORT", "http")
+        .WithEndpoint(name: "http", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
+        .WithMcpServer(endpointName: "http");
+#pragma warning restore ASPIREMCP001
 }
 
 if (IsEnabled("DIGITALBRAIN_ENABLE_TELEGRAM"))

@@ -111,7 +111,7 @@ builder.Services.AddSingleton<SqliteSchemaInspector>();
 builder.Services.AddHttpClient<DigitalBrain.Kernel.Market.IMarketDataApiClient, DigitalBrain.Kernel.Market.CoinGeckoApiClient>();
 
 // Co-host the MCP tool surface in-process. Only read-only tools are exposed over HTTP (remotely reachable);
-// mutation tools are stdio-only (local/trusted) pending a remote auth decision.
+// mutation tools are handled by the dedicated MCP host.
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()

@@ -52,9 +52,15 @@ public static class FlutterAspireExtensions
         if (!string.IsNullOrWhiteSpace(flutterPathEnv) && Directory.Exists(flutterPathEnv))
             return Path.GetFullPath(flutterPathEnv);
 
-        var canonicalPath = Path.GetFullPath(Path.Combine(appHostDirectory, "..", "app"));
-        return Directory.Exists(canonicalPath) && File.Exists(Path.Combine(canonicalPath, "pubspec.yaml"))
-            ? canonicalPath
-            : null;
+        var candidatePaths = new[]
+        {
+            // Current repo layout: /hosts/DigitalBrain.AppHost -> /app.
+            Path.GetFullPath(Path.Combine(appHostDirectory, "..", "..", "app")),
+            // Backward-compatible fallback for older layouts where /app sat beside the AppHost parent.
+            Path.GetFullPath(Path.Combine(appHostDirectory, "..", "app"))
+        };
+
+        return candidatePaths.FirstOrDefault(path =>
+            Directory.Exists(path) && File.Exists(Path.Combine(path, "pubspec.yaml")));
     }
 }

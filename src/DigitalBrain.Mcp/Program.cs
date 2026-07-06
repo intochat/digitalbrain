@@ -1,45 +1,81 @@
-// DigitalBrain.Mcp - standalone stdio MCP server for DigitalBrain.
+// DigitalBrain.Mcp - standalone MCP server for DigitalBrain.
 // An Orleans CLIENT that exposes cluster interactions as MCP tools (DigitalBrain.Mcp.Tools).
-// Requires the kernel cluster (storage + Ollama) to be running — the tools operate on real grains, so there is
-// no degraded no-cluster mode (fail-fast). For an in-process, remote-reachable variant the kernel co-hosts the same
-// tools over HTTP (see DigitalBrain.Kernel/Program.cs).
+// Requires the kernel cluster (storage + Ollama) to be running - the tools operate on real grains, so there is
+// no degraded no-cluster mode (fail-fast). Default transport is stdio for trusted local clients; Aspire sets
+// DIGITALBRAIN_MCP_TRANSPORT=http so `aspire mcp` can discover and call the same tools over HTTP.
 
 using DigitalBrain.Mcp;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.Logging.AddConsole(consoleLogOptions =>
+if (UseHttpTransport())
 {
-    consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
-});
+    var builder = WebApplication.CreateBuilder(args);
+    ConfigureOrleansClient(builder);
 
-// Orleans client clustering: Aspire injects the provider type. Azure Table in cloud, Redis locally.
-var clusteringProvider = Environment.GetEnvironmentVariable("Orleans__Clustering__ProviderType");
-if (string.Equals(clusteringProvider, "AzureTableStorage", StringComparison.OrdinalIgnoreCase))
-{
-    var clusteringServiceKey = Environment.GetEnvironmentVariable("Orleans__Clustering__ServiceKey") ?? "clustering";
-    builder.AddKeyedAzureTableServiceClient(clusteringServiceKey);
+    builder.Services
+        .AddMcpServer()
+        .WithHttpTransport()
+        .WithTools<DigitalBrainReadTools>()
+        .WithTools<DigitalBrainMutationTools>();
+    AddToolServices(builder.Services);
+
+    var app = builder.Build();
+    app.MapMcp("/mcp");
+    app.MapGet("/health", () => Results.Ok("DigitalBrain MCP server ready."));
+    await app.RunAsync();
 }
 else
 {
-    builder.AddKeyedRedisClient("redis");
+    var builder = Host.CreateApplicationBuilder(args);
+
+    builder.Logging.AddConsole(consoleLogOptions =>
+    {
+        consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
+    });
+
+    ConfigureOrleansClient(builder);
+
+    builder.Services
+        .AddMcpServer()
+        .WithStdioServerTransport()
+        .WithTools<DigitalBrainReadTools>()
+        .WithTools<DigitalBrainMutationTools>();
+    AddToolServices(builder.Services);
+
+    var app = builder.Build();
+
+    await app.StartAsync();
+    Console.Error.WriteLine("DigitalBrain MCP server (stdio) started. Ready for tools. Connect via .mcp.json");
+    await app.WaitForShutdownAsync();
 }
 
-builder.UseOrleansClient();
+static bool UseHttpTransport() =>
+    string.Equals(
+        Environment.GetEnvironmentVariable("DIGITALBRAIN_MCP_TRANSPORT"),
+        "http",
+        StringComparison.OrdinalIgnoreCase);
 
-builder.Services
-    .AddMcpServer()
-    .WithStdioServerTransport()
-    .WithTools<DigitalBrainReadTools>()
-    .WithTools<DigitalBrainMutationTools>();
-builder.Services.AddSingleton<DigitalBrainReadTools>();
-builder.Services.AddSingleton<DigitalBrainMutationTools>();
+static void ConfigureOrleansClient(IHostApplicationBuilder builder)
+{
+    // Orleans client clustering: Aspire injects the provider type. Azure Table in cloud, Redis locally.
+    var clusteringProvider = Environment.GetEnvironmentVariable("Orleans__Clustering__ProviderType");
+    if (string.Equals(clusteringProvider, "AzureTableStorage", StringComparison.OrdinalIgnoreCase))
+    {
+        var clusteringServiceKey = Environment.GetEnvironmentVariable("Orleans__Clustering__ServiceKey") ?? "clustering";
+        builder.AddKeyedAzureTableServiceClient(clusteringServiceKey);
+    }
+    else
+    {
+        builder.AddKeyedRedisClient("redis");
+    }
 
-var app = builder.Build();
+    builder.UseOrleansClient();
+}
 
-await app.StartAsync();
-Console.Error.WriteLine("DigitalBrain MCP server (stdio) started. Ready for tools. Connect via .mcp.json");
-await app.WaitForShutdownAsync();
+static void AddToolServices(IServiceCollection services)
+{
+    services.AddSingleton<DigitalBrainReadTools>();
+    services.AddSingleton<DigitalBrainMutationTools>();
+}
