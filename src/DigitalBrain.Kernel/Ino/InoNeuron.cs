@@ -607,10 +607,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         try
         {
-            var values = await store.GetAsync("default", "google");
-            return HasValue(values, "client_id") &&
-                   HasValue(values, "client_secret") &&
-                   HasValue(values, "refresh_token");
+            var values = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName);
+            return HasValue(values, GoogleClientFactory.ClientIdKey) &&
+                   HasValue(values, GoogleClientFactory.ClientSecretKey) &&
+                   HasValue(values, GoogleClientFactory.RefreshTokenKey);
         }
         catch (Exception ex)
         {

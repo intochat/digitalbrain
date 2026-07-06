@@ -1,7 +1,5 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Core.Ui;
-using DigitalBrain.Core.UiKit;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;

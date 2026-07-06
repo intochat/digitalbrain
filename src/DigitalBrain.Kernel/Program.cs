@@ -26,6 +26,7 @@ using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Ino;
+using DigitalBrain.Google;
 using DigitalBrain.ServiceDefaults;
 
 // Kernel host for DigitalBrain (Aspire + Orleans).
@@ -171,13 +172,13 @@ if (isAspireHosted)
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
 builder.Services.AddHostedService<SalesforceAppConfigSeeder>();
+builder.Services.AddHostedService<DigitalBrain.Kernel.Google.GoogleAppConfigSeeder>();
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
 
-// Google Gmail API client: one UserCredential per grain activation, built from the "google"/"default" pack
-// config scope (client_id/client_secret/refresh_token), mirroring LlmResponderNeuron's per-scope
-// IPackConfigStore resolution. Scoped (not singleton) because Orleans creates one DI scope per grain
-// activation (same pattern as LlmResponderNeuron).
+// Google Gmail API client: one UserCredential per grain activation, built from the pack config
+// (scope "default", pack "google" with client_id/client_secret/refresh_token). Scoped because Orleans
+// creates a DI scope per grain activation. Uses GoogleClientFactory constants for keys.
 builder.Services.AddGoogleGmailClient();
 // Salesforce CRM REST API client: built lazily per call from the shared app-level connected-app config
 // ("default" scope) merged with the calling grain's own per-user token scope ("user:{userId}"). Singleton
@@ -398,6 +399,27 @@ app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
         statusCode: result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
 });
 
+app.MapGet(GoogleClientFactory.DefaultCallbackPath, async (
+    HttpRequest request,
+    IGrainFactory grains) =>
+{
+    var state = request.Query["state"].FirstOrDefault();
+    var callback = new GoogleOAuthCallback(
+        Code: request.Query["code"].FirstOrDefault(),
+        State: state,
+        Error: request.Query["error"].FirstOrDefault(),
+        ErrorDescription: request.Query["error_description"].FirstOrDefault(),
+        FallbackRedirectUri: GoogleCallbackUri(request));
+
+    var auth = grains.GetGrain<IGoogleAuthNeuron>(GoogleOAuthUserIdFromState(state));
+    var result = await auth.CompleteOAuthAsync(callback);
+
+    return Results.Content(
+        GoogleCallbackPage(result.Title, result.Message),
+        "text/html",
+        statusCode: result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+});
+
 app.MapDigitalBrainOtlpProxy();
 
 if (!isAspireHosted)
@@ -510,6 +532,43 @@ static string SalesforceOAuthUserIdFromState(string? state)
 }
 
 static string SalesforceCallbackPage(string title, string message)
+{
+    var safeTitle = System.Net.WebUtility.HtmlEncode(title);
+    var safeMessage = System.Net.WebUtility.HtmlEncode(message);
+    return $$"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <title>{{safeTitle}}</title>
+          <style>
+            body { font-family: system-ui, sans-serif; margin: 3rem; line-height: 1.5; }
+            main { max-width: 42rem; }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>{{safeTitle}}</h1>
+            <p>{{safeMessage}}</p>
+          </main>
+        </body>
+        </html>
+        """;
+}
+
+static string GoogleCallbackUri(HttpRequest request) =>
+    new UriBuilder(request.Scheme, request.Host.Host, request.Host.Port ?? -1, GoogleClientFactory.DefaultCallbackPath)
+        .Uri
+        .ToString();
+
+static string GoogleOAuthUserIdFromState(string? state)
+{
+    if (string.IsNullOrWhiteSpace(state)) return "google-auth-unknown";
+    var separatorIndex = state.LastIndexOf(':');
+    return separatorIndex > 0 ? state[..separatorIndex] : "google-auth-unknown";
+}
+
+static string GoogleCallbackPage(string title, string message)
 {
     var safeTitle = System.Net.WebUtility.HtmlEncode(title);
     var safeMessage = System.Net.WebUtility.HtmlEncode(message);
