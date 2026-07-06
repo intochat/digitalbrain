@@ -3,7 +3,7 @@ name: ci
 on:
   pull_request:
   push:
-    branches-ignore: [master]
+    branches: [master]
 
 jobs:
   build-test:
@@ -27,4 +27,6 @@ jobs:
 
       - run: dotnet format whitespace Brain.slnx --verify-no-changes --no-restore --verbosity minimal
 
-      - run: dotnet test Brain.slnx --no-restore
+      - run: dotnet build Brain.slnx --no-restore -p:SkipDeployBuild=true
+
+      - run: dotnet test Brain.slnx --no-restore -p:SkipDeployBuild=true
