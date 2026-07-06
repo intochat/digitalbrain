@@ -53,6 +53,78 @@ public interface IChannelNeuron : INeuron
 {
 }
 
+// IUser contract lives in Core so kernel can run standalone for security/air-gapped scenarios.
+// Full user accounts, auth, billing live in the private marketplace service.
+[GenerateSerializer]
+public readonly record struct UserId([property: Id(0)] string Value)
+{
+    public static UserId Anonymous => new("anonymous");
+}
+
+[GenerateSerializer]
+public record LoginRequest(
+    string Username,
+    string Password,
+    string ClientId = "flutter") : Synapse(nameof(LoginRequest), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LoginSucceeded(
+    UserId UserId,
+    string SessionId,
+    string DisplayName,
+    IReadOnlyList<string> Roles,
+    string ClientId) : Synapse(nameof(LoginSucceeded), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LoginFailed(
+    string Username,
+    string Reason,
+    string ClientId) : Synapse(nameof(LoginFailed), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LogoutRequest(
+    string SessionId,
+    string ClientId = "flutter") : Synapse(nameof(LogoutRequest), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record UserSessionCreated(
+    UserId UserId,
+    string SessionId,
+    DateTimeOffset ExpiresAt,
+    string ClientId) : Synapse(nameof(UserSessionCreated), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record UserSessionEnded(
+    string SessionId,
+    string ClientId) : Synapse(nameof(UserSessionEnded), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LocalUserRegistered(
+    UserId UserId,
+    string Username,
+    string DisplayName,
+    string PasswordHashBase64,
+    string PasswordSaltBase64,
+    IReadOnlyList<string> Roles) : Synapse(nameof(LocalUserRegistered), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record UserSessionState(
+    UserId UserId,
+    string SessionId,
+    string DisplayName,
+    IReadOnlyList<string> Roles,
+    DateTimeOffset ExpiresAt,
+    bool Active);
+
+public interface IUserGrain : IGrainWithStringKey
+{
+    Task<UserProfile> GetProfileAsync();
+    Task<bool> HasEntitlementAsync(string bundleOrResource, string actionOrCapability);
+}
+
+[GenerateSerializer]
+public record UserProfile(UserId Id, string DisplayName, IReadOnlyList<string> Roles);
+
 public interface IMetaOptimizerNeuron : INeuron, IHandle<NeuronTelemetry>, IHandle<WiringOptimizationProposed> { }
 
 public interface IGeneratedNeuron : INeuron { }

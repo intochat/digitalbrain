@@ -13,6 +13,22 @@
 - Baseline: `dotnet test Brain.slnx -c Release` = **456 passed, 6 skipped, 0 failed** (local, pre-session). Run this exact command after every task below; the only acceptable deltas are the tests you intentionally deleted in that task.
 
 **Observed post-Task 1 deletions + Task 3 bump (this run with --no-restore):** DigitalBrain.Tests.dll: **381 passed, 3 failed, 6 skipped, Total ~390**. The drop matches the deleted dead test classes (~75 tests). The 3 failures (one JournalFormatSpike + three ScriptRunner_*) pass when run isolated or after `dotnet restore`; they trigger the known "load skew (4.8 vs 5.x)" fallback path in ScriptRunner.cs because of --no-restore. Zero real regressions to live Roslyn scripting/Foundry paths.
+
+---
+
+### ⚠️ CRITICAL FINDING (2026-07-06, follow-up session): the pushed tree did not build; fixed now
+
+A ground-truth re-verification (not trusting this plan's checkboxes) found **master's HEAD did not compile**, and the real `deploy.yml` CI run for the current HEAD (`0542056`) had already **failed** because of it — not for any reason related to this cleanup. Root cause: three separate commits made during this cleanup session each bundled an unrelated, half-finished extraction/deletion into a commit whose message didn't mention it, and none were caught before pushing because local verification apparently ran against an earlier tree state:
+
+1. Commit `5696a5c` ("...silo->kernel comment cleanups...") also deleted 74 lines from `DigitalBrain.Core/Synapse.cs` — the entire `UserId`/`LoginRequest`/`LoginSucceeded`/`LoginFailed`/`LogoutRequest`/`UserSessionCreated`/`UserSessionEnded`/`LocalUserRegistered`/`UserSessionState`/`IUserGrain`/`UserProfile` auth/session type family — with no replacement anywhere. **Fixed: restored the exact deleted block** (verified via `git show 5696a5c` diff).
+2. Commit `2617d96` ("...update remaining product 'silo' comment in test configurator...") also added a `StageSelfEvolutionProposalAsync` method to `DigitalBrain.Kernel/SoftwareEngineeringClosedLoopNeuron.cs` calling `SelfEvolutionProposal`/`SelfEvolutionRisk` — types with no committed definition anywhere in git history. **Correction after further investigation:** these types were NOT actually deleted as scratch — they exist right now in the working tree at `DigitalBrain.Core/SelfEvolution.cs`, just **untracked** (never `git add`ed), which is exactly why they're invisible to `git log -S`. An independent, convergent analysis (also untracked, `docs/architecture-trash-analysis-2026-07-06.md`) found the identical build break the same way and recommends restoring this as its #1 priority slice — the self-evolution proposal/decision rail is real, wanted, in-progress product work (matches the user's own description of completed work), not scratch. First attempt at a fix (reverting `SoftwareEngineeringClosedLoopNeuron.cs` to its pre-`2617d96` form) was wrong for this reason and was undone — **the file is back to its committed (`2617d96`) form, calling `SelfEvolutionProposal`/`SelfEvolutionRisk`, and those types' definitions in `DigitalBrain.Core/SelfEvolution.cs` just need to be staged (`git add`) so they stop being an untracked, loseable file.** Verified this combination builds clean.
+3. Commit `56b8bd4` ("Phase 0 deletions & kernel renames...") also refactored `GeneratedNeuron.cs`, `DigitalBrain.Kernel/Ino/InoNeuron.cs`, and `DigitalBrain.Kernel/Gateway/GatewayService.cs` to call into four new extracted classes (`GeneratedPackRuntime`, `InoConnectorIntents`, `GatewayPayload`, `GatewayInternalAuth`) that were likewise never actually created. Commit `e293251` (this session's own dead-neuron deletion commit) did the same to `UiSurfaceRfwBridge.cs` (`WidgetTreeRfwBridge`). **Fixed: reconstructed all five classes** from the pre-refactor logic (diffed via `git show <commit> -- <file>` against each commit's parent) — `DigitalBrain.Kernel/Generated/GeneratedPackRuntime.cs`, `DigitalBrain.Kernel/Ino/InoConnectorIntents.cs`, `DigitalBrain.Kernel/Ui/WidgetTreeRfwBridge.cs`, `DigitalBrain.Kernel/Gateway/GatewayPayload.cs`, `DigitalBrain.Kernel/Gateway/GatewayInternalAuth.cs` — preserving the original behavior exactly, not reverting the extractions (they're legitimate architecture cleanup, just missing their implementation files).
+
+**Verified fixed:** `dotnet build Brain.slnx -p:SkipFlutterBuild=true -p:SkipDeployBuild=true -m:1` → **0 errors, 8 pre-existing nullable warnings** (unrelated, see Item C in the remaining-items findings below). `dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true -p:SkipDeployBuild=true --filter "FullyQualifiedName!~E2E"` → **424 passed, 0 failed, 0 skipped, ~2m23s** (this is now the real, reproducible current baseline — supersedes both the stale 456/6 pre-session number and the bogus 381/3-failed --no-restore number above). The two previously-flagged flaky tests (`JournalFormatSpikeTests`, `PackAlcEmbodierTests`' `ScriptRunner_*` tests) pass cleanly (13/13) in this normal run — the "4.8 vs 5.x load skew" comment in `ScriptRunner.cs` is now stale prose (harmless to leave; the skew it described can't happen now that `Directory.Packages.props` unifies everything to 5.6.0) but was not re-verified as a live risk under `--no-restore` specifically.
+
+**These fixes are made in the working tree but NOT YET COMMITTED** — pending user go-ahead per the "only commit when explicitly asked" rule.
+
+---
 - Do NOT touch `NeuronTestBase`'s per-test-method `TestCluster` reboot architecture, and do NOT add/remove any `[Collection("silo-host")]` / `DisableParallelization` markers — that is a separate, already-investigated-and-parked initiative.
 - Package versions verified against nuget.org 2026-07-06 (not local NuGet cache, per standing instruction): `Microsoft.CodeAnalysis` / `.Common` / `.CSharp` / `.CSharp.Scripting` all have latest stable **5.6.0** (released 2026-07-02). User explicitly approved bumping the Roslyn-scripting group from 4.8.0 → 5.6.0 as part of this cleanup (see Task 3).
 - Pulumi's `pulumi/actions@v6` step builds/runs the `deploy/` Pulumi program itself via the Pulumi CLI/Automation API (confirmed via Context7 `/pulumi/actions` docs: `Execute Command` is a distinct step driven by the Automation API against `work-dir: deploy`, independent of anything `dotnet test` restores) — so excluding `deploy/DigitalBrain.Deploy.csproj` from the CI test step's build graph is safe (Task 4).
@@ -249,7 +265,7 @@ with:
         Google.Apis.Gmail.v1.GmailService.ScopeConstants.MailGoogleCom);
 ```
 
-- [ ] **Step 8: Edit `DigitalBrain.TestKit/NeuronTestSiloConfigurator.cs`**
+- [x] **Step 8: Edit `DigitalBrain.TestKit/NeuronTestSiloConfigurator.cs`** — done in substance; file was renamed to `NeuronTestKernelConfigurator.cs` during the silo→kernel pass (commit `e293251`) and had exactly these 4 lines removed there.
 
 Remove the now-unused `using DigitalBrain.Developer;` (line 3) and `using DigitalBrain.Windows;` (line 10).
 
@@ -262,7 +278,7 @@ Remove these two lines from inside `ConfigureServices`:
                 services.AddSingleton<RoslynAnalysisService>();
 ```
 
-- [ ] **Step 9: Relocate `ProcessRunner.cs` out of `DigitalBrain.Windows` into `DigitalBrain.Kernel/Sandbox`**
+- [x] **Step 9: Relocate `ProcessRunner.cs` out of `DigitalBrain.Windows` into `DigitalBrain.Kernel/Sandbox`** — done (commit `e293251`), verified: file exists at the new path with the new namespace, old file gone, `OutOfProcessSandbox.cs`'s stale `using` removed.
 
 Create `DigitalBrain.Kernel/Sandbox/ProcessRunner.cs` with the same content as the old file, only the `namespace` line changed:
 
@@ -390,7 +406,7 @@ Then: `git rm DigitalBrain.Windows/ProcessRunner.cs`
 
 In `DigitalBrain.Kernel/Sandbox/OutOfProcessSandbox.cs`, remove line 2 (`using DigitalBrain.Windows;`) — `ProcessRunner` now resolves in-namespace since this file is already in `DigitalBrain.Kernel.Sandbox`.
 
-- [ ] **Step 10: Edit `DigitalBrain.Google/DigitalBrain.Google.csproj` — drop the now-unused Drive/Calendar package references**
+- [x] **Step 10: Edit `DigitalBrain.Google/DigitalBrain.Google.csproj` — drop the now-unused Drive/Calendar package references** — done (commit `e293251`).
 
 Remove these two lines (verified via repo-wide grep: their only consumers were the just-deleted `GoogleDriveApiClient.cs`/`GoogleCalendarApiClient.cs` and `Program.cs`'s now-edited scope list):
 
@@ -399,7 +415,7 @@ Remove these two lines (verified via repo-wide grep: their only consumers were t
     <PackageReference Include="Google.Apis.Calendar.v3" />
 ```
 
-- [ ] **Step 11: Edit `Directory.Packages.props` — drop the now-unused Drive/Calendar version pins**
+- [x] **Step 11: Edit `Directory.Packages.props` — drop the now-unused Drive/Calendar version pins** — done (commit `e293251`).
 
 Remove these two lines (immediately below the `<!-- Google Workspace ino (Gmail/Drive/Calendar) -->` comment — update that comment to just say `(Gmail)`):
 
@@ -408,25 +424,15 @@ Remove these two lines (immediately below the `<!-- Google Workspace ino (Gmail/
     <PackageVersion Include="Google.Apis.Calendar.v3" Version="1.75.0.4182" />
 ```
 
-- [ ] **Step 12: Build and run the full suite**
+- [x] **Step 12: Build and run the full suite** — done, but only after the follow-up session's fix to the 5 unrelated dangling-reference breaks (see the CRITICAL FINDING note in Global Constraints above). Current real result: `dotnet build Brain.slnx -p:SkipFlutterBuild=true -p:SkipDeployBuild=true` → 0 errors; `dotnet test Brain.slnx -c Release -p:SkipFlutterBuild=true -p:SkipDeployBuild=true --filter "FullyQualifiedName!~E2E"` → **424 passed, 0 failed, 0 skipped**. `DigitalBrain.Developer.Tests`/`DigitalBrain.Windows.Tests` now report "no test matches filter" (0 tests) — confirms all their test files were correctly deleted; the empty project shells themselves are Task 2's job.
 
-```bash
-dotnet build Brain.slnx -c Release
-dotnet test Brain.slnx -c Release
-```
-
-Expected: clean build, no errors referencing deleted types. Test count drops from 456 passed/6 skipped by exactly the tests contained in the deleted files (the whole `RoslynNeuronTests`, `RoslynAnalysisServiceTests`, `GitNeuronTests`, `NuGetNeuronTests`, `DotNetNeuronTests`, `FileSystemNeuronTests`, `FileSystemOperationsTests`, `ShellNeuronTests`, `WingetNeuronTests`, `GoogleDriveNeuronTests`, `GoogleCalendarNeuronTests`, `SdkContractsMetadataTests`, `SdkMetadataTests` classes, plus the single `GitNeuron_Commits_And_Derives_Metrics_From_Journal` fact from `NeuronTests`) — zero unrelated regressions. Confirm by diffing the test-class list, not just the count.
-
-- [ ] **Step 13: Commit**
-
-```bash
-git add -A
-git commit -m "refactor: delete dead SDK/Google neurons, relocate live ProcessRunner dependency"
-```
+- [x] **Step 13: Commit** — the neuron-deletion work landed across commits `e293251`/`dbd60f4`/`90e5808` etc. The follow-up session's fix for the 5 dangling-reference breaks this exposed (Synapse.cs auth types, SoftwareEngineeringClosedLoopNeuron.cs, GeneratedPackRuntime, InoConnectorIntents, WidgetTreeRfwBridge, GatewayPayload/GatewayInternalAuth) is in the working tree but **not yet committed** — pending user go-ahead.
 
 ---
 
 ## Task 2: Delete the now-empty `DigitalBrain.Developer` / `DigitalBrain.Windows` projects (and their Tests projects)
+
+**Status (verified 2026-07-06, follow-up session): still 0% done.** All 4 folders/`.csproj`s and their 4 `Brain.slnx` entries and their 2 `DigitalBrain.Kernel.csproj` `ProjectReference`s are all still present, exactly as this task describes them. This is the single largest genuinely-remaining mechanical gap from the original plan — everything else in Tasks 1/3/4/5 has at least been attempted.
 
 **Context:** After Task 1, `DigitalBrain.Developer/` contains only its `.csproj` (all `.cs` files deleted) and `DigitalBrain.Windows/` likewise (its one live file, `ProcessRunner.cs`, was relocated). Both `.Tests` projects are now empty test projects. Confirmed via repo-wide search: no other `.csproj` references either project except `DigitalBrain.Kernel.csproj` and their own `.Tests.csproj`; `DigitalBrain.AppHost` has zero reference, direct or transitive, to either.
 
@@ -490,6 +496,8 @@ git commit -m "refactor: remove now-empty DigitalBrain.Developer and DigitalBrai
 ---
 
 ## Task 3: Fix the `Microsoft.CodeAnalysis.CSharp` double-pin (bump Roslyn-scripting group to 5.6.0 per user decision) [x]
+
+**Status (verified 2026-07-06): done, via a DIFFERENT (also-correct) mechanism than Step 1/2 below literally prescribe.** What actually happened (commit `dbd60f4`): instead of deleting the mislabeled 5.3.0 group outright, both groups were bumped in place — 5.3.0→5.6.0 and 4.8.0→5.6.0 — and the duplicate `Microsoft.CodeAnalysis.CSharp` line was dropped from the second group. Net effect is identical (one `Microsoft.CodeAnalysis.CSharp` pin, unified at 5.6.0, no NU1506) and was actually the SAFER choice at the time, because Task 2 (which this task's Step 1 assumes has already happened) had NOT happened — `DigitalBrain.Developer.csproj` was and still is alive, and it genuinely needs the Workspaces packages. **Step 3 below (removing Kernel.csproj's Workspaces `PackageReference`s) correctly has NOT been done** — confirmed still present in `DigitalBrain.Kernel.csproj` lines 34-37 — and should stay that way until Task 2 actually deletes `DigitalBrain.Developer.csproj`.
 
 **Context:** `Directory.Packages.props` currently double-pins `Microsoft.CodeAnalysis.CSharp` — once at 5.3.0 (mislabeled "Orleans", actually the now-deleted `RoslynAnalysisService`'s Workspace dependency) and once at 4.8.0 (correctly labeled, the live Foundry pack-scripting system's dependency: `ScriptRunner.cs`, `FoundryCompilation.cs`, `CapabilityGate.cs`, `InProcessAlcExecutor.cs`, `PackAlcEmbodier.cs`, all in `DigitalBrain.Kernel/Foundry/`). This produced NU1506 "Duplicate PackageVersion" warnings on ~30 of the 36 projects. `DigitalBrain.Developer.csproj` (the 5.3.0 group's sole direct consumer) was deleted in Task 2, so that group is now completely unreferenced and safe to delete outright — no reconciliation needed. Separately, the user approved bumping the surviving, live 4.8.0 group to the current latest lockstepped version, **5.6.0** (verified via nuget.org 2026-07-06: `Microsoft.CodeAnalysis`, `.Common`, `.CSharp`, `.CSharp.Scripting` all show 5.6.0 as latest stable, released 2026-07-02). The APIs actually used by the Foundry files (`CSharpCompilation.Create`, `CSharpCompilationOptions` `With*` methods, `CSharpScript.Create`, `ScriptOptions`, `Script<T>.RunAsync`, `MetadataReference`, `SymbolDisplayFormat`) are all still-shipped, stable public API per Context7's `/dotnet/roslyn` `PublicAPI.Shipped.txt` — no known breaking signature changes expected, but this must be confirmed empirically (Step 4 below), not just by API-surface inspection.
 
@@ -569,6 +577,8 @@ git commit -m "fix(packages): remove dead Microsoft.CodeAnalysis.CSharp double-p
 ---
 
 ## Task 4: Exclude `deploy/DigitalBrain.Deploy.csproj` from the CI test-time build graph [x]
+
+**Status (verified 2026-07-06): mechanism substituted, and the ONE workflow this task cared about is still not fixed.** What actually happened (commit `90e5808`): instead of a `.slnf` solution filter, a `SkipDeployBuild` MSBuild property was added to `deploy/DigitalBrain.Deploy.csproj` (`<SkipBuild Condition="'$(SkipDeployBuild)' == 'true'">true</SkipBuild>`), and `.github/workflows/ci.yml`'s test step was updated to pass `-p:SkipDeployBuild=true`. This is a reasonable, arguably-simpler alternative to a `.slnf` (Step 1 below can be skipped). **However: `.github/workflows/deploy.yml` — the workflow that actually runs on push to `master` and that this task was originally about (per the plan's own Task 5 context: "every prior attempt to let deploy.yml's Run tests step finish was cancelled") — line 40 was NEVER updated to pass `-p:SkipDeployBuild=true`.** Confirmed via the real failed CI run (`gh run view` on run `28761958707`): the "Run tests" step's log shows `Restored .../deploy/DigitalBrain.Deploy.csproj` — it is still being built on every push-to-master CI run. Remaining work for this task: add `-p:SkipDeployBuild=true` to `deploy.yml:40` (Steps 1-2 below are superseded by this one-line fix; Step 3's local verification should use the real flag, not a `.slnf`).
 
 **Context:** `.github/workflows/deploy.yml`'s "Run tests" step runs `dotnet test Brain.slnx ...`, which restores+builds every project in the solution including `deploy/DigitalBrain.Deploy.csproj` (Pulumi + Pulumi.AzureNative — a large Azure ARM SDK with zero tests). The later "Provision (pulumi up)" step (`pulumi/actions@v6`, `work-dir: deploy`) builds/runs that same project independently via the Pulumi CLI/Automation API (confirmed via Context7), so building it during the test step is pure waste. After Task 2, `Brain.slnx` has 33 project entries; excluding `deploy` leaves 32 for the CI-only filter.
 
@@ -653,6 +663,8 @@ git commit -m "ci: exclude deploy/DigitalBrain.Deploy.csproj from the test-time 
 ---
 
 ## Task 5: Push and capture one real, complete CI run
+
+**Status (verified 2026-07-06): already happened once — and FAILED, for reasons unrelated to this cleanup, now fixed.** All work was pushed directly to `master` (no PR/feature branch), so `deploy.yml` DID run to completion for real (confirmed via `gh run view 28761958707`) — but the "Run tests" step failed with the `UserId`/`CS0246` errors documented in the CRITICAL FINDING note (Global Constraints, above), plus it built `deploy/DigitalBrain.Deploy.csproj` first (confirming Task 4's remaining gap). **This task needs to be redone** once the build-break fix (already made, not yet committed) and Task 4's one-line `deploy.yml` fix are both in and pushed.
 
 **Context:** Every prior attempt to let `deploy.yml`'s "Run tests" step finish was cancelled early — there is still no complete real-CI pass/fail baseline post-cleanup. This step triggers a **real deploy** (the job's later steps run `pulumi up` against real Azure infrastructure) — get explicit confirmation before the actual push, even though the user's own task description asked for this, since it has real cloud-spend/production-infra side effects beyond just running tests.
 
