@@ -46,7 +46,7 @@ dependencies:
   media_kit_libs_video: ^1.0.7
   youtube_player_iframe: ^6.0.0
   markdraw: ^0.2.0
-  simple_icons: ^14.6.1
+  simple_icons: 16.23.0
   digital_brain_sdk_flutter:
     path: packages/digital_brain_sdk_flutter
 

@@ -22,10 +22,7 @@ class NeuronVectorLogo extends StatelessWidget {
     IconData? iconData;
     Color? iconColor;
 
-    if (normalized.contains('openai')) {
-      iconData = SimpleIcons.openai;
-      iconColor = SimpleIconColors.openai;
-    } else if (normalized.contains('anthropic')) {
+    if (normalized.contains('anthropic')) {
       iconData = SimpleIcons.anthropic;
       iconColor = SimpleIconColors.anthropic;
     } else if (normalized.contains('gmail') || normalized.contains('mail')) {
@@ -56,14 +53,11 @@ class NeuronVectorLogo extends StatelessWidget {
       iconData = SimpleIcons.google;
       iconColor = SimpleIconColors.google;
     } else if (normalized.contains('salesforce') || normalized.contains('crm')) {
-      iconData = SimpleIcons.salesforce;
+      iconData = Icons.cloud_queue;
       iconColor = const Color(0xFF00A1E0); // Salesforce blue
     } else if (normalized.contains('travel') || normalized.contains('tripadvisor')) {
       iconData = SimpleIcons.tripadvisor;
       iconColor = SimpleIconColors.tripadvisor;
-    } else if (normalized.contains('ai') || normalized.contains('llm')) {
-      iconData = SimpleIcons.openai; // default to OpenAI for generic AI
-      iconColor = SimpleIconColors.openai;
     }
 
     if (iconData != null) {
