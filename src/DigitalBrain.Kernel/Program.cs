@@ -22,7 +22,7 @@ using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Economics;
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Salesforce;
-using DigitalBrain.Ino;
+using Ino = DigitalBrain.Ino;
 using DigitalBrain.Google;
 using DigitalBrain.ServiceDefaults;
 
@@ -192,8 +192,10 @@ builder.Services.AddDigitalBrainOtlpForwardClient();
 // Ino (personal AI assistant) as pluggable integration.
 // Owns its AI config (provider, model, system prompts, temperature) so the assistant logic
 // can evolve independently and be "plugged" into the kernel host.
-builder.Services.AddInoAi(builder.Configuration.GetSection("Ino:AI"));
-builder.Services.AddSingleton<IInoCapabilityRecall, DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall>();
+DigitalBrain.Ino.InoServiceRegistration.AddInoAi(builder.Services, builder.Configuration.GetSection("Ino:AI"));
+var inoRecallType = Type.GetType("DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall");
+if (inoRecallType != null)
+    builder.Services.AddSingleton(typeof(Ino.IInoCapabilityRecall), inoRecallType);
 
 // Proxy to private marketplace (new separate repo) when enabled.
 // Register the stub here; real impl uses HttpClient to the marketplace service.
