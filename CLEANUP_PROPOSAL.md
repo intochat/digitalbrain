@@ -1,9 +1,20 @@
 # DigitalBrain / NeuroOS — Comprehensive Cleanup & Architecture Refinement Proposal
 
 **Date:** 2026-07-06  
-**Status:** DRAFT — FOR USER APPROVAL  
+**Status:** DRAFT — FOR USER APPROVAL (Execution in progress)  
 **Author:** Grok (analysis based on full repo scan + existing `ARCHITECTURE_CLEANUP_PROPOSAL.md`)  
 **Goal:** Make requirements less dumb. **Delete** aggressively. Simplify boundaries. Accelerate the inner loop and the self-evolution cycle. Prepare the system for long-term extensibility as a true self-evolving AI-native OS built on Neurons, Synapses, and live C# Packs.
+
+**Execution Progress (as of latest):** Phase 0 deletions largely complete per this proposal and the 2026-07-06-dead-neuron-cleanup plan:
+- Dead Ino language editor, CompilerNeuron, Software20TeamNeuron, Awesome/ reviewer + ProjectReview fully pruned (synapses, grains, tests, features, dirs).
+- .claude skills cache removed.
+- Silo→kernel product renames (test collections "silo-host"→"kernel-host", configurator file/class, comments in Program.cs, docs).
+- Dead SDK neurons (Roslyn/Git/NuGet/DotNet/FS/Shell/Winget in Kernel/Developer/Windows) + dead Google Drive/Calendar deleted, ProcessRunner relocated, fakes/registrations/configs/tests trimmed.
+- Roslyn packages bumped to 5.6.0 unified (skew fixed, duplicate pin removed).
+- Deploy project excluded from CI test graph (SkipDeployBuild).
+- Docs updated for removals and naming.
+- All with per-step `dotnet build` + targeted tests + `aspire doctor`; net deletions >> additions.
+- Full baseline test count reduced as expected by deleted tests (see plan for details). Isolated live tests green.
 
 > **Core principle (AGENTS.md):** Keep changes small and focused after approval. Delete more than we add. Run `dotnet build && dotnet test --filter "..."` + `aspire doctor` after every logical chunk. Use Aspire MCP tools for hosting changes.
 
