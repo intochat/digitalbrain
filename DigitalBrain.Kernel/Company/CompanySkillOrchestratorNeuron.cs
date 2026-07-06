@@ -45,6 +45,9 @@ public sealed class CompanySkillOrchestratorNeuron(ILogger<CompanySkillOrchestra
         await market.FireAsync(new PublishToMarketplace(
             processName, "1.0", code, "system", false, 0.0, $"Auto-generated executable skill for {processName}"));
 
+        // Trusted internal/system bootstrap path (not user-created mutation). Bypasses human SelfEvolutionProposal
+        // approval per design (see architecture-trash-action-plan § bootstrap exceptions). "system" buyer + internal
+        // synthesis makes this safe. Public user paths (MCP/UI/Ino) must continue to stage proposals.
         await market.FireAsync(new InstallFromMarketplace(processName, "1.0", "system"));
 
         var generated = GrainFactory.GetGrain<IGeneratedNeuron>($"generated-{processName.ToLowerInvariant()}");

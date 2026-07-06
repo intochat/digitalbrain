@@ -245,6 +245,19 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
         {
             if (node.Props.TryGetValue("text", out var text) && text is not null)
                 values.Add(text.ToString()!);
+            if (node.Props.TryGetValue("subtitle", out var sub) && sub is not null)
+                values.Add(sub.ToString()!);
+            if (node.Props.TryGetValue("title", out var tit) && tit is not null)
+                values.Add(tit.ToString()!);
+
+            // Support list items stored in "items" prop (enriched G/SF surfaces + gallery)
+            if (node.Props.TryGetValue("items", out var itemsObj) && itemsObj is System.Collections.IEnumerable itemsEnum)
+            {
+                foreach (var it in itemsEnum)
+                {
+                    if (it is UiWidgetTree wt) Collect(wt);
+                }
+            }
 
             foreach (var child in node.Children ?? [])
                 Collect(child);
@@ -301,6 +314,19 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
         {
             if (node.Props.TryGetValue("text", out var text) && text is not null)
                 values.Add(text.ToString()!);
+            if (node.Props.TryGetValue("subtitle", out var sub) && sub is not null)
+                values.Add(sub.ToString()!);
+            if (node.Props.TryGetValue("title", out var tit) && tit is not null)
+                values.Add(tit.ToString()!);
+
+            // Support list items stored in "items" prop (enriched G/SF surfaces + gallery)
+            if (node.Props.TryGetValue("items", out var itemsObj) && itemsObj is System.Collections.IEnumerable itemsEnum)
+            {
+                foreach (var it in itemsEnum)
+                {
+                    if (it is UiWidgetTree wt) Collect(wt);
+                }
+            }
 
             foreach (var child in node.Children ?? [])
                 Collect(child);

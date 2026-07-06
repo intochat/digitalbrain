@@ -24,7 +24,8 @@ internal sealed class BitcoinPriceInoIntentHandler : IInoIntentHandler
 {
     public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
     {
-        if (!IsBitcoinPriceIntent(request.Prompt))
+        var cls = InoIntentClassifier.Classify(request.Prompt);
+        if (cls.Intent != "bitcoin_price" || cls.Confidence < 0.7)
         {
             return Task.FromResult(false);
         }
@@ -37,17 +38,14 @@ internal sealed class BitcoinPriceInoIntentHandler : IInoIntentHandler
         await neuron.HandleBitcoinPriceIntentAsync(request, workspaceId);
         return true;
     }
-
-    private static bool IsBitcoinPriceIntent(string prompt) =>
-        prompt.Contains("bitcoin", StringComparison.OrdinalIgnoreCase) &&
-        prompt.Contains("price", StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed class RelationGraphInoIntentHandler : IInoIntentHandler
 {
     public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
     {
-        if (!IsTwoObjectRelationIntent(request.Prompt))
+        var cls = InoIntentClassifier.Classify(request.Prompt);
+        if (cls.Intent != "relation_graph" || cls.Confidence < 0.7)
         {
             return Task.FromResult(false);
         }
@@ -60,36 +58,19 @@ internal sealed class RelationGraphInoIntentHandler : IInoIntentHandler
         await neuron.HandleRelationGraphIntentAsync(request, workspaceId);
         return true;
     }
-
-    private static bool IsTwoObjectRelationIntent(string prompt)
-    {
-        var p = prompt.ToLowerInvariant();
-        return (p.Contains("draw") || p.Contains("show") || p.Contains("visualize")) &&
-               p.Contains("relation") &&
-               (p.Contains("2 objects") || p.Contains("two objects") || p.Contains("object"));
-    }
 }
 
 internal sealed class SchemaVisualizationInoIntentHandler : IInoIntentHandler
 {
     public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
     {
-        if (!IsSchemaVisualizationIntent(request.Prompt))
+        var cls = InoIntentClassifier.Classify(request.Prompt);
+        if (cls.Intent != "schema_viz" || cls.Confidence < 0.7)
         {
             return Task.FromResult(false);
         }
 
         return neuron.TryHandleSchemaVisualizationIntentAsync(request, workspaceId);
-    }
-
-    private static bool IsSchemaVisualizationIntent(string prompt)
-    {
-        var p = prompt.ToLowerInvariant();
-        return p.Contains("schema") ||
-               p.Contains("visualize database") ||
-               p.Contains("visualize db") ||
-               p.Contains("show database") ||
-               p.Contains("show db");
     }
 }
 
@@ -97,7 +78,9 @@ internal sealed class GmailInoIntentHandler : IInoIntentHandler
 {
     public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
     {
-        if (!InoConnectorIntents.IsGmail(request.Prompt))
+        // Uses classifier (keyword fast path + future LLM). Replaced direct Regex in InoConnectorIntents.
+        var classification = InoIntentClassifier.Classify(request.Prompt);
+        if (classification.Intent != "gmail" || classification.Confidence < 0.55)
         {
             return false;
         }
@@ -111,7 +94,8 @@ internal sealed class SalesforceInoIntentHandler : IInoIntentHandler
 {
     public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
     {
-        if (!InoConnectorIntents.IsSalesforce(request.Prompt))
+        var classification = InoIntentClassifier.Classify(request.Prompt);
+        if (classification.Intent != "salesforce" || classification.Confidence < 0.55)
         {
             return false;
         }

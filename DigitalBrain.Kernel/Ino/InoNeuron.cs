@@ -8,7 +8,9 @@ using DigitalBrain.Google;
 using DigitalBrain.Kernel.Salesforce;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Market;
+using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Salesforce;
+using DigitalBrain.Ui.Runtime;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Kernel.Ino;
@@ -33,6 +35,29 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     public async Task HandleAsync(InoRequest req)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
+
+        // Check for gallery early (before generic handler which always matches)
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        if (cls.Intent == "uikit_gallery")
+        {
+            await DeliverUiKitGallerySurfaceAsync(req.ClientId, workspaceId);
+            await FireAsync(new InoResponse(req.Prompt, "UiKit component gallery:", []));
+            return;
+        }
+
+        if (cls.Intent == "llm_settings")
+        {
+            await DeliverLlmSettingsSurfaceAsync(req.ClientId, workspaceId);
+            await FireAsync(new InoResponse(req.Prompt, "LLM / model settings:", []));
+            return;
+        }
+
+        if (cls.Intent == "automation_create")
+        {
+            await HandleAutomationCreateIntentAsync(req, workspaceId);
+            return;
+        }
+
         foreach (var handler in InoIntentHandlers.Default)
         {
             if (await handler.TryHandleAsync(this, req, workspaceId))
@@ -255,6 +280,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     internal async Task HandleGmailIntentAsync(InoRequest req)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
+
+        // Use LLM classifier for natural language understanding (beyond simple keywords).
+        // Falls back gracefully if no LLM.
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        if (cls.Intent != "gmail")
+        {
+            // Not confident enough after LLM — fall through to generic in caller if needed.
+            await HandleGenericIntentAsync(req, workspaceId);
+            return;
+        }
+
         if (!await HasGoogleCredentialAsync())
         {
             _pendingGmailRequest = req;
@@ -270,6 +306,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     internal async Task HandleSalesforceIntentAsync(InoRequest req)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
+
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        if (cls.Intent != "salesforce")
+        {
+            await HandleGenericIntentAsync(req, workspaceId);
+            return;
+        }
+
         var salesforceSession = await ResolveSessionAsync(req.ClientId);
         if (salesforceSession is null)
         {
@@ -290,6 +334,50 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
 
         await FetchSalesforceAccountsAsync(req, salesforceUserId);
+    }
+
+    internal async Task HandleAutomationCreateIntentAsync(InoRequest req, string workspaceId)
+    {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+
+        // Use LLM to turn NL into automation proposal (radical simplicity)
+        var ctx = await BuildContextAsync(req.Prompt, workspaceId);
+        var llmPrompt = "You are helping create a safe DigitalBrain automation. Given the user request, output ONLY valid JSON with: when (e.g. 'Signal:GmailMessageReceived' or 'NeuronActivated'), target (grain key or null), script (short valid C# that returns Signal[] or does simple Fire, no unsafe code), rationale.\nExample good script: return new[] { new Signal(\"EmailSummarized\", new Dictionary<string,object?>{[\"to\"] = \"salesforce\"}) };\nUser request: " + req.Prompt;
+        var raw = await ReasonWithLlmAsync(llmPrompt, ctx);
+        // naive parse for demo (in prod use structured)
+        string when = "NeuronActivated";
+        string? target = null;
+        string script = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from chat\" }) };";
+        if (raw.Contains("Gmail") || raw.Contains("email")) when = "Signal:GmailMessageReceived";
+        if (raw.Contains("salesforce")) when = "Signal:SalesforceQueryReady"; // example
+        // for now simple
+        var autoId = "chat-auto-" + Guid.NewGuid().ToString("N")[..8];
+        var proposalId = "automation-" + Guid.NewGuid().ToString("N");
+        var scriptId = autoId + "-script";
+        var regScript = new RegisterScript(scriptId, script, "via-ino-chat", Array.Empty<string>(), "default");
+        var regReaction = new RegisterReaction(autoId, when, scriptId, target, Array.Empty<string>(), "default");
+
+        var autoGrain = GrainFactory.GetGrain<IAutomationNeuron>("automation-main");
+        await autoGrain.FireAsync(new AutomationDefinitionStaged(proposalId, "automation-main", regScript, regReaction));
+
+        var approval = GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+        await approval.DeliverAsync(new SelfEvolutionProposal(
+            ProposalId: proposalId,
+            Scope: "automation:default",
+            Rationale: $"Ino chat: {req.Prompt}",
+            ProposedChange: $"Register automation {autoId}",
+            ApplyVia: SelfEvolutionApplyVia.AutomationDefineReaction,
+            Risk: SelfEvolutionRisk.InProcessCode,
+            RequiresHumanApproval: true,
+            RollbackPlan: "Remove reaction and script if fails.",
+            Origin: "automation-main")
+        {
+            Sender = Self,
+            Receiver = new NeuronId(SelfEvolutionNeuronIds.Main)
+        });
+
+        await FireAsync(new InoResponse(req.Prompt, $"Staged automation proposal {proposalId} for approval (when={when}).", []));
+        await DeliverReplySurfaceAsync($"Automation proposal created. Approve via self-evolution to activate.", req.ClientId, workspaceId);
     }
 
     private async Task<bool> HasGoogleCredentialAsync()
@@ -396,17 +484,20 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private async Task FetchRecentGmailAsync(InoRequest req)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
-        var maxResults = InoConnectorIntents.ResultCount(req.Prompt);
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        var maxResults = cls.MaxResults ?? InoConnectorIntents.ResultCount(req.Prompt);
+        var q = cls.Query ?? "";
         await Broadcast(new Signal(GoogleSignals.GmailFetchRequested, new Dictionary<string, object?>
         {
             ["prompt"] = req.Prompt,
             ["clientId"] = req.ClientId,
             ["workspaceId"] = workspaceId,
-            ["maxResults"] = maxResults
+            ["maxResults"] = maxResults,
+            ["query"] = q
         }));
 
         var gmail = GrainFactory.GetGrain<IGmailNeuron>("gmail-main");
-        var ids = await gmail.ListMessagesAsync("", maxResults);
+        var ids = await gmail.ListMessagesAsync(q, maxResults);
         var summaries = new List<GmailMessageSummary>();
 
         foreach (var id in ids.Take(maxResults))
@@ -425,13 +516,23 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var reply = GmailReplyText(summaries);
         await FireAsync(new InoResponse(req.Prompt, reply, []));
-        await DeliverGmailMessagesSurfaceAsync(summaries, req.ClientId, workspaceId);
+
+        string? summary = null;
+        var p = req.Prompt.ToLowerInvariant();
+        if ((p.Contains("summar") || p.Contains("brief")) && summaries.Count > 0)
+        {
+            var bodies = string.Join("\n---\n", summaries.Select(s => s.Body));
+            summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + bodies, "");
+        }
+
+        await DeliverGmailMessagesSurfaceAsync(summaries, req.ClientId, workspaceId, summary);
     }
 
     private async Task FetchSalesforceAccountsAsync(InoRequest req, string salesforceUserId)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
-        var maxResults = InoConnectorIntents.ResultCount(req.Prompt);
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        var maxResults = cls.MaxResults ?? InoConnectorIntents.ResultCount(req.Prompt);
         await Broadcast(new Signal(SalesforceSignals.QueryRequested, new Dictionary<string, object?>
         {
             ["prompt"] = req.Prompt,
@@ -468,13 +569,22 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await DeliverSalesforceRecordsSurfaceAsync(records, req.ClientId, workspaceId);
     }
 
-    private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? clientId, string? workspaceId = null)
+    private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? clientId, string? workspaceId = null, string? summary = null)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var children = new List<UiWidgetTree>
         {
             new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Recent Gmail" })
         };
+
+        if (summary != null)
+        {
+            children.Add(new UiWidgetTree(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Summary" }));
+            children.Add(new UiWidgetTree(UiKitVocabulary.TextArea, new Dictionary<string, object?>
+            {
+                ["text"] = summary
+            }));
+        }
 
         if (messages.Count == 0)
         {
@@ -485,14 +595,23 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
         else
         {
+            var listItems = new List<UiWidgetTree>();
             for (var i = 0; i < messages.Count; i++)
             {
                 var message = messages[i];
-                children.Add(new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?>
+                // Use Tile for richer per-message UI
+                listItems.Add(new UiWidgetTree(UiKitVocabulary.Tile, new Dictionary<string, object?>
                 {
-                    ["text"] = $"{i + 1}. {TrimForSurface(message.Body)}"
+                    ["title"] = $"Message {i + 1}",
+                    ["subtitle"] = TrimForSurface(message.Body)
                 }));
             }
+            children.Add(new UiWidgetTree(UiKitVocabulary.List, new Dictionary<string, object?> { ["items"] = listItems }));
+            children.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
+            {
+                ["label"] = "Summarize last message",
+                ["action"] = "summarize-gmail"
+            }));
         }
 
         var props = new Dictionary<string, object?>
@@ -527,13 +646,21 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
         else
         {
+            var listItems = new List<UiWidgetTree>();
             for (var i = 0; i < records.Count; i++)
             {
-                children.Add(new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?>
+                listItems.Add(new UiWidgetTree(UiKitVocabulary.Tile, new Dictionary<string, object?>
                 {
-                    ["text"] = $"{i + 1}. {TrimForSurface(records[i])}"
+                    ["title"] = $"Account {i + 1}",
+                    ["subtitle"] = TrimForSurface(records[i])
                 }));
             }
+            children.Add(new UiWidgetTree(UiKitVocabulary.List, new Dictionary<string, object?> { ["items"] = listItems }));
+            children.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
+            {
+                ["label"] = "Add note for first account",
+                ["action"] = "salesforce-note"
+            }));
         }
 
         var props = new Dictionary<string, object?>
@@ -541,6 +668,74 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), children),
             [UiSurfaceKeys.Title] = "Salesforce",
             [UiSurfaceKeys.SurfaceId] = "surface.salesforce.accounts",
+            ["role"] = "assistant",
+            ["workspaceId"] = workspaceId
+        };
+        if (clientId is not null) props["clientId"] = clientId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
+    private async Task DeliverUiKitGallerySurfaceAsync(string? clientId, string? workspaceId = null)
+    {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+        var tree = UiKitGallery.Build("UiKit Gallery (via INO)");
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = tree,
+            [UiSurfaceKeys.Title] = "UiKit Gallery",
+            [UiSurfaceKeys.SurfaceId] = "surface.uikit.gallery",
+            ["role"] = "assistant",
+            ["workspaceId"] = workspaceId
+        };
+        if (clientId is not null) props["clientId"] = clientId;
+
+        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(StampCurrent(surface));
+    }
+
+    private async Task DeliverLlmSettingsSurfaceAsync(string? clientId, string? workspaceId = null)
+    {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+        var children = new List<UiWidgetTree>
+        {
+            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "LLM / Model Settings" }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "Current global selection is driven by 'system' pack config (llm_provider / llm_key) or Aspire composition default."
+            }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "Supported: ollama (e.g. qwen2.5-coder:1.5b), azureopenai (gpt-4o-mini), etc."
+            }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "To change: set pack config for scope 'system', pack 'llm' with llm_provider and llm_key (if needed)."
+            }),
+            new(UiKitVocabulary.Button, new Dictionary<string, object?>
+            {
+                ["label"] = "Use Local Qwen (default dev)",
+                ["action"] = "set-llm:qwen"
+            }),
+            new(UiKitVocabulary.Button, new Dictionary<string, object?>
+            {
+                ["label"] = "Use Azure gpt-4o-mini",
+                ["action"] = "set-llm:gpt4o"
+            }),
+            new(UiKitVocabulary.Text, new Dictionary<string, object?>
+            {
+                ["text"] = "Changes affect LlmResponder, Ino reasoning, etc. (persisted via pack config)."
+            })
+        };
+
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), children),
+            [UiSurfaceKeys.Title] = "LLM Settings",
+            [UiSurfaceKeys.SurfaceId] = "surface.llm.settings",
             ["role"] = "assistant",
             ["workspaceId"] = workspaceId
         };
@@ -733,7 +928,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task<string> ReasonWithLlmAsync(string prompt, string context)
     {
-        var chat = ServiceProvider.GetService<IChatClient>();
+        var chat = await ResolveGlobalLlmClientAsync() ?? ServiceProvider.GetService<IChatClient>();
         if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
 
         var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. Be concise and answer the user's request directly. Only add action directives on separate lines when the user explicitly asks to create a task, branch, simulation, or what-if. Valid directives are 'TASK: desc' and 'BRANCH: whatif'. Never let a directive replace the user-visible answer.";
@@ -744,7 +939,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private async Task<string> ReasonDirectlyWithLlmAsync(string prompt, string context)
     {
-        var chat = ServiceProvider.GetService<IChatClient>();
+        var chat = await ResolveGlobalLlmClientAsync() ?? ServiceProvider.GetService<IChatClient>();
         if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
 
         var response = await chat.GetResponseAsync(
@@ -752,6 +947,25 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             + context + "\nUSER: " + prompt);
         var text = response.Text.Trim();
         return string.IsNullOrWhiteSpace(text) ? "I do not have a useful answer yet." : text;
+    }
+
+    private async Task<IChatClient?> ResolveGlobalLlmClientAsync()
+    {
+        var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
+        var store = ServiceProvider.GetService<IPackConfigStore>();
+        if (factory is null || store is null) return null;
+
+        try
+        {
+            var sys = await store.GetAsync("system", "llm");
+            if (sys.TryGetValue("llm_provider", out var provider) && !string.IsNullOrWhiteSpace(provider))
+            {
+                sys.TryGetValue("llm_key", out var key);
+                return factory.Create(provider, string.IsNullOrWhiteSpace(key) ? null : key);
+            }
+        }
+        catch { /* optional */ }
+        return null;
     }
 
     private static ReplyPlan BuildReplyPlan(string prompt, string rawReply)

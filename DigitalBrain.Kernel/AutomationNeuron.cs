@@ -205,6 +205,9 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
 
     public async Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null)
     {
+        // Low-level / internal only. Public entry points (MCP define_reaction, Ino chat-to-automation, etc.)
+        // must stage a SelfEvolutionProposal first (see AutomationDefinitionApplyHandler and MCP tools).
+        // Direct calls bypass the approval rail and are only for trusted bootstrap or internal apply handlers.
         var scriptId = id + "-script";
         await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction", Array.Empty<string>(), "default"));
         await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>(), "default"));
