@@ -227,7 +227,7 @@ Current state snapshot (after multiple sessions):
 - B (G+SF + intent): B1 complete (full classifier, regex killed). B2 advanced-to-complete (query param extraction via classifier, Tile/List/Tile surfaces, summarize-last/that-one without re-fetch using MemorySummary journals, cross-turn context via journal lookup + recent req, actionable buttons wired via synapseType+InoRequest to trigger journal follow-ups, enhanced detection, 2 new characterization tests + broader coverage). Registry + caps still keyword Retrieve (vector next).
 - C (LLM control): Complete (system/llm pack config + Ino/LlmResponder resolver + settings surface + functional buttons with dynamic current + set feedback).
 - D (gallery): Complete (UiKitGallery + Ino invocation).
-- E (automation): Progress (Ino detects + LLM proposes + stages via rail; MCP parser improved; cap registration).
+- E / Slice D (automation): Progress -> advanced (Ino detects + richer LLM prompt+JSON parse for when/target/script with G/SF examples; stages via rail; delivers rich proposal surface with ID/rationale/script + "Approve to activate" button + approve-via-chat; approval delivers SelfEvolutionDecision. All through rail. MCP define remains separate but compatible. Ino/Automation tests green).
 - Intent arch: Registry + CapabilityRegistered + projection in Ino + caps remembered to Context (embeddings via Remember/Recall) + Retrieve now uses RecallAsync top-k + keyword merge (Slice B basic vector index done). Full use in dispatch/handlers + "did you mean" in later slices.
 
 **Prioritized Next Slices** (small, independently buildable + verifiable; focus on G+SF magic, automation simplicity, full modern intent per arch thinking):
@@ -254,11 +254,12 @@ Current state snapshot (after multiple sessions):
 - Also affects LlmResponder (which already prioritizes system/llm config) + Ino ResolveGlobalLlmClientAsync.
 - Verification: targeted tests + build + aspire doctor.
 
-**Slice D (E + automation simplicity): Deeper Ino-driven automation**
-- Enhance `HandleAutomationCreateIntentAsync`: better LLM prompt + parsing for high-quality when/target/script (support G/SF examples).
-- After staging, deliver rich feedback surface (proposal id, rationale, "approve to activate").
-- Optional: have Ino call MCP `create_automation_from_description` tool for sugar.
-- Verification: automation + Ino + self-evo tests.
+**Slice D (E + automation simplicity): Deeper Ino-driven automation** (implemented in this session)
+- Enhanced `HandleAutomationCreateIntentAsync`: direct IChatClient structured prompt (explicit GMail/SF when examples, safe script rules) + robust JsonDocument parse with fallback. Produces higher quality when/target/script from NL.
+- After staging proposal + AutomationDefinitionStaged: deliver rich UiWidgetTree (Heading + details for proposalId/when/rationale/script + "Approve to activate" button emitting InoRequest + text hint).
+- Added early "approve proposal ..." handling + HandleApproveProposalIntentAsync that extracts id (or last pending), delivers SelfEvolutionDecision(Approved=true, "user-via-ino") to rail. Confirmation surface.
+- Verification: build clean; Ino tests (25) + Automation/MCP-stage tests (4) passed; broader filter occasionally hits unrelated durability flakes (re-runs green); aspire doctor green. Context7 used for Microsoft.Extensions.AI + Orleans grain patterns before edit. All mutations via rail.
+- Optional MCP integration deferred (Ino directly mirrors the staging pattern used by define_reaction; no need to proxy).
 
 **Slice E (D3 + quality): Gallery expansion + tests**
 - Expand `UiKitGallery.Build()` with more components/states/variants.
@@ -288,6 +289,6 @@ Current state snapshot (after multiple sessions):
 - Registry is journaled (CapabilityRegistered) for durability/audit.
 - All user mutations go through self-evo rail.
 
-Next agent session: Slice C (LLM settings polish) **complete** (dynamic current in surface, fixed set button execution, re-deliver feedback, tests). Next: Slice D (deeper automation) or Slice F (full classifier modernization + structured output). Re-read plan. All mutations via rail.
+Next agent session: Slice D (deeper automation) **advanced/complete for this slice** (rich LLM prompt+parse for G/SF, rich proposal surface + approve chat button/handling, rail only; build+Ino/Automation tests+doctor green; Context7 preflight). Update todos/plan. Next: finish any D polish if needed, or start Slice E (gallery expansion + BundleHarness tests) or Slice F (full vector intent modernization + did-you-mean). Re-read plan. All mutations via rail. Use narrow filters for Ino/Automation tests.
 
 End of continuation note. (Plan list of next actions maintained here and in todos.)
