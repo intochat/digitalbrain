@@ -9,6 +9,7 @@
     <!-- AI / assistant common logic (Ino owns AI config as integration) -->
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>
