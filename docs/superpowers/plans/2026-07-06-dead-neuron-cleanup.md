@@ -487,7 +487,7 @@ git commit -m "refactor: remove now-empty DigitalBrain.Developer and DigitalBrai
 
 ---
 
-## Task 3: Fix the `Microsoft.CodeAnalysis.CSharp` double-pin (bump Roslyn-scripting group to 5.6.0 per user decision)
+## Task 3: Fix the `Microsoft.CodeAnalysis.CSharp` double-pin (bump Roslyn-scripting group to 5.6.0 per user decision) [x]
 
 **Context:** `Directory.Packages.props` currently double-pins `Microsoft.CodeAnalysis.CSharp` — once at 5.3.0 (mislabeled "Orleans", actually the now-deleted `RoslynAnalysisService`'s Workspace dependency) and once at 4.8.0 (correctly labeled, the live Foundry pack-scripting system's dependency: `ScriptRunner.cs`, `FoundryCompilation.cs`, `CapabilityGate.cs`, `InProcessAlcExecutor.cs`, `PackAlcEmbodier.cs`, all in `DigitalBrain.Kernel/Foundry/`). This produced NU1506 "Duplicate PackageVersion" warnings on ~30 of the 36 projects. `DigitalBrain.Developer.csproj` (the 5.3.0 group's sole direct consumer) was deleted in Task 2, so that group is now completely unreferenced and safe to delete outright — no reconciliation needed. Separately, the user approved bumping the surviving, live 4.8.0 group to the current latest lockstepped version, **5.6.0** (verified via nuget.org 2026-07-06: `Microsoft.CodeAnalysis`, `.Common`, `.CSharp`, `.CSharp.Scripting` all show 5.6.0 as latest stable, released 2026-07-02). The APIs actually used by the Foundry files (`CSharpCompilation.Create`, `CSharpCompilationOptions` `With*` methods, `CSharpScript.Create`, `ScriptOptions`, `Script<T>.RunAsync`, `MetadataReference`, `SymbolDisplayFormat`) are all still-shipped, stable public API per Context7's `/dotnet/roslyn` `PublicAPI.Shipped.txt` — no known breaking signature changes expected, but this must be confirmed empirically (Step 4 below), not just by API-surface inspection.
 
@@ -566,7 +566,7 @@ git commit -m "fix(packages): remove dead Microsoft.CodeAnalysis.CSharp double-p
 
 ---
 
-## Task 4: Exclude `deploy/DigitalBrain.Deploy.csproj` from the CI test-time build graph
+## Task 4: Exclude `deploy/DigitalBrain.Deploy.csproj` from the CI test-time build graph [x]
 
 **Context:** `.github/workflows/deploy.yml`'s "Run tests" step runs `dotnet test Brain.slnx ...`, which restores+builds every project in the solution including `deploy/DigitalBrain.Deploy.csproj` (Pulumi + Pulumi.AzureNative — a large Azure ARM SDK with zero tests). The later "Provision (pulumi up)" step (`pulumi/actions@v6`, `work-dir: deploy`) builds/runs that same project independently via the Pulumi CLI/Automation API (confirmed via Context7), so building it during the test step is pure waste. After Task 2, `Brain.slnx` has 33 project entries; excluding `deploy` leaves 32 for the CI-only filter.
 
