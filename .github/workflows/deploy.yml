@@ -114,7 +114,7 @@ jobs:
               --tags Environment=prod Project=Application Owner=Application-DevOps CorrelationId=unknown CreatedBy=GitHubActions ManagedBy=GitHubActions ResourceType=static-web-app >/dev/null
           fi
 
-          token=$(az staticwebapp secrets list --name digitalbrain-web-prod --query "properties.apiKey" -o tsv)
+          token=$(az staticwebapp secrets list --name digitalbrain-web-prod --resource-group digitalbrain-rg --query "properties.apiKey" -o tsv)
           hostname=$(az staticwebapp show --name digitalbrain-web-prod --resource-group digitalbrain-rg --query "defaultHostname" -o tsv)
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
