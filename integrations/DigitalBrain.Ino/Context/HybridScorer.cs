@@ -1,4 +1,4 @@
-namespace DigitalBrain.Context;
+namespace DigitalBrain.Ino.Context;
 
 // Pure-C# hybrid relevance scoring: cosine similarity over embeddings blended with keyword overlap.
 // Harvested from IAW AgentRegistryGrain.HybridSearchAsync. Zero-vector detection lets recall fall back to

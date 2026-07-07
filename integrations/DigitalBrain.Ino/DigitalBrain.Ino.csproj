@@ -6,20 +6,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <!-- Context lives under Ino folder (smart context is part of Ino) but is a separate project. Exclude its sources from Ino's compilation. -->
-  <ItemGroup>
-    <Compile Remove="Context\**" />
-    <EmbeddedResource Remove="Context\**" />
-    <None Remove="Context\**" />
-  </ItemGroup>
-
 <ItemGroup>
     <!-- AI / assistant common logic (Ino owns AI config as integration) -->
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Qdrant.Client" />
     <ProjectReference Include="..\..\src\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
-    <ProjectReference Include="Context/DigitalBrain.Context.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Google\DigitalBrain.Google.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />

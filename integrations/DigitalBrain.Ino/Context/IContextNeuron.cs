@@ -1,8 +1,8 @@
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Context;
+namespace DigitalBrain.Ino.Context;
 
-[Alias("DigitalBrain.Context.IContextNeuron")]
+[Alias("DigitalBrain.Ino.Context.IContextNeuron")]
 public interface IContextNeuron : INeuron, IHandle<ContextUpdate>
 {
     [Alias("GetContextAsync")]

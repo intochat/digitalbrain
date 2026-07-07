@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace DigitalBrain.Context;
+namespace DigitalBrain.Ino.Context;
 
 public sealed record VectorRecord(string Id, float[] Vector, string Payload);
 public sealed record VectorHit(string Id, float Score, string Payload);

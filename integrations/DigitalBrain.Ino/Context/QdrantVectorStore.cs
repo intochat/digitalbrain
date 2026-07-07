@@ -3,7 +3,7 @@ using System.Text;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
 
-namespace DigitalBrain.Context;
+namespace DigitalBrain.Ino.Context;
 
 // Qdrant-backed vector store (Qdrant.Client 1.17). The production backend for document RAG. Requires a running
 // Qdrant (Aspire AddQdrant / a configured endpoint) — not exercised in unit tests, which use InMemoryVectorStore.
