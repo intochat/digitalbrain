@@ -191,7 +191,7 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         var proposalId = "automation-" + Guid.NewGuid().ToString("N");
         var scriptId = id + "-script";
         var script = new RegisterScript(scriptId, scriptCode, $"via-mcp:{source}", Array.Empty<string>(), scope);
-        var reaction = new RegisterReaction(id, when, scriptId, target, Array.Empty<string>(), scope);
+        var reaction = new RegisterReaction(id, when, scriptId, target, Array.Empty<string>(), scope, null);
 
         var auto = Grains.GetGrain<IAutomationNeuron>(automationNeuronId);
         await auto.FireAsync(new AutomationDefinitionStaged(proposalId, automationNeuronId, script, reaction));

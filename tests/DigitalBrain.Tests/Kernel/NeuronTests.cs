@@ -96,7 +96,7 @@ public class NeuronTests : NeuronTestBase
     {
         // TDD: forces the new contracts from Automations.cs and basic usage.
         var script = new RegisterScript("daily-brief", "return Array.Empty<Synapse>();", "demo script");
-        var reaction = new RegisterReaction("on-my-activate", "NeuronActivated", "daily-brief", "MyNeuron");
+        var reaction = new RegisterReaction("on-my-activate", "NeuronActivated", "daily-brief", "MyNeuron", Array.Empty<string>(), "default", null);
         var app = new AutomationApp("my-app", "example app");
 
         Assert.IsAssignableFrom<Synapse>(script);
@@ -115,7 +115,7 @@ public class NeuronTests : NeuronTestBase
         await auto.GetTimelineAsync(); // activate
 
         await auto.FireAsync(new RegisterScript("act-script", "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?>()) };", "demo"));
-        await auto.FireAsync(new RegisterReaction("act-reaction", "NeuronActivated", "act-script", "act-test"));
+        await auto.FireAsync(new RegisterReaction("act-reaction", "NeuronActivated", "act-script", "act-test", Array.Empty<string>(), "default", null));
 
         // Simulate a neuron activating (the real Neuron base does this on OnActivate)
         // Directly simulate the lifetime event the plan targets: when MyNeuron.Lifetime.Activated

@@ -564,7 +564,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var proposalId = "automation-" + Guid.NewGuid().ToString("N");
         var scriptId = autoId + "-script";
         var regScript = new RegisterScript(scriptId, script, "via-ino-chat", Array.Empty<string>(), "default");
-        var regReaction = new RegisterReaction(autoId, when, scriptId, target, Array.Empty<string>(), "default");
+        var regReaction = new RegisterReaction(autoId, when, scriptId, target, Array.Empty<string>(), "default", null);
 
         var autoGrain = GrainFactory.GetGrain<IAutomationNeuron>("automation-main");
         await autoGrain.FireAsync(new AutomationDefinitionStaged(proposalId, "automation-main", regScript, regReaction));
