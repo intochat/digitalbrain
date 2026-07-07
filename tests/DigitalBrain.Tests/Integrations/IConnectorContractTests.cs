@@ -1,5 +1,9 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Salesforce;
+using DigitalBrain.Google;
+using System.Threading;
 using Xunit;
 
 namespace DigitalBrain.Tests.Integrations;
@@ -26,14 +30,13 @@ public abstract class IConnectorContractTests<TConnector> where TConnector : cla
     }
 
     [Fact]
-    public async Task ValidateConfigAsync_MissingKeys_ReturnsInvalid()
+    public async Task ValidateConfigAsync_ReturnsStatus()
     {
         var connector = CreateConnector();
-        // Simulate no config
         var status = await connector.ValidateConfigAsync(userScope: "user:test");
 
-        // For now, basic; real impls will return specific missing.
-        // This will be asserted in provider-specific overrides.
+        // Real providers (Google/Salesforce) check RequiredConfigKeys from store and return !IsValid + MissingKey when absent.
+        // Dummy always valid. Provider contract subclasses will assert the missing case with fakes.
         Assert.NotNull(status);
     }
 
@@ -86,4 +89,79 @@ public sealed class DummyConnector : IConnector
 public class DummyIConnectorContractTests : IConnectorContractTests<DummyConnector>
 {
     protected override DummyConnector CreateConnector(NeuronId? user = null) => new DummyConnector();
+}
+
+// Fakes for real provider contract tests (in-mem store + stub factory; no network for auth path).
+internal sealed class FakePackConfigStore : IPackConfigStore
+{
+    private readonly Dictionary<(string scope, string pack), Dictionary<string, string>> _data = new();
+
+    public Task SetAsync(string scope, string pack, IReadOnlyDictionary<string, string> values)
+    {
+        _data[(scope, pack)] = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> GetAsync(string scope, string pack)
+    {
+        return _data.TryGetValue((scope, pack), out var d)
+            ? Task.FromResult<IReadOnlyDictionary<string, string>>(d)
+            : Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+    }
+}
+
+internal sealed class FakeSalesforceApiClientFactory : ISalesforceApiClientFactory
+{
+    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope) =>
+        Task.FromResult<ISalesforceApiClient>(new FakeSalesforceApiClient());
+}
+
+internal sealed class FakeSalesforceApiClient : ISalesforceApiClient
+{
+    public Task<string[]> QueryAsync(string soql, CancellationToken ct = default) => throw new NotImplementedException("Auth path does not call; TestConnection does.");
+    public Task<string[]> ListAccountsAsync(int maxResults, CancellationToken ct = default) => Task.FromResult(Array.Empty<string>());
+}
+
+internal sealed class FakeGoogleApiClientFactory // placeholder if needed for future Google TestConnection extension
+{
+}
+
+// Provider contract tests exercising real impls + fakes (Validate missing/valid, Begin challenge, health stub).
+public class SalesforceConnectorContractTests : IConnectorContractTests<SalesforceConnector>
+{
+    protected override SalesforceConnector CreateConnector(NeuronId? user = null)
+    {
+        var store = new FakePackConfigStore();
+        var factory = new FakeSalesforceApiClientFactory();
+        return new SalesforceConnector(factory, store);
+    }
+
+    [Fact]
+    public async Task Validate_MissingKeys_ReturnsInvalid()
+    {
+        var connector = CreateConnector();
+        var status = await connector.ValidateConfigAsync();
+        Assert.NotNull(status);
+        Assert.False(status.IsValid);
+        Assert.NotNull(status.MissingKey);
+    }
+}
+
+public class GoogleConnectorContractTests : IConnectorContractTests<GoogleConnector>
+{
+    protected override GoogleConnector CreateConnector(NeuronId? user = null)
+    {
+        var store = new FakePackConfigStore();
+        return new GoogleConnector(store);
+    }
+
+    [Fact]
+    public async Task Validate_MissingKeys_ReturnsInvalid()
+    {
+        var connector = CreateConnector();
+        var status = await connector.ValidateConfigAsync();
+        Assert.NotNull(status);
+        Assert.False(status.IsValid);
+        Assert.NotNull(status.MissingKey);
+    }
 }

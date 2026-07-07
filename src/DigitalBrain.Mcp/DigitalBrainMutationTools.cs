@@ -253,18 +253,13 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
     }
 
     [McpServerTool(Name = "create_automation_from_description"), Description("High-level sugar for Ino/LLM: describe in English like 'when personal-assistant activates then emit DailyBriefGenerated with name'. Internally creates real RegisterScript + Reaction using DefineReactionAsync. Returns confirmation.")]
-    public async Task<string> CreateAutomationFromDescription(
+    public Task<string> CreateAutomationFromDescription(
         [Description("Natural language description of the when-then automation")] string description,
         [Description("Optional explicit id, otherwise derived")] string? id = null)
     {
-        // P2: heuristic removed. Use Foundry LLM rail for intent -> script + trigger + manifest -> proposal.
-        // For now, stage basic example; full LLM integration next.
-        var autoId = id ?? "natural-" + Guid.NewGuid().ToString("N")[..8];
-        string when = "NeuronActivated";
-        string? target = null;
-        string script = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from description: " + description + "\" }) };";
-        var proposalId = await StageAutomationDefinitionAsync(autoId, when, target, script, "default", "create_automation_from_description");
-        return $"Staged automation '{autoId}' for approval as proposal '{proposalId}'. (heuristic removed; LLM rail pending)";
+        // Heuristic deleted (P2/Elon delete step). Keyword path removed. Force real LLM rail via run_code_foundry / define_reaction + approval.
+        // Full wiring: Ino/Foundry intent->RegisterReaction+script+caps manifest -> CapabilityGate -> proposal.
+        return Task.FromResult($"Heuristic deleted. Use run_code_foundry(spec:\"{description}\") or define_reaction for LLM-authored automation with trigger/caps.");
     }
 
     [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]

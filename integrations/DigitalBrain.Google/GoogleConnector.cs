@@ -21,12 +21,19 @@ public class GoogleConnector : IConnector
     public ConnectorDescriptor Descriptor => new(
         Id: "google",
         DisplayName: "Google",
-        RequiredConfigKeys: new[] { "clientId", "clientSecret", "redirectUri" },
-        Scopes: new[] { "https://www.googleapis.com/auth/gmail.readonly" });
+        RequiredConfigKeys: new[] { GoogleClientFactory.ClientIdKey, GoogleClientFactory.ClientSecretKey, GoogleClientFactory.RedirectUriKey },
+        Scopes: new[] { GoogleClientFactory.DefaultGmailScope });
 
-    public Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null)
+    public async Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null)
     {
-        return Task.FromResult(new ConnectorConfigStatus(IsValid: true));
+        var scope = string.IsNullOrWhiteSpace(userScope) ? GoogleClientFactory.DefaultScope : userScope;
+        var values = await _store.GetAsync(scope, GoogleClientFactory.PackName);
+        foreach (var key in Descriptor.RequiredConfigKeys)
+        {
+            if (!values.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
+                return new ConnectorConfigStatus(false, MissingKey: key, Message: $"Missing {key}");
+        }
+        return new ConnectorConfigStatus(true);
     }
 
     public async Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null)
@@ -61,7 +68,6 @@ public class GoogleConnector : IConnector
 
         if (!GoogleClientFactory.HasConnectedAppConfig(values) || store is null)
         {
-            var message = "Google OAuth client configuration required. Enter Client ID and Secret from Google Cloud Console.";
             return new AuthChallenge(UrlOrForm: "credential-form-needed", IsForm: true);
         }
 

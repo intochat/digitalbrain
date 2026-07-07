@@ -26,13 +26,19 @@ public class SalesforceConnector : IConnector
     public ConnectorDescriptor Descriptor => new(
         Id: "salesforce",
         DisplayName: "Salesforce CRM",
-        RequiredConfigKeys: new[] { "clientId", "clientSecret", "loginUrl", "apiVersion", "oauthScope", "redirectUri" },
+        RequiredConfigKeys: new[] { SalesforceClientFactory.ClientIdKey, SalesforceClientFactory.ClientSecretKey, SalesforceClientFactory.LoginUrlKey, SalesforceClientFactory.ApiVersionKey, SalesforceClientFactory.OAuthScopeKey, SalesforceClientFactory.RedirectUriKey },
         Scopes: new[] { "api", "refresh_token" });
 
-    public Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null)
+    public async Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null)
     {
-        // TODO full validation from store; for now assume valid if factory can create (real impl will check keys).
-        return Task.FromResult(new ConnectorConfigStatus(IsValid: true));
+        var scope = string.IsNullOrWhiteSpace(userScope) ? PackConfigScopes.App : userScope;
+        var values = await _store.GetAsync(scope, SalesforceClientFactory.PackName);
+        foreach (var key in Descriptor.RequiredConfigKeys)
+        {
+            if (!values.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
+                return new ConnectorConfigStatus(false, MissingKey: key, Message: $"Missing {key}");
+        }
+        return new ConnectorConfigStatus(true);
     }
 
     public async Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null)
