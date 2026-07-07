@@ -11,6 +11,7 @@ public static class GoogleClientFactory
     public const string OAuthPendingPackName = "google-oauth-pending";
     public const string DefaultScope = "default";
     public const string DefaultCallbackPath = "/google-callback";
+    public const string DefaultRedirectUri = "http://localhost:51014/google-callback";
 
     public const string ClientIdKey = "client_id";
     public const string ClientSecretKey = "client_secret";
@@ -46,7 +47,7 @@ public static class GoogleClientFactory
     {
         var clientId = Required(values, ClientIdKey);
         var effectiveRedirect = string.IsNullOrWhiteSpace(redirectUri)
-            ? Optional(values, RedirectUriKey, "http://localhost:51014/google-callback")
+            ? Optional(values, RedirectUriKey, DefaultRedirectUri)
             : redirectUri;
 
         var scopes = new List<string> { DefaultGmailScope };
@@ -81,7 +82,7 @@ public static class GoogleClientFactory
         var clientId = Required(values, ClientIdKey);
         var clientSecret = Required(values, ClientSecretKey);
         var effectiveRedirect = string.IsNullOrWhiteSpace(redirectUri)
-            ? Optional(values, RedirectUriKey, "http://localhost:51014/google-callback")
+            ? Optional(values, RedirectUriKey, DefaultRedirectUri)
             : redirectUri;
 
         var form = new Dictionary<string, string>

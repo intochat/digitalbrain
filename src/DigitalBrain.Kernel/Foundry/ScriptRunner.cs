@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 
@@ -45,6 +46,19 @@ public static class ScriptRunner
         if (scriptBody.StartsWith("inline:", StringComparison.OrdinalIgnoreCase))
             scriptBody = scriptBody["inline:".Length..].Trim();
 
+        // Gate before any execution (same as packs). Use Roslyn compilation for violation check.
+        try
+        {
+            var checkCompilation = FoundryCompilation.Create("script-gate", scriptBody, Enumerable.Empty<MetadataReference>());
+            // Note: full refs added in real run; gate will catch obvious bans even with limited for check.
+            var violations = CapabilityGate.FindViolations(checkCompilation);
+            if (violations.Count > 0)
+            {
+                return new[] { new PackEmission("automation", input.Type, "script-violation:" + string.Join(";", violations)) };
+            }
+        }
+        catch { /* gate is best effort; proceed to real compile which will fail on bad anyway */ }
+
         var globals = new ScriptGlobals(input, self, fire);
         var bodyHash = HashBody(scriptBody);
 
@@ -81,43 +95,9 @@ public static class ScriptRunner
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Runtime error or load skew (4.8 Scripting vs 5.x common) -> safe diagnostic + fallback emulation
-            var diag = new PackEmission("automation", input.Type, "script-error:" + ex.Message);
-            try
-            {
-                // Fallback: simple regex emulation for common patterns so feature stays usable
-                var fb = await EmulateAsync(scriptBody, input, self, fire);
-                return fb.Count > 0 ? fb : new[] { diag };
-            }
-            catch
-            {
-                return new[] { diag };
-            }
+            // Runtime error -> safe diagnostic only. No fallback (Emulate deleted per plan).
+            return new[] { new PackEmission("automation", input.Type, "script-error:" + ex.Message) };
         }
     }
 
-    private static async Task<IReadOnlyList<Synapse>> EmulateAsync(string scriptBody, Synapse input, NeuronId self, Func<Synapse, Task> fire)
-    {
-        var emitted = new List<Synapse>();
-        foreach (Match m in Regex.Matches(scriptBody, @"new\s+Signal\s*\(\s*""([^""]+)"""))
-        {
-            var name = m.Groups[1].Value;
-            var sig = new Signal(name, new Dictionary<string, object?> { ["fromScript"] = true });
-            emitted.Add(sig);
-            await fire(sig);
-        }
-        if (scriptBody.Contains("PackEmission", StringComparison.Ordinal))
-        {
-            var p = new PackEmission("automation", input.Type, "ok");
-            emitted.Add(p);
-            await fire(p);
-        }
-        if (emitted.Count == 0)
-        {
-            var trace = new Signal("ScriptExecuted", new Dictionary<string, object?> { ["scriptLength"] = scriptBody.Length, ["self"] = self.Value });
-            emitted.Add(trace);
-            await fire(trace);
-        }
-        return emitted;
-    }
 }

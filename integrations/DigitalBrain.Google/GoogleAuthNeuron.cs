@@ -58,21 +58,17 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
 
         if (!values.TryGetValue(GoogleClientFactory.RedirectUriKey, out var redirectUri) || string.IsNullOrWhiteSpace(redirectUri))
         {
-            redirectUri = "http://localhost:51014/google-callback";
+            redirectUri = GoogleClientFactory.DefaultRedirectUri;
             values[GoogleClientFactory.RedirectUriKey] = redirectUri;
         }
 
         if (!GoogleClientFactory.HasConnectedAppConfig(values) || store is null)
         {
-            // Emit AuthUrl even without full config (supports unit tests + INO button before full seed).
-            var url = values.Count > 0 && GoogleClientFactory.HasConnectedAppConfig(values)
-                ? GoogleClientFactory.CreateAuthorizationUrl(values, redirectUri, Guid.NewGuid().ToString("N"))
-                : string.Empty;
-            await Broadcast(new Signal(GoogleSignals.AuthUrl, new Dictionary<string, object?>
-            {
-                ["provider"] = "google",
-                ["url"] = url
-            }));
+            // No config: emit credential form (port from Salesforce) instead of empty URL.
+            // User fills client id/secret via form -> saves -> re-triggers OAuth.
+            var message = "Google OAuth client configuration required. Enter Client ID and Secret from Google Cloud Console.";
+            var form = GoogleAuthSurfaces.CredentialForm(Self.Value, clientId: null, message);
+            await FireAsync(form);
             return;
         }
 
