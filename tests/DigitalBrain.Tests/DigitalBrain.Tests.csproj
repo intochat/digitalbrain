@@ -55,6 +55,8 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="DigitalBrain.Ui.Contracts" />
+    <Using Include="DigitalBrain.Ui.Runtime" />
   </ItemGroup>
 
   <ItemGroup>
