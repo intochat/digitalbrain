@@ -148,7 +148,7 @@ if (isAspireHosted)
 // everywhere else and AddDigitalBrainChat falls back to constructing its own.
 builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
 builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
-builder.Services.AddSingleton<DigitalBrain.Core.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
+builder.Services.AddSingleton<DigitalBrain.Kernel.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
 builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
 builder.Services.AddContextStore(builder.Configuration);

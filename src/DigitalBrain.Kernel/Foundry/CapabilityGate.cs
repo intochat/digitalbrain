@@ -8,13 +8,20 @@ namespace DigitalBrain.Kernel.Foundry;
 // collections/LINQ" as earlier design notes implied. CONFIRMED BYPASS: Type.GetType + Activator.CreateInstance
 // sit inside that broad "System." allowance and aren't excluded, so reflection reaches any nominally-banned
 // API with zero statically-resolvable symbol reference. This is a guardrail against accidental misuse, not a
-// security boundary — see docs/specs/2026-07-02-capability-gate-hardening-followup.md for the tracked fix.
+// security boundary — the followup doc that used to be linked here (docs/specs/2026-07-02-capability-gate-hardening-followup.md)
+// was deleted in commit 6dfc0a7; the tracked fix it described no longer exists.
 public static class CapabilityGate
 {
     private static readonly string[] AllowedNamespacePrefixes =
     {
         "System.",              // narrowed further below by explicit exclusions
         "DigitalBrain.Core.",
+        "DigitalBrain.Ui.Contracts.", // DTOs/interfaces only (UiSurface, UiWidgetTree, RfwCard, ...);
+                                       // same dependency footprint as DigitalBrain.Core. above (only
+                                       // Core + Orleans abstractions), no I/O/reflection/process capability.
+        "DigitalBrain.Pack.Contracts.", // Pack authoring DSL (KitExperience, UiExperience, UiHop, ...) that
+                                         // packs are expected to build against; its .csproj references only
+                                         // Core + Ui.Contracts + Orleans abstractions, the same safe footprint.
     };
 
     // Explicit exclusions within the broad "System." allowance above — these remain banned
