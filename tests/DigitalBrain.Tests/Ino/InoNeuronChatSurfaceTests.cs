@@ -303,6 +303,45 @@ public sealed class InoNeuronActionDirectiveTests : NeuronTestBase
     }
 }
 
+internal sealed class ThrowingInoChatClient : IChatClient
+{
+    public Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        throw new HttpRequestException("Response status code does not indicate success: 404 (Not Found).");
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Streaming not used.");
+
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    public void Dispose() { }
+}
+
+public sealed class InoNeuronLlmUnavailableTests : NeuronTestBase
+{
+    protected override void ConfigureSilo(ISiloBuilder builder) =>
+        builder.ConfigureServices(services => services.AddSingleton<IChatClient, ThrowingInoChatClient>());
+
+    [Fact]
+    public async Task Plain_chat_returns_visible_fallback_when_llm_is_unavailable()
+    {
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("tell me a joke", "session-llm-down"));
+
+        var response = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().Last();
+        Assert.Contains("local LLM is not ready", response.Response);
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surface = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().Single();
+        Assert.Equal("assistant", surface.Props["role"]);
+    }
+}
+
 public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
 {
     private readonly RecordingGmailApiClient _gmail = new();

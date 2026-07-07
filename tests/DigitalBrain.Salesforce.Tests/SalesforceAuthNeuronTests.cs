@@ -64,7 +64,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         {
             ["clientId"] = "session-oauth",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
-            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/salesforce"
         })
         { Receiver = new NeuronId("salesforce-auth-test") });
 
@@ -74,7 +74,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
 
         Assert.StartsWith("https://test.salesforce.com/services/oauth2/authorize?", url);
         Assert.Contains("client_id=connected-app-id", url);
-        Assert.Contains("redirect_uri=http%3A%2F%2Flocalhost%3A8081%2Fsalesforce-callback", url);
+        Assert.Contains("redirect_uri=http%3A%2F%2Flocalhost%3A8081%2Foauth%2Fcallback%2Fsalesforce", url);
         Assert.Contains("code_challenge=", url);
         Assert.Contains("code_challenge_method=S256", url);
     }
@@ -87,7 +87,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         {
             ["clientId"] = "session-oauth-missing",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
-            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/salesforce"
         })
         { Receiver = new NeuronId("salesforce-auth-test") });
 
@@ -110,7 +110,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         {
             ["clientId"] = "session-race",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
-            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/salesforce"
         })
         { Receiver = new NeuronId("salesforce-auth-test-race") });
 
@@ -137,7 +137,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         {
             ["clientId"] = "session-complete",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
-            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/salesforce"
         })
         { Receiver = new NeuronId("salesforce-auth-test-complete") });
 
@@ -151,7 +151,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
             State: state,
             Error: null,
             ErrorDescription: null,
-            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+            FallbackRedirectUri: "http://localhost:8081/oauth/callback/salesforce"));
 
         Assert.True(result.Success);
         Assert.Equal("Salesforce connected", result.Title);
@@ -174,7 +174,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         {
             ["clientId"] = "session-mismatch",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
-            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/salesforce"
         })
         { Receiver = new NeuronId("salesforce-auth-test-mismatch") });
 
@@ -183,7 +183,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
             State: "wrong-state",
             Error: null,
             ErrorDescription: null,
-            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+            FallbackRedirectUri: "http://localhost:8081/oauth/callback/salesforce"));
 
         Assert.False(result.Success);
         Assert.Equal("The callback state did not match the pending login.", result.Message);
@@ -208,7 +208,7 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
             State: "some-state",
             Error: null,
             ErrorDescription: null,
-            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+            FallbackRedirectUri: "http://localhost:8081/oauth/callback/salesforce"));
 
         Assert.False(result.Success);
         Assert.Equal("The callback state did not match the pending login.", result.Message);

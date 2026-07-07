@@ -400,10 +400,6 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
     return Results.Ok();
 });
 
-// Old per-provider routes deleted per P2 (now unified to generic /oauth/callback/{provider} dispatched to IConnector.CompleteAuthAsync).
-// DefaultCallbackPath in factories updated; tests/surfaces updated to generic paths.
-
-// P2 generic callback route
 app.MapGet("/oauth/callback/{provider}", async (
     string provider,
     HttpRequest request,
@@ -515,83 +511,3 @@ if (grainFactory != null && !isTestMode)
 }
 
 app.Run();
-
-
-static string SalesforceCallbackUri(HttpRequest request) =>
-    new UriBuilder(request.Scheme, request.Host.Host, request.Host.Port ?? -1, SalesforceClientFactory.DefaultCallbackPath)
-        .Uri
-        .ToString();
-
-// The callback is a cold, unauthenticated GET from Salesforce's redirect — it carries no session, only
-// code/state. StartOAuthAsync prefixes state with its own userId ("{userId}:{nonce}") so this endpoint can
-// route to the right per-user grain; the grain still exact-matches the FULL state string against its own
-// stored pending value, so CSRF protection is unchanged. This is NOT D-MU2's encrypted state (deferred to
-// S4) — a malformed/tampered state just fails to route to a real pending flow and fails closed.
-static string SalesforceOAuthUserIdFromState(string? state)
-{
-    if (string.IsNullOrWhiteSpace(state)) return "salesforce-auth-unknown";
-    var separatorIndex = state.LastIndexOf(':');
-    return separatorIndex > 0 ? state[..separatorIndex] : "salesforce-auth-unknown";
-}
-
-static string SalesforceCallbackPage(string title, string message)
-{
-    var safeTitle = System.Net.WebUtility.HtmlEncode(title);
-    var safeMessage = System.Net.WebUtility.HtmlEncode(message);
-    return $$"""
-        <!doctype html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8">
-          <title>{{safeTitle}}</title>
-          <style>
-            body { font-family: system-ui, sans-serif; margin: 3rem; line-height: 1.5; }
-            main { max-width: 42rem; }
-          </style>
-        </head>
-        <body>
-          <main>
-            <h1>{{safeTitle}}</h1>
-            <p>{{safeMessage}}</p>
-          </main>
-        </body>
-        </html>
-        """;
-}
-
-static string GoogleCallbackUri(HttpRequest request) =>
-    new UriBuilder(request.Scheme, request.Host.Host, request.Host.Port ?? -1, GoogleClientFactory.DefaultCallbackPath)
-        .Uri
-        .ToString();
-
-static string GoogleOAuthUserIdFromState(string? state)
-{
-    if (string.IsNullOrWhiteSpace(state)) return "google-auth-unknown";
-    var separatorIndex = state.LastIndexOf(':');
-    return separatorIndex > 0 ? state[..separatorIndex] : "google-auth-unknown";
-}
-
-static string GoogleCallbackPage(string title, string message)
-{
-    var safeTitle = System.Net.WebUtility.HtmlEncode(title);
-    var safeMessage = System.Net.WebUtility.HtmlEncode(message);
-    return $$"""
-        <!doctype html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8">
-          <title>{{safeTitle}}</title>
-          <style>
-            body { font-family: system-ui, sans-serif; margin: 3rem; line-height: 1.5; }
-            main { max-width: 42rem; }
-          </style>
-        </head>
-        <body>
-          <main>
-            <h1>{{safeTitle}}</h1>
-            <p>{{safeMessage}}</p>
-          </main>
-        </body>
-        </html>
-        """;
-}
