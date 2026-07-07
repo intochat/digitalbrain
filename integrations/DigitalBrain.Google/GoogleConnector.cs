@@ -1,6 +1,8 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Abstractions;
+using Google.Apis.Gmail.v1;
+using Google.Apis.Services;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Google;
@@ -158,15 +160,27 @@ public class GoogleConnector : IConnector
         {
             var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
             var values = await _store.GetAsync(userScope, GoogleClientFactory.PackName);
-            if (values.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var rt) && !string.IsNullOrWhiteSpace(rt))
+            if (!values.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var rt) || string.IsNullOrWhiteSpace(rt))
+                return new ConnectionHealth(Healthy: false, Detail: "No refresh token for user", Checked: DateTimeOffset.UtcNow);
+
+            if (!values.TryGetValue(GoogleClientFactory.ClientIdKey, out var cid) || string.IsNullOrWhiteSpace(cid) ||
+                !values.TryGetValue(GoogleClientFactory.ClientSecretKey, out var cs) || string.IsNullOrWhiteSpace(cs))
+                return new ConnectionHealth(Healthy: false, Detail: "Missing client credentials for probe", Checked: DateTimeOffset.UtcNow);
+
+            var cred = GoogleCredentialFactory.FromRefreshToken(cid, cs, rt, GoogleClientFactory.DefaultGmailScope);
+            var service = new GmailService(new BaseClientService.Initializer
             {
-                return new ConnectionHealth(Healthy: true, Detail: "Google has refresh token", Checked: DateTimeOffset.UtcNow);
-            }
-            return new ConnectionHealth(Healthy: false, Detail: "No refresh token for user", Checked: DateTimeOffset.UtcNow);
+                HttpClientInitializer = cred,
+                ApplicationName = "DigitalBrain-TestConnection"
+            });
+
+            var labelsResponse = await service.Users.Labels.List("me").ExecuteAsync();
+            var count = labelsResponse.Labels?.Count ?? 0;
+            return new ConnectionHealth(Healthy: true, Detail: $"Google labels.list succeeded ({count} labels)", Checked: DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {
-            return new ConnectionHealth(Healthy: false, Detail: ex.Message, Checked: DateTimeOffset.UtcNow);
+            return new ConnectionHealth(Healthy: false, Detail: "Probe failed: " + ex.Message, Checked: DateTimeOffset.UtcNow);
         }
     }
 }

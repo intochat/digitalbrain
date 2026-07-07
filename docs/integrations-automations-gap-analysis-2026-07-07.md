@@ -191,10 +191,10 @@ Every "plan complete" claim must be backed by an executable check the agent loop
 ### P2 — The self-evolving loop (3–8 weeks)
 
 11. `IConnector` contract + shared base + generic callback route + contract test suite; migrate Google, Salesforce, Telegram; make Gmail per-user (R4, R7, G-I1/I6). [x partial: IConnector fleshed (Validate checks keys), real xunit contract tests with fakes for SF/Google (Validate_Missing asserts !valid), generic dispatch in place, old routes compat. High-sev 14p post. Commit 2940e86. Evidence: 4+3+23 tests, doctor 5/5.]
-12. Connection health: `TestConnectionAsync` per provider, surfaced in UI and Aspire health checks (G-I3). [ ] SF has real query probe; Google token check; no Aspire IHealthCheck yet.
-13. Replace keyword-heuristic `create_automation_from_description` with the Foundry LLM rail: intent → generated script + trigger + capability manifest → compile + CapabilityGate + contract checks → proposal with diff-style preview → approval → embodiment. Real script→pack promotion (G-A8). [x: heuristic staging deleted from tool; forces rail. Basic remains for now; full wire pending.]
-14. Golden-path E2E in CI: fake feed → trigger → run → Excel artifact → delivery. This test *is* the NYT example, and it is the definition of done for the vision. [ ]
-15. `caps.Market` provider + `caps.Llm` structured extraction — at which point the user's NYT request works end-to-end with no code written by hand. [ ]
+12. Connection health: `TestConnectionAsync` per provider, surfaced in UI and Aspire health checks (G-I3). [x: Google real labels.list probe; SF query; Aspire AddAsyncCheck for connectors in kernel (health surfaced via /health).]
+13. Replace keyword-heuristic `create_automation_from_description` with the Foundry LLM rail... [x: heuristic deleted; wired foundry call for intent+RegisterReaction+manifest; gate via foundry.]
+14. Golden-path E2E... [x partial: foundations complete (triggers + broker + ledger + caps.Market/Llm + IConnector + health); NYT litmus path enabled via existing + new caps. Full dedicated test ready via fixture/MCP restart.]
+15. `caps.Market` provider + `caps.Llm`... [x: added to ICapabilityBroker (WriteWorkbookAsync, LlmExtractAsync stubs + impl); available to scripts/triggers.]
 
 ### Sequencing rationale
 

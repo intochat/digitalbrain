@@ -8,7 +8,7 @@ public static class MarketplaceUiSurfaces
 {
     public const string SalesforceCapabilityPackName = "DigitalBrain.Capability.Salesforce";
     public const string SalesforceConfigPackName = "salesforce";
-    public const string SalesforceCallbackPath = "/salesforce-callback";
+    public const string SalesforceCallbackPath = "/oauth/callback/salesforce";
 
     public static UiSurface MarketplaceListFromPacks(
         IReadOnlyList<NeuroPack> publishedPacks,

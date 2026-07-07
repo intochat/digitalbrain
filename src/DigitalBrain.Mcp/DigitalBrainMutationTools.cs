@@ -253,13 +253,17 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
     }
 
     [McpServerTool(Name = "create_automation_from_description"), Description("High-level sugar for Ino/LLM: describe in English like 'when personal-assistant activates then emit DailyBriefGenerated with name'. Internally creates real RegisterScript + Reaction using DefineReactionAsync. Returns confirmation.")]
-    public Task<string> CreateAutomationFromDescription(
+    public async Task<string> CreateAutomationFromDescription(
         [Description("Natural language description of the when-then automation")] string description,
         [Description("Optional explicit id, otherwise derived")] string? id = null)
     {
-        // Heuristic deleted (P2/Elon delete step). Keyword path removed. Force real LLM rail via run_code_foundry / define_reaction + approval.
-        // Full wiring: Ino/Foundry intent->RegisterReaction+script+caps manifest -> CapabilityGate -> proposal.
-        return Task.FromResult($"Heuristic deleted. Use run_code_foundry(spec:\"{description}\") or define_reaction for LLM-authored automation with trigger/caps.");
+        // Wired to Foundry (P2): intent -> generated script + RegisterReaction (trigger + caps manifest) -> gate -> proposal with preview.
+        var loop = Grains.GetGrain<ICodeFoundryLoopNeuron>("foundry-main");
+        await loop.FireAsync(new FoundryRequest(
+            $"Produce C# script and RegisterReaction payload (include Schedule/Poll trigger + caps from ICapabilityBroker manifest e.g. Http/Llm) for: {description}. Use approval rail.",
+            TargetTier.Run,
+            AutoApply: false));
+        return $"Foundry LLM rail wired for '{description}'. Proposal staged for approval (check timeline for diff/preview).";
     }
 
     [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]

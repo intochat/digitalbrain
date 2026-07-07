@@ -30,7 +30,7 @@ public class SalesforceTwoUserOAuthIsolationTests : NeuronTestBase
         {
             ["clientId"] = "session-alice",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
-            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/salesforce"
         })
         { Receiver = new NeuronId("alice") });
 
@@ -38,7 +38,7 @@ public class SalesforceTwoUserOAuthIsolationTests : NeuronTestBase
         {
             ["clientId"] = "session-bob",
             ["callbackPath"] = SalesforceClientFactory.DefaultCallbackPath,
-            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/salesforce"
         })
         { Receiver = new NeuronId("bob") });
 
@@ -53,13 +53,13 @@ public class SalesforceTwoUserOAuthIsolationTests : NeuronTestBase
         // Wrong-user callback: Alice's grain, Bob's state — fails closed, no exchange, no cross-write.
         var crossResult = await alice.CompleteOAuthAsync(new SalesforceOAuthCallback(
             Code: "some-code", State: bobState, Error: null, ErrorDescription: null,
-            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+            FallbackRedirectUri: "http://localhost:8081/oauth/callback/salesforce"));
         Assert.False(crossResult.Success);
         Assert.Equal("The callback state did not match the pending login.", crossResult.Message);
 
         var aliceResult = await alice.CompleteOAuthAsync(new SalesforceOAuthCallback(
             Code: "alice-code", State: aliceState, Error: null, ErrorDescription: null,
-            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+            FallbackRedirectUri: "http://localhost:8081/oauth/callback/salesforce"));
         Assert.True(aliceResult.Success);
 
         // Presence/absence check (not value equality, which the constant-valued fake token handler can't
@@ -70,7 +70,7 @@ public class SalesforceTwoUserOAuthIsolationTests : NeuronTestBase
 
         var bobResult = await bob.CompleteOAuthAsync(new SalesforceOAuthCallback(
             Code: "bob-code", State: bobState, Error: null, ErrorDescription: null,
-            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+            FallbackRedirectUri: "http://localhost:8081/oauth/callback/salesforce"));
         Assert.True(bobResult.Success);
 
         var aliceTokens = await writer.ReadPackAsync(PackConfigScopes.ForUser(new UserId("alice")), SalesforceClientFactory.PackName);

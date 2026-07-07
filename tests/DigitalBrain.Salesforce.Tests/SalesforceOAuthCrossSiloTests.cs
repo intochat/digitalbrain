@@ -35,7 +35,7 @@ public class SalesforceOAuthCrossSiloTests : NeuronTestBase
             [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
             [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
             [SalesforceClientFactory.LoginUrlKey] = "https://test.salesforce.com",
-            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/salesforce-callback"
+            [SalesforceClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/salesforce"
         })
         { Receiver = new NeuronId("salesforce-auth-main") });
 
@@ -58,7 +58,7 @@ public class SalesforceOAuthCrossSiloTests : NeuronTestBase
             State: state,
             Error: null,
             ErrorDescription: null,
-            FallbackRedirectUri: "http://localhost:8081/salesforce-callback"));
+            FallbackRedirectUri: "http://localhost:8081/oauth/callback/salesforce"));
 
         Assert.True(result.Success);
         Assert.Equal("Salesforce connected", result.Title);

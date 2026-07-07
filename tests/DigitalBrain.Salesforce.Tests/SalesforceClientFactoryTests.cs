@@ -44,12 +44,12 @@ public class SalesforceClientFactoryTests
             [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
             [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
             [SalesforceClientFactory.LoginUrlKey] = "https://test.salesforce.com"
-        }, "http://localhost:8081/salesforce-callback", "state-1");
+        }, "http://localhost:8081/oauth/callback/salesforce", "state-1");
 
         Assert.StartsWith("https://test.salesforce.com/services/oauth2/authorize?", url);
         Assert.Contains("response_type=code", url);
         Assert.Contains("client_id=connected-app-id", url);
-        Assert.Contains("redirect_uri=http%3A%2F%2Flocalhost%3A8081%2Fsalesforce-callback", url);
+        Assert.Contains("redirect_uri=http%3A%2F%2Flocalhost%3A8081%2Foauth%2Fcallback%2Fsalesforce", url);
         Assert.Contains("scope=api%20refresh_token", url);
         Assert.DoesNotContain("offline_access", url);
         Assert.Contains("state=state-1", url);
@@ -63,7 +63,7 @@ public class SalesforceClientFactoryTests
             [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
             [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
             [SalesforceClientFactory.LoginUrlKey] = "https://test.salesforce.com"
-        }, "http://localhost:8081/salesforce-callback", "state-1", "challenge-1");
+        }, "http://localhost:8081/oauth/callback/salesforce", "state-1", "challenge-1");
 
         Assert.Contains("code_challenge=challenge-1", url);
         Assert.Contains("code_challenge_method=S256", url);
@@ -134,7 +134,7 @@ public class SalesforceClientFactoryTests
                 [SalesforceClientFactory.OAuthCodeVerifierKey] = "verifier-1"
             },
             "auth-code-1",
-            "http://localhost:8081/salesforce-callback",
+            "http://localhost:8081/oauth/callback/salesforce",
             handler);
 
         Assert.Equal("fake-access-token", result[SalesforceClientFactory.AccessTokenKey]);

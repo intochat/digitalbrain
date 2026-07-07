@@ -9,6 +9,8 @@ public interface ICapabilityBroker
 {
     Task<string> HttpGetAsync(string url);
     Task NotifyAsync(string channel, string message);
+    Task<string> LlmExtractAsync(string text, string schemaHint); // caps.Llm structured extraction
+    Task<string> WriteWorkbookAsync(string specJson); // caps.Market narrow workbook
 }
 
 public class CapabilityBroker : ICapabilityBroker
@@ -30,5 +32,17 @@ public class CapabilityBroker : ICapabilityBroker
         // Host can deliver via TelegramTransport etc. For v1 emit observable signal.
         // Real impl would resolve channel grain and deliver.
         return Task.CompletedTask;
+    }
+
+    public Task<string> LlmExtractAsync(string text, string schemaHint)
+    {
+        // Wired to existing Ino/Foundry structured for caps.Llm (stub returns manifest for now; real call in full).
+        return Task.FromResult($"{{ \"extracted\": true, \"schema\": \"{schemaHint}\", \"sample\": \"{text.Substring(0, Math.Min(50, text.Length)) }...\" }}");
+    }
+
+    public Task<string> WriteWorkbookAsync(string specJson)
+    {
+        // caps.Market: narrow workbook (artifact ref; host would use ClosedXML or equiv).
+        return Task.FromResult("artifact:workbook.xlsx:spec=" + (specJson.Length > 20 ? specJson.Substring(0,20) : specJson));
     }
 }

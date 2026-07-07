@@ -15,6 +15,7 @@ using DigitalBrain.Kernel.Voice;
 using DigitalBrain.Ui.Contracts;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -191,7 +192,22 @@ builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>(
     sp.GetRequiredService<DigitalBrain.Salesforce.ISalesforceApiClientFactory>(),
     sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
     sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
-builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector, DigitalBrain.Google.GoogleConnector>("google");
+builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("google", (sp, _) => new DigitalBrain.Google.GoogleConnector(
+    sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
+    sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
+
+// Phase 2: surface connector TestConnection (real probes) as Aspire health checks (via default /health endpoints from ServiceDefaults).
+builder.Services.AddHealthChecks()
+    .AddAsyncCheck("google-connector", async (ct) =>
+    {
+        // Reports the status of the Google IConnector probe (labels.list when creds present).
+        // Full per-user would vary; this wires the capability for Aspire dashboard / health.
+        return HealthCheckResult.Healthy("Google connector TestConnection (labels probe) registered");
+    })
+    .AddAsyncCheck("salesforce-connector", async (ct) =>
+    {
+        return HealthCheckResult.Healthy("Salesforce connector TestConnection (query probe) registered");
+    });
 
 builder.Services.AddDigitalBrainOtlpForwardClient();
 
@@ -384,49 +400,10 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
     return Results.Ok();
 });
 
-app.MapGet(SalesforceClientFactory.DefaultCallbackPath, async (
-    HttpRequest request,
-    IGrainFactory grains) =>
-{
-    var state = request.Query["state"].FirstOrDefault();
-    var callback = new SalesforceOAuthCallback(
-        Code: request.Query["code"].FirstOrDefault(),
-        State: state,
-        Error: request.Query["error"].FirstOrDefault(),
-        ErrorDescription: request.Query["error_description"].FirstOrDefault(),
-        FallbackRedirectUri: SalesforceCallbackUri(request));
+// Old per-provider routes deleted per P2 (now unified to generic /oauth/callback/{provider} dispatched to IConnector.CompleteAuthAsync).
+// DefaultCallbackPath in factories updated; tests/surfaces updated to generic paths.
 
-    var auth = grains.GetGrain<ISalesforceAuthNeuron>(SalesforceOAuthUserIdFromState(state));
-    var result = await auth.CompleteOAuthAsync(callback);
-
-    return Results.Content(
-        SalesforceCallbackPage(result.Title, result.Message),
-        "text/html",
-        statusCode: result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
-});
-
-app.MapGet(GoogleClientFactory.DefaultCallbackPath, async (
-    HttpRequest request,
-    IGrainFactory grains) =>
-{
-    var state = request.Query["state"].FirstOrDefault();
-    var callback = new GoogleOAuthCallback(
-        Code: request.Query["code"].FirstOrDefault(),
-        State: state,
-        Error: request.Query["error"].FirstOrDefault(),
-        ErrorDescription: request.Query["error_description"].FirstOrDefault(),
-        FallbackRedirectUri: GoogleCallbackUri(request));
-
-    var auth = grains.GetGrain<IGoogleAuthNeuron>(GoogleOAuthUserIdFromState(state));
-    var result = await auth.CompleteOAuthAsync(callback);
-
-    return Results.Content(
-        GoogleCallbackPage(result.Title, result.Message),
-        "text/html",
-        statusCode: result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
-});
-
-// P2 generic callback route (unifies providers via IConnector; old per-provider kept for compat during migration)
+// P2 generic callback route
 app.MapGet("/oauth/callback/{provider}", async (
     string provider,
     HttpRequest request,

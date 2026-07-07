@@ -14,7 +14,7 @@ public static class SalesforceClientFactory
     public const string DefaultScope = "default";
     public const string DefaultLoginUrl = "https://login.salesforce.com";
     public const string DefaultApiVersion = "v60.0";
-    public const string DefaultCallbackPath = "/salesforce-callback";
+    public const string DefaultCallbackPath = "/oauth/callback/salesforce";
     public const string DefaultRedirectUri = "http://localhost:8081" + DefaultCallbackPath;
     public const string DefaultOAuthScope = "api refresh_token";
 

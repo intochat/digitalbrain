@@ -49,6 +49,6 @@ public sealed class GoogleConfigWriter(ILogger<GoogleConfigWriter> logger, Neuro
         {
             [GoogleClientFactory.ClientIdKey] = "test-client-id.apps.googleusercontent.com",
             [GoogleClientFactory.ClientSecretKey] = "test-secret",
-            [GoogleClientFactory.RedirectUriKey] = "http://localhost:51014/google-callback"
+            [GoogleClientFactory.RedirectUriKey] = "http://localhost:8081/oauth/callback/google"
         });
 }
