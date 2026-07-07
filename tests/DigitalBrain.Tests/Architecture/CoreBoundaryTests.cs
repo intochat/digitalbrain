@@ -140,16 +140,55 @@ public class CoreBoundaryTests
         Assert.Equal("DigitalBrain.Ino", typeof(IInoCapabilityRecall).Assembly.GetName().Name);
 
         var references = InoReferenceNames();
-        var forbiddenReferences = references
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) ||
-                name.StartsWith("Orleans", StringComparison.Ordinal) ||
-                name.StartsWith("Microsoft.Orleans", StringComparison.Ordinal) ||
+        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+        var packContractsAssemblyName = typeof(IPackBehavior).Assembly.GetName().Name!;
+        var uiContractsAssemblyName = typeof(UiSurface).Assembly.GetName().Name!;
+        var uiRuntimeAssemblyName = typeof(UiSurfaceLiveData).Assembly.GetName().Name!;
+        var marketplaceContractsAssemblyName = typeof(MarketplaceUiSurfaces).Assembly.GetName().Name!;
+
+        // Ino is a full peer integration (commit 4ee79a4): it legitimately references Core, its own
+        // Google/Salesforce peers, Kernel.Abstractions (to host itself as a real grain), and the Ui/Marketplace
+        // contract layers it emits surfaces through. Anything DigitalBrain.* outside this allowlist -
+        // e.g. DigitalBrain.Kernel, DigitalBrain.Mcp, DigitalBrain.AppHost - would be a real boundary violation.
+        var allowedDigitalBrainReferences = new[]
+        {
+            coreAssemblyName,
+            "DigitalBrain.Kernel.Abstractions",
+            packContractsAssemblyName,
+            uiContractsAssemblyName,
+            uiRuntimeAssemblyName,
+            marketplaceContractsAssemblyName,
+            "DigitalBrain.Google",
+            "DigitalBrain.Salesforce"
+        };
+
+        var unexpectedDigitalBrainReferences = references
+            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
+                !allowedDigitalBrainReferences.Contains(name, StringComparer.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(unexpectedDigitalBrainReferences);
+
+        // Ino hosting itself as a grain legitimately needs the grain-abstraction packages (Orleans.Core.Abstractions,
+        // Orleans.Journaling, Orleans.Serialization*). Only the hosting/server packages - which would mean Ino
+        // pulled in a full silo host instead of just grain abstractions - are a real violation.
+        var forbiddenOrleansHostingAssemblyNames = new[]
+        {
+            "Orleans.Server",
+            "Microsoft.Orleans.Server",
+            "Orleans.Runtime"
+        };
+
+        var offenders = references
+            .Where(name =>
+                forbiddenOrleansHostingAssemblyNames.Contains(name, StringComparer.Ordinal) ||
                 name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) ||
                 name.StartsWith("Microsoft.Extensions.Hosting", StringComparison.Ordinal))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Empty(forbiddenReferences);
+        Assert.Empty(offenders);
     }
     [Fact]
     public void Ui_Runtime_Depends_On_Core_And_Ui_Contracts_Not_Marketplace_Runtime_Host_Or_Integrations()
