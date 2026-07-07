@@ -11,6 +11,9 @@
       "env": {
         "DOTNET_ENVIRONMENT": "Development"
       }
+    },
+    "digitalbrain-http": {
+      "url": "http://localhost:5000/mcp"
     }
   }
 }

@@ -24,7 +24,7 @@ Full stack:
 aspire run
 ```
 
-See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, and iteration speed rules.
+See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, iteration speed rules (MCP-first, parallel Context7, bg tests + polling, metrics + retro, self-evolution for WoW proposals), and pre-change ritual (Context7 + Aspire MCP + todo).
 
 ## Core Ideas
 
@@ -38,12 +38,13 @@ See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, and iter
 
 - Always follow Elon's 5 steps **in order**: less dumb reqs → delete (target 10%+) → simplify → accelerate → automate last.
 - **Context7** for every library/framework API before touching code.
-- **Aspire MCP + CLI** for fast inspection/restarts/logs/traces (prefer over full runs).
-- Tests: `dotnet test --logger "console;verbosity=minimal"` from root only. No --filter.
-- After every change: build + above test + `aspire doctor` + MCP health.
+- **Aspire MCP + CLI** for fast inspection/restarts/logs/traces (prefer over full runs). Use resource-targeted restarts.
+- Tests: `dotnet test --logger "console;verbosity=minimal"` from root only. No --filter. Launch bg + poll with MCP logs.
+- After every change: build + above test + `aspire doctor` + MCP health. Log cycle time + 5-steps retro.
 - Delete trash (especially docs/plans). Only living docs: this README + CLAUDE.md.
 - Relative paths. Self-explanatory names. No vacuous summaries.
-- Self-evolution is non-negotiable for mutations.
+- Self-evolution is non-negotiable for mutations. Use rail to propose WoW improvements.
+- Minimal/isolated starts when possible; pre-build for MCP; parallel Context7 + MCP.
 
 ## Vision (Self-Evolving System)
 
