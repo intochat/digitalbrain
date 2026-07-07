@@ -89,16 +89,11 @@ jobs:
           work-dir: deploy
           cloud-url: azblob://pulumi-state
 
-      - name: Capture kernel FQDN
+      - name: Capture stable kernel FQDN
         id: kernel_fqdn
-        working-directory: deploy
         run: |
-          fqdn=$(pulumi stack output kernelFqdn --stack dev)
+          fqdn=$(az containerapp show --name digitalbrain-jobs --resource-group digitalbrain-rg --query "properties.configuration.ingress.fqdn" -o tsv)
           echo "fqdn=$fqdn" >> "$GITHUB_OUTPUT"
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
-          PULUMI_BACKEND_URL: azblob://pulumi-state
-          AZURE_STORAGE_ACCOUNT: digitalbrainstprod
 
       - name: Ensure Azure Static Web App
         id: swa
