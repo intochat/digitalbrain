@@ -5,7 +5,7 @@ namespace DigitalBrain.Tests.E2E;
 public class E2ERunSettingsTests
 {
     private static string RunSettingsPath =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "e2e.runsettings"));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "e2e.runsettings"));
 
     [Fact]
     public void Runsettings_file_exists_at_the_repo_root()
