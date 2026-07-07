@@ -105,10 +105,6 @@ public sealed class KeywordWatcherNeuron : IPackBehavior
 }
 """;
 
-    // XBitcoinTelegramDemoPackCode demo const deleted as trash (bitcoin market data + demo removed).
-
-    // ExcelVizPackCode demo const deleted (Musk delete-first).
-
     public static IReadOnlyList<NeuroPack> LocalUiPacks { get; } =
     [
         new NeuroPack(
