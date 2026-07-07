@@ -1,5 +1,7 @@
+extern alias McpProject;
+
 using System.Reflection;
-using DigitalBrain.Mcp;
+using McpProject::DigitalBrain.Mcp;
 using ModelContextProtocol.Server;
 
 namespace DigitalBrain.Tests.Mcp;
