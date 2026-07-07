@@ -1,6 +1,7 @@
 using Microsoft.Extensions.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Models;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Kernel.Llm;
 
