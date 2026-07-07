@@ -131,7 +131,10 @@ jobs:
       # Served at the apex custom domain, so base href is "/". Flutter's default
       # hash URL strategy resolves routes client-side without a custom 404.html.
       # --no-tree-shake-icons: the app uses non-constant IconData, which blocks icon tree-shaking.
-      - run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run
+      - run: >
+          flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run
+          --dart-define=KERNEL_ENDPOINT=https://${{ steps.kernel_fqdn.outputs.fqdn }}
+          --dart-define=KERNEL_UPLOAD_ENDPOINT=https://${{ steps.kernel_fqdn.outputs.fqdn }}
         working-directory: app
 
       - name: Deploy Flutter web to Azure Static Web Apps

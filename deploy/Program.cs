@@ -312,6 +312,8 @@ internal static class Program
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIEndpoint", Value = openAiEndpoint },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIKey", SecretRef = OpenAiKeySecret },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Checkpoint__Key", SecretRef = CheckpointKeySecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__0", Value = "https://digitalbrain.tech" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__1", Value = "https://gentle-sand-0f4081803.7.azurestaticapps.net" },
                             new AppInputs.EnvironmentVarArgs { Name = "APPLICATIONINSIGHTS_CONNECTION_STRING", Value = appInsightsConnectionString }
                         }
                     }
