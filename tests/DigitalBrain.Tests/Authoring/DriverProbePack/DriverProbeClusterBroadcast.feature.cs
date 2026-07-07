@@ -173,8 +173,8 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.AndAsync("a demo neuron is activated on a different silo than pack \"DriverProbePack\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 12
-  await testRunner.WhenAsync("the demo neuron broadcasts synapse \"DemoMessageSynapse\" with text \"cross-silo-pro" +
-                        "be\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+  await testRunner.WhenAsync("the demo neuron broadcasts synapse \"ProbeMessageSynapse\" with text \"cross-silo-pr" +
+                        "obe\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 13
   await testRunner.ThenAsync("pack \"DriverProbePack\" observes the broadcast on another silo", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");

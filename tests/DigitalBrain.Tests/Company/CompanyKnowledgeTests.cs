@@ -80,12 +80,12 @@ public sealed class CompanyKnowledgeTests : NeuronTestBase
         var synth = new SkillPackSynthesizer();
         var spec = new ProcessSpec(
             "RefundHandling",
-            [ "RefundRequested" ],
-            [ "check window" ],
-            [ new DecisionPoint("days > 30", "deny", "check other") ],
-            [ "outside window" ],
-            [ "RefundApproved", "RefundDenied" ],
-            [ "emit-outcomes" ]);
+            ["RefundRequested"],
+            ["check window"],
+            [new DecisionPoint("days > 30", "deny", "check other")],
+            ["outside window"],
+            ["RefundApproved", "RefundDenied"],
+            ["emit-outcomes"]);
 
         string code = synth.SynthesizePackSource(spec);
 

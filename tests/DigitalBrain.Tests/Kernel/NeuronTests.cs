@@ -15,7 +15,7 @@ public class NeuronTests : NeuronTestBase
     [Fact]
     public async Task Neuron_Activates_And_Journals_NeuronActivated()
     {
-        var grain = Grain<IDemoNeuron>("demo1");
+        var grain = Grain<IProbeNeuron>("demo1");
         var timeline = await grain.GetTimelineAsync();
 
         Assert.NotEmpty(timeline);
@@ -25,11 +25,11 @@ public class NeuronTests : NeuronTestBase
     [Fact]
     public async Task FireAsync_Persists_And_Replayable()
     {
-        var grain = Grain<IDemoNeuron>("demo2");
-        await grain.FireAsync(new DemoMessageSynapse("hello from test"));
+        var grain = Grain<IProbeNeuron>("demo2");
+        await grain.FireAsync(new ProbeMessageSynapse("hello from test"));
 
         var timeline = await grain.GetTimelineAsync();
-        Assert.Contains(timeline, s => s.Type == nameof(DemoMessageSynapse));
+        Assert.Contains(timeline, s => s.Type == nameof(ProbeMessageSynapse));
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class NeuronTests : NeuronTestBase
         var market = Grain<IMarketplaceNeuron>("market-test-1");
         var pack = new NeuroPack(
             "TestPrivatePack", "1.0", OwnerId: "owner1", IsPrivate: true, CommissionRate: 0.25, Code: "// test code", Description: "private test");
-        
+
         await market.FireAsync(new PublishToMarketplace(pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate, pack.Description));
         await market.FireAsync(new ListPublished());  // trigger the list event like real usage
 
@@ -299,35 +299,35 @@ public class NeuronTests : NeuronTestBase
     [Fact]
     public async Task Branch_Forks_Same_Type_With_Replayed_History_And_Isolation()
     {
-        var src = Grain<IDemoNeuron>("branch-src");
-        await src.FireAsync(new DemoMessageSynapse("original"));
+        var src = Grain<IProbeNeuron>("branch-src");
+        await src.FireAsync(new ProbeMessageSynapse("original"));
         var cp = await src.CreateCheckpointAsync();
         var bid = await src.BranchAsync(cp);
         Assert.NotEqual(src.GetPrimaryKeyString(), bid.Value);
 
         // The branch is a grain of the SAME type, seeded with the checkpoint history.
-        var branch = Grain<IDemoNeuron>(bid.Value);
+        var branch = Grain<IProbeNeuron>(bid.Value);
         var branchIn = await branch.GetIncomingTimelineAsync();
-        Assert.Contains(branchIn, s => s is DemoMessageSynapse d && d.Text == "original");
+        Assert.Contains(branchIn, s => s is ProbeMessageSynapse d && d.Text == "original");
 
         // Firing on the branch does not pollute the source (isolation).
-        await branch.FireAsync(new DemoMessageSynapse("branch only"));
+        await branch.FireAsync(new ProbeMessageSynapse("branch only"));
         var mainOut = await src.GetOutgoingTimelineAsync();
-        Assert.DoesNotContain(mainOut, s => s is DemoMessageSynapse d && d.Text.Contains("branch only"));
+        Assert.DoesNotContain(mainOut, s => s is ProbeMessageSynapse d && d.Text.Contains("branch only"));
     }
 
     [Fact]
     public async Task Restore_Seeds_Journal_From_Checkpoint_Without_Redispatch()
     {
-        var src = Grain<IDemoNeuron>("restore-src");
-        await src.FireAsync(new DemoMessageSynapse("to-restore"));
+        var src = Grain<IProbeNeuron>("restore-src");
+        await src.FireAsync(new ProbeMessageSynapse("to-restore"));
         var checkpoint = await src.CreateCheckpointAsync();
 
-        var target = Grain<IDemoNeuron>("restore-target");
+        var target = Grain<IProbeNeuron>("restore-target");
         await target.RestoreCheckpointAsync(checkpoint);
 
         var restored = await target.GetIncomingTimelineAsync();
-        Assert.Contains(restored, s => s is DemoMessageSynapse d && d.Text == "to-restore");
+        Assert.Contains(restored, s => s is ProbeMessageSynapse d && d.Text == "to-restore");
     }
 
     [Fact]
@@ -487,11 +487,11 @@ public class NeuronTests : NeuronTestBase
                 public string Respond(string input) => "fallback:" + input;
 
                 public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
-                    synapse is DigitalBrain.Core.DemoMessageSynapse;
+                    synapse is DigitalBrain.Core.ProbeMessageSynapse;
 
                 public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
                 {
-                    var message = (DigitalBrain.Core.DemoMessageSynapse)synapse;
+                    var message = (DigitalBrain.Core.ProbeMessageSynapse)synapse;
                     return new DigitalBrain.Core.Synapse[]
                     {
                         new DigitalBrain.Core.Distribution.PackEmission("spoofed-pack-name", message.Text, "typed:" + message.Text)
@@ -505,10 +505,10 @@ public class NeuronTests : NeuronTestBase
         await market.FireAsync(new InstallFromMarketplace("TypedDispatch", "1.0", BuyerId: "buyer"));
 
         var generated = Grain<IGeneratedNeuron>("generated-typeddispatch");
-        await generated.FireAsync(new DemoMessageSynapse("typed-input"));
+        await generated.FireAsync(new ProbeMessageSynapse("typed-input"));
 
         var timeline = await generated.GetOutgoingTimelineAsync();
-        var input = timeline.OfType<DemoMessageSynapse>().Last(message => message.Text == "typed-input");
+        var input = timeline.OfType<ProbeMessageSynapse>().Last(message => message.Text == "typed-input");
         var emission = timeline.OfType<PackEmission>().LastOrDefault(result => result.Input == "typed-input");
 
         Assert.NotNull(emission);
@@ -527,25 +527,25 @@ public class NeuronTests : NeuronTestBase
                 public string Respond(string input) => "fallback:" + input;
 
                 public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
-                    synapse is DigitalBrain.Core.DemoMessageSynapse;
+                    synapse is DigitalBrain.Core.ProbeMessageSynapse;
 
                 public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
                 {
-                    var message = (DigitalBrain.Core.DemoMessageSynapse)synapse;
+                    var message = (DigitalBrain.Core.ProbeMessageSynapse)synapse;
                     var props = new System.Collections.Generic.Dictionary<string, object?>
                     {
-                        [DigitalBrain.Core.UiSurfaceKeys.SurfaceId] = "surface-" + message.Text,
-                        [DigitalBrain.Core.UiSurfaceKeys.Emitter] = "SurfacePack",
-                        [DigitalBrain.Core.UiSurfaceKeys.Title] = "Pack surface",
-                        [DigitalBrain.Core.UiSurfaceKeys.Priority] = 10,
-                        [DigitalBrain.Core.UiSurfaceKeys.RequiresInput] = false,
-                        [DigitalBrain.Core.UiSurfaceKeys.Layout] = DigitalBrain.Core.UiSurfaceLayouts.Panel,
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.SurfaceId] = "surface-" + message.Text,
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Emitter] = "SurfacePack",
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Title] = "Pack surface",
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Priority] = 10,
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.RequiresInput] = false,
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Layout] = DigitalBrain.Ui.Contracts.UiSurfaceLayouts.Panel,
                         ["message"] = message.Text
                     };
 
                     return new DigitalBrain.Core.Synapse[]
                     {
-                        new DigitalBrain.Core.UiSurface(DigitalBrain.Core.UiSurfaceKinds.TaskWindow, props)
+                        new DigitalBrain.Ui.Contracts.UiSurface(DigitalBrain.Ui.Contracts.UiSurfaceKinds.TaskWindow, props)
                         {
                             CorrelationId = "pack-spoofed-correlation",
                             CausationId = "pack-spoofed-cause",
@@ -567,10 +567,10 @@ public class NeuronTests : NeuronTestBase
         await market.FireAsync(new InstallFromMarketplace("SurfacePack", "1.0", BuyerId: "buyer"));
 
         var generated = Grain<IGeneratedNeuron>("generated-surfacepack");
-        await generated.FireAsync(new DemoMessageSynapse("task-card"));
+        await generated.FireAsync(new ProbeMessageSynapse("task-card"));
 
         var timeline = await generated.GetOutgoingTimelineAsync();
-        var input = timeline.OfType<DemoMessageSynapse>().Last(message => message.Text == "task-card");
+        var input = timeline.OfType<ProbeMessageSynapse>().Last(message => message.Text == "task-card");
         var surface = timeline.OfType<UiSurface>().LastOrDefault(result =>
             result.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var id) && Equals(id, "surface-task-card"));
 

@@ -8,12 +8,12 @@ namespace DigitalBrain.Kernel.Sync;
 // MCP tool surface or a future scheduled trigger to call — no background timer here, that's a later task's call.
 public sealed class CheckpointBackupTrigger(IGrainFactory grains, CheckpointProtector protector, BlobContainerClient syncContainer)
 {
-    // V1 fixed neuron-id scope: the nine singleton neurons the kernel warms up at startup (Program.cs), not a
+    // V1 fixed neuron-id scope: the seven singleton neurons the kernel warms up at startup (Program.cs), not a
     // general per-user neuron enumeration (no such registry exists yet).
     private static readonly string[] V1NeuronIds =
     [
         "status-main", "ino-main", "context-main",
-        "db-main", "chart-main", "session-main", "automation-main", "market-data-main"
+        "db-main", "chart-main", "session-main", "automation-main"
     ];
 
     public Task<SyncManifest> BackupAsync(string userScope)

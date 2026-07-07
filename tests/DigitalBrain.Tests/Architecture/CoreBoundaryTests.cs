@@ -1,8 +1,8 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
-using DigitalBrain.Demo.Runtime;
 using DigitalBrain.Ino;
 using DigitalBrain.Marketplace.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 using System.Reflection;
 
 namespace DigitalBrain.Tests.Architecture;
@@ -55,87 +55,6 @@ public class CoreBoundaryTests
 
         Assert.Contains(coreAssemblyName, references);
         Assert.DoesNotContain(uiContractsAssemblyName, CoreReferenceNames());
-    }
-
-    [Fact]
-    public void Demo_Contracts_Depend_On_Core_Not_The_Other_Way_Around()
-    {
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-        var demoContractsAssemblyName = typeof(DemoMessageSynapse).Assembly.GetName().Name!;
-        var references = DemoContractsReferenceNames();
-
-        Assert.Equal("DigitalBrain.Demo.Contracts", demoContractsAssemblyName);
-        Assert.Contains(coreAssemblyName, references);
-        Assert.DoesNotContain(demoContractsAssemblyName, CoreReferenceNames());
-    }
-
-    [Fact]
-    public void Demo_Contracts_Do_Not_Reference_Runtime_Host_Integration_Or_Marketplace_Packages()
-    {
-        var references = DemoContractsReferenceNames();
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-
-        var unexpectedDigitalBrainReferences = references
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
-                !string.Equals(name, coreAssemblyName, StringComparison.Ordinal))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(unexpectedDigitalBrainReferences);
-
-        var offenders = references
-            .Where(name => ForbiddenRuntimeHostOrIntegrationPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(offenders);
-    }
-
-    [Fact]
-    public void Demo_Runtime_Depends_On_Contract_Packages_Not_Runtime_Host_Or_Integrations()
-    {
-        var references = DemoRuntimeReferenceNames();
-        var allowedDigitalBrainReferences = new HashSet<string>(StringComparer.Ordinal)
-        {
-            typeof(Synapse).Assembly.GetName().Name!,
-            typeof(DemoMessageSynapse).Assembly.GetName().Name!,
-            typeof(IPackBehavior).Assembly.GetName().Name!,
-            typeof(MarketplaceUiSurfaces).Assembly.GetName().Name!,
-            typeof(UiSurface).Assembly.GetName().Name!
-        };
-
-        var unexpectedDigitalBrainReferences = references
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
-                !allowedDigitalBrainReferences.Contains(name))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(unexpectedDigitalBrainReferences);
-
-        var offenders = references
-            .Where(name => ForbiddenRuntimeHostOrIntegrationPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(offenders);
-    }
-
-    [Fact]
-    public void Core_Does_Not_Own_Demo_Test_Contracts()
-    {
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-
-        Assert.NotEqual(coreAssemblyName, typeof(DemoMessageSynapse).Assembly.GetName().Name);
-        Assert.NotEqual(coreAssemblyName, typeof(IDemoNeuron).Assembly.GetName().Name);
-        Assert.Equal("DigitalBrain.Demo.Runtime", typeof(SurfaceDemoRuntime).Assembly.GetName().Name);
-        Assert.NotEqual(coreAssemblyName, typeof(SurfaceDemoRuntime).Assembly.GetName().Name);
-    }
-
-    [Fact]
-    public void Demo_Runtime_Owns_Surface_Demo_Request_And_Runtime_Helpers()
-    {
-        Assert.Equal("DigitalBrain.Demo.Runtime", typeof(SurfaceDemoRuntime).Assembly.GetName().Name);
-        Assert.Equal("DigitalBrain.Kernel.SurfaceDemoRequested", SurfaceDemoRuntime.RequestType);
     }
 
     [Fact]
@@ -221,16 +140,55 @@ public class CoreBoundaryTests
         Assert.Equal("DigitalBrain.Ino", typeof(IInoCapabilityRecall).Assembly.GetName().Name);
 
         var references = InoReferenceNames();
-        var forbiddenReferences = references
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) ||
-                name.StartsWith("Orleans", StringComparison.Ordinal) ||
-                name.StartsWith("Microsoft.Orleans", StringComparison.Ordinal) ||
+        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
+        var packContractsAssemblyName = typeof(IPackBehavior).Assembly.GetName().Name!;
+        var uiContractsAssemblyName = typeof(UiSurface).Assembly.GetName().Name!;
+        var uiRuntimeAssemblyName = typeof(UiSurfaceLiveData).Assembly.GetName().Name!;
+        var marketplaceContractsAssemblyName = typeof(MarketplaceUiSurfaces).Assembly.GetName().Name!;
+
+        // Ino is a full peer integration (commit 4ee79a4): it legitimately references Core, its own
+        // Google/Salesforce peers, Kernel.Abstractions (to host itself as a real grain), and the Ui/Marketplace
+        // contract layers it emits surfaces through. Anything DigitalBrain.* outside this allowlist -
+        // e.g. DigitalBrain.Kernel, DigitalBrain.Mcp, DigitalBrain.AppHost - would be a real boundary violation.
+        var allowedDigitalBrainReferences = new[]
+        {
+            coreAssemblyName,
+            "DigitalBrain.Kernel.Abstractions",
+            packContractsAssemblyName,
+            uiContractsAssemblyName,
+            uiRuntimeAssemblyName,
+            marketplaceContractsAssemblyName,
+            "DigitalBrain.Google",
+            "DigitalBrain.Salesforce"
+        };
+
+        var unexpectedDigitalBrainReferences = references
+            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
+                !allowedDigitalBrainReferences.Contains(name, StringComparer.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(unexpectedDigitalBrainReferences);
+
+        // Ino hosting itself as a grain legitimately needs the grain-abstraction packages (Orleans.Core.Abstractions,
+        // Orleans.Journaling, Orleans.Serialization*). Only the hosting/server packages - which would mean Ino
+        // pulled in a full silo host instead of just grain abstractions - are a real violation.
+        var forbiddenOrleansHostingAssemblyNames = new[]
+        {
+            "Orleans.Server",
+            "Microsoft.Orleans.Server",
+            "Orleans.Runtime"
+        };
+
+        var offenders = references
+            .Where(name =>
+                forbiddenOrleansHostingAssemblyNames.Contains(name, StringComparer.Ordinal) ||
                 name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) ||
                 name.StartsWith("Microsoft.Extensions.Hosting", StringComparison.Ordinal))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Empty(forbiddenReferences);
+        Assert.Empty(offenders);
     }
     [Fact]
     public void Ui_Runtime_Depends_On_Core_And_Ui_Contracts_Not_Marketplace_Runtime_Host_Or_Integrations()
@@ -325,10 +283,6 @@ public class CoreBoundaryTests
     private static string[] UiRuntimeReferenceNames() => ReferenceNames(typeof(UiSurfaceLiveData).Assembly);
 
     private static string[] InoReferenceNames() => ReferenceNames(typeof(InoIntentClassifier).Assembly);
-
-    private static string[] DemoContractsReferenceNames() => ReferenceNames(typeof(DemoMessageSynapse).Assembly);
-
-    private static string[] DemoRuntimeReferenceNames() => ReferenceNames(typeof(SurfaceDemoRuntime).Assembly);
 
     private static bool MethodSignatureContains(MethodInfo method, Type type) =>
         TypeContains(method.ReturnType, type) ||

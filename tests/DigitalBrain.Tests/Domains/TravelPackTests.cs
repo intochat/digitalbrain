@@ -65,9 +65,9 @@ public class TravelPackTests
     public void Full_sequence_walks_intro_to_summary()
     {
         var pack = new TravelPackBehavior();
-        Assert.Equal("travel-intro",      SurfaceId(OnlySurface(pack.Handle(Step("start", ("prompt", "plan a trip to Bali next month"))))));
-        Assert.Equal("travel-hotels",     SurfaceId(OnlySurface(pack.Handle(Step("flight.selected", ("flightId", "FL-001"))))));
-        Assert.Equal("travel-events",     SurfaceId(OnlySurface(pack.Handle(Step("hotel.selected", ("hotelId", "H-001"))))));
+        Assert.Equal("travel-intro", SurfaceId(OnlySurface(pack.Handle(Step("start", ("prompt", "plan a trip to Bali next month"))))));
+        Assert.Equal("travel-hotels", SurfaceId(OnlySurface(pack.Handle(Step("flight.selected", ("flightId", "FL-001"))))));
+        Assert.Equal("travel-events", SurfaceId(OnlySurface(pack.Handle(Step("hotel.selected", ("hotelId", "H-001"))))));
         Assert.Equal("travel-activities", SurfaceId(OnlySurface(pack.Handle(Step("event.selected", ("eventId", "EV-001"))))));
         var summary = OnlySurface(pack.Handle(Step("activity.selected", ("activityId", "AC-001"))));
         Assert.Equal("travel-summary", SurfaceId(summary));

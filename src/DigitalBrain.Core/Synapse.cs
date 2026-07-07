@@ -563,12 +563,3 @@ public record SalesforceOAuthCallbackResult(
     [property: Id(1)] string Title,
     [property: Id(2)] string Message);
 
-// Builds an IChatClient for a caller-supplied provider/key (the LLM config a user entered for a pack),
-// distinct from the single global kernel IChatClient. Returns null when the input is insufficient
-// (e.g. openai with no key) so callers can fall back to the global IChatClient gracefully.
-// Moved to Core so Ino integration (and other peers) can reference without depending on Kernel.
-public interface IScopedChatClientFactory
-{
-    Microsoft.Extensions.AI.IChatClient? Create(string provider, string? apiKey);
-}
-

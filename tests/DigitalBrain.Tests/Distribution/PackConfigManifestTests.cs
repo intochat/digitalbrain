@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
+using DigitalBrain.Pack.Contracts;
 
 namespace DigitalBrain.Tests.Distribution;
 

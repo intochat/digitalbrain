@@ -1,6 +1,6 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
 using DigitalBrain.TestKit;
+using DigitalBrain.Ui.Contracts.Ui;
 
 namespace DigitalBrain.Tests.Ui;
 

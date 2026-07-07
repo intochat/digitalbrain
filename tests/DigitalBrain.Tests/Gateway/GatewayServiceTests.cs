@@ -1,14 +1,11 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Core.Ui;
-using DigitalBrain.Demo.Runtime;
 using DigitalBrain.Google;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
-using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Voice;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tests.TestSupport;
@@ -20,6 +17,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
 using Orleans.TestingHost;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Pack.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 
 namespace DigitalBrain.Tests.Gateway;
 
@@ -27,7 +26,6 @@ namespace DigitalBrain.Tests.Gateway;
 public class GatewayServiceTests : NeuronTestBase
 {
     private HomeFeedBus? _homeFeedBusInstance;
-    private readonly FakeMarketDataApiClient _marketClient = new();
 
     // Lazily resolved via the silo's own DI container (same pattern as HomeFeedCrossSiloTests) — HomeFeedBus
     // now requires a real IClusterClient, which is only available once the cluster has finished starting,
@@ -49,7 +47,6 @@ public class GatewayServiceTests : NeuronTestBase
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
             services.AddSingleton<HomeFeedBus>();
-            services.AddSingleton<IMarketDataApiClient>(_marketClient);
         });
 
     private GatewayService NewService() =>
@@ -162,7 +159,7 @@ public class GatewayServiceTests : NeuronTestBase
         await svc.Fire(new FireRequest { NeuronId = "demo-fire", Text = "ping-123" }, TestContext());
 
         var timeline = await svc.Timeline(new TimelineRequest { NeuronId = "demo-fire", MaxEntries = 10 }, TestContext());
-        Assert.Contains(timeline.Entries, e => e.Type == nameof(DemoMessageSynapse) && e.Text.Contains("ping-123"));
+        Assert.Contains(timeline.Entries, e => e.Type == "DemoMessage" && e.Text.Contains("ping-123"));
     }
 
     [Fact]
@@ -317,49 +314,6 @@ public class GatewayServiceTests : NeuronTestBase
     }
 
     [Fact]
-    public async Task Send_InoRequest_BitcoinPriceIntent_DeliversFormattedPriceSurface()
-    {
-        _marketClient.Price = "$42,123.45";
-        var svc = NewService();
-        const string myClientId = "bitcoin-price-connection";
-
-        await svc.Send(new SynapseEnvelope
-        {
-            TypeName = nameof(LoginRequest),
-            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                username = "bitcoin-price-user",
-                password = "correct horse battery staple",
-                clientId = myClientId
-            }))
-        }, TestContext());
-
-        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            prompt = "what's the bitcoin price?",
-            clientId = myClientId
-        });
-
-        await svc.Send(new SynapseEnvelope
-        {
-            TypeName = nameof(InoRequest),
-            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
-        }, TestContext());
-
-        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
-        var timeline = await flutter.GetIncomingTimelineAsync();
-
-        var surface = Assert.Single(timeline.OfType<UiSurface>());
-        Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
-        Assert.Equal(myClientId, surface.Props["clientId"]);
-        Assert.Equal("assistant", surface.Props["role"]);
-
-        var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
-        Assert.Equal(UiKitVocabulary.Text, tree.Type);
-        Assert.Contains("$42,123.45", tree.Props["text"]!.ToString());
-    }
-
-    [Fact]
     public async Task Send_GoogleAuthRequested_Routes_To_The_Callers_Own_UserKeyed_Grain()
     {
         var svc = NewService();
@@ -477,61 +431,6 @@ public class GatewayServiceTests : NeuronTestBase
         Assert.Equal(StatusCode.Unauthenticated, ex.StatusCode);
     }
 
-    [Fact]
-    public async Task Send_SurfaceDemoRequested_InstallsPack_And_BroadcastsRenderableSurface()
-    {
-        await using var subscription = await HomeFeedBus.SubscribeAsync(clientId: null);
-        var svc = NewService();
-
-        await svc.Send(new SynapseEnvelope
-        {
-            TypeName = SurfaceDemoRuntime.RequestType,
-            CorrelationId = "ui-demo-test"
-        }, TestContext());
-
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-        var cards = new List<RfwCard>();
-        while (cards.Count < 8 &&
-               (!cards.Any(c => c.DataJson.Contains("journaled response and surface update observed", StringComparison.Ordinal)) ||
-                !cards.Any(IsSurfaceDemoPackCard)))
-        {
-            cards.Add(await subscription.Reader.ReadAsync(timeout.Token));
-        }
-
-        var graph = cards.FirstOrDefault(c => c.DataJson.Contains("journaled response and surface update observed", StringComparison.Ordinal));
-        Assert.NotNull(graph);
-        Assert.Equal("digitalbrain", graph!.LibraryName);
-        Assert.Equal("root", graph.RootWidget);
-        Assert.Contains("\"kind\":\"activity-graph\"", graph.DataJson);
-        Assert.Contains("\"edges\"", graph.DataJson);
-        Assert.Contains("\"correlationId\":\"ui-demo-test\"", graph.DataJson);
-
-        var card = cards.FirstOrDefault(c => IsSurfaceDemoPackCard(c) && c.DataJson.Contains("Embodied pack live", StringComparison.Ordinal));
-        Assert.NotNull(card);
-        Assert.Equal("digitalbrain", card!.LibraryName);
-        Assert.Equal("root", card.RootWidget);
-        Assert.False(string.IsNullOrWhiteSpace(card.CorrelationId));
-        Assert.Contains("\"source\"", card.DataJson);
-
-        var generated = Grain<IGeneratedNeuron>(SurfaceDemoRuntime.GeneratedNeuronKey);
-        var timeline = await generated.GetOutgoingTimelineAsync();
-        var emittedSurface = Assert.Single(timeline.OfType<UiSurface>(), surface =>
-            surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var id) &&
-            Equals(id, "surface-demo-pack"));
-        Assert.Equal("ui-demo-test", emittedSurface.CorrelationId);
-        Assert.False(string.IsNullOrWhiteSpace(emittedSurface.CausationId));
-
-        var observability = Grain<IObservabilityNeuron>(SurfaceDemoRuntime.ObservabilityNeuronKey);
-        var graphTimeline = await observability.GetOutgoingTimelineAsync();
-        Assert.Contains(graphTimeline.OfType<UiSurface>(), surface =>
-            surface.Kind == UiSurfaceKinds.ActivityGraph &&
-            surface.CorrelationId == "ui-demo-test");
-
-        static bool IsSurfaceDemoPackCard(RfwCard card) =>
-            card.DataJson.Contains("\"surfaceId\":\"surface-demo-pack\"", StringComparison.Ordinal) &&
-            card.DataJson.Contains("\"kind\":\"task-window\"", StringComparison.Ordinal);
-    }
-
     private static ServerCallContext TestContext(CancellationToken cancellationToken = default) =>
         TestServerCallContext.Create(cancellationToken);
 
@@ -619,7 +518,6 @@ public class GatewayServiceTests : NeuronTestBase
 // user-scoped credential would be invisible and the flow would ask for credentials instead of querying.
 public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBase
 {
-    private readonly FakeMarketDataApiClient _marketClient = new();
     private readonly RecordingSalesforceApiClientFactory _salesforceFactory = new();
     private HomeFeedBus? _homeFeedBusInstance;
 
@@ -640,7 +538,6 @@ public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBas
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
             services.AddSingleton<HomeFeedBus>();
-            services.AddSingleton<IMarketDataApiClient>(_marketClient);
             services.AddPackConfigStore(blobsForKeyRing: null);
             services.AddSingleton<ISalesforceApiClientFactory>(_salesforceFactory);
         });

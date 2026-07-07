@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.UiKit;
+using DigitalBrain.Pack.Contracts.UiKit;
 
 namespace DigitalBrain.Tests.Domains;
 

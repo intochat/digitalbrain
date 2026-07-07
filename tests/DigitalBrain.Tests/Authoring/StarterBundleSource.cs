@@ -17,7 +17,7 @@ public static class StarterBundleSource
     public const string Code = """
 using System.Collections.Generic;
 using DigitalBrain.Core;
-using DigitalBrain.Core.UiKit;
+using DigitalBrain.Pack.Contracts.UiKit;
 
 public sealed class StarterExperience : KitExperience
 {

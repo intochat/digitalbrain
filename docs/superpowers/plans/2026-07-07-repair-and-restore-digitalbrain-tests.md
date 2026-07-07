@@ -497,7 +497,218 @@ csproj (Aliases=\"AppHostProject\")."
 
 ---
 
-### Task 7: Re-add the project to `Brain.slnx` and run full verification
+### Task 7: Fix newly-unmasked missing-using errors (Ui.Contracts.Ui / Ui.Contracts / Pack.Contracts)
+
+**Context:** Task 6 fixed the `Program` ambiguity as scoped, but doing so unmasked 86 previously-hidden compile errors across 19 files — the `CS0433` ambiguity was somehow suppressing further diagnostics in this compilation (confirmed empirically by Task 6's implementer: swapping in an unrelated dummy type instead of the real fix produces the identical 86 errors). Of those 86, this task covers the ~49 that are simple missing-`using` errors for types that still exist — same mechanical pattern as Task 4. The remaining ~37 (genuinely deleted `IDemoNeuron`/`DemoMessageSynapse` types used as generic test infrastructure) are Task 8.
+
+**Files (add the stated `using`, if not already present, to each):**
+- `tests/DigitalBrain.Tests/Architecture/CoreBoundaryTests.cs` — add `using DigitalBrain.Ui.Contracts.Ui;` (for `RfwCard`, referenced in `Ui_Contracts_Own_Ui_Schema_Types`)
+- `tests/DigitalBrain.Tests/Auth/UserSessionNeuronTests.cs` — add `using DigitalBrain.Ui.Contracts.Ui;` (for `RfwCard` and its `ClientId`/`DataJson` members)
+- `tests/DigitalBrain.Tests/Gateway/GatewayServiceTests.cs` — add BOTH `using DigitalBrain.Ui.Contracts.Ui;` (for `RfwCard`) AND `using DigitalBrain.Pack.Contracts;` (for `ConfigurationProvided`/`ConfigFormSurface`)
+- `tests/DigitalBrain.Tests/Ui/ChatNeuronTests.cs` — add `using DigitalBrain.Ui.Contracts.Ui;` (for `IChatNeuron`, defined in `src/DigitalBrain.Ui.Contracts/Ui/RfwCard.cs:16`)
+- `tests/DigitalBrain.Tests/Ui/HomeFeedBusTests.cs` — add `using DigitalBrain.Ui.Contracts.Ui;` (for `RfwCard`)
+- `tests/DigitalBrain.Tests/Ui/HomeFeedCrossSiloTests.cs` — add `using DigitalBrain.Ui.Contracts.Ui;` (for `RfwCard`)
+- `tests/DigitalBrain.Tests/UiSurfaceContractTests.cs` — add `using DigitalBrain.Ui.Contracts;` (for `UiWidgetTree`, currently referenced as `DigitalBrain.Core.UiWidgetTree` — also fix those fully-qualified references to just `UiWidgetTree` once the using is added, or to `DigitalBrain.Ui.Contracts.UiWidgetTree` if you prefer leaving them qualified; either compiles, pick whichever matches this file's existing style for other types)
+- `tests/DigitalBrain.Tests/Authoring/StarterBundleTests.cs` — add `using DigitalBrain.Ui.Contracts;` (for `UiKitVocabulary`, currently referenced as `DigitalBrain.Core.UiKitVocabulary` — same fully-qualified-reference note as above)
+- `tests/DigitalBrain.Tests/Distribution/PackConfigManifestTests.cs` — add `using DigitalBrain.Pack.Contracts;` (for `ConfigurationProvided`)
+- `tests/DigitalBrain.Tests/Gateway/PackConfigPullTests.cs` — add `using DigitalBrain.Pack.Contracts;` (for `ConfigurationProvided`, 4 sites)
+- `tests/DigitalBrain.Tests/Ino/InoNeuronChatSurfaceTests.cs` — add `using DigitalBrain.Pack.Contracts;` (for `ConfigFormSurface`, 3 sites)
+- `tests/DigitalBrain.Tests/Steps/ConfigFormSteps.cs` — add `using DigitalBrain.Pack.Contracts;` (for `ConfigFormSurface` and `ConfigurationProvided`)
+- `tests/DigitalBrain.Tests/Steps/TelegramReactiveLoopSteps.cs` — add `using DigitalBrain.Pack.Contracts;` (for `ConfigFormSurface` and `ConfigurationProvided`)
+
+**Interfaces:** none — pure additive `using`-directive fixes. `RfwCard`/`IChatNeuron` are defined in `src/DigitalBrain.Ui.Contracts/Ui/RfwCard.cs` (namespace `DigitalBrain.Ui.Contracts.Ui`). `UiWidgetTree`/`UiKitVocabulary` are defined in `src/DigitalBrain.Ui.Contracts/UiSurfaces.cs` and siblings (namespace `DigitalBrain.Ui.Contracts`). `ConfigurationProvided`/`ConfigFormSurface` are defined in `src/DigitalBrain.Pack.Contracts/Configuration.cs` (namespace `DigitalBrain.Pack.Contracts`).
+
+- [ ] **Step 1: For each file above, check its current `using` block and add only what's missing**
+
+For each file, run `head -20 <file>` (or read it) to see its current usings, then add the stated `using` line(s) in the existing block (alphabetical-ish placement matching the file's own style; exact position doesn't matter to the compiler). Do not add a duplicate if a file somehow already has one of these usings partially.
+
+- [ ] **Step 2: Build to confirm all these errors are gone**
+
+Run: `dotnet build tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Debug --nologo --no-incremental 2>&1 | grep -E "error CS" | sort -u`
+Expected: zero `RfwCard`/`IChatNeuron`/`UiWidgetTree`/`UiKitVocabulary`/`ConfigurationProvided`/`ConfigFormSurface` errors remain. Only `IDemoNeuron`/`DemoMessageSynapse` errors (Task 8's scope, in `Kernel/NeuronTests.cs`, `Kernel/NeuronBroadcastTests.cs`, `Kernel/CheckpointSecurityTests.cs`, `Specs/PackSpecDriver.cs`, `Steps/NeuronSteps.cs`, `Steps/PackSpecSteps.cs`) should remain.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add tests/DigitalBrain.Tests/Architecture/CoreBoundaryTests.cs tests/DigitalBrain.Tests/Auth/UserSessionNeuronTests.cs \
+  tests/DigitalBrain.Tests/Gateway/GatewayServiceTests.cs tests/DigitalBrain.Tests/Ui/ChatNeuronTests.cs \
+  tests/DigitalBrain.Tests/Ui/HomeFeedBusTests.cs tests/DigitalBrain.Tests/Ui/HomeFeedCrossSiloTests.cs \
+  tests/DigitalBrain.Tests/UiSurfaceContractTests.cs tests/DigitalBrain.Tests/Authoring/StarterBundleTests.cs \
+  tests/DigitalBrain.Tests/Distribution/PackConfigManifestTests.cs tests/DigitalBrain.Tests/Gateway/PackConfigPullTests.cs \
+  tests/DigitalBrain.Tests/Ino/InoNeuronChatSurfaceTests.cs tests/DigitalBrain.Tests/Steps/ConfigFormSteps.cs \
+  tests/DigitalBrain.Tests/Steps/TelegramReactiveLoopSteps.cs
+git commit -m "fix: add missing usings unmasked by the Program ambiguity fix (RfwCard/UiWidgetTree/ConfigurationProvided etc.)
+
+Task 6's Program-ambiguity fix revealed 86 previously-hidden compile
+errors in this project — a CS0433 in one file was somehow suppressing
+further diagnostics across the whole compilation. Of those, these 13
+files just needed a missing using directive for a type that still
+exists (Ui.Contracts.Ui, Ui.Contracts, or Pack.Contracts); the
+IDemoNeuron/DemoMessageSynapse cluster is handled separately (next task)
+since those types are genuinely gone."
+```
+
+---
+
+### Task 8: Replace deleted `IDemoNeuron`/`DemoMessageSynapse` test-double with a shared TestKit type
+
+**Context:** `IDemoNeuron` and `DemoMessageSynapse` were defined by the deleted `DigitalBrain.Demo.Contracts`/`DigitalBrain.Demo.Runtime` projects and used across 6 files as a convenient minimal "any simple neuron" test double for exercising generic Neuron/checkpoint/pack-installation infrastructure — these files are NOT testing the Demo feature itself (unlike Tasks 2/3's targets), so deletion is wrong here; a replacement is needed. Neither type exists anywhere in the current tree (confirmed by repo-wide grep).
+
+**Files:**
+- Create: a new shared test-double neuron + synapse type in `tests/DigitalBrain.TestKit/` (exact file name/location per the investigation below)
+- Modify: `tests/DigitalBrain.Tests/Kernel/NeuronTests.cs`, `Kernel/NeuronBroadcastTests.cs`, `Kernel/CheckpointSecurityTests.cs`, `Specs/PackSpecDriver.cs`, `Steps/NeuronSteps.cs`, `Steps/PackSpecSteps.cs` — replace `IDemoNeuron`/`DemoMessageSynapse` references with the new type(s)
+
+**Before writing any code:** read the investigation findings at `.superpowers/sdd/task8-investigation.md` (written by the controller before this task was dispatched) — it documents, per file, exactly which capabilities (`Grain<T>(id)` resolution, `FireAsync`, `GetOutgoingTimelineAsync`/`GetTimelineAsync`, `BranchAsync`, checkpoint create/restore, broadcast) each of the 6 files actually needs from the test double, and whether any already-compiling type in this test suite (e.g. `IGeneratedNeuron`) could be reused instead of introducing a new one. Follow its recommendation for where the new type should live and what it needs to implement — do not re-derive this from scratch.
+
+- [ ] **Step 1: Implement the replacement type(s) per the investigation's recommendation**
+
+(Exact shape depends on the investigation findings — implement whatever grain interface + concrete `Neuron`-derived class + `Synapse`-derived record combination it specifies, following this codebase's established patterns: `[GenerateSerializer]`/`[Alias(...)]` on the synapse record matching `src/DigitalBrain.Core/Synapse.cs`'s existing examples, `[GrainType("...")]` on the neuron class matching other test/production neuron classes' conventions.)
+
+- [ ] **Step 2: Update all 6 files to use the new type(s) instead of `IDemoNeuron`/`DemoMessageSynapse`**
+
+Replace every `Grain<IDemoNeuron>(id)` → `Grain<TNewInterface>(id)` and every `new DemoMessageSynapse(text)` → `new TNewSynapseType(text)` (or whatever constructor shape the new type has), preserving each test's actual assertions and behavior — this is a mechanical rename once Step 1's type exists with an equivalent shape, not a rewrite of test logic.
+
+- [ ] **Step 3: Build to confirm zero remaining errors in the whole project**
+
+Run: `dotnet build tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Debug --nologo --no-incremental 2>&1 | tail -10`
+Expected: `Build succeeded.` with 0 errors — this closes out all 121 errors found across this repair series (the original 35 plus the 86 Task 6 unmasked).
+
+- [ ] **Step 4: Run this project's fast test lane to confirm the renamed tests still pass at runtime, not just compile**
+
+Run: `dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName!~E2E" --nologo`
+Expected: all tests pass, including every test in the 6 modified files — a passing compile doesn't prove the new test double actually behaves equivalently to the old one (e.g. supports branching/checkpoint restore correctly), so this run is the real proof.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add tests/DigitalBrain.TestKit/ tests/DigitalBrain.Tests/Kernel/NeuronTests.cs tests/DigitalBrain.Tests/Kernel/NeuronBroadcastTests.cs \
+  tests/DigitalBrain.Tests/Kernel/CheckpointSecurityTests.cs tests/DigitalBrain.Tests/Specs/PackSpecDriver.cs \
+  tests/DigitalBrain.Tests/Steps/NeuronSteps.cs tests/DigitalBrain.Tests/Steps/PackSpecSteps.cs
+git commit -m "test: replace deleted IDemoNeuron/DemoMessageSynapse with a shared TestKit test double
+
+These 6 files used the Demo project's minimal neuron/synapse as generic
+test infrastructure, not to test the Demo feature itself — its deletion
+broke them as collateral damage. Reintroduces an equivalent, TestKit-owned
+test double so this generic Neuron/checkpoint/pack-installation coverage
+is restored rather than deleted."
+```
+
+---
+
+### Task 9: Fix all 8 pre-existing test failures found by Task 8's test run
+
+**Context:** Task 8's test run (the first real execution of this project's tests since 2026-07-06) surfaced 8 failures, all confirmed pre-existing and unrelated to the Demo→Probe rename. Deep investigation (with empirical repros against the actual built assemblies) found precise root causes and decisive fixes for all 8. Two of the fixes are shared across two failures.
+
+**Files:**
+- Modify: `src/DigitalBrain.Kernel/Foundry/CapabilityGate.cs` (shared fix, unblocks failures #1 and #4 below)
+- Modify: `tests/DigitalBrain.Tests/Kernel/NeuronTests.cs` (failure #1)
+- Modify: `tests/DigitalBrain.Tests/E2E/Packs/TravelPack.cs` (failure #4)
+- Modify: `tests/DigitalBrain.Tests/Foundry/PackAlcEmbodierTests.cs` (failure #2)
+- Modify: `tests/DigitalBrain.Tests/Authoring/StarterBundleSource.cs` (failure #3)
+- Modify: `src/DigitalBrain.Ui.Runtime/UiSurfaceRuntime.cs`, `tests/DigitalBrain.Tests/UiSurfaceContractTests.cs` (failure #5)
+- Modify: `tests/DigitalBrain.Tests/Architecture/CoreBoundaryTests.cs` (failure #6)
+- Modify: `src/DigitalBrain.Core/Synapse.cs`, `src/DigitalBrain.Core/DigitalBrain.Core.csproj`, `src/DigitalBrain.Kernel.Abstractions/` (failure #7)
+- Delete: `tests/DigitalBrain.Tests/Features/XBitcoinTelegramDemo.feature`, `tests/DigitalBrain.Tests/Features/XBitcoinTelegramDemo.feature.cs` (failure #8)
+
+**Interfaces:** `CancelTask` (an existing, real `Synapse`-derived record, `src/DigitalBrain.Core/Synapse.cs:249`) is consumed by failure #5's fix. `IScopedChatClientFactory` (failure #7) is produced in its new home, `DigitalBrain.Kernel.Abstractions`, consumed unchanged by its existing callers (`LlmResponderNeuron.cs`, `InoNeuron.cs`, TestKit/Tests doubles) since they already reference that project.
+
+- [ ] **Step 1: Fix failures #1 (`NeuronTests.Installed_Pack_Handles_Typed_Synapse_And_Emits_Journaled_UiSurface`) and #4 (`ExperienceStepDispatchTests.ExperienceStep_start_emits_intro_surface_to_home_feed`) — shared root cause**
+
+Both fail because `PackAlcEmbodier` compiles pack source standalone (no `DigitalBrain.*` implicit usings), and (a) two embedded/extracted pack sources still reference `UiSurface`-family types as `DigitalBrain.Core.*` instead of their real home `DigitalBrain.Ui.Contracts`, and (b) even once that's fixed, `CapabilityGate` rejects the `DigitalBrain.Ui.Contracts.` namespace outright. Both parts must be fixed together.
+
+In `src/DigitalBrain.Kernel/Foundry/CapabilityGate.cs`, find `AllowedNamespacePrefixes` (around lines 14-18) and add `"DigitalBrain.Ui.Contracts."` to the array — confirmed safe: that namespace contains only DTOs/interfaces (`UiSurface`, `UiWidgetTree`, `RfwCard`, etc.), no I/O/reflection/process capability, and its own `.csproj` references only `DigitalBrain.Core` + Orleans abstractions — the identical dependency footprint as the already-allowed `DigitalBrain.Core.`. Also fix the file's header comment (around line 11) which currently points at `docs/specs/2026-07-02-capability-gate-hardening-followup.md` — that file was deleted in commit `6dfc0a7`; either remove the dangling reference or note the doc no longer exists.
+
+In `tests/DigitalBrain.Tests/Kernel/NeuronTests.cs` (around lines 537-548), change the embedded pack source's fully-qualified references from `DigitalBrain.Core.UiSurfaceKeys`/`UiSurfaceLayouts`/`UiSurfaceKinds`/`UiSurface` to `DigitalBrain.Ui.Contracts.UiSurfaceKeys`/`UiSurfaceLayouts`/`UiSurfaceKinds`/`UiSurface` (or add a `using DigitalBrain.Ui.Contracts;` inside the raw-string pack source and drop the qualification — either compiles).
+
+In `tests/DigitalBrain.Tests/E2E/Packs/TravelPack.cs` (lines 1-9), add `using DigitalBrain.Ui.Contracts;` next to the existing `using DigitalBrain.Core;` / `using DigitalBrain.Core.Distribution;` — this file's `UiSurface`-returning `TravelCards.*` methods only compile today because the *outer test project* has a global using for `DigitalBrain.Ui.Contracts`; `TravelPackSource.Read()` extracts this file's raw text and feeds it to the same standalone `PackAlcEmbodier` compilation, which has no such global using.
+
+- [ ] **Step 2: Fix failure #2 (`PackAlcEmbodierTests.Embodies_Typed_Synapse_Handler`)**
+
+In `tests/DigitalBrain.Tests/Foundry/PackAlcEmbodierTests.cs`, find the embedded pack source referencing `sig.Payload` and change it to `sig.Props` — `Signal` (`src/DigitalBrain.Core/Signals.cs:47`) has no `Payload` member, only `Props` (`IReadOnlyDictionary<string, object?>`).
+
+- [ ] **Step 3: Fix failure #3 (`StarterBundleTests.Starter_ask_hop_renders_input_and_button`)**
+
+In `tests/DigitalBrain.Tests/Authoring/StarterBundleSource.cs`, change `using DigitalBrain.Core.UiKit;` to `using DigitalBrain.Pack.Contracts.UiKit;` — `KitExperience`/`UiExperience` live there (`src/DigitalBrain.Pack.Contracts/UiKit/KitExperience.cs:4`), matching the fix already applied elsewhere in this repair series (Task 4).
+
+- [ ] **Step 4: Fix failure #5 (`UiSurfaceContractTests.Action_Descriptors_Point_To_Existing_Synapse_Types`)**
+
+Neither `"DemoMessageSynapse"` nor `"TestMessageSynapse"` refers to a real type — both are stale string literals from before/around the Demo cleanup. `CancelTask` (`src/DigitalBrain.Core/Synapse.cs:249`) is the real, currently-used type for this exact "cancel task" action elsewhere in the same runtime file (`src/DigitalBrain.Ui.Runtime/UiSurfaceRuntime.cs:665`, `nameof(CancelTask)` inside `TaskManagerFromTasks`).
+
+In `src/DigitalBrain.Ui.Runtime/UiSurfaceRuntime.cs`: delete the `DemoMessageSynapseName = "DemoMessageSynapse"` constant (around line 8), and replace its two use sites — `UiSurfaceSamples.TaskWindow()`'s `"cancel-task"` action (around line 69) and `UiSurfaceSamples.UserInput()`'s `"dismiss-input"` action (around line 104) — with `nameof(CancelTask)`. (The unrelated uses in `Timeline()` around lines 292/299 are a generic message-type placeholder, not an action descriptor asserted by this test — leave those untouched.)
+
+In `tests/DigitalBrain.Tests/UiSurfaceContractTests.cs:62`, change `"TestMessageSynapse"` to `nameof(CancelTask)`, matching every sibling assertion in this same test method's style (`nameof(InoRequest)`, `nameof(LoginRequest)`, `nameof(InstallFromMarketplace)`).
+
+- [ ] **Step 5: Fix failure #6 (`CoreBoundaryTests.Ino_Integration_Owns_Assistant_Reasoning_Not_Kernel_Orleans`)**
+
+This test's blanket "forbid all `DigitalBrain.*`/`Orleans`/`Microsoft.Orleans`" assertion was already wrong when written (Ino legitimately needs `DigitalBrain.Kernel.Abstractions`, which itself needs Orleans grain/journal abstractions, to host itself as a real grain) and predates the deliberate architecture change in commit `4ee79a4` that made Ino a full peer integration (with `Core`/`Google`/`Salesforce`/`Ui.Contracts`/`Ui.Runtime`/`Marketplace.Contracts` references, matching `DigitalBrain.Google`'s identical, untested-for shape).
+
+In `tests/DigitalBrain.Tests/Architecture/CoreBoundaryTests.cs`, rewrite `Ino_Integration_Owns_Assistant_Reasoning_Not_Kernel_Orleans` (around lines 137-153) to match this same file's own established idiom used by every other `X_Depends_On_Y_Not_Z` test: assert an explicit allowlist of expected `DigitalBrain.*` reference names (`Core`, `Kernel.Abstractions`, `Pack.Contracts`, `Ui.Contracts`, `Ui.Runtime`, `Marketplace.Contracts`, `Google`, `Salesforce`) and flag only *unexpected* `DigitalBrain.*` names (this is what would catch a real violation, e.g. an accidental `DigitalBrain.Kernel`/`DigitalBrain.Mcp`/`DigitalBrain.AppHost` reference). Narrow the Orleans ban from a blanket prefix match to specifically the hosting/server packages (exact-match `Microsoft.Orleans.Server`/similar), not the grain-abstraction packages (`Orleans.Core.Abstractions`, `Orleans.Journaling`, `Orleans.Serialization*`) every `DigitalBrain.*` project legitimately needs. Keep the existing `Microsoft.AspNetCore`/`Microsoft.Extensions.Hosting` bans (still genuinely satisfied and meaningful).
+
+- [ ] **Step 6: Fix failure #7 (`CoreBoundaryTests.Core_Does_Not_Reference_Runtime_Host_Or_Integration_Packages`)**
+
+This IS a genuine regression from commit `4ee79a4`, which added `IScopedChatClientFactory` directly to `src/DigitalBrain.Core/Synapse.cs` (around lines 570-573) and a `Microsoft.Extensions.AI` package reference to `DigitalBrain.Core.csproj:18`, violating Core's pre-existing, deliberate "no runtime/host/integration packages" boundary (this exact `Microsoft.Extensions.AI` ban already existed in the forbidden-prefix list before that commit).
+
+Move `IScopedChatClientFactory` from `src/DigitalBrain.Core/Synapse.cs` to a new file in `src/DigitalBrain.Kernel.Abstractions/` (e.g. `IScopedChatClientFactory.cs`), keeping its exact shape:
+```csharp
+namespace DigitalBrain.Kernel.Abstractions;
+
+public interface IScopedChatClientFactory
+{
+    Microsoft.Extensions.AI.IChatClient? Create(string provider, string? apiKey);
+}
+```
+(check the exact current namespace convention used by sibling files in `DigitalBrain.Kernel.Abstractions` and match it.) Move the `<PackageReference Include="Microsoft.Extensions.AI" />` line from `src/DigitalBrain.Core/DigitalBrain.Core.csproj` to `src/DigitalBrain.Kernel.Abstractions/DigitalBrain.Kernel.Abstractions.csproj`. This still satisfies the original goal of that commit (letting peer integrations reference this interface without depending on the full `DigitalBrain.Kernel` runtime/host project) since Ino/Google/Salesforce already reference `DigitalBrain.Kernel.Abstractions` directly. Update any consumers (`LlmResponderNeuron.cs`, `InoNeuron.cs`, test doubles in `TestKit`/`Tests`) that reference `IScopedChatClientFactory` via a `using DigitalBrain.Core;` to instead (or also) `using DigitalBrain.Kernel.Abstractions;` — grep for `IScopedChatClientFactory` first to find every call site before editing.
+
+- [ ] **Step 7: Fix failure #8 (Reqnroll scenario `"X post from watched author triggers a Bitcoin price alert on Telegram"`)**
+
+This scenario tests a permanently-deleted feature (the XBitcoin/Telegram demo pack, whose step bindings were already correctly deleted in this repair series' Task 2) — the `.feature`/`.feature.cs` pair was simply missed in that cleanup. Delete both:
+```bash
+git rm tests/DigitalBrain.Tests/Features/XBitcoinTelegramDemo.feature
+git rm tests/DigitalBrain.Tests/Features/XBitcoinTelegramDemo.feature.cs
+```
+No `.csproj` changes needed (Reqnroll/SDK glob-includes these implicitly, same as Task 2's step-file deletion needed none).
+
+- [ ] **Step 8: Build and run the full test suite to confirm all 8 failures are resolved**
+
+Run: `dotnet build tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Debug --nologo --no-incremental`
+Expected: `Build succeeded.` with 0 errors.
+
+Run: `dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "FullyQualifiedName!~E2E" --nologo`
+Expected: `Passed: 400, Skipped: 2, Total: 402` (0 failures — all 8 fixed, none of Tasks 1-9's other 392 previously-passing tests regressed).
+
+Also run the full solution build once, since Step 6 touches production code across 3 projects (`Core`, `Kernel.Abstractions`, and any consumer files):
+Run: `dotnet build Brain.slnx -c Release --nologo` (before this project is re-added to the solution in Task 10 — this confirms the `IScopedChatClientFactory` move doesn't break any *other* already-in-solution project that referenced it)
+Expected: `Build succeeded.` with 0 errors.
+
+- [ ] **Step 9: Commit**
+
+Consider splitting into 2 commits matching this repo's "commit CI/production-code changes separately from test-suite changes" convention observed elsewhere in this series: one for the `CapabilityGate`/`IScopedChatClientFactory`/`UiSurfaceRuntime.cs` production-code changes (Steps 1's CapabilityGate part, 5's UiSurfaceRuntime part, 6, 7), one for the test-file-only changes (Steps 1's NeuronTests/TravelPack part, 2, 3, 5's UiSurfaceContractTests part, 8). If that split feels artificial given how intertwined the fixes are, one combined commit is acceptable — use judgment, but explain the choice in the commit message(s).
+
+```bash
+git commit -m "fix: resolve 8 pre-existing test failures surfaced by restoring DigitalBrain.Tests
+
+<details of which failures, referencing this task's investigation>
+
+These predate this repair series and were undetectable while the
+project was orphaned from Brain.slnx (since 2026-07-06) and later
+uncompilable (121 accumulated errors, Tasks 1-8). Root causes: stale
+DigitalBrain.Core.* qualifications for types that moved to
+DigitalBrain.Ui.Contracts (in embedded pack sources compiled standalone
+by PackAlcEmbodier, which has no DigitalBrain.* implicit usings);
+CapabilityGate's namespace allowlist never having been extended to
+Ui.Contracts even though packs legitimately need to emit UiSurface;
+two stale string-literal/type mismatches (Signal.Payload, DemoMessageSynapse/
+TestMessageSynapse placeholders); a Core boundary regression from an
+earlier commit that moved an LLM-client-factory interface into Core
+along with a Microsoft.Extensions.AI package reference; an
+architecture-guard test that was already wrong when written, predating
+a deliberate Ino-as-peer-integration redesign; and one leftover dead
+Reqnroll scenario for the already-deleted XBitcoin/Telegram demo pack."
+```
+
+---
+
+### Task 10: Re-add the project to `Brain.slnx` and run full verification
 
 **Files:**
 - Modify: `Brain.slnx`
@@ -515,7 +726,7 @@ In `Brain.slnx`, inside `<Folder Name="/tests/">`, add:
 - [ ] **Step 2: Full solution build**
 
 Run: `dotnet build Brain.slnx -c Release --nologo`
-Expected: `Build succeeded.` with 0 errors. (First time in this repo's history that `Brain.slnx` has included this project since commit `5eb7448` on 2026-07-06 — if new, unrelated errors surface here that Tasks 1-6 didn't catch building the project standalone, e.g. from a different `Configuration`/`Release` symbol path, treat them as new findings and fix before proceeding — do not skip via `--no-restore`/config flags.)
+Expected: `Build succeeded.` with 0 errors. (First time in this repo's history that `Brain.slnx` has included this project since commit `5eb7448` on 2026-07-06 — if new, unrelated errors surface here that Tasks 1-8 didn't catch building the project standalone, e.g. from a different `Configuration`/`Release` symbol path, treat them as new findings and fix before proceeding — do not skip via `--no-restore`/config flags.)
 
 - [ ] **Step 3: Fast-loop test run (matches what CI does)**
 
@@ -536,13 +747,15 @@ git commit -m "build: re-add DigitalBrain.Tests to Brain.slnx
 Removed in 5eb7448 (2026-07-06, 'Fix fast solution test loop') alongside
 DigitalBrain.AppHost. AppHost was restored later (ef2d4ff); this project
 never was, so CI's 'dotnet test Brain.slnx' has been silently skipping
-Kernel/Gateway/Architecture/SelfEvolution/E2E coverage since. Tasks 1-6
-in this series repaired 35 compile errors accumulated in the interim."
+Kernel/Gateway/Architecture/SelfEvolution/E2E coverage since. Tasks 1-8
+in this series repaired 121 compile errors accumulated in the interim
+(35 visible initially, plus 86 unmasked once Task 6's Program-ambiguity
+fix stopped suppressing further diagnostics)."
 ```
 
 ---
 
-### Task 8: Update the stale E2E section of `docs/SYSTEM_DESIGN.md`
+### Task 11: Update the stale E2E section of `docs/SYSTEM_DESIGN.md`
 
 **Files:**
 - Modify: `docs/SYSTEM_DESIGN.md:424-428`
@@ -573,6 +786,6 @@ on its own."
 
 ## Self-Review
 
-**Spec coverage:** every one of the 35 compile errors from the `dotnet build tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj` run has a task above that names its exact file and fix (Market: Task 2; Demo: Task 3; namespace usings: Task 4; InoTestHarness: Task 5; Program ambiguity: Task 6). Re-solution-wiring (the actual top-priority finding) is Task 7. The one production-code loose end the Market removal left behind (stale `market-data-main` id) is Task 1, sequenced first since Tasks 2/4 depend on the corrected count. The e2e.runsettings documentation follow-up from the original analysis is Task 8, sequenced last since it only makes sense once Task 7 lands.
+**Spec coverage:** every one of the original 35 compile errors from the `dotnet build tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj` run has a task above that names its exact file and fix (Market: Task 2; Demo: Task 3; namespace usings: Task 4; InoTestHarness: Task 5; Program ambiguity: Task 6). Task 6's fix unmasked 86 further errors across 19 files, hidden until then by the `Program` ambiguity itself (confirmed independent of the specific fix via a controlled experiment) — Task 7 covers the ~49 that are simple missing-`using` errors for types that still exist, and Task 8 covers the ~37 that need a real replacement for the deleted `IDemoNeuron`/`DemoMessageSynapse` test-double. Re-solution-wiring (the actual top-priority finding) is Task 9. The one production-code loose end the Market removal left behind (stale `market-data-main` id) is Task 1, sequenced first since Tasks 2/7 depend on the corrected count. The e2e.runsettings documentation follow-up from the original analysis is Task 10, sequenced last since it only makes sense once Task 9 lands.
 
 **Not in this plan (separate, lower-risk follow-up):** `AGENTS.md` restore/purge decision, `.mcp.json`'s stale project path, archiving the five superseded 2026-07-06 trash-analysis docs, refreshing `README.md`, `docs/PRODUCT_VISION.md`'s name/content mismatch, and `docs/demo-sample/`/`deploy/DEPLOY-STATUS.md` cleanup — these are docs/config-only, independent of the test repair, and were intentionally left out per this skill's scope-check guidance (multiple independent subsystems → separate plans). Happy to write a second, much shorter plan for these on request.
