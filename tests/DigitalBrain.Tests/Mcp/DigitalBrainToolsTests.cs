@@ -1,5 +1,7 @@
+extern alias McpProject;
+
 using DigitalBrain.Core;
-using DigitalBrain.Mcp;
+using McpProject::DigitalBrain.Mcp;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
 
