@@ -37,12 +37,12 @@ public class CapabilityBroker : ICapabilityBroker
     public Task<string> LlmExtractAsync(string text, string schemaHint)
     {
         // Wired to existing Ino/Foundry structured for caps.Llm (stub returns manifest for now; real call in full).
-        return Task.FromResult($"{{ \"extracted\": true, \"schema\": \"{schemaHint}\", \"sample\": \"{text.Substring(0, Math.Min(50, text.Length)) }...\" }}");
+        return Task.FromResult($"{{ \"extracted\": true, \"schema\": \"{schemaHint}\", \"sample\": \"{text.Substring(0, Math.Min(50, text.Length))}...\" }}");
     }
 
     public Task<string> WriteWorkbookAsync(string specJson)
     {
         // caps.Market: narrow workbook (artifact ref; host would use ClosedXML or equiv).
-        return Task.FromResult("artifact:workbook.xlsx:spec=" + (specJson.Length > 20 ? specJson.Substring(0,20) : specJson));
+        return Task.FromResult("artifact:workbook.xlsx:spec=" + (specJson.Length > 20 ? specJson.Substring(0, 20) : specJson));
     }
 }
