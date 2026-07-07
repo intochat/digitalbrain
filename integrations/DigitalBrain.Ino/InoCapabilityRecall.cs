@@ -1,9 +1,10 @@
 using DigitalBrain.Context;
-using DigitalBrain.Ino;
 
-namespace DigitalBrain.Kernel.Ino;
+namespace DigitalBrain.Ino;
 
-public sealed class KernelInoCapabilityRecall(IGrainFactory grains) : IInoCapabilityRecall
+/// Ino-owned implementation of capability recall (delegates to Context grain).
+/// Lives in the Ino integration (no Kernel dep).
+public sealed class InoCapabilityRecall(IGrainFactory grains) : IInoCapabilityRecall
 {
     public async Task<IReadOnlyList<string>> RecallAsync(string prompt, int top = 5, CancellationToken cancellationToken = default)
     {

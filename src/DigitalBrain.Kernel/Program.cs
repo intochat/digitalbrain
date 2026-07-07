@@ -148,7 +148,7 @@ if (isAspireHosted)
 // everywhere else and AddDigitalBrainChat falls back to constructing its own.
 builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
 builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
-builder.Services.AddSingleton<DigitalBrain.Kernel.Llm.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
+builder.Services.AddSingleton<DigitalBrain.Core.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
 builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
 builder.Services.AddEconomics(builder.Configuration);
@@ -193,9 +193,7 @@ builder.Services.AddDigitalBrainOtlpForwardClient();
 // Owns its AI config (provider, model, system prompts, temperature) so the assistant logic
 // can evolve independently and be "plugged" into the kernel host.
 DigitalBrain.Ino.InoServiceRegistration.AddInoAi(builder.Services, builder.Configuration.GetSection("Ino:AI"));
-var inoRecallType = Type.GetType("DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall");
-if (inoRecallType != null)
-    builder.Services.AddSingleton(typeof(DigitalBrain.Ino.IInoCapabilityRecall), inoRecallType);
+builder.Services.AddSingleton<DigitalBrain.Ino.IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
 
 // Proxy to private marketplace (new separate repo) when enabled.
 // Register the stub here; real impl uses HttpClient to the marketplace service.

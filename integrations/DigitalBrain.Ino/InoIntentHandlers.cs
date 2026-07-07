@@ -1,7 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Ino;
 
-namespace DigitalBrain.Kernel.Ino;
+namespace DigitalBrain.Ino;
 
 internal interface IInoIntentHandler
 {
