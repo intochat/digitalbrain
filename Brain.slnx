@@ -35,6 +35,7 @@
     <Project Path="tests/DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
     <Project Path="tests/DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
     <Project Path="tests/DigitalBrain.TestKit.Tests/DigitalBrain.TestKit.Tests.csproj" />
   </Folder>
