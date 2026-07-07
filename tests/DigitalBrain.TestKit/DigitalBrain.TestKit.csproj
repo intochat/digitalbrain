@@ -18,7 +18,7 @@
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Ino\DigitalBrain.Ino.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
-    <ProjectReference Include="..\..\integrations\DigitalBrain.Context\DigitalBrain.Context.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Ino\Context\DigitalBrain.Context.csproj" />
   </ItemGroup>
 
   <ItemGroup>

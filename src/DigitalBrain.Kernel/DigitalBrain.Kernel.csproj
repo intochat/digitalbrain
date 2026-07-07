@@ -47,7 +47,7 @@
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Streaming" />
     <!-- Microsoft.Orleans.Dashboard added for DigitalBrainOptions.EnableOrleansDashboard - run 'dotnet add package Microsoft.Orleans.Dashboard' if needed for full UI -->
-    <ProjectReference Include="..\..\integrations\DigitalBrain.Context\DigitalBrain.Context.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Ino\Context\DigitalBrain.Context.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
 

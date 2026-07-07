@@ -1498,7 +1498,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         foreach (var taskDesc in replyPlan.TaskDescriptions)
         {
             var tid = "task-" + Guid.NewGuid().ToString("N")[..8];
-            // IKernelTask stubb ed (internal to Kernel)
+            // Placeholder; full durable task orchestration via IKernelTask is coordinated from Kernel layer.
             created.Add(tid);
         }
         if (!string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
