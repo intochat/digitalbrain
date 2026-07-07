@@ -8,6 +8,10 @@ namespace DigitalBrain.Tests.Spikes;
 
 #pragma warning disable ORLEANSEXP005
 
+[GenerateSerializer]
+[Alias("DigitalBrain.Tests.Spikes.SpikePayloadSynapse")]
+public sealed record SpikePayloadSynapse(string Text) : Synapse(nameof(SpikePayloadSynapse), DateTimeOffset.UtcNow);
+
 [Trait("Category", "cluster")]
 [Collection(OrleansJournalClusterCollection.Name)]
 public class JournalFormatSpikeTests(OrleansJournalClusterFixture fixture)
@@ -16,11 +20,11 @@ public class JournalFormatSpikeTests(OrleansJournalClusterFixture fixture)
     public async Task Orleans_Json_Format_Round_Trips_A_Synapse_With_JournalJsonResolver()
     {
         var grain = fixture.Cluster.Client.GetGrain<IJournalFormatProbeNeuron>("spike-json-format-" + Guid.NewGuid().ToString("N"));
-        await grain.FireAsync(new DemoMessageSynapse("spike-payload"));
+        await grain.FireAsync(new SpikePayloadSynapse("spike-payload"));
 
         var activationInstanceId = await grain.GetActivationInstanceIdAsync();
         var timeline = await grain.GetTimelineAsync();
-        Assert.Contains(timeline, s => s is DemoMessageSynapse d && d.Text == "spike-payload");
+        Assert.Contains(timeline, s => s is SpikePayloadSynapse d && d.Text == "spike-payload");
 
         // Write-only round-trips prove serialization works, but not deserialization. DeactivateAsync
         // waits for deactivation; the next call creates a fresh activation and rebuilds from journal bytes.
@@ -30,7 +34,7 @@ public class JournalFormatSpikeTests(OrleansJournalClusterFixture fixture)
         Assert.NotEqual(activationInstanceId, reactivatedInstanceId);
 
         var timelineAfterReactivation = await grain.GetTimelineAsync();
-        Assert.Contains(timelineAfterReactivation, s => s is DemoMessageSynapse d && d.Text == "spike-payload");
+        Assert.Contains(timelineAfterReactivation, s => s is SpikePayloadSynapse d && d.Text == "spike-payload");
     }
 }
 
@@ -41,7 +45,7 @@ public interface IJournalFormatProbeNeuron : INeuron
 
 [GrainType("digitalbrain.test.journal-format-probe")]
 public sealed class JournalFormatProbeNeuron(ILogger<JournalFormatProbeNeuron> logger, NeuronJournals journals)
-    : Neuron(logger, journals), IJournalFormatProbeNeuron, IHandle<DemoMessageSynapse>
+    : Neuron(logger, journals), IJournalFormatProbeNeuron, IHandle<SpikePayloadSynapse>
 {
     private string _activationInstanceId = string.Empty;
 
@@ -51,7 +55,7 @@ public sealed class JournalFormatProbeNeuron(ILogger<JournalFormatProbeNeuron> l
         await base.OnActivateAsync(ct);
     }
 
-    public Task HandleAsync(DemoMessageSynapse synapse) => Task.CompletedTask;
+    public Task HandleAsync(SpikePayloadSynapse synapse) => Task.CompletedTask;
 
     public Task<string> GetActivationInstanceIdAsync() => Task.FromResult(_activationInstanceId);
 }
