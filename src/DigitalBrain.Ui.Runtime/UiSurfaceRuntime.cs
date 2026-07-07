@@ -287,14 +287,14 @@ public static class UiSurfaceSamples
                 {
                     new Dictionary<string, object?>
                     {
-                        ["type"] = "DemoMessageSynapse",
-                        ["title"] = "Demo message",
+                        ["type"] = nameof(InoResponse),
+                        ["title"] = "Assistant response",
                         ["at"] = DateTimeOffset.UtcNow
                     }
                 },
                 ["filters"] = new Dictionary<string, object?>
                 {
-                    ["types"] = new[] { "DemoMessageSynapse", nameof(InoResponse) }
+                    ["types"] = new[] { nameof(InoResponse), nameof(TaskCompleted) }
                 }
             }));
 
