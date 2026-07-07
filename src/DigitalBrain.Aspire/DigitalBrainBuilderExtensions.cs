@@ -12,6 +12,7 @@ public sealed class DigitalBrainContext
     public required IDistributedApplicationBuilder ApplicationBuilder { get; init; }
     public required OrleansService Orleans { get; init; }
     public required IResourceBuilder<IResourceWithConnectionString> Llm { get; init; }
+    public IResourceBuilder<IResourceWithConnectionString>? EmbeddingModel { get; init; }
     public required OrleansServiceClient OrleansClient { get; init; }
     public required int KernelReplicas { get; init; }
     public required bool UseLocalMarketplace { get; init; }
@@ -109,6 +110,7 @@ public static class DigitalBrainBuilderExtensions
         // manifest — prod gets its LLM from Azure OpenAI via Pulumi, wired separately (see WireKernelSilo method).
         const string ollamaFallbackModel = "qwen2.5-coder:1.5b";
         IResourceBuilder<IResourceWithConnectionString> qwen;
+        IResourceBuilder<IResourceWithConnectionString>? embeddingModel = null;
         EndpointReference? ollamaEndpoint = null;
         EndpointReference? embeddingOllamaEndpoint = null;
         if (isRunMode)
@@ -118,7 +120,7 @@ public static class DigitalBrainBuilderExtensions
                 .WithDataVolume()
                 .WithOpenWebUI();
             qwen = ollama.AddModel("qwen", ollamaFallbackModel);
-            ollama.AddModel("embed", "nomic-embed-text");
+            embeddingModel = ollama.AddModel("embed", "nomic-embed-text");
             ollamaEndpoint = ollama.GetEndpoint("http");
             // Same container as qwen — Ollama serves every pulled model from one endpoint,
             // selected by model name in the request, not by a per-model endpoint.
@@ -159,6 +161,7 @@ public static class DigitalBrainBuilderExtensions
             ApplicationBuilder = builder,
             Orleans = orleans,
             Llm = qwen,
+            EmbeddingModel = embeddingModel,
             OrleansClient = orleans.AsClient(),
             KernelReplicas = options.KernelReplicas,
             UseLocalMarketplace = options.UseLocalMarketplace,
@@ -215,10 +218,15 @@ public static class DigitalBrainBuilderExtensions
         if (ctx.OllamaEndpoint is not null)
         {
             kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint", HttpUrl(ctx.OllamaEndpoint));
+            kernel.WaitFor(ctx.Llm);
         }
         if (ctx.EmbeddingOllamaEndpoint is not null)
         {
             kernel.WithEnvironment("DigitalBrain__Embedding__OllamaEndpoint", HttpUrl(ctx.EmbeddingOllamaEndpoint));
+            if (ctx.EmbeddingModel is not null)
+            {
+                kernel.WaitFor(ctx.EmbeddingModel);
+            }
         }
         kernel.WithModelRegistry(ctx);
 

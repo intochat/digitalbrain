@@ -1,3 +1,4 @@
+using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using DigitalBrain.Core;
@@ -128,8 +129,10 @@ if (isAspireHosted)
     var clusteringServiceKey = Environment.GetEnvironmentVariable("Orleans__Clustering__ServiceKey") ?? "clustering";
     var grainStorageServiceKey = Environment.GetEnvironmentVariable("Orleans__GrainStorage__Default__ServiceKey") ?? "grainstate";
 
-    builder.AddKeyedAzureTableServiceClient(clusteringServiceKey);
-    builder.AddKeyedAzureBlobServiceClient(grainStorageServiceKey);
+    // Register via Aspire integrations. These honor Aspire:Azure:Data:Tables:DisableTracing and
+    // Aspire:Azure:Storage:Blobs:DisableTracing from configuration for the Orleans internal stores.
+    builder.AddKeyedAzureTableServiceClient(clusteringServiceKey, settings => settings.DisableTracing = true);
+    builder.AddKeyedAzureBlobServiceClient(grainStorageServiceKey, settings => settings.DisableTracing = true);
 
     // Non-keyed BlobServiceClient from grain storage for pack-config key ring persistence and blob backing.
     // Uses the same Azurite account as grain state but stores in a separate "pack-config" container.
@@ -140,7 +143,11 @@ if (isAspireHosted)
     // DefaultHealthCheckService does not catch (only exceptions from CheckHealthAsync itself are caught),
     // crashing /health with a 500. Orleans grain-storage/clustering failures already surface through the app
     // failing to function, so this decorative check isn't needed to gate readiness.
-    builder.AddAzureBlobServiceClient("grainstate", settings => settings.DisableHealthChecks = true);
+    builder.AddAzureBlobServiceClient("grainstate", settings =>
+    {
+        settings.DisableHealthChecks = true;
+        settings.DisableTracing = true;
+    });
 }
 
 // Reuses storageCredential (built once above) rather than letting AddDigitalBrainChat mint its own
@@ -159,15 +166,21 @@ builder.Services.AddContextStore(builder.Configuration);
 BlobServiceClient? packConfigBlobs = null;
 if (isAspireHosted)
 {
+    // Pack config is internal (key ring + connector config). Disable distributed tracing on this client
+    // to avoid flooding traces with storage noise from Azure SDK. Use Aspire DisableTracing config
+    // for the Aspire-registered clients; here we create directly.
+    var blobOptions = new BlobClientOptions();
+    blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
+
     if (useManagedIdentity)
     {
-        packConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!);
+        packConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions);
     }
     else
     {
         var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
         if (!string.IsNullOrEmpty(grainStateConnStr))
-            packConfigBlobs = new BlobServiceClient(grainStateConnStr);
+            packConfigBlobs = new BlobServiceClient(grainStateConnStr, blobOptions);
     }
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
@@ -271,28 +284,49 @@ builder.UseOrleans(siloBuilder =>
             // ConfigureBlobServiceClient(Uri, TokenCredential): those overloads are [Obsolete] on
             // AzureStorageOperationOptions/AzureBlobStorageOptions in this Orleans version (confirmed against
             // dotnet/orleans source), which explicitly says to set the property instead. AddAzureBlobJournalStorage's
-            // options type has no such deprecation, so it keeps using ConfigureBlobServiceClient below.
+            // options type has no such deprecation, but its BlobServiceClient is assigned directly here too
+            // (rather than via ConfigureBlobServiceClient) so it can share the tracing-disabled BlobClientOptions below.
+            //
+            // These clients are used exclusively for Orleans internals (clustering, grain state, journaling).
+            // Disable distributed tracing on them to prevent Azure SDK storage spans from polluting
+            // application traces. Prefer Aspire's Aspire:Azure:* :DisableTracing config where possible.
+            var tableOptions = NoTracingTableOptions();
+            var blobOptions = NoTracingBlobOptions();
+
             siloBuilder.UseAzureStorageClustering(options =>
-                options.TableServiceClient = new Azure.Data.Tables.TableServiceClient(storageTableServiceUri!, storageCredential!));
+                options.TableServiceClient = new TableServiceClient(storageTableServiceUri!, storageCredential!, tableOptions));
             siloBuilder.AddAzureBlobGrainStorage("Default", options =>
-                options.BlobServiceClient = new BlobServiceClient(storageBlobServiceUri!, storageCredential!));
+                options.BlobServiceClient = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions));
             siloBuilder.AddAzureBlobJournalStorage(options =>
-                options.ConfigureBlobServiceClient(storageBlobServiceUri!, storageCredential!));
+                options.BlobServiceClient = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions));
         }
         else
         {
+            var clusteringConn = builder.Configuration.GetConnectionString("clustering")!;
+            var grainStateConn = builder.Configuration.GetConnectionString("grainstate")!;
+            var journalConn = builder.Configuration.GetConnectionString("journal")!;
+
+            var tableOptions = NoTracingTableOptions();
+            var blobOptions = NoTracingBlobOptions();
+
             siloBuilder.UseAzureStorageClustering(options =>
-                options.TableServiceClient = new Azure.Data.Tables.TableServiceClient(builder.Configuration.GetConnectionString("clustering")!));
+                options.TableServiceClient = new TableServiceClient(clusteringConn, tableOptions));
             siloBuilder.AddAzureBlobGrainStorage("Default", options =>
-                options.BlobServiceClient = new BlobServiceClient(builder.Configuration.GetConnectionString("grainstate")!));
+                options.BlobServiceClient = new BlobServiceClient(grainStateConn, blobOptions));
             siloBuilder.AddAzureBlobJournalStorage(options =>
-                options.BlobServiceClient = new BlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
+                options.BlobServiceClient = new BlobServiceClient(journalConn, blobOptions));
         }
         siloBuilder.UseJsonJournalFormat(JournalJson.Configure);
 
         // Aspire path: real durable IDurableList<Synapse> for in/out-journal provided by Orleans journaling
         // (AddAzureBlobJournalStorage + UseJsonJournalFormat + DurableGrain replay). No in-memory override.
         // Non-aspire fast paths continue to use prototype via ConfigurePrototypeJournals for local dev speed.
+
+        static TableClientOptions NoTracingTableOptions() =>
+            new() { Diagnostics = { IsDistributedTracingEnabled = false } };
+
+        static BlobClientOptions NoTracingBlobOptions() =>
+            new() { Diagnostics = { IsDistributedTracingEnabled = false } };
     }
 
     siloBuilder.AddMemoryStreams("HomeFeed");
@@ -400,10 +434,6 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
     return Results.Ok();
 });
 
-// Old per-provider routes deleted per P2 (now unified to generic /oauth/callback/{provider} dispatched to IConnector.CompleteAuthAsync).
-// DefaultCallbackPath in factories updated; tests/surfaces updated to generic paths.
-
-// P2 generic callback route
 app.MapGet("/oauth/callback/{provider}", async (
     string provider,
     HttpRequest request,
@@ -515,83 +545,3 @@ if (grainFactory != null && !isTestMode)
 }
 
 app.Run();
-
-
-static string SalesforceCallbackUri(HttpRequest request) =>
-    new UriBuilder(request.Scheme, request.Host.Host, request.Host.Port ?? -1, SalesforceClientFactory.DefaultCallbackPath)
-        .Uri
-        .ToString();
-
-// The callback is a cold, unauthenticated GET from Salesforce's redirect — it carries no session, only
-// code/state. StartOAuthAsync prefixes state with its own userId ("{userId}:{nonce}") so this endpoint can
-// route to the right per-user grain; the grain still exact-matches the FULL state string against its own
-// stored pending value, so CSRF protection is unchanged. This is NOT D-MU2's encrypted state (deferred to
-// S4) — a malformed/tampered state just fails to route to a real pending flow and fails closed.
-static string SalesforceOAuthUserIdFromState(string? state)
-{
-    if (string.IsNullOrWhiteSpace(state)) return "salesforce-auth-unknown";
-    var separatorIndex = state.LastIndexOf(':');
-    return separatorIndex > 0 ? state[..separatorIndex] : "salesforce-auth-unknown";
-}
-
-static string SalesforceCallbackPage(string title, string message)
-{
-    var safeTitle = System.Net.WebUtility.HtmlEncode(title);
-    var safeMessage = System.Net.WebUtility.HtmlEncode(message);
-    return $$"""
-        <!doctype html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8">
-          <title>{{safeTitle}}</title>
-          <style>
-            body { font-family: system-ui, sans-serif; margin: 3rem; line-height: 1.5; }
-            main { max-width: 42rem; }
-          </style>
-        </head>
-        <body>
-          <main>
-            <h1>{{safeTitle}}</h1>
-            <p>{{safeMessage}}</p>
-          </main>
-        </body>
-        </html>
-        """;
-}
-
-static string GoogleCallbackUri(HttpRequest request) =>
-    new UriBuilder(request.Scheme, request.Host.Host, request.Host.Port ?? -1, GoogleClientFactory.DefaultCallbackPath)
-        .Uri
-        .ToString();
-
-static string GoogleOAuthUserIdFromState(string? state)
-{
-    if (string.IsNullOrWhiteSpace(state)) return "google-auth-unknown";
-    var separatorIndex = state.LastIndexOf(':');
-    return separatorIndex > 0 ? state[..separatorIndex] : "google-auth-unknown";
-}
-
-static string GoogleCallbackPage(string title, string message)
-{
-    var safeTitle = System.Net.WebUtility.HtmlEncode(title);
-    var safeMessage = System.Net.WebUtility.HtmlEncode(message);
-    return $$"""
-        <!doctype html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8">
-          <title>{{safeTitle}}</title>
-          <style>
-            body { font-family: system-ui, sans-serif; margin: 3rem; line-height: 1.5; }
-            main { max-width: 42rem; }
-          </style>
-        </head>
-        <body>
-          <main>
-            <h1>{{safeTitle}}</h1>
-            <p>{{safeMessage}}</p>
-          </main>
-        </body>
-        </html>
-        """;
-}

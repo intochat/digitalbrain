@@ -24,6 +24,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private sealed record ReplyPlan(string VisibleReply, IReadOnlyList<string> TaskDescriptions, string? BranchDescription);
     private sealed record GmailMessageSummary(string Id, string Body);
 
+    private const string LlmUnavailableReply =
+        "The local LLM is not ready yet. Ollama may still be pulling or loading the model; try again in a moment.";
+
     private InoRequest? _pendingGmailRequest;
     private InoRequest? _pendingSalesforceRequest;
 
@@ -1408,8 +1411,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. ALWAYS answer the user's request directly and visibly first with the actual content (e.g. the joke, summary, fact or help). Put any TASK: or BRANCH: directives ONLY on their own separate lines AFTER the answer, and ONLY if user explicitly asked to create a task/automation/branch. Never output only a directive. For a plain request like 'tell a joke' or 'generate a joke' just reply with the joke text directly.";
         var full = sys + "\nCTX:\n" + context + "\nUSER: " + prompt;
-        var response = await chat.GetResponseAsync(full);
-        return response.Text.Trim();
+        var (text, _) = await GetChatTextOrFallbackAsync(chat, full);
+        return text;
     }
 
     private async Task<string> ReasonDirectlyWithLlmAsync(string prompt, string context)
@@ -1417,11 +1420,29 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var chat = await ResolveGlobalLlmClientAsync() ?? ServiceProvider.GetService<IChatClient>();
         if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
 
-        var response = await chat.GetResponseAsync(
+        var (text, _) = await GetChatTextOrFallbackAsync(
+            chat,
             "Answer the user's request directly in one or two sentences. Do not output TASK or BRANCH directives.\nCTX:\n"
             + context + "\nUSER: " + prompt);
-        var text = response.Text.Trim();
-        return string.IsNullOrWhiteSpace(text) ? "I do not have a useful answer yet." : text;
+        return text;
+    }
+
+    // TaskCanceledException also covers the Ollama-model-still-loading case: OllamaApiClient's HttpClient has
+    // no explicit timeout configured, so a slow model pull/load times out via HttpClient's default timeout
+    // rather than failing fast with a connection-refused HttpRequestException.
+    private async Task<(string Text, bool Available)> GetChatTextOrFallbackAsync(IChatClient chat, string prompt)
+    {
+        try
+        {
+            var response = await chat.GetResponseAsync(prompt);
+            var text = response.Text.Trim();
+            return (string.IsNullOrWhiteSpace(text) ? "I do not have a useful answer yet." : text, true);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            Logger.LogWarning(ex, "INO LLM request failed; returning an unavailable response.");
+            return (LlmUnavailableReply, false);
+        }
     }
 
     private async Task<IChatClient?> ResolveGlobalLlmClientAsync()
@@ -1512,8 +1533,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var ctx = string.Join("\n", recent.Select(s => s.Type + ": " + s.ToString()));
         var prompt = "Summarize the following recent activity in DigitalBrain for personal assistant memory. One short topic + 1-sentence summary. Activity:\n" + ctx;
-        var response = await chat.GetResponseAsync(prompt);
-        var summaryText = response.Text.Trim();
+        var (summaryText, available) = await GetChatTextOrFallbackAsync(chat, prompt);
+        if (!available)
+            return;
+
         if (summaryText.Length > 10)
         {
             var topic = summaryText.Split('.')[0].Trim();
