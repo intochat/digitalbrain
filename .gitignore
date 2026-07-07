@@ -445,3 +445,6 @@ sdd/
 *.sdd/
 aspire_*.log
 *.superpowers*
+
+# Local git worktrees used for isolated plan execution
+.worktrees/
