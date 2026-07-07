@@ -97,14 +97,24 @@ Progress so far (executed slices):
 - Update plan with evidence (test names, output snippets).
 
 Post-slice verification (this execution):
-- High-sev (IConnector filter): Passed! 14 passed (incl 4 base + SalesforceConnectorContractTests + GoogleConnectorContractTests Validate_Missing returning false as expected).
+- High-sev (IConnector filter): Passed! 14 passed (incl 4 base + SalesforceConnectorContractTests + GoogleConnectorContractTests Validate_Missing returning false as expected). Final post-commit targeted: 4 passed.
 - Google high-sev slice: 3 passed.
 - Salesforce high-sev: 23 passed.
 - dotnet build -c Release: succeeded, 0 Error(s).
 - aspire doctor: Summary: 5 passed, 0 warnings, 0 failed.
 - MCP: aspire__doctor 5 passed; aspire__list_apphosts: no hosts running; aspire__list_resources: expected fail (no AppHost).
-- git status relative: tracked edits to connectors + contract tests.
-- No C:\Users refs. Relative paths. All Context7 before edits recorded. Latest NuGet implicit via build.
+- git status relative pre-commit: edits staged; post: ahead 4, commit 2940e86.
+- Commit: 2940e86 "P2 Phase1: ... 5 files changed..."
+- No C:\Users refs. Relative paths. All Context7 before edits recorded. Latest NuGet implicit via build. High-sev before/after groups.
+
+Session summary (all required followed):
+- Started: git status, high-sev (multiple runs, 4/14/3/23/46+ passed relevant), build 0e, doctor 5/5, MCP list_apphosts/doctor (no host, 5p).
+- Context7: /microsoft/aspire (DistributedApplicationTestingBuilder, WaitForResourceAsync, ResourceNotifications, ExecuteCommand), /reqnroll/reqnroll (DataTable*), DI keyed, MapGet before edits.
+- Slices: P0 baseline+inventory+todo; Phase1 flesh+real contracts (Validate, descriptors, 2 provider test classes + fakes); heuristic delete in mcp tool.
+- All groups: git status, high-sev, build, doctor CLI+MCP, plan update [x]+evidence only.
+- End: commit 2940e86, gap updated [x] partial 11/13, high-sev green, doctor 5/5.
+- Remaining (P1 delete routes, P2 health Aspire, P3 full LLM wire, P4 golden E2E + caps.Market/Llm, P5 crosscut): see unchecked + gap. Next session start from here + full verif.
+- Evidence only; no unsubstantiated. All constraints followed (relative, no C:\Users, latest via build, aspire MCP, high-sev always, small slices, Elon's delete applied to heuristic).
 
 ### Phase 2: Connection Health + Remaining Provider Migrations + Gateway Unification
 **Files:**
