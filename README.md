@@ -1,115 +1,64 @@
-# NeuroOS / DigitalBrain — Framework (brain/)
+# DigitalBrain
 
-**NeuroOS** is the canonical .NET Aspire + Orleans runtime ("Kernel") for **DigitalBrain**. Everything is a **Neuron** (actor grain) or **Synapse** (immutable typed message). Server-driven UI, marketplace packs, typed C# only (`.ino` is dead).
+**DigitalBrain** is the .NET Aspire + Orleans kernel for self-evolving personal OS where everything is a **Neuron** (Orleans grain) or **Synapse** (typed message).
 
-The web client lives at [digitalbrain.tech](https://digitalbrain.tech) and talks to the kernels via gRPC + RFW/ForUI surfaces.
+The core product: **safe, explicit, journaled, human-approved self-evolution is the *only* path** for any user-visible mutation (packs, automations, new neurons, Ino proposals, foundry runs, etc.).
 
-## What lives here
+Ino (the orchestrator) + Marketplace + Foundry + automations all stage proposals. Only approved decisions apply effects. Everything is durable, replayable, and rollback-capable.
 
-- `DigitalBrain.Core` — pure protocol: `INeuron`, `Synapse`, `IHandle<T>`, `NeuronId`/`TaskId`, and shared runtime messages.
-- `DigitalBrain.Demo.Contracts` — demo/sample protocol contracts: `DemoMessageSynapse` and `IDemoNeuron`, kept out of the stable Core package.
-- `DigitalBrain.Demo.Runtime` — demo/sample runtime helpers: the surface demo pack source, signing helper, and live observability graph surface builder, kept out of Kernel gateway code.
-- `DigitalBrain.Ui.Contracts` — server-driven UI contracts: `UiSurface`, `UiWidgetTree`, `RfwCard`, UI vocabularies, typed surface records, chart specs, generic action descriptors, and UI-facing neuron contracts.
-- `DigitalBrain.Ui.Runtime` — runtime/sample UI projection helpers: `UiSurfaceSamples` and `UiSurfaceLiveData`, kept out of the stable schema assembly.
-- `DigitalBrain.Pack.Contracts` — executable pack contracts: `IPackBehavior`, `NeuroPack`, `PackManifest`, bundle manifest/config schema, pack trust helpers, and `KitExperience` authoring helpers.
-- `DigitalBrain.Marketplace.Contracts` — marketplace neuron commands/events plus projection helpers for marketplace and installed-bundle UI surfaces.
-- `DigitalBrain.SeedPacks` — local marketplace seed catalog and embedded built-in pack source.
-- `DigitalBrain.Kernel` — the runtime (Orleans + services): base `Neuron`, embodiment (`Foundry`/`PackAlcEmbodier`), LLM, economics (Stripe + ECDSA), context/memory (hybrid + Qdrant), server-driven UI (UiSurface emission + bidirectional `UiGateway`), self-update/HA rolling.
-- `DigitalBrain.Aspire` — hosting SDK (`AddDigitalBrain`, `WireKernelSilo`, `AddFlutterClient`...).
-- `DigitalBrain.AppHost` — the Aspire model (3× kernel replicas, Ollama, Azurite, MCP, flutter-ui).
-- `DigitalBrain.Mcp(.Tools)` — internal MCP server (neuron tools).
-- Tests (Reqnroll BDD over real `TestCluster` + Aspire E2E).
+Thin client (Flutter + RFW/ForUI) consumes server-driven `UiSurface` / `UiWidgetTree` emitted by neurons.
 
-See `Brain.slnx`, `aspire.config.json`, `Directory.Packages.props` (Aspire 13.4.6, Orleans 10.2, net11.0).
+## Quick Start (Local)
 
-## Core Concepts
+From repo root:
 
-- **Neuron** = Orleans grain (`IGrainWithStringKey` implementing `INeuron` + `IHandle<>` for the synapses it consumes).
-- **Synapse** = broadcast or point-to-point message (`[GenerateSerializer] record : Synapse`). Carries `SynapseId` + causation lineage via `Stamp(...)`.
-- **NeuroPack** = signed (ECDSA-nistP256) C# code. Compiled in collectible ALC, embodied as running behavior. Marketplace install reaches N+1 handlers without restart.
-- **UI** = `UiSurface : Synapse` (or `RfwCard`) from `DigitalBrain.Ui.Contracts`. Neurons emit `UiWidgetTree` using the official kit (`NeuronUiKit`, `UiKitVocabulary`). Client is thin (ForUI + RFW host/renderer). Shell, nav, content, experiences all come from neurons.
-
-## Working in this repo (AGENTS.md loop)
-
-1. Make requirements less dumb.
-2. Delete (target >10% net reduction).
-3. Simplify.
-4. Accelerate (fast targeted feedback).
-5. Automate last.
-
-**Fast inner loop**: `dotnet build && dotnet test --filter "Category!=cluster"` (protocol/unit/UI contracts); use narrower `FullyQualifiedName~...` filters when editing a specific slice.
-
-**Aspire/hosting**: use MCP tools (`aspire__doctor`, `aspire__list_resources`, `aspire__execute_resource_command` to restart flutter-ui/kernel, `aspire__list_console_logs`) or `aspire` CLI. Prefer targeted commands.
-
-**Full distributed**: `aspire run` (Ollama + 3 kernels + client) only when needed for end-to-end (pack embodiment, LLM flows, live surfaces).
-
-**After every change**:
-- `dotnet build`
-- Relevant `dotnet test`
-- `aspire doctor` (MCP or CLI)
-- Flutter: `flutter analyze` + targeted tests on renderer/kit
-- MCP resource restart + logs when UI or hosting touched
-
-**Rules**:
-- Context7 for all library/framework APIs before writing against them (ForUI, RFW, Orleans, Aspire, gRPC...).
-- Relative paths only. Never reference `C:\Users\...`.
-- Meaningful names over comments. No vacuous `/// <summary>`.
-- Central versions in `Directory.Packages.props`. Latest deliberate.
-- Self-explanatory variable names.
-
-## UI Kit (Neurons + Synapses focus)
-
-See `docs/SYSTEM_DESIGN.md` for the current architecture and `docs/archive/CONTINUITY.md` for recent history.
-
-- Grammar lives in `DigitalBrain.Ui.Contracts/UiSurfaces.cs` (`NeuronUiKit`, `UiKitVocabulary`, `UiWidgetTree`, `UiSurface.ForWidgetTree`...).
-- Runtime/sample surface builders live in `DigitalBrain.Ui.Runtime/UiSurfaceRuntime.cs` (`UiSurfaceSamples`, `UiSurfaceLiveData`).
-- Experiences: `KitExperience` + fluent `UiExperience` live in `DigitalBrain.Pack.Contracts` (packs author multi-hop UIs in pure C# while Core stays out of the UI schema and marketplace contracts stay outside Core).
-- Emission examples: `UserSessionNeuron` (app-shell), `SystemNeurons`, UI runtime live-data helpers, and marketplace projections in `DigitalBrain.Marketplace.Contracts`.
-- Wire: `HomeFeedBus` + `UiSurfaceRfwBridge` + bidirectional `UiGatewayService`.
-- Client: `rfw_host/` (host + `UiSurfaceTreeRenderer`) + `ui_kit/` (thin ForUI impl of `ui:` vocab) + ForUI shell. Thin host only.
-
-All shell/nav/content/forms/actions upgradable by publishing + installing packs.
-
-## Quick start (dev)
-
-From `brain/`:
-```sh
+```powershell
 aspire doctor
-# targeted work
-dotnet build DigitalBrain.Core/DigitalBrain.Core.csproj
-dotnet build DigitalBrain.Demo.Contracts/DigitalBrain.Demo.Contracts.csproj
-dotnet build DigitalBrain.Demo.Runtime/DigitalBrain.Demo.Runtime.csproj
-dotnet build DigitalBrain.Ui.Contracts/DigitalBrain.Ui.Contracts.csproj
-dotnet build DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj
-dotnet test --filter "UiSurface|KitExperience"
+dotnet build
+dotnet test --logger "console;verbosity=minimal"
 ```
 
-From `brain/app/`:
-```sh
-flutter pub get
-flutter run -d chrome   # or windows
-```
+Full stack:
 
-Full stack (kernels + Ollama + MCP + flutter):
 ```sh
 aspire run
 ```
 
-See `samples/`, `DigitalBrain.Tests/`, `DigitalBrain.AppHost/AppHost.cs`.
+See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, and iteration speed rules.
 
-## Deploy / Ops
+## Core Ideas
 
-See `deploy/`, Pulumi files, `docs/`.
+- **Self-evolution rail** (the point): Proposals → human (or trusted) approval → apply handler. Ino proposes; rail executes. No side doors for user mutations.
+- **Neuron / Synapse**: Actor model with causation, journals, broadcasts.
+- **Packs**: Signed C# (NeuroPack) embodied at runtime via collectible ALC. Marketplace install = instant new behavior.
+- **UI**: Neurons emit rich server-driven surfaces. Client is thin renderer.
+- **Aspire hosting**:  AppHost wires replicas, Ollama, storage, MCP, flutter client.
 
-## Related
+## Working Rules (see CLAUDE.md)
 
-- `app/` — Flutter client (static bundle on GitHub Pages).
-- `core-requirements/` — planning (Musk approach, project survey).
-- `Projects/` — archive (read for patterns, do not extend).
-- `marketplace/` — seeds & client.
+- Always follow Elon's 5 steps **in order**: less dumb reqs → delete (target 10%+) → simplify → accelerate → automate last.
+- **Context7** for every library/framework API before touching code.
+- **Aspire MCP + CLI** for fast inspection/restarts/logs/traces (prefer over full runs).
+- Tests: `dotnet test --logger "console;verbosity=minimal"` from root only. No --filter.
+- After every change: build + above test + `aspire doctor` + MCP health.
+- Delete trash (especially docs/plans). Only living docs: this README + CLAUDE.md.
+- Relative paths. Self-explanatory names. No vacuous summaries.
+- Self-evolution is non-negotiable for mutations.
 
-License, continuity, and session notes live alongside the code. Follow the 5 steps.
+## Vision (Self-Evolving System)
+
+The OS evolves itself safely through one explicit rail. Durable journals capture proposals/decisions/applies. Ino is the smart front-end that proposes; the rail is the trusted executor. Human approval (or explicit trusted bypasses for seeds/dev) gates everything.
+
+Packs, Ino creations, automations, foundry outputs — all flow the same way.
+
+This is the architecture north star. See the SelfEvolution types + handlers in Core/Kernel for the implementation.
+
+## Status
+
+AppHost + kernels + self-evolution rail are live. Use `aspire doctor` and MCP tools for state.
+
+For detailed rules and iteration improvements, read CLAUDE.md.
 
 ---
 
-*NeuroOS: typed C# neurons, synapses on a timeline, UI from the kernel.*
+Built for speed, safety, and relentless self-improvement. Delete the dumb parts first.

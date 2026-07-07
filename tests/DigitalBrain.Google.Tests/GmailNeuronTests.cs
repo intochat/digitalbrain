@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -9,7 +10,8 @@ public class GmailNeuronTests : NeuronTestBase
     private readonly FakeGmailApiClient _fake = new();
 
     protected override void ConfigureSilo(ISiloBuilder builder) =>
-        builder.ConfigureServices(services => services.AddSingleton<IGmailApiClient>(_fake));
+        builder.ConfigureServices(services =>
+            services.AddSingleton<IGmailApiClientFactory>(new TestGmailFactory(_fake)));
 
     [Fact]
     public async Task SendMessageAsync_Records_The_Send_On_The_Fake()
@@ -26,4 +28,9 @@ public class GmailNeuronTests : NeuronTestBase
         var messages = await gmail.ListMessagesAsync("is:unread", 10);
         Assert.NotEmpty(messages);
     }
+}
+
+internal sealed class TestGmailFactory(FakeGmailApiClient client) : IGmailApiClientFactory
+{
+    public Task<IGmailApiClient> CreateAsync(NeuronScope scope) => Task.FromResult<IGmailApiClient>(client);
 }

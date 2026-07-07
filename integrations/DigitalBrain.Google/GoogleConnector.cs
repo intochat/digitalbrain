@@ -13,11 +13,13 @@ public class GoogleConnector : IConnector
 {
     private readonly IPackConfigStore _store;
     private readonly IConfiguration? _config;
+    private readonly IGrainFactory? _grainFactory;
 
-    public GoogleConnector(IPackConfigStore store, IConfiguration? config = null)
+    public GoogleConnector(IPackConfigStore store, IConfiguration? config = null, IGrainFactory? grainFactory = null)
     {
         _store = store;
         _config = config;
+        _grainFactory = grainFactory;
     }
 
     public ConnectorDescriptor Descriptor => new(
@@ -145,6 +147,22 @@ public class GoogleConnector : IConnector
 
             await store.SetAsync(userScope, GoogleClientFactory.PackName, userTokenValues);
             await store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
+
+            if (_grainFactory is not null)
+            {
+                // Broadcast via ingress so subscribed grains (ino-main) receive AuthCompleted / PackConfigured on the timeline stream.
+                // Uses same ingress pattern as GatewaySendHandlers. Enables INO to resume pending Gmail fetch after OAuth.
+                var notifyKey = "google-auth-completed";
+                var ingress = _grainFactory.GetGrain<IIngressNeuron>(notifyKey);
+                var props = new Dictionary<string, object?>
+                {
+                    ["provider"] = "google",
+                    ["pack"] = GoogleClientFactory.PackName,
+                    ["scope"] = userScope
+                };
+                await ingress.IngestAsync("PackConfigured", props);
+                await ingress.IngestAsync(GoogleSignals.AuthCompleted, props);
+            }
 
             return new AuthResult(true);
         }

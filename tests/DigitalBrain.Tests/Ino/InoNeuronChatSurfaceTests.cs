@@ -385,7 +385,8 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
         builder.ConfigureServices(services =>
         {
             services.AddPackConfigStore(blobsForKeyRing: null);
-            services.AddSingleton<IGmailApiClient>(_gmail);
+            // Provide factory so GmailNeuron (now per-user) gets IGmailApiClient via CreateAsync.
+            services.AddSingleton<IGmailApiClientFactory>(new TestGmailApiClientFactory(_gmail));
         });
 
     [Fact]
@@ -683,5 +684,10 @@ internal sealed class RecordingGmailApiClient : IGmailApiClient
 
     public Task SendMessageAsync(string to, string subject, string body, CancellationToken ct) =>
         throw new NotSupportedException("Send is not used by INO Gmail read tests.");
+}
+
+internal sealed class TestGmailApiClientFactory(RecordingGmailApiClient client) : IGmailApiClientFactory
+{
+    public Task<IGmailApiClient> CreateAsync(NeuronScope scope) => Task.FromResult<IGmailApiClient>(client);
 }
 

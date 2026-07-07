@@ -189,16 +189,19 @@ builder.Services.AddHostedService<DigitalBrain.Google.GoogleAppConfigSeeder>();
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
 
-// Google Gmail API client: one UserCredential per grain activation, built from the pack config
-// (scope "default", pack "google" with client_id/client_secret/refresh_token). Scoped because Orleans
-// creates a DI scope per grain activation. Uses GoogleClientFactory constants for keys.
-DigitalBrain.Google.GoogleServiceRegistration.AddGoogleGmailClient(builder.Services);
+// Old eager Google Gmail client registration removed in favor of per-user GmailApiClientFactory
+// (see registration below). The factory creates clients on demand inside per-user GmailNeuron using Self.AsScope().
+// DigitalBrain.Google.GoogleServiceRegistration.AddGoogleGmailClient(builder.Services);
 // Salesforce CRM REST API client: built lazily per call from the shared app-level connected-app config
 // ("default" scope) merged with the calling grain's own per-user token scope ("user:{userId}"). Singleton
 // (not scoped) because, unlike the old eager factory, it no longer resolves a client at grain-activation
 // time — SalesforceCrmNeuron calls CreateAsync explicitly per method with its own NeuronScope, so "user
 // hasn't connected yet" is a normal per-call condition instead of an activation-time throw.
 builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
+
+// Google Gmail client factory: built per call using merged app + per-user scope from the calling grain's identity (Self.AsScope()).
+// Registered as singleton (factory itself is stateless); clients created inside per-user GmailNeuron methods.
+builder.Services.AddSingleton<DigitalBrain.Google.IGmailApiClientFactory, DigitalBrain.Google.GmailApiClientFactory>();
 
 // P2: register IConnector implementations for unified auth + health (keyed by provider id for generic dispatch)
 builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("salesforce", (sp, _) => new DigitalBrain.Salesforce.SalesforceConnector(
@@ -207,7 +210,8 @@ builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>(
     sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
 builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("google", (sp, _) => new DigitalBrain.Google.GoogleConnector(
     sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
-    sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
+    sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>(),
+    sp.GetService<IGrainFactory>()));
 
 // Phase 2: surface connector TestConnection (real probes) as Aspire health checks (via default /health endpoints from ServiceDefaults).
 builder.Services.AddHealthChecks()

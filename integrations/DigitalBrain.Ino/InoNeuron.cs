@@ -257,11 +257,15 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var pending = _pendingGmailRequest
             ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => InoConnectorIntents.IsGmail(r.Prompt));
 
-        if (pending is null || !await HasGoogleCredentialAsync())
+        if (pending is null)
+            return;
+
+        var gmailUserId = await ResolveUserIdAsync(pending.ClientId);
+        if (!await HasGoogleCredentialAsync(gmailUserId))
             return;
 
         _pendingGmailRequest = null;
-        await FetchRecentGmailAsync(pending);
+        await FetchRecentGmailAsync(pending, gmailUserId);
     }
 
     private async Task<string> ResolveUserIdAsync(string? clientId)
@@ -407,7 +411,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             }
         }
 
-        if (!await HasGoogleCredentialAsync())
+        var gmailUserId = await ResolveUserIdAsync(req.ClientId);
+        if (!await HasGoogleCredentialAsync(gmailUserId))
         {
             _pendingGmailRequest = req;
             var reply = "Google authentication is required to read Gmail.";
@@ -416,7 +421,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        await FetchRecentGmailAsync(req);
+        await FetchRecentGmailAsync(req, gmailUserId);
     }
 
     internal async Task HandleSalesforceIntentAsync(InoRequest req)
@@ -592,7 +597,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await DeliverAutomationProposalSurfaceAsync(proposalId, rationale, when, script, req.ClientId, workspaceId);
     }
 
-    private async Task<bool> HasGoogleCredentialAsync()
+    private async Task<bool> HasGoogleCredentialAsync(string? gmailUserId = null)
     {
         var store = ServiceProvider.GetService<IPackConfigStore>();
         if (store is null)
@@ -600,8 +605,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         try
         {
-            // Wire GetMergedScopedValuesAsync so tokens written to user scope are seen (root cause B).
-            var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, Self.AsScope());
+            var scope = string.IsNullOrWhiteSpace(gmailUserId)
+                ? Self.AsScope()
+                : new NeuronScope(new UserId(gmailUserId), null);
+            var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope);
             return GoogleClientFactory.HasUsableCredential(values);
         }
         catch (Exception ex)
@@ -609,9 +616,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             Logger.LogDebug(ex, "Google credential check failed.");
             return false;
         }
-
-        static bool HasValue(IReadOnlyDictionary<string, string> values, string key) =>
-            values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
     }
 
     private async Task<bool> HasSalesforceCredentialAsync(string userId)
@@ -681,7 +685,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface));
     }
 
-    private async Task FetchRecentGmailAsync(InoRequest req)
+    private async Task FetchRecentGmailAsync(InoRequest req, string gmailUserId)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
@@ -696,7 +700,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["query"] = q
         }));
 
-        var gmail = GrainFactory.GetGrain<IGmailNeuron>("gmail-main");
+        // Use per-user grain key (gmailUserId) so the GmailNeuron can resolve creds via its Self.AsScope() + factory.
+        // Mirrors SalesforceCrmNeuron pattern for isolation.
+        var gmail = GrainFactory.GetGrain<IGmailNeuron>(gmailUserId);
         var ids = await gmail.ListMessagesAsync(q, maxResults);
         var summaries = new List<GmailMessageSummary>();
 
