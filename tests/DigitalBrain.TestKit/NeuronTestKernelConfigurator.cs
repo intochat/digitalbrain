@@ -49,9 +49,7 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
-                var inoRecallType = Type.GetType("DigitalBrain.Kernel.Ino.KernelInoCapabilityRecall");
-                if (inoRecallType != null)
-                    services.AddSingleton(typeof(IInoCapabilityRecall), inoRecallType);
+                services.AddSingleton<IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
                 services.AddSingleton<IVectorStore, InMemoryVectorStore>();
                 services.AddSingleton<DocumentIngestor>();

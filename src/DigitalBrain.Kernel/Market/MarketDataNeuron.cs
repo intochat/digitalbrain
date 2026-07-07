@@ -2,13 +2,6 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel.Market;
 
-[Alias("DigitalBrain.Kernel.Market.IMarketDataNeuron")]
-public interface IMarketDataNeuron : INeuron, IHandle<Signal>
-{
-    [Alias("GetBitcoinPriceUsdAsync")]
-    Task<string> GetBitcoinPriceUsdAsync();
-}
-
 [GrainType("digitalbrain.market-data")]
 public sealed class MarketDataNeuron(ILogger<MarketDataNeuron> logger, NeuronJournals journals, IMarketDataApiClient client)
     : Neuron(logger, journals), IMarketDataNeuron

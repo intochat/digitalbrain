@@ -6,13 +6,12 @@ using DigitalBrain.Context;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Kernel;
-using DigitalBrain.Kernel.Market;
-using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Ui.Runtime;
 using Microsoft.Extensions.AI;
-using DigitalBrain.Ino;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
-namespace DigitalBrain.Kernel.Ino;
+namespace DigitalBrain.Ino;
 
 using DigitalBrain.Ui.Contracts;
 

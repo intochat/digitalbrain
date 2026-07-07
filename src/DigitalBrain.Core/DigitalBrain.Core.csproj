@@ -15,5 +15,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Core.Abstractions" />
     <PackageReference Include="Microsoft.Orleans.Serialization" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
   </ItemGroup>
 </Project>
