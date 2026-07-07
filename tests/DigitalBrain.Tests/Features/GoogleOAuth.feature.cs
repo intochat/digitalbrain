@@ -134,15 +134,15 @@ namespace DigitalBrain.Tests.Features
             await this.TestTearDownAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="INO triggers Google auth surface when no credentials")]
+        [global::Xunit.SkippableFactAttribute(DisplayName="INO triggers Google auth form when no credentials")]
         [global::Xunit.TraitAttribute("FeatureTitle", "Google OAuth for Gmail via INO")]
-        [global::Xunit.TraitAttribute("Description", "INO triggers Google auth surface when no credentials")]
-        public async global::System.Threading.Tasks.Task INOTriggersGoogleAuthSurfaceWhenNoCredentials()
+        [global::Xunit.TraitAttribute("Description", "INO triggers Google auth form when no credentials")]
+        public async global::System.Threading.Tasks.Task INOTriggersGoogleAuthFormWhenNoCredentials()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "0";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("INO triggers Google auth surface when no credentials", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("INO triggers Google auth form when no credentials", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 7
@@ -162,21 +162,21 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.WhenAsync("INO receives prompt \"show my last 5 gmail senders\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 10
-  await testRunner.ThenAsync("a Google auth button surface is delivered", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+  await testRunner.ThenAsync("a Google credential form surface is delivered", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
         }
         
-        [global::Xunit.SkippableFactAttribute(DisplayName="Google auth flow emits AuthUrl signal")]
+        [global::Xunit.SkippableFactAttribute(DisplayName="Google auth flow emits AuthUrl signal with correct params")]
         [global::Xunit.TraitAttribute("FeatureTitle", "Google OAuth for Gmail via INO")]
-        [global::Xunit.TraitAttribute("Description", "Google auth flow emits AuthUrl signal")]
-        public async global::System.Threading.Tasks.Task GoogleAuthFlowEmitsAuthUrlSignal()
+        [global::Xunit.TraitAttribute("Description", "Google auth flow emits AuthUrl signal with correct params")]
+        public async global::System.Threading.Tasks.Task GoogleAuthFlowEmitsAuthUrlSignalWithCorrectParams()
         {
             string[] tagsOfScenario = ((string[])(null));
             global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
             string pickleIndex = "1";
-            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Google auth flow emits AuthUrl signal", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Google auth flow emits AuthUrl signal with correct params", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
             string[] tagsOfRule = ((string[])(null));
             global::Reqnroll.RuleInfo ruleInfo = null;
 #line 12
@@ -196,7 +196,7 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.WhenAsync("AuthRequested signal is delivered", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 15
-  await testRunner.ThenAsync("GoogleAuthUrl signal is emitted", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+  await testRunner.ThenAsync("GoogleAuthUrl signal is emitted with offline consent and gmail.readonly scope", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

@@ -107,8 +107,8 @@ P0 tests first (trust), then P1 ledger before triggers (per gap rationale).
 - [x] MCP: list called.
 - [x] Optional E2E smoke noted (no live host in session).
 - [x] Plan updated with evidence.
-- [x] Will commit.
-- [x] Execution complete for the plan.
+- [x] Committed (dc483de).
+- [x] Execution complete for the plan. All phases done with verifs.
 
 ## Risks & Mitigations
 - Reqnroll rewrite scope: start with 2-3 core scenarios; delegate heavy INO parts if harness allows.
