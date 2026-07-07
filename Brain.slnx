@@ -19,7 +19,7 @@
     <Project Path="src/DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj" />
   </Folder>
   <Folder Name="/integrations/">
-    <Project Path="integrations/DigitalBrain.Ino/Context/DigitalBrain.Context.csproj" />
+
     <Project Path="integrations/DigitalBrain.Google/DigitalBrain.Google.csproj" />
     <Project Path="integrations/DigitalBrain.Ino/DigitalBrain.Ino.csproj" />
     <Project Path="integrations/DigitalBrain.Salesforce/DigitalBrain.Salesforce.csproj" />
@@ -31,7 +31,7 @@
     <Project Path="hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj" />
+
     <Project Path="tests/DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />

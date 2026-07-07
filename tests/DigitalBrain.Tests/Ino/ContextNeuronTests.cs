@@ -1,8 +1,9 @@
 using DigitalBrain.TestKit;
 using DigitalBrain.Core;
+using DigitalBrain.Ino.Context;
 using Xunit;
 
-namespace DigitalBrain.Context.Tests;
+namespace DigitalBrain.Tests.Ino;
 
 public class ContextNeuronTests : NeuronTestBase
 {

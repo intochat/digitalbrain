@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Context;
+using DigitalBrain.Ino.Context;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Kernel.Company;
