@@ -39,6 +39,27 @@ inline: return new[] { new Signal("Z", null) };
 
 Globals: Synapse input, NeuronId Self, Func<Synapse,Task> Fire
 
+## Salesforce automation via LLM self-evolution (recommended)
+
+Use the describe tool or Ino to create:
+
+create_automation_from_description description="when poll new leads from Salesforce then emit LeadCreated with name and email"
+
+The LLM (Foundry with local Qwen) identifies the intent, generates script using available caps (e.g. Http for Salesforce REST or Llm for processing), + RegisterReaction with poll trigger, stages proposal for approval.
+
+Example generated script (LLM will adapt):
+
+```csharp
+// Poll new leads (use with 'poll' in When)
+var leadsJson = await Caps.HttpGetAsync("https://<instance>.salesforce.com/services/data/v60.0/query?q=SELECT+Id,Name,Email+FROM+Lead+WHERE+CreatedDate=TODAY");
+ // parse and emit
+return new[] { new Signal("LeadCreated", new Dictionary<string,object?> { ["data"] = leadsJson }) };
+```
+
+Register and approve via the rail. The system self-evolves the automation.
+
+For better, the LLM can use vector search on DigitalBrain knowledge for exact Salesforce patterns if wired.
+
 ## Surfaces
 
 - AutomationSurface: reactions + scripts + counts (emitted on change/query)

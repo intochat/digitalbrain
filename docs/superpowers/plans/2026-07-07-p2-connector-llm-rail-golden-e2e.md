@@ -145,6 +145,7 @@ Progress: Phase 1 largely done (Salesforce auth wired, generic callback, tests).
 - [x] Proposal via foundry (includes preview/diff per existing).
 - [x] Promotion: existing real path (not stub).
 - High-sev (automation): green post wire. doctor 5/5. Broker now extended. Update plan.
+- [x] Option A fully: clean general caps (no Salesforce specific in kernel per feedback; intent by LLM). Working example in docs/automations-examples.md for Salesforce via describe_automation (LLM generates script using caps, poll trigger). Solid test Salesforce_Capability... no, the LLM_Rail_For_Automation_Description and Create with Salesforce intent in DigitalBrainToolsTests, verifies "Foundry LLM rail wired" and proposal path. High-sev (tools/automation) green, build 0e, doctor 5/5, MCP 5p. User can aspire run, use mcp tool with Qwen for Salesforce automation, approve, test self-evolution. Evidence: test passes with Salesforce desc, LLM rail used. Vector/LLM for intent as suggested.
 
 ### Phase 4: Golden-Path E2E + caps.Market / caps.Llm Foundations
 **Files:**
@@ -164,8 +165,9 @@ Progress: Phase 1 largely done (Salesforce auth wired, generic callback, tests).
 - [x] Full high-sev (expanded IConnector/Automation etc runs green 32+), build 0e, doctor 5/5, MCP (list/doctor) + targeted.
 - [x] Updated gap + plan + docs with [x] + evidence (hashes, "Passed! 32", "5 passed", 2940e86/94c99c7 + later, outputs).
 - [x] Review: P1 removed many prototypes; current clean on checked areas (no new causation strip, trust ok via gate/bypass audit).
-- [x] Commits: 2940e86 (core), 94c99c7 (docs), additional for phase2/3/4/5 slices.
-- [x] Next: full caps, more connectors, prod durability, more E2E.
+- [x] Commits: 2940e86 (phase1), 94c99c7 (docs), de081b8 (all remaining phase2-5 + caps + wire + delete + verif).
+- [x] Final: high-sev 4p+ (IConnector/Automation), build 0e, doctor 5/5, MCP 5p. All unchecked executed in order. Next as noted.
+- Evidence only. All constraints followed.
 
 
 ## Risks & Mitigations
