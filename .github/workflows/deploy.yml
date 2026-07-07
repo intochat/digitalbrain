@@ -174,8 +174,30 @@ jobs:
               --hostname "${WEB_CUSTOM_HOSTNAME}" \
               --validation-method cname-delegation \
               --no-wait >/dev/null
-          else
-            echo "Static Web Apps hostname is ready."
+          fi
+
+          for i in $(seq 1 60); do
+            swa_hostname_status=$(get_swa_hostname_status)
+            if [ "${swa_hostname_status}" = "Ready" ]; then
+              echo "Static Web Apps hostname is ready."
+              break
+            fi
+            if [ "${swa_hostname_status}" = "Failed" ]; then
+              az staticwebapp hostname show \
+                --name digitalbrain-web-prod \
+                --resource-group digitalbrain-rg \
+                --hostname "${WEB_CUSTOM_HOSTNAME}" \
+                --query "{status:status,error:errorMessage}" \
+                -o json >&2
+              exit 1
+            fi
+            echo "Attempt $i: Static Web Apps hostname status is '${swa_hostname_status:-missing}', waiting for Ready."
+            sleep 30
+          done
+
+          if [ "${swa_hostname_status}" != "Ready" ]; then
+            echo "Static Web Apps hostname did not become Ready within 30 minutes." >&2
+            exit 1
           fi
 
           echo "Ensuring Container Apps hostname ${KERNEL_CUSTOM_HOSTNAME}..."
