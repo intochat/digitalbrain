@@ -597,10 +597,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         try
         {
-            var values = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName);
-            return HasValue(values, GoogleClientFactory.ClientIdKey) &&
-                   HasValue(values, GoogleClientFactory.ClientSecretKey) &&
-                   HasValue(values, GoogleClientFactory.RefreshTokenKey);
+            // Wire GetMergedScopedValuesAsync so tokens written to user scope are seen (root cause B).
+            var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, Self.AsScope());
+            return GoogleClientFactory.HasUsableCredential(values);
         }
         catch (Exception ex)
         {

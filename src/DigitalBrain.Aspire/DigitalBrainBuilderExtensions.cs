@@ -88,7 +88,10 @@ public static class DigitalBrainBuilderExtensions
         var storage = builder.AddAzureStorage("storage");
         if (isRunMode)
         {
-            storage.RunAsEmulator();
+            storage.RunAsEmulator(azurite =>
+            {
+                azurite.WithLifetime(ContainerLifetime.Persistent);
+            });
         }
         var clusteringTable = storage.AddTables("clustering");
         var grainBlobs = storage.AddBlobs("grainstate");

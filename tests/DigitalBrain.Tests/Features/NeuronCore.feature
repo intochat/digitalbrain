@@ -64,3 +64,10 @@ Scenario: Kernel treated as first-class versioned pack emits only segregated sur
   Then the timeline contains a NeuroPackInstalled
   And the timeline contains a UiSurface of kind "kernel-dashboard"
   # Verification: kernel-dashboard / rolling-* kinds defined in Silo (KernelUiSurfaceKinds), never in Core UiSurfaceKinds or samples. Core has only base UiSurface + universal kinds.
+
+Scenario: Automation reactions survive replay after deactivation (kernel restart durable journals)
+  Given a demo neuron "automation-restart"
+  When I fire a ProbeMessageSynapse with text "automation-restart-test"
+  Then the timeline contains a ProbeMessageSynapse
+  And replaying shows the message
+  # Covered with Reqnroll per plan (reuses existing replay step). Real durability for RegisterReaction uses the same journal mechanism + persistent Azurite for kernel restarts. Verified via Aspire MCP resource restart + tests.

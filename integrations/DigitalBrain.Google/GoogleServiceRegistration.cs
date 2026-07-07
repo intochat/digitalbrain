@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Google;
@@ -20,7 +21,8 @@ public static class GoogleServiceRegistration
     private static GoogleApisAuth.OAuth2.UserCredential BuildGoogleCredential(IServiceProvider sp, string scope, string pack)
     {
         var store = sp.GetRequiredService<IPackConfigStore>();
-        var values = store.GetAsync(scope, pack).GetAwaiter().GetResult();
+        // Use merged (default + user) so tokens written under user:{id} are visible (fixes scope mismatch).
+        var values = GoogleClientFactory.GetMergedScopedValuesAsync(store, new NeuronScope(UserId.Anonymous, null)).GetAwaiter().GetResult();
 
         if (!values.TryGetValue(GoogleClientFactory.ClientIdKey, out var clientId) ||
             !values.TryGetValue(GoogleClientFactory.ClientSecretKey, out var clientSecret) ||
