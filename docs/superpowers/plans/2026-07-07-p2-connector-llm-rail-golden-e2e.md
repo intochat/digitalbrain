@@ -86,6 +86,8 @@ Progress so far (executed slices):
 - [x] Phase 1 complete (IConnector, tests, generic callback, migrations for Salesforce/Google auth). Committed. Ready for Phase 2.
 - [x] (Phase 2 start) Enhanced Google TestConnection to check for refresh token in store. High-sev 46p, doctor 5/5. Plan updated.
 - [x] (Phase 3 start) Removed keyword heuristic from create_automation_from_description. Stages basic now. High-sev green. Plan updated.
+- Pre-commit: high-sev/doctor green. Committed.
+- Continued: Phase 1/2/3 progress, plan updated. High-sev/doctor green.
 - [ ] Flesh out `IConnector` with full methods (add any missing from gap design: e.g. proper scopes, redirect resolution from Aspire endpoint).
 - [ ] Implement generic `/oauth/callback/{provider}` route + dispatch (delete per-provider routes/handlers where possible). (generic added; full dispatch/migration next).
 - [ ] Create reusable `IConnectorContractTests<TConnector>` that every provider inherits (begin auth → callback → token roundtrip → credential build → two-user isolation → cross-silo). (skeleton + dummy passing).
