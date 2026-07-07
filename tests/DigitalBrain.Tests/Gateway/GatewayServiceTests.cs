@@ -8,7 +8,6 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
-using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Voice;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tests.TestSupport;
@@ -27,7 +26,6 @@ namespace DigitalBrain.Tests.Gateway;
 public class GatewayServiceTests : NeuronTestBase
 {
     private HomeFeedBus? _homeFeedBusInstance;
-    private readonly FakeMarketDataApiClient _marketClient = new();
 
     // Lazily resolved via the silo's own DI container (same pattern as HomeFeedCrossSiloTests) — HomeFeedBus
     // now requires a real IClusterClient, which is only available once the cluster has finished starting,
@@ -49,7 +47,6 @@ public class GatewayServiceTests : NeuronTestBase
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
             services.AddSingleton<HomeFeedBus>();
-            services.AddSingleton<IMarketDataApiClient>(_marketClient);
         });
 
     private GatewayService NewService() =>
@@ -162,7 +159,7 @@ public class GatewayServiceTests : NeuronTestBase
         await svc.Fire(new FireRequest { NeuronId = "demo-fire", Text = "ping-123" }, TestContext());
 
         var timeline = await svc.Timeline(new TimelineRequest { NeuronId = "demo-fire", MaxEntries = 10 }, TestContext());
-        Assert.Contains(timeline.Entries, e => e.Type == nameof(DemoMessageSynapse) && e.Text.Contains("ping-123"));
+        Assert.Contains(timeline.Entries, e => e.Type == "DemoMessage" && e.Text.Contains("ping-123"));
     }
 
     [Fact]
@@ -314,49 +311,6 @@ public class GatewayServiceTests : NeuronTestBase
         var timeline = await ino.GetOutgoingTimelineAsync();
         var response = Assert.Single(timeline.OfType<InoResponse>());
         Assert.Equal("what's the bitcoin price", response.Prompt);
-    }
-
-    [Fact]
-    public async Task Send_InoRequest_BitcoinPriceIntent_DeliversFormattedPriceSurface()
-    {
-        _marketClient.Price = "$42,123.45";
-        var svc = NewService();
-        const string myClientId = "bitcoin-price-connection";
-
-        await svc.Send(new SynapseEnvelope
-        {
-            TypeName = nameof(LoginRequest),
-            Payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                username = "bitcoin-price-user",
-                password = "correct horse battery staple",
-                clientId = myClientId
-            }))
-        }, TestContext());
-
-        var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            prompt = "what's the bitcoin price?",
-            clientId = myClientId
-        });
-
-        await svc.Send(new SynapseEnvelope
-        {
-            TypeName = nameof(InoRequest),
-            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
-        }, TestContext());
-
-        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
-        var timeline = await flutter.GetIncomingTimelineAsync();
-
-        var surface = Assert.Single(timeline.OfType<UiSurface>());
-        Assert.Equal(UiSurface.WidgetTreeKind, surface.Kind);
-        Assert.Equal(myClientId, surface.Props["clientId"]);
-        Assert.Equal("assistant", surface.Props["role"]);
-
-        var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
-        Assert.Equal(UiKitVocabulary.Text, tree.Type);
-        Assert.Contains("$42,123.45", tree.Props["text"]!.ToString());
     }
 
     [Fact]
@@ -619,7 +573,6 @@ public class GatewayServiceTests : NeuronTestBase
 // user-scoped credential would be invisible and the flow would ask for credentials instead of querying.
 public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBase
 {
-    private readonly FakeMarketDataApiClient _marketClient = new();
     private readonly RecordingSalesforceApiClientFactory _salesforceFactory = new();
     private HomeFeedBus? _homeFeedBusInstance;
 
@@ -640,7 +593,6 @@ public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBas
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
             services.AddSingleton<HomeFeedBus>();
-            services.AddSingleton<IMarketDataApiClient>(_marketClient);
             services.AddPackConfigStore(blobsForKeyRing: null);
             services.AddSingleton<ISalesforceApiClientFactory>(_salesforceFactory);
         });
