@@ -5,6 +5,7 @@ using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Pack.Contracts;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;

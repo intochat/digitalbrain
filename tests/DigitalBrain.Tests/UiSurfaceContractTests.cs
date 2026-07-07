@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Marketplace.Contracts;
+using DigitalBrain.Ui.Contracts;
 
 namespace DigitalBrain.Tests;
 
@@ -469,19 +470,19 @@ public class UiSurfaceContractTests
     [Fact]
     public void AppShell_Tree_Can_Use_NeuronUiKit_Menu_Items()
     {
-        var shell = new DigitalBrain.Core.UiWidgetTree(
+        var shell = new UiWidgetTree(
             "app-shell",
             new Dictionary<string, object?> { ["activeContent"] = "marketplace-list" },
-            new List<DigitalBrain.Core.UiWidgetTree>
+            new List<UiWidgetTree>
             {
-                new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.Header, new Dictionary<string, object?> { ["title"] = "DigitalBrain" }),
-                new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.Menu, new Dictionary<string, object?>(),
+                new UiWidgetTree(NeuronUiKit.Header, new Dictionary<string, object?> { ["title"] = "DigitalBrain" }),
+                new UiWidgetTree(NeuronUiKit.Menu, new Dictionary<string, object?>(),
                     new[]
                     {
-                        new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.MenuItem,
+                        new UiWidgetTree(NeuronUiKit.MenuItem,
                             new Dictionary<string, object?> { ["label"] = "Marketplace", ["targetSurfaceKind"] = "marketplace-list" }),
-                        new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.Divider, new Dictionary<string, object?>()),
-                        new DigitalBrain.Core.UiWidgetTree(NeuronUiKit.MenuItem,
+                        new UiWidgetTree(NeuronUiKit.Divider, new Dictionary<string, object?>()),
+                        new UiWidgetTree(NeuronUiKit.MenuItem,
                             new Dictionary<string, object?> { ["label"] = "Tasks", ["targetSurfaceKind"] = "task-manager" })
                     })
             });

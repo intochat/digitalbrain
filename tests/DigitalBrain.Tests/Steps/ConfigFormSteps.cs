@@ -5,6 +5,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
+using DigitalBrain.Pack.Contracts;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
 using Microsoft.AspNetCore.DataProtection;
