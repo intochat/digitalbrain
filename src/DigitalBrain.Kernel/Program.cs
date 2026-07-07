@@ -186,6 +186,13 @@ DigitalBrain.Google.GoogleServiceRegistration.AddGoogleGmailClient(builder.Servi
 // hasn't connected yet" is a normal per-call condition instead of an activation-time throw.
 builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
 
+// P2: register IConnector implementations for unified auth + health (keyed by provider id for generic dispatch)
+builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("salesforce", (sp, _) => new DigitalBrain.Salesforce.SalesforceConnector(
+    sp.GetRequiredService<DigitalBrain.Salesforce.ISalesforceApiClientFactory>(),
+    sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
+    sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
+builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector, DigitalBrain.Google.GoogleConnector>("google");
+
 builder.Services.AddDigitalBrainOtlpForwardClient();
 
 // Ino (personal AI assistant) as pluggable integration.
@@ -416,6 +423,26 @@ app.MapGet(GoogleClientFactory.DefaultCallbackPath, async (
     return Results.Content(
         GoogleCallbackPage(result.Title, result.Message),
         "text/html",
+        statusCode: result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+});
+
+// P2 generic callback route (unifies providers via IConnector; old per-provider kept for compat during migration)
+app.MapGet("/oauth/callback/{provider}", async (
+    string provider,
+    HttpRequest request,
+    IServiceProvider sp) =>
+{
+    var connector = sp.GetRequiredKeyedService<DigitalBrain.Kernel.Abstractions.IConnector>(provider);
+    var cb = new DigitalBrain.Kernel.Abstractions.OAuthCallback(
+        Code: request.Query["code"].FirstOrDefault() ?? string.Empty,
+        State: request.Query["state"].FirstOrDefault() ?? string.Empty,
+        Error: request.Query["error"].FirstOrDefault(),
+        ErrorDescription: request.Query["error_description"].FirstOrDefault(),
+        FallbackRedirectUri: request.Query["redirect_uri"].FirstOrDefault());
+    var result = await connector.CompleteAuthAsync(cb);
+    var title = result.Success ? "Success" : "Error";
+    var msg = result.Success ? "Authentication completed." : (result.Error + ": " + result.Details);
+    return Results.Content($"<html><body><h1>{title}</h1><p>{msg}</p><p>Provider: {provider}</p></body></html>", "text/html",
         statusCode: result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
 });
 

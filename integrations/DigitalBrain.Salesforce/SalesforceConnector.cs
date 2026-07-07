@@ -1,0 +1,160 @@
+using DigitalBrain.Core;
+using DigitalBrain.Core.Config;
+using DigitalBrain.Kernel.Abstractions;
+using Microsoft.Extensions.Configuration;
+
+namespace DigitalBrain.Salesforce;
+
+/// IConnector implementation for Salesforce (P2 Phase 1).
+/// Uses store for config, factory for client. Health uses probe query. Auth uses store/PKCE logic (adapted from neuron).
+public class SalesforceConnector : IConnector
+{
+    private readonly ISalesforceApiClientFactory _factory;
+    private readonly IPackConfigStore _store;
+    private readonly IConfiguration? _config;
+
+    public SalesforceConnector(ISalesforceApiClientFactory factory, IPackConfigStore store, IConfiguration? config = null)
+    {
+        _factory = factory;
+        _store = store;
+        _config = config;
+    }
+
+    // Convenience for DI with fewer params
+    public SalesforceConnector(ISalesforceApiClientFactory factory, IPackConfigStore store) : this(factory, store, null) { }
+
+    public ConnectorDescriptor Descriptor => new(
+        Id: "salesforce",
+        DisplayName: "Salesforce CRM",
+        RequiredConfigKeys: new[] { "clientId", "clientSecret", "loginUrl", "apiVersion", "oauthScope", "redirectUri" },
+        Scopes: new[] { "api", "refresh_token" });
+
+    public Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null)
+    {
+        // TODO full validation from store; for now assume valid if factory can create (real impl will check keys).
+        return Task.FromResult(new ConnectorConfigStatus(IsValid: true));
+    }
+
+    public async Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null)
+    {
+        var existing = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
+        var values = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
+
+        // props would come from clientIdHint or elsewhere; for simplicity use config
+        if (clientIdHint != null) values[SalesforceClientFactory.ClientIdKey] = clientIdHint;
+
+        var configuredRedirectUri = _config?["DigitalBrain:Salesforce:RedirectUri"];
+        if (!string.IsNullOrWhiteSpace(configuredRedirectUri))
+            values[SalesforceClientFactory.RedirectUriKey] = configuredRedirectUri.Trim();
+        else if (!values.ContainsKey(SalesforceClientFactory.RedirectUriKey))
+            values[SalesforceClientFactory.RedirectUriKey] = SalesforceClientFactory.DefaultRedirectUri;
+
+        if (!values.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var redirectUri) || string.IsNullOrWhiteSpace(redirectUri))
+        {
+            redirectUri = SalesforceClientFactory.DefaultRedirectUri;
+            values[SalesforceClientFactory.RedirectUriKey] = redirectUri;
+        }
+
+        if (!SalesforceClientFactory.HasConnectedAppConfig(values))
+        {
+            return new AuthChallenge(UrlOrForm: "credential-form-needed", IsForm: true);
+        }
+
+        var state = $"{user.Value}:{Guid.NewGuid():N}";
+        var codeVerifier = SalesforceClientFactory.CreatePkceCodeVerifier();
+        var codeChallenge = SalesforceClientFactory.CreatePkceCodeChallenge(codeVerifier);
+
+        string url;
+        try
+        {
+            url = SalesforceClientFactory.CreateAuthorizationUrl(values, redirectUri, state, codeChallenge);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new AuthChallenge(UrlOrForm: "error:" + ex.Message, IsForm: true);
+        }
+
+        await _store.SetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, values);
+        var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
+        await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>
+        {
+            [SalesforceClientFactory.OAuthStateKey] = state,
+            [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier
+        });
+
+        return new AuthChallenge(url, IsForm: false, State: state);
+    }
+
+    public async Task<AuthResult> CompleteAuthAsync(OAuthCallback callback)
+    {
+        if (!string.IsNullOrWhiteSpace(callback.Error))
+        {
+            return new AuthResult(false, callback.Error, callback.ErrorDescription);
+        }
+
+        if (string.IsNullOrWhiteSpace(callback.Code))
+        {
+            return new AuthResult(false, "no-code", "The callback did not include an authorization code.");
+        }
+
+        var state = callback.State;
+        var userId = state?.Split(':')[0] ?? "default";
+        var user = new NeuronId(userId);
+        var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
+
+        var appValues = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
+        var pending = await _store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName);
+
+        if (!pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) || string.IsNullOrWhiteSpace(expectedState))
+        {
+            return new AuthResult(false, "no-pending", "No pending OAuth flow.");
+        }
+
+        if (!string.Equals(expectedState, state, StringComparison.Ordinal))
+        {
+            return new AuthResult(false, "state-mismatch", "State did not match.");
+        }
+
+        var redirectUri = appValues.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var stored) ? stored : callback.FallbackRedirectUri;
+        if (string.IsNullOrWhiteSpace(redirectUri))
+            redirectUri = SalesforceClientFactory.DefaultRedirectUri;
+
+        try
+        {
+            var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri);
+            var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in tokenValues)
+            {
+                userTokenValues[kv.Key] = kv.Value;
+            }
+
+            if (appValues.TryGetValue(SalesforceClientFactory.ClientIdKey, out var cid)) userTokenValues[SalesforceClientFactory.ClientIdKey] = cid;
+            if (appValues.TryGetValue(SalesforceClientFactory.ClientSecretKey, out var cs)) userTokenValues[SalesforceClientFactory.ClientSecretKey] = cs;
+
+            await _store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues);
+            await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
+
+            return new AuthResult(true);
+        }
+        catch (Exception ex)
+        {
+            return new AuthResult(false, "exchange-failed", ex.Message);
+        }
+    }
+
+    public async Task<ConnectionHealth> TestConnectionAsync(NeuronId user)
+    {
+        try
+        {
+            // Use existing factory to create client (exercises merged scope/credentials).
+            var client = await _factory.CreateAsync(new NeuronScope(new UserId(user.Value), null));  // per-user scope for credential merge
+            // Cheap probe: SELECT Id FROM User LIMIT 1
+            await client.QueryAsync("SELECT Id FROM User LIMIT 1", CancellationToken.None);
+            return new ConnectionHealth(Healthy: true, Detail: "Salesforce connection healthy (query succeeded)", Checked: DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            return new ConnectionHealth(Healthy: false, Detail: ex.Message, Checked: DateTimeOffset.UtcNow);
+        }
+    }
+}
