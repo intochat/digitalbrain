@@ -150,79 +150,90 @@ jobs:
               --validation-method CNAME >/dev/null
           fi
 
-          echo "Ensuring Static Web Apps hostname ${WEB_CUSTOM_HOSTNAME}..."
           get_swa_hostname_status() {
+            local hostname="$1"
             az staticwebapp hostname show \
               --name digitalbrain-web-prod \
               --resource-group digitalbrain-rg \
-              --hostname "${WEB_CUSTOM_HOSTNAME}" \
+              --hostname "${hostname}" \
               --query "status" \
               -o tsv 2>/dev/null || true
           }
 
-          swa_hostname_status=$(get_swa_hostname_status)
+          ensure_swa_hostname() {
+            local hostname="$1"
+            local swa_hostname_status
 
-          if [ "${swa_hostname_status}" = "Failed" ]; then
-            echo "Static Web Apps hostname is Failed; deleting it before retrying validation."
-            az staticwebapp hostname delete \
-              --name digitalbrain-web-prod \
-              --resource-group digitalbrain-rg \
-              --hostname "${WEB_CUSTOM_HOSTNAME}" \
-              --no-wait \
-              --yes >/dev/null
-            swa_hostname_status="Deleting"
-          fi
+            echo "Ensuring Static Web Apps hostname ${hostname}..."
+            swa_hostname_status=$(get_swa_hostname_status "${hostname}")
 
-          if [ "${swa_hostname_status}" = "Deleting" ]; then
-            echo "Static Web Apps hostname is deleting; waiting before retrying validation."
-            for i in $(seq 1 40); do
-              sleep 30
-              swa_hostname_status=$(get_swa_hostname_status)
-              if [ "${swa_hostname_status}" != "Deleting" ]; then
-                break
-              fi
-              echo "Attempt $i: hostname still deleting."
-            done
-
-            if [ "${swa_hostname_status}" = "Deleting" ]; then
-              echo "Static Web Apps hostname deletion did not finish within 20 minutes." >&2
-              exit 1
-            fi
-          fi
-
-          if [ -z "${swa_hostname_status}" ] || [ "${swa_hostname_status}" != "Ready" ]; then
-            echo "Static Web Apps hostname status is '${swa_hostname_status:-missing}'; requesting TXT validation."
-            az staticwebapp hostname set \
-              --name digitalbrain-web-prod \
-              --resource-group digitalbrain-rg \
-              --hostname "${WEB_CUSTOM_HOSTNAME}" \
-              --validation-method dns-txt-token \
-              --no-wait >/dev/null
-          fi
-
-          for i in $(seq 1 60); do
-            swa_hostname_status=$(get_swa_hostname_status)
-            if [ "${swa_hostname_status}" = "Ready" ]; then
-              echo "Static Web Apps hostname is ready."
-              break
-            fi
             if [ "${swa_hostname_status}" = "Failed" ]; then
-              az staticwebapp hostname show \
+              echo "Static Web Apps hostname ${hostname} is Failed; deleting it before retrying validation."
+              az staticwebapp hostname delete \
                 --name digitalbrain-web-prod \
                 --resource-group digitalbrain-rg \
-                --hostname "${WEB_CUSTOM_HOSTNAME}" \
-                --query "{status:status,error:errorMessage,validationToken:validationToken}" \
-                -o json >&2
-              echo "Expected DNS TXT record for Static Web Apps validation: _dnsauth.${WEB_CUSTOM_HOSTNAME} -> <validationToken>" >&2
+                --hostname "${hostname}" \
+                --no-wait \
+                --yes >/dev/null
+              swa_hostname_status="Deleting"
+            fi
+
+            if [ "${swa_hostname_status}" = "Deleting" ]; then
+              echo "Static Web Apps hostname ${hostname} is deleting; waiting before retrying validation."
+              for i in $(seq 1 40); do
+                sleep 30
+                swa_hostname_status=$(get_swa_hostname_status "${hostname}")
+                if [ "${swa_hostname_status}" != "Deleting" ]; then
+                  break
+                fi
+                echo "Attempt $i: ${hostname} still deleting."
+              done
+
+              if [ "${swa_hostname_status}" = "Deleting" ]; then
+                echo "Static Web Apps hostname ${hostname} deletion did not finish within 20 minutes." >&2
+                exit 1
+              fi
+            fi
+
+            if [ -z "${swa_hostname_status}" ] || [ "${swa_hostname_status}" != "Ready" ]; then
+              echo "Static Web Apps hostname ${hostname} status is '${swa_hostname_status:-missing}'; requesting TXT validation."
+              az staticwebapp hostname set \
+                --name digitalbrain-web-prod \
+                --resource-group digitalbrain-rg \
+                --hostname "${hostname}" \
+                --validation-method dns-txt-token \
+                --no-wait >/dev/null
+            fi
+
+            for i in $(seq 1 60); do
+              swa_hostname_status=$(get_swa_hostname_status "${hostname}")
+              if [ "${swa_hostname_status}" = "Ready" ]; then
+                echo "Static Web Apps hostname ${hostname} is ready."
+                break
+              fi
+              if [ "${swa_hostname_status}" = "Failed" ]; then
+                az staticwebapp hostname show \
+                  --name digitalbrain-web-prod \
+                  --resource-group digitalbrain-rg \
+                  --hostname "${hostname}" \
+                  --query "{status:status,error:errorMessage,validationToken:validationToken}" \
+                  -o json >&2
+                echo "Expected Static Web Apps DNS TXT validation token is shown above; make sure it exists in authoritative DNS." >&2
+                exit 1
+              fi
+              echo "Attempt $i: Static Web Apps hostname ${hostname} status is '${swa_hostname_status:-missing}', waiting for Ready."
+              sleep 30
+            done
+
+            if [ "${swa_hostname_status}" != "Ready" ]; then
+              echo "Static Web Apps hostname ${hostname} did not become Ready within 30 minutes." >&2
               exit 1
             fi
-            echo "Attempt $i: Static Web Apps hostname status is '${swa_hostname_status:-missing}', waiting for Ready."
-            sleep 30
-          done
+          }
 
-          if [ "${swa_hostname_status}" != "Ready" ]; then
-            echo "Static Web Apps hostname did not become Ready within 30 minutes." >&2
-            exit 1
+          ensure_swa_hostname "${WEB_CUSTOM_HOSTNAME}"
+          if [ "${WEB_APEX_HOSTNAME}" != "${WEB_CUSTOM_HOSTNAME}" ]; then
+            ensure_swa_hostname "${WEB_APEX_HOSTNAME}"
           fi
 
       - uses: subosito/flutter-action@v2
