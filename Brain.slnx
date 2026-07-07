@@ -19,7 +19,7 @@
     <Project Path="src/DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj" />
   </Folder>
   <Folder Name="/integrations/">
-    <Project Path="integrations/DigitalBrain.Context/DigitalBrain.Context.csproj" />
+    <Project Path="integrations/DigitalBrain.Ino/Context/DigitalBrain.Context.csproj" />
     <Project Path="integrations/DigitalBrain.Google/DigitalBrain.Google.csproj" />
     <Project Path="integrations/DigitalBrain.Ino/DigitalBrain.Ino.csproj" />
     <Project Path="integrations/DigitalBrain.Salesforce/DigitalBrain.Salesforce.csproj" />
