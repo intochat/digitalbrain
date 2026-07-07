@@ -469,13 +469,6 @@ public record DbIndex(
 [Alias("DigitalBrain.Core.IDbSupportNeuron")]
 public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery>, IHandle<DbInspectSchema> { }
 
-[Alias("DigitalBrain.Kernel.Market.IMarketDataNeuron")]
-public interface IMarketDataNeuron : INeuron, IHandle<Signal>
-{
-    [Alias("GetBitcoinPriceUsdAsync")]
-    Task<string> GetBitcoinPriceUsdAsync();
-}
-
 // Filter changes - INO/Context must be notified so assistant knows current UI view state
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.FilterChanged")]

@@ -105,63 +105,7 @@ public sealed class KeywordWatcherNeuron : IPackBehavior
 }
 """;
 
-    public const string XBitcoinTelegramDemoPackCode = """
-using System.Collections.Generic;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Distribution;
-
-public sealed class XBitcoinTelegramDemoNeuron : IPackBehavior
-{
-    private const string WatchedAuthor = "elon";
-
-    public PackManifest GetManifest() => new(
-        new[] { new SynapseType("XPostReceived"), new SynapseType("BitcoinPriceChecked") },
-        null);
-
-    public string Respond(string input) => input;
-
-    public IReadOnlyList<Synapse> Handle(Synapse synapse)
-    {
-        if (synapse is Signal xPost && xPost.Name == "XPostReceived")
-        {
-            var author = xPost.Props.TryGetValue("author", out var a) ? a?.ToString() ?? "" : "";
-            if (!string.Equals(author, WatchedAuthor, System.StringComparison.OrdinalIgnoreCase))
-                return System.Array.Empty<Synapse>();
-
-            return new Synapse[]
-            {
-                new Signal("CheckBitcoinPrice", new Dictionary<string, object?>
-                {
-                    ["chatId"] = xPost.Props.TryGetValue("chatId", out var c) ? c : null,
-                    ["author"] = author
-                })
-            };
-        }
-
-        if (synapse is Signal priceChecked && priceChecked.Name == "BitcoinPriceChecked")
-        {
-            var author = priceChecked.Props.TryGetValue("author", out var a) ? a?.ToString() ?? WatchedAuthor : WatchedAuthor;
-            var price = priceChecked.Props.TryGetValue("price", out var p) ? p?.ToString() ?? "unknown" : "unknown";
-
-            return new Synapse[]
-            {
-                new Signal("TelegramReplyRequested", new Dictionary<string, object?>
-                {
-                    ["chatId"] = priceChecked.Props.TryGetValue("chatId", out var c) ? c : null,
-                    ["text"] = $"New post from {author}. Bitcoin price right now: {price}"
-                })
-            };
-        }
-
-        return System.Array.Empty<Synapse>();
-    }
-
-    public BundleManifest? GetBundleManifest() => new(
-        BundleTier.Content,
-        null,
-        new[] { BundleChannel.Telegram });
-}
-""";
+    // XBitcoinTelegramDemoPackCode demo const deleted as trash (bitcoin market data + demo removed).
 
     // ExcelVizPackCode demo const deleted (Musk delete-first).
 
@@ -253,17 +197,7 @@ public sealed class XBitcoinTelegramDemoNeuron : IPackBehavior
             "Keyword watcher: listens for TelegramMessageReceived, emits ReminderScheduled when the text starts with 'remind me'.",
             Manifest: new(BundleTier.Channel, null, new[] { BundleChannel.Telegram })),
 
-        new NeuroPack(
-            "DigitalBrain.Experience.XBitcoinTelegramDemo",
-            "1.0.0",
-            "digitalbraintech",
-            false,
-            0.0,
-            XBitcoinTelegramDemoPackCode,
-            "Demo: reacts to a simulated X post from a watched author, checks the Bitcoin price, and sends a Telegram alert.",
-            Manifest: new(BundleTier.Content, null, new[] { BundleChannel.Telegram })),
-
-        // demo pack entries (hello-world, simple-color-picker, ui-gallery) deleted (Musk delete-first; non load-bearing).
+        // demo pack entries (hello-world, simple-color-picker, ui-gallery, xbitcoin) deleted (Musk delete-first; non load-bearing).
 
         // Dummy and excel-viz demo seeds deleted (Musk delete-first; non load-bearing for core protocol).
 

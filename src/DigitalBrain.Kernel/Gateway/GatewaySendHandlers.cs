@@ -18,8 +18,7 @@ internal sealed record GatewaySendContext(
     IHostEnvironment Environment,
     ILogger Logger,
     IPackConfigStore? PackConfigStore,
-    Func<string?, Task<UserSessionState?>> ResolveSessionByClientIdAsync,
-    Func<string, Task> InstallAndRunSurfaceDemoAsync);
+    Func<string?, Task<UserSessionState?>> ResolveSessionByClientIdAsync);
 
 internal interface IGatewaySendHandler
 {
@@ -30,7 +29,6 @@ internal static class GatewaySendHandlers
 {
     public static IReadOnlyList<IGatewaySendHandler> Default { get; } =
     [
-        new GatewayDemoSendHandler(),
         new GatewayMarketplaceSendHandler(),
         new GatewayAuthSessionSendHandler(),
         new GatewayConfigSendHandler(),
@@ -44,20 +42,6 @@ internal static class GatewaySendHandlers
 
     internal static string PayloadString(SynapseEnvelope request) =>
         System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-}
-
-internal sealed class GatewayDemoSendHandler : IGatewaySendHandler
-{
-    public async Task<bool> TryHandleAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
-    {
-        if (request.TypeName != "SurfaceDemoRequested") // Demo removed as trash
-        {
-            return false;
-        }
-
-        await context.InstallAndRunSurfaceDemoAsync(request.CorrelationId);
-        return true;
-    }
 }
 
 internal sealed class GatewayMarketplaceSendHandler : IGatewaySendHandler

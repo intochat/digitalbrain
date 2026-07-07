@@ -40,8 +40,7 @@ public sealed class GatewayService(
                 environment,
                 logger,
                 packConfigStore,
-                ResolveSessionByClientIdAsync,
-                InstallAndRunSurfaceDemoAsync);
+                ResolveSessionByClientIdAsync);
 
             foreach (var handler in GatewaySendHandlers.Default)
             {
@@ -296,22 +295,7 @@ public sealed class GatewayService(
         }
     }
 
-    private async Task InstallAndRunSurfaceDemoAsync(string correlationId)
-    {
-        // SurfaceDemo (Demo projects) removed as trash. Stubbed.
-        logger.LogDebug("InstallAndRunSurfaceDemoAsync skipped (trash removal) for {CorrelationId}", correlationId);
-        await Task.CompletedTask;
-    }
 
-    private async Task PublishSurfaceDemoGraphAsync(
-        string correlationId,
-        string phase,
-        IReadOnlyList<Synapse>? generatedTimeline = null)
-    {
-        // Demo surface graph (SurfaceDemoRuntime) removed as trash. No-op for now.
-        logger.LogDebug("Demo graph publish skipped (trash removal) phase={Phase} correlation={CorrelationId}", phase, correlationId);
-        await Task.CompletedTask;
-    }
 
     private static bool IsObservabilityJournalUnavailable(Exception exception) =>
         exception.GetBaseException().Message.Contains("state journal stream writer is not initialized", StringComparison.OrdinalIgnoreCase);

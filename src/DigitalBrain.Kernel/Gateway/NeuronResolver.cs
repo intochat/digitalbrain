@@ -1,7 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel.Kernel;
-using DigitalBrain.Kernel.Market;
+
 
 namespace DigitalBrain.Kernel.Gateway;
 
@@ -30,7 +30,7 @@ public static class NeuronResolver
             "ino-main" => grains.GetGrain<IInoNeuron>(neuronId),
             "llm-main" => grains.GetGrain<ILlmNeuron>(neuronId),
             "market-main" => grains.GetGrain<IMarketplaceNeuron>(neuronId),
-            "market-data-main" => grains.GetGrain<IMarketDataNeuron>(neuronId),
+
             "session-main" => grains.GetGrain<IUserSessionNeuron>(neuronId),
             "status-main" => grains.GetGrain<ISystemStatus>(neuronId),
             _ => grains.GetGrain<IGeneratedNeuron>(neuronId) // Demo removed as trash

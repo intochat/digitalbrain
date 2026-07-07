@@ -12,33 +12,12 @@ internal static class InoIntentHandlers
 {
     public static IReadOnlyList<IInoIntentHandler> Default { get; } =
     [
-        new BitcoinPriceInoIntentHandler(),
         new RelationGraphInoIntentHandler(),
         new SchemaVisualizationInoIntentHandler(),
         new GmailInoIntentHandler(),
         new SalesforceInoIntentHandler(),
         new GenericLlmInoIntentHandler()
     ];
-}
-
-internal sealed class BitcoinPriceInoIntentHandler : IInoIntentHandler
-{
-    public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
-    {
-        var cls = InoIntentClassifier.Classify(request.Prompt);
-        if (cls.Intent != "bitcoin_price" || cls.Confidence < 0.7)
-        {
-            return Task.FromResult(false);
-        }
-
-        return HandleAsync(neuron, request, workspaceId);
-    }
-
-    private static async Task<bool> HandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
-    {
-        await neuron.HandleBitcoinPriceIntentAsync(request, workspaceId);
-        return true;
-    }
 }
 
 internal sealed class RelationGraphInoIntentHandler : IInoIntentHandler

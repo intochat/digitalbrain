@@ -8,7 +8,7 @@ using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
-using DigitalBrain.Kernel.Market;
+
 using DigitalBrain.Kernel.Uploads;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Kernel.Voice;
@@ -19,7 +19,7 @@ using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using DigitalBrain.Kernel.Kernel;
-using DigitalBrain.Kernel.Economics;
+
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Salesforce;
 using Ino = DigitalBrain.Ino;
@@ -109,7 +109,7 @@ builder.Services.AddSingleton<SignalEgressBus>();
 
 builder.Services.AddSingleton<SqliteSchemaInspector>();
 
-builder.Services.AddHttpClient<DigitalBrain.Kernel.Market.IMarketDataApiClient, DigitalBrain.Kernel.Market.CoinGeckoApiClient>();
+
 
 // Co-host the MCP tool surface in-process. Only read-only tools are exposed over HTTP (remotely reachable);
 // mutation tools are handled by the dedicated MCP host.
@@ -151,7 +151,6 @@ builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
 builder.Services.AddSingleton<DigitalBrain.Core.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
 builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
-builder.Services.AddEconomics(builder.Configuration);
 builder.Services.AddContextStore(builder.Configuration);
 
 // Aspire path: supply a BlobServiceClient so DataProtection keys are shared across all 3 HA replicas.
@@ -195,13 +194,7 @@ builder.Services.AddDigitalBrainOtlpForwardClient();
 DigitalBrain.Ino.InoServiceRegistration.AddInoAi(builder.Services, builder.Configuration.GetSection("Ino:AI"));
 builder.Services.AddSingleton<DigitalBrain.Ino.IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
 
-// Proxy to private marketplace (new separate repo) when enabled.
-// Register the stub here; real impl uses HttpClient to the marketplace service.
-var useRemote = builder.Configuration.GetValue("DigitalBrain:Marketplace:UseRemote", false);
-if (useRemote)
-{
-    builder.Services.AddSingleton<IRemoteMarketplaceClient, DigitalBrain.Kernel.Marketplace.RemoteMarketplaceClientStub>();
-}
+
 
 builder.UseOrleans(siloBuilder =>
 {
@@ -498,10 +491,7 @@ if (grainFactory != null && !isTestMode)
                 await automation.FireAsync(new RegisterReaction("scoped-reaction", "NeuronActivated", "scoped.demo", null, Array.Empty<string>(), "demo-user"));
 
 
-                // MarketDataNeuron has the same activate-before-broadcast requirement as ILlmResponderNeuron
-                // above: it's an IHandle<Signal> grain that filters Signal("CheckBitcoinPrice") off the
-                // timeline, so it must be activated before that broadcast arrives or it never fires.
-                await grainFactory.GetGrain<IMarketDataNeuron>("market-data-main").GetTimelineAsync();
+
             }
             catch (Exception ex)
             {
