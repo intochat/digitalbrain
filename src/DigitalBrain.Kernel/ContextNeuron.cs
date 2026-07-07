@@ -61,7 +61,7 @@ public class ContextNeuron(ILogger<ContextNeuron> logger, NeuronJournals journal
             var generated = await generator.GenerateAsync([text]);
             return generated.First().Vector.ToArray();
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             Logger.LogWarning(ex, "Embedding generation failed; falling back to keyword-only context recall.");
             return [];

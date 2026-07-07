@@ -284,15 +284,14 @@ builder.UseOrleans(siloBuilder =>
             // ConfigureBlobServiceClient(Uri, TokenCredential): those overloads are [Obsolete] on
             // AzureStorageOperationOptions/AzureBlobStorageOptions in this Orleans version (confirmed against
             // dotnet/orleans source), which explicitly says to set the property instead. AddAzureBlobJournalStorage's
-            // options type has no such deprecation, so it keeps using ConfigureBlobServiceClient below.
+            // options type has no such deprecation, but its BlobServiceClient is assigned directly here too
+            // (rather than via ConfigureBlobServiceClient) so it can share the tracing-disabled BlobClientOptions below.
             //
             // These clients are used exclusively for Orleans internals (clustering, grain state, journaling).
             // Disable distributed tracing on them to prevent Azure SDK storage spans from polluting
             // application traces. Prefer Aspire's Aspire:Azure:* :DisableTracing config where possible.
-            var tableOptions = new TableClientOptions();
-            tableOptions.Diagnostics.IsDistributedTracingEnabled = false;
-            var blobOptions = new BlobClientOptions();
-            blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
+            var tableOptions = NoTracingTableOptions();
+            var blobOptions = NoTracingBlobOptions();
 
             siloBuilder.UseAzureStorageClustering(options =>
                 options.TableServiceClient = new TableServiceClient(storageTableServiceUri!, storageCredential!, tableOptions));
@@ -307,10 +306,8 @@ builder.UseOrleans(siloBuilder =>
             var grainStateConn = builder.Configuration.GetConnectionString("grainstate")!;
             var journalConn = builder.Configuration.GetConnectionString("journal")!;
 
-            var tableOptions = new TableClientOptions();
-            tableOptions.Diagnostics.IsDistributedTracingEnabled = false;
-            var blobOptions = new BlobClientOptions();
-            blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
+            var tableOptions = NoTracingTableOptions();
+            var blobOptions = NoTracingBlobOptions();
 
             siloBuilder.UseAzureStorageClustering(options =>
                 options.TableServiceClient = new TableServiceClient(clusteringConn, tableOptions));
@@ -324,6 +321,12 @@ builder.UseOrleans(siloBuilder =>
         // Aspire path: real durable IDurableList<Synapse> for in/out-journal provided by Orleans journaling
         // (AddAzureBlobJournalStorage + UseJsonJournalFormat + DurableGrain replay). No in-memory override.
         // Non-aspire fast paths continue to use prototype via ConfigurePrototypeJournals for local dev speed.
+
+        static TableClientOptions NoTracingTableOptions() =>
+            new() { Diagnostics = { IsDistributedTracingEnabled = false } };
+
+        static BlobClientOptions NoTracingBlobOptions() =>
+            new() { Diagnostics = { IsDistributedTracingEnabled = false } };
     }
 
     siloBuilder.AddMemoryStreams("HomeFeed");
