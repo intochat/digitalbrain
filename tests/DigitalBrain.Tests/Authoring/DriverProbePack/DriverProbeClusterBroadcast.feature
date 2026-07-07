@@ -9,5 +9,5 @@ Scenario: A broadcast synapse reaches a subscriber on another silo
   And a pack "DriverProbePack" version "1.0" with source from "DriverProbePack.cs"
   And pack "DriverProbePack" is installed
   And a demo neuron is activated on a different silo than pack "DriverProbePack"
-  When the demo neuron broadcasts synapse "DemoMessageSynapse" with text "cross-silo-probe"
+  When the demo neuron broadcasts synapse "ProbeMessageSynapse" with text "cross-silo-probe"
   Then pack "DriverProbePack" observes the broadcast on another silo

@@ -51,9 +51,9 @@ public sealed class PackSpecSteps : NeuronTestBase
     public async Task GivenADemoNeuronIsActivatedOnADifferentSiloThanPack(string packName) =>
         _crossSiloBroadcasterKey = await Driver.ActivateBroadcasterOnDifferentSiloAsync(packName);
 
-    [When(@"the demo neuron broadcasts synapse ""DemoMessageSynapse"" with text ""(.*)""")]
+    [When(@"the demo neuron broadcasts synapse ""ProbeMessageSynapse"" with text ""(.*)""")]
     public async Task WhenTheDemoNeuronBroadcastsSynapse(string text) =>
-        await Driver.BroadcastFromAsync(_crossSiloBroadcasterKey!, new DemoMessageSynapse(text) with { IsBroadcast = true });
+        await Driver.BroadcastFromAsync(_crossSiloBroadcasterKey!, new ProbeMessageSynapse(text) with { IsBroadcast = true });
 
     [Then(@"pack ""(.*)"" observes the broadcast on another silo")]
     public async Task ThenPackObservesTheBroadcastOnAnotherSilo(string packName) =>

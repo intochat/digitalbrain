@@ -27,7 +27,7 @@ public sealed class PackSpecDriver(INeuronTestHost host)
     public Task FireSynapseAtPackAsync(string packName, Synapse synapse) =>
         host.Grain<IGeneratedNeuron>(GeneratedKeyFor(packName)).FireAsync(synapse).AsTask();
 
-    // Finds (and activates) an IDemoNeuron whose activation lands on a different silo than the named
+    // Finds (and activates) an IProbeNeuron whose activation lands on a different silo than the named
     // pack's already-activated grain, so a subsequent broadcast from it is real proof of cross-silo
     // delivery rather than a same-grain loopback. Bounded trial rather than forcing placement: Orleans'
     // default placement strategy distributes distinctly-keyed grains across silos, so with 3 silos in
@@ -43,7 +43,7 @@ public sealed class PackSpecDriver(INeuronTestHost host)
         for (var attempt = 0; attempt < maxAttempts; attempt++)
         {
             var key = $"cross-silo-broadcaster-{attempt}";
-            var broadcasterSilo = await host.Grain<IDemoNeuron>(key).GetSiloIdentityAsync();
+            var broadcasterSilo = await host.Grain<IProbeNeuron>(key).GetSiloIdentityAsync();
             if (broadcasterSilo != packSilo)
                 return key;
         }
@@ -53,7 +53,7 @@ public sealed class PackSpecDriver(INeuronTestHost host)
     }
 
     public Task BroadcastFromAsync<T>(string broadcasterKey, T synapse) where T : Synapse =>
-        host.Grain<IDemoNeuron>(broadcasterKey).FireAsync(synapse).AsTask();
+        host.Grain<IProbeNeuron>(broadcasterKey).FireAsync(synapse).AsTask();
 
     public async Task AssertBroadcastObservedAsync(string packName)
     {
@@ -67,13 +67,13 @@ public sealed class PackSpecDriver(INeuronTestHost host)
         for (var attempt = 0; attempt < 40; attempt++)
         {
             var incoming = await receiver.GetIncomingTimelineAsync();
-            if (incoming.Any(s => s is DemoMessageSynapse d && d.Text == "cross-silo-probe"))
+            if (incoming.Any(s => s is ProbeMessageSynapse d && d.Text == "cross-silo-probe"))
                 return;
             await Task.Delay(50);
         }
 
         var final = await receiver.GetIncomingTimelineAsync();
-        Assert.Contains(final, s => s is DemoMessageSynapse d && d.Text == "cross-silo-probe");
+        Assert.Contains(final, s => s is ProbeMessageSynapse d && d.Text == "cross-silo-probe");
     }
 
     public async Task<IReadOnlyList<PackEmission>> GetEmissionsAsync(string packName)

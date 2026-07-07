@@ -31,7 +31,7 @@ public class NeuronSteps : IAsyncDisposable
     [Given(@"a demo neuron ""(.*)""")]
     public async Task GivenADemoNeuron(string id)
     {
-        _currentGrain = _cluster.Client.GetGrain<IDemoNeuron>(id);
+        _currentGrain = _cluster.Client.GetGrain<IProbeNeuron>(id);
         await _currentGrain.GetTimelineAsync();
     }
 
@@ -79,11 +79,11 @@ public class NeuronSteps : IAsyncDisposable
     [When(@"I fire multiple messages to trigger telemetry")]
     public async Task WhenIFireMultipleMessagesToTriggerTelemetry()
     {
-        var demo = _cluster.Client.GetGrain<IDemoNeuron>("demo-opt");
+        var demo = _cluster.Client.GetGrain<IProbeNeuron>("demo-opt");
         var optimizer = _cluster.Client.GetGrain<IMetaOptimizerNeuron>("optimizer1");
         for (int i = 0; i < 6; i++)
         {
-            await demo.FireAsync(new DemoMessageSynapse($"msg-{i}"));
+            await demo.FireAsync(new ProbeMessageSynapse($"msg-{i}"));
             // fire telemetry to optimizer
             await optimizer.FireAsync(new NeuronTelemetry(new NeuronId("demo-opt"), "test-event"));
         }
@@ -110,10 +110,10 @@ public class NeuronSteps : IAsyncDisposable
         _currentGrain = gen;
     }
 
-    [When(@"I fire a DemoMessageSynapse with text ""(.*)""")]
-    public async Task WhenIFireADemoMessageSynapseWithText(string text)
+    [When(@"I fire a ProbeMessageSynapse with text ""(.*)""")]
+    public async Task WhenIFireAProbeMessageSynapseWithText(string text)
     {
-        await _currentGrain!.FireAsync(new DemoMessageSynapse(text));
+        await _currentGrain!.FireAsync(new ProbeMessageSynapse(text));
     }
 
     [When(@"I fire a StartDistributedApp for ""(.*)""")]
@@ -210,11 +210,11 @@ public class NeuronSteps : IAsyncDisposable
         await target!.FireAsync(new ListPublished());
     }
 
-    [Then(@"the timeline contains a DemoMessageSynapse")]
-    public async Task ThenTheTimelineContainsADemoMessageSynapse()
+    [Then(@"the timeline contains a ProbeMessageSynapse")]
+    public async Task ThenTheTimelineContainsAProbeMessageSynapse()
     {
         _timeline = await _currentGrain!.GetTimelineAsync();
-        Assert.Contains(_timeline, s => s.Type == nameof(DemoMessageSynapse));
+        Assert.Contains(_timeline, s => s.Type == nameof(ProbeMessageSynapse));
     }
 
     [Then(@"the timeline contains a DistributedAppStarted")]
