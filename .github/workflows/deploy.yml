@@ -126,6 +126,30 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "Ensuring Container Apps hostname ${KERNEL_CUSTOM_HOSTNAME}..."
+          binding_type=$(az containerapp hostname list \
+            --name digitalbrain-jobs \
+            --resource-group digitalbrain-rg \
+            --query "[?name=='${KERNEL_CUSTOM_HOSTNAME}'].bindingType | [0]" \
+            -o tsv)
+
+          if [ -z "${binding_type}" ]; then
+            az containerapp hostname add \
+              --name digitalbrain-jobs \
+              --resource-group digitalbrain-rg \
+              --hostname "${KERNEL_CUSTOM_HOSTNAME}" >/dev/null
+            binding_type="Disabled"
+          fi
+
+          if [ "${binding_type}" != "SniEnabled" ]; then
+            az containerapp hostname bind \
+              --name digitalbrain-jobs \
+              --resource-group digitalbrain-rg \
+              --environment digitalbrain-cae-prod \
+              --hostname "${KERNEL_CUSTOM_HOSTNAME}" \
+              --validation-method CNAME >/dev/null
+          fi
+
           echo "Ensuring Static Web Apps hostname ${WEB_CUSTOM_HOSTNAME}..."
           get_swa_hostname_status() {
             az staticwebapp hostname show \
@@ -198,30 +222,6 @@ jobs:
           if [ "${swa_hostname_status}" != "Ready" ]; then
             echo "Static Web Apps hostname did not become Ready within 30 minutes." >&2
             exit 1
-          fi
-
-          echo "Ensuring Container Apps hostname ${KERNEL_CUSTOM_HOSTNAME}..."
-          binding_type=$(az containerapp hostname list \
-            --name digitalbrain-jobs \
-            --resource-group digitalbrain-rg \
-            --query "[?name=='${KERNEL_CUSTOM_HOSTNAME}'].bindingType | [0]" \
-            -o tsv)
-
-          if [ -z "${binding_type}" ]; then
-            az containerapp hostname add \
-              --name digitalbrain-jobs \
-              --resource-group digitalbrain-rg \
-              --hostname "${KERNEL_CUSTOM_HOSTNAME}" >/dev/null
-            binding_type="Disabled"
-          fi
-
-          if [ "${binding_type}" != "SniEnabled" ]; then
-            az containerapp hostname bind \
-              --name digitalbrain-jobs \
-              --resource-group digitalbrain-rg \
-              --environment digitalbrain-cae-prod \
-              --hostname "${KERNEL_CUSTOM_HOSTNAME}" \
-              --validation-method CNAME >/dev/null
           fi
 
       - uses: subosito/flutter-action@v2
