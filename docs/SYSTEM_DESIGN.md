@@ -421,11 +421,20 @@ in the plain-C#-test folder structure, not the `.feature` tree: `Kernel/`, `Econ
 coverage is plain xUnit facts against the `TestCluster`, with Reqnroll reserved for the handful of
 narrative BDD scenarios.
 
-`E2E/` gates real browser rendering behind `[Trait("Category","E2E")]` plus either the
-`RUN_FLUTTER_E2E=true` / `FAST_UI_E2E=1` env vars or `e2e.runsettings` (`brain/e2e.runsettings`) —
-wiring the runsettings file once via VS Test Explorer's "Configure Run Settings" makes any E2E-tagged
-test opt into the render loop with no manual env-var ceremony. CI (`.github/workflows/ci.yml`) does
-not reference `e2e.runsettings` and instead excludes the gated E2E namespace by default.
+`E2E/` gates tests behind `RUN_REAL_STACK_E2E=true`, checked via
+`E2EPrerequisites.OptedIn`/`RequireRealStackE2E()`
+(`tests/DigitalBrain.Tests/E2E/E2EPrerequisites.cs`) — set directly for CLI runs, or once via
+`e2e.runsettings` (repo root) wired up through VS Test Explorer's "Configure Run Settings" so any
+gated test opts in with no manual env-var ceremony. Gated tests assert over the real Aspire-hosted
+stack through real gRPC (`DigitalBrainAppHostFixture`, `WatchHomeFeed`/`Send`), not a browser —
+Playwright was removed entirely (see
+`docs/superpowers/specs/2026-07-05-e2e-testing-without-playwright-design.md`). Booting the fixture
+cold (no already-running dev cluster) additionally requires `-p:EnableAppHostTests=true`
+(`DigitalBrain.Tests.csproj:10`) so the `DigitalBrain.AppHost` project reference is included —
+`e2e.runsettings` can't set this itself since it's an MSBuild property, not a runtime env var, so it
+has to be passed alongside `RUN_REAL_STACK_E2E` rather than through the runsettings file. CI
+(`.github/workflows/ci.yml`) does not set `RUN_REAL_STACK_E2E`, so these tests are opt-in for
+local/manual verification only.
 
 ### 2.3 Branch/PR conventions (observed from git log)
 
