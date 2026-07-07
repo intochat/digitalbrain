@@ -1,7 +1,5 @@
 using System.Text.Json;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
-using DigitalBrain.Core.UiKit;
 using DigitalBrain.TestKit;
 
 namespace DigitalBrain.Tests.Ino;

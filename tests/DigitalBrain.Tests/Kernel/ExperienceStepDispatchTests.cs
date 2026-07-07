@@ -1,9 +1,9 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Ui;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Tests.E2E;
 using DigitalBrain.TestKit;
+using DigitalBrain.Ui.Contracts.Ui;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
