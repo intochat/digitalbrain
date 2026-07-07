@@ -205,7 +205,7 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         }
 
         NeuronInstrumentation.SynapsesOut.Add(1);
-        Logger.LogInformation("Fired {Type} from {Self}", typeof(T).Name, Self);
+        Logger.LogDebug("Fired {Type} from {Self}", typeof(T).Name, Self);
     }
 
     protected Task Broadcast(Synapse s) => FireAsync(s with { IsBroadcast = true }).AsTask();
@@ -286,6 +286,8 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             {
                 activity.SetTag("neuron.id", Self.Value);
                 activity.SetTag("synapse.type", synapseType);
+                if (!string.IsNullOrEmpty(synapse.CorrelationId))
+                    activity.SetTag("correlation.id", synapse.CorrelationId);
             }
 
             var handleStopwatch = Stopwatch.StartNew();

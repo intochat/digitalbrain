@@ -68,10 +68,11 @@ public static class Extensions
                     //.AddSource("Microsoft.Orleans.Runtime")
                     .AddSource("Microsoft.Orleans.Application")
                     .AddSource("DigitalBrain.Neuron")
-                    .AddAspNetCoreInstrumentation(tracing =>
-                        tracing.Filter = context =>
+                    .AddAspNetCoreInstrumentation(options =>
+                        options.Filter = context =>
                             !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                             && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                            && !context.Request.Path.StartsWithSegments("/otlp")
                     )
                     .AddHttpClientInstrumentation();
             });

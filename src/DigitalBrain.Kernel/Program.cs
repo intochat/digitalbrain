@@ -1,3 +1,4 @@
+using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using DigitalBrain.Core;
@@ -128,8 +129,10 @@ if (isAspireHosted)
     var clusteringServiceKey = Environment.GetEnvironmentVariable("Orleans__Clustering__ServiceKey") ?? "clustering";
     var grainStorageServiceKey = Environment.GetEnvironmentVariable("Orleans__GrainStorage__Default__ServiceKey") ?? "grainstate";
 
-    builder.AddKeyedAzureTableServiceClient(clusteringServiceKey);
-    builder.AddKeyedAzureBlobServiceClient(grainStorageServiceKey);
+    // Register via Aspire integrations. These honor Aspire:Azure:Data:Tables:DisableTracing and
+    // Aspire:Azure:Storage:Blobs:DisableTracing from configuration for the Orleans internal stores.
+    builder.AddKeyedAzureTableServiceClient(clusteringServiceKey, settings => settings.DisableTracing = true);
+    builder.AddKeyedAzureBlobServiceClient(grainStorageServiceKey, settings => settings.DisableTracing = true);
 
     // Non-keyed BlobServiceClient from grain storage for pack-config key ring persistence and blob backing.
     // Uses the same Azurite account as grain state but stores in a separate "pack-config" container.
@@ -140,7 +143,11 @@ if (isAspireHosted)
     // DefaultHealthCheckService does not catch (only exceptions from CheckHealthAsync itself are caught),
     // crashing /health with a 500. Orleans grain-storage/clustering failures already surface through the app
     // failing to function, so this decorative check isn't needed to gate readiness.
-    builder.AddAzureBlobServiceClient("grainstate", settings => settings.DisableHealthChecks = true);
+    builder.AddAzureBlobServiceClient("grainstate", settings =>
+    {
+        settings.DisableHealthChecks = true;
+        settings.DisableTracing = true;
+    });
 }
 
 // Reuses storageCredential (built once above) rather than letting AddDigitalBrainChat mint its own
@@ -159,15 +166,21 @@ builder.Services.AddContextStore(builder.Configuration);
 BlobServiceClient? packConfigBlobs = null;
 if (isAspireHosted)
 {
+    // Pack config is internal (key ring + connector config). Disable distributed tracing on this client
+    // to avoid flooding traces with storage noise from Azure SDK. Use Aspire DisableTracing config
+    // for the Aspire-registered clients; here we create directly.
+    var blobOptions = new BlobClientOptions();
+    blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
+
     if (useManagedIdentity)
     {
-        packConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!);
+        packConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions);
     }
     else
     {
         var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
         if (!string.IsNullOrEmpty(grainStateConnStr))
-            packConfigBlobs = new BlobServiceClient(grainStateConnStr);
+            packConfigBlobs = new BlobServiceClient(grainStateConnStr, blobOptions);
     }
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
@@ -272,21 +285,39 @@ builder.UseOrleans(siloBuilder =>
             // AzureStorageOperationOptions/AzureBlobStorageOptions in this Orleans version (confirmed against
             // dotnet/orleans source), which explicitly says to set the property instead. AddAzureBlobJournalStorage's
             // options type has no such deprecation, so it keeps using ConfigureBlobServiceClient below.
+            //
+            // These clients are used exclusively for Orleans internals (clustering, grain state, journaling).
+            // Disable distributed tracing on them to prevent Azure SDK storage spans from polluting
+            // application traces. Prefer Aspire's Aspire:Azure:* :DisableTracing config where possible.
+            var tableOptions = new TableClientOptions();
+            tableOptions.Diagnostics.IsDistributedTracingEnabled = false;
+            var blobOptions = new BlobClientOptions();
+            blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
+
             siloBuilder.UseAzureStorageClustering(options =>
-                options.TableServiceClient = new Azure.Data.Tables.TableServiceClient(storageTableServiceUri!, storageCredential!));
+                options.TableServiceClient = new TableServiceClient(storageTableServiceUri!, storageCredential!, tableOptions));
             siloBuilder.AddAzureBlobGrainStorage("Default", options =>
-                options.BlobServiceClient = new BlobServiceClient(storageBlobServiceUri!, storageCredential!));
+                options.BlobServiceClient = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions));
             siloBuilder.AddAzureBlobJournalStorage(options =>
-                options.ConfigureBlobServiceClient(storageBlobServiceUri!, storageCredential!));
+                options.BlobServiceClient = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions));
         }
         else
         {
+            var clusteringConn = builder.Configuration.GetConnectionString("clustering")!;
+            var grainStateConn = builder.Configuration.GetConnectionString("grainstate")!;
+            var journalConn = builder.Configuration.GetConnectionString("journal")!;
+
+            var tableOptions = new TableClientOptions();
+            tableOptions.Diagnostics.IsDistributedTracingEnabled = false;
+            var blobOptions = new BlobClientOptions();
+            blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
+
             siloBuilder.UseAzureStorageClustering(options =>
-                options.TableServiceClient = new Azure.Data.Tables.TableServiceClient(builder.Configuration.GetConnectionString("clustering")!));
+                options.TableServiceClient = new TableServiceClient(clusteringConn, tableOptions));
             siloBuilder.AddAzureBlobGrainStorage("Default", options =>
-                options.BlobServiceClient = new BlobServiceClient(builder.Configuration.GetConnectionString("grainstate")!));
+                options.BlobServiceClient = new BlobServiceClient(grainStateConn, blobOptions));
             siloBuilder.AddAzureBlobJournalStorage(options =>
-                options.BlobServiceClient = new BlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
+                options.BlobServiceClient = new BlobServiceClient(journalConn, blobOptions));
         }
         siloBuilder.UseJsonJournalFormat(JournalJson.Configure);
 
