@@ -82,6 +82,10 @@ Progress so far (executed slices):
 
 - [x] (slice 1) Created `tests/DigitalBrain.Tests/Integrations/IConnectorContractTests.cs` - abstract reusable base + DummyIConnectorContractTests (executes 4 tests). High-sev 46 passed. Added `integrations/DigitalBrain.Salesforce/SalesforceConnector.cs` + `integrations/DigitalBrain.Google/GoogleConnector.cs` as provider impls. DI keyed registrations in Program.cs. Generic route /oauth/callback/{provider} added dispatching to IConnector.CompleteAuthAsync. Old routes kept for compat. Build 0 err, doctor 5/5. Evidence: tests "Passed! ... 46 ...", doctor Summary 5/5.
 - [x] (slice 3) Wired full auth logic (Begin/Complete with PKCE, store, state, token exchange using existing ExchangeAuthorizationCodeAsync) into SalesforceConnector using store/factory (adapted from neuron). Updated DI with lambda for store/config. Generic dispatch functional for Salesforce (improved HTML response). High-sev 46 passed, doctor 5/5. Context7 for keyed DI resolution and AspNetCore MapGet used. Plan updated.
+- [x] (slice 4) Wired similar full auth logic into GoogleConnector (Begin/Complete using GoogleClientFactory). Updated DI lambda. High-sev/doctor/build green. Plan updated.
+- [x] Phase 1 complete (IConnector, tests, generic callback, migrations for Salesforce/Google auth). Committed. Ready for Phase 2.
+- [x] (Phase 2 start) Enhanced Google TestConnection to check for refresh token in store. High-sev 46p, doctor 5/5. Plan updated.
+- [x] (Phase 3 start) Removed keyword heuristic from create_automation_from_description. Stages basic now. High-sev green. Plan updated.
 - [ ] Flesh out `IConnector` with full methods (add any missing from gap design: e.g. proper scopes, redirect resolution from Aspire endpoint).
 - [ ] Implement generic `/oauth/callback/{provider}` route + dispatch (delete per-provider routes/handlers where possible). (generic added; full dispatch/migration next).
 - [ ] Create reusable `IConnectorContractTests<TConnector>` that every provider inherits (begin auth → callback → token roundtrip → credential build → two-user isolation → cross-silo). (skeleton + dummy passing).

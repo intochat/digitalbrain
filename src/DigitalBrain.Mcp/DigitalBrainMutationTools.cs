@@ -257,37 +257,14 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         [Description("Natural language description of the when-then automation")] string description,
         [Description("Optional explicit id, otherwise derived")] string? id = null)
     {
-        // Improved heuristic (less regex). For full LLM-driven, Ino should parse NL to structured before calling (using classifier + LLM).
-        var lower = description.ToLowerInvariant();
+        // P2: heuristic removed. Use Foundry LLM rail for intent -> script + trigger + manifest -> proposal.
+        // For now, stage basic example; full LLM integration next.
+        var autoId = id ?? "natural-" + Guid.NewGuid().ToString("N")[..8];
         string when = "NeuronActivated";
         string? target = null;
-        string script = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from natural\" }) };";
-
-        if (lower.Contains("signal:") || lower.Contains("on signal") || lower.Contains("gmail") || lower.Contains("email"))
-        {
-            if (lower.Contains("gmail") || lower.Contains("email"))
-                when = "Signal:GmailMessageReceived";
-            else
-                when = "Signal:CustomSignal";
-        }
-        else if (lower.Contains("activate") || lower.Contains("activated") || lower.Contains("salesforce"))
-        {
-            when = "NeuronActivated";
-            if (lower.Contains("personal-assistant") || lower.Contains("assistant")) target = "personal-assistant";
-            else if (lower.Contains("salesforce")) target = "salesforce";
-        }
-
-        if (lower.Contains("emit") || lower.Contains("dailybrief") || lower.Contains("signal") || lower.Contains("summarize"))
-        {
-            string emitName = "AutomationTriggered";
-            if (lower.Contains("summarize")) emitName = "Summarized";
-            else if (lower.Contains("brief")) emitName = "DailyBriefGenerated";
-            script = $"return new[] {{ new Signal(\"{emitName}\", new Dictionary<string,object?> {{ [\"from\"] = \"automation\", [\"target\"] = \"{target ?? "any"}\" }}) }};";
-        }
-
-        var autoId = id ?? "natural-" + Guid.NewGuid().ToString("N")[..8];
+        string script = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from description: " + description + "\" }) };";
         var proposalId = await StageAutomationDefinitionAsync(autoId, when, target, script, "default", "create_automation_from_description");
-        return $"Staged automation '{autoId}' for approval as proposal '{proposalId}'. when={when} target={target ?? "any"}. Real C# body: {script}";
+        return $"Staged automation '{autoId}' for approval as proposal '{proposalId}'. (heuristic removed; LLM rail pending)";
     }
 
     [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]
