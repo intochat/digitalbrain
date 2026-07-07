@@ -3,8 +3,8 @@ Feature: DigitalBrain Neuron Core
 
 Scenario: Sending a synapse journals it and is replayable
   Given a demo neuron "test-english"
-  When I fire a DemoMessageSynapse with text "grok build"
-  Then the timeline contains a DemoMessageSynapse
+  When I fire a ProbeMessageSynapse with text "grok build"
+  Then the timeline contains a ProbeMessageSynapse
   And replaying shows the message
 
 Scenario: Aspire neuron handles start and emits completion
@@ -26,9 +26,9 @@ Scenario: Meta optimizer tracks telemetry and proposes wiring improvements
 
 Scenario: Simulate a causal scene with ordered synapse sequence and replay (Durable journal)
   Given a demo neuron "scene-demo"
-  When I fire a DemoMessageSynapse with text "step-1"
-  And I fire a DemoMessageSynapse with text "step-2"
-  Then the timeline contains these synapse types in causal order: DemoMessageSynapse, DemoMessageSynapse
+  When I fire a ProbeMessageSynapse with text "step-1"
+  And I fire a ProbeMessageSynapse with text "step-2"
+  Then the timeline contains these synapse types in causal order: ProbeMessageSynapse, ProbeMessageSynapse
   And replaying shows the message
 
 Scenario: System self-awareness with status, fix proposal and simulation

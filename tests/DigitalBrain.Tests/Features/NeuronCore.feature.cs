@@ -160,10 +160,10 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.GivenAsync("a demo neuron \"test-english\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 6
-  await testRunner.WhenAsync("I fire a DemoMessageSynapse with text \"grok build\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+  await testRunner.WhenAsync("I fire a ProbeMessageSynapse with text \"grok build\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 7
-  await testRunner.ThenAsync("the timeline contains a DemoMessageSynapse", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+  await testRunner.ThenAsync("the timeline contains a ProbeMessageSynapse", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 8
   await testRunner.AndAsync("replaying shows the message", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
@@ -308,14 +308,14 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.GivenAsync("a demo neuron \"scene-demo\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
 #line hidden
 #line 29
-  await testRunner.WhenAsync("I fire a DemoMessageSynapse with text \"step-1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+  await testRunner.WhenAsync("I fire a ProbeMessageSynapse with text \"step-1\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 30
-  await testRunner.AndAsync("I fire a DemoMessageSynapse with text \"step-2\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+  await testRunner.AndAsync("I fire a ProbeMessageSynapse with text \"step-2\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 31
-  await testRunner.ThenAsync("the timeline contains these synapse types in causal order: DemoMessageSynapse, De" +
-                        "moMessageSynapse", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+  await testRunner.ThenAsync("the timeline contains these synapse types in causal order: ProbeMessageSynapse, P" +
+                        "robeMessageSynapse", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 32
   await testRunner.AndAsync("replaying shows the message", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");

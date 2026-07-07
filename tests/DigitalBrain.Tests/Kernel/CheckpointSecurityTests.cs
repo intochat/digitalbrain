@@ -28,14 +28,14 @@ public class CheckpointSecurityTests
     public void CheckpointProtector_Encrypts_And_Restores_Polymorphic_Snapshot()
     {
         var services = new ServiceCollection();
-        services.AddSerializer(b => b.AddAssembly(typeof(Synapse).Assembly));
+        services.AddSerializer(b => b.AddAssembly(typeof(Synapse).Assembly).AddAssembly(typeof(ProbeMessageSynapse).Assembly));
         using var provider = services.BuildServiceProvider();
         var serializer = provider.GetRequiredService<Serializer>();
 
         var protector = new CheckpointProtector(serializer, new AesNeuronStateProtector(TestKey));
         var snapshot = new List<Synapse>
         {
-            new DemoMessageSynapse("hello"),
+            new ProbeMessageSynapse("hello"),
             new LlmResponse("prompt", "response", "model")
         };
         var checkpoint = new Checkpoint(new NeuronId("n1"), snapshot.AsReadOnly(), DateTimeOffset.UtcNow);
@@ -44,7 +44,7 @@ public class CheckpointSecurityTests
         var restored = protector.Unprotect(encrypted);
 
         Assert.Equal(2, restored.Snapshot.Count);
-        Assert.Contains(restored.Snapshot, s => s is DemoMessageSynapse d && d.Text == "hello");
+        Assert.Contains(restored.Snapshot, s => s is ProbeMessageSynapse d && d.Text == "hello");
         Assert.Contains(restored.Snapshot, s => s is LlmResponse r && r.Response == "response");
         Assert.Equal("n1", restored.Source.Value);
     }
