@@ -17,6 +17,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
 using Orleans.TestingHost;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Pack.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 
 namespace DigitalBrain.Tests.Gateway;
 

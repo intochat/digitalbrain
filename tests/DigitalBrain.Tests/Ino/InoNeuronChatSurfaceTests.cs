@@ -4,6 +4,7 @@ using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Ino;
+using DigitalBrain.Pack.Contracts;
 using DigitalBrain.Salesforce;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.AI;

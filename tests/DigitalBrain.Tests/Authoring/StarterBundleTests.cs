@@ -1,4 +1,5 @@
 using DigitalBrain.Tests.Ui;
+using DigitalBrain.Ui.Contracts;
 
 namespace DigitalBrain.Tests.Authoring;
 
@@ -12,7 +13,7 @@ public class StarterBundleTests
 
         var tree = harness.GetTree(StarterBundleSource.Hops.Ask);
 
-        tree.ShouldHaveNodeOfType(DigitalBrain.Core.UiKitVocabulary.TextField);
+        tree.ShouldHaveNodeOfType(UiKitVocabulary.TextField);
         tree.ShouldHaveButtonWithLabel("Echo");
     }
 }

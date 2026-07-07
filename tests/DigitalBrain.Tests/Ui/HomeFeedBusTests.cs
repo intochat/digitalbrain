@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.TestKit;
+using DigitalBrain.Ui.Contracts.Ui;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 

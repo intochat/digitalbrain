@@ -2,6 +2,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
 using DigitalBrain.Ino;
 using DigitalBrain.Marketplace.Contracts;
+using DigitalBrain.Ui.Contracts.Ui;
 using System.Reflection;
 
 namespace DigitalBrain.Tests.Architecture;
