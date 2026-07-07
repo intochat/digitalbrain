@@ -34,6 +34,9 @@ public static class CapabilityGate
         "System.Reflection.Emit.",
         "System.Runtime.InteropServices.",
         "System.Runtime.Loader.",
+        "System.Reflection.Assembly.",
+        "System.Type.GetType",
+        "System.Activator.",
     };
 
     // ISymbol.ToDisplayString() with no arguments defaults to a format that renders special types via

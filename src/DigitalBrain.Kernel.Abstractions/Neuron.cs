@@ -61,8 +61,8 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             return journal;
         }
 
-        // Fail fast: missing registration means wiring error (prototype or real Azure journal). No silent in-memory degradation.
-        throw new InvalidOperationException($"Required journal '{key}' not registered for {Self}. Ensure ConfigurePrototypeJournals() or AddAzureBlobJournalStorage + UseJsonJournalFormat is called on the kernel's Orleans silo builder.");
+        // Fail fast: missing registration means wiring error. No silent in-memory degradation.
+        throw new InvalidOperationException($"Required journal '{key}' not registered for {Self}. Ensure journal storage (AddAzureBlobJournalStorage + UseJsonJournalFormat or prototype for fast paths) registered on silo builder.");
     }
 
     private void AddToJournal(ref IDurableList<Synapse>? journalField, string key, Synapse synapse)

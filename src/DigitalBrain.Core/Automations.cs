@@ -85,6 +85,15 @@ public record PromoteAutomationToPack(
 [Alias("DigitalBrain.Core.AutomationPromoted")]
 public record AutomationPromoted(string PackName, string Version, string ManifestSummary) : Synapse(nameof(AutomationPromoted), DateTimeOffset.UtcNow);
 
+/// Audit synapse emitted on any trust bypass (R6). Never silent.
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.AuditBypass")]
+public record AuditBypass(
+    [property: Id(0)] string Kind,
+    [property: Id(1)] string Details,
+    [property: Id(2)] DateTimeOffset When = default)
+    : Synapse(nameof(AuditBypass), DateTimeOffset.UtcNow);
+
 [Alias("DigitalBrain.Core.IAutomationNeuron")]
 public interface IAutomationNeuron : INeuron
 {

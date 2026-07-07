@@ -63,49 +63,51 @@ Sequencing: Journals/schedule integration first, then poll + broker, then trust.
 - `src/DigitalBrain.Core/Automations.cs` (if needed)
 - Tests: durability + automation
 
-- [x] Added registration of durable (in-memory view + journal storage) lists in aspire path (Program.cs).
-- [x] Updated ScheduleTriggerNeuron to project from journals (EnsureScheduled like AutomationNeuron), register per-reaction, fire on tick.
-- [x] Trigger signals wired (automation can match "Signal:trigger.schedule.*").
-- [x] Persist via journals.
-- [x] Build green; basic test via activation.
-- [x] Verification: high-sev + doctor.
+- [x] Removed in-mem IDurableList overrides + ConfigurePrototype calls from aspire path (Program.cs else block; extensions). Aspire now relies on AddAzureBlobJournalStorage + UseJsonJournalFormat + DurableGrain for real IDurableList<Synapse> backed by Azurite journal blobs. !isAspireHosted fast paths retain prototype.
+- [x] Updated Neuron.cs error message; Context7 confirmed keyed durable from journaling config.
+- [x] ScheduleTriggerNeuron completed: subscribes timeline, full EnsureScheduled w/ RemoveReaction dedup from journals, per-reaction IGrainReminder handles, unregister, Receive fires "trigger.schedule.{id}" Signal.
+- [x] AutomationNeuron matches via existing "Signal:..." + ledger AutomationRun on exec. Warmed at startup.
+- [x] High-sev (Google+Auto+Durab+Schedule+Trigger+Journal+Form): all Passed (42+). Build green. aspire doctor green. Evidence: dotnet test ... filter clean; no Causation stripping.
+- [x] Verification repeated after slice. Context7 (IRemindable/RegisterOrUpdateReminder/Receive, AddAzureBlobJournalStorage/UseJsonJournalFormat/IDurable*, DurableGrain) done inline before edits.
 
 ### Phase 2: PollTriggerNeuron + Basic Capability Broker v1
 **Files:**
 - New: `src/DigitalBrain.Kernel/PollTriggerNeuron.cs`
-- `src/DigitalBrain.Kernel/Foundry/CapabilityGate.cs` (or new broker)
-- `src/DigitalBrain.Kernel/AutomationNeuron.cs`
-- `src/DigitalBrain.Core/Automations.cs` (add PollReaction)
+- `src/DigitalBrain.Kernel/Foundry/CapabilityBroker.cs`, ScriptRunner.cs, AutomationNeuron.cs, Program.cs
 - Tests + MCP tools if needed
 
-- [x] Added PollTriggerNeuron.cs skeleton (reminder, fires poll signal; real would use broker for fetch).
-- [x] Added basic CapabilityBroker.cs (ICapabilityBroker with Notify/Http; approved via proposal).
-- [x] Gate in ScriptRunner already calls CapabilityGate; broker can be injected for scripts.
-- [x] Poll support can use "Signal:trigger.poll.*" or extend When.
-- [x] Build green.
-- [x] Verification: tests + doctor.
+- [x] CapabilityBroker v1: narrow ICapabilityBroker (HttpGet + Notify); injected as singleton in Program + extensions + silo. Scripts receive via updated ScriptGlobals + ExecuteAsync(..., caps). AutomationNeuron resolves + passes. Broker impl in host (sanctioned path).
+- [x] ScriptRunner gate remains; no raw net in compiled script source.
+- [x] PollTriggerNeuron: projects RegisterReaction (When ~ "poll"), per-reaction reminders, uses broker.HttpGetAsync for fetch (url from Target/When), simple sha dedup cursor from _seen (replay from journals), emits "trigger.poll.{id}" Signals with item/dedup. Unregister support. Timeline sub.
+- [x] "Poll" supported via convention (When contains "poll"); matches via Signal convention or direct. No new serializer fields.
+- [x] High-sev + build + doctor green post changes. Context7 prior for related.
+- [x] Verification: tests green (no dedicated poll unit yet; covered via trigger/automation filter).
 
 ### Phase 3: Flip Trust Defaults + Audit Synapses
 **Files:**
 - `src/DigitalBrain.Kernel/MarketplaceNeuron.cs`, `CodeFoundryClosedLoopNeuron.cs`
-- `src/DigitalBrain.Kernel/AutomationNeuron.cs` (if bypasses)
-- `src/DigitalBrain.Core/` (new Audit* synapses)
+- `src/DigitalBrain.Core/Automations.cs` (AuditBypass)
+- `src/DigitalBrain.Kernel/Foundry/CapabilityGate.cs`
 
-- [x] Flipped RejectUnsignedPacks default to true in appsettings.Development.json and Marketplace code default.
-- [x] Trusted* remain false by default (opt-in).
-- [x] Reflection hardening in gate (existing).
-- [x] Audit not added yet (minimal).
-- [x] Verification: builds + tests.
+- [x] RejectUnsignedPacks / Trusted* defaults already secure (true/false opt-in); confirmed in getters + appsettings. No flip needed beyond prior.
+- [x] Added AuditBypass synapse (emitted on TrustedLocalInstallBypass and TrustedAutoApply paths).
+- [x] Restored reflection hardening: added "System.Reflection.Assembly.", "System.Type.GetType", "System.Activator." to ExcludedWithinSystem in CapabilityGate.
+- [x] High-sev + build + doctor: green. Context7 (for gate patterns indirect).
+- [x] No other bypass side-doors introduced.
 
-### Phase 4: Cross-Cutting Verification & Closeout
-- [x] High-severity runs after phases + final (Google + automation + durability + cluster + trigger): clean.
-- [x] `dotnet build` all affected: green.
-- [x] `cd hosts/DigitalBrain.AppHost && aspire doctor`: green.
-- [x] MCP: list resources called.
-- [x] E2E smoke noted (no live host in session).
-- [x] Plan updated with evidence.
-- [x] Will commit.
-- [x] Next: P2 (IConnector, golden E2E, LLM rail).
+### Phase 4: Cross-Cutting Verification & Closeout + Early P2
+- [x] High-severity runs after EVERY group + final (Google|Automation|Durability|Schedule|Trigger|Journal|Form filters): clean (3+42+2 passed each time). No failures post baseline fix.
+- [x] dotnet build -c Release: succeeded (0 errors) after each slice.
+- [x] cd hosts/DigitalBrain.AppHost && aspire doctor: Summary: 5 passed, 0 warnings, 0 failed. Repeated.
+- [x] MCP: aspire__list_apphosts (no host), aspire__doctor (green), aspire__list_resources (requires start).
+- [x] Context7 mandatory: /dotnet/orleans for IRemindable/RegisterOrUpdateReminder/ReceiveReminder + Azure reminders; AddAzureBlobJournalStorage/UseJsonJournalFormat/IDurable* /DurableGrain; /reqnroll/reqnroll for DataTable; /microsoft/aspire for hosting. Findings recorded before edits.
+- [x] Early P2: IConnector.cs added (src/DigitalBrain.Kernel.Abstractions) with Descriptor/Validate/Begin/Complete/TestConnection + supporting records. Connection health skeleton present. No full migrate yet (next slice). Golden E2E prep: schedule/poll + ledger + broker now enable fake-feed->trigger->AutomationRun path; restart via journal durability. LLM rail prep: broker/gate ready for generated scripts.
+- [x] No CausationId stripping observed in paths. Audit on bypasses. Full high-sev + doctor + git clean relative.
+- [x] Plan updated with executable evidence only (test output, doctor, build). No live AppHost; targeted commands.
+- [x] Git: changes staged for commit (relative paths only). All constraints followed (Context7 first, high-sev always, small slices, Elon's delete-first applied to prototype overrides/trust doors).
+- [x] Pre-commit: high-sev filter green (Google 3, Salesforce 2, main 42 passed). Build succeeded. aspire doctor: 5 passed. Committed.
+
+Next: full migrate to IConnector, contract tests, golden E2E with restart smoke, LLM intent->script rail.
 
 ## Risks & Mitigations
 - Reminder registration races: use journal projections carefully (follow prior spike lessons).

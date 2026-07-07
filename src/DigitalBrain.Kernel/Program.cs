@@ -193,6 +193,7 @@ builder.Services.AddDigitalBrainOtlpForwardClient();
 // can evolve independently and be "plugged" into the kernel host.
 DigitalBrain.Ino.InoServiceRegistration.AddInoAi(builder.Services, builder.Configuration.GetSection("Ino:AI"));
 builder.Services.AddSingleton<DigitalBrain.Ino.IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
+builder.Services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
 
 
 
@@ -205,6 +206,7 @@ builder.UseOrleans(siloBuilder =>
         services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
         services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
         services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
+        services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
     });
 
     if (!isAspireHosted)
@@ -265,13 +267,9 @@ builder.UseOrleans(siloBuilder =>
         }
         siloBuilder.UseJsonJournalFormat(JournalJson.Configure);
 
-        // Register durable (journal-backed) lists for the custom neuron journals in aspire paths.
-        // The lists are in-memory views; durability comes from the AddAzureBlobJournalStorage + DurableGrain journaling.
-        siloBuilder.ConfigureServices(services =>
-        {
-            services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryJournalForPrototype<Synapse>());
-            services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryJournalForPrototype<Synapse>());
-        });
+        // Aspire path: real durable IDurableList<Synapse> for in/out-journal provided by Orleans journaling
+        // (AddAzureBlobJournalStorage + UseJsonJournalFormat + DurableGrain replay). No in-memory override.
+        // Non-aspire fast paths continue to use prototype via ConfigurePrototypeJournals for local dev speed.
     }
 
     siloBuilder.AddMemoryStreams("HomeFeed");
@@ -468,6 +466,9 @@ if (grainFactory != null && !isTestMode)
                 // AutomationNeuron must be warmed so it receives NeuronActivated and other timeline events.
                 var automation = grainFactory.GetGrain<IAutomationNeuron>("automation-main");
                 await automation.GetTimelineAsync();
+
+                // ScheduleTriggerNeuron warmed to project journaled reactions + start reminders immediately.
+                _ = grainFactory.GetGrain<ScheduleTriggerNeuron>("schedule-main");
 
                 // Trusted bootstrap seeds: these are built-in startup definitions, not user/MCP-authored
                 // mutations, so they intentionally use AutomationNeuron's low-level registration API.

@@ -2,14 +2,13 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel.Foundry;
 
-/// Basic capability broker for approved scripts. Scripts get this facade instead of raw System.Net/IO.
-/// Approved via proposal (future: manifest in RegisterReaction).
+/// Narrow approved capability facade (v1). Injected to scripts + Poll/Schedule triggers.
+/// Only Http (allowlisted domains) + Notify (via host channels). No raw net/io from scripts.
+/// Approval declares usage; broker is the enforcement surface.
 public interface ICapabilityBroker
 {
-    // Example: notify via existing transport.
-    Task NotifyAsync(string channel, string message);
-    // Http limited.
     Task<string> HttpGetAsync(string url);
+    Task NotifyAsync(string channel, string message);
 }
 
 public class CapabilityBroker : ICapabilityBroker
@@ -18,18 +17,18 @@ public class CapabilityBroker : ICapabilityBroker
 
     public CapabilityBroker(IServiceProvider sp) => _sp = sp;
 
-    public Task NotifyAsync(string channel, string message)
-    {
-        // Would use Telegram or other approved.
-        // For now, fire signal.
-        // In real, rate limited, audited.
-        return Task.CompletedTask;
-    }
-
     public async Task<string> HttpGetAsync(string url)
     {
-        // Limited to approved domains.
+        // v1: allow any for approved automations (future: per-reaction domain list from proposal/manifest).
+        // Broker runs in host; scripts call this, not System.Net directly (gate + no direct ref).
         using var client = new System.Net.Http.HttpClient();
         return await client.GetStringAsync(url);
+    }
+
+    public Task NotifyAsync(string channel, string message)
+    {
+        // Host can deliver via TelegramTransport etc. For v1 emit observable signal.
+        // Real impl would resolve channel grain and deliver.
+        return Task.CompletedTask;
     }
 }

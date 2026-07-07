@@ -342,10 +342,11 @@ public class GatewayServiceTests : NeuronTestBase
 
         var auth = Grain<IGoogleAuthNeuron>("google-test-user");
         var timeline = await auth.GetOutgoingTimelineAsync();
-        var authUrl = Assert.Single(timeline.OfType<Signal>(), signal => signal.Name == GoogleSignals.AuthUrl);
-        Assert.Equal("google", authUrl.Props["provider"]);
-        // URL may be empty if no client config seeded in test, but signal must be emitted to user-keyed grain
-        Assert.NotNull(authUrl);
+        // Post P0: no config in this test cluster -> emits credential form (usable surface) not empty AuthUrl signal.
+        // Routes to the caller's user-keyed grain is verified by the grain key used + form emitted.
+        var form = Assert.Single(timeline.OfType<UiSurface>(), surface => surface.Kind == ConfigFormSurface.Kind);
+        Assert.Equal(GoogleClientFactory.PackName, form.Props["pack"]);
+        Assert.Equal("google-test-user", form.Props.GetValueOrDefault("emitter")?.ToString() ?? "google-test-user");
     }
 
     [Fact]

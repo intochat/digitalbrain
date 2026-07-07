@@ -114,6 +114,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 
         if (TrustedLocalInstallBypass)
         {
+            await FireAsync(new AuditBypass("TrustedLocalInstallBypass", $"Unsigned/ local install bypass for {pack.Name}@{pack.Version}", DateTimeOffset.UtcNow));
             await MarketplaceInstallActivation.ApplyAsync(
                 staged,
                 synapse => FireAsync(synapse),

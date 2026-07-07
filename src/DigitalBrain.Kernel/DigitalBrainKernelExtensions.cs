@@ -16,8 +16,8 @@ public static class DigitalBrainKernelExtensions
             siloBuilder.UseLocalhostClustering();
             siloBuilder.AddMemoryGrainStorageAsDefault();
 
-            // Centralized prototype journals (single source in PrototypeJournals).
-            siloBuilder.ConfigurePrototypeJournals();
+            // Prototype journals retained only for legacy !isAspireHosted fast-paths (Program.cs non-aspire).
+            // Aspire paths use real journal blobs exclusively.
             siloBuilder.AddFoundry();
             siloBuilder.ConfigureServices(services =>
             {
@@ -26,6 +26,7 @@ public static class DigitalBrainKernelExtensions
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<DigitalBrain.Ino.IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
+                services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
             });
 
             // Built-in neurons discovered automatically.

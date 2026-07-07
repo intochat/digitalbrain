@@ -20,7 +20,8 @@ public static class ScriptRunner
     public sealed record ScriptGlobals(
         Synapse Synapse,
         NeuronId Self,
-        Func<Synapse, Task> Fire
+        Func<Synapse, Task> Fire,
+        ICapabilityBroker? Caps = null
     );
 
     private static readonly ScriptOptions _options = ScriptOptions.Default
@@ -38,7 +39,7 @@ public static class ScriptRunner
     private static string HashBody(string body) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(body)));
 
     public static async Task<IReadOnlyList<Synapse>> ExecuteAsync(
-        string scriptBody, Synapse input, NeuronId self, Func<Synapse, Task> fire)
+        string scriptBody, Synapse input, NeuronId self, Func<Synapse, Task> fire, ICapabilityBroker? caps = null)
     {
         if (string.IsNullOrWhiteSpace(scriptBody))
             return Array.Empty<Synapse>();
@@ -59,7 +60,7 @@ public static class ScriptRunner
         }
         catch { /* gate is best effort; proceed to real compile which will fail on bad anyway */ }
 
-        var globals = new ScriptGlobals(input, self, fire);
+        var globals = new ScriptGlobals(input, self, fire, caps);
         var bodyHash = HashBody(scriptBody);
 
         // Try real CSharpScript first (real executable C# as authored)

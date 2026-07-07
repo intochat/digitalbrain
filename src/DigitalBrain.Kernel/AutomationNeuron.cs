@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Kernel.Foundry;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 
@@ -94,11 +95,13 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
 
             _execCounts[reaction.Id] = _execCounts.GetValueOrDefault(reaction.Id) + 1;
 
+            var caps = ServiceProvider.GetService<ICapabilityBroker>();
             var outputs = await Foundry.ScriptRunner.ExecuteAsync(
                 code,
                 synapse,
                 Self,
-                s => FireAsync(StampCurrent(s)).AsTask());
+                s => FireAsync(StampCurrent(s)).AsTask(),
+                caps);
 
             // Light declared-emits enforcement (plan Task 9)
             if (reaction.DeclaredEmits != null && reaction.DeclaredEmits.Count > 0)

@@ -34,6 +34,7 @@ public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> lo
                 return;
             }
 
+            await FireAsync(new AuditBypass("TrustedAutoApply", $"Foundry auto-apply tier {request.Tier} spec", DateTimeOffset.UtcNow));
             await ApplyImmediatelyAsync(request, generated, checkpointId);
             return;
         }
