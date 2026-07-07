@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Economics;
+
 using DigitalBrain.Core.Trust;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.SelfEvolution;
@@ -15,14 +15,6 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 
     public async Task HandleAsync(PublishToMarketplace cmd)
     {
-        var remote = ServiceProvider.GetService<IRemoteMarketplaceClient>();
-        var useRemote = ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:UseRemote", false) ?? false;
-
-        if (useRemote && remote is not null)
-        {
-            await remote.PublishAsync(cmd);
-        }
-
         if (GatePublishing && !PublisherTrust.IsTrusted(ToNeuroPack(cmd), TrustedPublisherKeys()))
         {
             Logger.LogWarning("Publish REJECTED - pack {Name}@{Ver} is not from a trusted publisher (publishing gate enabled)",
@@ -75,14 +67,6 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 
     public async Task HandleAsync(InstallFromMarketplace cmd)
     {
-        var remote = ServiceProvider.GetService<IRemoteMarketplaceClient>();
-        var useRemote = ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:UseRemote", false) ?? false;
-
-        if (useRemote && remote is not null)
-        {
-            await remote.InstallAsync(cmd);
-        }
-
         var pack = FindPublishedPack(cmd.PackName, cmd.Version);
         if (pack == null)
         {
@@ -116,16 +100,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
             Logger.LogWarning("Install WARNING - pack {Key} is unsigned (allowed during trust transition)", cmd.PackName + "@" + cmd.Version);
         }
 
-        if (pack.Price > 0m)
-        {
-            var license = GrainFactory.GetGrain<ILicenseNeuron>("license-main");
-            if (!await license.HasLicenseAsync(pack.Name, cmd.BuyerId))
-            {
-                Logger.LogWarning("Install REJECTED - premium pack {Key} requires a license for buyer {Buyer}", cmd.PackName + "@" + cmd.Version, cmd.BuyerId);
-                return;
-            }
-            Logger.LogInformation("Install entitlement verified for premium pack {Key}, buyer {Buyer}", cmd.PackName + "@" + cmd.Version, cmd.BuyerId);
-        }
+        // Economics / license check removed as trash (premium entitlement flow not core to current Ino focus)
 
         var commissionAmount = 0.0;
         var staged = new MarketplaceInstallStaged(
@@ -173,16 +148,6 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 
     public async Task HandleAsync(ListPublished _cmd)
     {
-        var remote = ServiceProvider.GetService<IRemoteMarketplaceClient>();
-        var useRemote = ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:UseRemote", false) ?? false;
-
-        if (useRemote && remote is not null)
-        {
-            var list = await remote.ListAsync();
-            await FireAsync(list);
-            return;
-        }
-
         var packs = GetPublishedPacks();
         Logger.LogInformation("Marketplace listing {Count} real packs", packs.Count);
         await FireAsync(new PublishedList(packs));

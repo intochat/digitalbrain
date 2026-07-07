@@ -119,14 +119,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 
-    internal async Task HandleBitcoinPriceIntentAsync(InoRequest req, string workspaceId)
-    {
-        var price = await GrainFactory.GetGrain<IMarketDataNeuron>("market-data-main").GetBitcoinPriceUsdAsync();
-        var priceReply = $"The current Bitcoin price is {price}.";
-        await FireAsync(new InoResponse(req.Prompt, priceReply, []));
-        await DeliverReplySurfaceAsync(priceReply, req.ClientId, workspaceId);
-    }
-
     internal async Task HandleRelationGraphIntentAsync(InoRequest req, string workspaceId)
     {
         await FireAsync(new InoResponse(req.Prompt, "Rendered a relation graph.", []));
