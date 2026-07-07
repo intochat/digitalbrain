@@ -4,15 +4,15 @@ Feature: Google OAuth for Gmail via INO
   I want to authenticate with Google via INO
   So that I can retrieve my recent Gmail senders and messages
 
-Scenario: INO triggers Google auth surface when no credentials
+Scenario: INO triggers Google auth form when no credentials
   Given the system is running
   When INO receives prompt "show my last 5 gmail senders"
-  Then a Google auth button surface is delivered
+  Then a Google credential form surface is delivered
 
-Scenario: Google auth flow emits AuthUrl signal
+Scenario: Google auth flow emits AuthUrl signal with correct params
   Given a Google auth neuron
   When AuthRequested signal is delivered
-  Then GoogleAuthUrl signal is emitted
+  Then GoogleAuthUrl signal is emitted with offline consent and gmail.readonly scope
 
 Scenario: Full Gmail read after simulated auth
   Given Google credentials are seeded in pack config

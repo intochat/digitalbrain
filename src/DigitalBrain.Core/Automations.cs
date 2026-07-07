@@ -56,6 +56,16 @@ public record AutomationDefinitionStaged(
     : Synapse(nameof(AutomationDefinitionStaged), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.AutomationRun")]
+public record AutomationRun(
+    [property: Id(0)] string ReactionId,
+    [property: Id(1)] string? DedupKey,
+    [property: Id(2)] int Attempt,
+    [property: Id(3)] string Status,
+    [property: Id(4)] DateTimeOffset Timestamp)
+    : Synapse(nameof(AutomationRun), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
 [Alias("DigitalBrain.Core.RemoveReaction")]
 public record RemoveReaction(string Id) : Synapse(nameof(RemoveReaction), DateTimeOffset.UtcNow);
 

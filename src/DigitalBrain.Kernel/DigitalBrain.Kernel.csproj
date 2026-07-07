@@ -45,6 +45,7 @@
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Persistence.Memory" />
     <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="Microsoft.Orleans.Reminders" />
     <PackageReference Include="Microsoft.Orleans.Streaming" />
     <!-- Microsoft.Orleans.Dashboard added for DigitalBrainOptions.EnableOrleansDashboard - run 'dotnet add package Microsoft.Orleans.Dashboard' if needed for full UI -->
 

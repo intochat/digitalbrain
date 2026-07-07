@@ -31,6 +31,6 @@ public static class GoogleServiceRegistration
             throw new InvalidOperationException($"Google pack config (scope '{scope}', pack '{pack}') is missing keys. Complete sign in.");
         }
 
-        return DigitalBrain.Google.GoogleCredentialFactory.FromRefreshToken(clientId, clientSecret, refreshToken, GoogleApisGmail.v1.GmailService.ScopeConstants.MailGoogleCom);
+        return DigitalBrain.Google.GoogleCredentialFactory.FromRefreshToken(clientId, clientSecret, refreshToken, GoogleClientFactory.DefaultGmailScope);
     }
 }

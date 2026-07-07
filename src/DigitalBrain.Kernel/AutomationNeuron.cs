@@ -117,6 +117,9 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 await FireAsync(StampCurrent(output));
             }
 
+            // Minimal run ledger entry (P1). Persisted via journal.
+            await FireAsync(StampCurrent(new AutomationRun(reaction.Id, null, _execCounts[reaction.Id], "completed", DateTimeOffset.UtcNow)));
+
             await EmitAutomationsSurfaceAsync();
         }
     }

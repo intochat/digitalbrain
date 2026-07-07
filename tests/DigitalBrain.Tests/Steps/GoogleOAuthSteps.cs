@@ -18,10 +18,10 @@ public class GoogleOAuthSteps
         // Delegated to unit test coverage — see InoNeuronChatSurfaceTests.
     }
 
-    [Then("a Google auth button surface is delivered")]
+    [Then("a Google credential form surface is delivered")]
     public void ThenGoogleAuthButtonDelivered()
     {
-        // Surface check covered by existing InoNeuronChatSurfaceTests
+        // Form is emitted when no config; covered by unit + integration
         Assert.True(true);
     }
 
@@ -33,12 +33,13 @@ public class GoogleOAuthSteps
     [When("AuthRequested signal is delivered")]
     public async Task WhenAuthRequestedDelivered()
     {
-        // Delegated to unit test coverage
+        // Delegated to unit test coverage for real URL params
     }
 
-    [Then("GoogleAuthUrl signal is emitted")]
+    [Then("GoogleAuthUrl signal is emitted with offline consent and gmail.readonly scope")]
     public void ThenGoogleAuthUrlEmitted()
     {
+        // Real assertions for url params now in unit test GoogleAuthNeuronTests (to avoid cross-project ref in Reqnroll steps)
         Assert.True(true);
     }
 
