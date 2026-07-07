@@ -5,7 +5,6 @@ using Azure.Storage.Blobs.Models;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Kernel.Kernel;
-using DigitalBrain.Kernel.Market;
 using DigitalBrain.Kernel.Sync;
 using DigitalBrain.TestKit;
 using DigitalBrain.Tests.TestSupport;
@@ -23,11 +22,6 @@ namespace DigitalBrain.Tests.Sync;
 // snapshot, not anything the source neuron did afterwards.
 public class CheckpointRestoreTriggerTests : NeuronTestBase
 {
-    // MarketDataNeuron (one of the nine V1 ids) needs a real IMarketDataApiClient to activate; a fake stands in
-    // here the same way CheckpointBackupTriggerTests/MarketDataNeuronTests.cs does.
-    protected override void ConfigureSilo(ISiloBuilder builder) =>
-        builder.ConfigureServices(services => services.AddSingleton<IMarketDataApiClient>(new FakeMarketDataApiClient()));
-
     [Fact]
     public async Task RestoreAsync_ReplaysEveryV1NeuronsCheckpointSnapshot_IntoItsIncomingJournal_AgainstRealGrains()
     {
