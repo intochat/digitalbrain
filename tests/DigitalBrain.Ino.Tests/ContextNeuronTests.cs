@@ -3,7 +3,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Ino.Context;
 using Xunit;
 
-namespace DigitalBrain.Tests.Ino;
+namespace DigitalBrain.Ino.Tests;
 
 public class ContextNeuronTests : NeuronTestBase
 {

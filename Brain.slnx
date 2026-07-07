@@ -31,7 +31,7 @@
     <Project Path="hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
   </Folder>
   <Folder Name="/tests/">
-
+    <Project Path="tests/DigitalBrain.Ino.Tests/DigitalBrain.Ino.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />
