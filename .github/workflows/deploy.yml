@@ -191,12 +191,12 @@ jobs:
           fi
 
           if [ -z "${swa_hostname_status}" ] || [ "${swa_hostname_status}" != "Ready" ]; then
-            echo "Static Web Apps hostname status is '${swa_hostname_status:-missing}'; requesting CNAME validation."
+            echo "Static Web Apps hostname status is '${swa_hostname_status:-missing}'; requesting TXT validation."
             az staticwebapp hostname set \
               --name digitalbrain-web-prod \
               --resource-group digitalbrain-rg \
               --hostname "${WEB_CUSTOM_HOSTNAME}" \
-              --validation-method cname-delegation \
+              --validation-method dns-txt-token \
               --no-wait >/dev/null
           fi
 
@@ -211,8 +211,9 @@ jobs:
                 --name digitalbrain-web-prod \
                 --resource-group digitalbrain-rg \
                 --hostname "${WEB_CUSTOM_HOSTNAME}" \
-                --query "{status:status,error:errorMessage}" \
+                --query "{status:status,error:errorMessage,validationToken:validationToken}" \
                 -o json >&2
+              echo "Expected DNS TXT record for Static Web Apps validation: _dnsauth.${WEB_CUSTOM_HOSTNAME} -> <validationToken>" >&2
               exit 1
             fi
             echo "Attempt $i: Static Web Apps hostname status is '${swa_hostname_status:-missing}', waiting for Ready."
