@@ -25,6 +25,10 @@ internal static class Program
     private const string ResourceGroupName = "digitalbrain-rg";
     private const string EnvSuffix = "prod";
     private const string ChatDeploymentName = "chat";
+    private const string DefaultFrontendApexHostname = "digitalbrain.tech";
+    private const string DefaultFrontendWwwHostname = "www.digitalbrain.tech";
+    private const string DefaultFrontendStaticWebAppsHostname = "gentle-sand-0f4081803.7.azurestaticapps.net";
+    private const string DefaultKernelCustomHostname = "api.digitalbrain.tech";
 
     // Images live in private Docker Hub repos under the owner's personal account. ACA authenticates the pull
     // via AppInputs.RegistryCredentialsArgs (server=docker.io) with a Docker Hub PAT stored as a Container App
@@ -56,6 +60,26 @@ internal static class Program
         var imageTag = Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
             ?? config.Get("imageTag")
             ?? "latest";
+        var frontendApexOrigin = ConfiguredHttpsOrigin(
+            config,
+            "DIGITALBRAIN_WEB_APEX_HOSTNAME",
+            "webApexHostname",
+            DefaultFrontendApexHostname);
+        var frontendWwwOrigin = ConfiguredHttpsOrigin(
+            config,
+            "DIGITALBRAIN_WEB_HOSTNAME",
+            "webHostname",
+            DefaultFrontendWwwHostname);
+        var frontendStaticWebAppsOrigin = ConfiguredHttpsOrigin(
+            config,
+            "DIGITALBRAIN_STATIC_WEB_APPS_HOSTNAME",
+            "staticWebAppsHostname",
+            DefaultFrontendStaticWebAppsHostname);
+        var kernelCustomEndpoint = ConfiguredHttpsOrigin(
+            config,
+            "DIGITALBRAIN_KERNEL_HOSTNAME",
+            "kernelHostname",
+            DefaultKernelCustomHostname);
 
         // CI injects the AES checkpoint-encryption key as a secret env var (from a GitHub Actions secret) so it
         // never lives in git; local runs can instead use `pulumi config set --secret checkpointKey ...`.
@@ -312,8 +336,9 @@ internal static class Program
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIEndpoint", Value = openAiEndpoint },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIKey", SecretRef = OpenAiKeySecret },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Checkpoint__Key", SecretRef = CheckpointKeySecret },
-                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__0", Value = "https://digitalbrain.tech" },
-                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__1", Value = "https://gentle-sand-0f4081803.7.azurestaticapps.net" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__0", Value = frontendApexOrigin },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__1", Value = frontendWwwOrigin },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__2", Value = frontendStaticWebAppsOrigin },
                             new AppInputs.EnvironmentVarArgs { Name = "APPLICATIONINSIGHTS_CONNECTION_STRING", Value = appInsightsConnectionString }
                         }
                     }
@@ -442,11 +467,35 @@ internal static class Program
             ["chatDeployment"] = ChatDeploymentName,
             ["kernelApp"] = kernelApp.Name,
             ["kernelFqdn"] = kernelApp.LatestRevisionFqdn,
+            ["kernelCustomEndpoint"] = kernelCustomEndpoint,
             ["telegramApp"] = telegramTransport?.Name,
             ["telegramFqdn"] = telegramTransport?.LatestRevisionFqdn,
             ["imageTag"] = imageTag,
             ["environment"] = EnvSuffix
         };
+    }
+
+    private static string ConfiguredHttpsOrigin(Config config, string envName, string configName, string defaultHostname)
+    {
+        var configured = Environment.GetEnvironmentVariable(envName);
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = config.Get(configName);
+        }
+
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = defaultHostname;
+        }
+
+        var trimmed = configured.Trim().TrimEnd('/');
+        if (trimmed.StartsWith("https://", System.StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("http://", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmed;
+        }
+
+        return $"https://{trimmed}";
     }
 
     private static CustomResourceOptions AliasOldRuntimeParent() =>

@@ -87,7 +87,7 @@ builder.Services.AddGrpc();
 
 var corsOrigins = builder.Configuration
     .GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "https://digitalbrain.tech" };
+    ?? new[] { "https://digitalbrain.tech", "https://www.digitalbrain.tech" };
 
 builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy
     .WithOrigins(corsOrigins)

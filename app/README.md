@@ -1,15 +1,15 @@
 # DigitalBrain — Flutter client
 
-The web/mobile client for **DigitalBrain / NeuroOS**. The web build is published to GitHub
-Pages at **[digitalbrain.tech](https://digitalbrain.tech)** and talks to the backend API at
-**`https://api.digitalbrain.tech`** (the [`digitalbraintech/framework`](https://github.com/digitalbraintech/framework)
-runtime, hosted on Azure Container Apps).
+The web/mobile client for **DigitalBrain / NeuroOS**. The web build is published to Azure Static
+Web Apps and talks to the backend API at **`https://api.digitalbrain.tech`** (the kernel runtime,
+hosted on Azure Container Apps).
 
 ## Architecture
 
 ```
-digitalbrain.tech            →  this app (Flutter web, GitHub Pages, Fastly CDN)
-api.digitalbrain.tech        →  digitalbraintech/framework (Orleans/.NET on Azure Container Apps)
+www.digitalbrain.tech        →  this app (Flutter web, Azure Static Web Apps)
+digitalbrain.tech            →  forwarded to www.digitalbrain.tech at the registrar
+api.digitalbrain.tech        →  DigitalBrain kernel (Orleans/.NET on Azure Container Apps)
 ```
 
 The frontend is a static bundle; all dynamic work (LLM, neurons, journals) happens in the backend.
@@ -20,8 +20,7 @@ The frontend is a static bundle; all dynamic work (LLM, neurons, journals) happe
 |------|------|
 | `lib/`, `web/`, `assets/` | the Flutter client (`digitalbrain_flutter`) |
 | `packages/digital_brain_sdk_flutter/` | vendored self-instrumenting perf SDK the app depends on (`path:` dependency) |
-| `.github/workflows/deploy-flutter-web.yml` | builds web + deploys to GitHub Pages |
-| `web/CNAME` | binds the Pages site to the apex domain `digitalbrain.tech` |
+| `.github/workflows/deploy.yml` | release-gated Azure deploy for backend images and Flutter web |
 
 ## Run locally
 
@@ -38,11 +37,9 @@ flutter build web --release --base-href "/"
 
 ## Deploy
 
-Pushing to `main`/`master` triggers **`Deploy Flutter Web`**, which builds the release web bundle
-and publishes it to GitHub Pages. One-time setup: **Settings → Pages → Source: GitHub Actions**, and
-verify the `digitalbrain.tech` custom domain (apex `A` records → GitHub Pages + `www` CNAME →
-`digitalbraintech.github.io`). The backend's `api.` host is configured separately in the
-[`framework`](https://github.com/digitalbraintech/framework) repo's deploy.
+Publishing a GitHub Release runs `.github/workflows/deploy.yml`, which builds the Flutter web bundle,
+uploads it to Azure Static Web Apps (`digitalbrain-web-prod`), and compiles the client with
+`KERNEL_ENDPOINT=https://api.digitalbrain.tech`. Push/PR CI only validates the build and tests.
 
 ## Related repos
 
