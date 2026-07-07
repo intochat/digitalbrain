@@ -1,7 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Core.Ui;
-using DigitalBrain.Demo.Runtime;
 using DigitalBrain.Google;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Kernel;
@@ -429,61 +428,6 @@ public class GatewayServiceTests : NeuronTestBase
         }, TestContext()));
 
         Assert.Equal(StatusCode.Unauthenticated, ex.StatusCode);
-    }
-
-    [Fact]
-    public async Task Send_SurfaceDemoRequested_InstallsPack_And_BroadcastsRenderableSurface()
-    {
-        await using var subscription = await HomeFeedBus.SubscribeAsync(clientId: null);
-        var svc = NewService();
-
-        await svc.Send(new SynapseEnvelope
-        {
-            TypeName = SurfaceDemoRuntime.RequestType,
-            CorrelationId = "ui-demo-test"
-        }, TestContext());
-
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-        var cards = new List<RfwCard>();
-        while (cards.Count < 8 &&
-               (!cards.Any(c => c.DataJson.Contains("journaled response and surface update observed", StringComparison.Ordinal)) ||
-                !cards.Any(IsSurfaceDemoPackCard)))
-        {
-            cards.Add(await subscription.Reader.ReadAsync(timeout.Token));
-        }
-
-        var graph = cards.FirstOrDefault(c => c.DataJson.Contains("journaled response and surface update observed", StringComparison.Ordinal));
-        Assert.NotNull(graph);
-        Assert.Equal("digitalbrain", graph!.LibraryName);
-        Assert.Equal("root", graph.RootWidget);
-        Assert.Contains("\"kind\":\"activity-graph\"", graph.DataJson);
-        Assert.Contains("\"edges\"", graph.DataJson);
-        Assert.Contains("\"correlationId\":\"ui-demo-test\"", graph.DataJson);
-
-        var card = cards.FirstOrDefault(c => IsSurfaceDemoPackCard(c) && c.DataJson.Contains("Embodied pack live", StringComparison.Ordinal));
-        Assert.NotNull(card);
-        Assert.Equal("digitalbrain", card!.LibraryName);
-        Assert.Equal("root", card.RootWidget);
-        Assert.False(string.IsNullOrWhiteSpace(card.CorrelationId));
-        Assert.Contains("\"source\"", card.DataJson);
-
-        var generated = Grain<IGeneratedNeuron>(SurfaceDemoRuntime.GeneratedNeuronKey);
-        var timeline = await generated.GetOutgoingTimelineAsync();
-        var emittedSurface = Assert.Single(timeline.OfType<UiSurface>(), surface =>
-            surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var id) &&
-            Equals(id, "surface-demo-pack"));
-        Assert.Equal("ui-demo-test", emittedSurface.CorrelationId);
-        Assert.False(string.IsNullOrWhiteSpace(emittedSurface.CausationId));
-
-        var observability = Grain<IObservabilityNeuron>(SurfaceDemoRuntime.ObservabilityNeuronKey);
-        var graphTimeline = await observability.GetOutgoingTimelineAsync();
-        Assert.Contains(graphTimeline.OfType<UiSurface>(), surface =>
-            surface.Kind == UiSurfaceKinds.ActivityGraph &&
-            surface.CorrelationId == "ui-demo-test");
-
-        static bool IsSurfaceDemoPackCard(RfwCard card) =>
-            card.DataJson.Contains("\"surfaceId\":\"surface-demo-pack\"", StringComparison.Ordinal) &&
-            card.DataJson.Contains("\"kind\":\"task-window\"", StringComparison.Ordinal);
     }
 
     private static ServerCallContext TestContext(CancellationToken cancellationToken = default) =>

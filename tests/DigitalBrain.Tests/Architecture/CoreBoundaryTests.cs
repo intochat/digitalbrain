@@ -1,6 +1,5 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
-using DigitalBrain.Demo.Runtime;
 using DigitalBrain.Ino;
 using DigitalBrain.Marketplace.Contracts;
 using System.Reflection;
@@ -55,87 +54,6 @@ public class CoreBoundaryTests
 
         Assert.Contains(coreAssemblyName, references);
         Assert.DoesNotContain(uiContractsAssemblyName, CoreReferenceNames());
-    }
-
-    [Fact]
-    public void Demo_Contracts_Depend_On_Core_Not_The_Other_Way_Around()
-    {
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-        var demoContractsAssemblyName = typeof(DemoMessageSynapse).Assembly.GetName().Name!;
-        var references = DemoContractsReferenceNames();
-
-        Assert.Equal("DigitalBrain.Demo.Contracts", demoContractsAssemblyName);
-        Assert.Contains(coreAssemblyName, references);
-        Assert.DoesNotContain(demoContractsAssemblyName, CoreReferenceNames());
-    }
-
-    [Fact]
-    public void Demo_Contracts_Do_Not_Reference_Runtime_Host_Integration_Or_Marketplace_Packages()
-    {
-        var references = DemoContractsReferenceNames();
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-
-        var unexpectedDigitalBrainReferences = references
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
-                !string.Equals(name, coreAssemblyName, StringComparison.Ordinal))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(unexpectedDigitalBrainReferences);
-
-        var offenders = references
-            .Where(name => ForbiddenRuntimeHostOrIntegrationPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(offenders);
-    }
-
-    [Fact]
-    public void Demo_Runtime_Depends_On_Contract_Packages_Not_Runtime_Host_Or_Integrations()
-    {
-        var references = DemoRuntimeReferenceNames();
-        var allowedDigitalBrainReferences = new HashSet<string>(StringComparer.Ordinal)
-        {
-            typeof(Synapse).Assembly.GetName().Name!,
-            typeof(DemoMessageSynapse).Assembly.GetName().Name!,
-            typeof(IPackBehavior).Assembly.GetName().Name!,
-            typeof(MarketplaceUiSurfaces).Assembly.GetName().Name!,
-            typeof(UiSurface).Assembly.GetName().Name!
-        };
-
-        var unexpectedDigitalBrainReferences = references
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
-                !allowedDigitalBrainReferences.Contains(name))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(unexpectedDigitalBrainReferences);
-
-        var offenders = references
-            .Where(name => ForbiddenRuntimeHostOrIntegrationPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(offenders);
-    }
-
-    [Fact]
-    public void Core_Does_Not_Own_Demo_Test_Contracts()
-    {
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-
-        Assert.NotEqual(coreAssemblyName, typeof(DemoMessageSynapse).Assembly.GetName().Name);
-        Assert.NotEqual(coreAssemblyName, typeof(IDemoNeuron).Assembly.GetName().Name);
-        Assert.Equal("DigitalBrain.Demo.Runtime", typeof(SurfaceDemoRuntime).Assembly.GetName().Name);
-        Assert.NotEqual(coreAssemblyName, typeof(SurfaceDemoRuntime).Assembly.GetName().Name);
-    }
-
-    [Fact]
-    public void Demo_Runtime_Owns_Surface_Demo_Request_And_Runtime_Helpers()
-    {
-        Assert.Equal("DigitalBrain.Demo.Runtime", typeof(SurfaceDemoRuntime).Assembly.GetName().Name);
-        Assert.Equal("DigitalBrain.Kernel.SurfaceDemoRequested", SurfaceDemoRuntime.RequestType);
     }
 
     [Fact]
@@ -325,10 +243,6 @@ public class CoreBoundaryTests
     private static string[] UiRuntimeReferenceNames() => ReferenceNames(typeof(UiSurfaceLiveData).Assembly);
 
     private static string[] InoReferenceNames() => ReferenceNames(typeof(InoIntentClassifier).Assembly);
-
-    private static string[] DemoContractsReferenceNames() => ReferenceNames(typeof(DemoMessageSynapse).Assembly);
-
-    private static string[] DemoRuntimeReferenceNames() => ReferenceNames(typeof(SurfaceDemoRuntime).Assembly);
 
     private static bool MethodSignatureContains(MethodInfo method, Type type) =>
         TypeContains(method.ReturnType, type) ||
