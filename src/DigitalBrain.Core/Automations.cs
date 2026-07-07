@@ -23,7 +23,8 @@ public record RegisterReaction(
     [property: Id(2)] string ScriptRef,
     [property: Id(3)] string? Target = null,
     [property: Id(4)] IReadOnlyList<string> DeclaredEmits = null!,
-    [property: Id(5)] string Scope = "default")
+    [property: Id(5)] string Scope = "default",
+    [property: Id(6)] string? Schedule = null)
     : Synapse(nameof(RegisterReaction), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]

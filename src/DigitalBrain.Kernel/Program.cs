@@ -264,6 +264,14 @@ builder.UseOrleans(siloBuilder =>
                 options.BlobServiceClient = new BlobServiceClient(builder.Configuration.GetConnectionString("journal")!));
         }
         siloBuilder.UseJsonJournalFormat(JournalJson.Configure);
+
+        // Register durable (journal-backed) lists for the custom neuron journals in aspire paths.
+        // The lists are in-memory views; durability comes from the AddAzureBlobJournalStorage + DurableGrain journaling.
+        siloBuilder.ConfigureServices(services =>
+        {
+            services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryJournalForPrototype<Synapse>());
+            services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryJournalForPrototype<Synapse>());
+        });
     }
 
     siloBuilder.AddMemoryStreams("HomeFeed");
@@ -483,12 +491,12 @@ if (grainFactory != null && !isTestMode)
 
                 // 3+4. Script sharing demo: one script id referenced by two different reactions
                 await automation.FireAsync(new RegisterScript("shared.brief-gen", "return new[] { new Signal(\"SharedBriefEmitted\", new Dictionary<string,object?> { [\"reused\"] = true }) };", "Reusable brief emitter", Array.Empty<string>(), "default"));
-                await automation.FireAsync(new RegisterReaction("brief-on-pa-activate", "NeuronActivated", "shared.brief-gen", "personal-assistant", Array.Empty<string>(), "default"));
-                await automation.FireAsync(new RegisterReaction("brief-on-any-activate", "NeuronActivated", "shared.brief-gen", null, Array.Empty<string>(), "default"));
+                await automation.FireAsync(new RegisterReaction("brief-on-pa-activate", "NeuronActivated", "shared.brief-gen", "personal-assistant", Array.Empty<string>(), "default", null));
+                await automation.FireAsync(new RegisterReaction("brief-on-any-activate", "NeuronActivated", "shared.brief-gen", null, Array.Empty<string>(), "default", null));
 
                 // Scoped demo (priority 9): only matches for specific user scope (backward default=global)
                 await automation.FireAsync(new RegisterScript("scoped.demo", "return new[] { new Signal(\"ScopedOnly\", null) };", "scoped only", Array.Empty<string>(), "demo-user"));
-                await automation.FireAsync(new RegisterReaction("scoped-reaction", "NeuronActivated", "scoped.demo", null, Array.Empty<string>(), "demo-user"));
+                await automation.FireAsync(new RegisterReaction("scoped-reaction", "NeuronActivated", "scoped.demo", null, Array.Empty<string>(), "demo-user", null));
 
 
 

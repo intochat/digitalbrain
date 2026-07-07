@@ -215,7 +215,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         // Direct calls bypass the approval rail and are only for trusted bootstrap or internal apply handlers.
         var scriptId = id + "-script";
         await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction", Array.Empty<string>(), "default"));
-        await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>(), "default"));
+        await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>(), "default", null));
     }
 
     public Task<string?> GetScriptCodeAsync(string id)

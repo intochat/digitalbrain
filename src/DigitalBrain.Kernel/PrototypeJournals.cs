@@ -4,7 +4,7 @@ using Orleans.Journaling;
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
 // Centralized (single source) prototype in-memory journal support to avoid duplication across entry points.
-internal sealed class InMemoryJournalForPrototype<T> : List<T>, IDurableList<T>;
+public sealed class InMemoryJournalForPrototype<T> : List<T>, IDurableList<T>;
 
 internal sealed class PrototypeJournaledStateManager : IJournaledStateManager
 {

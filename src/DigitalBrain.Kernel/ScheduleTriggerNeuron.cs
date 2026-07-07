@@ -10,16 +10,38 @@ namespace DigitalBrain.Kernel;
 public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IRemindable
 {
+    private List<RegisterReaction> _scheduled = new();
+
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        // Example daily reminder; real version would read from journals the RegisterReaction with schedule.
-        await this.RegisterOrUpdateReminder("example-schedule", TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(1));
+        await base.OnActivateAsync(cancellationToken);
+        EnsureScheduled();
+        foreach (var r in _scheduled.Where(r => !string.IsNullOrWhiteSpace(r.Schedule)))
+        {
+            // Register reminder; real would parse cron for due/period.
+            await this.RegisterOrUpdateReminder(r.Id, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(1));
+        }
+    }
+
+    protected void EnsureScheduled()
+    {
+        _scheduled = OutgoingJournal.Concat(IncomingJournal).OfType<RegisterReaction>()
+            .Where(r => !string.IsNullOrWhiteSpace(r.Schedule)).ToList();
     }
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
         Logger.LogInformation("Schedule reminder {Name} ticked", reminderName);
-        // Fire a trigger signal that reactions can match on (e.g. "Signal:trigger.schedule.example")
         await FireAsync(new Signal("trigger.schedule." + reminderName, new Dictionary<string, object?>()));
+    }
+
+    protected override async Task DispatchSynapse(Synapse synapse)
+    {
+        await base.DispatchSynapse(synapse);
+        if (synapse is RegisterReaction rr && !string.IsNullOrWhiteSpace(rr.Schedule))
+        {
+            _scheduled.Add(rr);
+            await this.RegisterOrUpdateReminder(rr.Id, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(1));
+        }
     }
 }
