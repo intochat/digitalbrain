@@ -81,7 +81,7 @@ public class NeuronTests : NeuronTestBase
         var market = Grain<IMarketplaceNeuron>("market-test-1");
         var pack = new NeuroPack(
             "TestPrivatePack", "1.0", OwnerId: "owner1", IsPrivate: true, CommissionRate: 0.25, Code: "// test code", Description: "private test");
-        
+
         await market.FireAsync(new PublishToMarketplace(pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate, pack.Description));
         await market.FireAsync(new ListPublished());  // trigger the list event like real usage
 

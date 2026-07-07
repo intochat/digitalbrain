@@ -130,7 +130,7 @@ public class PackAlcEmbodierTests
         var embodied = _embodier.Embody("TelegramResponderNeuron", MarketplaceSeeds.TelegramResponderPackCode);
         embodied.Dispose();
     }
-[Fact]
+    [Fact]
     public async Task ScriptRunner_Executes_Small_CSharp_Body_And_Returns_Synapses()
     {
         // TDD for Task 2: pure execution of C# script (the "then" part of reactions).

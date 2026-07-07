@@ -10,7 +10,10 @@ public class TelegramChatNeuronTests : NeuronTestBase
     private static Signal Inbound(long chatId, string text) =>
         new("TelegramMessageReceived", new Dictionary<string, object?>
         {
-            ["chatId"] = chatId, ["fromUserId"] = 1L, ["text"] = text, ["updateId"] = 1L
+            ["chatId"] = chatId,
+            ["fromUserId"] = 1L,
+            ["text"] = text,
+            ["updateId"] = 1L
         });
 
     [Fact]

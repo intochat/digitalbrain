@@ -257,8 +257,8 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
 
     private readonly SignalEgressBus _egressBus = new();
     private const string ResponderPackName = "TelegramResponderNeuron";
-    private const string WatcherPackName   = "KeywordWatcherNeuron";
-    private const string N1Scope           = "n1-reactivity-user";
+    private const string WatcherPackName = "KeywordWatcherNeuron";
+    private const string N1Scope = "n1-reactivity-user";
     private string? _configScope;
     private HomeFeedBus? _homeFeedBusInstance;
 
@@ -333,18 +333,18 @@ public sealed class TelegramN1ReactivitySteps : NeuronTestBase
         var values = new Dictionary<string, string>
         {
             ["telegram_token"] = token,
-            ["llm_provider"]   = provider,
-            ["llm_key"]        = key,
-            ["pack"]           = ResponderPackName,
-            ["scope"]          = _configScope,
-            ["clientId"]       = "test"
+            ["llm_provider"] = provider,
+            ["llm_key"] = key,
+            ["pack"] = ResponderPackName,
+            ["scope"] = _configScope,
+            ["clientId"] = "test"
         };
         var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(values);
 
         await gateway.Send(new SynapseEnvelope
         {
             TypeName = nameof(ConfigurationProvided),
-            Payload  = global::Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
     }
 
