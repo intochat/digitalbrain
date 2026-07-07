@@ -134,9 +134,15 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
 
         var cmd = new
         {
-            PackName = packName, Version = version, Code = code, OwnerId = owner,
-            IsPrivate = false, CommissionRate = commissionRate, Description = description,
-            AuthorPublicKeyBase64 = signed.AuthorPublicKeyBase64, SignatureBase64 = signed.SignatureBase64
+            PackName = packName,
+            Version = version,
+            Code = code,
+            OwnerId = owner,
+            IsPrivate = false,
+            CommissionRate = commissionRate,
+            Description = description,
+            AuthorPublicKeyBase64 = signed.AuthorPublicKeyBase64,
+            SignatureBase64 = signed.SignatureBase64
         };
         var payload = System.Text.Json.JsonSerializer.Serialize(cmd);
 
