@@ -1,5 +1,12 @@
 # Deploy status — sub-project A (Azure Deploy Foundation)
 
+## LIVE (2026-07-07) — custom domain migration
+
+- Frontend target: `www.digitalbrain.tech` on Azure Static Web Apps (`digitalbrain-web-prod`).
+- Apex target: `digitalbrain.tech` forwards to `www.digitalbrain.tech` at GoDaddy because the Static Web App currently has no `stableInboundIP` for a GoDaddy apex `A` record.
+- Backend target: `api.digitalbrain.tech` on Azure Container Apps (`digitalbrain-jobs`) with an Azure-managed certificate.
+- Release deploys build Flutter with `KERNEL_ENDPOINT=https://api.digitalbrain.tech` and validate custom frontend/backend domains after deployment.
+
 ## LIVE (2026-06-23) — Elon Algorithm Pass 1 applied
 
 The vendored `DeploymentKit` (308 files / ~33k LOC) was deleted and replaced by a single ~237-line

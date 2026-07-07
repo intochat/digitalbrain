@@ -20,6 +20,8 @@ authenticates the pull with the same Docker Hub PAT via `RegistryCredentialsArgs
 - Checkpoint encryption key (required): from `secrets.CHECKPOINT_KEY` as DIGITALBRAIN_CHECKPOINT_KEY or local `pulumi config set --secret checkpointKey`
 - Docker Hub PAT (required, read/write for CI push and ACA pull): from `secrets.DOCKERHUB_TOKEN` as DIGITALBRAIN_DOCKERHUB_TOKEN or local `pulumi config set --secret dockerHubToken`
 - Static Web App: `digitalbrain-web-prod`, created/read by the release workflow through Azure CLI, then deployed with `Azure/static-web-apps-deploy@v1`
+- Production domains: `www.digitalbrain.tech` for Flutter web and `api.digitalbrain.tech` for the kernel Container App. The release workflow keeps these custom hostnames registered and builds Flutter with `KERNEL_ENDPOINT=https://api.digitalbrain.tech`.
+- Optional GitHub Actions vars can override the defaults: `DIGITALBRAIN_WEB_HOSTNAME`, `DIGITALBRAIN_WEB_APEX_HOSTNAME`, and `DIGITALBRAIN_KERNEL_HOSTNAME`. The workflow passes those through to Pulumi so backend CORS stays aligned. For local Pulumi verification, the equivalent config keys are `webHostname`, `webApexHostname`, `kernelHostname`, and `staticWebAppsHostname`.
 
 Local (for verification only; prod deploys are GH Actions only):
 
