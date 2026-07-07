@@ -22,6 +22,9 @@ public static class GoogleAuthSurfaces
             }));
         }
 
+        // Add direct link to Google Cloud Console for easy credential creation (UX improvement).
+        children.Insert(1, UiContracts.NeuronUiKit.BuildLink("Open Google Cloud Console", "https://console.cloud.google.com/apis/credentials/create"));
+
         var buttonProps = new Dictionary<string, object?>
         {
             ["label"] = "Login via Google",

@@ -38,6 +38,7 @@ import 'ui_text_field.dart';
 import 'ui_tile.dart';
 import 'ui_toast.dart';
 import 'ui_tooltip.dart';
+import 'ui_link.dart';
 
 // Maps a ui:* node (type already lower-cased by the tree renderer) to its ForUI cover widget.
 // [buildChild] recurses back into the tree renderer for container children (ui:Screen, ui:Panel).
@@ -64,6 +65,8 @@ Widget buildUiNode(
       return UiKitPanel(children: kids());
     case 'ui:text':
       return UiKitText(text: s('text'));
+    case 'ui:link':
+      return UiKitLink(label: s('label'), url: s('url'));
     case 'ui:textfield':
       return UiKitTextField(
         name: s('name'),

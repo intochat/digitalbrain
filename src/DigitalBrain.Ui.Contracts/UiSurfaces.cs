@@ -133,6 +133,7 @@ public static class NeuronUiKit
     public const string Select = "forui:FSelect";
     public const string Notification = "forui:FNotification";
     public const string Toast = "forui:Toast";
+    public const string Link = "ui:Link";
 
     // Self-explanatory helpers for common tree nodes (used by emitters; keep emission sites small).
     public static UiWidgetTree BuildMenuItem(string label, string? targetSurfaceKind = null, IReadOnlyDictionary<string, object?>? action = null)
@@ -155,6 +156,9 @@ public static class NeuronUiKit
 
     public static UiWidgetTree BuildSidebar(string title, IReadOnlyList<UiWidgetTree> items)
         => new(Sidebar, new Dictionary<string, object?> { ["title"] = title }, items);
+
+    public static UiWidgetTree BuildLink(string label, string url)
+        => new(Link, new Dictionary<string, object?> { ["label"] = label, ["url"] = url });
 }
 
 // Curated UI-kit vocabulary (Slice 0). Each node is a thin ForUI cover on the client.
@@ -198,6 +202,7 @@ public static class UiKitVocabulary
     public const string Toast = "ui:Toast";
     public const string Table = "ui:Table";
     public const string GraphCanvas = "ui:GraphCanvas";
+    public const string Link = "ui:Link";
 }
 
 [GenerateSerializer]
