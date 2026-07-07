@@ -107,7 +107,7 @@ namespace DigitalBrain.Tests.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/NeuronCore.feature.ndjson", 10);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/NeuronCore.feature.ndjson", 11);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -478,6 +478,46 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
 #line 65
   await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-dashboard\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Automation reactions survive replay after deactivation (kernel restart durable jo" +
+            "urnals)")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "DigitalBrain Neuron Core")]
+        [global::Xunit.TraitAttribute("Description", "Automation reactions survive replay after deactivation (kernel restart durable jo" +
+            "urnals)")]
+        public async global::System.Threading.Tasks.Task AutomationReactionsSurviveReplayAfterDeactivationKernelRestartDurableJournals()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "8";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Automation reactions survive replay after deactivation (kernel restart durable jo" +
+                    "urnals)", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 68
+this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 69
+  await testRunner.GivenAsync("a demo neuron \"automation-restart\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 70
+  await testRunner.WhenAsync("I fire a ProbeMessageSynapse with text \"automation-restart-test\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 71
+  await testRunner.ThenAsync("the timeline contains a ProbeMessageSynapse", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 72
+  await testRunner.AndAsync("replaying shows the message", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();
