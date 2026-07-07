@@ -59,7 +59,7 @@ public class PackAlcEmbodierTests
                 public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
                 {
                     var sig = (DigitalBrain.Core.Signal)synapse;
-                    var text = sig.Payload?["text"]?.ToString() ?? "";
+                    var text = sig.Props?["text"]?.ToString() ?? "";
                     return new DigitalBrain.Core.Synapse[]
                     {
                         new DigitalBrain.Core.Distribution.PackEmission("", text, "typed:" + text)

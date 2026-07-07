@@ -534,18 +534,18 @@ public class NeuronTests : NeuronTestBase
                     var message = (DigitalBrain.Core.ProbeMessageSynapse)synapse;
                     var props = new System.Collections.Generic.Dictionary<string, object?>
                     {
-                        [DigitalBrain.Core.UiSurfaceKeys.SurfaceId] = "surface-" + message.Text,
-                        [DigitalBrain.Core.UiSurfaceKeys.Emitter] = "SurfacePack",
-                        [DigitalBrain.Core.UiSurfaceKeys.Title] = "Pack surface",
-                        [DigitalBrain.Core.UiSurfaceKeys.Priority] = 10,
-                        [DigitalBrain.Core.UiSurfaceKeys.RequiresInput] = false,
-                        [DigitalBrain.Core.UiSurfaceKeys.Layout] = DigitalBrain.Core.UiSurfaceLayouts.Panel,
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.SurfaceId] = "surface-" + message.Text,
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Emitter] = "SurfacePack",
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Title] = "Pack surface",
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Priority] = 10,
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.RequiresInput] = false,
+                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Layout] = DigitalBrain.Ui.Contracts.UiSurfaceLayouts.Panel,
                         ["message"] = message.Text
                     };
 
                     return new DigitalBrain.Core.Synapse[]
                     {
-                        new DigitalBrain.Core.UiSurface(DigitalBrain.Core.UiSurfaceKinds.TaskWindow, props)
+                        new DigitalBrain.Ui.Contracts.UiSurface(DigitalBrain.Ui.Contracts.UiSurfaceKinds.TaskWindow, props)
                         {
                             CorrelationId = "pack-spoofed-correlation",
                             CausationId = "pack-spoofed-cause",
