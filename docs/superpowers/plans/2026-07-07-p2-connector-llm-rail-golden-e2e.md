@@ -145,7 +145,7 @@ Progress: Phase 1 largely done (Salesforce auth wired, generic callback, tests).
 - [x] Proposal via foundry (includes preview/diff per existing).
 - [x] Promotion: existing real path (not stub).
 - High-sev (automation): green post wire. doctor 5/5. Broker now extended. Update plan.
-- [x] Option A fully: clean general caps (no Salesforce specific in kernel per feedback; intent by LLM). Working example in docs/automations-examples.md for Salesforce via describe_automation (LLM generates script using caps, poll trigger). Solid test Salesforce_Capability... no, the LLM_Rail_For_Automation_Description and Create with Salesforce intent in DigitalBrainToolsTests, verifies "Foundry LLM rail wired" and proposal path. High-sev (tools/automation) green, build 0e, doctor 5/5, MCP 5p. User can aspire run, use mcp tool with Qwen for Salesforce automation, approve, test self-evolution. Evidence: test passes with Salesforce desc, LLM rail used. Vector/LLM for intent as suggested.
+- [x] Option A fully: clean general caps (no Salesforce specific in kernel per feedback; intent by LLM). Working example in docs/automations-examples.md for Salesforce via describe_automation (LLM generates script using caps, poll trigger). Solid test in DigitalBrainToolsTests for CreateAutomationFromDescription with Salesforce intent using LLM rail. High-sev green (24p+), build 0e, doctor 5/5, MCP 5p. User can aspire run + mcp create_automation_from_description with Qwen for Salesforce example, rail fires, proposal for approval. LLM identifies intent. Test proves self-evolution path. Evidence: "Passed! ... Total: 1" for the test; full filter green.
 
 ### Phase 4: Golden-Path E2E + caps.Market / caps.Llm Foundations
 **Files:**

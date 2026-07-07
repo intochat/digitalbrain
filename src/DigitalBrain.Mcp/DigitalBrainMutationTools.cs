@@ -263,7 +263,8 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
             $"Produce C# script and RegisterReaction payload (include Schedule/Poll trigger + caps from ICapabilityBroker manifest e.g. Http/Llm) for: {description}. Use approval rail.",
             TargetTier.Run,
             AutoApply: false));
-        return $"Foundry LLM rail wired for '{description}'. Proposal staged for approval (check timeline for diff/preview).";
+        var idPart = id != null ? $" (id={id})" : "";
+        return $"Foundry LLM rail wired for '{description}'{idPart}. Proposal staged for approval (check timeline for diff/preview).";
     }
 
     [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]
