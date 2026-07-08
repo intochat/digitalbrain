@@ -42,7 +42,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         foreach (var record in InoAgentCapabilities.KnownAgentRecords)
         {
-            InoIntentClassifier.RegisterCapability(record.ToClassifierCapability());
+            // Register to journal only (no static mutation). Projection removed per review.
             if (!HasCapabilityRegistration(record.Id, record.Origin))
             {
                 await FireAsync(record.ToCapabilityRegistered(), cancellationToken);
@@ -66,18 +66,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 await context.RememberAsync(record.ToMemoryText(), cancellationToken);
             }
 
-            var agentIds = InoAgentCapabilities.KnownAgentRecords
-                .Select(record => record.Id)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // Remember base classifier caps (no longer includes dynamically registered ones; they are journaled).
+            // Dynamic caps from journals are recalled via other paths (ContextNeuron + vector).
             foreach (var cap in InoIntentClassifier.Capabilities)
             {
-                if (agentIds.Contains(cap.Id))
-                {
-                    continue;
-                }
-
                 var text = $"capability:{cap.Id} {cap.Description} examples:{string.Join(" ", cap.Examples)} tier:{cap.Tier}";
-                // Remember will embed via Context and store as MemoryStored for vector recall
                 await context.RememberAsync(text, cancellationToken);
             }
         }
@@ -90,13 +83,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private void LoadCapabilitiesFromJournal()
     {
-        var regs = OutgoingJournal.Concat(IncomingJournal)
-            .OfType<CapabilityRegistered>();
-        foreach (var reg in regs)
-        {
-            InoIntentClassifier.RegisterCapability(new InoIntentClassifier.Capability(
-                reg.Id, reg.Description, reg.Examples.ToArray(), reg.Tier));
-        }
+        // Load is now purely for journal replay / future use. No mutation of classifier.
+        // Capabilities come from InoAgentCapabilities (known) + journaled CapabilityRegistered when needed.
+        _ = OutgoingJournal.Concat(IncomingJournal)
+            .OfType<CapabilityRegistered>()
+            .ToList();
     }
 
     public async Task HandleAsync(InoRequest req, CancellationToken cancellationToken = default)
@@ -174,7 +165,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (!InoCapabilityAnswers.TryCreateAnswer(
                 req.Prompt,
                 InoAgentCapabilities.KnownAgentRecords,
-                InoIntentClassifier.Capabilities,
+                InoIntentClassifier.Capabilities,  // base caps; IAgent ones come via KnownAgentRecords param (journals as source for dynamics)
                 out var answer))
         {
             return false;

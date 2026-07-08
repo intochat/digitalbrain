@@ -24,14 +24,14 @@ public class InoAwarenessTests
     [Fact]
     public void FakeAgent_Can_Project_To_Capability_Without_Editing_Classifier_List()
     {
-        var before = InoIntentClassifier.Capabilities.Count;
-
+        // Demonstrates projection from IAgent metadata without mutating any global classifier list (journals are source).
         var record = InoAgentCapabilities.FromAgent<ITestCalendarAgent>("calendar", "calendar-test");
-        InoIntentClassifier.RegisterCapability(record.ToClassifierCapability());
+        var cap = record.ToClassifierCapability();
 
-        Assert.True(InoIntentClassifier.Capabilities.Count >= before);
-        Assert.Contains(InoIntentClassifier.Capabilities, cap => cap.Id == "calendar");
+        // No RegisterCapability call; list mutation deleted. Use record directly or via journaled path.
+        Assert.Equal("calendar", cap.Id);
         Assert.Equal("IAgent", record.SourceKind);
+        Assert.Equal("System", record.TrustLevel);
     }
 
     [Fact]

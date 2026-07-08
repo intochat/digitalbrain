@@ -11,22 +11,19 @@ public static class InoIntentClassifier
 {
     public sealed record Capability(string Id, string Description, string[] Examples, string Tier = "generic");
 
-    private static readonly List<Capability> _caps =
+    // Base capabilities (core, non-dynamic). Dynamic capabilities (from IAgent, automations) come from
+    // journaled CapabilityRegistered + InoAgentCapabilities.KnownAgentRecords (projection removed; journals are source).
+    private static readonly IReadOnlyList<Capability> _baseCaps =
     [
         new Capability("automation_create", "Create a new reaction/automation", new[] { "when gmail then summarize", "if email then note in crm" }, "automation"),
         new Capability("llm_settings", "Change or view active LLM/model", new[] { "change llm to gpt", "llm settings" }, "generic"),
         new Capability("uikit_gallery", "Show UI component gallery", new[] { "ui kit gallery", "show components" }, "ui"),
     ];
 
-    public static IReadOnlyList<Capability> Capabilities => _caps;
+    public static IReadOnlyList<Capability> Capabilities => _baseCaps;
 
-    public static void RegisterCapability(Capability cap)
-    {
-        if (!_caps.Any(c => c.Id == cap.Id))
-        {
-            _caps.Add(cap);
-        }
-    }
+    // RegisterCapability deleted entirely (was source of global mutable state and test pollution).
+    // All registration flows through journaled CapabilityRegistered synapses + InoAgentCapabilities (IAgent metadata).
 
     public sealed record Classification(string Intent, double Confidence, string? Query = null, int? MaxResults = null);
 
@@ -164,11 +161,20 @@ public static class InoIntentClassifier
     }
 
     public static List<Capability> RetrieveCapabilities(string prompt) =>
-        KeywordCapabilities(prompt);
+        KeywordCapabilities(prompt, Capabilities);
+
+    public static List<Capability> RetrieveCapabilities(string prompt, IReadOnlyList<Capability> caps) =>
+        KeywordCapabilities(prompt, caps ?? Capabilities);
 
     public static async Task<List<Capability>> RetrieveCapabilitiesAsync(string prompt, IServiceProvider? services = null, CancellationToken cancellationToken = default)
     {
-        var keyword = KeywordCapabilities(prompt);
+        return await RetrieveCapabilitiesAsync(prompt, Capabilities, services, cancellationToken);
+    }
+
+    public static async Task<List<Capability>> RetrieveCapabilitiesAsync(string prompt, IReadOnlyList<Capability> caps, IServiceProvider? services = null, CancellationToken cancellationToken = default)
+    {
+        caps ??= Capabilities;
+        var keyword = KeywordCapabilities(prompt, caps);
 
         var vectorCaps = new List<Capability>();
         if (services != null)
@@ -185,7 +191,7 @@ public static class InoIntentClassifier
                         if (idMatch.Success)
                         {
                             var id = idMatch.Groups[1].Value;
-                            var cap = Capabilities.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
+                            var cap = caps.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
                             if (cap != null && !vectorCaps.Any(c => c.Id == cap.Id))
                             {
                                 vectorCaps.Add(cap);
@@ -214,10 +220,10 @@ public static class InoIntentClassifier
         return combined;
     }
 
-    private static List<Capability> KeywordCapabilities(string prompt)
+    private static List<Capability> KeywordCapabilities(string prompt, IReadOnlyList<Capability> caps)
     {
         var p = prompt.ToLowerInvariant();
-        return Capabilities
+        return caps
             .Where(c => p.Contains(c.Id) || c.Examples.Any(e => p.Contains(e.ToLowerInvariant())))
             .OrderByDescending(c => p.Contains(c.Id) ? 2 : 1)
             .Take(5)

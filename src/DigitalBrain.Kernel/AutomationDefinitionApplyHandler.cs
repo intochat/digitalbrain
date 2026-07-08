@@ -31,13 +31,12 @@ public sealed class AutomationDefinitionApplyHandler(IGrainFactory grains) : ISe
         await automation.FireAsync(staged.Script, ct);
         await automation.FireAsync(staged.Reaction, ct);
 
-        // Register capability for intent classifier / future vector index (part of modern intent arch)
+        // Capability registration is journal-only (CapabilityRegistered). Static classifier projection removed.
         var cap = new InoIntentClassifier.Capability(
             staged.Reaction.Id,
             $"Automation: when {staged.Reaction.When} target {staged.Reaction.Target}",
             new[] { proposal.Rationale ?? "" },
             "automation");
-        InoIntentClassifier.RegisterCapability(cap);
 
         await automation.FireAsync(new CapabilityRegistered(cap.Id, cap.Description, cap.Examples, cap.Tier, proposal.Origin), ct);
 

@@ -170,27 +170,24 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
     [Fact]
     public async Task CapabilityRegistry_Projection_And_Retrieve_Works_For_Intent()
     {
-        foreach (var record in InoAgentCapabilities.KnownAgentRecords)
-        {
-            InoIntentClassifier.RegisterCapability(record.ToClassifierCapability());
-        }
+        // Projection now via explicit lists (from journals + Known) passed to Retrieve overloads.
+        // No mutation of classifier. Tests the journal-derived path.
+        var caps = InoAgentCapabilities.KnownAgentRecords
+            .Select(r => r.ToClassifierCapability())
+            .ToList();
 
-        // Tests journal-driven registry projection path (Load/Register from journals) and Retrieve (Slice B: keyword + Context.RecallAsync top-k for vector grounding).
         var cap = new InoIntentClassifier.Capability(
             "test-gsf-followup",
             "Cross Gmail to Salesforce follow-up using journal memory",
             new[] { "find salesforce for last email", "related crm from gmail" },
             "g-sf");
+        caps.Add(cap);
 
-        var beforeCount = InoIntentClassifier.Capabilities.Count;
-        InoIntentClassifier.RegisterCapability(cap);
-        Assert.True(InoIntentClassifier.Capabilities.Count >= beforeCount, "Register should add to in-memory registry projection");
-
-        // Verify Retrieve (and async with recall hook) works for known + new registry entries.
-        var retrieved = InoIntentClassifier.RetrieveCapabilities("salesforce accounts");
+        // Verify Retrieve using explicit caps list (as would come from journal load).
+        var retrieved = InoIntentClassifier.RetrieveCapabilities("salesforce accounts", caps);
         Assert.Contains(retrieved, c => c.Id == "salesforce");
 
-        var retrievedAsync = await InoIntentClassifier.RetrieveCapabilitiesAsync("salesforce related", null);
+        var retrievedAsync = await InoIntentClassifier.RetrieveCapabilitiesAsync("salesforce related", caps, null);
         Assert.Contains(retrievedAsync, c => c.Id == "salesforce");
     }
 
@@ -227,6 +224,11 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
         var jira = await InoTestHarness.Interact(ino, "do you have Jira?", clientId: "capability-specific-client");
         Assert.Contains("No.", jira.ResponseText);
         Assert.Contains("will not claim", jira.ResponseText);
+
+        // Variant not in old phrase list: structured record match on id/alias should still answer from catalog (no LLM).
+        var gmailVariant = await InoTestHarness.Interact(ino, "is gmail available?", clientId: "capability-specific-client");
+        Assert.Contains("Yes.", gmailVariant.ResponseText);
+        Assert.Contains("Gmail", gmailVariant.ResponseText);
     }
 
     [Fact]
