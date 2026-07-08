@@ -81,7 +81,7 @@ public sealed class UiGatewayService(
             {
                 if (p.ValueKind == JsonValueKind.Object)
                 {
-                    props = JsonSerializer.Deserialize<Dictionary<string, object?>>(p.GetRawText()) ?? [];
+                    props = JsonSerializer.Deserialize<Dictionary<string, object?>>(p.GetRawText(), SynapsePayloadJson.Options) ?? [];
                 }
             }
             if (string.IsNullOrWhiteSpace(synapseType) && root.TryGetProperty("action", out var act) && act.ValueKind == JsonValueKind.Object)
@@ -93,7 +93,7 @@ public sealed class UiGatewayService(
 
                 if (act.TryGetProperty("props", out p) && p.ValueKind == JsonValueKind.Object)
                 {
-                    props = JsonSerializer.Deserialize<Dictionary<string, object?>>(p.GetRawText()) ?? [];
+                    props = JsonSerializer.Deserialize<Dictionary<string, object?>>(p.GetRawText(), SynapsePayloadJson.Options) ?? [];
                 }
             }
         }
