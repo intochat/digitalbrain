@@ -17,6 +17,24 @@ public record InoRequest(
 public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) : Synapse(nameof(InoResponse), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.ContextEvidenceRef")]
+public record ContextEvidenceRef(
+    [property: Id(0)] string EvidenceId,
+    [property: Id(1)] string SourceKind,
+    [property: Id(2)] string SourceId,
+    [property: Id(3)] string TrustLevel,
+    [property: Id(4)] string? CorrelationId = null,
+    [property: Id(5)] string? CausationId = null);
+
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.ContextPacketSelected")]
+public record ContextPacketSelected(
+    [property: Id(0)] string PacketId,
+    [property: Id(1)] string WorkspaceId,
+    [property: Id(2)] IReadOnlyList<ContextEvidenceRef> Evidence,
+    [property: Id(3)] int EstimatedSize) : Synapse(nameof(ContextPacketSelected), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
 [Alias("DigitalBrain.Core.MemorySummary")]
 public record MemorySummary(
     string Topic,

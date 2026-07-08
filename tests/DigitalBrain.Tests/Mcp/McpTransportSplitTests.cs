@@ -20,7 +20,7 @@ public class McpTransportSplitTests
     {
         var read = ToolNames<DigitalBrainReadTools>();
         Assert.Equal(
-            new[] { "get_timeline", "get_workbench_surfaces", "ping_digitalbrain" }.OrderBy(n => n),
+            new[] { "get_causal_lineage", "get_timeline", "get_workbench_surfaces", "ping_digitalbrain" }.OrderBy(n => n),
             read.OrderBy(n => n));
     }
 

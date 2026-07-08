@@ -13,8 +13,6 @@ public static class InoIntentClassifier
 
     private static readonly List<Capability> _caps =
     [
-        new Capability("gmail", "Read or act on Gmail messages", new[] { "show my emails", "last gmail from boss" }, "gmail"),
-        new Capability("salesforce", "Query Salesforce CRM accounts/contacts", new[] { "list salesforce accounts", "salesforce from Acme" }, "salesforce"),
         new Capability("automation_create", "Create a new reaction/automation", new[] { "when gmail then summarize", "if email then note in crm" }, "automation"),
         new Capability("llm_settings", "Change or view active LLM/model", new[] { "change llm to gpt", "llm settings" }, "generic"),
         new Capability("uikit_gallery", "Show UI component gallery", new[] { "ui kit gallery", "show components" }, "ui"),
@@ -41,6 +39,16 @@ public static class InoIntentClassifier
         }
 
         var p = prompt.ToLowerInvariant();
+
+        if (InoExplanationFormatter.IsExplanationQuestion(prompt))
+        {
+            return new("explain", 0.95);
+        }
+
+        if (InoCapabilityAnswers.IsCapabilityQuestion(prompt))
+        {
+            return new("capability_status", 0.95);
+        }
 
         int? max = null;
         if (p.Contains("last") || p.Contains("latest") || p.Contains("most recent"))
@@ -133,7 +141,7 @@ public static class InoIntentClassifier
                                "Reply with ONLY a single JSON object: {\"intent\":\"gmail\",\"confidence\":0.92}. " +
                                "Ground on these capabilities (use best match):\n";
 
-            var fullPrompt = sys + capsText + "\nUser request: " + prompt;
+            var fullPrompt = sys + capsText + "\nUser request: " + SecretText.Redact(prompt);
             var response = await chat.GetResponseAsync(fullPrompt, cancellationToken: cancellationToken);
 
             var text = response.Text?.Trim() ?? "";

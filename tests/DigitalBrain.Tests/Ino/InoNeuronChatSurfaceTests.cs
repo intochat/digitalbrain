@@ -31,7 +31,9 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
         Assert.Equal(UiKitVocabulary.Text, tree.Type);
-        Assert.Contains("no-llm", tree.Props["text"]!.ToString());
+        Assert.Contains("Registered capabilities", tree.Props["text"]!.ToString());
+        Assert.Contains("Gmail", tree.Props["text"]!.ToString());
+        Assert.Contains("Salesforce", tree.Props["text"]!.ToString());
     }
 
     [Fact]
@@ -168,6 +170,11 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
     [Fact]
     public async Task CapabilityRegistry_Projection_And_Retrieve_Works_For_Intent()
     {
+        foreach (var record in InoAgentCapabilities.KnownAgentRecords)
+        {
+            InoIntentClassifier.RegisterCapability(record.ToClassifierCapability());
+        }
+
         // Tests journal-driven registry projection path (Load/Register from journals) and Retrieve (Slice B: keyword + Context.RecallAsync top-k for vector grounding).
         var cap = new InoIntentClassifier.Capability(
             "test-gsf-followup",
@@ -185,6 +192,56 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
 
         var retrievedAsync = await InoIntentClassifier.RetrieveCapabilitiesAsync("salesforce related", null);
         Assert.Contains(retrievedAsync, c => c.Id == "salesforce");
+    }
+
+    [Fact]
+    public async Task CapabilityQuestion_Answers_From_IAgent_Metadata_Without_Llm()
+    {
+        var ino = Grain<IInoNeuron>("ino-capabilities");
+
+        var result = await InoTestHarness.Interact(ino, "what can you do?", clientId: "capability-client");
+
+        Assert.Equal("capability_status", result.ClassifiedIntent);
+        Assert.Contains("Gmail", result.ResponseText);
+        Assert.Contains("Salesforce CRM", result.ResponseText);
+        Assert.Contains("source: IAgent", result.ResponseText);
+
+        var inventory = await InoTestHarness.Interact(
+            ino,
+            "Give a one sentence status of your available system capabilities.",
+            clientId: "capability-client");
+
+        Assert.Equal("capability_status", inventory.ClassifiedIntent);
+        Assert.Contains("Registered capabilities", inventory.ResponseText);
+    }
+
+    [Fact]
+    public async Task SpecificCapabilityQuestion_FailsClosed_For_Unknown_Capability()
+    {
+        var ino = Grain<IInoNeuron>("ino-capability-specific");
+
+        var gmail = await InoTestHarness.Interact(ino, "do you have Gmail?", clientId: "capability-specific-client");
+        Assert.Contains("Yes", gmail.ResponseText);
+        Assert.Contains("DigitalBrain.Google.IGmailNeuron", gmail.ResponseText);
+
+        var jira = await InoTestHarness.Interact(ino, "do you have Jira?", clientId: "capability-specific-client");
+        Assert.Contains("No.", jira.ResponseText);
+        Assert.Contains("will not claim", jira.ResponseText);
+    }
+
+    [Fact]
+    public async Task ExplainLastAction_Uses_Correlation_Lineage()
+    {
+        var ino = Grain<IInoNeuron>("ino-explain");
+
+        await InoTestHarness.Interact(ino, "what can you do?", clientId: "explain-client");
+        var explanation = await InoTestHarness.Interact(ino, "why did you do that?", clientId: "explain-client");
+
+        Assert.Equal("explain", explanation.ClassifiedIntent);
+        Assert.Contains("Correlation:", explanation.ResponseText);
+        Assert.Contains("User request: what can you do?", explanation.ResponseText);
+        Assert.Contains("InoRequest", explanation.ResponseText);
+        Assert.Contains("InoResponse", explanation.ResponseText);
     }
 
     [Fact]
@@ -380,6 +437,67 @@ public sealed class InoNeuronLlmTimeoutTests : NeuronTestBase
 
         var response = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().Last();
         Assert.Contains("local LLM is not ready", response.Response);
+    }
+}
+
+internal sealed class CapturingInoChatClient : IChatClient
+{
+    public static readonly List<string> Prompts = [];
+    public static readonly Queue<string> Replies = [];
+
+    public static void Reset()
+    {
+        Prompts.Clear();
+        Replies.Clear();
+    }
+
+    public Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var prompt = string.Concat(messages.Select(message => message.Text));
+        Prompts.Add(prompt);
+
+        var reply = Replies.Count > 0
+            ? Replies.Dequeue()
+            : "{\"intent\":\"generic\",\"confidence\":0.4}";
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
+    }
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Streaming not used.");
+
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    public void Dispose() { }
+}
+
+public sealed class InoNeuronSecretRedactionTests : NeuronTestBase
+{
+    protected override void ConfigureSilo(ISiloBuilder builder) =>
+        builder.ConfigureServices(services => services.AddSingleton<IChatClient, CapturingInoChatClient>());
+
+    [Fact]
+    public async Task Llm_Prompts_Redact_Secret_Shaped_User_Text()
+    {
+        CapturingInoChatClient.Reset();
+        CapturingInoChatClient.Replies.Enqueue("{\"intent\":\"generic\",\"confidence\":0.4}");
+        CapturingInoChatClient.Replies.Enqueue("Sanitized response.");
+
+        var ino = Grain<IInoNeuron>("ino-redaction");
+        var result = await InoTestHarness.Interact(
+            ino,
+            "tell me a joke access_token=raw-secret-123",
+            clientId: "redaction-client");
+
+        Assert.Equal("Sanitized response.", result.ResponseText);
+        var prompts = string.Join("\n---\n", CapturingInoChatClient.Prompts);
+        Assert.DoesNotContain("raw-secret-123", prompts);
+        Assert.Contains("access_token=[redacted]", prompts);
     }
 }
 

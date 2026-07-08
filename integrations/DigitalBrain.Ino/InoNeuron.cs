@@ -34,16 +34,48 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         await base.OnActivateAsync(ct);
         LoadCapabilitiesFromJournal();
+        await RegisterKnownAgentCapabilitiesAsync(ct);
         await RememberCapabilitiesAsync(ct);
     }
+
+    private async Task RegisterKnownAgentCapabilitiesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var record in InoAgentCapabilities.KnownAgentRecords)
+        {
+            InoIntentClassifier.RegisterCapability(record.ToClassifierCapability());
+            if (!HasCapabilityRegistration(record.Id, record.Origin))
+            {
+                await FireAsync(record.ToCapabilityRegistered(), cancellationToken);
+            }
+        }
+    }
+
+    private bool HasCapabilityRegistration(string id, string origin) =>
+        OutgoingJournal.Concat(IncomingJournal)
+            .OfType<CapabilityRegistered>()
+            .Any(reg => string.Equals(reg.Id, id, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(reg.Origin, origin, StringComparison.OrdinalIgnoreCase));
 
     private async Task RememberCapabilitiesAsync(CancellationToken cancellationToken)
     {
         try
         {
             var context = GrainFactory.GetGrain<IContextNeuron>(IContextNeuron.SingletonKey);
+            foreach (var record in InoAgentCapabilities.KnownAgentRecords)
+            {
+                await context.RememberAsync(record.ToMemoryText(), cancellationToken);
+            }
+
+            var agentIds = InoAgentCapabilities.KnownAgentRecords
+                .Select(record => record.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var cap in InoIntentClassifier.Capabilities)
             {
+                if (agentIds.Contains(cap.Id))
+                {
+                    continue;
+                }
+
                 var text = $"capability:{cap.Id} {cap.Description} examples:{string.Join(" ", cap.Examples)} tier:{cap.Tier}";
                 // Remember will embed via Context and store as MemoryStored for vector recall
                 await context.RememberAsync(text, cancellationToken);
@@ -71,6 +103,16 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (await TryHandleCapabilityQuestionAsync(req, workspaceId, cancellationToken))
+        {
+            return;
+        }
+
+        if (await TryHandleExplanationQuestionAsync(req, workspaceId, cancellationToken))
+        {
+            return;
+        }
 
         // Check for gallery early (before generic handler which always matches)
         var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider, cancellationToken);
@@ -125,6 +167,48 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 return;
             }
         }
+    }
+
+    private async Task<bool> TryHandleCapabilityQuestionAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken)
+    {
+        if (!InoCapabilityAnswers.TryCreateAnswer(
+                req.Prompt,
+                InoAgentCapabilities.KnownAgentRecords,
+                InoIntentClassifier.Capabilities,
+                out var answer))
+        {
+            return false;
+        }
+
+        await FireAsync(new InoResponse(req.Prompt, answer, []), cancellationToken);
+        await DeliverReplySurfaceAsync(answer, req.ClientId, workspaceId, cancellationToken);
+        return true;
+    }
+
+    private async Task<bool> TryHandleExplanationQuestionAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken)
+    {
+        if (!InoExplanationFormatter.IsExplanationQuestion(req.Prompt))
+        {
+            return false;
+        }
+
+        var correlationId = InoExplanationFormatter.TryExtractCorrelationId(req.Prompt)
+            ?? InoExplanationFormatter.ResolveLastCorrelationId(OutgoingJournal);
+
+        string reply;
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            reply = "I do not have enough lineage yet. No previous action with a correlation id is in my journal.";
+        }
+        else
+        {
+            var lineage = await GetCausalLineageAsync(correlationId, cancellationToken);
+            reply = InoExplanationFormatter.Format(correlationId, lineage);
+        }
+
+        await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
+        await DeliverReplySurfaceAsync(reply, req.ClientId, workspaceId, cancellationToken);
+        return true;
     }
 
     internal async Task HandleRelationGraphIntentAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken = default)
@@ -835,7 +919,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (summaries.Count > 0)
         {
             var bodies = string.Join("\n---\n", summaries.Select(s => s.Body));
-            await FireAsync(new MemorySummary("last-gmail", bodies, DateTimeOffset.UtcNow, workspaceId), cancellationToken);
+            await FireAsync(new MemorySummary("last-gmail", SecretText.Redact(bodies), DateTimeOffset.UtcNow, workspaceId), cancellationToken);
         }
 
         string? summary = null;
@@ -847,7 +931,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 : GetLastGmailBodiesFromJournal(workspaceId) ?? "";
             if (!string.IsNullOrWhiteSpace(bodiesToSummarize))
             {
-                summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + bodiesToSummarize, "", cancellationToken);
+                summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + SecretText.Redact(bodiesToSummarize), "", cancellationToken);
             }
         }
 
@@ -899,7 +983,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         if (records.Length > 0)
         {
-            await FireAsync(new MemorySummary("last-salesforce", string.Join("\n", records), DateTimeOffset.UtcNow, workspaceId), cancellationToken);
+            await FireAsync(new MemorySummary("last-salesforce", SecretText.Redact(string.Join("\n", records)), DateTimeOffset.UtcNow, workspaceId), cancellationToken);
         }
 
         await DeliverSalesforceRecordsSurfaceAsync(records, req.ClientId, workspaceId, cancellationToken);
@@ -1415,29 +1499,37 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         );
     }
 
-    private Task<string> BuildContextAsync(string prompt, string? workspaceId, CancellationToken cancellationToken = default)
+    private async Task<string> BuildContextAsync(string prompt, string? workspaceId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         workspaceId = WorkspaceIds.Effective(workspaceId);
-        var recentOut = OutgoingJournal.TakeLast(8).Select(s => s.Type + ":" + s.ToString()).ToList();
-        var recentIn = IncomingJournal.TakeLast(5).Select(s => "in:" + s.ToString()).ToList();
-
-        var completed = OutgoingJournal.OfType<TaskCompleted>().TakeLast(3);
-        var taskCtx = string.Join(";", completed.Select(t => t.TaskId + "=" + (t.Result ?? "")));
+        var recentOut = OutgoingJournal.TakeLast(8).ToList();
+        var recentIn = IncomingJournal.TakeLast(5).ToList();
+        var completed = OutgoingJournal.OfType<TaskCompleted>().TakeLast(3).ToList();
 
         var mems = OutgoingJournal
             .OfType<MemorySummary>()
             .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId)
-            .TakeLast(5);
-        var memCtx = string.Join(";", mems.Select(m => m.Topic + "=" + m.Summary));
+            .TakeLast(5)
+            .ToList();
 
         var automations = OutgoingJournal.Concat(IncomingJournal)
             .OfType<AutomationDefinitionStaged>()
             .TakeLast(3)
-            .Select(a => a.Reaction.Id + " when " + a.Reaction.When);
-        var automationCtx = string.Join(";", automations);
+            .ToList();
 
-        return Task.FromResult($"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nautomations:{automationCtx}");
+        var packet = InoContextPacketBuilder.Build(
+            prompt,
+            workspaceId,
+            recentOut,
+            recentIn,
+            completed,
+            mems,
+            automations,
+            InoAgentCapabilities.KnownAgentRecords);
+
+        await FireAsync(new ContextPacketSelected(packet.PacketId, workspaceId, packet.Evidence, packet.EstimatedSize), cancellationToken);
+        return packet.RenderForPrompt();
     }
 
     private DbSchemaInspected? LatestSuccessfulSchema(string? clientId, string? workspaceId)
@@ -1619,11 +1711,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
         if (chat == null)
         {
-            return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
+            return $"[no-llm] INO would act on: {SecretText.Redact(prompt)} (ctx len {context.Length})";
         }
 
         var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. ALWAYS answer the user's request directly and visibly first with the actual content (e.g. the joke, summary, fact or help). Put any TASK: or BRANCH: directives ONLY on their own separate lines AFTER the answer, and ONLY if user explicitly asked to create a task/automation/branch. Never output only a directive. For a plain request like 'tell a joke' or 'generate a joke' just reply with the joke text directly.";
-        var full = sys + "\nCTX:\n" + context + "\nUSER: " + prompt;
+        var full = sys + "\nCTX:\n" + context + "\nUSER: " + SecretText.Redact(prompt);
         var (text, _) = await GetChatTextOrFallbackAsync(chat, full, cancellationToken);
         return text;
     }
@@ -1633,13 +1725,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
         if (chat == null)
         {
-            return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
+            return $"[no-llm] INO would act on: {SecretText.Redact(prompt)} (ctx len {context.Length})";
         }
 
         var (text, _) = await GetChatTextOrFallbackAsync(
             chat,
             "Answer the user's request directly in one or two sentences. Do not output TASK or BRANCH directives.\nCTX:\n"
-            + context + "\nUSER: " + prompt,
+            + context + "\nUSER: " + SecretText.Redact(prompt),
             cancellationToken);
         return text;
     }
@@ -1775,7 +1867,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        var ctx = string.Join("\n", recent.Select(s => s.Type + ": " + s.ToString()));
+        var ctx = string.Join("\n", recent.Select(s => s.Type + ": " + SecretText.Redact(s.ToString() ?? string.Empty)));
         var prompt = "Summarize the following recent activity in DigitalBrain for personal assistant memory. One short topic + 1-sentence summary. Activity:\n" + ctx;
         var (summaryText, available) = await GetChatTextOrFallbackAsync(chat, prompt, cancellationToken);
         if (!available)
@@ -1785,8 +1877,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         if (summaryText.Length > 10)
         {
-            var topic = summaryText.Split('.')[0].Trim();
-            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0, 30) : topic, summaryText, DateTimeOffset.UtcNow, workspaceId);
+            var sanitizedSummary = SecretText.Redact(summaryText);
+            var topic = sanitizedSummary.Split('.')[0].Trim();
+            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0, 30) : topic, sanitizedSummary, DateTimeOffset.UtcNow, workspaceId);
             await FireAsync(mem, cancellationToken);
         }
     }

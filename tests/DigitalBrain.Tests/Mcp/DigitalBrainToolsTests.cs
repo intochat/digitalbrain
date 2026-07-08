@@ -133,5 +133,28 @@ public class DigitalBrainToolsTests : NeuronTestBase
             (await automation.GetOutgoingTimelineAsync()).OfType<AutomationDefinitionStaged>(),
             staged => staged.Reaction.Id == "sf-chat-example");
     }
+
+    [Fact]
+    public async Task GetCausalLineage_Returns_ReadOnly_Structured_Journal_Data()
+    {
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("what can you do?", "mcp-lineage-client"));
+
+        var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
+        var correlationId = response.CorrelationId ?? response.SynapseId;
+
+        var factory = new TestGrainFactory(this);
+        var readTools = new DigitalBrainReadTools(factory);
+        var json = await readTools.GetCausalLineage("ino-main", correlationId);
+
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        Assert.Equal("ino-main", document.RootElement.GetProperty("neuronId").GetString());
+        Assert.Equal(correlationId, document.RootElement.GetProperty("correlationId").GetString());
+        Assert.True(document.RootElement.GetProperty("count").GetInt32() > 0);
+
+        var entries = document.RootElement.GetProperty("entries").EnumerateArray().ToList();
+        Assert.Contains(entries, entry => entry.GetProperty("type").GetString() == nameof(InoRequest));
+        Assert.Contains(entries, entry => entry.GetProperty("type").GetString() == nameof(InoResponse));
+    }
 }
 

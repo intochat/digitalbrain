@@ -25,6 +25,7 @@ public sealed class KernelStartupWarmupService(
             await grainFactory.GetGrain<IDbSupportNeuron>(IDbSupportNeuron.SingletonKey).GetTimelineAsync(stoppingToken);
             await grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync(stoppingToken);
             await grainFactory.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey).GetTimelineAsync(stoppingToken);
+            await grainFactory.GetGrain<IInoNeuron>("ino-main").GetTimelineAsync(stoppingToken);
 
             // Activate the singleton LLM responder so it subscribes to the timeline at startup.
             await grainFactory.GetGrain<ILlmResponderNeuron>(ILlmResponderNeuron.SingletonKey).GetTimelineAsync(stoppingToken);

@@ -27,6 +27,49 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
         return string.Join("\n", lines);
     }
 
+    [McpServerTool(Name = "get_causal_lineage"), Description("Read-only causal lineage lookup for a neuron by CorrelationId or SynapseId. Returns sanitized structured JSON from journals.")]
+    public async Task<string> GetCausalLineage(
+        [Description("Neuron ID to query, e.g. 'ino-main', 'context-main', 'automation-main'")] string neuronId,
+        [Description("CorrelationId or SynapseId to inspect")] string correlationId,
+        [Description("Max number of recent lineage entries to include")] int maxEntries = 25,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            return JsonSerializer.Serialize(new
+            {
+                neuronId,
+                error = "correlationId is required"
+            }, SurfaceJsonOptions);
+        }
+
+        var neuron = ResolveNeuron(neuronId);
+        var lineage = await neuron.GetCausalLineageAsync(correlationId, cancellationToken);
+        var entries = lineage
+            .OrderBy(s => s.Timestamp)
+            .TakeLast(Math.Clamp(maxEntries, 1, 100))
+            .Select(s => new
+            {
+                s.Type,
+                s.SynapseId,
+                s.CorrelationId,
+                s.CausationId,
+                Timestamp = s.Timestamp,
+                Sender = s.Sender?.Value,
+                Receiver = s.Receiver?.Value,
+                Summary = SanitizeToolText(s.ToString() ?? string.Empty)
+            })
+            .ToArray();
+
+        return JsonSerializer.Serialize(new
+        {
+            neuronId,
+            correlationId,
+            count = entries.Length,
+            entries
+        }, SurfaceJsonOptions);
+    }
+
     [McpServerTool(Name = "get_workbench_surfaces"), Description("Return dynamic UiSurface JSON for the Flutter workbench, derived from task, graph, chart, and timeline journals. Pass comma-separated taskIds when the caller knows active kernel tasks.")]
     public async Task<string> GetWorkbenchSurfaces(
         [Description("Comma-separated kernel task ids to include, if known.")] string taskIds = "",
@@ -54,5 +97,41 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
             taskTimelines, graphTimeline, timeline, maxEvents, chartTimeline);
 
         return JsonSerializer.Serialize(surfaces, SurfaceJsonOptions);
+    }
+
+    private static string SanitizeToolText(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var text = value
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal);
+
+        foreach (var marker in new[] { "password", "secret", "token", "api_key", "apikey", "refresh_token", "access_token" })
+        {
+            var index = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            while (index >= 0)
+            {
+                var valueStart = text.IndexOfAny(['=', ':'], index);
+                if (valueStart < 0)
+                {
+                    break;
+                }
+
+                var valueEnd = text.IndexOfAny([' ', ',', ';', '}', ']'], valueStart + 1);
+                if (valueEnd < 0)
+                {
+                    valueEnd = text.Length;
+                }
+
+                text = text[..(valueStart + 1)] + "[redacted]" + text[valueEnd..];
+                index = text.IndexOf(marker, valueStart + "[redacted]".Length, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        return text.Length <= 500 ? text : text[..497] + "...";
     }
 }
