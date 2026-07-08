@@ -27,7 +27,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <!-- Real E2E: boot the full Aspire AppHost and drive it over real gRPC while packs embody and stream RfwCards/surfaces -->
+    <!-- AppHost model tests, gRPC-Web health coverage, and generated scenario-test support. -->
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Grpc.Net.Client.Web" />
     <PackageReference Include="Xunit.SkippableFact" />
@@ -46,7 +46,7 @@
     <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
-    <!-- For E2E collection fixture: boot the real Aspire AppHost model (alias to avoid Program type clash with the kernel host) -->
+    <!-- AppHost model tests load the real entry point; alias avoids Program type clash with the kernel host. -->
     <ProjectReference Include="..\..\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" Aliases="AppHostProject" />
     <!-- Kernel transitively references Mcp unaliased (DigitalBrain.Kernel.csproj:58); both projects use
          top-level statements, so both generate a global::Program, colliding in

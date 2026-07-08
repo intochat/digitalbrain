@@ -6,7 +6,7 @@ namespace DigitalBrain.Tests.Aspire;
 // Real, executed coverage for the builder.ExecutionContext.IsRunMode branching added to
 // AddDigitalBrain (storage emulator + Ollama container vs. AddConnectionString("qwen")
 // placeholder). Uses DistributedApplicationTestingBuilder.CreateAsync against the real
-// DigitalBrain.AppHost entry point (same reflection technique as DigitalBrainAppHostFixture)
+// DigitalBrain.AppHost entry point.
 // but deliberately stops after CreateAsync — never calling BuildAsync/StartAsync — so it only
 // inspects the declared resource graph. No Docker, no Orleans, no container start.
 public sealed class AddDigitalBrainExecutionModeTests
