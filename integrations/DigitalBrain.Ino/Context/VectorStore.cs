@@ -29,14 +29,19 @@ public sealed class InMemoryVectorStore : IVectorStore
     {
         var col = _collections.GetOrAdd(collection, _ => new ConcurrentDictionary<string, VectorRecord>());
         foreach (var record in records)
+        {
             col[record.Id] = record;
+        }
+
         return Task.CompletedTask;
     }
 
     public Task<VectorHit[]> SearchAsync(string collection, float[] query, int top = 5, CancellationToken ct = default)
     {
         if (!_collections.TryGetValue(collection, out var col))
+        {
             return Task.FromResult(Array.Empty<VectorHit>());
+        }
 
         var hits = col.Values
             .Select(r => new VectorHit(r.Id, HybridScorer.CosineSimilarity(query, r.Vector), r.Payload))

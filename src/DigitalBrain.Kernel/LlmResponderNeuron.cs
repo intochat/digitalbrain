@@ -11,7 +11,7 @@ namespace DigitalBrain.Kernel;
 public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ILlmResponderNeuron
 {
     // Cache scoped clients per (provider, key) so a chatty pack does not rebuild a client per message.
-    private readonly Dictionary<(string Provider, string? Key), IChatClient> _scopedClients = new();
+    private readonly Dictionary<(string Provider, string? Key), IChatClient> _scopedClients = [];
 
     public async Task HandleAsync(AskLlm ask, CancellationToken cancellationToken = default)
     {
@@ -42,9 +42,14 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
                     {
                         sysClient = factory.Create(sysProvider, k.Item2);
                         if (sysClient is not null)
+                        {
                             _scopedClients[k] = sysClient;
+                        }
                     }
-                    if (sysClient is not null) return sysClient;
+                    if (sysClient is not null)
+                    {
+                        return sysClient;
+                    }
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -55,14 +60,20 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
         }
 
         if (ask.ConfigPack is null)
+        {
             return global;
+        }
 
         if (factory is null || store is null)
+        {
             return global;
+        }
 
         var values = await store.GetAsync(ask.ConfigScope ?? "default", ask.ConfigPack, cancellationToken);
         if (!values.TryGetValue("llm_provider", out var provider) || string.IsNullOrWhiteSpace(provider))
+        {
             return global;
+        }
 
         values.TryGetValue("llm_key", out var apiKey);
         var key = (provider, string.IsNullOrEmpty(apiKey) ? null : apiKey);
@@ -70,7 +81,10 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
         {
             client = factory.Create(provider, key.Item2);
             if (client is null)
+            {
                 return global;
+            }
+
             _scopedClients[key] = client;
         }
 

@@ -1,14 +1,13 @@
-using DigitalBrain.Core;
-using DigitalBrain.Core.Distribution;
-using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
+using DigitalBrain.Core;
+using ModelContextProtocol.Server;
 
 namespace DigitalBrain.Mcp;
 
 using DigitalBrain.Ui.Contracts;
 
-// Mutating DigitalBrain MCP tools: fire side-effecting synapses, spend LLM tokens, or change marketplace/cluster
+// Mutating DigitalBrain MCP tools: fire side-effecting synapses, spend LLM tokens, or change cluster
 // state. Registered on trusted local stdio clients and on the dedicated local Aspire MCP host.
 [McpServerToolType]
 public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBrainToolsBase(grains)
@@ -28,9 +27,9 @@ public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBra
             : "Prompt fired to the LLM neuron, but no response is on the timeline yet (is Ollama running?).";
     }
 
-    [McpServerTool(Name = "fire_synapse"), Description("Fire a synapse (message) to any neuron by ID. Use for demo, system, marketplace etc. Returns confirmation.")]
+    [McpServerTool(Name = "fire_synapse"), Description("Fire a generic signal to any neuron by ID. Returns confirmation.")]
     public async Task<string> FireSynapse(
-        [Description("Neuron ID / grain key, e.g. 'demo-opt', 'llm-main', 'market-main'")] string neuronId,
+        [Description("Neuron ID / grain key, e.g. 'ino-main', 'llm-main', 'automation-main'")] string neuronId,
         [Description("The text or payload for the synapse (for DemoMessageSynapse)")] string text,
         CancellationToken cancellationToken = default)
     {
@@ -84,11 +83,14 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         // Extract just the text for simple callers
         using var doc = JsonDocument.Parse(resultJson);
         if (doc.RootElement.TryGetProperty("ResponseText", out var txt))
+        {
             return txt.GetString() ?? resultJson;
+        }
+
         return resultJson;
     }
 
-    [McpServerTool(Name = "ino_list_proposals"), Description("List recent staged SelfEvolutionProposals (automations, packs, code changes). Essential for testing the approval rail after creating automations via INO.")]
+    [McpServerTool(Name = "ino_list_proposals"), Description("List recent staged SelfEvolutionProposals for automation changes. Essential for testing the approval rail after creating automations via INO.")]
     public async Task<string> InoListProposals([Description("Optional client scope")] string client_id = "mcp-default", CancellationToken cancellationToken = default)
     {
         var selfEvo = Grains.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
@@ -253,7 +255,10 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         if (lib.Count > 0)
         {
             details.AppendLine("Script library entries (id, usage):");
-            foreach (var e in lib) details.AppendLine($"  - {e.Id} (uses:{e.UsageCount}) desc:{e.Description}");
+            foreach (var e in lib)
+            {
+                details.AppendLine($"  - {e.Id} (uses:{e.UsageCount}) desc:{e.Description}");
+            }
         }
         details.AppendLine("(AutomationSurface emitted to timeline for UI consumption.)");
         return details.ToString();
@@ -268,58 +273,30 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         return $"Removed reaction {id}.";
     }
 
-    [McpServerTool(Name = "create_automation_from_description"), Description("High-level sugar for Ino/LLM: describe in English like 'when personal-assistant activates then emit DailyBriefGenerated with name'. Internally creates real RegisterScript + Reaction using DefineReactionAsync. Returns confirmation.")]
+    [McpServerTool(Name = "create_automation_from_description"), Description("High-level sugar for Ino/LLM: describe in English and stage a conservative automation proposal for approval.")]
     public async Task<string> CreateAutomationFromDescription(
         [Description("Natural language description of the when-then automation")] string description,
         [Description("Optional explicit id, otherwise derived")] string? id = null,
         CancellationToken cancellationToken = default)
     {
-        // Wired to Foundry (P2): intent -> generated script + RegisterReaction (trigger + caps manifest) -> gate -> proposal with preview.
-        var loop = Grains.GetGrain<ICodeFoundryLoopNeuron>("foundry-main");
-        await loop.FireAsync(new FoundryRequest(
-            $"Produce C# script and RegisterReaction payload (include Schedule/Poll trigger + caps from ICapabilityBroker manifest e.g. Http/Llm) for: {description}. Use approval rail.",
-            TargetTier.Run,
-            AutoApply: false), cancellationToken);
-        var idPart = id != null ? $" (id={id})" : "";
-        return $"Foundry LLM rail wired for '{description}'{idPart}. Proposal staged for approval (check timeline for diff/preview).";
-    }
+        var reactionId = string.IsNullOrWhiteSpace(id)
+            ? "auto-" + Guid.NewGuid().ToString("N")[..10]
+            : id.Trim();
+        var descriptionLiteral = JsonSerializer.Serialize(description);
+        var scriptCode =
+            "return new[] { new Signal(\"AutomationRequested\", new Dictionary<string, object?> " +
+            "{ [\"description\"] = " + descriptionLiteral + ", [\"source\"] = \"mcp\" }) };";
 
-    [McpServerTool(Name = "run_closed_loop"), Description("Trigger a marketplace closed loop ('ui' for Dart MCP widget-tree authoring, 'se' for SoftwareEngineering runtime mod via Aspire MCP + LLM).")]
-    public async Task<string> RunClosedLoop(
-        [Description("Loop type: ui | se")] string loopType,
-        [Description("Prompt or task for the loop, e.g. inspect editor tree and improve")] string prompt,
-        CancellationToken cancellationToken = default)
-    {
-        var loop = Grains.GetGrain<IClosedLoopNeuron>("closedloop-main");
-        await loop.FireAsync(new ClosedLoopRequest(loopType, prompt), cancellationToken);
-        return $"ClosedLoop {loopType} triggered on the marketplace-installed experience.";
-    }
+        var proposalId = await StageAutomationDefinitionAsync(
+            reactionId,
+            "*",
+            null,
+            scriptCode,
+            "default",
+            "create_automation_from_description",
+            cancellationToken);
 
-    [McpServerTool(Name = "dart_ui_inspect_and_reload"), Description("Helper for the UI closed loop: connect Dart DTD, get the live widget tree, and hot reload after mods.")]
-    public static string DartUIInspect(
-        [Description("DTD uri from running flutter (copy from IDE or console)")] string dtdUri,
-        [Description("Whether to hot reload after inspect")] bool doReload = false)
-        => $"[UIClosedLoop] Connect dart DTD {dtdUri}, call get_widget_tree(summaryOnly=true), then hot_reload after the LLM proposes edits (doReload={doReload}).";
-
-    [McpServerTool(Name = "run_code_foundry")]
-    [Description("Generate, compile, and (Run) execute in-process or (Deploy) build+restart a new neuron. tier is 'Run' or 'Deploy'.")]
-    public async Task<string> RunCodeFoundry(
-        [Description("English spec of the code to generate")] string spec,
-        [Description("'Run' for Tier-1 in-process, 'Deploy' for Tier-2 durable")] string tier = "Run",
-        [Description("Apply automatically (requires trusted kernel config; default stages approval only)")] bool autoApply = false,
-        CancellationToken cancellationToken = default)
-    {
-        var parsedTier = string.Equals(tier, "Deploy", StringComparison.OrdinalIgnoreCase)
-            ? TargetTier.Deploy
-            : TargetTier.Run;
-
-        var loop = Grains.GetGrain<ICodeFoundryLoopNeuron>("foundry-main");
-        await loop.FireAsync(new FoundryRequest(spec, parsedTier, autoApply), cancellationToken);
-
-        var timeline = await loop.GetOutgoingTimelineAsync(cancellationToken);
-        var terminal = timeline.LastOrDefault(s =>
-            s.Type == nameof(FoundryCompleted) || s.Type == nameof(FoundryRolledBack));
-        return terminal?.Type ?? "FoundryRequest accepted (no terminal synapse yet).";
+        return $"Staged automation '{reactionId}' from description as proposal '{proposalId}'. Approve it with ino_approve_proposal before it becomes active.";
     }
 
     [McpServerTool(Name = "visualize_data"), Description("Infer a generic data-chart UiSurface from JSON rows and return the generated surface JSON. The Flutter UI renders this dynamically by UiSurface.kind.")]
@@ -375,43 +352,36 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
             case "CancelKernelTask":
                 {
                     var taskId = ReadString(props, "taskId");
-                    if (string.IsNullOrWhiteSpace(taskId)) return "CancelTask action requires props.taskId.";
+                    if (string.IsNullOrWhiteSpace(taskId))
+                    {
+                        return "CancelTask action requires props.taskId.";
+                    }
+
                     await Grains.GetGrain<INeuron>(taskId).FireAsync(new CancelTask(taskId), cancellationToken);
                     return $"Fired CancelTask for {taskId}.";
                 }
             case nameof(InoRequest):
                 {
                     var prompt = ReadString(props, "prompt") ?? ReadString(props, "text");
-                    if (string.IsNullOrWhiteSpace(prompt)) return "InoRequest action requires props.prompt.";
+                    if (string.IsNullOrWhiteSpace(prompt))
+                    {
+                        return "InoRequest action requires props.prompt.";
+                    }
+
                     var sessionId = ReadString(props, "sessionId");
                     await Grains.GetGrain<IInoNeuron>("ino-main").FireAsync(new InoRequest(prompt, sessionId), cancellationToken);
                     return "Fired InoRequest.";
                 }
-            case nameof(InstallFromMarketplace):
-                {
-                    var packName = ReadString(props, "packName");
-                    var version = ReadString(props, "version") ?? "0.1.0";
-                    var buyerId = ReadString(props, "buyerId") ?? "current-user";
-                    if (string.IsNullOrWhiteSpace(packName)) return "InstallFromMarketplace action requires props.packName.";
-                    await Grains.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new InstallFromMarketplace(packName, version, buyerId), cancellationToken);
-                    return $"Fired InstallFromMarketplace for {packName}@{version}.";
-                }
-            case nameof(ListPublished):
-                await Grains.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new ListPublished(), cancellationToken);
-                return "Fired ListPublished.";
             case nameof(RestartResource):
                 {
                     var resourceName = ReadString(props, "resourceName");
-                    if (string.IsNullOrWhiteSpace(resourceName)) return "RestartResource action requires props.resourceName.";
+                    if (string.IsNullOrWhiteSpace(resourceName))
+                    {
+                        return "RestartResource action requires props.resourceName.";
+                    }
+
                     await Grains.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new RestartResource(resourceName), cancellationToken);
                     return $"Fired RestartResource for {resourceName}.";
-                }
-            case nameof(ClosedLoopRequest):
-                {
-                    var loopType = ReadString(props, "loopType") ?? "ui";
-                    var prompt = ReadString(props, "prompt") ?? "Run installed closed loop";
-                    await Grains.GetGrain<IClosedLoopNeuron>("closedloop-main").FireAsync(new ClosedLoopRequest(loopType, prompt), cancellationToken);
-                    return $"Fired ClosedLoopRequest for {loopType}.";
                 }
             default:
                 {
@@ -422,48 +392,6 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         }
     }
 
-    [McpServerTool(Name = "publish_to_marketplace"), Description("Publish a pack/experience (e.g. generated neuron code) to the marketplace. Supports private and commission rate.")]
-    public async Task<string> PublishToMarketplace(
-        [Description("Pack name")] string packName,
-        [Description("Version, e.g. '0.1-dev'")] string version,
-        [Description("The code or content of the pack")] string code,
-        [Description("Owner ID")] string ownerId = "mcp-user",
-        [Description("Is private pack?")] bool isPrivate = false,
-        [Description("Commission rate e.g. 0.15 for 15%")] double commissionRate = 0.15,
-        CancellationToken cancellationToken = default)
-    {
-        var market = Grains.GetGrain<IMarketplaceNeuron>("market-main");
-        await market.FireAsync(new PublishToMarketplace(packName, version, code, ownerId, isPrivate, commissionRate), cancellationToken);
-        return $"Published '{packName}@{version}' to marketplace (private={isPrivate}, commission={commissionRate:P0}).";
-    }
-
-    [McpServerTool(Name = "install_from_marketplace"), Description("Install a pack from the marketplace. Triggers commission.")]
-    public async Task<string> InstallFromMarketplace(
-        [Description("Pack name to install")] string packName,
-        [Description("Version")] string version,
-        [Description("Buyer ID for commission tracking")] string buyerId = "mcp-buyer",
-        CancellationToken cancellationToken = default)
-    {
-        var market = Grains.GetGrain<IMarketplaceNeuron>("market-main");
-        await GetPublishedPacksWithLocalSeedsAsync(market, cancellationToken);
-        await market.FireAsync(new InstallFromMarketplace(packName, version, buyerId), cancellationToken);
-        return $"Installed '{packName}@{version}' for buyer '{buyerId}'. Commission should have been taken.";
-    }
-
-    [McpServerTool(Name = "promote_automations_to_pack"), Description("Thin promotion (priority 6): crystallize selected reaction ids + their scripts into a NeuroPack seed stub for the heavy publish/install pipeline. Example: promote 'my-auto' reactions to a named pack.")]
-    public async Task<string> PromoteAutomationsToPack(
-        [Description("Pack name for the crystallized output")] string packName,
-        [Description("Version e.g. 0.1.0")] string version,
-        [Description("Comma separated reaction ids to include")] string reactionIdsCsv,
-        [Description("Optional owner")] string ownerId = "automation-user",
-        CancellationToken cancellationToken = default)
-    {
-        // PromoteToPackAsync has no cancellable overload today; parameter accepted for MCP SDK binding only.
-        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
-        var ids = reactionIdsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        await auto.PromoteToPackAsync(packName, version, ids, ownerId);
-        return $"Promotion requested for {packName}@{version} covering {ids.Count} reactions. Watch for AutomationPromoted + crystallized signal.";
-    }
 }
 
 

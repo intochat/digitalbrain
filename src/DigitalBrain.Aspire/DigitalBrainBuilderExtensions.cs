@@ -15,7 +15,6 @@ public sealed class DigitalBrainContext
     public IResourceBuilder<IResourceWithConnectionString>? EmbeddingModel { get; init; }
     public required OrleansServiceClient OrleansClient { get; init; }
     public required int KernelReplicas { get; init; }
-    public required bool UseLocalMarketplace { get; init; }
     public required DigitalBrainModelRegistry ModelRegistry { get; init; }
 
     // The resolved LLM model name (e.g. "qwen2.5-coder:1.5b") for env injection.
@@ -165,7 +164,6 @@ public static class DigitalBrainBuilderExtensions
             EmbeddingModel = embeddingModel,
             OrleansClient = orleans.AsClient(),
             KernelReplicas = options.KernelReplicas,
-            UseLocalMarketplace = options.UseLocalMarketplace,
             ModelRegistry = options.ModelRegistry.Snapshot(),
             LlmModel = llmModel,
             LlmProvider = llmProvider,
@@ -186,8 +184,8 @@ public static class DigitalBrainBuilderExtensions
 
     /// <summary>
     /// Wires a kernel project with the core kernel features out of the box:
-    /// marketplace, dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
-    /// This makes the kernel (company brain) provide built-in capabilities (embodiment, status, tasks, etc.)
+    /// dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
+    /// This makes the kernel provide built-in capabilities (INO, automations, status, tasks, etc.)
     /// immediately when the kernel starts.
     /// </summary>
     public static IResourceBuilder<ProjectResource> WireKernelSilo(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
@@ -209,7 +207,6 @@ public static class DigitalBrainBuilderExtensions
             .WithExternalHttpEndpoints()
             .WithReplicas(ctx.KernelReplicas);
 
-        kernel.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
         // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks). Provider/model come from
@@ -385,7 +382,6 @@ public sealed class DigitalBrainOptions
             : llmModel;
 
     public int KernelReplicas { get; set; } = 3;
-    public bool UseLocalMarketplace { get; set; } = true;
 
     public bool EnableOrleansDashboard { get; set; } = true;
     public int? OrleansDashboardPort { get; set; } = 8080;

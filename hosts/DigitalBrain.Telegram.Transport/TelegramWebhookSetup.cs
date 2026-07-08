@@ -27,7 +27,9 @@ public sealed class TelegramWebhookSetup(
 
         var publicUrl = config.WebhookUrl;
         if (string.IsNullOrWhiteSpace(publicUrl) && !string.IsNullOrWhiteSpace(config.NgrokApiUrl))
+        {
             publicUrl = await ResolveNgrokUrlAsync(config.NgrokApiUrl, ct);
+        }
 
         if (string.IsNullOrWhiteSpace(publicUrl))
         {

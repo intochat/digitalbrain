@@ -9,7 +9,7 @@ using DigitalBrain.Ui.Contracts;
 // The base owns the ExperienceStep state machine, accumulates flow state, and emits each hop as a widget-tree surface.
 public abstract class KitExperience : IPackBehavior
 {
-    private readonly Dictionary<string, string> _state = new();
+    private readonly Dictionary<string, string> _state = [];
     private UiExperience? _definition;
 
     protected abstract UiExperience Define();
@@ -33,16 +33,28 @@ public abstract class KitExperience : IPackBehavior
 
     public IReadOnlyList<Synapse> Handle(Synapse synapse)
     {
-        if (synapse is not ExperienceStep step) return Array.Empty<Synapse>();
+        if (synapse is not ExperienceStep step)
+        {
+            return Array.Empty<Synapse>();
+        }
 
-        foreach (var (key, value) in step.Args) _state[key] = value;
+        foreach (var (key, value) in step.Args)
+        {
+            _state[key] = value;
+        }
 
         var experience = _definition ??= Define();
-        if (experience.Hops.Count == 0) return Array.Empty<Synapse>();
+        if (experience.Hops.Count == 0)
+        {
+            return Array.Empty<Synapse>();
+        }
 
         var hopId = step.EventName == "start" ? experience.Hops[0].Id : step.EventName;
         var hop = experience.Hops.FirstOrDefault(h => h.Id == hopId);
-        if (hop is null) return Array.Empty<Synapse>();
+        if (hop is null)
+        {
+            return Array.Empty<Synapse>();
+        }
 
         var screen = BuildScreen(hop, _state, experience.Id);
         return new Synapse[]

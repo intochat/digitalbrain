@@ -39,7 +39,9 @@ public sealed class SignalEgressBus
         foreach (var (_, subscriber) in _subscribers)
         {
             if (subscriber.Filter is null || subscriber.Filter.Contains(signal.Name))
+            {
                 subscriber.Channel.Writer.TryWrite(signal);
+            }
         }
     }
 
@@ -52,7 +54,9 @@ public sealed class SignalEgressBus
         public void Dispose()
         {
             if (owner._subscribers.TryRemove(id, out _))
+            {
                 channel.Writer.TryComplete();
+            }
         }
     }
 }

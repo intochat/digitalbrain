@@ -29,7 +29,6 @@ internal static class GatewaySendHandlers
 {
     public static IReadOnlyList<IGatewaySendHandler> Default { get; } =
     [
-        new GatewayMarketplaceSendHandler(),
         new GatewayAuthSessionSendHandler(),
         new GatewayConfigSendHandler(),
         new GatewayInoSendHandler(),
@@ -42,56 +41,6 @@ internal static class GatewaySendHandlers
 
     internal static string PayloadString(SynapseEnvelope request) =>
         System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
-}
-
-internal sealed class GatewayMarketplaceSendHandler : IGatewaySendHandler
-{
-    public async Task<bool> TryHandleAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
-    {
-        if (GatewaySendHandlers.TypeMatches(request, nameof(PublishToMarketplace)))
-        {
-            await PublishAsync(request, serverContext, context);
-            return true;
-        }
-
-        if (GatewaySendHandlers.TypeMatches(request, nameof(InstallFromMarketplace)))
-        {
-            await InstallAsync(request, serverContext, context);
-            return true;
-        }
-
-        return false;
-    }
-
-    private static async Task PublishAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
-    {
-        var market = context.Grains.GetGrain<IMarketplaceNeuron>("market-main");
-        var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
-        string Field(string key, string fallback = "") => p.TryGetValue(key, out var v) ? v?.ToString() ?? fallback : fallback;
-        var packName = Field("packName", Field("name", request.CorrelationId));
-        var isPrivate = bool.TryParse(Field("isPrivate"), out var priv) && priv;
-        var commissionRate = double.TryParse(Field("commissionRate"), System.Globalization.CultureInfo.InvariantCulture, out var cr) ? cr : 0.10;
-        var price = decimal.TryParse(Field("price"), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var pr) ? pr : 0m;
-        await market.FireAsync(new PublishToMarketplace(
-            packName, Field("version"), Field("code"), Field("ownerId", "anonymous"),
-            isPrivate, commissionRate, Field("description"),
-            Field("authorPublicKeyBase64"), Field("signatureBase64"), price), serverContext.CancellationToken);
-    }
-
-    private static async Task InstallAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
-    {
-        var market = context.Grains.GetGrain<IMarketplaceNeuron>("market-main");
-        var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
-        var packName = p.TryGetValue("packName", out var pn) ? pn?.ToString() ?? p.GetValueOrDefault("name")?.ToString() ?? "" : "";
-        var ver = p.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "";
-        var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
-        var installSession = await context.ResolveSessionByClientIdAsync(clientId);
-        var buyer = installSession?.UserId.Value ?? "anonymous";
-        if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId;
-        await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer, clientId), serverContext.CancellationToken);
-    }
 }
 
 internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
@@ -137,7 +86,9 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
         var authClientId = authProps.TryGetValue("clientId", out var authCid) ? authCid?.ToString() : null;
         var authSession = await context.ResolveSessionByClientIdAsync(authClientId);
         if (authSession is null)
+        {
             throw new RpcException(new Status(StatusCode.Unauthenticated, "A real login session is required to connect Google."));
+        }
 
         var auth = context.Grains.GetGrain<IGoogleAuthNeuron>(authSession.UserId.Value);
         var signal = new Signal(GoogleSignals.AuthRequested, authProps)
@@ -162,7 +113,9 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
         var authClientId = authProps.TryGetValue("clientId", out var authCid) ? authCid?.ToString() : null;
         var authSession = await context.ResolveSessionByClientIdAsync(authClientId);
         if (authSession is null)
+        {
             throw new RpcException(new Status(StatusCode.Unauthenticated, "A real login session is required to connect Salesforce."));
+        }
 
         var auth = context.Grains.GetGrain<ISalesforceAuthNeuron>(authSession.UserId.Value);
         var signal = new Signal(SalesforceSignals.AuthRequested, authProps)
@@ -176,7 +129,7 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
     {
         var session = context.Grains.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
+        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? [];
         var username = p.TryGetValue("username", out var u) ? u?.ToString() ?? "" : "";
         var password = p.TryGetValue("password", out var pw) ? pw?.ToString() ?? "" : "";
         var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
@@ -187,7 +140,7 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
     {
         var session = context.Grains.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
+        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? [];
         var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
         var logoutSession = await context.ResolveSessionByClientIdAsync(clientId);
         await session.FireAsync(new LogoutRequest(logoutSession?.SessionId ?? "", clientId), serverContext.CancellationToken);
@@ -204,7 +157,9 @@ internal sealed class GatewayConfigSendHandler : IGatewaySendHandler
         }
 
         if (context.PackConfigStore is null)
+        {
             throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pack config store is not configured."));
+        }
 
         var payloadStr = GatewaySendHandlers.PayloadString(request);
         var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
@@ -216,7 +171,9 @@ internal sealed class GatewayConfigSendHandler : IGatewaySendHandler
         var configSession = await context.ResolveSessionByClientIdAsync(Field("clientId"));
         var callerOwnScope = configSession is not null ? PackConfigScopes.ForUser(configSession.UserId) : null;
         if (scope != PackConfigScopes.App && scope != callerOwnScope)
+        {
             throw new RpcException(new Status(StatusCode.PermissionDenied, $"Scope '{scope}' is not permitted for this caller."));
+        }
 
         var controlKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -273,7 +230,7 @@ internal sealed class GatewayExperienceStepSendHandler : IGatewaySendHandler
         }
 
         var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(payloadStr) ?? new();
+        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(payloadStr) ?? [];
         var pack = p.GetValueOrDefault("pack", "");
         var experienceId = p.GetValueOrDefault("experienceId", "");
         var eventName = p.GetValueOrDefault("eventName", "start");
@@ -290,14 +247,16 @@ internal sealed class GatewayGenericSignalSendHandler : IGatewaySendHandler
     public async Task<bool> TryHandleAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
         if (string.IsNullOrWhiteSpace(request.TypeName))
+        {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Empty synapse type"));
+        }
 
         GatewayInternalAuth.Enforce(context.Configuration, context.Environment, context.Logger, serverContext, nameof(GatewayService.Send));
 
         var payloadJson = GatewaySendHandlers.PayloadString(request);
         var rawProps = string.IsNullOrWhiteSpace(payloadJson)
-            ? new Dictionary<string, object?>()
-            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? new();
+            ? []
+            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? [];
         var signalProps = GatewayPayload.NormalizeJsonProps(rawProps);
 
         if (string.Equals(request.TypeName, TelegramSignals.MessageReceived, StringComparison.Ordinal)

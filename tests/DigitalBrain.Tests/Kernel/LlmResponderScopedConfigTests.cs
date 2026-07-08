@@ -15,7 +15,7 @@ namespace DigitalBrain.Tests.Kernel;
 // never the global IChatClient.
 public sealed class RecordingScopedChatClientFactory : IScopedChatClientFactory
 {
-    public readonly List<(string Provider, string? ApiKey)> Requests = new();
+    public readonly List<(string Provider, string? ApiKey)> Requests = [];
 
     public IChatClient? Create(string provider, string? apiKey)
     {
@@ -47,8 +47,10 @@ internal sealed class ScopedPrefixChatClient : IChatClient
 }
 
 // Emitter that broadcasts an AskLlm carrying a config reference.
+[Alias("DigitalBrain.Tests.Kernel.IScopedAskLlmEmitter")]
 public interface IScopedAskLlmEmitter : INeuron
 {
+    [Alias("BroadcastScopedAskAsync")]
     Task BroadcastScopedAskAsync(
         string prompt, string replyType, IReadOnlyDictionary<string, object?> replyProps,
         string? configPack, string? configScope);
@@ -58,6 +60,7 @@ public interface IScopedAskLlmEmitter : INeuron
     // and responder must share a silo to read the same plaintext — the tests rely on NeuronTestBase's
     // single-silo default (a 2-silo cluster placed them nondeterministically, which made these tests flaky
     // before this was pinned).
+    [Alias("StoreConfigAsync")]
     Task StoreConfigAsync(string scope, string pack, Dictionary<string, string> values);
 }
 
@@ -88,7 +91,7 @@ public sealed class ScopedLlmResponderSiloConfigurator(RecordingScopedChatClient
 // Returns null for every Create call — simulates the graceful-fallback path (e.g. openai with no key).
 public sealed class NullScopedChatClientFactory : IScopedChatClientFactory
 {
-    public readonly List<(string Provider, string? ApiKey)> Requests = new();
+    public readonly List<(string Provider, string? ApiKey)> Requests = [];
 
     public IChatClient? Create(string provider, string? apiKey)
     {

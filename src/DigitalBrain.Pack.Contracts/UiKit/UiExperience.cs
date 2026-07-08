@@ -9,7 +9,7 @@ public sealed class UiExperience
 {
     public string Id { get; }
     public string Name { get; }
-    internal List<UiHop> Hops { get; } = new();
+    internal List<UiHop> Hops { get; } = [];
 
     internal UiExperience(string id, string name)
     {
@@ -31,7 +31,7 @@ public sealed class UiExperience
 public sealed class UiHop
 {
     public string Id { get; }
-    internal List<Func<IReadOnlyDictionary<string, string>, UiWidgetTree>> Factories { get; } = new();
+    internal List<Func<IReadOnlyDictionary<string, string>, UiWidgetTree>> Factories { get; } = [];
 
     internal UiHop(string id) => Id = id;
 
@@ -204,7 +204,11 @@ public sealed class UiHop
         Factories.Add(_ =>
         {
             var props = new Dictionary<string, object?> { ["title"] = title, ["subtitle"] = subtitle ?? string.Empty };
-            if (goTo is not null) props["eventName"] = goTo;
+            if (goTo is not null)
+            {
+                props["eventName"] = goTo;
+            }
+
             return new UiWidgetTree(UiKitVocabulary.Tile, props);
         });
         return this;

@@ -23,7 +23,10 @@ public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals j
             var prompt = $"Perform the task and output ONLY the concise result value: {cmd.Description}";
             var response = await chat.GetResponseAsync(prompt, cancellationToken: cancellationToken);
             result = response.Text.Trim();
-            if (string.IsNullOrWhiteSpace(result)) result = "completed:" + cmd.Description;
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                result = "completed:" + cmd.Description;
+            }
         }
         else
         {
@@ -74,19 +77,34 @@ public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals j
         var history = OutgoingJournal.Concat(IncomingJournal).ToList();
         var completed = history.OfType<TaskCompleted>().LastOrDefault();
         if (completed != null)
+        {
             return Task.FromResult(new TaskInfo(completed.TaskId, "completed", completed.Result));
+        }
+
         var cancelled = history.OfType<TaskCancelled>().LastOrDefault();
         if (cancelled != null)
+        {
             return Task.FromResult(new TaskInfo(cancelled.TaskId, "cancelled", null));
+        }
+
         var progress = history.OfType<TaskProgress>().LastOrDefault();
         if (progress != null)
+        {
             return Task.FromResult(new TaskInfo(progress.TaskId, "running:" + progress.Detail, null));
+        }
+
         var started = history.OfType<TaskStarted>().LastOrDefault();
         if (started != null)
+        {
             return Task.FromResult(new TaskInfo(started.TaskId, "running", null));
+        }
+
         var created = history.OfType<TaskCreated>().LastOrDefault();
         if (created != null)
+        {
             return Task.FromResult(new TaskInfo(created.TaskId, "created", null));
+        }
+
         var id = this.GetPrimaryKeyString() ?? "task";
         TaskId idTask = id;
         return Task.FromResult(new TaskInfo(idTask, "created", null));

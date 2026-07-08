@@ -1,9 +1,9 @@
+using System.Net;
+using System.Net.Http.Headers;
 using DigitalBrain.Core.Models;
 using DigitalBrain.Kernel.Voice;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net;
-using System.Net.Http.Headers;
 
 namespace DigitalBrain.Tests.Llm;
 

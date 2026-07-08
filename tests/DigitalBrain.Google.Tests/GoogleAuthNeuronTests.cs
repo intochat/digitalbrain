@@ -1,11 +1,11 @@
 using DigitalBrain.Core;
-using DigitalBrain.TestKit;
-using DigitalBrain.Kernel;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Kernel.Config;
 using DigitalBrain.Google;
-using Microsoft.Extensions.Logging;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Config;
+using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace DigitalBrain.Google.Tests;
@@ -35,8 +35,10 @@ public class GoogleAuthNeuronTests : NeuronTestBase
     }
 }
 
+[Alias("DigitalBrain.Google.Tests.IGoogleConfigWriter")]
 public interface IGoogleConfigWriter : INeuron
 {
+    [Alias("StoreConnectedAppConfigAsync")]
     Task StoreConnectedAppConfigAsync();
 }
 

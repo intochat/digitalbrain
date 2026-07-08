@@ -1,9 +1,9 @@
-using DigitalBrain.Core;
-using DigitalBrain.Core.Config;
-using Salesforce.Force;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Core;
+using DigitalBrain.Core.Config;
+using Salesforce.Force;
 
 namespace DigitalBrain.Salesforce;
 
@@ -47,7 +47,9 @@ public static class SalesforceClientFactory
 
         var merged = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in userValues)
+        {
             merged[key] = value;
+        }
 
         return merged;
     }
@@ -57,7 +59,9 @@ public static class SalesforceClientFactory
         var apiVersion = NormalizeApiVersion(Optional(values, ApiVersionKey, DefaultApiVersion));
 
         if (HasOAuthCredential(values))
+        {
             return await CreateOAuthForceClientAsync(values, apiVersion, cancellationToken).ConfigureAwait(false);
+        }
 
         var clientId = Required(values, ClientIdKey);
         var clientSecret = Required(values, ClientSecretKey);
@@ -137,7 +141,9 @@ public static class SalesforceClientFactory
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(code))
+        {
             throw new InvalidOperationException("Salesforce authorization callback did not include a code.");
+        }
 
         var clientId = Required(values, ClientIdKey);
         var clientSecret = Required(values, ClientSecretKey);
@@ -176,11 +182,19 @@ public static class SalesforceClientFactory
             [RedirectUriKey] = effectiveRedirectUri
         };
         if (!string.IsNullOrWhiteSpace(token.RefreshToken))
+        {
             result[RefreshTokenKey] = token.RefreshToken;
+        }
+
         if (!string.IsNullOrWhiteSpace(token.IssuedAt))
+        {
             result["issued_at"] = token.IssuedAt;
+        }
+
         if (!string.IsNullOrWhiteSpace(token.Scope))
+        {
             result[OAuthScopeKey] = token.Scope;
+        }
 
         return result;
     }
@@ -190,7 +204,9 @@ public static class SalesforceClientFactory
         var value = NormalizeLoginUrlOrEndpoint(loginUrlOrEndpoint);
 
         if (value.EndsWith("/services/oauth2/authorize", StringComparison.OrdinalIgnoreCase))
+        {
             return value;
+        }
 
         return value.TrimEnd('/') + "/services/oauth2/authorize";
     }
@@ -200,7 +216,9 @@ public static class SalesforceClientFactory
         var value = NormalizeLoginUrlOrEndpoint(loginUrlOrEndpoint);
 
         if (value.EndsWith("/services/oauth2/token", StringComparison.OrdinalIgnoreCase))
+        {
             return value;
+        }
 
         return value.TrimEnd('/') + "/services/oauth2/token";
     }
@@ -211,7 +229,9 @@ public static class SalesforceClientFactory
     public static string CreatePkceCodeChallenge(string codeVerifier)
     {
         if (string.IsNullOrWhiteSpace(codeVerifier))
+        {
             throw new ArgumentException("PKCE code verifier is required.", nameof(codeVerifier));
+        }
 
         return Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier.Trim())));
     }
@@ -225,7 +245,9 @@ public static class SalesforceClientFactory
     private static string NormalizeLoginUrlOrEndpoint(string loginUrlOrEndpoint)
     {
         if (string.IsNullOrWhiteSpace(loginUrlOrEndpoint))
+        {
             return DefaultLoginUrl;
+        }
 
         var value = loginUrlOrEndpoint.Trim();
         if (value.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
@@ -235,10 +257,14 @@ public static class SalesforceClientFactory
         }
 
         if (value.StartsWith("//", StringComparison.Ordinal))
+        {
             return "https:" + value;
+        }
 
         if (value.StartsWith("/", StringComparison.Ordinal))
+        {
             return DefaultLoginUrl.TrimEnd('/') + value;
+        }
 
         return "https://" + value;
     }
@@ -246,7 +272,9 @@ public static class SalesforceClientFactory
     private static string Required(IReadOnlyDictionary<string, string> values, string key)
     {
         if (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+        {
             return value.Trim();
+        }
 
         throw new InvalidOperationException(
             $"Salesforce pack config (scope '{DefaultScope}', pack '{PackName}') is missing {key}. " +
@@ -293,10 +321,14 @@ public static class SalesforceClientFactory
         }
 
         if (HasValue(values, AccessTokenKey) && HasValue(values, InstanceUrlKey))
+        {
             return new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion);
+        }
 
         if (HasValue(values, RefreshTokenKey))
+        {
             RequireConnectedAppConfig(values);
+        }
 
         return new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion);
     }
@@ -304,7 +336,9 @@ public static class SalesforceClientFactory
     private static void RequireConnectedAppConfig(IReadOnlyDictionary<string, string> values)
     {
         if (!HasConnectedAppConfig(values))
+        {
             throw new InvalidOperationException(MissingConnectedAppConfigMessage);
+        }
     }
 
     private static async Task<SalesforceTokenResponse> RequestTokenAsync(
@@ -331,7 +365,9 @@ public static class SalesforceClientFactory
         using (response)
         {
             if (!response.IsSuccessStatusCode)
+            {
                 throw new InvalidOperationException(AuthenticationFailureMessage + " " + SalesforceErrorDetails(responseBody));
+            }
 
             return ParseTokenResponse(responseBody);
         }
@@ -367,11 +403,19 @@ public static class SalesforceClientFactory
             var error = GetString(root, "error");
             var description = GetString(root, "error_description");
             if (!string.IsNullOrWhiteSpace(error) && !string.IsNullOrWhiteSpace(description))
+            {
                 return $"Salesforce returned {error}: {description}";
+            }
+
             if (!string.IsNullOrWhiteSpace(error))
+            {
                 return $"Salesforce returned {error}.";
+            }
+
             if (!string.IsNullOrWhiteSpace(description))
+            {
                 return $"Salesforce returned: {description}";
+            }
         }
         catch (JsonException)
         {

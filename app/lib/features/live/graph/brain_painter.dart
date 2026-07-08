@@ -647,7 +647,6 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
     if (lower.contains('word')) return Icons.description;
     if (lower.contains('diagram')) return Icons.schema;
     if (lower.contains('onboarding')) return Icons.handshake;
-    if (lower.contains('marketplace')) return Icons.storefront;
     if (lower.contains('innolang') || lower.contains('interpreter')) return Icons.translate;
     return Icons.cloud_outlined;
   }

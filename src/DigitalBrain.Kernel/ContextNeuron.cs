@@ -15,7 +15,11 @@ public class ContextNeuron(ILogger<ContextNeuron> logger, NeuronJournals journal
 
     public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
-        if (signal.Name != ContextSignals.RecallRequested) return;
+        if (signal.Name != ContextSignals.RecallRequested)
+        {
+            return;
+        }
+
         var query = signal.Props.TryGetValue("query", out var q) ? q?.ToString() ?? "" : "";
         var results = await RecallAsync(query, cancellationToken: cancellationToken);
         var replyProps = new Dictionary<string, object?>(signal.Props) { ["results"] = results };
@@ -56,7 +60,10 @@ public class ContextNeuron(ILogger<ContextNeuron> logger, NeuronJournals journal
     {
         cancellationToken.ThrowIfCancellationRequested();
         var generator = ServiceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
-        if (generator is null) return [];
+        if (generator is null)
+        {
+            return [];
+        }
 
         try
         {

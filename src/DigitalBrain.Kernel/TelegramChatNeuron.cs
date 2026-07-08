@@ -23,8 +23,15 @@ public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, Neuro
 
     public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
-        if (signal.IsBroadcast) return;
-        if (signal.Name != InboundName) return;
+        if (signal.IsBroadcast)
+        {
+            return;
+        }
+
+        if (signal.Name != InboundName)
+        {
+            return;
+        }
 
         var text = signal.Props.TryGetValue("text", out var t) ? t?.ToString() ?? "" : "";
         var chatId = signal.Props.TryGetValue("chatId", out var c) ? c : null;
@@ -90,10 +97,21 @@ public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, Neuro
         // "/startfoo" must NOT match — require exactly "/start" or "/start" followed by whitespace.
         if (trimmed.Length != StartPrefix.Length
             && (trimmed.Length < StartPrefix.Length || !trimmed.StartsWith(StartPrefix, StringComparison.Ordinal) || !char.IsWhiteSpace(trimmed[StartPrefix.Length])))
+        {
             return false;
-        if (trimmed.Length == StartPrefix.Length) return false; // bare "/start" with no payload
+        }
+
+        if (trimmed.Length == StartPrefix.Length)
+        {
+            return false; // bare "/start" with no payload
+        }
+
         var rest = trimmed[StartPrefix.Length..].Trim();
-        if (rest.Length == 0) return false;
+        if (rest.Length == 0)
+        {
+            return false;
+        }
+
         bundleId = rest;
         return true;
     }

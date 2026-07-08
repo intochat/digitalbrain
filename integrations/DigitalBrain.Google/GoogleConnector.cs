@@ -35,7 +35,9 @@ public class GoogleConnector : IConnector
         foreach (var key in Descriptor.RequiredConfigKeys)
         {
             if (!values.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
+            {
                 return new ConnectorConfigStatus(false, MissingKey: key, Message: $"Missing {key}");
+            }
         }
         return new ConnectorConfigStatus(true);
     }
@@ -59,15 +61,22 @@ public class GoogleConnector : IConnector
             catch { }
         }
 
-        if (clientIdHint != null) values[GoogleClientFactory.ClientIdKey] = clientIdHint;
+        if (clientIdHint != null)
+        {
+            values[GoogleClientFactory.ClientIdKey] = clientIdHint;
+        }
 
         var configuredRedirect = _config?["DigitalBrain:Google:RedirectUri"];
         if (!string.IsNullOrWhiteSpace(configuredRedirect))
+        {
             values[GoogleClientFactory.RedirectUriKey] = configuredRedirect.Trim();
-        else if (values.TryGetValue(GoogleClientFactory.RedirectUriKey, out var r) && !string.IsNullOrWhiteSpace(r))
-            values[GoogleClientFactory.RedirectUriKey] = r;
+        }
         else
-            values[GoogleClientFactory.RedirectUriKey] = GoogleClientFactory.DefaultRedirectUri;
+        {
+            values[GoogleClientFactory.RedirectUriKey] = values.TryGetValue(GoogleClientFactory.RedirectUriKey, out var r) && !string.IsNullOrWhiteSpace(r)
+                ? r
+                : GoogleClientFactory.DefaultRedirectUri;
+        }
 
         if (!values.TryGetValue(GoogleClientFactory.RedirectUriKey, out var redirectUri) || string.IsNullOrWhiteSpace(redirectUri))
         {
@@ -136,7 +145,9 @@ public class GoogleConnector : IConnector
             ? stored
             : (!string.IsNullOrWhiteSpace(callback.FallbackRedirectUri) ? callback.FallbackRedirectUri : null);
         if (string.IsNullOrWhiteSpace(redirectUri))
+        {
             redirectUri = _config?["DigitalBrain:Google:RedirectUri"] ?? GoogleClientFactory.DefaultRedirectUri;
+        }
 
         var existingUser = await store.GetAsync(userScope, GoogleClientFactory.PackName, cancellationToken);
 
@@ -150,14 +161,21 @@ public class GoogleConnector : IConnector
             }
 
             if (appValues.TryGetValue(GoogleClientFactory.ClientIdKey, out var cid))
+            {
                 userTokenValues[GoogleClientFactory.ClientIdKey] = cid;
+            }
+
             if (appValues.TryGetValue(GoogleClientFactory.ClientSecretKey, out var cs))
+            {
                 userTokenValues[GoogleClientFactory.ClientSecretKey] = cs;
+            }
 
             if (!userTokenValues.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var newRt) || string.IsNullOrWhiteSpace(newRt))
             {
                 if (existingUser.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var priorRt) && !string.IsNullOrWhiteSpace(priorRt))
+                {
                     userTokenValues[GoogleClientFactory.RefreshTokenKey] = priorRt;
+                }
             }
 
             await store.SetAsync(userScope, GoogleClientFactory.PackName, userTokenValues, cancellationToken);
@@ -193,11 +211,15 @@ public class GoogleConnector : IConnector
             var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
             var values = await _store.GetAsync(userScope, GoogleClientFactory.PackName, cancellationToken);
             if (!values.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var rt) || string.IsNullOrWhiteSpace(rt))
+            {
                 return new ConnectionHealth(Healthy: false, Detail: "No refresh token for user", Checked: DateTimeOffset.UtcNow);
+            }
 
             if (!values.TryGetValue(GoogleClientFactory.ClientIdKey, out var cid) || string.IsNullOrWhiteSpace(cid) ||
                 !values.TryGetValue(GoogleClientFactory.ClientSecretKey, out var cs) || string.IsNullOrWhiteSpace(cs))
+            {
                 return new ConnectionHealth(Healthy: false, Detail: "Missing client credentials for probe", Checked: DateTimeOffset.UtcNow);
+            }
 
             var cred = GoogleCredentialFactory.FromRefreshToken(cid, cs, rt, GoogleClientFactory.DefaultGmailScope);
             var service = new GmailService(new BaseClientService.Initializer

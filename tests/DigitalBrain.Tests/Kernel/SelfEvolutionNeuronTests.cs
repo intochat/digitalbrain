@@ -8,7 +8,7 @@ namespace DigitalBrain.Tests.Kernel;
 public sealed class SelfEvolutionNeuronTests : NeuronTestBase
 {
     private readonly RecordingApplyHandler _handler = new("test.apply", SelfEvolutionRisk.KernelRestart);
-    private readonly RecordingApplyHandler _lowRiskHandler = new("low-risk.apply", SelfEvolutionRisk.PackInstall);
+    private readonly RecordingApplyHandler _lowRiskHandler = new("low-risk.apply", SelfEvolutionRisk.InProcessCode);
     private readonly FailingApplyHandler _failingHandler = new();
 
     protected override void ConfigureSilo(ISiloBuilder builder) => builder.ConfigureServices(services =>
@@ -107,7 +107,7 @@ public sealed class SelfEvolutionNeuronTests : NeuronTestBase
         Assert.Contains(outgoing.OfType<SelfEvolutionApplyResult>(), result =>
             result.ProposalId == "risk-1"
             && !result.Succeeded
-            && result.Details.Contains("allows PackInstall", StringComparison.Ordinal));
+            && result.Details.Contains("allows InProcessCode", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public sealed class SelfEvolutionNeuronTests : NeuronTestBase
     private static SelfEvolutionProposal Proposal(
         string id,
         string applyVia = "test.apply",
-        SelfEvolutionRisk risk = SelfEvolutionRisk.PackInstall,
+        SelfEvolutionRisk risk = SelfEvolutionRisk.InProcessCode,
         DateTimeOffset? expiresAt = null,
         string rollbackPlan = "restore checkpoint") =>
         new(

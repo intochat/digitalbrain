@@ -2,16 +2,16 @@ using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
+using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Runtime.Grpc;
-using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
+using DigitalBrain.Tests.TestSupport;
 using Grpc.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
 using Orleans.TestingHost;
-using DigitalBrain.Kernel.Ui;
 
 namespace DigitalBrain.Tests.Gateway;
 
@@ -66,7 +66,11 @@ public class GenericSendTests : NeuronTestBase
         while (!cts.IsCancellationRequested)
         {
             received = await sink.GetReceivedSignalsAsync();
-            if (received.Count > 0) break;
+            if (received.Count > 0)
+            {
+                break;
+            }
+
             await Task.Delay(50, cts.Token).ContinueWith(_ => { });
         }
 
@@ -117,9 +121,12 @@ public class GenericSendTests : NeuronTestBase
 [CollectionDefinition("signal-sink-host", DisableParallelization = true)]
 public sealed class SignalSinkHostCollection;
 
+[Alias("DigitalBrain.Tests.Gateway.ISignalSink")]
 public interface ISignalSink : INeuron
 {
+    [Alias("ActivateAsync")]
     Task ActivateAsync();
+    [Alias("GetReceivedSignalsAsync")]
     Task<IReadOnlyList<Signal>> GetReceivedSignalsAsync();
 }
 
@@ -129,7 +136,7 @@ public sealed class SignalSinkGrain(
     NeuronJournals journals)
     : Neuron(logger, journals), ISignalSink, IHandle<Signal>
 {
-    private readonly List<Signal> _received = new();
+    private readonly List<Signal> _received = [];
 
     public Task ActivateAsync() => Task.CompletedTask; // activation handled by OnActivateAsync
 

@@ -35,7 +35,11 @@ public sealed class FoundryRunApplyHandler(IGrainFactory grains) : ISelfEvolutio
 
     private async Task<FoundryApplyStaged?> FindStagedAsync(SelfEvolutionProposal proposal, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(proposal.Origin)) return null;
+        if (string.IsNullOrWhiteSpace(proposal.Origin))
+        {
+            return null;
+        }
+
         var foundry = grains.GetGrain<ICodeFoundryLoopNeuron>(proposal.Origin);
         return (await foundry.GetOutgoingTimelineAsync(ct))
             .OfType<FoundryApplyStaged>()
@@ -78,7 +82,11 @@ public sealed class FoundryDeployApplyHandler(IGrainFactory grains) : ISelfEvolu
 
     private async Task<FoundryApplyStaged?> FindStagedAsync(SelfEvolutionProposal proposal, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(proposal.Origin)) return null;
+        if (string.IsNullOrWhiteSpace(proposal.Origin))
+        {
+            return null;
+        }
+
         var foundry = grains.GetGrain<ICodeFoundryLoopNeuron>(proposal.Origin);
         return (await foundry.GetOutgoingTimelineAsync(ct))
             .OfType<FoundryApplyStaged>()

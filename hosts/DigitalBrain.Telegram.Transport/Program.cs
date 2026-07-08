@@ -52,7 +52,9 @@ app.MapPost("/webhook", async (
     {
         var header = context.Request.Headers["X-Telegram-Bot-Api-Secret-Token"].FirstOrDefault();
         if (!string.Equals(header, secret, StringComparison.Ordinal))
+        {
             return Results.Unauthorized();
+        }
     }
 
     Update? update;
@@ -67,7 +69,9 @@ app.MapPost("/webhook", async (
     }
 
     if (update is null)
+    {
         return Results.Ok();
+    }
 
     await forwarder.ForwardAsync(update, ct);
     return Results.Ok();

@@ -1,8 +1,8 @@
+using System.Reflection;
 using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
-using System.Reflection;
 
 namespace DigitalBrain.Kernel;
 
@@ -20,7 +20,10 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         await FireAsync(new SystemStatusChanged("kernel", "launched"), ct);
 
         // In tests we do not poll; avoid background loops and repeated MCP attempts that log noise.
-        if (IsTestMode()) return;
+        if (IsTestMode())
+        {
+            return;
+        }
 
         _pollTimer = this.RegisterGrainTimer(
             static (grain, token) => grain.PollOnceAsync(token),
@@ -48,7 +51,11 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
 
     private async Task TryConnectMcpAsync(CancellationToken ct)
     {
-        if (_mcp != null) return;
+        if (_mcp != null)
+        {
+            return;
+        }
+
         if (IsTestMode())
         {
             // Tests run without Aspire MCP / CLI available; self-awareness is telemetry + LLM only. No spawn, no long cancel.
@@ -115,7 +122,11 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
 
     private async Task PollHealthAsync(CancellationToken ct)
     {
-        if (_mcp == null) return;
+        if (_mcp == null)
+        {
+            return;
+        }
+
         var resources = await CallMcpAsync("list_resources", ct: ct);
         if (resources.Contains("Failed", StringComparison.OrdinalIgnoreCase) || resources.Contains("Unhealthy", StringComparison.OrdinalIgnoreCase) || resources.Contains("Exited", StringComparison.OrdinalIgnoreCase))
         {
@@ -125,9 +136,11 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
 
     private string? ResolveAppHostDir()
     {
-        var candidates = new List<string>();
-        candidates.Add(Directory.GetCurrentDirectory());
-        candidates.Add(AppContext.BaseDirectory);
+        var candidates = new List<string>
+        {
+            Directory.GetCurrentDirectory(),
+            AppContext.BaseDirectory
+        };
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         for (int i = 0; i < 5 && dir != null; i++)
         {
@@ -206,8 +219,16 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
 
     private Dictionary<string, object?> NormalizeArgs(object? args)
     {
-        if (args == null) return new Dictionary<string, object?>();
-        if (args is Dictionary<string, object?> d) return d;
+        if (args == null)
+        {
+            return [];
+        }
+
+        if (args is Dictionary<string, object?> d)
+        {
+            return d;
+        }
+
         var result = new Dictionary<string, object?>();
         foreach (var p in args.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -218,7 +239,11 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
 
     private async Task<string> CallMcpAsync(string tool, object? args = null, CancellationToken ct = default)
     {
-        if (_mcp == null) return "mcp-unavailable";
+        if (_mcp == null)
+        {
+            return "mcp-unavailable";
+        }
+
         var dict = NormalizeArgs(args);
         var res = await _mcp.CallToolAsync(tool, dict, cancellationToken: ct);
         return res.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "no-data";
@@ -237,7 +262,9 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         foreach (var s in checkpoint)
         {
             if (s is SystemStatusChanged sc && !string.IsNullOrWhiteSpace(sc.Component))
+            {
                 simState[sc.Component] = sc.Status;
+            }
         }
 
         string before = simState.TryGetValue(bad.Component, out var b) ? b : "unknown";

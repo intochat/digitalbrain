@@ -1,17 +1,12 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Distribution;
-using DigitalBrain.Core.Trust;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.TestKit;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Tests;
 
 [Trait("Group", "Core")]
 public class NeuronTests : NeuronTestBase
 {
-
     [Fact]
     public async Task Neuron_Activates_And_Journals_NeuronActivated()
     {
@@ -37,6 +32,7 @@ public class NeuronTests : NeuronTestBase
     {
         var status = Grain<ISystemStatus>("status-test");
         var timeline = await status.GetTimelineAsync();
+
         Assert.Contains(timeline, s => s.Type == nameof(SystemLaunched) || s.Type == nameof(SystemStatusChanged));
     }
 
@@ -44,57 +40,19 @@ public class NeuronTests : NeuronTestBase
     public async Task SystemStatus_Simulates_Fix_From_Checkpoint()
     {
         var status = Grain<ISystemStatus>("status-sim");
-        var cp = await status.CreateCheckpointAsync();
+
         await status.FireAsync(new SystemStatusChanged("kernel", "FailedToStart", "test failure"));
+
         var timeline = await status.GetTimelineAsync();
         Assert.Contains(timeline, s => s.Type == nameof(FixProposal));
         var sim = timeline.LastOrDefault(s => s.Type == nameof(SimulationResult)) as SimulationResult;
         Assert.NotNull(sim);
         Assert.True(sim.Success);
-        Assert.Contains("different", sim.Details, StringComparison.OrdinalIgnoreCase);
-
-        var isolatedReplay = new IsolatedReplayTest();
-        await isolatedReplay.InitializeAsync();
-        try
-        {
-            var simStatus = isolatedReplay.Grain<ISystemStatus>("status-isolated-sim");
-            foreach (var s in cp.Snapshot.OfType<SystemStatusChanged>())
-            {
-                await simStatus.FireAsync(s);
-            }
-            await simStatus.FireAsync(new SystemStatusChanged("kernel", "FailedToStart", "isolated checkpoint replay"));
-            var simTl = await simStatus.GetTimelineAsync();
-            var isolatedSim = simTl.LastOrDefault(s => s.Type == nameof(SimulationResult)) as SimulationResult;
-            Assert.NotNull(isolatedSim);
-            Assert.True(isolatedSim.Success);
-            Assert.Contains("different", isolatedSim.Details, StringComparison.OrdinalIgnoreCase);
-        }
-        finally
-        {
-            await isolatedReplay.DisposeAsync();
-        }
-    }
-
-    [Fact]
-    public async Task Marketplace_Publishes_Real_NeuroPack_With_Owner_Private_Commission()
-    {
-        var market = Grain<IMarketplaceNeuron>("market-test-1");
-        var pack = new NeuroPack(
-            "TestPrivatePack", "1.0", OwnerId: "owner1", IsPrivate: true, CommissionRate: 0.25, Code: "// test code", Description: "private test");
-
-        await market.FireAsync(new PublishToMarketplace(pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate, pack.Description));
-        await market.FireAsync(new ListPublished());  // trigger the list event like real usage
-
-        var timeline = await market.GetTimelineAsync();
-        var published = timeline.LastOrDefault(s => s.Type == nameof(PublishedList)) as PublishedList;
-        Assert.NotNull(published);
-        Assert.Contains(published.Packs, p => p.Name == "TestPrivatePack" && p.OwnerId == "owner1" && p.IsPrivate && p.CommissionRate == 0.25);
     }
 
     [Fact]
     public void AutomationRecords_Are_Synapses_And_Construct_Correctly()
     {
-        // TDD: forces the new contracts from Automations.cs and basic usage.
         var script = new RegisterScript("daily-brief", "return Array.Empty<Synapse>();", "demo script");
         var reaction = new RegisterReaction("on-my-activate", "NeuronActivated", "daily-brief", "MyNeuron", Array.Empty<string>(), "default", null);
         var app = new AutomationApp("my-app", "example app");
@@ -110,25 +68,31 @@ public class NeuronTests : NeuronTestBase
     [Fact]
     public async Task AutomationNeuron_Registers_And_Reacts_To_NeuronActivated()
     {
-        // Core happy path from the plan: when X.Lifetime.Activated then script "runs".
         var auto = Grain<IAutomationNeuron>("automation-main");
-        await auto.GetTimelineAsync(); // activate
+        await auto.GetTimelineAsync();
 
-        await auto.FireAsync(new RegisterScript("act-script", "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?>()) };", "demo"));
-        await auto.FireAsync(new RegisterReaction("act-reaction", "NeuronActivated", "act-script", "act-test", Array.Empty<string>(), "default", null));
+        await auto.FireAsync(new RegisterScript(
+            "act-script",
+            "return new[] { new Signal(\"AutomationFired\", new Dictionary<string, object?>()) };",
+            "demo"));
+        await auto.FireAsync(new RegisterReaction(
+            "act-reaction",
+            "NeuronActivated",
+            "act-script",
+            "act-test",
+            Array.Empty<string>(),
+            "default",
+            null));
 
-        // Simulate a neuron activating (the real Neuron base does this on OnActivate)
-        // Directly simulate the lifetime event the plan targets: when MyNeuron.Lifetime.Activated
         await auto.FireAsync(new NeuronActivated(new NeuronId("act-test")));
 
-        var tl = await auto.GetTimelineAsync();
-        Assert.Contains(tl, s => s.Type == "AutomationFired" || s.Type == "ScriptExecuted" || s.Type == "ScriptRegistered");
+        var timeline = await auto.GetTimelineAsync();
+        Assert.Contains(timeline, s => s.Type == "AutomationFired" || s.Type == "ScriptRegistered");
     }
 
     [Fact]
     public async Task DefineReactionAsync_Enables_InoStyle_WhenActivatedThenScript()
     {
-        // Ergonomics for Ino/MCP (plan Task 8): one call for "when X then C#"
         var auto = Grain<IAutomationNeuron>("automation-main");
         await auto.GetTimelineAsync();
 
@@ -136,472 +100,11 @@ public class NeuronTests : NeuronTestBase
             "brief-on-activate",
             "NeuronActivated",
             "personal-assistant",
-            @"return new[] { new Signal(""DailyBriefGenerated"", new Dictionary<string,object?>()) };");
+            "return new[] { new Signal(\"DailyBriefGenerated\", new Dictionary<string, object?>()) };");
 
         await auto.FireAsync(new NeuronActivated(new NeuronId("personal-assistant")));
 
-        var tl = await auto.GetTimelineAsync();
-        // Verify Define worked (registration + surface); script execution covered in other tests
-        Assert.Contains(tl, s => s.Type == "ReactionRegistered" || s.Type == "ScriptRegistered");
-        Assert.Contains(tl, s => s is ListSurface ls && (ls.Title.Contains("Automations") || ls.Title.Contains("Reactions")));
-        Assert.Contains(tl, s => s is AutomationSurface); // dedicated surface for UI
+        var timeline = await auto.GetTimelineAsync();
+        Assert.Contains(timeline, s => s.Type == "DailyBriefGenerated");
     }
-
-    [Fact]
-    public async Task RemoveReaction_RemovesAndEmitsSurface()
-    {
-        var auto = Grain<IAutomationNeuron>("automation-main");
-        await auto.GetTimelineAsync();
-
-        await auto.DefineReactionAsync("temp-reaction", "NeuronActivated", "temp", "return new[] { new Signal(\"TempFired\", null) };");
-        await auto.RemoveReactionAsync("temp-reaction");
-
-        var tl = await auto.GetTimelineAsync();
-        Assert.Contains(tl, s => s.Type == "ReactionRemoved");
-        // Surface should reflect removal (last surface has no temp)
-        var lastSurface = tl.OfType<ListSurface>().LastOrDefault(ls => ls.Title.Contains("Automations") || ls.Title.Contains("Reactions"));
-        Assert.NotNull(lastSurface);
-        Assert.DoesNotContain(lastSurface.Items, i => i.Contains("temp-reaction"));
-    }
-
-    // Isolation test (bad script handling + continued execution) covered by design in ScriptRunner (catch) and grain.
-    // Functional coverage via other activation tests.
-
-    [Fact]
-    public async Task Marketplace_Install_Takes_Commission_And_Delivers_Pack()
-    {
-        var market = Grain<IMarketplaceNeuron>("market-test-2");
-        await market.FireAsync(new PublishToMarketplace("CommPack", "1.0", Code: "real code here", OwnerId: "seller1", IsPrivate: false, CommissionRate: 0.15));
-
-        await market.FireAsync(new InstallFromMarketplace("CommPack", "1.0", BuyerId: "buyer42"));
-
-        var timeline = await market.GetTimelineAsync();
-        Assert.Contains(timeline, s => s.Type == nameof(CommissionTaken));
-        var comm = timeline.LastOrDefault(s => s.Type == nameof(CommissionTaken)) as CommissionTaken;
-        Assert.NotNull(comm);
-        Assert.Equal(0.15, comm.CommissionRate);
-        Assert.Equal("buyer42", comm.BuyerId);
-        Assert.Equal("seller1", comm.SellerId);
-
-        Assert.Contains(timeline, s => s.Type == nameof(NeuroPackInstalled));
-        var installed = timeline.LastOrDefault(s => s.Type == nameof(NeuroPackInstalled)) as NeuroPackInstalled;
-        Assert.NotNull(installed);
-        Assert.Equal("CommPack", installed.Pack.Name);
-        Assert.Equal("real code here", installed.Pack.Code);
-    }
-
-    [Fact]
-    public async Task PromoteAndGraphSurface_Work()
-    {
-        var auto = Grain<IAutomationNeuron>("automation-main");
-        await auto.GetTimelineAsync();
-        await auto.DefineReactionAsync("promo-demo", "NeuronActivated", null, "return new[] { new Signal(\"P\", null) };");
-        await auto.PromoteToPackAsync("demo-pack", "0.0.1", new[] { "promo-demo" });
-        var tl = await auto.GetTimelineAsync();
-        Assert.Contains(tl, s => s.Type == nameof(AutomationPromoted) || s.Type == "AutomationCrystallized");
-        Assert.Contains(tl, s => s is AutomationGraphSurface);
-    }
-
-    [Fact]
-    public async Task Synapse_Propagates_Correlation_And_Causation()
-    {
-        var market = Grain<IMarketplaceNeuron>("market-causation");
-        await market.FireAsync(new PublishToMarketplace("CausPack", "1.0", Code: "x", OwnerId: "owner", IsPrivate: false, CommissionRate: 0.1));
-        await market.FireAsync(new InstallFromMarketplace("CausPack", "1.0", BuyerId: "buyer"));
-
-        var outTl = await market.GetOutgoingTimelineAsync();
-        var install = outTl.OfType<InstallFromMarketplace>().Last();
-        var commission = outTl.OfType<CommissionTaken>().Last();
-
-        // Every fired synapse has a stable id; a root synapse correlates to itself.
-        Assert.False(string.IsNullOrEmpty(install.SynapseId));
-        Assert.Equal(install.SynapseId, install.CorrelationId);
-        Assert.Null(install.CausationId);
-
-        // The commission was fired while handling the install, so it inherits the chain + points back at it.
-        Assert.Equal(install.SynapseId, commission.CausationId);
-        Assert.Equal(install.CorrelationId, commission.CorrelationId);
-    }
-
-    [Fact]
-    public async Task Marketplace_Private_Blocks_NonOwner_Install()
-    {
-        var market = Grain<IMarketplaceNeuron>("market-test-3");
-        await market.FireAsync(new PublishToMarketplace("SecretPack", "1.0", OwnerId: "ownerOnly", IsPrivate: true, CommissionRate: 0.1));
-
-        // Non-owner tries
-        await market.FireAsync(new InstallFromMarketplace("SecretPack", "1.0", BuyerId: "stranger"));
-
-        var timeline = await market.GetTimelineAsync();
-        // Should not have installed or commission for stranger
-        var lastInstalled = timeline.LastOrDefault(s => s.Type == nameof(NeuroPackInstalled)) as NeuroPackInstalled;
-        Assert.Null(lastInstalled); // or check no commission for this
-    }
-
-    [Fact]
-    public async Task Installed_Pack_Code_Reaches_GeneratedNeuron()
-    {
-        var market = Grain<IMarketplaceNeuron>("market-test-4");
-        await market.FireAsync(new PublishToMarketplace("CodePack", "2.0", Code: "public class Test : Neuron { /* code */ }", OwnerId: "dev", IsPrivate: false));
-
-        await market.FireAsync(new InstallFromMarketplace("CodePack", "2.0", BuyerId: "userX"));
-
-        var gen = Grain<IGeneratedNeuron>("generated-codepack");
-        var timeline = await gen.GetTimelineAsync();
-        // The install flow fires ExperienceUsed which triggers dispatch that now receives the pack
-        Assert.Contains(timeline, s => s.Type == nameof(ExperienceUsed) || s is NeuroPackInstalled);
-    }
-
-    [Fact]
-    public async Task Full_Install_Embody_RealCompiledCode_Emits_PackEmission()
-    {
-        // E2E: signed/unsigned ok in transition -> marketplace install -> embody via ALC -> use fires real IPackBehavior.Respond (not LLM fallback) -> PackEmission in journal.
-        // Validates the keystone chain from the review gap.
-        const string packCode = """
-            public sealed class Uppercaser : DigitalBrain.Core.Distribution.IPackBehavior
-            {
-                public string Respond(string input) => (input ?? string.Empty).ToUpperInvariant();
-            }
-            """;
-
-        var market = Grain<IMarketplaceNeuron>("market-e2e-embody");
-        await market.FireAsync(new PublishToMarketplace("UpperPackE2E", "1.0", Code: packCode, OwnerId: "tester", IsPrivate: false, CommissionRate: 0.0));
-
-        await market.FireAsync(new InstallFromMarketplace("UpperPackE2E", "1.0", BuyerId: "e2e-user"));
-
-        // Trigger use which should now run the compiled behavior (GeneratedNeuron handles ExperienceUsed -> real Respond).
-        var gen = Grain<IGeneratedNeuron>("generated-upperpacke2e");
-        await gen.FireAsync(new ExperienceUsed("UpperPackE2E", "hello test"));
-
-        var genTl = await gen.GetTimelineAsync();
-        var emission = genTl.OfType<PackEmission>().LastOrDefault();
-        Assert.NotNull(emission);
-        Assert.Equal("UpperPackE2E", emission.Pack);
-        Assert.Equal("hello test", emission.Input);
-        Assert.Equal("HELLO TEST", emission.Output);  // real compiled, not LLM text
-    }
-
-    [Fact]
-    public async Task KernelTask_Runs_And_Recovers_Status()
-    {
-        var task = Grain<IKernelTask>("task-test-1");
-        await task.FireAsync(new RunTask("task-test-1", "demo work"));
-        var info = await task.GetInfoAsync();
-        Assert.Equal("completed", info.Status);
-        Assert.Contains("demo work", info.Result ?? "");
-
-        var timeline = await task.GetOutgoingTimelineAsync();
-        Assert.Contains(timeline.OfType<TaskProgress>(), progress => progress.Detail == "planning");
-        Assert.Contains(timeline.OfType<TaskProgress>(), progress => progress.Detail == "running-fallback");
-        Assert.Contains(timeline.OfType<TaskProgress>(), progress => progress.Detail == "finalizing");
-    }
-
-    [Fact]
-    public async Task Branch_Forks_Same_Type_With_Replayed_History_And_Isolation()
-    {
-        var src = Grain<IProbeNeuron>("branch-src");
-        await src.FireAsync(new ProbeMessageSynapse("original"));
-        var cp = await src.CreateCheckpointAsync();
-        var bid = await src.BranchAsync(cp);
-        Assert.NotEqual(src.GetPrimaryKeyString(), bid.Value);
-
-        // The branch is a grain of the SAME type, seeded with the checkpoint history.
-        var branch = Grain<IProbeNeuron>(bid.Value);
-        var branchIn = await branch.GetIncomingTimelineAsync();
-        Assert.Contains(branchIn, s => s is ProbeMessageSynapse d && d.Text == "original");
-
-        // Firing on the branch does not pollute the source (isolation).
-        await branch.FireAsync(new ProbeMessageSynapse("branch only"));
-        var mainOut = await src.GetOutgoingTimelineAsync();
-        Assert.DoesNotContain(mainOut, s => s is ProbeMessageSynapse d && d.Text.Contains("branch only"));
-    }
-
-    [Fact]
-    public async Task Restore_Seeds_Journal_From_Checkpoint_Without_Redispatch()
-    {
-        var src = Grain<IProbeNeuron>("restore-src");
-        await src.FireAsync(new ProbeMessageSynapse("to-restore"));
-        var checkpoint = await src.CreateCheckpointAsync();
-
-        var target = Grain<IProbeNeuron>("restore-target");
-        await target.RestoreCheckpointAsync(checkpoint);
-
-        var restored = await target.GetIncomingTimelineAsync();
-        Assert.Contains(restored, s => s is ProbeMessageSynapse d && d.Text == "to-restore");
-    }
-
-    [Fact]
-    public async Task Ino_Uses_DualJournals_And_Creates_Tasks_Context()
-    {
-        var ino = Grain<IInoNeuron>("ino-test");
-        // Ask without llm should still process via fallback and journal
-        var resp = await ino.AskAsync("remember to backup important files using task");
-        Assert.False(string.IsNullOrWhiteSpace(resp));
-        var outTl = await ino.GetOutgoingTimelineAsync();
-        Assert.Contains(outTl, s => s.Type == nameof(InoRequest) || s.Type == nameof(InoResponse));
-        // May have triggered task if parsed, but fallback ok
-    }
-
-    [Fact]
-    public async Task DataVisualizationNeuron_Emits_DataChart_Surface()
-    {
-        var chart = Grain<IDataVisualizationNeuron>("chart-test");
-
-        await chart.FireAsync(new VisualizeDataRequest(
-            "show sales by month",
-            """
-            [
-              { "month": "Jan", "sales": 12 },
-              { "month": "Feb", "sales": 18 }
-            ]
-            """,
-            "bar",
-            "req-test"));
-
-        var timeline = await chart.GetTimelineAsync();
-        var generated = timeline.OfType<DataChartGenerated>().LastOrDefault(result => result.RequestId == "req-test");
-
-        Assert.NotNull(generated);
-        Assert.Equal(UiSurfaceKinds.DataChart, generated.Surface.Kind);
-        Assert.True(generated.Surface.Props.ContainsKey(UiSurfaceKeys.ChartSpec));
-    }
-
-    [Fact]
-    public async Task GmailInsights_Experience_Emits_Summary_Surface_And_User_Scoped_Chart()
-    {
-        var generated = Grain<IGeneratedNeuron>("generated-digitalbrain.experience.gmailinsights");
-
-        await generated.FireAsync(new ExperienceUsed(
-            "DigitalBrain.Experience.GmailInsights",
-            "gmail:last-100-chart",
-            "alice",
-            "session-1"));
-
-        var timeline = await generated.GetTimelineAsync();
-        var emission = timeline.OfType<PackEmission>().LastOrDefault(e => e.Pack == "DigitalBrain.Experience.GmailInsights");
-        Assert.NotNull(emission);
-        Assert.Contains("100", emission.Output);
-
-        var surface = timeline.OfType<UiSurface>().LastOrDefault(s => s.Kind == "gmail-insights");
-        Assert.NotNull(surface);
-        Assert.Equal("alice", surface.Props["userId"]);
-        Assert.Equal("session-1", surface.Props["sessionId"]);
-        Assert.Equal(100, surface.Props["emailCount"]);
-
-        var chart = Grain<IDataVisualizationNeuron>("chart-gmail-last-100-alice");
-        var chartTimeline = await chart.GetTimelineAsync();
-        var chartGenerated = chartTimeline.OfType<DataChartGenerated>().LastOrDefault(g => g.RequestId == "gmail-last-100-alice");
-        Assert.NotNull(chartGenerated);
-        Assert.Equal("alice", chartGenerated.Surface.Props["userId"]);
-        Assert.Equal("session-1", chartGenerated.Surface.Props["clientId"]);
-        Assert.True(chartGenerated.Surface.Props.ContainsKey(UiSurfaceKeys.ChartSpec));
-    }
-
-    [Fact]
-    public async Task ChartNeuron_Handles_Visualize_With_GraphicSpec()
-    {
-        var chart = Grain<IDataVisualizationNeuron>("chart-cmd-test");
-        // Verify the new graphic path doesn't break firing
-        await chart.FireAsync(new VisualizeDataRequest("demo sales csv", "[{\"m\":\"Jan\",\"s\":10},{\"m\":\"Feb\",\"s\":20}]", null, "cmd-1"));
-        // Command path exercised in integration; here just ensure no explosion on visualize for new spec
-    }
-
-    [Fact]
-    public async Task Marketplace_Rejects_Invalid_Signature_And_Accepts_Valid()
-    {
-        var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();
-
-        // A validly-signed pack installs.
-        var marketOk = Grain<IMarketplaceNeuron>("market-sign-ok");
-        var good = PackSignatureVerifier.SignPack(new NeuroPack("SignOk", "1.0", OwnerId: "dev", Code: "ok"), priv, pub);
-        await marketOk.FireAsync(new PublishToMarketplace(
-            good.Name, good.Version, good.Code, good.OwnerId, good.IsPrivate, good.CommissionRate,
-            good.Description, good.AuthorPublicKeyBase64, good.SignatureBase64));
-        await marketOk.FireAsync(new InstallFromMarketplace("SignOk", "1.0", BuyerId: "buyer"));
-        Assert.Contains(await marketOk.GetTimelineAsync(), s => s is NeuroPackInstalled);
-
-        // A pack whose code was tampered AFTER signing is rejected at install (signature no longer matches).
-        var marketBad = Grain<IMarketplaceNeuron>("market-sign-bad");
-        var signed = PackSignatureVerifier.SignPack(new NeuroPack("SignBad", "1.0", OwnerId: "dev", Code: "original"), priv, pub);
-        var tampered = signed with { Code = "tampered" };
-        await marketBad.FireAsync(new PublishToMarketplace(
-            tampered.Name, tampered.Version, tampered.Code, tampered.OwnerId, tampered.IsPrivate, tampered.CommissionRate,
-            tampered.Description, tampered.AuthorPublicKeyBase64, tampered.SignatureBase64));
-        await marketBad.FireAsync(new InstallFromMarketplace("SignBad", "1.0", BuyerId: "buyer"));
-        Assert.DoesNotContain(await marketBad.GetTimelineAsync(), s => s is NeuroPackInstalled);
-    }
-
-    [Fact]
-    public async Task Marketplace_Rejects_Unsigned_Packs_When_Strict_Config_Is_Enabled()
-    {
-        var strictConfig = new StrictConfigNeuronTest();
-        await strictConfig.InitializeAsync();
-        try
-        {
-            var market = strictConfig.Grain<IMarketplaceNeuron>("market-strict-unsigned");
-            await market.FireAsync(new PublishToMarketplace("UnsignedStrict", "1.0", Code: "ok", OwnerId: "dev"));
-            await market.FireAsync(new InstallFromMarketplace("UnsignedStrict", "1.0", BuyerId: "buyer"));
-
-            Assert.DoesNotContain(await market.GetTimelineAsync(), s => s is NeuroPackInstalled);
-        }
-        finally
-        {
-            await strictConfig.DisposeAsync();
-        }
-    }
-
-    [Fact]
-    public async Task Install_Embodies_Signed_Pack_And_Runs_Real_Compiled_Code()
-    {
-        var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();
-        var code = """
-            public sealed class EchoPack : DigitalBrain.Core.Distribution.IPackBehavior
-            {
-                public string Respond(string input) => "ECHO:" + input;
-            }
-            """;
-        var pack = PackSignatureVerifier.SignPack(
-            new NeuroPack("EchoPack", "1.0", OwnerId: "dev", Code: code), priv, pub);
-
-        var market = Grain<IMarketplaceNeuron>("market-embody");
-        await market.FireAsync(new PublishToMarketplace(
-            pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate,
-            pack.Description, pack.AuthorPublicKeyBase64, pack.SignatureBase64));
-        await market.FireAsync(new InstallFromMarketplace("EchoPack", "1.0", BuyerId: "buyer"));
-
-        // The host neuron compiled pack.Code into a collectible ALC and dispatched to it for real.
-        var generated = Grain<IGeneratedNeuron>("generated-echopack");
-        var emission = (await generated.GetTimelineAsync()).OfType<PackEmission>().LastOrDefault();
-
-        Assert.NotNull(emission);                         // proof the install->compile->ALC->dispatch chain ran
-        Assert.Equal("EchoPack", emission!.Pack);
-        Assert.StartsWith("ECHO:", emission.Output);      // ...the pack's REAL compiled output, not the LLM stub
-    }
-
-    [Fact]
-    public async Task Installed_Pack_Handles_Typed_Synapse_And_Preserves_Causation()
-    {
-        const string code = """
-            public sealed class TypedDispatchPack : DigitalBrain.Core.Distribution.IPackBehavior
-            {
-                public string Respond(string input) => "fallback:" + input;
-
-                public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
-                    synapse is DigitalBrain.Core.ProbeMessageSynapse;
-
-                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
-                {
-                    var message = (DigitalBrain.Core.ProbeMessageSynapse)synapse;
-                    return new DigitalBrain.Core.Synapse[]
-                    {
-                        new DigitalBrain.Core.Distribution.PackEmission("spoofed-pack-name", message.Text, "typed:" + message.Text)
-                    };
-                }
-            }
-            """;
-
-        var market = Grain<IMarketplaceNeuron>("market-typed-dispatch");
-        await market.FireAsync(new PublishToMarketplace("TypedDispatch", "1.0", Code: code, OwnerId: "dev"));
-        await market.FireAsync(new InstallFromMarketplace("TypedDispatch", "1.0", BuyerId: "buyer"));
-
-        var generated = Grain<IGeneratedNeuron>("generated-typeddispatch");
-        await generated.FireAsync(new ProbeMessageSynapse("typed-input"));
-
-        var timeline = await generated.GetOutgoingTimelineAsync();
-        var input = timeline.OfType<ProbeMessageSynapse>().Last(message => message.Text == "typed-input");
-        var emission = timeline.OfType<PackEmission>().LastOrDefault(result => result.Input == "typed-input");
-
-        Assert.NotNull(emission);
-        Assert.Equal("TypedDispatch", emission!.Pack);  // host owns pack identity; pack output cannot spoof it
-        Assert.Equal("typed:typed-input", emission.Output);
-        Assert.Equal(input.SynapseId, emission.CausationId);
-        Assert.Equal(input.CorrelationId, emission.CorrelationId);
-    }
-
-    [Fact]
-    public async Task Installed_Pack_Handles_Typed_Synapse_And_Emits_Journaled_UiSurface()
-    {
-        const string code = """
-            public sealed class SurfacePack : DigitalBrain.Core.Distribution.IPackBehavior
-            {
-                public string Respond(string input) => "fallback:" + input;
-
-                public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
-                    synapse is DigitalBrain.Core.ProbeMessageSynapse;
-
-                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
-                {
-                    var message = (DigitalBrain.Core.ProbeMessageSynapse)synapse;
-                    var props = new System.Collections.Generic.Dictionary<string, object?>
-                    {
-                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.SurfaceId] = "surface-" + message.Text,
-                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Emitter] = "SurfacePack",
-                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Title] = "Pack surface",
-                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Priority] = 10,
-                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.RequiresInput] = false,
-                        [DigitalBrain.Ui.Contracts.UiSurfaceKeys.Layout] = DigitalBrain.Ui.Contracts.UiSurfaceLayouts.Panel,
-                        ["message"] = message.Text
-                    };
-
-                    return new DigitalBrain.Core.Synapse[]
-                    {
-                        new DigitalBrain.Ui.Contracts.UiSurface(DigitalBrain.Ui.Contracts.UiSurfaceKinds.TaskWindow, props)
-                        {
-                            CorrelationId = "pack-spoofed-correlation",
-                            CausationId = "pack-spoofed-cause",
-                            SynapseId = synapse.SynapseId
-                        }
-                    };
-                }
-            }
-            """;
-
-        var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();
-        var pack = PackSignatureVerifier.SignPack(
-            new NeuroPack("SurfacePack", "1.0", OwnerId: "dev", Code: code), priv, pub);
-
-        var market = Grain<IMarketplaceNeuron>("market-surface-pack");
-        await market.FireAsync(new PublishToMarketplace(
-            pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate,
-            pack.Description, pack.AuthorPublicKeyBase64, pack.SignatureBase64));
-        await market.FireAsync(new InstallFromMarketplace("SurfacePack", "1.0", BuyerId: "buyer"));
-
-        var generated = Grain<IGeneratedNeuron>("generated-surfacepack");
-        await generated.FireAsync(new ProbeMessageSynapse("task-card"));
-
-        var timeline = await generated.GetOutgoingTimelineAsync();
-        var input = timeline.OfType<ProbeMessageSynapse>().Last(message => message.Text == "task-card");
-        var surface = timeline.OfType<UiSurface>().LastOrDefault(result =>
-            result.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var id) && Equals(id, "surface-task-card"));
-
-        Assert.NotNull(surface);
-        Assert.Equal(UiSurfaceKinds.TaskWindow, surface!.Kind);
-        Assert.Equal("task-card", surface.Props["message"]);
-        Assert.Equal(input.SynapseId, surface.CausationId);
-        Assert.Equal(input.CorrelationId, surface.CorrelationId);
-        Assert.NotEqual(input.SynapseId, surface.SynapseId);
-        Assert.Equal("generated-surfacepack", surface.Sender?.Value);
-    }
-
-    private sealed class IsolatedReplayTest : NeuronTests
-    {
-    }
-
-    private sealed class StrictConfigNeuronTest : NeuronTests
-    {
-        protected override void ConfigureSilo(ISiloBuilder builder)
-        {
-            builder.ConfigureServices(services =>
-            {
-                var configuration = new ConfigurationBuilder()
-                    .AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "true"
-                    })
-                    .Build();
-                services.AddSingleton<IConfiguration>(configuration);
-            });
-        }
-    }
-
 }

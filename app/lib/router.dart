@@ -25,12 +25,6 @@ final digitalbrainRouter = GoRouter(
           builder: (context, state) =>
               const SizedBox.shrink(), // UI kit gallery now emitted as rich neuron tree (forui components)
         ),
-        GoRoute(
-          path: '/marketplace',
-          name: 'marketplace',
-          builder: (context, state) =>
-              const SizedBox.shrink(), // lists + authoring via UiSurfaceTree / kit from neurons
-        ),
       ],
     ),
     // Canvas is advanced immersive (still uses some RFW surfaces but will be further thinned in future steps).

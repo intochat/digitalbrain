@@ -20,7 +20,10 @@ public sealed class ProcessBuildRunner : IBuildRunner
             await File.WriteAllTextAsync(Path.Combine(tempDir, moduleName + ".cs"), source, cancellationToken);
             var kernelProject = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "DigitalBrain.Kernel.csproj"));
             if (!File.Exists(kernelProject))
+            {
                 kernelProject = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "DigitalBrain.Kernel.csproj"));
+            }
+
             await File.WriteAllTextAsync(Path.Combine(tempDir, "verify.csproj"), VerifyProject(kernelProject), cancellationToken);
 
             var psi = new ProcessStartInfo("dotnet", $"build \"{Path.Combine(tempDir, "verify.csproj")}\" -c Release")

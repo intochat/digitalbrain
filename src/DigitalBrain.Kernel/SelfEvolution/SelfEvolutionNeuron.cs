@@ -152,10 +152,26 @@ public sealed class SelfEvolutionNeuron(
 
     private static string? RejectIfInvalid(SelfEvolutionProposal proposal)
     {
-        if (string.IsNullOrWhiteSpace(proposal.ProposalId)) return "ProposalId is required.";
-        if (string.IsNullOrWhiteSpace(proposal.ApplyVia)) return "ApplyVia is required.";
-        if (string.IsNullOrWhiteSpace(proposal.Origin)) return "Origin is required.";
-        if (string.IsNullOrWhiteSpace(proposal.RollbackPlan)) return "RollbackPlan is required.";
+        if (string.IsNullOrWhiteSpace(proposal.ProposalId))
+        {
+            return "ProposalId is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(proposal.ApplyVia))
+        {
+            return "ApplyVia is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(proposal.Origin))
+        {
+            return "Origin is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(proposal.RollbackPlan))
+        {
+            return "RollbackPlan is required.";
+        }
+
         return null;
     }
 

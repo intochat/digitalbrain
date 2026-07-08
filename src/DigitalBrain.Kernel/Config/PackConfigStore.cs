@@ -34,10 +34,12 @@ public sealed class PackConfigStore(
     {
         var blob = await backing.LoadAsync(scope, pack, cancellationToken);
         if (blob is null)
+        {
             return new Dictionary<string, string>();
+        }
 
         var encrypted = JsonSerializer.Deserialize<Dictionary<string, string>>(blob)
-            ?? new Dictionary<string, string>();
+            ?? [];
 
         // Decrypt per value: a value sealed under a now-unavailable key (rotated/recreated DataProtection key
         // ring, or written by a replica before the shared ring existed) must not poison the whole dictionary or

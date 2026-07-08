@@ -1,9 +1,10 @@
+#nullable enable
 using DigitalBrain.Core;
-using DigitalBrain.Kernel.Foundry;
-using Microsoft.Extensions.AI;
-using Microsoft.CodeAnalysis;
 using DigitalBrain.Core.Distribution;
+using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Ui;
+using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel;
 
 using DigitalBrain.Pack.Contracts;
@@ -28,7 +29,9 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         EnsureEmbodied();
         if (await TryDispatchEmbodiedAsync(item))
+        {
             return;
+        }
 
         await DispatchBroadcastIfHandledAsync(item);
     }
@@ -46,14 +49,6 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         var id = this.GetPrimaryKeyString() ?? "unknown-generated";
         Logger.LogInformation("GeneratedNeuron {Id} dispatched {Type}", id, synapse.Type);
         await FireAsync(new NeuronTelemetry(Self, "generated-dispatched"), cancellationToken);
-
-        switch (synapse)
-        {
-            case NeuroPackInstalled installed:
-                PackRuntime.Install(installed.Pack);
-                await EmitConfigFormIfRequiredAsync(cancellationToken);
-                return;
-        }
 
         if (await TryDispatchEmbodiedAsync(synapse, cancellationToken))
         {
@@ -74,10 +69,16 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
     private async Task EmitConfigFormIfRequiredAsync(CancellationToken cancellationToken)
     {
         var embodied = PackRuntime.Current;
-        if (embodied is null) return;
+        if (embodied is null)
+        {
+            return;
+        }
 
         var required = embodied.GetManifest().RequiredConfig;
-        if (required is null || required.Count == 0) return;
+        if (required is null || required.Count == 0)
+        {
+            return;
+        }
 
         var surface = ConfigFormSurface.Build(embodied.PackName, required, Self.Value);
         await FireAsync(surface, cancellationToken);
@@ -147,7 +148,10 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
     private async Task BroadcastPackSurfaceAsync(Synapse output, string packName, CancellationToken cancellationToken)
     {
         var bus = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus is null) return;
+        if (bus is null)
+        {
+            return;
+        }
 
         if (output is UiSurface surface)
         {
@@ -177,7 +181,7 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
             Logger.LogInformation("GeneratedNeuron ran embodied pack '{Pack}' for action '{Action}'", embodied.PackName, used.Action);
             if (used.Action is "open" or "emit-test-surface" or "self-test")
             {
-                var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, new List<UiWidgetTree> { new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live from embodied " + used.Pack }) });
+                var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, [new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live from embodied " + used.Pack })]);
                 var surf = new UiSurface(used.Pack, new Dictionary<string, object?> { [UiSurfaceKeys.Title] = used.Pack, ["pack"] = used.Pack, ["tree"] = winTree });
                 await FireAsync(surf, cancellationToken);
                 var b = ServiceProvider.GetService<HomeFeedBus>();
@@ -215,7 +219,7 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         if (used.Action is "open" or "emit-test-surface" or "self-test")
         {
-            var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, new List<UiWidgetTree> { new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live surface from " + used.Pack + " pack scenario." }) });
+            var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, [new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live surface from " + used.Pack + " pack scenario." })]);
             var surf = new UiSurface(used.Pack, new Dictionary<string, object?>
             {
                 [UiSurfaceKeys.Title] = used.Pack,
@@ -313,11 +317,10 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
                 ["title"] = "Gmail Insights",
                 ["subtitle"] = emailCount + " messages analyzed locally"
             },
-            new List<UiWidgetTree>
-            {
+            [
                 new("text", new Dictionary<string, object?> { ["text"] = summary }),
                 new("text", new Dictionary<string, object?> { ["text"] = "Chart request: " + chartRequestId })
-            });
+            ]);
 
         return new UiSurface("gmail-insights", new Dictionary<string, object?>
         {
@@ -402,10 +405,7 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
     private (string Key, string Code, string Description)? LastInstalledPack()
     {
-        var last = OutgoingJournal.Concat(IncomingJournal).OfType<NeuroPackInstalled>().LastOrDefault();
-        if (last is null) return null;
-        var p = last.Pack;
-        return ($"{p.Name}@{p.Version}", p.Code, p.Description);
+        return null;
     }
 
 }

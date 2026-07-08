@@ -3,8 +3,8 @@ using DigitalBrain.Aspire;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Integrations (Telegram, Flutter) packed as marketplace NeuroPacks - no logic inside this AppHost.
-// Pack provides the Aspire bits (see AddFlutterClient).
+// Integrations stay thin here: INO, Gmail, Salesforce, Flutter, and optional transports
+// are wired through the kernel rather than distributed through a marketplace.
 
 // Experiences emit UiSurface (AuthButtonSurface etc) for sdk/flutter_demo + Telegram skeleton.
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
@@ -17,7 +17,6 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
     options.WithVoice2Text<Whisper1Local>();
     // To switch to Azure OpenAI, call options.WithLLM<Gpt4oMini>() instead — it needs the
     // azure-openai-endpoint/-key parameters wired below (see README "LLM provider switch").
-    options.UseLocalMarketplace = true;
 });
 
 // Service-to-service secret gating the secrets-returning GetPackConfig RPC. Shared (same value) between the
@@ -31,13 +30,13 @@ var salesforceAppConfig = builder.AddSalesforceAppConfig();
 var googleAppConfig = builder.AddGoogleAppConfig();
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
-ctx.WireKernelSilo(kernel);  // Provides kernel cool features out of box (marketplace, surfaces, journals, 3 replicas HA, LLM for built-ins) via the Aspire package.
+ctx.WireKernelSilo(kernel);  // Provides surfaces, journals, 3 replicas HA, and LLM wiring via the Aspire package.
 kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
 kernel.WithGoogleAppConfig(googleAppConfig);
 
 // Default Windows Flutter thin client on local `aspire run` (P0 item 1+12).
-// Full UI logic remains in marketplace NeuroPack. Uses shared dev default helper (extracted to Aspire ext; pack can override later).
+// Flutter is the thin local client for neuron-emitted surfaces.
 var flutter = ctx.AddDefaultDevFlutterClient(kernel)
     ?? throw new InvalidOperationException(
         "Flutter app path not resolved for default windows client. Ensure brain/app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
@@ -58,8 +57,7 @@ if (ctx.EnableMcp)
 if (IsEnabled("DIGITALBRAIN_ENABLE_TELEGRAM"))
 {
     // Telegram transport: bridges Telegram updates to the kernel gateway over gRPC. It boots no-op without a
-    // token, so it is safe to make always-present in production (the spec's "install from marketplace, no
-    // restart" intent). Kept behind DIGITALBRAIN_ENABLE_TELEGRAM here so the default product path is unchanged;
+    // token, so it is safe to make always-present in production. Kept behind DIGITALBRAIN_ENABLE_TELEGRAM here so the default product path is unchanged;
     // to enable the experience without an AppHost restart, set DIGITALBRAIN_ENABLE_TELEGRAM=true (or drop this gate).
     // The token is an optional secret parameter — supplied at startup (config/user-secrets/env: Parameters:telegram-bot-token)
     // OR later via the in-app config flow. Empty default keeps it optional: no token -> transport boots no-op.

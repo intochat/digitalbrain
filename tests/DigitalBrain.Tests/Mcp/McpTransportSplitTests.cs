@@ -20,7 +20,7 @@ public class McpTransportSplitTests
     {
         var read = ToolNames<DigitalBrainReadTools>();
         Assert.Equal(
-            new[] { "get_timeline", "get_workbench_surfaces", "list_marketplace", "ping_digitalbrain" }.OrderBy(n => n),
+            new[] { "get_timeline", "get_workbench_surfaces", "ping_digitalbrain" }.OrderBy(n => n),
             read.OrderBy(n => n));
     }
 
@@ -30,9 +30,12 @@ public class McpTransportSplitTests
         var read = ToolNames<DigitalBrainReadTools>().ToHashSet();
         var mutation = ToolNames<DigitalBrainMutationTools>();
 
-        Assert.Contains("publish_to_marketplace", mutation);
-        Assert.Contains("install_from_marketplace", mutation);
-        Assert.Contains("run_code_foundry", mutation);
+        Assert.Contains("ino_interact", mutation);
+        Assert.Contains("define_reaction", mutation);
+        Assert.Contains("create_automation_from_description", mutation);
+        Assert.DoesNotContain("publish_to_marketplace", mutation);
+        Assert.DoesNotContain("install_from_marketplace", mutation);
+        Assert.DoesNotContain("run_code_foundry", mutation);
         Assert.All(mutation, name => Assert.DoesNotContain(name, read));
     }
 }

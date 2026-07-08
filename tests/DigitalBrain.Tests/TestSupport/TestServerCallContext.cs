@@ -11,7 +11,7 @@ public sealed class TestServerCallContext : ServerCallContext
     private TestServerCallContext(CancellationToken cancellationToken = default, Metadata? requestHeaders = null)
     {
         _cancellationToken = cancellationToken;
-        _requestHeaders = requestHeaders ?? new Metadata();
+        _requestHeaders = requestHeaders ?? [];
     }
 
     public static TestServerCallContext Create(CancellationToken cancellationToken = default) => new(cancellationToken);
@@ -20,7 +20,10 @@ public sealed class TestServerCallContext : ServerCallContext
     {
         var metadata = new Metadata();
         foreach (var (key, value) in headers)
+        {
             metadata.Add(key, value);
+        }
+
         return new TestServerCallContext(requestHeaders: metadata);
     }
 
@@ -30,10 +33,10 @@ public sealed class TestServerCallContext : ServerCallContext
     protected override DateTime DeadlineCore => DateTime.MaxValue;
     protected override Metadata RequestHeadersCore => _requestHeaders;
     protected override CancellationToken CancellationTokenCore => _cancellationToken;
-    protected override Metadata ResponseTrailersCore { get; } = new();
+    protected override Metadata ResponseTrailersCore { get; } = [];
     protected override Status StatusCore { get; set; }
     protected override WriteOptions? WriteOptionsCore { get; set; }
-    protected override AuthContext AuthContextCore => new(string.Empty, new Dictionary<string, List<AuthProperty>>());
+    protected override AuthContext AuthContextCore => new(string.Empty, []);
     protected override ContextPropagationToken CreatePropagationTokenCore(ContextPropagationOptions? options) => null!;
     protected override Task WriteResponseHeadersAsyncCore(Metadata responseHeaders) => Task.CompletedTask;
 }

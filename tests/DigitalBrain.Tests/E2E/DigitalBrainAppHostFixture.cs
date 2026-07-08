@@ -1,12 +1,11 @@
+using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Trust;
 using DigitalBrain.Runtime.Grpc;
 using Google.Protobuf;
 using Grpc.Net.Client;
-using System.Reflection;
 
 namespace DigitalBrain.Tests.E2E;
 
@@ -51,7 +50,9 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
     public virtual async Task InitializeAsync()
     {
         if (!E2EPrerequisites.OptedIn)
+        {
             return; // Not opted into the real-stack E2E; the [SkippableFact] will skip.
+        }
 
         if (await ProbeAsync(WarmClusterWebUrl, TimeSpan.FromSeconds(2)))
         {
@@ -68,7 +69,6 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
 
         var testId = Guid.NewGuid().ToString("N")[..8];
         Environment.SetEnvironmentVariable("DIGITALBRAIN_TEST_MODE", "true");
-        Environment.SetEnvironmentVariable("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", "true");
         Environment.SetEnvironmentVariable("DIGITALBRAIN_SURFACES_ENABLED", "true");
         Environment.SetEnvironmentVariable("DigitalBrain__ClusterId", $"e2e-{testId}");
         Environment.SetEnvironmentVariable("DIGITALBRAIN_KERNEL_REPLICAS",
@@ -118,56 +118,6 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
     public GrpcChannel CreateGatewayGrpcChannel()
     {
         return GrpcChannel.ForAddress(GrpcUrl);
-    }
-
-    // Pack-specific helpers for E2E: drive real marketplace publish/install so packs embody via ALC/IPackBehavior.
-    public async Task PublishPackAsync(string packName, string version, string code = "/* E2E test pack code */", string owner = "e2e-test", double commissionRate = 0.0, string description = "pack for E2E surface render test")
-    {
-        using var channel = CreateGatewayGrpcChannel();
-        var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
-
-        // Sign the pack so it passes the install-time RejectUnsignedPacks gate (the secure default).
-        // Self-signed is sufficient: the gate verifies code integrity, not publisher identity.
-        var (privateKey, publicKey) = PackSignatureVerifier.GenerateKeyPair();
-        var signed = PackSignatureVerifier.SignPack(
-            new NeuroPack(packName, version, owner, false, commissionRate, code, description), privateKey, publicKey);
-
-        var cmd = new
-        {
-            PackName = packName,
-            Version = version,
-            Code = code,
-            OwnerId = owner,
-            IsPrivate = false,
-            CommissionRate = commissionRate,
-            Description = description,
-            AuthorPublicKeyBase64 = signed.AuthorPublicKeyBase64,
-            SignatureBase64 = signed.SignatureBase64
-        };
-        var payload = System.Text.Json.JsonSerializer.Serialize(cmd);
-
-        await client.SendAsync(new SynapseEnvelope
-        {
-            CorrelationId = "e2e-pub-" + packName,
-            TypeName = "PublishToMarketplace",
-            Payload = ByteString.CopyFromUtf8(payload)
-        });
-    }
-
-    public async Task InstallPackAsync(string packName, string version, string buyer = "e2e-browser-user")
-    {
-        using var channel = CreateGatewayGrpcChannel();
-        var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
-
-        var cmd = new { PackName = packName, Version = version, BuyerId = buyer };
-        var payload = System.Text.Json.JsonSerializer.Serialize(cmd);
-
-        await client.SendAsync(new SynapseEnvelope
-        {
-            CorrelationId = "e2e-install-" + packName,
-            TypeName = "InstallFromMarketplace",
-            Payload = ByteString.CopyFromUtf8(payload)
-        });
     }
 
     public async Task SendSynapseAsync(string typeName, string jsonPayload, string? correlationId = null)

@@ -4,7 +4,7 @@ namespace DigitalBrain.Tests.Domains;
 
 public class ForExperienceHopTests
 {
-    static string DataJson(UiSurface s) => (string)s.Props["dataJson"]!;
+    private static string DataJson(UiSurface s) => (string)s.Props["dataJson"]!;
 
     [Fact]
     public void Injects_marker_into_wire_dataJson()

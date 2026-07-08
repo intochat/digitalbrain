@@ -1,9 +1,9 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
+using DigitalBrain.Ino;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
-using DigitalBrain.Ino;
 using DigitalBrain.Pack.Contracts;
 using DigitalBrain.Salesforce;
 using DigitalBrain.TestKit;
@@ -136,13 +136,17 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
     private static UiWidgetTree? FindNode(UiWidgetTree tree, string type)
     {
         if (tree.Type == type)
+        {
             return tree;
+        }
 
         foreach (var child in tree.Children ?? [])
         {
             var found = FindNode(child, type);
             if (found is not null)
+            {
                 return found;
+            }
         }
 
         return null;
@@ -155,7 +159,9 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
         foreach (var child in tree.Children ?? [])
         {
             foreach (var found in FindNodes(child))
+            {
                 yield return found;
+            }
         }
     }
 
@@ -513,23 +519,36 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
         void Collect(UiWidgetTree node)
         {
             if (node.Props.TryGetValue("text", out var text) && text is not null)
+            {
                 values.Add(text.ToString()!);
+            }
+
             if (node.Props.TryGetValue("subtitle", out var sub) && sub is not null)
+            {
                 values.Add(sub.ToString()!);
+            }
+
             if (node.Props.TryGetValue("title", out var tit) && tit is not null)
+            {
                 values.Add(tit.ToString()!);
+            }
 
             // Support list items stored in "items" prop (enriched G/SF surfaces + gallery)
             if (node.Props.TryGetValue("items", out var itemsObj) && itemsObj is System.Collections.IEnumerable itemsEnum)
             {
                 foreach (var it in itemsEnum)
                 {
-                    if (it is UiWidgetTree wt) Collect(wt);
+                    if (it is UiWidgetTree wt)
+                    {
+                        Collect(wt);
+                    }
                 }
             }
 
             foreach (var child in node.Children ?? [])
+            {
                 Collect(child);
+            }
         }
     }
 
@@ -539,7 +558,9 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
         foreach (var child in tree.Children ?? [])
         {
             foreach (var found in FindNodes(child))
+            {
                 yield return found;
+            }
         }
     }
 }
@@ -592,29 +613,44 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
         void Collect(UiWidgetTree node)
         {
             if (node.Props.TryGetValue("text", out var text) && text is not null)
+            {
                 values.Add(text.ToString()!);
+            }
+
             if (node.Props.TryGetValue("subtitle", out var sub) && sub is not null)
+            {
                 values.Add(sub.ToString()!);
+            }
+
             if (node.Props.TryGetValue("title", out var tit) && tit is not null)
+            {
                 values.Add(tit.ToString()!);
+            }
 
             // Support list items stored in "items" prop (enriched G/SF surfaces + gallery)
             if (node.Props.TryGetValue("items", out var itemsObj) && itemsObj is System.Collections.IEnumerable itemsEnum)
             {
                 foreach (var it in itemsEnum)
                 {
-                    if (it is UiWidgetTree wt) Collect(wt);
+                    if (it is UiWidgetTree wt)
+                    {
+                        Collect(wt);
+                    }
                 }
             }
 
             foreach (var child in node.Children ?? [])
+            {
                 Collect(child);
+            }
         }
     }
 }
 
+[Alias("DigitalBrain.Tests.Ino.ISalesforceConfigWriter")]
 public interface ISalesforceConfigWriter : INeuron
 {
+    [Alias("StoreSalesforceCredentialAsync")]
     Task StoreSalesforceCredentialAsync();
 }
 
@@ -647,8 +683,10 @@ internal sealed class FailingSalesforceApiClientFactory : ISalesforceApiClientFa
         Task.FromResult<ISalesforceApiClient>(new FailingSalesforceApiClient());
 }
 
+[Alias("DigitalBrain.Tests.Ino.IGoogleConfigWriter")]
 public interface IGoogleConfigWriter : INeuron
 {
+    [Alias("StoreGoogleCredentialAsync")]
     Task StoreGoogleCredentialAsync();
 }
 

@@ -19,14 +19,19 @@ public static class GatewayInternalAuth
         if (string.IsNullOrEmpty(configuredKey))
         {
             if (environment.IsDevelopment())
+            {
                 return;
+            }
+
             logger.LogError("{Caller} denied: no InternalServiceKey configured outside Development.", callerName);
             throw new RpcException(new Status(StatusCode.Unauthenticated, "internal only"));
         }
 
         var presented = context.RequestHeaders.GetValue(InternalKeyHeader);
         if (presented is null || !FixedTimeEquals(presented, configuredKey))
+        {
             throw new RpcException(new Status(StatusCode.Unauthenticated, "internal only"));
+        }
     }
 
     private static bool FixedTimeEquals(string a, string b) =>

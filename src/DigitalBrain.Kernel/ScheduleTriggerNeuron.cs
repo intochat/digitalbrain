@@ -14,7 +14,7 @@ public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, Neuron
 {
     protected override bool ShouldSubscribeToTimeline => true;
 
-    private List<RegisterReaction> _scheduled = new();
+    private List<RegisterReaction> _scheduled = [];
     private Dictionary<string, IGrainReminder> _reminders = new(StringComparer.OrdinalIgnoreCase);
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -38,7 +38,9 @@ public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, Neuron
     {
         var removes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var rm in OutgoingJournal.Concat(IncomingJournal).OfType<RemoveReaction>())
+        {
             removes.Add(rm.Id);
+        }
 
         _scheduled = OutgoingJournal.Concat(IncomingJournal)
             .OfType<RegisterReaction>()

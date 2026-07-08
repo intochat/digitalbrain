@@ -14,7 +14,7 @@ public static class KernelPack
 {
     public const string Name = "kernel";
     public const string DefaultVersion = "0.3.0";
-    public const string Description = "Core kernel substrate. Pre-installed; updatable via marketplace with rolling replica support.";
+    public const string Description = "Core kernel substrate with rolling replica support.";
 }
 
 [GrainType("digitalbrain.kernel.aspire.v1")]

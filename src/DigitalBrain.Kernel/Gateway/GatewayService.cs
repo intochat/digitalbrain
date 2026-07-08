@@ -13,9 +13,8 @@ using Grpc.Core;
 namespace DigitalBrain.Kernel.Gateway;
 
 using DigitalBrain.Ui.Contracts;
-using DigitalBrain.Ui.Runtime;
-
 using DigitalBrain.Ui.Contracts.Ui;
+using DigitalBrain.Ui.Runtime;
 
 public sealed class GatewayService(
     IGrainFactory grains,
@@ -91,7 +90,11 @@ public sealed class GatewayService(
     // a raw client-supplied userId/sessionId directly.
     private async Task<UserSessionState?> ResolveSessionByClientIdAsync(string? clientId)
     {
-        if (string.IsNullOrWhiteSpace(clientId)) return null;
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            return null;
+        }
+
         var session = grains.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         return await session.GetSessionByClientIdAsync(clientId);
     }
@@ -127,14 +130,19 @@ public sealed class GatewayService(
         GatewayInternalAuth.Enforce(configuration, environment, logger, context, nameof(GetPackConfig));
 
         if (packConfigStore is null)
+        {
             throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pack config store is not configured."));
+        }
 
         var scope = string.IsNullOrWhiteSpace(request.Scope) ? "default" : request.Scope;
         var values = await packConfigStore.GetAsync(scope, request.Pack, context.CancellationToken);
 
         var reply = new PackConfigReply();
         foreach (var (key, value) in values)
+        {
             reply.Values[key] = value;
+        }
+
         return reply;
     }
 
@@ -163,7 +171,9 @@ public sealed class GatewayService(
     {
         var neuronId = string.IsNullOrWhiteSpace(request.NeuronId) ? "ino-main" : request.NeuronId;
         if (neuronId != "ino-main")
+        {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Ask currently supports only 'ino-main'."));
+        }
 
         try
         {

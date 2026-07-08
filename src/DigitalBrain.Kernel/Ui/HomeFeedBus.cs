@@ -21,14 +21,17 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
     private const string ProviderName = "HomeFeed";
     private const string StreamNamespace = "homefeed";
     private static readonly Guid UnaddressedKey = Guid.Empty;
-    private readonly HashSet<string> _seen = new();
+    private readonly HashSet<string> _seen = [];
     private readonly Queue<string> _seenOrder = new();
     private readonly object _seenLock = new();
 
     public async Task BroadcastAsync(RfwCard card, CancellationToken cancellationToken = default)
     {
         var key = SeenKey(card);
-        if (!TryMarkSeen(key)) return;
+        if (!TryMarkSeen(key))
+        {
+            return;
+        }
 
         try
         {
@@ -52,7 +55,10 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
     private async Task BroadcastAndLogAsync(RfwCard card)
     {
         var key = SeenKey(card);
-        if (!TryMarkSeen(key)) return;
+        if (!TryMarkSeen(key))
+        {
+            return;
+        }
 
         try
         {
@@ -114,7 +120,11 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
     {
         lock (_seenLock)
         {
-            if (!_seen.Add(key)) return false;
+            if (!_seen.Add(key))
+            {
+                return false;
+            }
+
             _seenOrder.Enqueue(key);
             while (_seenOrder.Count > MaxSeenEntries)
             {
@@ -152,7 +162,10 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
         {
             await unaddressedHandle.UnsubscribeAsync();
             if (personalHandle is not null)
+            {
                 await personalHandle.UnsubscribeAsync();
+            }
+
             channel.Writer.TryComplete();
         }
     }

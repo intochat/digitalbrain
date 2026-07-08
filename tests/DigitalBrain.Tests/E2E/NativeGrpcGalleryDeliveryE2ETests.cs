@@ -13,7 +13,7 @@ namespace DigitalBrain.Tests.E2E;
 [Collection(nameof(DigitalBrainE2ECollection))]
 public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainAppHostFixture fixture)
 {
-    readonly DigitalBrainAppHostFixture _fx = fixture;
+    private readonly DigitalBrainAppHostFixture _fx = fixture;
 
     [SkippableFact]
     public async Task Gallery_start_hop_is_delivered_over_native_grpc()
@@ -45,14 +45,18 @@ public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainAppHostFixture
         Assert.True(await delivered, "ui-gallery start hop was not delivered to the native-gRPC WatchHomeFeed stream");
     }
 
-    static async Task<bool> ReadForGalleryHopAsync(IAsyncStreamReader<RfwCardEnvelope> stream, CancellationToken ct)
+    private static async Task<bool> ReadForGalleryHopAsync(IAsyncStreamReader<RfwCardEnvelope> stream, CancellationToken ct)
     {
         try
         {
             while (await stream.MoveNext(ct))
             {
                 var json = stream.Current.DataJson;
-                if (string.IsNullOrEmpty(json)) continue;
+                if (string.IsNullOrEmpty(json))
+                {
+                    continue;
+                }
+
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("activeExperience", out var marker) &&
                     marker.GetString() == "ui-gallery/ui-gallery")

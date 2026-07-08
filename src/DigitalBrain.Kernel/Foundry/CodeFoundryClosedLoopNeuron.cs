@@ -90,9 +90,14 @@ public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> lo
             var runResult = (await runner.GetOutgoingTimelineAsync(cancellationToken)).OfType<CodeRunResult>().LastOrDefault();
 
             if (runResult is { Success: true })
+            {
                 await FireAsync(new FoundryCompleted(request.Spec, request.Tier, runResult.Output, Applied: true), cancellationToken);
+            }
             else
+            {
                 await FireAsync(new FoundryRolledBack(request.Spec, runResult?.Error ?? "run-failed", checkpointId), cancellationToken);
+            }
+
             return;
         }
 
@@ -102,9 +107,13 @@ public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> lo
         var built = (await deployer.GetOutgoingTimelineAsync(cancellationToken)).OfType<CodeBuilt>().LastOrDefault(b => b.ModuleName == moduleName);
 
         if (built is { Success: true })
+        {
             await FireAsync(new FoundryCompleted(request.Spec, request.Tier, "restart-requested:" + moduleName, Applied: true), cancellationToken);
+        }
         else
+        {
             await FireAsync(new FoundryRolledBack(request.Spec, "build", checkpointId), cancellationToken);
+        }
     }
 
     private bool TrustedAutoApply =>

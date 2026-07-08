@@ -44,7 +44,10 @@ internal sealed class FakeSalesforceApiClientFactory(ISalesforceApiClient client
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (client is RecordingSalesforceApiClient recording)
+        {
             recording.ScopesRequested.Add(scope);
+        }
+
         return Task.FromResult(client);
     }
 }

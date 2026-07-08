@@ -16,7 +16,9 @@ public sealed class SalesforceAppConfigSeeder(
     {
         var appConfig = SalesforceAppConfig.From(configuration);
         if (!appConfig.HasAnyValue)
+        {
             return;
+        }
 
         if (!appConfig.HasConnectedAppConfig)
         {
@@ -47,7 +49,9 @@ public sealed class SalesforceAppConfigSeeder(
         changed |= SetIfConfigured(merged, SalesforceClientFactory.RedirectUriKey, appConfig.RedirectUri);
 
         if (!changed)
+        {
             return;
+        }
 
         await store
             .SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged, cancellationToken)
@@ -61,7 +65,9 @@ public sealed class SalesforceAppConfigSeeder(
     private static bool SetIfConfigured(IDictionary<string, string> values, string key, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             return false;
+        }
 
         var trimmed = value.Trim();
         if (values.TryGetValue(key, out var existing) &&

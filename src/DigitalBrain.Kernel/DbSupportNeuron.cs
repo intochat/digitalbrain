@@ -110,7 +110,9 @@ public class DbSupportNeuron(
     private static bool IsSqlitePath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
+        {
             return false;
+        }
 
         var extension = Path.GetExtension(path);
         return extension.Equals(".db", StringComparison.OrdinalIgnoreCase) ||
@@ -121,7 +123,9 @@ public class DbSupportNeuron(
     private static bool IsSqliteConnectionString(string? connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
+        {
             return false;
+        }
 
         try
         {
@@ -137,10 +141,14 @@ public class DbSupportNeuron(
     private static string SafeSourceLabel(string? sourcePath, string? connectionString)
     {
         if (!string.IsNullOrWhiteSpace(sourcePath))
+        {
             return SafeFileName(sourcePath);
+        }
 
         if (string.IsNullOrWhiteSpace(connectionString))
+        {
             return "none";
+        }
 
         try
         {

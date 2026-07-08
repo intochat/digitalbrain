@@ -10,7 +10,7 @@ public class WidgetTreeHopBridgeTests
     public void WidgetTree_hop_surface_carries_markers_and_keys_correlation_on_surfaceId()
     {
         var tree = new UiWidgetTree(UiKitVocabulary.Screen, new Dictionary<string, object?>(),
-            new List<UiWidgetTree> { new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "hi" }) });
+            [new(UiKitVocabulary.Text, new Dictionary<string, object?> { ["text"] = "hi" })]);
         var surface = UiSurface.ForExperienceHopTree("hello-world", "hello-world", "ask", tree);
 
         var card = UiSurfaceRfwBridge.FromUiSurface(surface, "hello-world");

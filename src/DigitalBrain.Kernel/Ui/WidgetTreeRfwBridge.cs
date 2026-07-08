@@ -27,7 +27,9 @@ public static class WidgetTreeRfwBridge
         foreach (var markerKey in new[] { "activeExperience", "experienceId", UiSurfaceKeys.SurfaceId, UiSurfaceKeys.Title, "clientId", "role", "surfaceKind" })
         {
             if (surface.Props.TryGetValue(markerKey, out var markerValue) && markerValue is not null)
+            {
                 payload[markerKey] = markerValue;
+            }
         }
         var correlation = surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var sid) && sid is string sidStr && sidStr.Length > 0
             ? sidStr

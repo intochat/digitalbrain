@@ -19,7 +19,9 @@ public sealed class FakeSalesforceTokenHandler(string accessToken, string instan
             ["instance_url"] = instanceUrl
         };
         if (refreshToken is not null)
+        {
             payload["refresh_token"] = refreshToken;
+        }
 
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -34,7 +36,9 @@ public sealed class FakeSalesforceTokenHandler(string accessToken, string instan
         {
             var parts = pair.Split('=', 2);
             if (parts.Length == 2 && Uri.UnescapeDataString(parts[0]) == key)
+            {
                 return Uri.UnescapeDataString(parts[1]);
+            }
         }
 
         throw new InvalidOperationException($"Query parameter '{key}' not found in '{url}'.");

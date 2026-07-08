@@ -15,10 +15,14 @@ public static class ChatUploadClassifier
     public static ChatUploadKind Classify(string fileName)
     {
         if (IsSqliteDatabase(fileName))
+        {
             return ChatUploadKind.SqliteDatabase;
+        }
 
         if (IsTabularWorkbook(fileName))
+        {
             return ChatUploadKind.TabularWorkbook;
+        }
 
         return ChatUploadKind.Unsupported;
     }
@@ -43,7 +47,9 @@ public static class ChatUploadClassifier
         var safeFileName = SafeFileName(fileName);
         var connectionName = Path.GetFileNameWithoutExtension(safeFileName);
         if (string.IsNullOrWhiteSpace(connectionName))
+        {
             connectionName = "sqlite-upload";
+        }
 
         var connectionString = new SqliteConnectionStringBuilder
         {
@@ -63,7 +69,9 @@ public static class ChatUploadClassifier
     {
         var extension = Path.GetExtension(fileName);
         if (string.IsNullOrWhiteSpace(extension) || !IsSqliteDatabase("x" + extension))
+        {
             extension = ".db";
+        }
 
         return Path.Combine(Path.GetTempPath(), "digitalbrain-upload-" + Guid.NewGuid().ToString("N") + extension);
     }

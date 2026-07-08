@@ -24,8 +24,8 @@ public static class UiSurfaceSamples
                     },
                     new Dictionary<string, object?>
                     {
-                        ["id"] = "market-main",
-                        ["label"] = "Marketplace",
+                        ["id"] = "automation-main",
+                        ["label"] = "Automations",
                         ["activity"] = 0.4
                     }
                 },
@@ -34,7 +34,7 @@ public static class UiSurfaceSamples
                     new Dictionary<string, object?>
                     {
                         ["from"] = "ino-main",
-                        ["to"] = "market-main",
+                        ["to"] = "automation-main",
                         ["value"] = 0.3
                     }
                 },
@@ -149,8 +149,8 @@ public static class UiSurfaceSamples
                         {
                             ["clientId"] = clientId
                         }),
-                    ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), new List<UiWidgetTree>
-                    {
+                    ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(),
+                    [
                         new UiWidgetTree(
                             NeuronUiKit.Form,
                             new Dictionary<string, object?>
@@ -178,98 +178,9 @@ public static class UiSurfaceSamples
                             ["synapseType"] = SalesforceSignals.AuthRequested,
                             ["clientId"] = clientId
                         })
-                    })
+                    ])
                 }));
     }
-
-    public static UiSurface MarketplaceList() => new(
-        UiSurfaceKinds.MarketplaceList,
-        WithCommon(
-            surfaceId: "surface.marketplace-list",
-            emitter: "market-main",
-            title: "Marketplace",
-            layout: UiSurfaceLayouts.Panel,
-            props: new Dictionary<string, object?>
-            {
-                ["packs"] = new[]
-                {
-                    new Dictionary<string, object?>
-                    {
-                        ["name"] = "DigitalBrain.UIKit.ForUI",
-                        ["version"] = "0.1.0",
-                        ["installed"] = true,
-                        ["description"] = "Trusted ForUI primitive pack for DigitalBrain surfaces."
-                    }
-                },
-                ["installAction"] = SynapseAction("install-pack", "Install", "InstallFromMarketplace", new Dictionary<string, object?>
-                {
-                    ["version"] = "0.1.0",
-                    ["buyerId"] = "anonymous",
-                    ["userId"] = "anonymous"
-                }),
-                ["updateAction"] = SynapseAction("update-pack", "Update", "InstallFromMarketplace", new Dictionary<string, object?>
-                {
-                    ["version"] = "0.1.0",
-                    ["buyerId"] = "anonymous",
-                    ["userId"] = "anonymous"
-                })
-            }));
-
-    public static UiSurface InstalledBundles() => new(
-        UiSurfaceKinds.InstalledBundles,
-        WithCommon(
-            surfaceId: "surface.installed-bundles",
-            emitter: "market-main",
-            title: "Installed Bundles",
-            layout: UiSurfaceLayouts.Panel,
-            priority: 11,
-            props: new Dictionary<string, object?>
-            {
-                ["bundles"] = new[]
-                {
-                    new Dictionary<string, object?>
-                    {
-                        ["name"] = "DigitalBrain.UI.Workbench",
-                        ["version"] = "0.1.0",
-                        ["ownerId"] = "digitalbraintech",
-                        ["installed"] = true,
-                        ["status"] = "ready",
-                        ["description"] = "Startup workbench experience.",
-                        ["experienceCount"] = 1,
-                        ["experiences"] = new[]
-                        {
-                            new Dictionary<string, object?>
-                            {
-                                ["experienceId"] = "digitalbrain-ui-workbench-open",
-                                ["name"] = "Open Workbench",
-                                ["kind"] = "app",
-                                ["status"] = "ready",
-                                ["summary"] = "Launch the main DigitalBrain workbench.",
-                                ["action"] = SynapseAction(
-                                    "open-workbench",
-                                    "Open",
-                                    nameof(InoRequest),
-                                    new Dictionary<string, object?>
-                                    {
-                                        ["prompt"] = "Open the DigitalBrain workbench experience.",
-                                        ["sessionId"] = "workbench"
-                                    })
-                            }
-                        }
-                    }
-                },
-                ["experiences"] = new[]
-                {
-                    new Dictionary<string, object?>
-                    {
-                        ["experienceId"] = "digitalbrain-ui-workbench-open",
-                        ["bundleName"] = "DigitalBrain.UI.Workbench",
-                        ["name"] = "Open Workbench",
-                        ["kind"] = "app",
-                        ["status"] = "ready"
-                    }
-                }
-            }));
 
     public static UiSurface Workspace() =>
         UiSurfaceLiveData.WorkspaceBoundary("anonymous", WorkspaceIds.Default, "workbench");
@@ -554,8 +465,8 @@ public static class UiSurfaceLiveData
             ["vectorCollection"] = vectorCollection
         };
 
-        var tree = new UiWidgetTree("column", new Dictionary<string, object?>(), new List<UiWidgetTree>
-        {
+        var tree = new UiWidgetTree("column", new Dictionary<string, object?>(),
+        [
             new("fcard", new Dictionary<string, object?>
             {
                 ["title"] = "Active workspace",
@@ -575,7 +486,7 @@ public static class UiSurfaceLiveData
                 ["title"] = "Isolation boundary",
                 ["subtitle"] = vectorCollection
             }, isolation.Select(pair => new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = pair.Key + ": " + pair.Value })).ToArray())
-        });
+        ]);
 
         return new UiSurface(
             UiSurfaceKinds.Workspace,
@@ -741,10 +652,10 @@ public static class UiSurfaceLiveData
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows)
     {
         var children = rows.Count == 0
-            ? new List<UiWidgetTree>
-            {
+            ?
+            [
                 new("text", new Dictionary<string, object?> { ["text"] = "No tasks" })
-            }
+            ]
             : rows.Select(TaskCardTree).ToList();
 
         return new UiWidgetTree("fcard", new Dictionary<string, object?>
@@ -764,17 +675,28 @@ public static class UiSurfaceLiveData
         var children = new List<UiWidgetTree>();
 
         if (!string.IsNullOrWhiteSpace(description))
+        {
             children.Add(new("text", new Dictionary<string, object?> { ["text"] = description }));
+        }
+
         if (!string.IsNullOrWhiteSpace(latest))
+        {
             children.Add(new("text", new Dictionary<string, object?> { ["text"] = "Progress: " + latest }));
+        }
+
         if (!string.IsNullOrWhiteSpace(result))
+        {
             children.Add(new("text", new Dictionary<string, object?> { ["text"] = "Result: " + result }));
+        }
+
         if (row.TryGetValue("events", out var rawEvents) &&
             rawEvents is IEnumerable<IReadOnlyDictionary<string, object?>> events)
         {
             var eventText = string.Join(" -> ", events.Select(e => StringProp(e, "label")).Where(s => !string.IsNullOrWhiteSpace(s)));
             if (!string.IsNullOrWhiteSpace(eventText))
+            {
                 children.Add(new("text", new Dictionary<string, object?> { ["text"] = "Events: " + eventText }));
+            }
         }
 
         if (row.TryGetValue("cancelAction", out var rawAction) &&

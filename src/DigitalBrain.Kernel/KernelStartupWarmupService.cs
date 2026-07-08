@@ -15,7 +15,9 @@ public sealed class KernelStartupWarmupService(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (IsTestMode(environment))
+        {
             return;
+        }
 
         try
         {

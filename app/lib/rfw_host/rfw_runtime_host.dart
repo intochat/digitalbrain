@@ -576,7 +576,7 @@ class UiSurfaceTreeRenderer {
 // Simple navigator key for theme access in renderer when no context.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// Local ForUI search widget for buddy/pack autocomplete in dynamic trees (marketplace etc).
+/// Local ForUI search widget for autocomplete in dynamic trees.
 /// Uses FTextField + results as FTappable FCard. Query select sends event for neuron/synapse handling.
 class _ForuiBuddySearch extends StatefulWidget {
   const _ForuiBuddySearch({

@@ -36,7 +36,9 @@ public class SalesforceConnector : IConnector
         foreach (var key in Descriptor.RequiredConfigKeys)
         {
             if (!values.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
+            {
                 return new ConnectorConfigStatus(false, MissingKey: key, Message: $"Missing {key}");
+            }
         }
         return new ConnectorConfigStatus(true);
     }
@@ -47,13 +49,20 @@ public class SalesforceConnector : IConnector
         var values = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
 
         // props would come from clientIdHint or elsewhere; for simplicity use config
-        if (clientIdHint != null) values[SalesforceClientFactory.ClientIdKey] = clientIdHint;
+        if (clientIdHint != null)
+        {
+            values[SalesforceClientFactory.ClientIdKey] = clientIdHint;
+        }
 
         var configuredRedirectUri = _config?["DigitalBrain:Salesforce:RedirectUri"];
         if (!string.IsNullOrWhiteSpace(configuredRedirectUri))
+        {
             values[SalesforceClientFactory.RedirectUriKey] = configuredRedirectUri.Trim();
+        }
         else if (!values.ContainsKey(SalesforceClientFactory.RedirectUriKey))
+        {
             values[SalesforceClientFactory.RedirectUriKey] = SalesforceClientFactory.DefaultRedirectUri;
+        }
 
         if (!values.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var redirectUri) || string.IsNullOrWhiteSpace(redirectUri))
         {
@@ -123,7 +132,9 @@ public class SalesforceConnector : IConnector
 
         var redirectUri = appValues.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var stored) ? stored : callback.FallbackRedirectUri;
         if (string.IsNullOrWhiteSpace(redirectUri))
+        {
             redirectUri = SalesforceClientFactory.DefaultRedirectUri;
+        }
 
         try
         {
@@ -134,8 +145,15 @@ public class SalesforceConnector : IConnector
                 userTokenValues[kv.Key] = kv.Value;
             }
 
-            if (appValues.TryGetValue(SalesforceClientFactory.ClientIdKey, out var cid)) userTokenValues[SalesforceClientFactory.ClientIdKey] = cid;
-            if (appValues.TryGetValue(SalesforceClientFactory.ClientSecretKey, out var cs)) userTokenValues[SalesforceClientFactory.ClientSecretKey] = cs;
+            if (appValues.TryGetValue(SalesforceClientFactory.ClientIdKey, out var cid))
+            {
+                userTokenValues[SalesforceClientFactory.ClientIdKey] = cid;
+            }
+
+            if (appValues.TryGetValue(SalesforceClientFactory.ClientSecretKey, out var cs))
+            {
+                userTokenValues[SalesforceClientFactory.ClientSecretKey] = cs;
+            }
 
             await _store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues, cancellationToken);
             await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>(), cancellationToken);

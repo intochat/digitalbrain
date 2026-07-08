@@ -1,6 +1,6 @@
-using DigitalBrain.Ino.Context;
 using DigitalBrain.Core;
 using DigitalBrain.Ino;
+using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
@@ -23,8 +23,7 @@ internal sealed class NoOpScopedChatClientFactory : IScopedChatClientFactory
     public IChatClient? Create(string provider, string? apiKey) => null;
 }
 
-// Shared in-process cluster kernel wiring: in-memory dual journals + the pack embodiment engine.
-// Reused by cluster-backed tests so the prototype journal + Foundry services stay consistent.
+// Shared in-process cluster kernel wiring: in-memory dual journals plus current INO/automation services.
 public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder)
@@ -42,11 +41,8 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddScoped<NeuronJournals>();
                 services.Configure<NeuronLifecycleOptions>(options => options.JournalActivationMarkers = true);
                 services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
-                services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, MarketplaceInstallApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
+                services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
@@ -60,8 +56,7 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                     new ConfigurationBuilder()
                         .AddInMemoryCollection(new Dictionary<string, string?>
                         {
-                            ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false",
-                            ["DigitalBrain:Marketplace:TrustedLocalInstallBypass"] = "true"
+                            ["DigitalBrain:Automations:Enabled"] = "true"
                         })
                         .Build());
             });

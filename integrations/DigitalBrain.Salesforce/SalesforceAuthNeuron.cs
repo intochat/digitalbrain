@@ -2,10 +2,10 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
-using UiContracts = DigitalBrain.Ui.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using UiContracts = DigitalBrain.Ui.Contracts;
 
 [GrainType("digitalbrain.salesforce.auth.v1")]
 public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJournals journals)
@@ -20,7 +20,9 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
     public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
         if (signal.Name != SalesforceSignals.AuthRequested)
+        {
             return;
+        }
 
         if (IsOAuthStart(signal.Props))
         {
@@ -48,9 +50,13 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         var configuredRedirectUri = ServiceProvider
             .GetService<IConfiguration>()?["DigitalBrain:Salesforce:RedirectUri"];
         if (!string.IsNullOrWhiteSpace(configuredRedirectUri))
+        {
             values[SalesforceClientFactory.RedirectUriKey] = configuredRedirectUri.Trim();
+        }
         else
+        {
             CopyIfPresent(props, values, SalesforceClientFactory.RedirectUriKey);
+        }
 
         if (!values.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var redirectUri) ||
             string.IsNullOrWhiteSpace(redirectUri))
@@ -151,7 +157,9 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         {
             var exchangeValues = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
             if (pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var pendingCodeVerifier))
+            {
                 exchangeValues[SalesforceClientFactory.OAuthCodeVerifierKey] = pendingCodeVerifier;
+            }
 
             var handler = ServiceProvider.GetService<HttpMessageHandler>();
             var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(exchangeValues, callback.Code, redirectUri, handler, cancellationToken);
@@ -213,6 +221,8 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         string key)
     {
         if (props.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value?.ToString()))
+        {
             values[key] = value.ToString()!.Trim();
+        }
     }
 }

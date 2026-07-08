@@ -33,17 +33,18 @@ public static class GoogleAuthSurfaces
             ["pack"] = GoogleClientFactory.PackName
         };
         if (!string.IsNullOrWhiteSpace(clientId))
+        {
             buttonProps["clientId"] = clientId;
+        }
 
         children.Add(new UiContracts.UiWidgetTree(UiContracts.UiKitVocabulary.Button, buttonProps));
 
         var tree = new UiContracts.UiWidgetTree(
             UiContracts.UiKitVocabulary.Screen,
             new Dictionary<string, object?> { ["title"] = GoogleClientFactory.PackName + " configuration" },
-            new List<UiContracts.UiWidgetTree>
-            {
+            [
                 new(UiContracts.UiKitVocabulary.Column, new Dictionary<string, object?>(), children)
-            });
+            ]);
 
         var props = new Dictionary<string, object?>
         {
@@ -56,9 +57,14 @@ public static class GoogleAuthSurfaces
             ["tree"] = tree
         };
         if (!string.IsNullOrWhiteSpace(clientId))
+        {
             props["clientId"] = clientId;
+        }
+
         if (!string.IsNullOrWhiteSpace(message))
+        {
             props["message"] = message;
+        }
 
         return new UiContracts.UiSurface(PackContracts.ConfigFormSurface.Kind, props);
     }
@@ -73,7 +79,9 @@ public static class GoogleAuthSurfaces
             ["placeholder"] = label
         };
         if (secret)
+        {
             props["secret"] = true;
+        }
 
         return new UiContracts.UiWidgetTree(UiContracts.UiKitVocabulary.TextField, props);
     }

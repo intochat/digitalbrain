@@ -2,16 +2,20 @@ using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using DigitalBrain.Core;
+using DigitalBrain.Google;
 using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
-
-using DigitalBrain.Kernel.Uploads;
+using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Kernel.Uploads;
 using DigitalBrain.Kernel.Voice;
+using DigitalBrain.Salesforce;
+using DigitalBrain.ServiceDefaults;
 using DigitalBrain.Ui.Contracts;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
@@ -19,13 +23,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
-using DigitalBrain.Kernel.Kernel;
-
-using DigitalBrain.Kernel.SelfEvolution;
-using DigitalBrain.Salesforce;
 using Ino = DigitalBrain.Ino;
-using DigitalBrain.Google;
-using DigitalBrain.ServiceDefaults;
 
 // Kernel host for DigitalBrain (Aspire + Orleans).
 // Aspire-hosted path: env vars ConnectionStrings__clustering / grainstate / journal are injected by Aspire.
@@ -179,7 +177,9 @@ if (isAspireHosted)
     {
         var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
         if (!string.IsNullOrEmpty(grainStateConnStr))
+        {
             packConfigBlobs = new BlobServiceClient(grainStateConnStr, blobOptions);
+        }
     }
 }
 builder.Services.AddPackConfigStore(packConfigBlobs);
@@ -239,10 +239,7 @@ builder.UseOrleans(siloBuilder =>
     siloBuilder.ConfigureServices(services =>
     {
         services.AddScoped<NeuronJournals>();
-        services.AddSingleton<ISelfEvolutionApplyHandler, MarketplaceInstallApplyHandler>();
         services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
-        services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
-        services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
         services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
     });
 
@@ -334,7 +331,7 @@ builder.UseOrleans(siloBuilder =>
     siloBuilder.AddMemoryStreams("DigitalBrainTimeline");
     siloBuilder.AddMemoryGrainStorage("PubSubStore");
     siloBuilder.ConfigureServices(services => services.AddSignalEgressStreamSubscriber());
-    siloBuilder.AddFoundry();
+
 });
 
 builder.Services.AddHostedService<KernelStartupWarmupService>();
@@ -365,13 +362,17 @@ app.MapGrpcService<DigitalBrain.Kernel.Gateway.UiGatewayService>();
 app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
 {
     if (!request.HasFormContentType)
+    {
         return Results.BadRequest("Expected multipart/form-data.");
+    }
 
     var requestAborted = request.HttpContext.RequestAborted;
     var form = await request.ReadFormAsync(cancellationToken: requestAborted);
     var file = form.Files.GetFile("file");
     if (file is null || file.Length == 0)
+    {
         return Results.BadRequest("No file uploaded.");
+    }
 
     var clientId = form["clientId"].FirstOrDefault();
     var workspaceId = form["workspaceId"].FirstOrDefault();
@@ -410,7 +411,9 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
             try
             {
                 if (File.Exists(tempPath))
+                {
                     File.Delete(tempPath);
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -420,7 +423,9 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
     }
 
     if (kind != ChatUploadKind.TabularWorkbook)
+    {
         return Results.BadRequest("Unsupported upload type.");
+    }
 
     using var fileStream = new MemoryStream();
     await file.CopyToAsync(fileStream, requestAborted);

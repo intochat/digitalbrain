@@ -16,7 +16,9 @@ public sealed class GoogleAppConfigSeeder(
     {
         var appConfig = GoogleAppConfig.From(configuration);
         if (!appConfig.HasAnyValue)
+        {
             return;
+        }
 
         if (!appConfig.HasConnectedAppConfig)
         {
@@ -32,7 +34,9 @@ public sealed class GoogleAppConfigSeeder(
         changed |= SetIfConfigured(merged, GoogleClientFactory.RedirectUriKey, appConfig.RedirectUri);
 
         if (!changed)
+        {
             return;
+        }
 
         await store.SetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, merged, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Seeded Google OAuth client configuration.");
@@ -42,9 +46,17 @@ public sealed class GoogleAppConfigSeeder(
 
     private static bool SetIfConfigured(IDictionary<string, string> values, string key, string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return false;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
         var trimmed = value.Trim();
-        if (values.TryGetValue(key, out var existing) && string.Equals(existing, trimmed, StringComparison.Ordinal)) return false;
+        if (values.TryGetValue(key, out var existing) && string.Equals(existing, trimmed, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         values[key] = trimmed;
         return true;
     }

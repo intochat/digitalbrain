@@ -13,7 +13,9 @@ public sealed class AzureResourceController(ILogger<AzureResourceController> log
         LastReason = reason;
         _logger.LogWarning("Cloud self-update: requesting ACA revision restart ({Reason}).", reason);
         if (_dryRun)
+        {
             return Task.CompletedTask;
+        }
 
         // TODO Task 10: call Azure management API / `az containerapp revision restart`
         // via managed identity to trigger a real ACA revision restart.

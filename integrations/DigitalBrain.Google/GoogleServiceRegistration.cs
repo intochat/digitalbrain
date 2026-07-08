@@ -1,8 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Google;
-
+using Microsoft.Extensions.DependencyInjection;
 using GoogleApisAuth = global::Google.Apis.Auth;
 using GoogleApisGmail = global::Google.Apis.Gmail;
 

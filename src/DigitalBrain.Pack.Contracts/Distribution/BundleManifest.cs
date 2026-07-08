@@ -18,7 +18,7 @@ public record BundleDependency(
     [property: Id(0)] string PackName,
     [property: Id(1)] string MinVersion);
 
-// Product-level metadata a bundle declares in code (single source of truth). Marketplace catalog
+// Product-level metadata a bundle declares in code (single source of truth). Catalog
 // materialization facets by tier/channel without forcing the primitive Core assembly to know packs.
 // PackManifest stays separate: it carries dispatch (HandledSynapseTypes) and config requirements.
 [GenerateSerializer]

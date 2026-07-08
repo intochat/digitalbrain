@@ -14,7 +14,7 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
 {
     protected override bool ShouldSubscribeToTimeline => true;
 
-    private List<RegisterReaction> _polls = new();
+    private List<RegisterReaction> _polls = [];
     private HashSet<string> _seen = new(StringComparer.OrdinalIgnoreCase); // simple dedup, enhanced from journals on replay
     private Dictionary<string, IGrainReminder> _reminders = new(StringComparer.OrdinalIgnoreCase);
 
@@ -22,7 +22,10 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
     {
         await base.OnActivateAsync(cancellationToken);
         EnsurePolls();
-        foreach (var p in _polls) await RegisterPollReminder(p, cancellationToken);
+        foreach (var p in _polls)
+        {
+            await RegisterPollReminder(p, cancellationToken);
+        }
     }
 
     public override async Task OnNextAsync(Synapse item, StreamSequenceToken? token = null)
@@ -59,21 +62,19 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
         Logger.LogInformation("Poll reminder {Name} ticked", reminderName);
         EnsurePolls();
         var reaction = _polls.FirstOrDefault(r => r.Id == reminderName);
-        if (reaction is null) return;
+        if (reaction is null)
+        {
+            return;
+        }
 
         var broker = ServiceProvider.GetService<ICapabilityBroker>();
         string content = string.Empty;
         string source = reaction.Target ?? reaction.When;
         try
         {
-            if (broker != null && !string.IsNullOrWhiteSpace(source) && (source.StartsWith("http", StringComparison.OrdinalIgnoreCase)))
-            {
-                content = await broker.HttpGetAsync(source);
-            }
-            else
-            {
-                content = $"<poll-source>{source}</poll-source>";
-            }
+            content = broker != null && !string.IsNullOrWhiteSpace(source) && (source.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                ? await broker.HttpGetAsync(source)
+                : $"<poll-source>{source}</poll-source>";
         }
         catch (Exception ex)
         {

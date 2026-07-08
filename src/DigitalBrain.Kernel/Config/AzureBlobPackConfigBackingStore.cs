@@ -17,7 +17,9 @@ public sealed class AzureBlobPackConfigBackingStore(BlobServiceClient blobs) : I
     {
         var blob = EntryBlob(scope, pack);
         if (!await blob.ExistsAsync(cancellationToken))
+        {
             return null;
+        }
 
         using var stream = new MemoryStream();
         await blob.DownloadToAsync(stream, cancellationToken);

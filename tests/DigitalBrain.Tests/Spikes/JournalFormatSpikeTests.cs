@@ -38,8 +38,10 @@ public class JournalFormatSpikeTests(OrleansJournalClusterFixture fixture)
     }
 }
 
+[Alias("DigitalBrain.Tests.Spikes.IJournalFormatProbeNeuron")]
 public interface IJournalFormatProbeNeuron : INeuron
 {
+    [Alias("GetActivationInstanceIdAsync")]
     Task<string> GetActivationInstanceIdAsync();
 }
 

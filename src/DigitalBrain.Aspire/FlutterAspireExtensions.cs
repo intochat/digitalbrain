@@ -6,8 +6,7 @@ namespace DigitalBrain.Aspire;
 public static class FlutterAspireExtensions
 {
     /// <summary>
-    /// Flutter as marketplace pack + Aspire integration. Call from AppHost when the Flutter pack (DigitalBrain.UI.AspireFlutter) is installed.
-    /// Starts Flutter (windows or web-server) wired to brain for live surfaces/RfwCards. Enables full packing/distribution/reuse of the UI client as a NeuroPack.
+    /// Starts Flutter (windows or web-server) wired to the kernel for live surfaces/RfwCards.
     /// </summary>
     public static IResourceBuilder<ExecutableResource> AddFlutterClient(
         this DigitalBrainContext ctx,
@@ -27,18 +26,19 @@ public static class FlutterAspireExtensions
                 "-d",
                 target)
             .WithReference(ctx.OrleansClient)
-            .WithReference(ctx.Llm)
-            .WithEnvironment("DIGITALBRAIN_UI_PACK", "DigitalBrain.UI.AspireFlutter")
-            .WithEnvironment("DIGITALBRAIN_UI_TIER1_RESTART_REQUIRED", "true");
+            .WithReference(ctx.Llm);
     }
 
     // Dev default helper (item 12). Path resolve + AddFlutterClient + kernel ref.
-    // The DigitalBrain.UI.AspireFlutter (or equivalent) pack can later provide/override these resource bits.
+    // Keep this as a dev convenience only; production wiring should choose the client explicitly.
     public static IResourceBuilder<ExecutableResource>? AddDefaultDevFlutterClient(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
         var flutterPath = ResolveDevFlutterAppPath(ctx.ApplicationBuilder.AppHostDirectory);
         if (string.IsNullOrEmpty(flutterPath))
+        {
             return null;
+        }
+
         return ctx.AddFlutterClient("flutter-ui", flutterPath, "windows")
             .WithReference(kernel);
     }
@@ -50,7 +50,9 @@ public static class FlutterAspireExtensions
     {
         var flutterPathEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_FLUTTER_APP_PATH");
         if (!string.IsNullOrWhiteSpace(flutterPathEnv) && Directory.Exists(flutterPathEnv))
+        {
             return Path.GetFullPath(flutterPathEnv);
+        }
 
         var candidatePaths = new[]
         {

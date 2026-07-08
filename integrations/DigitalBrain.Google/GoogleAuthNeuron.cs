@@ -2,10 +2,10 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
-using UiContracts = DigitalBrain.Ui.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using UiContracts = DigitalBrain.Ui.Contracts;
 
 [GrainType("digitalbrain.google.auth.v1")]
 public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals journals)
@@ -19,7 +19,10 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
 
     public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
-        if (signal.Name != GoogleSignals.AuthRequested) return;
+        if (signal.Name != GoogleSignals.AuthRequested)
+        {
+            return;
+        }
 
         // Always attempt to start OAuth flow (will use seeded app config or props).
         // This supports both direct button from INO and credential form paths.
@@ -56,9 +59,13 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
 
         var configuredRedirect = ServiceProvider.GetService<IConfiguration>()?["DigitalBrain:Google:RedirectUri"];
         if (!string.IsNullOrWhiteSpace(configuredRedirect))
+        {
             values[GoogleClientFactory.RedirectUriKey] = configuredRedirect.Trim();
+        }
         else
+        {
             CopyIfPresent(props, values, GoogleClientFactory.RedirectUriKey);
+        }
 
         if (!values.TryGetValue(GoogleClientFactory.RedirectUriKey, out var redirectUri) || string.IsNullOrWhiteSpace(redirectUri))
         {
@@ -140,18 +147,27 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
             var tokenValues = await GoogleClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri, cancellationToken: cancellationToken);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var (k, v) in tokenValues)
+            {
                 userTokenValues[k] = v;
+            }
 
             // Merge client id/secret from app if present
             if (appValues.TryGetValue(GoogleClientFactory.ClientIdKey, out var cid))
+            {
                 userTokenValues[GoogleClientFactory.ClientIdKey] = cid;
+            }
+
             if (appValues.TryGetValue(GoogleClientFactory.ClientSecretKey, out var cs))
+            {
                 userTokenValues[GoogleClientFactory.ClientSecretKey] = cs;
+            }
 
             if (!userTokenValues.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var newRt) || string.IsNullOrWhiteSpace(newRt))
             {
                 if (existingUser.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var priorRt) && !string.IsNullOrWhiteSpace(priorRt))
+                {
                     userTokenValues[GoogleClientFactory.RefreshTokenKey] = priorRt;
+                }
             }
 
             await store.SetAsync(userScope, GoogleClientFactory.PackName, userTokenValues, cancellationToken);
@@ -194,6 +210,8 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
         string key)
     {
         if (props.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value?.ToString()))
+        {
             values[key] = value.ToString()!.Trim();
+        }
     }
 }

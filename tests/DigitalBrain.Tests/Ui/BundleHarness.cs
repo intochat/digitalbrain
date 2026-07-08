@@ -30,7 +30,9 @@ public sealed class BundleHarness(string packCode, string pack, string experienc
     {
         var surface = Trigger(eventName, args);
         if (surface.Props.TryGetValue("tree", out var t) && t is UiWidgetTree tree)
+        {
             return tree;
+        }
 
         throw new NotSupportedException($"Step '{eventName}' did not produce a widget tree.");
     }

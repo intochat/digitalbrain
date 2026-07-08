@@ -17,7 +17,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
     : Neuron(logger, journals), IAutomationNeuron
 {
     private Dictionary<string, string> _scripts = new(StringComparer.OrdinalIgnoreCase);
-    private List<RegisterReaction> _reactions = new();
+    private List<RegisterReaction> _reactions = [];
     private Dictionary<string, int> _execCounts = new(StringComparer.OrdinalIgnoreCase);
 
     protected override bool ShouldSubscribeToTimeline => true;
@@ -49,17 +49,35 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 return;
             case AutomationApp app:
                 foreach (var s in app.Scripts ?? Array.Empty<RegisterScript>())
+                {
                     _scripts[s.Id] = s.Code;
+                }
+
                 foreach (var r in app.Reactions ?? Array.Empty<RegisterReaction>())
+                {
                     _reactions.Add(r);
+                }
+
                 await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = app.AppId }), cancellationToken);
                 await EmitAutomationsSurfaceAsync(cancellationToken);
                 return;
             case CreateAutomationApp create:
                 if (create.Scripts is not null)
-                    foreach (var s in create.Scripts) _scripts[s.Id] = s.Code;
+                {
+                    foreach (var s in create.Scripts)
+                    {
+                        _scripts[s.Id] = s.Code;
+                    }
+                }
+
                 if (create.Reactions is not null)
-                    foreach (var r in create.Reactions) _reactions.Add(r);
+                {
+                    foreach (var r in create.Reactions)
+                    {
+                        _reactions.Add(r);
+                    }
+                }
+
                 await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = create.AppId }), cancellationToken);
                 await EmitAutomationsSurfaceAsync(cancellationToken);
                 return;
@@ -67,9 +85,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 _reactions.RemoveAll(r => r.Id == rm.Id);
                 await FireAsync(new Signal("ReactionRemoved", new Dictionary<string, object?> { ["id"] = rm.Id }), cancellationToken);
                 await EmitAutomationsSurfaceAsync(cancellationToken);
-                return;
-            case PromoteAutomationToPack promo:
-                await HandlePromoteAsync(promo, cancellationToken);
                 return;
         }
 
@@ -80,7 +95,10 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
     {
         cancellationToken.ThrowIfCancellationRequested();
         var matches = _reactions.Where(r => IsMatch(r, synapse)).ToList();
-        if (matches.Count == 0) return;
+        if (matches.Count == 0)
+        {
+            return;
+        }
 
         foreach (var reaction in matches)
         {
@@ -132,10 +150,14 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
     private static bool IsMatch(RegisterReaction r, Synapse s)
     {
         if (string.IsNullOrEmpty(r.When) || r.When == "*")
+        {
             return TargetMatches(r.Target, s) && ScopeMatches(r.Scope, s);
+        }
 
         if (r.When.Equals("NeuronActivated", StringComparison.OrdinalIgnoreCase) && s is NeuronActivated na)
+        {
             return TargetMatches(r.Target, na) && ScopeMatches(r.Scope, na);
+        }
 
         if (r.When.StartsWith("Signal:", StringComparison.OrdinalIgnoreCase) && s is Signal sig)
         {
@@ -144,55 +166,94 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         }
 
         if (r.When.Equals(s.Type, StringComparison.OrdinalIgnoreCase))
+        {
             return TargetMatches(r.Target, s) && ScopeMatches(r.Scope, s);
+        }
 
         return false;
     }
 
     private static bool TargetMatches(string? target, Synapse s)
     {
-        if (string.IsNullOrWhiteSpace(target)) return true;
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return true;
+        }
+
         if (s is NeuronActivated na)
+        {
             return na.Neuron.Value.Contains(target.Trim('*'), StringComparison.OrdinalIgnoreCase);
+        }
+
         return true;
     }
 
     private static bool ScopeMatches(string scope, Synapse s)
     {
-        if (string.IsNullOrWhiteSpace(scope) || scope == "default") return true;
+        if (string.IsNullOrWhiteSpace(scope) || scope == "default")
+        {
+            return true;
+        }
         // Coordinate with NeuronScope: for activation, match user prefix of neuron id; for signals look for user in Props
         if (s is NeuronActivated na && NeuronScope.TryParse(na.Neuron.Value, out var sc))
+        {
             return string.Equals(sc.UserId.Value, scope, StringComparison.OrdinalIgnoreCase) || sc.UserId.Value == "default";
+        }
+
         if (s is Signal sig && sig.Props != null && sig.Props.TryGetValue("userId", out var u) && u is string us)
+        {
             return string.Equals(us, scope, StringComparison.OrdinalIgnoreCase);
+        }
+
         return true; // default loose for compat
     }
 
     private void EnsureProjections()
     {
-        if (_scripts.Count > 0 || _reactions.Count > 0) return;
+        if (_scripts.Count > 0 || _reactions.Count > 0)
+        {
+            return;
+        }
 
-        // Replay from journals (exact pattern used by MarketplaceNeuron and GeneratedNeuron)
+        // Replay from journals.
         foreach (var s in OutgoingJournal.Concat(IncomingJournal).OfType<RegisterScript>())
+        {
             _scripts[s.Id] = s.Code;
+        }
 
         var removes = new HashSet<string>();
         foreach (var rm in OutgoingJournal.Concat(IncomingJournal).OfType<RemoveReaction>())
+        {
             removes.Add(rm.Id);
+        }
 
         foreach (var r in OutgoingJournal.Concat(IncomingJournal).OfType<RegisterReaction>())
         {
             if (!removes.Contains(r.Id))
+            {
                 _reactions.Add(r);
+            }
         }
 
         foreach (var a in OutgoingJournal.Concat(IncomingJournal).OfType<AutomationApp>())
         {
-            if (a.Scripts != null) foreach (var s in a.Scripts) _scripts[s.Id] = s.Code;
+            if (a.Scripts != null)
+            {
+                foreach (var s in a.Scripts)
+                {
+                    _scripts[s.Id] = s.Code;
+                }
+            }
+
             if (a.Reactions != null)
             {
                 foreach (var r in a.Reactions)
-                    if (!removes.Contains(r.Id)) _reactions.Add(r);
+                {
+                    if (!removes.Contains(r.Id))
+                    {
+                        _reactions.Add(r);
+                    }
+                }
             }
         }
 
@@ -238,24 +299,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         await EmitAutomationsSurfaceAsync();
     }
 
-    public async Task PromoteToPackAsync(string packName, string version, IReadOnlyList<string> reactionIds, string? ownerId = null)
-    {
-        await FireAsync(new PromoteAutomationToPack(packName, version, reactionIds, ownerId));
-    }
-
-    private async Task HandlePromoteAsync(PromoteAutomationToPack promo, CancellationToken cancellationToken)
-    {
-        EnsureProjections();
-        var selected = _reactions.Where(r => promo.ReactionIds.Contains(r.Id)).ToList();
-        // Thin manifest/source stub consumable by pack pipeline / seeds (real pack would synthesize full IPackBehavior + publish).
-        // Flow example: MCP promote_automations_to_pack -> this emits AutomationPromoted + Signal("AutomationCrystallized") with stub -> CodeFoundry or marketplace seeds can consume.
-        var summary = $"Promoted {selected.Count} reactions to {promo.PackName}@{promo.Version}. Reactions: {string.Join(",", selected.Select(r => r.Id))}";
-        var stubCode = $"// Auto-crystallized from automations\n// Reactions: {string.Join(", ", selected.Select(r => r.Id))}\npublic sealed class {promo.PackName}Pack : DigitalBrain.Core.Distribution.IPackBehavior {{ /* TODO: implement from scripts */ public string Respond(string i) => i; }}";
-        await FireAsync(new AutomationPromoted(promo.PackName, promo.Version, summary), cancellationToken);
-        // Fire a signal carrying the stub so CodeFoundry or marketplace can pick it up
-        await FireAsync(new Signal("AutomationCrystallized", new Dictionary<string, object?> { ["pack"] = promo.PackName, ["code"] = stubCode }), cancellationToken);
-    }
-
     public Task<IReadOnlyList<ScriptLibraryEntry>> ListScriptLibraryAsync()
     {
         EnsureProjections();
@@ -295,7 +338,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         // Also keep lightweight list for timeline consumers that expect ListSurface
         var reactionItems = _reactions.Any()
             ? _reactions.Select(r => $"{r.Id}: when {r.When} -> {r.ScriptRef}").ToList()
-            : new List<string> { "No active reactions. Define via MCP or synapses." };
+            : ["No active reactions. Define via MCP or synapses."];
         await FireAsync(new ListSurface("Active Reactions", reactionItems), cancellationToken);
     }
 
@@ -304,12 +347,18 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         var nodes = new List<AutomationGraphNode>();
         var edges = new List<AutomationGraphEdge>();
         foreach (var s in scripts)
+        {
             nodes.Add(new AutomationGraphNode(s.Id, "script", s.Id, new Dictionary<string, object?> { ["preview"] = s.CodePreview }));
+        }
+
         foreach (var r in reactions)
         {
             nodes.Add(new AutomationGraphNode(r.Id, "reaction", $"{r.Id} ({r.When})", new Dictionary<string, object?> { ["when"] = r.When, ["target"] = r.Target }));
             if (!string.IsNullOrEmpty(r.ScriptRef))
+            {
                 edges.Add(new AutomationGraphEdge(r.Id, r.ScriptRef, "uses-script"));
+            }
+
             edges.Add(new AutomationGraphEdge("timeline", r.Id, $"when:{r.When}"));
         }
         await FireAsync(new AutomationGraphSurface("Automations Graph", nodes, edges, now), cancellationToken);

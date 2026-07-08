@@ -34,7 +34,7 @@ public static class ConfigFormSurface
         var tree = new UiWidgetTree(
             UiKitVocabulary.Screen,
             new Dictionary<string, object?> { ["title"] = packName + " configuration" },
-            new List<UiWidgetTree> { new(UiKitVocabulary.Column, new Dictionary<string, object?>(), fieldNodes) });
+            [new(UiKitVocabulary.Column, new Dictionary<string, object?>(), fieldNodes)]);
 
         return new UiSurface(Kind, new Dictionary<string, object?>
         {
@@ -54,13 +54,19 @@ public static class ConfigFormSurface
         {
             return new UiWidgetTree(UiKitVocabulary.Select, FieldProps(field, extra: props =>
             {
-                if (field.Choices is not null) props["items"] = field.Choices;
+                if (field.Choices is not null)
+                {
+                    props["items"] = field.Choices;
+                }
             }));
         }
 
         return new UiWidgetTree(UiKitVocabulary.TextField, FieldProps(field, extra: props =>
         {
-            if (field.Kind == PackConfigFieldKind.Secret) props["secret"] = true;
+            if (field.Kind == PackConfigFieldKind.Secret)
+            {
+                props["secret"] = true;
+            }
         }));
     }
 
@@ -73,8 +79,16 @@ public static class ConfigFormSurface
             ["name"] = field.Key,
             ["placeholder"] = field.Label
         };
-        if (field.DependsOnKey is not null) props["dependsOnKey"] = field.DependsOnKey;
-        if (field.DependsOnValue is not null) props["dependsOnValue"] = field.DependsOnValue;
+        if (field.DependsOnKey is not null)
+        {
+            props["dependsOnKey"] = field.DependsOnKey;
+        }
+
+        if (field.DependsOnValue is not null)
+        {
+            props["dependsOnValue"] = field.DependsOnValue;
+        }
+
         extra(props);
         return props;
     }

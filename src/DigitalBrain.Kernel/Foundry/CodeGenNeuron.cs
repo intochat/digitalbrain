@@ -17,7 +17,9 @@ public class CodeGenNeuron(ILogger<CodeGenNeuron> logger, NeuronJournals journal
     {
         var chat = ServiceProvider.GetService<IChatClient>();
         if (chat is null)
+        {
             return FallbackSource(cmd);
+        }
 
         var system = cmd.Tier == TargetTier.Run
             ? "You generate ONE self-contained C# class with: public static object Run(System.Collections.Generic.IReadOnlyDictionary<string,object?> input). No I/O outside given input. Respond ONLY with a ```csharp block."
@@ -35,13 +37,20 @@ public class CodeGenNeuron(ILogger<CodeGenNeuron> logger, NeuronJournals journal
 
     private static string ExtractCode(string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return "";
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "";
+        }
+
         var start = text.IndexOf("```csharp", StringComparison.OrdinalIgnoreCase);
         if (start >= 0)
         {
             start += 9;
             var end = text.IndexOf("```", start, StringComparison.Ordinal);
-            if (end > start) return text.Substring(start, end - start).Trim();
+            if (end > start)
+            {
+                return text.Substring(start, end - start).Trim();
+            }
         }
         return text.Trim();
     }

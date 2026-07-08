@@ -26,7 +26,10 @@ internal sealed class SignalEgressStreamSubscriber(
                     _handle = await stream.SubscribeAsync((synapse, _) =>
                     {
                         if (synapse is Signal signal)
+                        {
                             bus.Publish(signal);
+                        }
+
                         return Task.CompletedTask;
                     });
                     logger.LogInformation("SignalEgressStreamSubscriber subscribed on this silo");

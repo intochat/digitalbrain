@@ -20,15 +20,9 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
 
         if (chat != null)
         {
-            string sysPrompt;
-            if (req.LoopType.Equals("ui", StringComparison.OrdinalIgnoreCase) || req.LoopType.Contains("dart", StringComparison.OrdinalIgnoreCase))
-            {
-                sysPrompt = "You are the UI Closed Loop. Use Dart MCP tools (connect_dart_tooling_daemon with DTD uri, get_widget_tree summaryOnly:true for user code, get_selected_widget, get_runtime_errors, hot_reload, launch_app on sdk/flutter_demo) to inspect live Flutter widget trees while authoring. Propose precise Dart code changes to improve surfaces, skill integration, and editor experiences in the workbench. Output: tree summary, proposed file edits or new widget code, then hot reload command.";
-            }
-            else
-            {
-                sysPrompt = "You are the SoftwareEngineering ClosedLoopNeuron. Inspect via Aspire MCP (list_resources, list_structured_logs, list_traces), use local context from journals. Propose runtime modifications to neurons/marketplace/INO/editor. Apply via marketplace publish+install for new behavior, or Aspire execute_resource_command restart on the kernel resource because multiple kernels may run. Prefer safe Aspire-orchestrated applies + checkpoints. Be concise.";
-            }
+            var sysPrompt = req.LoopType.Equals("ui", StringComparison.OrdinalIgnoreCase) || req.LoopType.Contains("dart", StringComparison.OrdinalIgnoreCase)
+                ? "You are the UI Closed Loop. Use Dart MCP tools (connect_dart_tooling_daemon with DTD uri, get_widget_tree summaryOnly:true for user code, get_selected_widget, get_runtime_errors, hot_reload, launch_app on sdk/flutter_demo) to inspect live Flutter widget trees while authoring. Propose precise Dart code changes to improve surfaces, skill integration, and editor experiences in the workbench. Output: tree summary, proposed file edits or new widget code, then hot reload command."
+                : "You are the SoftwareEngineering ClosedLoopNeuron. Inspect via Aspire MCP (list_resources, list_structured_logs, list_traces), use local context from journals. Propose runtime modifications to neurons, INO, automations, and editor surfaces. Apply by staging a self-evolution proposal or by using Aspire execute_resource_command restart on the kernel resource because multiple kernels may run. Prefer Aspire-orchestrated applies + checkpoints. Be concise.";
             var full = sysPrompt + "\nPROMPT: " + req.Prompt + "\nCTX: journal-driven";
             try
             {
@@ -59,7 +53,9 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             await StageSelfEvolutionProposalAsync(req, analysis, cancellationToken);
 
             if (!ShouldInspectAspireMcp())
+            {
                 return;
+            }
 
             await EnsureAspireMcpAsync(cancellationToken);
             if (_aspireMcp != null)
@@ -121,7 +117,11 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
 
     private async Task EnsureAspireMcpAsync(CancellationToken cancellationToken)
     {
-        if (_aspireMcp != null) return;
+        if (_aspireMcp != null)
+        {
+            return;
+        }
+
         try
         {
             var workDir = Directory.GetCurrentDirectory();
@@ -148,12 +148,18 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
 
     private async Task<string> CallAspireMcpAsync(string tool, object? args = null, CancellationToken ct = default)
     {
-        if (_aspireMcp == null) return "mcp-unavailable";
+        if (_aspireMcp == null)
+        {
+            return "mcp-unavailable";
+        }
+
         var dict = new Dictionary<string, object?>();
         if (args != null)
         {
             foreach (var p in args.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
                 dict[p.Name] = p.GetValue(args);
+            }
         }
         var res = await _aspireMcp.CallToolAsync(tool, dict, cancellationToken: ct);
         return res.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "no-data";

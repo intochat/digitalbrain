@@ -41,8 +41,7 @@ public static class TelegramAspireExtensions
             transport = transport.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
         }
 
-        // Tell the transport which marketplace pack's stored config carries its bot token.
-        // Matches the pack name in MarketplaceSeeds and the ConfigPack constant inside the pack code.
+        // Tell the transport which connector config scope carries its bot token.
         transport = transport
             .WithEnvironment("Telegram__PackName", "DigitalBrain.Telegram.Responder")
             .WithEnvironment("Telegram__ConfigScope", "default");

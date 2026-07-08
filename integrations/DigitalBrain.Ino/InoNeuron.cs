@@ -2,10 +2,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Ino.Context;
 using DigitalBrain.Google;
-using DigitalBrain.Salesforce;
+using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
+using DigitalBrain.Salesforce;
 using DigitalBrain.Ui.Runtime;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -183,7 +183,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var hasGmailMem = IncomingJournal.Concat(OutgoingJournal).OfType<MemorySummary>()
                 .TakeLast(5).Any(m => (m.Topic ?? "").ToLowerInvariant().Contains("gmail") || (m.Topic ?? "").ToLowerInvariant().Contains("email"));
             if ((p.Contains("summar") || p.Contains("brief")) && (lastGmailish || hasGmailMem))
+            {
                 gmailFollowupSummarize = true;
+            }
         }
 
         if (gmailFollowupSummarize)
@@ -264,7 +266,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
 
         if (signal.Name != GoogleSignals.AuthCompleted)
+        {
             return;
+        }
 
         var pending = _pendingGmailRequest
             ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => InoConnectorIntents.IsGmail(r.Prompt));
@@ -279,11 +283,18 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         string? gmailUserId = null;
         if (signal.Props.TryGetValue("userId", out var uid) && uid is string us && !string.IsNullOrWhiteSpace(us))
+        {
             gmailUserId = us;
+        }
         else if (signal.Props.TryGetValue("scope", out var sc) && sc is string scs && scs.StartsWith("user:", StringComparison.Ordinal))
+        {
             gmailUserId = scs.Substring(5);
+        }
+
         if (string.IsNullOrWhiteSpace(gmailUserId))
+        {
             gmailUserId = await ResolveUserIdAsync(pending.ClientId, cancellationToken);
+        }
 
         if (!await HasGoogleCredentialAsync(gmailUserId, cancellationToken))
         {
@@ -310,7 +321,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(clientId))
+        {
             return null;
+        }
 
         var session = GrainFactory.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         return await session.GetSessionByClientIdAsync(clientId);
@@ -323,11 +336,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var headers = JsonSerializer.Deserialize<List<string>>(ingested.HeadersJson) ?? [];
         var rows = JsonSerializer.Deserialize<List<List<string>>>(ingested.RowsJson) ?? [];
 
-        var tree = new UiWidgetTree(UiKitVocabulary.Panel, new Dictionary<string, object?>(), new List<UiWidgetTree>
-        {
+        var tree = new UiWidgetTree(UiKitVocabulary.Panel, new Dictionary<string, object?>(),
+        [
             new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = ingested.FileName }),
             new(UiKitVocabulary.Table, new Dictionary<string, object?> { ["columns"] = headers, ["rows"] = rows }),
-        });
+        ]);
 
         var props = new Dictionary<string, object?>
         {
@@ -335,7 +348,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             [UiSurfaceKeys.Title] = "INO",
             ["role"] = "assistant",
         };
-        if (ingested.ClientId is not null) props["clientId"] = ingested.ClientId;
+        if (ingested.ClientId is not null)
+        {
+            props["clientId"] = ingested.ClientId;
+        }
+
         props["workspaceId"] = workspaceId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
@@ -385,7 +402,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         var connectionName = Path.GetFileNameWithoutExtension(databasePath);
         if (string.IsNullOrWhiteSpace(connectionName))
+        {
             connectionName = "sqlite-db";
+        }
 
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var cmd = new DbInspectSchema(connectionName, "sqlite", SourcePath: databasePath, ClientId: clientId, WorkspaceId: workspaceId);
@@ -409,7 +428,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["role"] = "assistant",
             ["workspaceId"] = workspaceId
         };
-        if (clientId is not null) props["clientId"] = clientId;
+        if (clientId is not null)
+        {
+            props["clientId"] = clientId;
+        }
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
@@ -566,37 +588,61 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 // strip common fences
                 var start = jsonText.IndexOf('{');
                 var end = jsonText.LastIndexOf('}');
-                if (start >= 0 && end > start) jsonText = jsonText.Substring(start, end - start + 1);
+                if (start >= 0 && end > start)
+                {
+                    jsonText = jsonText.Substring(start, end - start + 1);
+                }
             }
             using var doc = JsonDocument.Parse(jsonText);
             var root = doc.RootElement;
             if (root.TryGetProperty("when", out var wEl) && wEl.ValueKind == JsonValueKind.String)
+            {
                 when = wEl.GetString() ?? when;
+            }
+
             if (root.TryGetProperty("target", out var tEl) && tEl.ValueKind == JsonValueKind.String)
+            {
                 target = tEl.GetString();
+            }
+
             if (root.TryGetProperty("script", out var scEl) && scEl.ValueKind == JsonValueKind.String)
+            {
                 script = scEl.GetString() ?? script;
+            }
+
             if (root.TryGetProperty("rationale", out var rEl) && rEl.ValueKind == JsonValueKind.String)
+            {
                 rationale = rEl.GetString() ?? rationale;
+            }
         }
         catch
         {
             // Fallbacks for G/SF and crude extract
             if (raw.Contains("Gmail", StringComparison.OrdinalIgnoreCase) || raw.Contains("email", StringComparison.OrdinalIgnoreCase))
+            {
                 when = "Signal:GmailMessageReceived";
+            }
             else if (raw.Contains("salesforce", StringComparison.OrdinalIgnoreCase) || raw.Contains("crm", StringComparison.OrdinalIgnoreCase))
+            {
                 when = "Signal:SalesforceQueryReady";
+            }
 
             if (raw.Contains("return", StringComparison.OrdinalIgnoreCase))
             {
                 var start = raw.IndexOf("return", StringComparison.OrdinalIgnoreCase);
                 var end = raw.IndexOf(';', start);
-                if (end > start) script = raw.Substring(start, end - start + 1).Trim();
+                if (end > start)
+                {
+                    script = raw.Substring(start, end - start + 1).Trim();
+                }
             }
             if (raw.Contains("\"when\"", StringComparison.OrdinalIgnoreCase))
             {
                 var wmatch = System.Text.RegularExpressions.Regex.Match(raw, @"""when""\s*:\s*""([^""]+)""");
-                if (wmatch.Success) when = wmatch.Groups[1].Value;
+                if (wmatch.Success)
+                {
+                    when = wmatch.Groups[1].Value;
+                }
             }
         }
 
@@ -633,7 +679,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         var store = ServiceProvider.GetService<IPackConfigStore>();
         if (store is null)
+        {
             return false;
+        }
 
         try
         {
@@ -658,7 +706,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         var store = ServiceProvider.GetService<IPackConfigStore>();
         if (store is null)
+        {
             return false;
+        }
 
         try
         {
@@ -679,8 +729,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private async Task DeliverGoogleAuthSurfaceAsync(string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
-        var tree = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), new List<UiWidgetTree>
-        {
+        var tree = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(),
+        [
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
                 ["text"] = "Connect Google to let INO read your recent Gmail messages."
@@ -691,7 +741,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 ["icon"] = "gmail",
                 ["synapseType"] = GoogleSignals.AuthRequested
             })
-        });
+        ]);
 
         var props = new Dictionary<string, object?>
         {
@@ -702,7 +752,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["surfaceKind"] = UiSurfaceKinds.AuthButton,
             ["workspaceId"] = workspaceId
         };
-        if (clientId is not null) props["clientId"] = clientId;
+        if (clientId is not null)
+        {
+            props["clientId"] = clientId;
+        }
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
@@ -746,7 +799,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             var gmail = GrainFactory.GetGrain<IGmailNeuron>(gmailUserId);
             ids = await gmail.ListMessagesAsync(q, maxResults, cancellationToken);
-            summaries = new List<GmailMessageSummary>();
+            summaries = [];
             foreach (var id in ids.Take(maxResults))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -916,7 +969,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["role"] = "assistant",
             ["workspaceId"] = workspaceId
         };
-        if (clientId is not null) props["clientId"] = clientId;
+        if (clientId is not null)
+        {
+            props["clientId"] = clientId;
+        }
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
@@ -968,7 +1024,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["role"] = "assistant",
             ["workspaceId"] = workspaceId
         };
-        if (clientId is not null) props["clientId"] = clientId;
+        if (clientId is not null)
+        {
+            props["clientId"] = clientId;
+        }
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
@@ -987,7 +1046,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["role"] = "assistant",
             ["workspaceId"] = workspaceId
         };
-        if (clientId is not null) props["clientId"] = clientId;
+        if (clientId is not null)
+        {
+            props["clientId"] = clientId;
+        }
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
@@ -1006,7 +1068,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             {
                 var sys = await store.GetAsync("system", "llm", cancellationToken);
                 if (sys.TryGetValue("llm_provider", out var prov) && !string.IsNullOrWhiteSpace(prov))
+                {
                     current = prov;
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -1064,7 +1128,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["role"] = "assistant",
             ["workspaceId"] = workspaceId
         };
-        if (clientId is not null) props["clientId"] = clientId;
+        if (clientId is not null)
+        {
+            props["clientId"] = clientId;
+        }
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
@@ -1096,8 +1163,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             var idx = p.IndexOf("set-llm:") + 8;
             var val = p.Substring(idx).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
-            if (val.Contains("qwen") || val.Contains("ollama") || val == "local") provider = "ollama";
-            else if (val.Contains("gpt") || val.Contains("azure")) provider = "azureopenai";
+            if (val.Contains("qwen") || val.Contains("ollama") || val == "local")
+            {
+                provider = "ollama";
+            }
+            else if (val.Contains("gpt") || val.Contains("azure"))
+            {
+                provider = "azureopenai";
+            }
         }
 
         await store.SetAsync("system", "llm", new Dictionary<string, string> { ["llm_provider"] = provider, ["llm_key"] = key }, cancellationToken);
@@ -1121,7 +1194,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             var idx = p.IndexOf("automation-");
             var candidate = p.Substring(idx).Split(' ', '\n', '\t', '.', ',', ':')[0].Trim();
-            if (candidate.StartsWith("automation-")) proposalId = candidate;
+            if (candidate.StartsWith("automation-"))
+            {
+                proposalId = candidate;
+            }
         }
         else if (p.Contains("proposal "))
         {
@@ -1214,7 +1290,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["role"] = "assistant",
             ["workspaceId"] = workspaceId
         };
-        if (clientId is not null) props["clientId"] = clientId;
+        if (clientId is not null)
+        {
+            props["clientId"] = clientId;
+        }
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
@@ -1233,7 +1312,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["surfaceKind"] = UiSurfaceKinds.GraphCanvas,
             ["workspaceId"] = workspaceId
         };
-        if (clientId is not null) props["clientId"] = clientId;
+        if (clientId is not null)
+        {
+            props["clientId"] = clientId;
+        }
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
@@ -1308,10 +1390,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             }
 
             if (cls.Intent == "uikit_gallery")
+            {
                 actions.Add(new InoAction("Refresh gallery", FollowUpPrompt: "uikit gallery"));
+            }
 
             if (cls.Intent is "gmail" or "salesforce")
+            {
                 actions.Add(new InoAction("Summarize last", FollowUpPrompt: "summarize the last one"));
+            }
         }
 
         return new InoInteractResult(
@@ -1345,14 +1431,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             .TakeLast(5);
         var memCtx = string.Join(";", mems.Select(m => m.Topic + "=" + m.Summary));
 
-        // Include recently applied marketplace skills / installed packs so INO can use their code+desc at runtime.
-        var skills = OutgoingJournal.Concat(IncomingJournal).OfType<SkillContextInjected>().TakeLast(2)
-            .Select(s => s.SkillPackName + ":" + (s.Description.Length > 60 ? s.Description[..60] : s.Description));
-        var packs = OutgoingJournal.Concat(IncomingJournal).OfType<NeuroPackInstalled>().TakeLast(2)
-            .Select(p => p.Pack.Name + "@" + p.Pack.Version);
-        var skillCtx = string.Join(";", skills.Concat(packs));
+        var automations = OutgoingJournal.Concat(IncomingJournal)
+            .OfType<AutomationDefinitionStaged>()
+            .TakeLast(3)
+            .Select(a => a.Reaction.Id + " when " + a.Reaction.When);
+        var automationCtx = string.Join(";", automations);
 
-        return Task.FromResult($"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nskills:{skillCtx}");
+        return Task.FromResult($"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nautomations:{automationCtx}");
     }
 
     private DbSchemaInspected? LatestSuccessfulSchema(string? clientId, string? workspaceId)
@@ -1368,13 +1453,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             .ToList();
 
         if (schemas.Count == 0)
+        {
             return null;
+        }
 
         if (!string.IsNullOrWhiteSpace(clientId))
         {
             var clientMatch = schemas.LastOrDefault(schema => schema.ClientId == clientId);
             if (clientMatch is not null)
+            {
                 return clientMatch;
+            }
         }
 
         return schemas[^1];
@@ -1385,7 +1474,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private static string GmailReplyText(IReadOnlyList<GmailMessageSummary> messages)
     {
         if (messages.Count == 0)
+        {
             return "No recent Gmail messages were returned.";
+        }
 
         var title = messages.Count == 1 ? "Latest Gmail message:" : "Recent Gmail messages:";
         var lines = messages.Select((m, i) => $"{i + 1}. {TrimForSurface(m.Body)}");
@@ -1395,7 +1486,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private static string SalesforceReplyText(IReadOnlyList<string> records)
     {
         if (records.Count == 0)
+        {
             return "No Salesforce accounts were returned.";
+        }
 
         var title = records.Count == 1 ? "Latest Salesforce account:" : "Salesforce accounts:";
         var lines = records.Select((record, i) => $"{i + 1}. {TrimForSurface(record)}");
@@ -1406,10 +1499,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         var message = exception.GetBaseException().Message;
         if (message.StartsWith(SalesforceClientFactory.AuthenticationFailureMessage, StringComparison.Ordinal))
+        {
             return TrimForSurface(message);
+        }
 
         if (message.Contains("authentication", StringComparison.OrdinalIgnoreCase))
+        {
             return SalesforceClientFactory.AuthenticationFailureMessage;
+        }
 
         return "I couldn't query Salesforce: " + TrimForSurface(message) +
                ". Check your Salesforce credentials and try again.";
@@ -1421,7 +1518,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             if (current.GetType().FullName?.Contains("Salesforce", StringComparison.OrdinalIgnoreCase) == true ||
                 current.Message.Contains("Salesforce", StringComparison.OrdinalIgnoreCase))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -1433,7 +1532,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (message.Contains("auth", StringComparison.OrdinalIgnoreCase) ||
             message.Contains("token", StringComparison.OrdinalIgnoreCase) ||
             message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase))
+        {
             return "Google auth issue: " + TrimForSurface(message) + ". Reconnect Google.";
+        }
 
         return "I couldn't fetch Gmail: " + TrimForSurface(message) +
                ". Check Google credentials or permissions and try again.";
@@ -1449,7 +1550,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 current.Message.Contains("Google", StringComparison.OrdinalIgnoreCase) ||
                 current.Message.Contains("gmail", StringComparison.OrdinalIgnoreCase) ||
                 current.Message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -1514,7 +1617,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private async Task<string> ReasonWithLlmAsync(string prompt, string context, CancellationToken cancellationToken = default)
     {
         var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
-        if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
+        if (chat == null)
+        {
+            return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
+        }
 
         var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. ALWAYS answer the user's request directly and visibly first with the actual content (e.g. the joke, summary, fact or help). Put any TASK: or BRANCH: directives ONLY on their own separate lines AFTER the answer, and ONLY if user explicitly asked to create a task/automation/branch. Never output only a directive. For a plain request like 'tell a joke' or 'generate a joke' just reply with the joke text directly.";
         var full = sys + "\nCTX:\n" + context + "\nUSER: " + prompt;
@@ -1525,7 +1631,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private async Task<string> ReasonDirectlyWithLlmAsync(string prompt, string context, CancellationToken cancellationToken = default)
     {
         var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
-        if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
+        if (chat == null)
+        {
+            return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
+        }
 
         var (text, _) = await GetChatTextOrFallbackAsync(
             chat,
@@ -1561,7 +1670,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
         var store = ServiceProvider.GetService<IPackConfigStore>();
-        if (factory is null || store is null) return null;
+        if (factory is null || store is null)
+        {
+            return null;
+        }
 
         try
         {
@@ -1593,7 +1705,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             {
                 var task = trimmed["TASK:".Length..].Trim();
                 if (task.Length > 0)
+                {
                     taskDescriptions.Add(task);
+                }
+
                 continue;
             }
 
@@ -1601,12 +1716,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             {
                 var branch = trimmed["BRANCH:".Length..].Trim();
                 if (branch.Length > 0 && ShouldCreateBranch(prompt))
+                {
                     branchDescription = branch;
+                }
+
                 continue;
             }
 
             if (line.Length > 0)
+            {
                 visibleLines.Add(line);
+            }
         }
 
         var visible = string.Join(Environment.NewLine, visibleLines).Trim();
@@ -1644,16 +1764,24 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         workspaceId = WorkspaceIds.Effective(workspaceId);
         cancellationToken.ThrowIfCancellationRequested();
         var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(20).ToList();
-        if (recent.Count < 5) return;
+        if (recent.Count < 5)
+        {
+            return;
+        }
 
         var chat = ServiceProvider.GetService<IChatClient>();
-        if (chat == null) return;
+        if (chat == null)
+        {
+            return;
+        }
 
         var ctx = string.Join("\n", recent.Select(s => s.Type + ": " + s.ToString()));
         var prompt = "Summarize the following recent activity in DigitalBrain for personal assistant memory. One short topic + 1-sentence summary. Activity:\n" + ctx;
         var (summaryText, available) = await GetChatTextOrFallbackAsync(chat, prompt, cancellationToken);
         if (!available)
+        {
             return;
+        }
 
         if (summaryText.Length > 10)
         {
@@ -1677,7 +1805,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                          m.Topic.ToLowerInvariant().Contains("mail")))
             .OrderByDescending(m => m.Timestamp)
             .FirstOrDefault();
-        if (recentMem != null) return recentMem.Summary;
+        if (recentMem != null)
+        {
+            return recentMem.Summary;
+        }
 
         // Explicitly support lookup last GmailMessagesReady (per plan) + associated context
         var lastGmailReady = IncomingJournal.Concat(OutgoingJournal)
@@ -1695,7 +1826,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                             (m.Topic?.ToLowerInvariant().Contains("gmail") == true || m.Topic?.ToLowerInvariant().Contains("email") == true))
                 .OrderByDescending(m => m.Timestamp)
                 .FirstOrDefault();
-            if (nearbyMem != null) return nearbyMem.Summary;
+            if (nearbyMem != null)
+            {
+                return nearbyMem.Summary;
+            }
 
             var count = lastGmailReady.Props.TryGetValue("count", out var c) ? c?.ToString() : "?";
             return $"[from GmailMessagesReady signal] {count} messages fetched recently (ids: {lastGmailReady.Props.GetValueOrDefault("messageIds")}). Use prior journal summaries for body details.";
@@ -1730,7 +1864,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                          m.Topic.ToLowerInvariant().Contains("account")))
             .OrderByDescending(m => m.Timestamp)
             .FirstOrDefault();
-        if (recentMem != null) return recentMem.Summary;
+        if (recentMem != null)
+        {
+            return recentMem.Summary;
+        }
 
         // Cross-turn fallback using most recent mem for workspace if prior SF request seen
         var lastSfReq = IncomingJournal.OfType<InoRequest>()

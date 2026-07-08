@@ -1,9 +1,9 @@
+using System.Threading;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Google;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Salesforce;
-using DigitalBrain.Google;
-using System.Threading;
 using Xunit;
 
 namespace DigitalBrain.Tests.Integrations;
@@ -94,7 +94,7 @@ public class DummyIConnectorContractTests : IConnectorContractTests<DummyConnect
 // Fakes for real provider contract tests (in-mem store + stub factory; no network for auth path).
 internal sealed class FakePackConfigStore : IPackConfigStore
 {
-    private readonly Dictionary<(string scope, string pack), Dictionary<string, string>> _data = new();
+    private readonly Dictionary<(string scope, string pack), Dictionary<string, string>> _data = [];
 
     public Task SetAsync(string scope, string pack, IReadOnlyDictionary<string, string> values, CancellationToken cancellationToken = default)
     {

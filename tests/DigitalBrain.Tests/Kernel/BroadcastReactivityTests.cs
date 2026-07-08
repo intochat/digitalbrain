@@ -8,17 +8,24 @@ namespace DigitalBrain.Tests.Kernel;
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Tests.Kernel.Ping")]
 public record Ping(string Note) : Synapse(nameof(Ping), DateTimeOffset.UtcNow, IsBroadcast: true);
 
+[Alias("DigitalBrain.Tests.Kernel.IPingSink")]
 public interface IPingSink : INeuron
 {
+    [Alias("EnsureActiveAsync")]
     Task EnsureActiveAsync();
+    [Alias("ReceivedCountAsync")]
     Task<int> ReceivedCountAsync();
 }
 
+[Alias("DigitalBrain.Tests.Kernel.IPingEmitter")]
 public interface IPingEmitter : INeuron
 {
+    [Alias("EnsureActiveAsync")]
     Task EnsureActiveAsync();
+    [Alias("EmitPingAsync")]
     Task EmitPingAsync(string note);
 }
 
@@ -51,7 +58,10 @@ public class BroadcastReactivityTests : NeuronTestBase
         for (var attempt = 0; attempt < 40; attempt++)
         {
             if (await getCount() >= expected)
+            {
                 return;
+            }
+
             await Task.Delay(50);
         }
     }

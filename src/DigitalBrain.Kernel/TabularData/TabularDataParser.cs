@@ -29,11 +29,15 @@ public static class TabularDataParser
         var worksheet = workbook.Worksheets.First();
         var used = worksheet.RangeUsed();
         if (used is null)
+        {
             return new TabularDataset([], [], []);
+        }
 
         var usedRows = used.RowsUsed().ToList();
         if (usedRows.Count == 0)
+        {
             return new TabularDataset([], [], []);
+        }
 
         var headers = usedRows[0].CellsUsed().Select(c => c.GetString()).ToList();
         var columnCount = headers.Count;

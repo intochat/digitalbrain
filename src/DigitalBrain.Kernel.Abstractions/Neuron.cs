@@ -1,11 +1,11 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using DigitalBrain.Core;
-using Orleans.Journaling;
-using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
-using System.Diagnostics.Metrics;
+using Orleans.Journaling;
+using Orleans.Streams;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
@@ -74,7 +74,7 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         }
         catch (Exception ex) when (IsJournalWriterUninitialized(ex))
         {
-            // Fail fast instead of silent switch. Durability is required for causation, checkpoints, marketplace etc.
+            // Fail fast instead of silent switch. Durability is required for causation and checkpoints.
             Logger.LogError(ex, "Journal writer not initialized for durable write of {Key} in {Neuron}.", key, Self);
             throw new InvalidOperationException($"Journal writer for '{key}' is not initialized for {Self}. Operation aborted to preserve durability guarantees.", ex);
         }
@@ -129,7 +129,9 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     private async Task SubscribeTimelineIfNeeded(CancellationToken cancellationToken)
     {
         if (!ShouldSubscribeToTimeline)
+        {
             return;
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -301,7 +303,9 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
                 activity.SetTag("neuron.id", Self.Value);
                 activity.SetTag("synapse.type", synapseType);
                 if (!string.IsNullOrEmpty(synapse.CorrelationId))
+                {
                     activity.SetTag("correlation.id", synapse.CorrelationId);
+                }
             }
 
             var handleStopwatch = Stopwatch.StartNew();
@@ -331,20 +335,33 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         foreach (var iface in grainType.GetInterfaces())
         {
             if (!iface.IsGenericType || iface.GetGenericTypeDefinition() != typeof(IHandle<>))
+            {
                 continue;
+            }
 
             var handledType = iface.GetGenericArguments()[0];
             if (handledType != synapse.GetType() && !handledType.IsAssignableFrom(synapse.GetType()))
+            {
                 continue;
+            }
 
             var handleMethod = iface.GetMethod("HandleAsync", new[] { handledType, typeof(CancellationToken) });
             if (handleMethod is null)
+            {
                 continue;
+            }
 
             Logger.LogDebug("Reflection IHandle<> dispatch for synapse {Type} on {GrainType}", synapse.Type, grainType.Name);
             var result = handleMethod.Invoke(this, new object[] { synapse, cancellationToken });
-            if (result is Task t) await t;
-            else if (result is ValueTask vt) await vt;
+            if (result is Task t)
+            {
+                await t;
+            }
+            else if (result is ValueTask vt)
+            {
+                await vt;
+            }
+
             return true;
         }
         return false;

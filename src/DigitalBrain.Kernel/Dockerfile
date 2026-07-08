@@ -1,5 +1,5 @@
 # Basic container image for the DigitalBrain kernel host.
-# This is the deployable "marketplace kernel".
+# This is the deployable INO kernel.
 #
 # Usage (example):
 #   docker build -t digitalbrain-kernel:latest -f src/DigitalBrain.Kernel/Dockerfile .

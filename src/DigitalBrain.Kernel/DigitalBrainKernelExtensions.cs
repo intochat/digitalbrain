@@ -1,7 +1,7 @@
-using Ino = DigitalBrain.Ino;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
+using Ino = DigitalBrain.Ino;
 
 namespace DigitalBrain.Kernel;
 
@@ -16,13 +16,9 @@ public static class DigitalBrainKernelExtensions
 
             // Prototype journals retained only for legacy !isAspireHosted fast-paths (Program.cs non-aspire).
             // Aspire paths use real journal blobs exclusively.
-            siloBuilder.AddFoundry();
             siloBuilder.ConfigureServices(services =>
             {
-                services.AddSingleton<ISelfEvolutionApplyHandler, MarketplaceInstallApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<DigitalBrain.Ino.IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
             });

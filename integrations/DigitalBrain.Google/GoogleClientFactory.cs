@@ -1,7 +1,7 @@
-using DigitalBrain.Core;
-using DigitalBrain.Core.Config;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DigitalBrain.Core;
+using DigitalBrain.Core.Config;
 
 namespace DigitalBrain.Google;
 
@@ -35,7 +35,9 @@ public static class GoogleClientFactory
 
         var merged = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in userValues)
+        {
             merged[key] = value;
+        }
 
         return merged;
     }
@@ -53,7 +55,9 @@ public static class GoogleClientFactory
 
         var scopes = new List<string> { DefaultGmailScope };
         if (additionalScopes.Length > 0)
+        {
             scopes.AddRange(additionalScopes);
+        }
 
         var scopeString = string.Join(" ", scopes);
 
@@ -79,7 +83,9 @@ public static class GoogleClientFactory
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(code))
+        {
             throw new InvalidOperationException("Google authorization callback did not include a code.");
+        }
 
         var clientId = Required(values, ClientIdKey);
         var clientSecret = Required(values, ClientSecretKey);
@@ -103,7 +109,9 @@ public static class GoogleClientFactory
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
+        {
             throw new InvalidOperationException("Google token exchange failed: " + responseBody);
+        }
 
         var token = ParseTokenResponse(responseBody);
 
@@ -114,7 +122,9 @@ public static class GoogleClientFactory
         };
 
         if (!string.IsNullOrWhiteSpace(token.RefreshToken))
+        {
             result[RefreshTokenKey] = token.RefreshToken;
+        }
 
         return result;
     }
@@ -128,7 +138,9 @@ public static class GoogleClientFactory
     private static string Required(IReadOnlyDictionary<string, string> values, string key)
     {
         if (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+        {
             return value.Trim();
+        }
 
         throw new InvalidOperationException(
             $"Google pack config is missing {key}. Complete \"Sign in with Google\" before using Gmail.");

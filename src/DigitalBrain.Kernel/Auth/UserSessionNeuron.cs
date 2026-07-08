@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel.Ui;
-using DigitalBrain.Marketplace.Contracts;
 
 namespace DigitalBrain.Kernel.Auth;
 
@@ -136,8 +135,6 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         var surfaces = new[]
         {
             BuildSignedInShellSurface(user, sessionId, clientId),
-            MarketplaceUiSurfaces.InstalledBundlesFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, clientId),
-            MarketplaceUiSurfaces.MarketplaceListFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, clientId),
             UiSurfaceLiveData.WorkspaceBoundary(userId, DefaultWorkspaceId, clientId),
             UiSurfaceLiveData.TaskManagerFromTasks(taskEvents, userId: userId, clientId: clientId)
         };
@@ -153,11 +150,9 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
     {
         var menuItems = new[]
         {
-            MenuItem("Installed", UiSurfaceKinds.InstalledBundles),
-            MenuItem("Marketplace", UiSurfaceKinds.MarketplaceList),
+            MenuItem("INO Chat", "chat"),
             MenuItem("Workspace", UiSurfaceKinds.Workspace),
             MenuItem("Tasks", UiSurfaceKinds.TaskManager),
-            MenuItem("INO Chat", "chat"),
             new UiWidgetTree(NeuronUiKit.Divider, new Dictionary<string, object?>()),
             new UiWidgetTree(NeuronUiKit.MenuItem, new Dictionary<string, object?>
             {
@@ -178,20 +173,19 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             new Dictionary<string, object?>
             {
                 ["title"] = "DigitalBrain",
-                ["activeContent"] = UiSurfaceKinds.InstalledBundles,
+                ["activeContent"] = "chat",
                 ["userId"] = user.UserId.Value,
                 ["clientId"] = clientId,
                 ["workspaceId"] = DefaultWorkspaceId
             },
-            new List<UiWidgetTree>
-            {
+            [
                 NeuronUiKit.BuildHeader("DigitalBrain", user.DisplayName),
                 new(NeuronUiKit.Sidebar, new Dictionary<string, object?> { ["title"] = user.DisplayName }, menuItems),
                 new("content", new Dictionary<string, object?>
                 {
-                    ["defaultView"] = UiSurfaceKinds.InstalledBundles
+                    ["defaultView"] = "chat"
                 })
-            });
+            ]);
 
         return new UiSurface(UiSurface.WidgetTreeKind, new Dictionary<string, object?>
         {

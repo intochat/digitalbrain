@@ -8,8 +8,10 @@ using Orleans.TestingHost;
 namespace DigitalBrain.Tests.Kernel;
 
 // Emitter grain that broadcasts AskLlm so the responder can receive it from the timeline.
+[Alias("DigitalBrain.Tests.Kernel.IAskLlmEmitter")]
 public interface IAskLlmEmitter : INeuron
 {
+    [Alias("BroadcastAskAsync")]
     Task BroadcastAskAsync(string prompt, string replyType, IReadOnlyDictionary<string, object?> replyProps);
 }
 

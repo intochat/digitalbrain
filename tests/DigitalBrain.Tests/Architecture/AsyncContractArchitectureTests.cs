@@ -1,5 +1,5 @@
 extern alias McpProject;
-
+using System.Reflection;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
@@ -10,9 +10,7 @@ using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Ui.Contracts;
-using DigitalBrain.Marketplace.Contracts;
 using McpProject::DigitalBrain.Mcp;
-using System.Reflection;
 
 namespace DigitalBrain.Tests.Architecture;
 
@@ -28,7 +26,6 @@ public sealed class AsyncContractArchitectureTests
         typeof(IAutomationNeuron),
         typeof(IUserSessionNeuron),
         typeof(IFlutterUiNeuron),
-        typeof(IMarketplaceNeuron),
         typeof(IGoogleAuthNeuron),
         typeof(ISalesforceAuthNeuron),
         typeof(IConnector),

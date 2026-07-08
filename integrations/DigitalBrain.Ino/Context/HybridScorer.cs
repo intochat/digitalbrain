@@ -20,7 +20,11 @@ public static class HybridScorer
     public static float KeywordScore(string query, string text)
     {
         var terms = Tokenize(query);
-        if (terms.Count == 0) return 0f;
+        if (terms.Count == 0)
+        {
+            return 0f;
+        }
+
         var haystack = text.ToLowerInvariant();
         var hits = terms.Count(t => haystack.Contains(t, StringComparison.Ordinal));
         return (float)hits / terms.Count;
@@ -29,13 +33,23 @@ public static class HybridScorer
     public static bool IsZeroVector(ReadOnlySpan<float> v)
     {
         for (var i = 0; i < v.Length; i++)
-            if (v[i] != 0f) return false;
+        {
+            if (v[i] != 0f)
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 
     public static float CosineSimilarity(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
     {
-        if (a.Length != b.Length || a.Length == 0) return 0f;
+        if (a.Length != b.Length || a.Length == 0)
+        {
+            return 0f;
+        }
+
         float dot = 0f, normA = 0f, normB = 0f;
         for (var i = 0; i < a.Length; i++)
         {
