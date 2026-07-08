@@ -172,15 +172,19 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
     {
         // Projection now via explicit lists (from journals + Known) passed to Retrieve overloads.
         // No mutation of classifier. Tests the journal-derived path.
-        var caps = InoAgentCapabilities.KnownAgentRecords
-            .Select(r => r.ToClassifierCapability())
+        var caps = InoAgentCapabilities.DiscoverAgentRecords()
             .ToList();
 
-        var cap = new InoIntentClassifier.Capability(
+        var cap = new InoCapabilityRecord(
             "test-gsf-followup",
+            "Test GSF follow-up",
             "Cross Gmail to Salesforce follow-up using journal memory",
-            new[] { "find salesforce for last email", "related crm from gmail" },
-            "g-sf");
+            ["test-gsf-followup", "gmail", "salesforce", "crm"],
+            ["find salesforce for last email", "related crm from gmail"],
+            "g-sf",
+            "test",
+            "CapabilityRegistered",
+            "JournalFact");
         caps.Add(cap);
 
         // Verify Retrieve using explicit caps list (as would come from journal load).
@@ -266,8 +270,8 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
             (n.Props.TryGetValue("text", out var txt) && txt?.ToString()?.Contains("Current active provider", StringComparison.OrdinalIgnoreCase) == true));
         Assert.True(hasCurrent, "Settings surface should include dynamic current provider display");
 
-        // Simulate button press -> InoRequest("set-llm:qwen")
-        await ino.FireAsync(new InoRequest("set-llm:qwen", "session-llm-1"));
+        // Simulate button press -> InoRequest("set-llm:ollama")
+        await ino.FireAsync(new InoRequest("set-llm:ollama", "session-llm-1"));
 
         var responses = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().ToList();
         var setResp = responses.LastOrDefault(r => r.Prompt.Contains("set-llm", StringComparison.OrdinalIgnoreCase));
@@ -532,6 +536,8 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
         var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
         Assert.Contains("Latest Gmail message", response.Response);
         Assert.Contains("Quarterly planning", response.Response);
+        Assert.DoesNotContain("mail-secret-456", response.Response);
+        Assert.Contains("access_token=[redacted]", response.Response);
 
         var signals = (await ino.GetOutgoingTimelineAsync()).OfType<Signal>().ToList();
         Assert.Contains(signals, signal => signal.Name == GoogleSignals.GmailFetchRequested);
@@ -543,7 +549,14 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
         Assert.Equal("Gmail", surface.Props[UiSurfaceKeys.Title]);
 
         var tree = Assert.IsType<UiWidgetTree>(surface.Props["tree"]);
-        Assert.Contains("Quarterly planning", FlattenText(tree));
+        var surfaceText = FlattenText(tree);
+        Assert.Contains("Quarterly planning", surfaceText);
+        Assert.DoesNotContain("mail-secret-456", surfaceText);
+        Assert.Contains("access_token=[redacted]", surfaceText);
+
+        var memory = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<MemorySummary>(), summary => summary.SourceKind == "Gmail");
+        Assert.DoesNotContain("mail-secret-456", memory.Summary);
+        Assert.Contains("access_token=[redacted]", memory.Summary);
 
         // Richer actionable follow-up buttons (Slice A continuation)
         var buttons = FindNodes(tree).Where(n => n.Type == UiKitVocabulary.Button).ToList();
@@ -837,7 +850,7 @@ internal sealed class RecordingGmailApiClient : IGmailApiClient
     public Task<string> ReadMessageAsync(string messageId, CancellationToken ct)
     {
         ReadMessageIds.Add(messageId);
-        return Task.FromResult("Quarterly planning moved to 3 PM. Bring the launch notes.");
+        return Task.FromResult("Quarterly planning moved to 3 PM. access_token=mail-secret-456 Bring the launch notes.");
     }
 
     public Task SendMessageAsync(string to, string subject, string body, CancellationToken ct) =>

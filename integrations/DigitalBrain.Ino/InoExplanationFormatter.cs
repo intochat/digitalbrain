@@ -4,15 +4,30 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Ino;
 
+public enum InoExplanationRequestKind
+{
+    None,
+    LastAction,
+    Correlation
+}
+
+public sealed record InoExplanationRequest(InoExplanationRequestKind Kind, string? CorrelationId = null);
+
 public static partial class InoExplanationFormatter
 {
-    public static bool IsExplanationQuestion(string prompt)
+    public static bool IsExplanationQuestion(string prompt) => TryParse(prompt).Kind != InoExplanationRequestKind.None;
+
+    public static InoExplanationRequest TryParse(string prompt)
     {
-        var p = prompt.ToLowerInvariant();
-        return p.Contains("why did you do that") ||
-               p.Contains("explain last action") ||
-               p.Contains("explain correlation") ||
-               p.Contains("why did that happen");
+        var correlation = TryExtractCorrelationId(prompt);
+        if (!string.IsNullOrWhiteSpace(correlation))
+        {
+            return new InoExplanationRequest(InoExplanationRequestKind.Correlation, correlation);
+        }
+
+        return ExplainLastRegex().IsMatch(prompt)
+            ? new InoExplanationRequest(InoExplanationRequestKind.LastAction)
+            : new InoExplanationRequest(InoExplanationRequestKind.None);
     }
 
     public static string? TryExtractCorrelationId(string prompt)
@@ -105,4 +120,7 @@ public static partial class InoExplanationFormatter
 
     [GeneratedRegex(@"correlation\s+(?<id>[a-zA-Z0-9:_\-\.]+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex CorrelationRegex();
+
+    [GeneratedRegex(@"\b(?:why\s+did\s+(?:you|that)|explain\s+(?:last|previous)\s+action)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ExplainLastRegex();
 }

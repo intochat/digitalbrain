@@ -42,6 +42,7 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.Configure<NeuronLifecycleOptions>(options => options.JournalActivationMarkers = true);
                 services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, AutomationRemovalApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();

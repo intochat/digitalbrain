@@ -114,8 +114,8 @@ public static class InoContextPacketBuilder
         foreach (var memory in memories)
         {
             // Trust from declared metadata on MemorySummary (deleted topic sniffing per review).
-            var trust = string.Equals(memory.TrustLevel, "UntrustedEvidence", StringComparison.OrdinalIgnoreCase)
-                ? InoContextTrustLevel.UntrustedEvidence
+            var trust = Enum.TryParse<InoContextTrustLevel>(memory.TrustLevel, ignoreCase: true, out var declaredTrust)
+                ? declaredTrust
                 : InoContextTrustLevel.MemorySummary;
             Add(items, "RetrievedMemories", $"{memory.Topic}={memory.Summary}", InoContextSourceKind.Memory,
                 memory.SynapseId, trust, workspaceId, memory.Timestamp, memory.CorrelationId, memory.CausationId,

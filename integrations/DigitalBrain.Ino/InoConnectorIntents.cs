@@ -10,9 +10,5 @@ public static class InoConnectorIntents
     public static bool IsSalesforce(string prompt) =>
         InoIntentClassifier.Classify(prompt).Intent == "salesforce";
 
-    public static int ResultCount(string prompt)
-    {
-        var p = prompt.ToLowerInvariant();
-        return p.Contains("last") || p.Contains("latest") || p.Contains("most recent") ? 1 : 5;
-    }
+    public static int ResultCount(string prompt) => InoPromptSemantics.ResultCount(prompt) ?? 5;
 }

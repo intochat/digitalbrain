@@ -13,10 +13,10 @@ using DigitalBrain.Ui.Runtime;
 [McpServerToolType]
 public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainToolsBase(grains)
 {
-    [McpServerTool(Name = "ping_digitalbrain"), Description("Simple ping tool to verify MCP connection to DigitalBrain server works. Always returns success.")]
+    [McpServerTool(Name = "ping_digitalbrain", ReadOnly = true), Description("Simple ping tool to verify MCP connection to DigitalBrain server works. Always returns success.")]
     public static string PingDigitalBrain() => "DigitalBrain MCP connected successfully. Cluster interaction tools ready when kernel is running.";
 
-    [McpServerTool(Name = "get_timeline"), Description("Get recent timeline (synapses) for a neuron. Useful to see history, responses, and automation activity.")]
+    [McpServerTool(Name = "get_timeline", ReadOnly = true), Description("Get recent timeline (synapses) for a neuron. Useful to see history, responses, and automation activity.")]
     public async Task<string> GetTimeline(
         [Description("Neuron ID to query, e.g. 'ino-main', 'llm-main', 'status-main'")] string neuronId,
         [Description("Max number of recent entries")] int maxEntries = 10)
@@ -27,7 +27,7 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
         return string.Join("\n", lines);
     }
 
-    [McpServerTool(Name = "get_causal_lineage"), Description("Read-only causal lineage lookup for a neuron by CorrelationId or SynapseId. Returns sanitized structured JSON from journals.")]
+    [McpServerTool(Name = "get_causal_lineage", ReadOnly = true), Description("Read-only causal lineage lookup for a neuron by CorrelationId or SynapseId. Returns sanitized structured JSON from journals.")]
     public async Task<string> GetCausalLineage(
         [Description("Neuron ID to query, e.g. 'ino-main', 'context-main', 'automation-main'")] string neuronId,
         [Description("CorrelationId or SynapseId to inspect")] string correlationId,
@@ -70,7 +70,7 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
         }, SurfaceJsonOptions);
     }
 
-    [McpServerTool(Name = "get_workbench_surfaces"), Description("Return dynamic UiSurface JSON for the Flutter workbench, derived from task, graph, chart, and timeline journals. Pass comma-separated taskIds when the caller knows active kernel tasks.")]
+    [McpServerTool(Name = "get_workbench_surfaces", ReadOnly = true), Description("Return dynamic UiSurface JSON for the Flutter workbench, derived from task, graph, chart, and timeline journals. Pass comma-separated taskIds when the caller knows active kernel tasks.")]
     public async Task<string> GetWorkbenchSurfaces(
         [Description("Comma-separated kernel task ids to include, if known.")] string taskIds = "",
         [Description("Max graph/timeline events to include")] int maxEvents = 20)
@@ -106,31 +106,9 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
             return string.Empty;
         }
 
-        var text = value
+        var text = SensitiveText.Redact(value)
             .Replace("\r", " ", StringComparison.Ordinal)
             .Replace("\n", " ", StringComparison.Ordinal);
-
-        foreach (var marker in new[] { "password", "secret", "token", "api_key", "apikey", "refresh_token", "access_token" })
-        {
-            var index = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            while (index >= 0)
-            {
-                var valueStart = text.IndexOfAny(['=', ':'], index);
-                if (valueStart < 0)
-                {
-                    break;
-                }
-
-                var valueEnd = text.IndexOfAny([' ', ',', ';', '}', ']'], valueStart + 1);
-                if (valueEnd < 0)
-                {
-                    valueEnd = text.Length;
-                }
-
-                text = text[..(valueStart + 1)] + "[redacted]" + text[valueEnd..];
-                index = text.IndexOf(marker, valueStart + "[redacted]".Length, StringComparison.OrdinalIgnoreCase);
-            }
-        }
 
         return text.Length <= 500 ? text : text[..497] + "...";
     }

@@ -5,6 +5,7 @@ namespace DigitalBrain.Ino;
 
 internal interface IInoIntentHandler
 {
+    IReadOnlyList<InoCapabilityRecord> Capabilities => [];
     Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken);
 }
 
@@ -22,10 +23,50 @@ internal static class InoIntentHandlers
         new SetLlmInoIntentHandler(),
         new GenericLlmInoIntentHandler()
     ];
+
+    public static IReadOnlyList<InoCapabilityRecord> CapabilityRecords { get; } =
+        Default.SelectMany(handler => handler.Capabilities)
+            .Concat([
+                HandlerCapability(
+                    "automation_create",
+                    "Automation creation",
+                    "Stage a new reaction/automation proposal through the self-evolution rail.",
+                    ["automation_create", "automation", "reaction"],
+                    ["when gmail then summarize", "if email then note in crm"],
+                    "automation"),
+                HandlerCapability(
+                    "uikit_gallery",
+                    "UiKit gallery",
+                    "Show the UI component gallery.",
+                    ["uikit_gallery", "uikit", "ui", "component", "gallery"],
+                    ["ui kit gallery", "show components"],
+                    "ui")
+            ])
+            .ToArray();
+
+    public static InoCapabilityRecord HandlerCapability(
+        string id,
+        string displayName,
+        string description,
+        IReadOnlyList<string> aliases,
+        IReadOnlyList<string> examples,
+        string tier) =>
+        new(id, displayName, description, aliases, examples, tier, "InoIntentHandlers", "InoHandler", "System");
 }
 
 internal sealed class RelationGraphInoIntentHandler : IInoIntentHandler
 {
+    public IReadOnlyList<InoCapabilityRecord> Capabilities { get; } =
+    [
+        InoIntentHandlers.HandlerCapability(
+            "relation_graph",
+            "Relation graph",
+            "Render a relation graph for object relationships.",
+            ["relation_graph", "relation", "graph"],
+            ["draw relation graph", "show object relation"],
+            "ui")
+    ];
+
     public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -47,6 +88,17 @@ internal sealed class RelationGraphInoIntentHandler : IInoIntentHandler
 
 internal sealed class SchemaVisualizationInoIntentHandler : IInoIntentHandler
 {
+    public IReadOnlyList<InoCapabilityRecord> Capabilities { get; } =
+    [
+        InoIntentHandlers.HandlerCapability(
+            "schema_viz",
+            "Database schema visualization",
+            "Inspect and render SQLite database schemas.",
+            ["schema_viz", "schema", "database", "sqlite"],
+            ["show database schema", "visualize sqlite database"],
+            "ui")
+    ];
+
     public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -104,6 +156,17 @@ internal sealed class GenericLlmInoIntentHandler : IInoIntentHandler
 
 internal sealed class LlmSettingsInoIntentHandler : IInoIntentHandler
 {
+    public IReadOnlyList<InoCapabilityRecord> Capabilities { get; } =
+    [
+        InoIntentHandlers.HandlerCapability(
+            "llm_settings",
+            "LLM settings",
+            "View and update the active LLM provider.",
+            ["llm_settings", "llm", "model", "settings"],
+            ["show llm settings", "change llm provider"],
+            "settings")
+    ];
+
     public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -148,6 +211,17 @@ internal sealed class ApproveProposalInoIntentHandler : IInoIntentHandler
 
 internal sealed class RunAutomationInoIntentHandler : IInoIntentHandler
 {
+    public IReadOnlyList<InoCapabilityRecord> Capabilities { get; } =
+    [
+        InoIntentHandlers.HandlerCapability(
+            "automation_run",
+            "Automation run",
+            "Run an approved automation.",
+            ["automation_run", "automation"],
+            ["run automation"],
+            "automation")
+    ];
+
     public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -113,6 +113,41 @@ public class DigitalBrainToolsTests : NeuronTestBase
         var approvalTimeline = await approval.GetOutgoingTimelineAsync();
         Assert.Contains(approvalTimeline.OfType<SelfEvolutionApplyResult>(), result =>
             result.ProposalId == staged.ProposalId && result.Succeeded);
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("what can you do?", "capability-after-automation"));
+        var inoResponse = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
+        Assert.Contains("mcp-auto-approve", inoResponse.Response);
+    }
+
+    [Fact]
+    public async Task RemoveReaction_Stages_Removal_And_Applies_Only_After_Approval()
+    {
+        var factory = new TestGrainFactory(this);
+        var mutationTools = new DigitalBrainMutationTools(factory);
+
+        await mutationTools.DefineReaction(
+            id: "mcp-auto-remove",
+            when: "NeuronActivated",
+            target: "personal-assistant",
+            scriptCode: "return new[] { new Signal(\"RemoveMe\", null) };");
+
+        var automation = Grain<IAutomationNeuron>("automation-main");
+        var stagedCreate = Assert.Single((await automation.GetOutgoingTimelineAsync()).OfType<AutomationDefinitionStaged>(), item => item.Reaction.Id == "mcp-auto-remove");
+        var approval = Grain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+        await approval.DeliverAsync(new SelfEvolutionDecision(stagedCreate.ProposalId, Approved: true, DecidedBy: "user:owner"));
+        Assert.Contains("mcp-auto-remove", await automation.ListActiveReactionsAsync());
+
+        var stagedRemovalText = await mutationTools.RemoveReaction("mcp-auto-remove");
+        Assert.Contains("Staged removal", stagedRemovalText);
+        Assert.Contains("mcp-auto-remove", await automation.ListActiveReactionsAsync());
+
+        var stagedRemoval = Assert.Single((await automation.GetOutgoingTimelineAsync()).OfType<AutomationRemovalStaged>(), item => item.ReactionId == "mcp-auto-remove");
+        var pending = Assert.Single((await approval.GetOutgoingTimelineAsync()).OfType<SelfEvolutionProposalPending>(), item => item.ProposalId == stagedRemoval.ProposalId);
+        Assert.Equal(SelfEvolutionApplyVia.AutomationRemoveReaction, pending.ApplyVia);
+
+        await approval.DeliverAsync(new SelfEvolutionDecision(stagedRemoval.ProposalId, Approved: true, DecidedBy: "user:owner"));
+        Assert.DoesNotContain("mcp-auto-remove", await automation.ListActiveReactionsAsync());
     }
 
     [Fact]
