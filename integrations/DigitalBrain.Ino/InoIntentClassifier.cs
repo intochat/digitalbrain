@@ -100,6 +100,11 @@ public static class InoIntentClassifier
             return new("uikit_gallery", 0.9);
         }
 
+        if (p.Contains("set-llm"))
+        {
+            return new("set_llm", 0.95);
+        }
+
         if (p.Contains("llm") || p.Contains("model") || p.Contains("settings") ||
             p.Contains("change llm") || p.Contains("use qwen") || p.Contains("use gpt") || p.Contains("openai"))
         {
@@ -109,6 +114,16 @@ public static class InoIntentClassifier
         if (p.Contains("automation") || p.Contains("create reaction") || (p.Contains("when") && p.Contains("then")) || p.Contains("if ") && p.Contains(" then "))
         {
             return new("automation_create", 0.8);
+        }
+
+        if (p.Contains("run automation") || p.Contains("run now") || p.Contains("execute automation"))
+        {
+            return new("run_automation", 0.85);
+        }
+
+        if (p.Contains("approve") && (p.Contains("proposal") || p.Contains("automation") || p.Contains("self-evolution")))
+        {
+            return new("approve", 0.9);
         }
 
         return new("generic", 0.3);

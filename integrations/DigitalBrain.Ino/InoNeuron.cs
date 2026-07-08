@@ -114,18 +114,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        // Handle set-llm commands from settings surface buttons (they classify as llm_settings due to "llm" keyword, so check sets first)
-        var pForCheck = req.Prompt.ToLowerInvariant();
-        if (pForCheck.Contains("set-llm") || pForCheck.Contains("use qwen") || pForCheck.Contains("use local") || pForCheck.Contains("use gpt") || pForCheck.Contains("use azure"))
+        if (cls.Intent == "set_llm")
         {
             await HandleLlmSetCommandAsync(req, workspaceId, cancellationToken);
-            return;
-        }
-
-        // Approve via chat: "approve proposal <id>" or "approve that automation" routes to decision (rail)
-        if (pForCheck.Contains("approve") && (pForCheck.Contains("proposal") || pForCheck.Contains("automation") || pForCheck.Contains("self-evolution")))
-        {
-            await HandleApproveProposalIntentAsync(req, workspaceId, cancellationToken);
             return;
         }
 
@@ -142,8 +133,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        var p = req.Prompt.ToLowerInvariant();
-        if (p.Contains("run automation") || p.Contains("run now") || p.Contains("execute automation"))
+        if (cls.Intent == "approve")
+        {
+            await HandleApproveProposalIntentAsync(req, workspaceId, cancellationToken);
+            return;
+        }
+
+        if (cls.Intent == "run_automation") // classifier now catches run automation strings
         {
             var reply = "Running the requested automation (preview or activated). Check the Tasks surface for results.";
             await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
@@ -290,13 +286,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 await CreateMemorySummaryAsync(workspaceId, cancellationToken);
                 return;
             }
-        }
-
-        // Fallback for text "set llm" prompts (button sets are handled early via HandleLlmSetCommandAsync)
-        if (p.Contains("set-llm") || p.Contains("use qwen") || p.Contains("use local") || p.Contains("use gpt") || p.Contains("use azure"))
-        {
-            await HandleLlmSetCommandAsync(req, workspaceId, cancellationToken);
-            return;
         }
 
         var ctx = await BuildContextAsync(req.Prompt, workspaceId, cancellationToken);
