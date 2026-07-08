@@ -60,10 +60,10 @@ public sealed class TestDigitalBrain(
             : throw new InvalidOperationException("DeliverAsync requires synapse.Receiver to be set.");
 
     private static void ConfigureMessagingTimeout(ISiloBuilder builder) =>
-        builder.Configure<MessagingOptions>(options => options.ResponseTimeout = TestClusterResponseTimeout);
+        builder.Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TestClusterResponseTimeout);
 
     private static void ConfigureMessagingTimeout(IClientBuilder builder) =>
-        builder.Configure<MessagingOptions>(options => options.ResponseTimeout = TestClusterResponseTimeout);
+        builder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = TestClusterResponseTimeout);
 }
 
 public sealed class TestDigitalBrainCluster(InProcessTestCluster cluster)
