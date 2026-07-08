@@ -56,6 +56,14 @@ public record AutomationDefinitionStaged(
     : Synapse(nameof(AutomationDefinitionStaged), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.AutomationRemovalStaged")]
+public record AutomationRemovalStaged(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string AutomationNeuronId,
+    [property: Id(2)] string ReactionId)
+    : Synapse(nameof(AutomationRemovalStaged), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
 [Alias("DigitalBrain.Core.AutomationRun")]
 public record AutomationRun(
     [property: Id(0)] string ReactionId,
@@ -94,6 +102,8 @@ public interface IAutomationNeuron : INeuron
     /// Get script source by id for library/reuse (documented for surfaces + MCP).
     [Alias("GetScriptCodeAsync")]
     Task<string?> GetScriptCodeAsync(string id);
+    /// Trusted/bootstrap convenience. User/MCP removals must stage AutomationRemovalStaged through the
+    /// self-evolution rail before this method is called.
     [Alias("RemoveReactionAsync")]
     Task RemoveReactionAsync(string id);
 

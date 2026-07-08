@@ -44,6 +44,7 @@ public static class SelfEvolutionNeuronIds
 public static class SelfEvolutionApplyVia
 {
     public const string AutomationDefineReaction = "automation.define-reaction";
+    public const string AutomationRemoveReaction = "automation.remove-reaction";
     public const string FoundryRun = "foundry.run";
     public const string FoundryDeploy = "foundry.deploy";
 }

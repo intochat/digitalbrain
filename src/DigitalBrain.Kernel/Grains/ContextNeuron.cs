@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Ino;
 using DigitalBrain.Ino.Context;
 using Microsoft.Extensions.AI;
 
@@ -39,8 +40,21 @@ public class ContextNeuron(ILogger<ContextNeuron> logger, NeuronJournals journal
 
     public async Task RememberAsync(string text, CancellationToken cancellationToken = default)
     {
-        var embedding = await EmbedAsync(text, cancellationToken);
-        await FireAsync(new MemoryStored(text, embedding), cancellationToken);
+        await RememberEvidenceAsync(text, null, "Context", "MemorySummary", "ContextNeuron", cancellationToken);
+    }
+
+    public async Task RememberEvidenceAsync(
+        string text,
+        string? workspaceId,
+        string? sourceKind,
+        string? trustLevel,
+        string? origin,
+        CancellationToken cancellationToken = default)
+    {
+        // Redact untrusted/secrets before storing in journal (per review).
+        var redacted = SensitiveText.Redact(text);
+        var embedding = await EmbedAsync(redacted, cancellationToken);
+        await FireAsync(new MemoryStored(redacted, embedding, workspaceId, sourceKind, trustLevel, origin), cancellationToken);
     }
 
     public async Task<string[]> RecallAsync(string query, int top = 5, CancellationToken cancellationToken = default)

@@ -113,6 +113,41 @@ public class DigitalBrainToolsTests : NeuronTestBase
         var approvalTimeline = await approval.GetOutgoingTimelineAsync();
         Assert.Contains(approvalTimeline.OfType<SelfEvolutionApplyResult>(), result =>
             result.ProposalId == staged.ProposalId && result.Succeeded);
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("what can you do?", "capability-after-automation"));
+        var inoResponse = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
+        Assert.Contains("mcp-auto-approve", inoResponse.Response);
+    }
+
+    [Fact]
+    public async Task RemoveReaction_Stages_Removal_And_Applies_Only_After_Approval()
+    {
+        var factory = new TestGrainFactory(this);
+        var mutationTools = new DigitalBrainMutationTools(factory);
+
+        await mutationTools.DefineReaction(
+            id: "mcp-auto-remove",
+            when: "NeuronActivated",
+            target: "personal-assistant",
+            scriptCode: "return new[] { new Signal(\"RemoveMe\", null) };");
+
+        var automation = Grain<IAutomationNeuron>("automation-main");
+        var stagedCreate = Assert.Single((await automation.GetOutgoingTimelineAsync()).OfType<AutomationDefinitionStaged>(), item => item.Reaction.Id == "mcp-auto-remove");
+        var approval = Grain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+        await approval.DeliverAsync(new SelfEvolutionDecision(stagedCreate.ProposalId, Approved: true, DecidedBy: "user:owner"));
+        Assert.Contains("mcp-auto-remove", await automation.ListActiveReactionsAsync());
+
+        var stagedRemovalText = await mutationTools.RemoveReaction("mcp-auto-remove");
+        Assert.Contains("Staged removal", stagedRemovalText);
+        Assert.Contains("mcp-auto-remove", await automation.ListActiveReactionsAsync());
+
+        var stagedRemoval = Assert.Single((await automation.GetOutgoingTimelineAsync()).OfType<AutomationRemovalStaged>(), item => item.ReactionId == "mcp-auto-remove");
+        var pending = Assert.Single((await approval.GetOutgoingTimelineAsync()).OfType<SelfEvolutionProposalPending>(), item => item.ProposalId == stagedRemoval.ProposalId);
+        Assert.Equal(SelfEvolutionApplyVia.AutomationRemoveReaction, pending.ApplyVia);
+
+        await approval.DeliverAsync(new SelfEvolutionDecision(stagedRemoval.ProposalId, Approved: true, DecidedBy: "user:owner"));
+        Assert.DoesNotContain("mcp-auto-remove", await automation.ListActiveReactionsAsync());
     }
 
     [Fact]
@@ -132,6 +167,29 @@ public class DigitalBrainToolsTests : NeuronTestBase
         Assert.Contains(
             (await automation.GetOutgoingTimelineAsync()).OfType<AutomationDefinitionStaged>(),
             staged => staged.Reaction.Id == "sf-chat-example");
+    }
+
+    [Fact]
+    public async Task GetCausalLineage_Returns_ReadOnly_Structured_Journal_Data()
+    {
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("what can you do?", "mcp-lineage-client"));
+
+        var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
+        var correlationId = response.CorrelationId ?? response.SynapseId;
+
+        var factory = new TestGrainFactory(this);
+        var readTools = new DigitalBrainReadTools(factory);
+        var json = await readTools.GetCausalLineage("ino-main", correlationId);
+
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        Assert.Equal("ino-main", document.RootElement.GetProperty("neuronId").GetString());
+        Assert.Equal(correlationId, document.RootElement.GetProperty("correlationId").GetString());
+        Assert.True(document.RootElement.GetProperty("count").GetInt32() > 0);
+
+        var entries = document.RootElement.GetProperty("entries").EnumerateArray().ToList();
+        Assert.Contains(entries, entry => entry.GetProperty("type").GetString() == nameof(InoRequest));
+        Assert.Contains(entries, entry => entry.GetProperty("type").GetString() == nameof(InoResponse));
     }
 }
 

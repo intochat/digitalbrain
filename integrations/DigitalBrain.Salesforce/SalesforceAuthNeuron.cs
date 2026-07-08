@@ -32,7 +32,7 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
 
         var clientId = signal.Props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
-        await FireAsync(surface, cancellationToken);
+        await PublishSurfaceAsync(surface, cancellationToken);
     }
 
     private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props, CancellationToken cancellationToken)
@@ -203,7 +203,14 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         var clientId = props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId, message);
 
+        await PublishSurfaceAsync(surface, cancellationToken);
+    }
+
+    private async Task PublishSurfaceAsync(UiContracts.UiSurface surface, CancellationToken cancellationToken)
+    {
         await FireAsync(surface, cancellationToken);
+        var flutter = GrainFactory.GetGrain<UiContracts.IFlutterUiNeuron>(UiContracts.IFlutterUiNeuron.SingletonKey);
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
     private static bool IsOAuthStart(IReadOnlyDictionary<string, object?> props) =>

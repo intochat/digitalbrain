@@ -1,10 +1,11 @@
 using System.ComponentModel;
+using DigitalBrain.Core;
 using DigitalBrain.Core.Sdk;
 
 namespace DigitalBrain.Google;
 
 [Alias("DigitalBrain.Google.IGmailNeuron")]
-public interface IGmailNeuron : IAgent
+public interface IGmailNeuron : IAgent, IHandle<CapabilityInvocation>
 {
     static string IAgent.AgentDisplayName => "Gmail";
 
@@ -18,6 +19,9 @@ public interface IGmailNeuron : IAgent
         You are Gmail, the email specialist. List, read, and send messages via the connected Google account.
         Sending mutates the user's mailbox — confirm intent before SendMessageAsync.
         """;
+
+    static string IAgent.AgentInvocationGrainType => "digitalbrain.google.gmail.v1";
+    static string IAgent.AgentInvocationGrainKey => "gmail-capability-main";
 
     [Description("List messages matching a Gmail search query, up to maxResults.")]
     [Alias("ListMessagesAsync")]

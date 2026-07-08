@@ -40,6 +40,7 @@ public static class DigitalBrainOrleansExtensions
             {
                 services.AddScoped<NeuronJournals>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, AutomationRemovalApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();

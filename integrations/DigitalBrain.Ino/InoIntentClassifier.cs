@@ -1,118 +1,107 @@
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Ino;
 
-/// Lightweight intent classifier for Ino (AI assistant integration).
-/// Extracted so that Ino can ship as a pluggable integration (like Google/Salesforce)
-/// owning its AI config and classification logic.
 public static class InoIntentClassifier
 {
     public sealed record Capability(string Id, string Description, string[] Examples, string Tier = "generic");
 
-    private static readonly List<Capability> _caps =
-    [
-        new Capability("gmail", "Read or act on Gmail messages", new[] { "show my emails", "last gmail from boss" }, "gmail"),
-        new Capability("salesforce", "Query Salesforce CRM accounts/contacts", new[] { "list salesforce accounts", "salesforce from Acme" }, "salesforce"),
-        new Capability("automation_create", "Create a new reaction/automation", new[] { "when gmail then summarize", "if email then note in crm" }, "automation"),
-        new Capability("llm_settings", "Change or view active LLM/model", new[] { "change llm to gpt", "llm settings" }, "generic"),
-        new Capability("uikit_gallery", "Show UI component gallery", new[] { "ui kit gallery", "show components" }, "ui"),
-    ];
-
-    public static IReadOnlyList<Capability> Capabilities => _caps;
-
-    public static void RegisterCapability(Capability cap)
-    {
-        if (!_caps.Any(c => c.Id == cap.Id))
-        {
-            _caps.Add(cap);
-        }
-    }
-
     public sealed record Classification(string Intent, double Confidence, string? Query = null, int? MaxResults = null);
 
-    // Fast path (keyword).
-    public static Classification Classify(string prompt)
+    private const int MaxKeywordCapabilities = 5;
+
+    public static Classification Classify(string prompt, IReadOnlyList<InoCapabilityRecord>? capabilities = null)
     {
         if (string.IsNullOrWhiteSpace(prompt))
         {
             return new("generic", 0.0);
         }
 
-        var p = prompt.ToLowerInvariant();
+        capabilities ??= InoAgentCapabilities.DiscoverAgentRecords()
+            .Concat(InoIntentHandlers.CapabilityRecords)
+            .ToArray();
 
-        int? max = null;
-        if (p.Contains("last") || p.Contains("latest") || p.Contains("most recent"))
+        if (InoExplanationFormatter.TryParse(prompt).Kind != InoExplanationRequestKind.None)
         {
-            max = 1;
-        }
-        else if (p.Contains("5") || p.Contains("few"))
-        {
-            max = 5;
+            return new("explain", 0.95);
         }
 
-        string? query = null;
-        if (p.Contains(" from "))
+        if (InoCapabilityAnswers.TryParseQuery(prompt, capabilities).Kind != InoCapabilityQueryKind.None)
         {
-            var parts = prompt.Split(new[] { " from ", " From " }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 1)
-            {
-                query = parts[1].Trim().Split(' ').FirstOrDefault();
-            }
+            return new("capability_status", 0.95);
         }
 
-        if (p.Contains("salesforce") || p.Contains("crm"))
-        {
-            return new("salesforce", 0.88, query, max);
-        }
+        var max = InoPromptSemantics.ResultCount(prompt);
+        var query = InoPromptSemantics.TryExtractFromQuery(prompt);
 
-        if (p.Contains("gmail") || p.Contains("inbox") || p.Contains("mailbox") ||
-            (p.Contains("email") && !p.Contains("salesforce") && !p.Contains("crm")))
-        {
-            return new("gmail", 0.85, query, max);
-        }
-
-        if (p.Contains("bitcoin") && p.Contains("price"))
-        {
-            return new("bitcoin_price", 0.9);
-        }
-
-        if ((p.Contains("draw") || p.Contains("show") || p.Contains("visualize")) &&
-            p.Contains("relation") && (p.Contains("2 object") || p.Contains("two object") || p.Contains("object")))
+        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "relation_graph"))
         {
             return new("relation_graph", 0.8);
         }
 
-        if (p.Contains("schema") || p.Contains("visualize database") || p.Contains("visualize db") ||
-            p.Contains("show database") || p.Contains("show db"))
+        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "schema_viz"))
         {
             return new("schema_viz", 0.8);
         }
 
-        if (p.Contains("uikit") || p.Contains("ui kit") || (p.Contains("gallery") && p.Contains("component")))
+        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "uikit_gallery"))
         {
             return new("uikit_gallery", 0.9);
         }
 
-        if (p.Contains("llm") || p.Contains("model") || p.Contains("settings") ||
-            p.Contains("change llm") || p.Contains("use qwen") || p.Contains("use gpt") || p.Contains("openai"))
+        if (InoPromptSemantics.HasAny(prompt, "set-llm"))
+        {
+            return new("set_llm", 0.95);
+        }
+
+        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "llm_settings"))
         {
             return new("llm_settings", 0.85);
         }
 
-        if (p.Contains("automation") || p.Contains("create reaction") || (p.Contains("when") && p.Contains("then")) || p.Contains("if ") && p.Contains(" then "))
+        if (InoPromptSemantics.HasAny(prompt, "automation") ||
+            InoPromptSemantics.HasAll(prompt, "create", "reaction") ||
+            InoPromptSemantics.HasAll(prompt, "when", "then"))
         {
             return new("automation_create", 0.8);
+        }
+
+        if (InoPromptSemantics.HasAll(prompt, "run", "automation") ||
+            InoPromptSemantics.HasAll(prompt, "execute", "automation"))
+        {
+            return new("run_automation", 0.85);
+        }
+
+        if (InoPromptSemantics.HasAny(prompt, "approve") &&
+            InoPromptSemantics.HasAny(prompt, "proposal", "automation", "self-evolution"))
+        {
+            return new("approve", 0.9);
+        }
+
+        if (capabilities != null)
+        {
+            var matchedCap = capabilities.FirstOrDefault(c => InoPromptSemantics.MatchesCapability(prompt, capabilities, c.Id));
+            if (matchedCap != null)
+            {
+                return new(matchedCap.Id, 0.82, query, max);
+            }
         }
 
         return new("generic", 0.3);
     }
 
-    // LLM-enhanced classification. Uses injected IChatClient (from Ino AI config / scoped factory).
-    public static async Task<Classification> ClassifyWithLlmAsync(string prompt, IServiceProvider? services = null, CancellationToken cancellationToken = default)
+    public static async Task<Classification> ClassifyWithLlmAsync(
+        string prompt,
+        IServiceProvider? services = null,
+        IReadOnlyList<InoCapabilityRecord>? capabilities = null,
+        CancellationToken cancellationToken = default)
     {
-        var fast = Classify(prompt);
+        capabilities ??= InoAgentCapabilities.DiscoverAgentRecords()
+            .Concat(InoIntentHandlers.CapabilityRecords)
+            .ToArray();
+        var fast = Classify(prompt, capabilities);
         if (fast.Confidence >= 0.8)
         {
             return fast;
@@ -126,18 +115,18 @@ public static class InoIntentClassifier
 
         try
         {
-            var relevant = await RetrieveCapabilitiesAsync(prompt, services, cancellationToken);
+            var relevant = await RetrieveCapabilitiesAsync(prompt, capabilities, services, cancellationToken);
             var capsText = string.Join("\n", relevant.Select(c => $"- {c.Id}: {c.Description} (e.g. {string.Join(", ", c.Examples)})"));
 
             const string sys = "You are an intent classifier for a personal AI assistant. " +
-                               "Reply with ONLY a single JSON object: {\"intent\":\"gmail\",\"confidence\":0.92}. " +
-                               "Ground on these capabilities (use best match):\n";
+                               "Reply with ONLY a single JSON object: {\"intent\":\"generic\",\"confidence\":0.7}. " +
+                               "Use only listed capability ids or generic/explain/approve/run_automation/uikit_gallery/schema_viz/relation_graph:\n";
 
-            var fullPrompt = sys + capsText + "\nUser request: " + prompt;
+            var fullPrompt = sys + capsText + "\nUser request: " + SecretText.Redact(prompt);
             var response = await chat.GetResponseAsync(fullPrompt, cancellationToken: cancellationToken);
 
             var text = response.Text?.Trim() ?? "";
-            var parsed = TryParseClassification(text);
+            var parsed = TryParseClassification(text, capabilities);
             if (parsed is not null && parsed.Confidence > 0.5)
             {
                 return parsed;
@@ -155,14 +144,27 @@ public static class InoIntentClassifier
         }
     }
 
-    public static List<Capability> RetrieveCapabilities(string prompt) =>
-        KeywordCapabilities(prompt);
+    public static List<InoCapabilityRecord> RetrieveCapabilities(string prompt, IReadOnlyList<InoCapabilityRecord> caps) =>
+        KeywordCapabilities(prompt, caps);
 
-    public static async Task<List<Capability>> RetrieveCapabilitiesAsync(string prompt, IServiceProvider? services = null, CancellationToken cancellationToken = default)
+    public static async Task<List<InoCapabilityRecord>> RetrieveCapabilitiesAsync(string prompt, IServiceProvider? services = null, CancellationToken cancellationToken = default)
     {
-        var keyword = KeywordCapabilities(prompt);
+        var caps = InoAgentCapabilities.DiscoverAgentRecords()
+            .Concat(InoIntentHandlers.CapabilityRecords)
+            .ToArray();
+        return await RetrieveCapabilitiesAsync(prompt, caps, services, cancellationToken);
+    }
 
-        var vectorCaps = new List<Capability>();
+    public static async Task<List<InoCapabilityRecord>> RetrieveCapabilitiesAsync(
+        string prompt,
+        IReadOnlyList<InoCapabilityRecord> caps,
+        IServiceProvider? services = null,
+        CancellationToken cancellationToken = default)
+    {
+        caps ??= [];
+        var keyword = KeywordCapabilities(prompt, caps);
+
+        var vectorCaps = new List<InoCapabilityRecord>();
         if (services != null)
         {
             try
@@ -173,11 +175,16 @@ public static class InoIntentClassifier
                     var recalled = await recall.RecallAsync(prompt, top: 5, cancellationToken);
                     foreach (var text in recalled ?? Array.Empty<string>())
                     {
-                        var idMatch = Regex.Match(text, @"capability:(\S+)");
-                        if (idMatch.Success)
+                        // Parse structured "capability:Id source:..." from memory text without regex
+                        var capPrefix = "capability:";
+                        var idx = text.IndexOf(capPrefix, StringComparison.OrdinalIgnoreCase);
+                        if (idx >= 0)
                         {
-                            var id = idMatch.Groups[1].Value;
-                            var cap = Capabilities.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
+                            var start = idx + capPrefix.Length;
+                            var end = text.IndexOf(' ', start);
+                            if (end < 0) end = text.Length;
+                            var id = text.Substring(start, end - start).Trim();
+                            var cap = caps.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
                             if (cap != null && !vectorCaps.Any(c => c.Id == cap.Id))
                             {
                                 vectorCaps.Add(cap);
@@ -192,7 +199,6 @@ public static class InoIntentClassifier
             }
             catch
             {
-                // degrade gracefully
             }
         }
 
@@ -200,78 +206,59 @@ public static class InoIntentClassifier
             .Concat(vectorCaps)
             .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
-            .Take(5)
+            .Take(MaxKeywordCapabilities)
             .ToList();
 
         return combined;
     }
 
-    private static List<Capability> KeywordCapabilities(string prompt)
+    private static List<InoCapabilityRecord> KeywordCapabilities(string prompt, IReadOnlyList<InoCapabilityRecord> caps)
     {
-        var p = prompt.ToLowerInvariant();
-        return Capabilities
-            .Where(c => p.Contains(c.Id) || c.Examples.Any(e => p.Contains(e.ToLowerInvariant())))
-            .OrderByDescending(c => p.Contains(c.Id) ? 2 : 1)
-            .Take(5)
+        return caps
+            .Where(c => c.Matches(prompt))
+            .OrderByDescending(c => InoPromptSemantics.HasAny(prompt, c.Id) ? 2 : 1)
+            .Take(MaxKeywordCapabilities)
             .ToList();
     }
 
-    private static Classification? TryParseClassification(string text)
+    private static Classification? TryParseClassification(string text, IReadOnlyList<InoCapabilityRecord> capabilities)
     {
         try
         {
-            var lower = text.ToLowerInvariant();
-            string intent = "generic";
-            double conf = 0.65;
-
-            if (lower.Contains("gmail") || lower.Contains("email"))
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("intent", out var intentElement) ||
+                intentElement.ValueKind != JsonValueKind.String)
             {
-                intent = "gmail";
-            }
-            else if (lower.Contains("salesforce") || lower.Contains("crm"))
-            {
-                intent = "salesforce";
-            }
-            else if (lower.Contains("bitcoin"))
-            {
-                intent = "bitcoin_price";
-            }
-            else if (lower.Contains("relation"))
-            {
-                intent = "relation_graph";
-            }
-            else if (lower.Contains("schema"))
-            {
-                intent = "schema_viz";
-            }
-            else if (lower.Contains("llm") || lower.Contains("model") || lower.Contains("settings"))
-            {
-                intent = "llm_settings";
-            }
-            else if (lower.Contains("automation") || lower.Contains("when") && lower.Contains("then"))
-            {
-                intent = "automation_create";
+                return null;
             }
 
-            foreach (var token in lower.Split(new[] { ' ', '\n', ',', ':', '"', '{', '}' }, StringSplitOptions.RemoveEmptyEntries))
+            var intent = intentElement.GetString() ?? "generic";
+            if (!IsAllowedIntent(intent, capabilities))
             {
-                if (token.StartsWith("0.") && double.TryParse(token, out var c))
-                {
-                    conf = c;
-                    break;
-                }
-                if (token.EndsWith("%") && double.TryParse(token.TrimEnd('%'), out var p))
-                {
-                    conf = p / 100.0;
-                    break;
-                }
+                return null;
             }
 
-            return new Classification(intent, Math.Clamp(conf, 0.0, 1.0));
+            var confidence = root.TryGetProperty("confidence", out var confidenceElement) &&
+                             confidenceElement.TryGetDouble(out var parsedConfidence)
+                ? parsedConfidence
+                : 0.65;
+
+            return new Classification(intent, Math.Clamp(confidence, 0.0, 1.0));
         }
         catch
         {
             return null;
         }
     }
+
+    private static bool IsAllowedIntent(string intent, IReadOnlyList<InoCapabilityRecord> capabilities) =>
+        string.Equals(intent, "generic", StringComparison.Ordinal) ||
+        string.Equals(intent, "explain", StringComparison.Ordinal) ||
+        string.Equals(intent, "approve", StringComparison.Ordinal) ||
+        string.Equals(intent, "run_automation", StringComparison.Ordinal) ||
+        string.Equals(intent, "uikit_gallery", StringComparison.Ordinal) ||
+        capabilities.Any(capability =>
+            string.Equals(capability.Id, intent, StringComparison.OrdinalIgnoreCase) ||
+            capability.Matches(intent));
 }

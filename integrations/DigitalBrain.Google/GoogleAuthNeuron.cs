@@ -78,8 +78,9 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
             // No config: emit credential form (port from Salesforce) instead of empty URL.
             // User fills client id/secret via form -> saves -> re-triggers OAuth.
             var message = "Google OAuth client configuration required. Enter Client ID and Secret from Google Cloud Console.";
-            var form = GoogleAuthSurfaces.CredentialForm(Self.Value, clientId: null, message);
-            await FireAsync(form, cancellationToken);
+            var clientId = props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
+            var form = GoogleAuthSurfaces.CredentialForm(Self.Value, clientId, message);
+            await PublishSurfaceAsync(form, cancellationToken);
             return;
         }
 
@@ -213,5 +214,12 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
         {
             values[key] = value.ToString()!.Trim();
         }
+    }
+
+    private async Task PublishSurfaceAsync(UiContracts.UiSurface surface, CancellationToken cancellationToken)
+    {
+        await FireAsync(surface, cancellationToken);
+        var flutter = GrainFactory.GetGrain<UiContracts.IFlutterUiNeuron>(UiContracts.IFlutterUiNeuron.SingletonKey);
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 }

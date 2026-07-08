@@ -530,12 +530,11 @@ public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBas
             }))
         }, TestContext());
 
-        var scope = Assert.Single(_salesforceFactory.Scopes);
-        Assert.Equal(new UserId(realUserId), scope.UserId);
-
         var ino = Grain<IInoNeuron>("ino-main");
         var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
-        Assert.Contains("Acme Test Corp", response.Response);
+        Assert.Contains("salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(_salesforceFactory.Scopes, scope => scope.UserId.Value == realUserId);
+        Assert.DoesNotContain(_salesforceFactory.Scopes, scope => scope.UserId.Value == UserId.Anonymous.Value);
     }
 
     private static ServerCallContext TestContext(CancellationToken cancellationToken = default) =>

@@ -284,7 +284,13 @@ public record ContextUpdate(string ContextName, string Key, string Value) : Syna
 // A stored semantic memory: the text plus its embedding (empty when no real embedder is configured).
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.MemoryStored")]
-public record MemoryStored(string Text, float[] Embedding) : Synapse(nameof(MemoryStored), DateTimeOffset.UtcNow);
+public record MemoryStored(
+    string Text,
+    float[] Embedding,
+    string? WorkspaceId = null,
+    string? SourceKind = null,
+    string? TrustLevel = null,
+    string? Origin = null) : Synapse(nameof(MemoryStored), DateTimeOffset.UtcNow);
 
 // Filter changes - INO/Context must be notified so assistant knows current UI view state
 [GenerateSerializer]

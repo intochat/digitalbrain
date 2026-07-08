@@ -264,13 +264,31 @@ Use this + ino_list_proposals + ino_approve_proposal for full create/approve/run
         return details.ToString();
     }
 
-    [McpServerTool(Name = "remove_reaction"), Description("Remove a reaction by id.")]
+    [McpServerTool(Name = "remove_reaction"), Description("Stage removal of a reaction by id. The reaction is not removed until a SelfEvolutionDecision approves the proposal.")]
     public async Task<string> RemoveReaction([Description("Reaction id to remove")] string id, CancellationToken cancellationToken = default)
     {
-        // RemoveReactionAsync has no cancellable overload today; parameter accepted for MCP SDK binding only.
-        var auto = Grains.GetGrain<IAutomationNeuron>("automation-main");
-        await auto.RemoveReactionAsync(id);
-        return $"Removed reaction {id}.";
+        const string automationNeuronId = "automation-main";
+        var proposalId = "automation-remove-" + Guid.NewGuid().ToString("N");
+        var auto = Grains.GetGrain<IAutomationNeuron>(automationNeuronId);
+        await auto.FireAsync(new AutomationRemovalStaged(proposalId, automationNeuronId, id), cancellationToken);
+
+        var approval = Grains.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
+        await approval.DeliverAsync(new SelfEvolutionProposal(
+            ProposalId: proposalId,
+            Scope: "automation:default",
+            Rationale: $"MCP remove_reaction requested removal of reaction {id}.",
+            ProposedChange: $"Remove reaction {id}.",
+            ApplyVia: SelfEvolutionApplyVia.AutomationRemoveReaction,
+            Risk: SelfEvolutionRisk.InProcessCode,
+            RequiresHumanApproval: true,
+            RollbackPlan: "Re-register the removed reaction from journaled automation history if removal was incorrect.",
+            Origin: automationNeuronId)
+        {
+            Receiver = new NeuronId(SelfEvolutionNeuronIds.Main),
+            Timestamp = DateTimeOffset.UtcNow
+        }, cancellationToken);
+
+        return $"Staged removal of reaction '{id}' as proposal '{proposalId}'. Approve it with ino_approve_proposal before it is removed.";
     }
 
     [McpServerTool(Name = "create_automation_from_description"), Description("High-level sugar for Ino/LLM: describe in English and stage a conservative automation proposal for approval.")]

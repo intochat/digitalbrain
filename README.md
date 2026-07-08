@@ -26,12 +26,18 @@ aspire run
 
 See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, iteration speed rules (MCP-first, parallel Context7, bg tests + polling, metrics + retro, self-evolution for WoW proposals), and pre-change ritual (Context7 + Aspire MCP + todo).
 
-## Opt-in Test Suites
+## Test Suites
 
-Two suites are skipped by default because they're expensive or environment-sensitive — not because they're unmaintained:
+The root test command is expected to run every test with zero skips:
 
-- **Real-stack E2E** (`tests/DigitalBrain.Tests/E2E`): boots the full Aspire AppHost + Orleans silo and drives it over real gRPC/gRPC-Web. In Visual Studio, select `e2e.runsettings` as the solution-wide run settings file (Test > Configure Run Settings) and run any `[Trait("Category", "E2E")]` test — no env vars to remember. From the CLI: `RUN_REAL_STACK_E2E=true dotnet test --logger "console;verbosity=minimal"`. Never run in CI (see `.github/workflows/ci.yml`).
-- **AppHost execution-mode tests** (`tests/DigitalBrain.Tests/Aspire/AddDigitalBrainExecutionModeTests.cs`): fast (no Docker/Orleans — only inspects the declared Aspire resource graph), but loading the `DigitalBrain.AppHost` assembly can collide with a running Aspire process on Windows, so it's opt-in: `RUN_APPHOST_MODEL_TESTS=true dotnet test --logger "console;verbosity=minimal" -p:EnableAppHostTests=true`. Don't run this while `aspire run`/`aspire start` has the AppHost live.
+```powershell
+dotnet test --logger "console;verbosity=minimal"
+```
+
+- **Real-stack E2E** (`tests/DigitalBrain.Tests/E2E`) boots the full Aspire AppHost + Orleans silo and drives it over real gRPC/gRPC-Web.
+- **AppHost execution-mode tests** (`tests/DigitalBrain.Tests/Aspire/AddDigitalBrainExecutionModeTests.cs`) inspect the declared Aspire resource graph without calling `BuildAsync`/`StartAsync`.
+
+Do not keep a separate `aspire run` / `aspire start` session alive while running the full root test suite; the E2E fixture owns its AppHost lifecycle.
 
 ## Core Ideas
 
