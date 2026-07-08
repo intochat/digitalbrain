@@ -3,6 +3,7 @@ using System.Text.Json;
 namespace DigitalBrain.Core;
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.JsonElementSurrogate")]
 public struct JsonElementSurrogate
 {
     [Id(0)]
