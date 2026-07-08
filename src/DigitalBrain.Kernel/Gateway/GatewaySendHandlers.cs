@@ -254,9 +254,9 @@ internal sealed class GatewayGenericSignalSendHandler : IGatewaySendHandler
         GatewayInternalAuth.Enforce(context.Configuration, context.Environment, context.Logger, serverContext, nameof(GatewayService.Send));
 
         var payloadJson = GatewaySendHandlers.PayloadString(request);
-        var signalProps = string.IsNullOrWhiteSpace(payloadJson)
-            ? new Dictionary<string, object?>()
-            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson, SynapsePayloadJson.Options) ?? [];
+        var signalProps = GatewayPayload.CaseInsensitive(string.IsNullOrWhiteSpace(payloadJson)
+            ? null
+            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson, SynapsePayloadJson.Options));
 
         if (string.Equals(request.TypeName, TelegramSignals.MessageReceived, StringComparison.Ordinal)
             && signalProps.TryGetValue("chatId", out var chatIdValue) && chatIdValue is not null)
