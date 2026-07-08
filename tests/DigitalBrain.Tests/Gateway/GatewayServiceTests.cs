@@ -530,10 +530,11 @@ public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBas
             }))
         }, TestContext());
 
-        // Special salesforce via Ino signal/scope resolution path updated for generic/catalog (no direct assert on factory scopes).
         var ino = Grain<IInoNeuron>("ino-main");
         var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
         Assert.Contains("salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(_salesforceFactory.Scopes, scope => scope.UserId.Value == realUserId);
+        Assert.DoesNotContain(_salesforceFactory.Scopes, scope => scope.UserId.Value == UserId.Anonymous.Value);
     }
 
     private static ServerCallContext TestContext(CancellationToken cancellationToken = default) =>

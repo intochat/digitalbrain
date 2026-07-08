@@ -39,20 +39,25 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
     [Fact]
     public async Task GmailIntent_WithoutGoogleCredential_Emits_Auth_Button_Surface()
     {
+        const string clientId = "session-gmail-auth";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("gmail-auth-user", "correct horse battery staple", clientId));
+
         var ino = Grain<IInoNeuron>("ino-gmail-auth");
-        await ino.FireAsync(new InoRequest("Get my last gmail", "session-gmail-auth"));
+        await ino.FireAsync(new InoRequest("Get my last gmail", clientId));
 
         var response = (await ino.GetOutgoingTimelineAsync())
             .OfType<InoResponse>()
             .Last(response => response.Prompt == "Get my last gmail");
         Assert.Equal("Get my last gmail", response.Prompt);
-        // gmail/sf special auth dispatch moved out of Ino core to catalog + generic path (connector logic deleted).
-        // Now hits generic LLM with capability context; tests updated for new behavior.
-        Assert.Contains("gmail", response.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Gmail", response.Response, StringComparison.OrdinalIgnoreCase);
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
-        Assert.NotEmpty(surfaces);
+        Assert.Contains(surfaces, surface =>
+            surface.Kind == ConfigFormSurface.Kind &&
+            Equals(surface.Props.GetValueOrDefault("pack"), GoogleClientFactory.PackName) &&
+            Equals(surface.Props.GetValueOrDefault("clientId"), clientId));
     }
 
     [Fact]
@@ -65,12 +70,13 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
             .OfType<InoResponse>()
             .Last(response => response.Prompt == "Show my salesforce accounts");
         Assert.Equal("Show my salesforce accounts", response.Prompt);
-        // gmail/sf special auth/login dispatch moved out; generic + catalog now.
-        Assert.Contains("salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
-        Assert.NotEmpty(surfaces);
+        Assert.Contains(surfaces, surface =>
+            surface.Kind == UiSurfaceKinds.Login &&
+            Equals(surface.Props.GetValueOrDefault("clientId"), "session-salesforce-auth"));
     }
 
     [Fact]
@@ -85,12 +91,14 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
 
         var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
         Assert.Equal("Show my salesforce accounts", response.Prompt);
-        // Special credential form for sf/gmail moved; generic/catalog now (updated overfit test).
-        Assert.Contains("salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
 
         var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
-        Assert.NotEmpty(surfaces); // special ConfigFormSurface for sf deleted; generic now.
+        Assert.Contains(surfaces, surface =>
+            surface.Kind == ConfigFormSurface.Kind &&
+            Equals(surface.Props.GetValueOrDefault("pack"), SalesforceClientFactory.PackName) &&
+            Equals(surface.Props.GetValueOrDefault("clientId"), clientId));
     }
 
     private static UiWidgetTree? FindNode(UiWidgetTree tree, string type)

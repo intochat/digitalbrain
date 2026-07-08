@@ -16,10 +16,16 @@ public class InoAwarenessTests
         Assert.Equal("IAgent", gmail.SourceKind);
         Assert.Equal("System", gmail.TrustLevel);
         Assert.Contains("google", gmail.Aliases);
+        Assert.True(gmail.HasInvocationEndpoint);
+        Assert.Equal("digitalbrain.google.gmail.v1", gmail.InvocationGrainType);
+        Assert.Equal("gmail-capability-main", gmail.InvocationGrainKey);
 
         var salesforce = Assert.Single(records, record => record.Id == "salesforce");
         Assert.Equal("Salesforce CRM", salesforce.DisplayName);
         Assert.Contains("soql", salesforce.Aliases);
+        Assert.True(salesforce.HasInvocationEndpoint);
+        Assert.Equal("digitalbrain.salesforce.crm.v1", salesforce.InvocationGrainType);
+        Assert.Equal("salesforce-capability-main", salesforce.InvocationGrainKey);
     }
 
     [Fact]
@@ -30,6 +36,7 @@ public class InoAwarenessTests
         Assert.Equal("IAgent", record.SourceKind);
         Assert.Equal("System", record.TrustLevel);
         Assert.Contains("availability", record.Aliases);
+        Assert.False(record.HasInvocationEndpoint);
     }
 
     [Fact]

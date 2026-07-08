@@ -80,6 +80,15 @@ public static class InoIntentClassifier
             return new("approve", 0.9);
         }
 
+        if (capabilities != null)
+        {
+            var matchedCap = capabilities.FirstOrDefault(c => InoPromptSemantics.MatchesCapability(prompt, capabilities, c.Id));
+            if (matchedCap != null)
+            {
+                return new(matchedCap.Id, 0.82, query, max);
+            }
+        }
+
         return new("generic", 0.3);
     }
 

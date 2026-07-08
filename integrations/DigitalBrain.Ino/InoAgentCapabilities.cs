@@ -14,7 +14,9 @@ public sealed partial record InoCapabilityRecord(
     string Tier,
     string Origin,
     string SourceKind,
-    string TrustLevel)
+    string TrustLevel,
+    string InvocationGrainType = "",
+    string InvocationGrainKey = "")
 {
     public InoIntentClassifier.Capability ToClassifierCapability() =>
         new(Id, Description, Examples.ToArray(), Tier);
@@ -30,7 +32,12 @@ public sealed partial record InoCapabilityRecord(
         " display:" + DisplayName +
         " description:" + Description +
         " aliases:" + string.Join(",", Aliases) +
-        " examples:" + string.Join(" | ", Examples);
+        " examples:" + string.Join(" | ", Examples) +
+        (HasInvocationEndpoint ? " invocation:true" : "");
+
+    public bool HasInvocationEndpoint =>
+        !string.IsNullOrWhiteSpace(InvocationGrainType) &&
+        !string.IsNullOrWhiteSpace(InvocationGrainKey);
 
     public bool Matches(string value)
     {
@@ -115,7 +122,9 @@ public static partial class InoAgentCapabilities
             string.IsNullOrWhiteSpace(tier) ? resolvedId : tier,
             string.IsNullOrWhiteSpace(origin) ? typeof(TContract).FullName ?? typeof(TContract).Name : origin,
             SourceKind: AgentSourceKind,
-            TrustLevel: SystemTrustLevel);
+            TrustLevel: SystemTrustLevel,
+            metadata.InvocationGrainType,
+            metadata.InvocationGrainKey);
     }
 
     private static InoCapabilityRecord? TryFromAgentType(Type contract)
@@ -144,7 +153,9 @@ public static partial class InoAgentCapabilities
             resolvedId,
             contract.FullName ?? contract.Name,
             AgentSourceKind,
-            SystemTrustLevel);
+            SystemTrustLevel,
+            metadata.InvocationGrainType,
+            metadata.InvocationGrainKey);
     }
 
     private static NeuronAgentMetadata ReadMetadata(Type contract)
@@ -154,7 +165,9 @@ public static partial class InoAgentCapabilities
             ReadStaticString(contract, nameof(IAgent.AgentDescription)),
             ReadStaticStringArray(contract, nameof(IAgent.AgentCapabilities)),
             ReadStaticString(contract, nameof(IAgent.AgentInstructions)),
-            ReadStaticStringArray(contract, nameof(IAgent.AgentRoutingExamples)));
+            ReadStaticStringArray(contract, nameof(IAgent.AgentRoutingExamples)),
+            ReadStaticString(contract, nameof(IAgent.AgentInvocationGrainType)),
+            ReadStaticString(contract, nameof(IAgent.AgentInvocationGrainKey)));
     }
 
     private static string ReadStaticString(Type type, string propertyName) =>

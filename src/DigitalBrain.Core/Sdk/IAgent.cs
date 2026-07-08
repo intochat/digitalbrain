@@ -14,6 +14,8 @@ public interface IAgent : INeuron
     static virtual string[] AgentCapabilities => [];
     static virtual string AgentInstructions => "You are a typed integration neuron.";
     static virtual string[] AgentRoutingExamples => [];
+    static virtual string AgentInvocationGrainType => "";
+    static virtual string AgentInvocationGrainKey => "";
 }
 
 public readonly record struct NeuronAgentMetadata(
@@ -21,7 +23,9 @@ public readonly record struct NeuronAgentMetadata(
     string Description,
     string[] Capabilities,
     string Instructions,
-    string[] RoutingExamples)
+    string[] RoutingExamples,
+    string InvocationGrainType = "",
+    string InvocationGrainKey = "")
 {
     // Zero-reflection: the compiler resolves the static abstract members at this call site.
     public static NeuronAgentMetadata ReadFrom<TContract>() where TContract : IAgent =>
@@ -30,5 +34,7 @@ public readonly record struct NeuronAgentMetadata(
             TContract.AgentDescription,
             TContract.AgentCapabilities,
             TContract.AgentInstructions,
-            TContract.AgentRoutingExamples);
+            TContract.AgentRoutingExamples,
+            TContract.AgentInvocationGrainType,
+            TContract.AgentInvocationGrainKey);
 }

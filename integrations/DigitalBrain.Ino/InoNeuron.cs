@@ -8,6 +8,7 @@ using DigitalBrain.Ui.Runtime;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans;
 
 namespace DigitalBrain.Ino;
 
@@ -145,6 +146,23 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (classification.Intent == "run_automation")
         {
             var reply = "Running the requested automation (preview or activated). Check the Tasks surface for results.";
+            await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
+            await DeliverReplySurfaceAsync(reply, request.ClientId, workspaceId, cancellationToken);
+            return;
+        }
+
+        var matchedCap = capabilities.FirstOrDefault(c => c.Id == classification.Intent);
+        if (matchedCap?.HasInvocationEndpoint == true)
+        {
+            var target = GrainFactory.GetGrain<INeuron>(
+                GrainId.Create(matchedCap.InvocationGrainType, matchedCap.InvocationGrainKey));
+            await target.DeliverAsync(StampCurrent(new CapabilityInvocation(
+                matchedCap.Id,
+                request.Prompt,
+                request.ClientId,
+                workspaceId)), cancellationToken);
+
+            var reply = "Routed the request to " + matchedCap.DisplayName + ".";
             await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
             await DeliverReplySurfaceAsync(reply, request.ClientId, workspaceId, cancellationToken);
             return;
