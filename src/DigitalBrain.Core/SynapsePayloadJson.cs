@@ -31,7 +31,7 @@ public static class SynapsePayloadJson
             JsonValueKind.True => true,
             JsonValueKind.False => false,
             JsonValueKind.Null or JsonValueKind.Undefined => null,
-            JsonValueKind.Number => UnwrapNumber(element),
+            JsonValueKind.Number => element.TryGetInt64(out var integer) ? (object)integer : element.GetDouble(),
             JsonValueKind.Object => element.EnumerateObject().ToDictionary(
                 property => property.Name,
                 property => Unwrap(property.Value),
@@ -39,21 +39,5 @@ public static class SynapsePayloadJson
             JsonValueKind.Array => element.EnumerateArray().Select(Unwrap).ToArray(),
             _ => element.GetString()
         };
-
-        private static object? UnwrapNumber(JsonElement element)
-        {
-            if (element.TryGetInt64(out var integer))
-                return integer;
-
-            if (element.TryGetDouble(out var d))
-            {
-                // If the double is actually an integer, box it as long to match Orleans' expectations
-                if (d % 1 == 0 && d >= long.MinValue && d <= long.MaxValue)
-                    return (long)d;
-                return d;
-            }
-
-            return null;
-        }
     }
 }
