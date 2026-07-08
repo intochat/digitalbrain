@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,11 +44,6 @@ public static class InoIntentClassifier
             return new("gmail", 0.85, query, max);
         }
 
-        if (InoPromptSemantics.HasAll(prompt, "bitcoin", "price"))
-        {
-            return new("bitcoin_price", 0.9);
-        }
-
         if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "relation_graph"))
         {
             return new("relation_graph", 0.8);
@@ -60,9 +54,7 @@ public static class InoIntentClassifier
             return new("schema_viz", 0.8);
         }
 
-        if (InoPromptSemantics.HasAll(prompt, "ui", "kit") ||
-            InoPromptSemantics.HasAll(prompt, "gallery", "component") ||
-            InoPromptSemantics.HasAny(prompt, "uikit"))
+        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "uikit_gallery"))
         {
             return new("uikit_gallery", 0.9);
         }
@@ -127,7 +119,7 @@ public static class InoIntentClassifier
 
             const string sys = "You are an intent classifier for a personal AI assistant. " +
                                "Reply with ONLY a single JSON object: {\"intent\":\"gmail\",\"confidence\":0.92}. " +
-                               "Use only listed capability ids or generic/explain/approve/run_automation/uikit_gallery/bitcoin_price/schema_viz/relation_graph:\n";
+                               "Use only listed capability ids or generic/explain/approve/run_automation/uikit_gallery/schema_viz/relation_graph:\n";
 
             var fullPrompt = sys + capsText + "\nUser request: " + SecretText.Redact(prompt);
             var response = await chat.GetResponseAsync(fullPrompt, cancellationToken: cancellationToken);
@@ -182,10 +174,15 @@ public static class InoIntentClassifier
                     var recalled = await recall.RecallAsync(prompt, top: 5, cancellationToken);
                     foreach (var text in recalled ?? Array.Empty<string>())
                     {
-                        var idMatch = Regex.Match(text, @"capability:(\S+)");
-                        if (idMatch.Success)
+                        // Parse structured "capability:Id source:..." from memory text without regex
+                        var capPrefix = "capability:";
+                        var idx = text.IndexOf(capPrefix, StringComparison.OrdinalIgnoreCase);
+                        if (idx >= 0)
                         {
-                            var id = idMatch.Groups[1].Value;
+                            var start = idx + capPrefix.Length;
+                            var end = text.IndexOf(' ', start);
+                            if (end < 0) end = text.Length;
+                            var id = text.Substring(start, end - start).Trim();
                             var cap = caps.FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
                             if (cap != null && !vectorCaps.Any(c => c.Id == cap.Id))
                             {
@@ -260,7 +257,6 @@ public static class InoIntentClassifier
         string.Equals(intent, "approve", StringComparison.Ordinal) ||
         string.Equals(intent, "run_automation", StringComparison.Ordinal) ||
         string.Equals(intent, "uikit_gallery", StringComparison.Ordinal) ||
-        string.Equals(intent, "bitcoin_price", StringComparison.Ordinal) ||
         capabilities.Any(capability =>
             string.Equals(capability.Id, intent, StringComparison.OrdinalIgnoreCase) ||
             capability.Matches(intent));

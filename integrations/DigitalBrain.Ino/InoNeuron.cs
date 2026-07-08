@@ -42,9 +42,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private static readonly Regex LlmProviderCommandRegex =
         new(@"^\s*set-llm:(?<provider>[A-Za-z0-9._-]+)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-    private InoRequest? _pendingGmailRequest;
-    private InoRequest? _pendingSalesforceRequest;
-
     public override async Task OnActivateAsync(CancellationToken ct)
     {
         await base.OnActivateAsync(ct);
@@ -250,59 +247,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return false;
     }
 
-    private static bool IsFollowupSummaryRequest(string prompt)
-    {
-        return InoPromptSemantics.HasAny(prompt, "summarize", "summary", "brief") &&
-               InoPromptSemantics.HasAny(prompt, "last", "previous", "that", "it", "one");
-    }
-
     internal async Task HandleGenericIntentAsync(InoRequest request, string workspaceId, CancellationToken cancellationToken = default)
     {
-        var capabilities = await LoadCapabilityRecordsAsync(cancellationToken);
-        bool gmailFollowupSummarize = IsFollowupSummaryRequest(request.Prompt) &&
-            InoPromptSemantics.MatchesCapability(request.Prompt, capabilities, "gmail");
-
-        if (!gmailFollowupSummarize)
-        {
-            var lastGmailish = IncomingJournal.OfType<InoRequest>().TakeLast(3).Any(r => InoConnectorIntents.IsGmail(r.Prompt));
-            var hasGmailMem = IncomingJournal.Concat(OutgoingJournal).OfType<MemorySummary>()
-                .TakeLast(5).Any(IsGmailMemory);
-            if (InoPromptSemantics.HasAny(request.Prompt, "summarize", "summary", "brief") && (lastGmailish || hasGmailMem))
-            {
-                gmailFollowupSummarize = true;
-            }
-        }
-
-        if (gmailFollowupSummarize)
-        {
-            var lastBodies = GetLastGmailBodiesFromJournal(workspaceId);
-            if (!string.IsNullOrWhiteSpace(lastBodies))
-            {
-                var sum = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + lastBodies, "", cancellationToken);
-                await FireAsync(new InoResponse(request.Prompt, "Summary of last Gmail: " + sum, []), cancellationToken);
-                await DeliverReplySurfaceAsync("Summary of previous Gmail messages:\n" + sum, request.ClientId, workspaceId, cancellationToken);
-                await CreateMemorySummaryAsync(workspaceId, cancellationToken);
-                return;
-            }
-        }
-
-        bool crossGmailToSf = InoPromptSemantics.MatchesCapability(request.Prompt, capabilities, "salesforce") &&
-                              (InoPromptSemantics.HasAll(request.Prompt, "last", "email") ||
-                               InoPromptSemantics.HasAll(request.Prompt, "previous", "email") ||
-                               InoPromptSemantics.HasAny(request.Prompt, "related"));
-        if (crossGmailToSf)
-        {
-            var lastGmail = GetLastGmailBodiesFromJournal(workspaceId);
-            if (!string.IsNullOrWhiteSpace(lastGmail))
-            {
-                var suggestion = await ReasonWithLlmAsync("Relate this Gmail to Salesforce context. Email:\n" + lastGmail + "\nRequest: " + request.Prompt, "", cancellationToken);
-                await FireAsync(new InoResponse(request.Prompt, "Cross Gmail->SF (journal): " + suggestion, []), cancellationToken);
-                await DeliverReplySurfaceAsync(suggestion, request.ClientId, workspaceId, cancellationToken);
-                await CreateMemorySummaryAsync(workspaceId, cancellationToken);
-                return;
-            }
-        }
-
         var ctx = await BuildContextAsync(request.Prompt, workspaceId, cancellationToken);
         var rawReply = await ReasonWithLlmAsync(request.Prompt, ctx, cancellationToken);
         var replyPlan = BuildReplyPlan(rawReply);
@@ -325,19 +271,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             signal.Props.TryGetValue("pack", out var pack) &&
             string.Equals(pack?.ToString(), SalesforceClientFactory.PackName, StringComparison.OrdinalIgnoreCase))
         {
-            var pendingSalesforce = _pendingSalesforceRequest
-                ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => InoConnectorIntents.IsSalesforce(r.Prompt));
-
-            if (pendingSalesforce is not null)
-            {
-                var salesforceUserId = await ResolveUserIdAsync(pendingSalesforce.ClientId, cancellationToken);
-                if (await HasSalesforceCredentialAsync(salesforceUserId, cancellationToken))
-                {
-                    _pendingSalesforceRequest = null;
-                    await FetchSalesforceAccountsAsync(pendingSalesforce, salesforceUserId, cancellationToken);
-                }
-            }
-
+            // Connector pack config handling simplified; no pending resumption in Ino core.
             return;
         }
 
@@ -346,45 +280,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        var pending = _pendingGmailRequest
-            ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => InoConnectorIntents.IsGmail(r.Prompt));
-
-        if (pending is null)
-        {
-            // Confirm success visibly even without a pending Gmail intent (auth via direct button/surface).
-            await FireAsync(new InoResponse("Google auth", "Google connected successfully.", []), cancellationToken);
-            await DeliverReplySurfaceAsync("Google authentication succeeded.", null, WorkspaceIds.Default, cancellationToken);
-            return;
-        }
-
-        string? gmailUserId = null;
-        if (signal.Props.TryGetValue("userId", out var uid) && uid is string us && !string.IsNullOrWhiteSpace(us))
-        {
-            gmailUserId = us;
-        }
-        else if (signal.Props.TryGetValue("scope", out var sc) && sc is string scs && scs.StartsWith("user:", StringComparison.Ordinal))
-        {
-            gmailUserId = scs.Substring(5);
-        }
-
-        if (string.IsNullOrWhiteSpace(gmailUserId))
-        {
-            gmailUserId = await ResolveUserIdAsync(pending.ClientId, cancellationToken);
-        }
-
-        if (!await HasGoogleCredentialAsync(gmailUserId, cancellationToken))
-        {
-            _pendingGmailRequest = null;
-            var workspaceId = WorkspaceIds.Effective(pending.WorkspaceId);
-            var reply = "Google auth succeeded but no usable credential was stored (missing refresh token).";
-            await FireAsync(new InoResponse(pending.Prompt, reply, []), cancellationToken);
-            await DeliverReplySurfaceAsync(reply, pending.ClientId, workspaceId, cancellationToken);
-            await DeliverGoogleAuthSurfaceAsync(pending.ClientId, workspaceId, cancellationToken);
-            return;
-        }
-
-        _pendingGmailRequest = null;
-        await FetchRecentGmailAsync(pending, gmailUserId, cancellationToken);
+        // Simplified auth completion; specific resumption logic removed from Ino (connector specific).
+        await FireAsync(new InoResponse("Google auth", "Google connected successfully.", []), cancellationToken);
+        await DeliverReplySurfaceAsync("Google authentication succeeded.", null, WorkspaceIds.Default, cancellationToken);
     }
 
     private async Task<string> ResolveUserIdAsync(string? clientId, CancellationToken cancellationToken = default)
@@ -527,24 +425,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        bool isSummarizeFollowup = IsFollowupSummaryRequest(request.Prompt);
-
-        if (isSummarizeFollowup)
-        {
-            var lastBodies = GetLastGmailBodiesFromJournal(workspaceId);
-            if (!string.IsNullOrWhiteSpace(lastBodies))
-            {
-                var sum = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + lastBodies, "", cancellationToken);
-                await FireAsync(new InoResponse(request.Prompt, "Summary of last Gmail: " + sum, []), cancellationToken);
-                await DeliverReplySurfaceAsync("Summary of previous Gmail messages:\n" + sum, request.ClientId, workspaceId, cancellationToken);
-                return;
-            }
-        }
-
         var gmailUserId = await ResolveUserIdAsync(request.ClientId, cancellationToken);
         if (!await HasGoogleCredentialAsync(gmailUserId, cancellationToken))
         {
-            _pendingGmailRequest = request;
             var reply = "Google authentication is required to read Gmail.";
             await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
             await DeliverGoogleAuthSurfaceAsync(request.ClientId, workspaceId, cancellationToken);
@@ -569,41 +452,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        bool isSummarizeFollowup = IsFollowupSummaryRequest(request.Prompt);
-
-        if (isSummarizeFollowup)
-        {
-            var last = GetLastSalesforceFromJournal(workspaceId);
-            if (!string.IsNullOrWhiteSpace(last))
-            {
-                var sum = await ReasonWithLlmAsync("Provide a concise summary of these Salesforce accounts:\n" + last, "", cancellationToken);
-                await FireAsync(new InoResponse(request.Prompt, "Summary of last Salesforce: " + sum, []), cancellationToken);
-                await DeliverReplySurfaceAsync("Summary of previous Salesforce data:\n" + sum, request.ClientId, workspaceId, cancellationToken);
-                return;
-            }
-        }
-
-        // Richer G/SF follow-up: "related to last email" / cross from Gmail journal without needing SF cred/fetch
-        var capabilities = await LoadCapabilityRecordsAsync(cancellationToken);
-        bool isGmailRelatedSf = InoPromptSemantics.MatchesCapability(request.Prompt, capabilities, "salesforce") &&
-                                (InoPromptSemantics.HasAny(request.Prompt, "related") ||
-                                 InoPromptSemantics.HasAll(request.Prompt, "last", "email") ||
-                                 InoPromptSemantics.HasAll(request.Prompt, "previous", "email"));
-        if (isGmailRelatedSf)
-        {
-            var lastGmail = GetLastGmailBodiesFromJournal(workspaceId);
-            if (!string.IsNullOrWhiteSpace(lastGmail))
-            {
-                var suggestion = await ReasonWithLlmAsync(
-                    "User wants Salesforce CRM info related to this recent Gmail. Last email content:\n" + lastGmail + "\n\nUser request: " + request.Prompt +
-                    "\n\nProvide a concise helpful response (suggest matching accounts/topics, key names/companies from the email). If fetching live data is needed later, note it.", "", cancellationToken);
-                await FireAsync(new InoResponse(request.Prompt, "Related to last email (using journal): " + suggestion, []), cancellationToken);
-                await DeliverReplySurfaceAsync("Based on previous Gmail + Salesforce context:\n" + suggestion, request.ClientId, workspaceId, cancellationToken);
-                await CreateMemorySummaryAsync(workspaceId, cancellationToken);
-                return;
-            }
-        }
-
         var salesforceSession = await ResolveSessionAsync(request.ClientId, cancellationToken);
         if (salesforceSession is null)
         {
@@ -616,7 +464,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var salesforceUserId = salesforceSession.UserId.Value;
         if (!await HasSalesforceCredentialAsync(salesforceUserId, cancellationToken))
         {
-            _pendingSalesforceRequest = request;
             var reply = "Salesforce credentials are required to query CRM records.";
             await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
             await DeliverSalesforceCredentialSurfaceAsync(request.ClientId, workspaceId, cancellationToken);
@@ -956,19 +803,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (summaries.Count > 0)
         {
             var bodies = string.Join("\n---\n", summaries.Select(s => s.Body));
-            await FireAsync(new MemorySummary("last-gmail", SecretText.Redact(bodies), DateTimeOffset.UtcNow, workspaceId, "Gmail", "UntrustedEvidence", "DigitalBrain.Google.IGmailNeuron"), cancellationToken);
+            await FireAsync(new MemorySummary("gmail-recent", SecretText.Redact(bodies), DateTimeOffset.UtcNow, workspaceId, "Gmail", "UntrustedEvidence", "DigitalBrain.Google.IGmailNeuron"), cancellationToken);
         }
 
         string? summary = null;
-        if (InoPromptSemantics.HasAny(request.Prompt, "summarize", "summary", "brief"))
+        if (InoPromptSemantics.HasAny(request.Prompt, "summarize", "summary", "brief") && summaries.Count > 0)
         {
-            string bodiesToSummarize = summaries.Count > 0
-                ? string.Join("\n---\n", summaries.Select(s => s.Body))
-                : GetLastGmailBodiesFromJournal(workspaceId) ?? "";
-            if (!string.IsNullOrWhiteSpace(bodiesToSummarize))
-            {
-                summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + SecretText.Redact(bodiesToSummarize), "", cancellationToken);
-            }
+            var bodiesToSummarize = string.Join("\n---\n", summaries.Select(s => s.Body));
+            summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + SecretText.Redact(bodiesToSummarize), "", cancellationToken);
         }
 
         await DeliverGmailMessagesSurfaceAsync(redactedSummaries, request.ClientId, workspaceId, summary, cancellationToken);
@@ -1024,7 +866,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         if (records.Length > 0)
         {
-            await FireAsync(new MemorySummary("last-salesforce", SecretText.Redact(string.Join("\n", records)), DateTimeOffset.UtcNow, workspaceId, "Salesforce", "UntrustedEvidence", "DigitalBrain.Salesforce.ISalesforceCrmNeuron"), cancellationToken);
+            await FireAsync(new MemorySummary("salesforce-recent", SecretText.Redact(string.Join("\n", records)), DateTimeOffset.UtcNow, workspaceId, "Salesforce", "UntrustedEvidence", "DigitalBrain.Salesforce.ISalesforceCrmNeuron"), cancellationToken);
         }
 
         await DeliverSalesforceRecordsSurfaceAsync(redactedRecords, request.ClientId, workspaceId, cancellationToken);
@@ -1899,73 +1741,5 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 
-    private string? GetLastGmailBodiesFromJournal(string? workspaceId)
-    {
-        workspaceId = WorkspaceIds.Effective(workspaceId);
-        var recentMem = IncomingJournal.Concat(OutgoingJournal)
-            .OfType<MemorySummary>()
-            .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId &&
-                        !string.IsNullOrWhiteSpace(m.Summary) &&
-                        IsGmailMemory(m))
-            .OrderByDescending(m => m.Timestamp)
-            .FirstOrDefault();
-        if (recentMem != null)
-        {
-            return recentMem.Summary;
-        }
-
-        // Explicitly support lookup last GmailMessagesReady (per plan) + associated context
-        var lastGmailReady = IncomingJournal.Concat(OutgoingJournal)
-            .OfType<Signal>()
-            .Where(s => s.Name == GoogleSignals.GmailMessagesReady &&
-                        WorkspaceIds.Effective(s.Props.TryGetValue("workspaceId", out var w) ? w?.ToString() : null) == workspaceId)
-            .OrderByDescending(s => s.Timestamp)
-            .FirstOrDefault();
-        if (lastGmailReady != null)
-        {
-            // Prefer a nearby or recent gmail mem; else synthesize note from signal
-            var nearbyMem = IncomingJournal.Concat(OutgoingJournal)
-                .OfType<MemorySummary>()
-                .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId && !string.IsNullOrWhiteSpace(m.Summary) &&
-                            IsGmailMemory(m))
-                .OrderByDescending(m => m.Timestamp)
-                .FirstOrDefault();
-            if (nearbyMem != null)
-            {
-                return nearbyMem.Summary;
-            }
-
-            var count = lastGmailReady.Props.TryGetValue("count", out var c) ? c?.ToString() : "?";
-            return $"[from GmailMessagesReady signal] {count} messages fetched recently (ids: {lastGmailReady.Props.GetValueOrDefault("messageIds")}). Use prior journal summaries for body details.";
-        }
-
-        return null;
-    }
-
-    private string? GetLastSalesforceFromJournal(string? workspaceId)
-    {
-        workspaceId = WorkspaceIds.Effective(workspaceId);
-        var recentMem = IncomingJournal.Concat(OutgoingJournal)
-            .OfType<MemorySummary>()
-            .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId &&
-                        !string.IsNullOrWhiteSpace(m.Summary) &&
-                        IsSalesforceMemory(m))
-            .OrderByDescending(m => m.Timestamp)
-            .FirstOrDefault();
-        if (recentMem != null)
-        {
-            return recentMem.Summary;
-        }
-
-        return null;
-    }
-
-    private static bool IsGmailMemory(MemorySummary memory) =>
-        string.Equals(memory.SourceKind, "Gmail", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(memory.Origin, "DigitalBrain.Google.IGmailNeuron", StringComparison.Ordinal);
-
-    private static bool IsSalesforceMemory(MemorySummary memory) =>
-        string.Equals(memory.SourceKind, "Salesforce", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(memory.Origin, "DigitalBrain.Salesforce.ISalesforceCrmNeuron", StringComparison.Ordinal);
 }
 
