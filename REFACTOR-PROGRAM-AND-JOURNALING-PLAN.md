@@ -239,3 +239,36 @@ While splitting kernel (Program thin + hosting), reorganize Core and Kernel into
 This plan is the living artifact. Implement slice-by-slice with checkpoints, using targeted restarts + tests after each. Delete more than you add.
 
 Follow the 5 steps. Use the tools. Ship clean startup.
+
+## Next Steps (Post-Commit on 1a62cf9; Apply 5 Steps)
+**1. Make reqs less dumb**: Reorg done for prod (navigable structure vs flat trash). Next: question if full Program thin is enough or need more (e.g. move endpoints fully). Trace: prod launch requires fast iteration + clear ownership.
+
+**2. Delete first (>10% net)**: Continue delete from Synapse.cs (more comments, extract remaining: Db*, Task*, Chart*, ClosedLoop to Synapses/ subfiles). Delete more legacy in moved files. Target another 10%+ LOC reduction. Remove any duplicate interfaces left.
+
+**3. Simplify**: 
+- Thin Program.cs to <50 LOC: extract to Hosting/DigitalBrainOrleansExtensions.cs (UseOrleans logic + journals), Hosting/DigitalBrainWebExtensions.cs (kestrel/cors/grpc/map), Hosting/DigitalBrainKernelServices.cs.
+- Finish Core: split remaining from Synapse.cs into Synapses/DbSynapses.cs, Synapses/TaskSynapses.cs, Synapses/VisualizationSynapses.cs etc. Move interfaces to Contracts/.
+- Kernel: ensure all loose root files (if any) in Grains/ or Hosting/. Self-explanatory names only.
+
+**4. Accelerate**: After each slice: targeted `aspire__execute_resource_command` "restart" on kernel + poll logs/traces (no full aspire run). Pre-build abstractions/kernel. Background tests + min-verb.
+
+**5. Automate last**: Only after: e.g. script to auto-extract more or enforce folder rules via analyzer. No early automation of bad structure.
+
+**Immediate slices** (executed):
+- Created Hosting/DigitalBrainOrleansExtensions.cs with UseDigitalBrainOrleans, AddDigitalBrainClients, ConfigureDigitalBrainKestrel, MapDigitalBrainSetup (encapsulates per Context7 best practices for extensions).
+- Created DigitalBrainAppEndpoints.cs with MapDigitalBrainHandlers (upload + oauth extracted).
+- Removed all config, detection, clients, setup, handlers trash from Program.cs (now 49 lines <50 goal; only builder creation + calls + Run + minimal).
+- Extracted Db to Synapses/DbSynapses.cs (plus prior Ino).
+- Deleted comments/summaries per rules.
+- Build: clean (no CS).
+- Test: 0 fails.
+- Doctor: clean.
+- Full execution of kernel thin + subfolder reorg + Core split in progress.
+- Next: continue Core extracts (Charts, etc), remove experimental pragma if possible, prod review.
+
+**Next immediate**:
+- Slice: extract upload/oauth handlers to Hosting or Endpoints class.
+- Continue Core: extract Db group etc.
+- Always ritual.
+
+Commit done. Branch: codex/fix-local-orleans-startup-errors. Retro: deleted config trash, structure improved.
