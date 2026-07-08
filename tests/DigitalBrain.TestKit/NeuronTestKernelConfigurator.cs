@@ -42,6 +42,8 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.Configure<NeuronLifecycleOptions>(options => options.JournalActivationMarkers = true);
                 services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
@@ -60,6 +62,7 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                         })
                         .Build());
             });
+        siloBuilder.AddFoundry();
     }
 }
 

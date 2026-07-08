@@ -40,8 +40,11 @@ public static class DigitalBrainOrleansExtensions
             {
                 services.AddScoped<NeuronJournals>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
+                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
             });
+            siloBuilder.AddFoundry();
 
             if (!isAspireHosted)
             {
@@ -217,7 +220,6 @@ public static class DigitalBrainOrleansExtensions
 
         DigitalBrain.Ino.InoServiceRegistration.AddInoAi(builder.Services, builder.Configuration.GetSection("Ino:AI"));
         builder.Services.AddSingleton<DigitalBrain.Ino.IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
-        builder.Services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
 
         return builder;
     }
