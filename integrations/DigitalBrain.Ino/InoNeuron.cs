@@ -41,7 +41,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         try
         {
-            var context = GrainFactory.GetGrain<IContextNeuron>("context-main");
+            var context = GrainFactory.GetGrain<IContextNeuron>(IContextNeuron.SingletonKey);
             foreach (var cap in InoIntentClassifier.Capabilities)
             {
                 var text = $"capability:{cap.Id} {cap.Description} examples:{string.Join(" ", cap.Examples)} tier:{cap.Tier}";
@@ -163,11 +163,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return false;
     }
 
+    private static bool IsFollowupSummaryRequest(string prompt)
+    {
+        var p = prompt.ToLowerInvariant();
+        return (p.Contains("summar") || p.Contains("brief") || p.Contains("what was")) &&
+               (p.Contains("last") || p.Contains("previous") || p.Contains("that") || p.Contains("it") || p.Contains("the one") || p.Contains("previous one"));
+    }
+
     internal async Task HandleGenericIntentAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken = default)
     {
         var p = req.Prompt.ToLowerInvariant();
-        bool gmailFollowupSummarize = (p.Contains("summar") || p.Contains("brief") || p.Contains("what was")) &&
-            (p.Contains("last") || p.Contains("previous") || p.Contains("that") || p.Contains("it") || p.Contains("the one") || p.Contains("previous one")) &&
+        bool gmailFollowupSummarize = IsFollowupSummaryRequest(req.Prompt) &&
             (p.Contains("email") || p.Contains("gmail") || p.Contains("mail"));
 
         if (!gmailFollowupSummarize)
@@ -306,7 +312,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (string.IsNullOrWhiteSpace(clientId))
             return null;
 
-        var session = GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
+        var session = GrainFactory.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         return await session.GetSessionByClientIdAsync(clientId);
     }
 
@@ -333,7 +339,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         props["workspaceId"] = workspaceId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
 
         // Deterministic (not LLM-generated) so follow-up questions can find this data via BuildContextAsync
@@ -383,7 +389,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var cmd = new DbInspectSchema(connectionName, "sqlite", SourcePath: databasePath, ClientId: clientId, WorkspaceId: workspaceId);
-        var db = GrainFactory.GetGrain<IDbSupportNeuron>("db-main");
+        var db = GrainFactory.GetGrain<IDbSupportNeuron>(IDbSupportNeuron.SingletonKey);
         await db.FireAsync(cmd, cancellationToken);
 
         var timeline = await db.GetTimelineAsync(cancellationToken);
@@ -406,7 +412,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
@@ -424,9 +430,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        var p = req.Prompt.ToLowerInvariant();
-        bool isSummarizeFollowup = (p.Contains("summar") || p.Contains("brief") || p.Contains("what was")) &&
-                                   (p.Contains("last") || p.Contains("previous") || p.Contains("that") || p.Contains("it") || p.Contains("the one") || p.Contains("previous one"));
+        bool isSummarizeFollowup = IsFollowupSummaryRequest(req.Prompt);
 
         if (isSummarizeFollowup)
         {
@@ -465,8 +469,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
 
         var p = req.Prompt.ToLowerInvariant();
-        bool isSummarizeFollowup = (p.Contains("summar") || p.Contains("brief") || p.Contains("what was")) &&
-                                   (p.Contains("last") || p.Contains("previous") || p.Contains("that") || p.Contains("it") || p.Contains("the one") || p.Contains("previous one"));
+        bool isSummarizeFollowup = IsFollowupSummaryRequest(req.Prompt);
 
         if (isSummarizeFollowup)
         {
@@ -702,15 +705,15 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
     private async Task DeliverLoginSurfaceAsync(string? clientId, CancellationToken cancellationToken = default)
     {
-        var session = GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
+        var session = GrainFactory.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         var surface = await session.BuildLoginSurfaceAsync(clientId);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
@@ -718,7 +721,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
@@ -916,7 +919,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
@@ -968,7 +971,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
@@ -987,7 +990,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
@@ -1064,7 +1067,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
@@ -1214,7 +1217,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
@@ -1233,7 +1236,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (clientId is not null) props["clientId"] = clientId;
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 

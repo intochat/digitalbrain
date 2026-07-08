@@ -5,6 +5,8 @@ namespace DigitalBrain.Ino.Context;
 [Alias("DigitalBrain.Ino.Context.IContextNeuron")]
 public interface IContextNeuron : INeuron, IHandle<ContextUpdate>
 {
+    const string SingletonKey = "context-main";
+
     [Alias("GetContextAsync")]
     Task<string> GetContextAsync(string contextName, CancellationToken cancellationToken = default);
 

@@ -27,12 +27,12 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
 
     public async Task BroadcastAsync(RfwCard card, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
         var key = SeenKey(card);
         if (!TryMarkSeen(key)) return;
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await PublishAsync(card, cancellationToken);
         }
         catch

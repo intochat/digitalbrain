@@ -92,7 +92,7 @@ public sealed class GatewayService(
     private async Task<UserSessionState?> ResolveSessionByClientIdAsync(string? clientId)
     {
         if (string.IsNullOrWhiteSpace(clientId)) return null;
-        var session = grains.GetGrain<IUserSessionNeuron>("session-main");
+        var session = grains.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         return await session.GetSessionByClientIdAsync(clientId);
     }
 

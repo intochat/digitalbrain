@@ -29,7 +29,7 @@ public class ChatNeuron(ILogger<ChatNeuron> logger, NeuronJournals journals) : N
             ["data"] = request.DataJson,
             ["chartHint"] = request.ChartHint
         });
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 

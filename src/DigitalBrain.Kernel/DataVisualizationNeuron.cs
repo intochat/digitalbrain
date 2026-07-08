@@ -55,7 +55,7 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
         await BroadcastRfwCard(surface, cancellationToken);
 
         // P0-5: also deliver UiSurface to dedicated FlutterUiNeuron (point-to-point via I* contract) so it owns handling for thin client.
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(surface.Stamp(Self, CurrentCause), cancellationToken);
     }
 
@@ -182,7 +182,7 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
     {
         // Prefer routing through dedicated IFlutterUiNeuron (item 14) so it owns the UI channel, applies bridge, and broadcasts.
         // Uses CorrelationId from surface for context sharing (per channel marker).
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 

@@ -467,7 +467,10 @@ public record DbIndex(
     [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
 
 [Alias("DigitalBrain.Core.IDbSupportNeuron")]
-public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery>, IHandle<DbInspectSchema> { }
+public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery>, IHandle<DbInspectSchema>
+{
+    const string SingletonKey = "db-main";
+}
 
 // Filter changes - INO/Context must be notified so assistant knows current UI view state
 [GenerateSerializer]

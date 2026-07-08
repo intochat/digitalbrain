@@ -174,7 +174,7 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
 
     private static async Task HandleLoginAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
-        var session = context.Grains.GetGrain<IUserSessionNeuron>("session-main");
+        var session = context.Grains.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         var payloadStr = GatewaySendHandlers.PayloadString(request);
         var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
         var username = p.TryGetValue("username", out var u) ? u?.ToString() ?? "" : "";
@@ -185,7 +185,7 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
 
     private static async Task HandleLogoutAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
-        var session = context.Grains.GetGrain<IUserSessionNeuron>("session-main");
+        var session = context.Grains.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         var payloadStr = GatewaySendHandlers.PayloadString(request);
         var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
         var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";

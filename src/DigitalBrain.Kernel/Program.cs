@@ -388,7 +388,7 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
             }
 
             var cmd = ChatUploadClassifier.BuildDbInspectSchema(file.FileName, tempPath, clientId, workspaceId);
-            var db = grains.GetGrain<IDbSupportNeuron>("db-main");
+            var db = grains.GetGrain<IDbSupportNeuron>(IDbSupportNeuron.SingletonKey);
             await db.FireAsync(cmd, requestAborted);
 
             var dbTimeline = await db.GetTimelineAsync(requestAborted);

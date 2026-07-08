@@ -19,10 +19,10 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
         value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(id => !string.IsNullOrWhiteSpace(id));
 
-    protected async Task<IReadOnlyList<NeuroPack>> GetPublishedPacksWithLocalSeedsAsync(IMarketplaceNeuron marketplace)
+    protected async Task<IReadOnlyList<NeuroPack>> GetPublishedPacksWithLocalSeedsAsync(IMarketplaceNeuron marketplace, CancellationToken cancellationToken = default)
     {
-        await marketplace.FireAsync(new ListPublished());
-        var published = await ReadLatestPublishedPacksAsync(marketplace);
+        await marketplace.FireAsync(new ListPublished(), cancellationToken);
+        var published = await ReadLatestPublishedPacksAsync(marketplace, cancellationToken);
         var publishedKeys = published.Select(PackKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var missingLocalPacks = MarketplaceSeeds.LocalUiPacks
             .Where(pack => !publishedKeys.Contains(PackKey(pack)))
@@ -35,16 +35,16 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
 
         foreach (var pack in missingLocalPacks)
         {
-            await marketplace.FireAsync(MarketplaceSeeds.ToPublishCommand(pack));
+            await marketplace.FireAsync(MarketplaceSeeds.ToPublishCommand(pack), cancellationToken);
         }
 
-        await marketplace.FireAsync(new ListPublished());
-        return await ReadLatestPublishedPacksAsync(marketplace);
+        await marketplace.FireAsync(new ListPublished(), cancellationToken);
+        return await ReadLatestPublishedPacksAsync(marketplace, cancellationToken);
     }
 
-    protected static async Task<IReadOnlyList<NeuroPack>> ReadLatestPublishedPacksAsync(IMarketplaceNeuron marketplace)
+    protected static async Task<IReadOnlyList<NeuroPack>> ReadLatestPublishedPacksAsync(IMarketplaceNeuron marketplace, CancellationToken cancellationToken = default)
     {
-        var timeline = await marketplace.GetTimelineAsync();
+        var timeline = await marketplace.GetTimelineAsync(cancellationToken);
         return timeline.OfType<PublishedList>().LastOrDefault()?.Packs ?? Array.Empty<NeuroPack>();
     }
 

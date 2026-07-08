@@ -5,4 +5,5 @@ using DigitalBrain.Core;
 [Alias("DigitalBrain.Ui.Contracts.IFlutterUiNeuron")]
 public interface IFlutterUiNeuron : IChannelNeuron, IHandle<UiSurface>
 {
+    const string SingletonKey = "flutter-ui";
 }

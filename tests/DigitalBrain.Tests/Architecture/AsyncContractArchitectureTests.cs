@@ -1,3 +1,5 @@
+extern alias McpProject;
+
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
@@ -9,6 +11,7 @@ using DigitalBrain.Kernel.Config;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Marketplace.Contracts;
+using McpProject::DigitalBrain.Mcp;
 using System.Reflection;
 
 namespace DigitalBrain.Tests.Architecture;
@@ -32,7 +35,8 @@ public sealed class AsyncContractArchitectureTests
         typeof(IPackConfigStore),
         typeof(IPackConfigBackingStore),
         typeof(IGmailApiClientFactory),
-        typeof(ISalesforceApiClientFactory)
+        typeof(ISalesforceApiClientFactory),
+        typeof(DigitalBrainMutationTools)
     ];
 
     [Fact]
@@ -122,9 +126,9 @@ public sealed class AsyncContractArchitectureTests
     {
         var editorConfig = File.ReadAllText(FindRepoFile(".editorconfig"));
 
-        Assert.Contains("dotnet_diagnostic.CA1068.severity = warning", editorConfig);
-        Assert.Contains("dotnet_diagnostic.CA2012.severity = warning", editorConfig);
-        Assert.Contains("dotnet_diagnostic.CA2016.severity = warning", editorConfig);
+        Assert.Contains("dotnet_diagnostic.CA1068.severity = error", editorConfig);
+        Assert.Contains("dotnet_diagnostic.CA2012.severity = error", editorConfig);
+        Assert.Contains("dotnet_diagnostic.CA2016.severity = error", editorConfig);
     }
 
     private static IEnumerable<MethodInfo> PublicDeclaredMethods(Type type) =>

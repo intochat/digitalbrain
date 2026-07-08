@@ -8,7 +8,7 @@ public sealed class InoCapabilityRecall(IGrainFactory grains) : IInoCapabilityRe
 {
     public async Task<IReadOnlyList<string>> RecallAsync(string prompt, int top = 5, CancellationToken cancellationToken = default)
     {
-        var context = grains.GetGrain<IContextNeuron>("context-main");
+        var context = grains.GetGrain<IContextNeuron>(IContextNeuron.SingletonKey);
         return await context.RecallAsync(prompt, top, cancellationToken);
     }
 }
