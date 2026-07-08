@@ -4,9 +4,7 @@ using DigitalBrain.Ui.Contracts;
 
 namespace DigitalBrain.Kernel;
 
-/// <summary>
-/// Activates singleton grains and seeds trusted built-in automations after the silo starts.
-/// </summary>
+// Activates singletons and seeds automations after silo start.
 public sealed class KernelStartupWarmupService(
     IGrainFactory grainFactory,
     IHostEnvironment environment,
