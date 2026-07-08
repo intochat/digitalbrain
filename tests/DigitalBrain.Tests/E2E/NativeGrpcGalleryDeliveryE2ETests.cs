@@ -7,45 +7,44 @@ using Grpc.Core;
 namespace DigitalBrain.Tests.E2E;
 
 // Reproduces the desktop client transport: native gRPC (not gRPC-Web) over the proxied "grpc" endpoint,
-// with WatchHomeFeed and the ExperienceStep Send on the SAME channel, at the real 3-replica replica count.
-// Asserts the first ui-gallery hop is delivered back to the streaming client (cross-silo fanout included).
+// with WatchHomeFeed and an InoRequest Send on the SAME channel.
+// Asserts a current server-driven UiKit gallery surface is delivered back to the streaming client.
 [Trait("Category", "E2E")]
 [Collection(nameof(DigitalBrainE2ECollection))]
 public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainAppHostFixture fixture)
 {
     private readonly DigitalBrainAppHostFixture _fx = fixture;
 
-    [SkippableFact]
-    public async Task Gallery_start_hop_is_delivered_over_native_grpc()
+    [Fact]
+    public async Task Ino_uikit_gallery_surface_is_delivered_over_native_grpc()
     {
-        E2EPrerequisites.RequireRealStackE2E();
-
+        var clientId = "e2e-gallery-" + Guid.NewGuid().ToString("N")[..8];
         using var channel = _fx.CreateGatewayGrpcChannel();
         var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest(), cancellationToken: cts.Token);
+        using var feed = client.WatchHomeFeed(new WatchHomeFeedRequest { ClientId = clientId }, cancellationToken: cts.Token);
 
-        var delivered = ReadForGalleryHopAsync(feed.ResponseStream, cts.Token);
+        var delivered = ReadForGallerySurfaceAsync(feed.ResponseStream, cts.Token);
 
         // Subscribe-before-emit: give the stream a moment to register, then fire start on the SAME channel.
         await Task.Delay(750, cts.Token);
         await client.SendAsync(new SynapseEnvelope
         {
-            CorrelationId = "native-grpc-start",
-            TypeName = nameof(ExperienceStep),
-            Payload = ByteString.CopyFromUtf8(JsonSerializer.Serialize(new Dictionary<string, string>
+            CorrelationId = "native-grpc-uikit-gallery",
+            TypeName = nameof(InoRequest),
+            Payload = ByteString.CopyFromUtf8(JsonSerializer.Serialize(new
             {
-                ["pack"] = "ui-gallery",
-                ["experienceId"] = "ui-gallery",
-                ["eventName"] = "start",
+                prompt = "uikit gallery",
+                clientId,
+                workspaceId = WorkspaceIds.Default
             })),
         }, cancellationToken: cts.Token);
 
-        Assert.True(await delivered, "ui-gallery start hop was not delivered to the native-gRPC WatchHomeFeed stream");
+        Assert.True(await delivered, "UiKit gallery surface was not delivered to the native-gRPC WatchHomeFeed stream");
     }
 
-    private static async Task<bool> ReadForGalleryHopAsync(IAsyncStreamReader<RfwCardEnvelope> stream, CancellationToken ct)
+    private static async Task<bool> ReadForGallerySurfaceAsync(IAsyncStreamReader<RfwCardEnvelope> stream, CancellationToken ct)
     {
         try
         {
@@ -58,8 +57,8 @@ public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainAppHostFixture
                 }
 
                 using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("activeExperience", out var marker) &&
-                    marker.GetString() == "ui-gallery/ui-gallery")
+                if (doc.RootElement.TryGetProperty("surfaceId", out var surfaceId) &&
+                    surfaceId.GetString() == "surface.uikit.gallery")
                 {
                     return true;
                 }

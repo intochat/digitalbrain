@@ -49,11 +49,6 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
 
     public virtual async Task InitializeAsync()
     {
-        if (!E2EPrerequisites.OptedIn)
-        {
-            return; // Not opted into the real-stack E2E; the [SkippableFact] will skip.
-        }
-
         if (await ProbeAsync(WarmClusterWebUrl, TimeSpan.FromSeconds(2)))
         {
             // Port 8080 is HTTP/2-only cleartext (h2c) -- the .NET gRPC client needs this switch to call

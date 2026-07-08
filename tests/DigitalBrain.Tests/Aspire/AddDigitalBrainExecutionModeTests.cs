@@ -8,18 +8,14 @@ namespace DigitalBrain.Tests.Aspire;
 // placeholder). Uses DistributedApplicationTestingBuilder.CreateAsync against the real
 // DigitalBrain.AppHost entry point (same reflection technique as DigitalBrainAppHostFixture)
 // but deliberately stops after CreateAsync — never calling BuildAsync/StartAsync — so it only
-// inspects the declared resource graph. No Docker, no Orleans, no container start. Because loading
-// the AppHost assembly can collide with a running Aspire process on Windows, this is opt-in instead
-// of part of the default fast `dotnet test Brain.slnx` loop.
+// inspects the declared resource graph. No Docker, no Orleans, no container start.
 public sealed class AddDigitalBrainExecutionModeTests
 {
-    private static bool AppHostModelTestsEnabled =>
-        string.Equals(Environment.GetEnvironmentVariable("RUN_APPHOST_MODEL_TESTS"), "true", StringComparison.OrdinalIgnoreCase);
-
     private static async Task<IDistributedApplicationTestingBuilder> CreateAppHostBuilderAsync(params string[] args)
     {
-        Skip.IfNot(AppHostModelTestsEnabled, "Set RUN_APPHOST_MODEL_TESTS=true and pass -p:EnableAppHostTests=true to run AppHost model tests.");
-        Skip.IfNot(File.Exists(Path.Combine(AppContext.BaseDirectory, "DigitalBrain.AppHost.dll")), "Pass -p:EnableAppHostTests=true so DigitalBrain.AppHost is built and copied for these tests.");
+        Assert.True(
+            File.Exists(Path.Combine(AppContext.BaseDirectory, "DigitalBrain.AppHost.dll")),
+            "DigitalBrain.AppHost must be built and copied for AppHost model tests.");
 
         var appHostAssembly = Assembly.Load("DigitalBrain.AppHost");
         var programType = appHostAssembly.GetTypes().FirstOrDefault(t => t.Name == "Program")
@@ -29,7 +25,7 @@ public sealed class AddDigitalBrainExecutionModeTests
         return await DistributedApplicationTestingBuilder.CreateAsync(programType, args);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RunMode_CreatesEmulatedStorageAndOllamaContainer()
     {
         // Default args == run mode, matching every `dotnet run`/`aspire run` invocation today.
@@ -57,7 +53,7 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.Contains(builder.Resources, r => r.Name == "sync" && r.GetType().Name == "AzureBlobStorageResource");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task PublishMode_SkipsEmulatorAndOllamaContainer_UsesConnectionStringPlaceholder()
     {
         // `aspire publish`'s equivalent: no containers should ever be started for this.

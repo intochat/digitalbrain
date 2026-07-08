@@ -27,11 +27,9 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
 {
     private readonly DigitalBrainAppHostFixture _fx = fixture;
 
-    [SkippableFact]
+    [Fact]
     public async Task Login_over_grpc_web_send_broadcasts_signed_in_session()
     {
-        E2EPrerequisites.RequireRealStackE2E();
-
         var clientId = "e2e-login-" + Guid.NewGuid().ToString("N")[..8];
         var httpHandler = new HttpClientHandler
         {
@@ -68,8 +66,8 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
             TypeName = nameof(LoginRequest),
             Payload = ByteString.CopyFromUtf8(JsonSerializer.Serialize(new
             {
-                username = "e2e-admin",
-                password = "e2e-password",
+                username = "admin",
+                password = "admin",
                 clientId,
             })),
         }, cancellationToken: cts.Token);
