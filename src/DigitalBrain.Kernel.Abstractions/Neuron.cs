@@ -71,7 +71,6 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     private void AddToJournal(ref IDurableList<Synapse>? journalField, string key, Synapse synapse)
     {
         var target = journalField ??= ResolveRequiredJournal(key);
-        SanitizeForOrleansCopy(synapse);
         try
         {
             target.Add(synapse);
@@ -389,130 +388,110 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         exception.GetBaseException().Message.Contains("state journal stream writer is not initialized", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<Synapse> SnapshotTimeline(IEnumerable<Synapse> journal)
+        => journal.Select(CopyForOrleansResponse).ToArray();
+
+    private static Synapse CopyForOrleansResponse(Synapse synapse) => synapse switch
     {
-        var snapshot = journal.ToList();
-        foreach (var synapse in snapshot)
+        Signal signal => signal with { Props = NormalizeStringObjectDictionary(signal.Props) },
+        AskLlm ask => ask with { ReplyProps = NormalizeStringObjectDictionary(ask.ReplyProps) },
+        ChartInteraction chart => chart with { Payload = NormalizeStringObjectDictionary(chart.Payload) },
+        InoInteractResult result => CopyForOrleansResponse(result),
+        Checkpoint checkpoint => checkpoint with { Snapshot = checkpoint.Snapshot.Select(CopyForOrleansResponse).ToArray() },
+        _ => CopyUnknownSynapseForOrleansResponse(synapse)
+    };
+
+    private static InoInteractResult CopyForOrleansResponse(InoInteractResult result)
+    {
+        if (result.AvailableActions is null)
         {
-            SanitizeForOrleansCopy(synapse);
+            return result;
         }
 
-        return snapshot;
+        return result with { AvailableActions = result.AvailableActions.Select(CopyForOrleansResponse).ToArray() };
     }
 
-    private static void SanitizeForOrleansCopy(Synapse synapse)
+    private static InoAction CopyForOrleansResponse(InoAction action) =>
+        action.Props is null
+            ? action
+            : action with { Props = NormalizeStringObjectDictionary(action.Props) };
+
+    private static Synapse CopyUnknownSynapseForOrleansResponse(Synapse synapse)
     {
-        // STJ object-valued dictionaries deserialize nested JSON as JsonElement, which Orleans
-        // cannot deep-copy by default when returning grain responses. Normalize at the journal
-        // boundary so old persisted entries and new traffic both stay copyable.
-        SanitizeValue(synapse, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        var normalized = NormalizeValue(synapse, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        if (!normalized.Changed || normalized.Value is not Synapse copy || ReferenceEquals(copy, synapse))
+        {
+            return synapse;
+        }
+
+        return copy with
+        {
+            Type = synapse.Type,
+            Timestamp = synapse.Timestamp,
+            Sender = synapse.Sender,
+            Receiver = synapse.Receiver,
+            IsBroadcast = synapse.IsBroadcast,
+            CorrelationId = synapse.CorrelationId,
+            SynapseId = synapse.SynapseId,
+            CausationId = synapse.CausationId
+        };
     }
 
-    private static object? SanitizeValue(object? value, HashSet<object> visited)
+    private static IReadOnlyDictionary<string, object?> NormalizeStringObjectDictionary(IReadOnlyDictionary<string, object?> dictionary)
+    {
+        var normalized = NormalizeStringObjectDictionaryValue(dictionary, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        return normalized.Changed && normalized.Value is IReadOnlyDictionary<string, object?> normalizedDictionary
+            ? normalizedDictionary
+            : dictionary;
+    }
+
+    private static NormalizedValue NormalizeValue(object? value, HashSet<object> visited)
     {
         if (value is null)
         {
-            return null;
+            return new(null, Changed: false);
         }
 
         if (value is JsonElement element)
         {
-            return UnwrapJsonElement(element);
+            return new(UnwrapJsonElement(element), Changed: true);
         }
 
         var type = value.GetType();
         if (type.IsPrimitive || type.IsEnum || value is string or decimal or DateTime or DateTimeOffset or Guid or TimeSpan)
         {
-            return value;
+            return new(value, Changed: false);
         }
 
         if (!visited.Add(value))
         {
-            return value;
+            return new(value, Changed: false);
         }
 
-        if (value is IDictionary<string, object?> objectDictionary)
+        try
         {
-            var keys = objectDictionary.Keys.ToArray();
-            foreach (var key in keys)
+            if (value is IReadOnlyDictionary<string, object?> objectDictionary)
             {
-                objectDictionary[key] = SanitizeValue(objectDictionary[key], visited);
+                return NormalizeStringObjectDictionaryValue(objectDictionary, visited);
             }
-            return value;
-        }
 
-        if (value is IDictionary dictionary)
+            if (value is IDictionary dictionary)
+            {
+                return NormalizeDictionaryValue(dictionary, visited);
+            }
+
+            if (value is IEnumerable enumerable)
+            {
+                return NormalizeEnumerableValue(enumerable, type, visited);
+            }
+
+            return ShouldInspectProperties(type)
+                ? NormalizeDigitalBrainObject(value, type, visited)
+                : new(value, Changed: false);
+        }
+        finally
         {
-            var keys = dictionary.Keys.Cast<object>().ToArray();
-            foreach (var key in keys)
-            {
-                try
-                {
-                    dictionary[key] = SanitizeValue(dictionary[key], visited);
-                }
-                catch (NotSupportedException)
-                {
-                }
-            }
-            return value;
+            visited.Remove(value);
         }
-
-        if (value is IList list)
-        {
-            for (var i = 0; i < list.Count; i++)
-            {
-                try
-                {
-                    list[i] = SanitizeValue(list[i], visited);
-                }
-                catch (NotSupportedException)
-                {
-                }
-            }
-            return value;
-        }
-
-        if (value is Array array && array.Rank == 1)
-        {
-            var elementType = array.GetType().GetElementType();
-            for (var i = 0; i < array.Length; i++)
-            {
-                var current = array.GetValue(i);
-                var sanitized = SanitizeValue(current, visited);
-                if (ReferenceEquals(current, sanitized) ||
-                    (sanitized is not null && elementType is not null && !elementType.IsInstanceOfType(sanitized)))
-                {
-                    continue;
-                }
-
-                array.SetValue(sanitized, i);
-            }
-            return value;
-        }
-
-        if (ShouldInspectProperties(type))
-        {
-            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (property.GetIndexParameters().Length > 0)
-                {
-                    continue;
-                }
-
-                object? propertyValue;
-                try
-                {
-                    propertyValue = property.GetValue(value);
-                }
-                catch (TargetInvocationException)
-                {
-                    continue;
-                }
-
-                SanitizeValue(propertyValue, visited);
-            }
-        }
-
-        return value;
     }
 
     private static bool ShouldInspectProperties(Type type)
@@ -521,16 +500,189 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         return ns.StartsWith("DigitalBrain.", StringComparison.Ordinal);
     }
 
+    private static NormalizedValue NormalizeStringObjectDictionaryValue(
+        IReadOnlyDictionary<string, object?> dictionary,
+        HashSet<object> visited)
+    {
+        var normalized = new Dictionary<string, object?>(dictionary.Count, DictionaryComparer(dictionary));
+        var changed = false;
+        foreach (var (key, value) in dictionary)
+        {
+            var entry = NormalizeValue(value, visited);
+            normalized[key] = entry.Value;
+            changed |= entry.Changed;
+        }
+
+        return changed
+            ? new(normalized, Changed: true)
+            : new(dictionary, Changed: false);
+    }
+
+    private static IEqualityComparer<string> DictionaryComparer(IReadOnlyDictionary<string, object?> dictionary) =>
+        dictionary is Dictionary<string, object?> concrete
+            ? concrete.Comparer
+            : StringComparer.Ordinal;
+
+    private static NormalizedValue NormalizeDictionaryValue(IDictionary dictionary, HashSet<object> visited)
+    {
+        var normalized = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var changed = false;
+
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            if (entry.Key is not string key)
+            {
+                return new(dictionary, Changed: false);
+            }
+
+            var value = NormalizeValue(entry.Value, visited);
+            normalized[key] = value.Value;
+            changed |= value.Changed;
+        }
+
+        return changed
+            ? new(normalized, Changed: true)
+            : new(dictionary, Changed: false);
+    }
+
+    private static NormalizedValue NormalizeEnumerableValue(IEnumerable enumerable, Type type, HashSet<object> visited)
+    {
+        if (type == typeof(string))
+        {
+            return new(enumerable, Changed: false);
+        }
+
+        var values = new List<object?>();
+        var changed = false;
+        foreach (var item in enumerable)
+        {
+            var value = NormalizeValue(item, visited);
+            values.Add(value.Value);
+            changed |= value.Changed;
+        }
+
+        if (!changed)
+        {
+            return new(enumerable, Changed: false);
+        }
+
+        if (type.IsArray)
+        {
+            var elementType = type.GetElementType() ?? typeof(object);
+            if (values.All(value => CanAssign(value, elementType)))
+            {
+                var array = Array.CreateInstance(elementType, values.Count);
+                for (var i = 0; i < values.Count; i++)
+                {
+                    array.SetValue(values[i], i);
+                }
+
+                return new(array, Changed: true);
+            }
+
+            return new(values.ToArray(), Changed: true);
+        }
+
+        var listElementType = EnumerableElementType(type);
+        if (listElementType is not null && values.All(value => CanAssign(value, listElementType)))
+        {
+            var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(listElementType))!;
+            foreach (var value in values)
+            {
+                list.Add(value);
+            }
+
+            return new(list, Changed: true);
+        }
+
+        return new(values, Changed: true);
+    }
+
+    private static NormalizedValue NormalizeDigitalBrainObject(object value, Type type, HashSet<object> visited)
+    {
+        var constructor = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .OrderByDescending(candidate => candidate.GetParameters().Length)
+            .FirstOrDefault();
+        if (constructor is null)
+        {
+            return new(value, Changed: false);
+        }
+
+        var arguments = new object?[constructor.GetParameters().Length];
+        var changed = false;
+        var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => property.GetIndexParameters().Length == 0)
+            .ToDictionary(property => property.Name, StringComparer.OrdinalIgnoreCase);
+
+        var parameters = constructor.GetParameters();
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            if (!properties.TryGetValue(parameters[i].Name ?? string.Empty, out var property))
+            {
+                return new(value, Changed: false);
+            }
+
+            object? propertyValue;
+            try
+            {
+                propertyValue = property.GetValue(value);
+            }
+            catch (TargetInvocationException)
+            {
+                return new(value, Changed: false);
+            }
+
+            var normalized = NormalizeValue(propertyValue, visited);
+            if (!CanAssign(normalized.Value, parameters[i].ParameterType))
+            {
+                return new(value, Changed: false);
+            }
+
+            arguments[i] = normalized.Value;
+            changed |= normalized.Changed;
+        }
+
+        if (!changed)
+        {
+            return new(value, Changed: false);
+        }
+
+        return new(constructor.Invoke(arguments), Changed: true);
+    }
+
+    private static Type? EnumerableElementType(Type type)
+    {
+        if (type.IsGenericType && type.GetGenericArguments().Length == 1)
+        {
+            return type.GetGenericArguments()[0];
+        }
+
+        return type.GetInterfaces()
+            .Where(candidate => candidate.IsGenericType)
+            .FirstOrDefault(candidate => candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            ?.GetGenericArguments()[0];
+    }
+
+    private static bool CanAssign(object? value, Type type) =>
+        value is null
+            ? !type.IsValueType || Nullable.GetUnderlyingType(type) is not null
+            : type.IsInstanceOfType(value);
+
     private static object? UnwrapJsonElement(JsonElement element) => element.ValueKind switch
     {
         JsonValueKind.True => true,
         JsonValueKind.False => false,
         JsonValueKind.Null or JsonValueKind.Undefined => null,
         JsonValueKind.Number => element.TryGetInt64(out var integer) ? integer : element.GetDouble(),
-        JsonValueKind.Object => element.GetRawText(),
-        JsonValueKind.Array => element.GetRawText(),
+        JsonValueKind.Object => element.EnumerateObject().ToDictionary(
+            property => property.Name,
+            property => UnwrapJsonElement(property.Value),
+            StringComparer.Ordinal),
+        JsonValueKind.Array => element.EnumerateArray().Select(UnwrapJsonElement).ToArray(),
         _ => element.GetString()
     };
+
+    private readonly record struct NormalizedValue(object? Value, bool Changed);
 
     public static class NeuronInstrumentation
     {

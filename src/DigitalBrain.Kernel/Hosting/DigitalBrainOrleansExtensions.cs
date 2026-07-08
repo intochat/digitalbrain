@@ -46,6 +46,7 @@ public static class DigitalBrainOrleansExtensions
             if (!isAspireHosted)
             {
                 siloBuilder.UseLocalhostClustering();
+                siloBuilder.UseInMemoryReminderService();
                 siloBuilder.AddMemoryGrainStorageAsDefault();
                 siloBuilder.ConfigurePrototypeJournals();
             }
@@ -67,6 +68,11 @@ public static class DigitalBrainOrleansExtensions
 
                     siloBuilder.UseAzureStorageClustering(options =>
                         options.TableServiceClient = new TableServiceClient(storageTableServiceUri!, storageCredential!, tableOptions));
+                    siloBuilder.UseAzureTableReminderService(options =>
+                    {
+                        options.TableServiceClient = new TableServiceClient(storageTableServiceUri!, storageCredential!, tableOptions);
+                        options.TableName = "OrleansReminders";
+                    });
                     siloBuilder.AddAzureBlobGrainStorage("Default", options =>
                         options.BlobServiceClient = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions));
                     siloBuilder.AddAzureBlobJournalStorage(options =>
@@ -83,6 +89,11 @@ public static class DigitalBrainOrleansExtensions
 
                     siloBuilder.UseAzureStorageClustering(options =>
                         options.TableServiceClient = new TableServiceClient(clusteringConn, tableOptions));
+                    siloBuilder.UseAzureTableReminderService(options =>
+                    {
+                        options.TableServiceClient = new TableServiceClient(clusteringConn, tableOptions);
+                        options.TableName = "OrleansReminders";
+                    });
                     siloBuilder.AddAzureBlobGrainStorage("Default", options =>
                         options.BlobServiceClient = new BlobServiceClient(grainStateConn, blobOptions));
                     siloBuilder.AddAzureBlobJournalStorage(options =>

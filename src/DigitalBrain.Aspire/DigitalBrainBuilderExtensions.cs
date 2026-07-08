@@ -100,17 +100,14 @@ public static class DigitalBrainBuilderExtensions
 
         var orleans = builder.AddOrleans("kernel")
             .WithClustering(clusteringTable)
-            .WithGrainStorage("Default", grainBlobs);
+            .WithGrainStorage("Default", grainBlobs)
+            .WithReminders(clusteringTable);
 
         if (isRunMode)
         {
             // Persistent Azurite keeps Orleans membership rows; use a fresh local cluster id so
             // stale active silos from killed/restarted replicas do not block the next startup.
-            var localClusterId = Environment.GetEnvironmentVariable("DIGITALBRAIN_CLUSTER_ID")
-                ?? Environment.GetEnvironmentVariable("DigitalBrain__ClusterId")
-                ?? Environment.GetEnvironmentVariable("Orleans__ClusterId")
-                ?? $"digitalbrain-dev-{Guid.NewGuid():N}";
-            orleans.WithClusterId(localClusterId);
+            orleans.WithClusterId(ResolveLocalClusterId());
         }
 
         // Ollama always runs as the offline fallback (per DEMO-PLAN), independent of the chosen primary
@@ -333,6 +330,18 @@ public static class DigitalBrainBuilderExtensions
         return int.TryParse(configured, out var port) && port > 0
             ? port
             : DefaultKernelWebPort;
+    }
+
+    internal static string ResolveLocalClusterId() => ResolveLocalClusterId(Environment.GetEnvironmentVariable);
+
+    internal static string ResolveLocalClusterId(Func<string, string?> getEnvironmentVariable)
+    {
+        ArgumentNullException.ThrowIfNull(getEnvironmentVariable);
+
+        return getEnvironmentVariable("DIGITALBRAIN_CLUSTER_ID")
+            ?? getEnvironmentVariable("DigitalBrain__ClusterId")
+            ?? getEnvironmentVariable("Orleans__ClusterId")
+            ?? $"digitalbrain-dev-{Guid.NewGuid():N}";
     }
 
 }

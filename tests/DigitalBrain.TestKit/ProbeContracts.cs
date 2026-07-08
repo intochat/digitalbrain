@@ -13,4 +13,6 @@ public record ProbeMessageSynapse(string Text) : Synapse(nameof(ProbeMessageSyna
 [Alias("DigitalBrain.Core.IProbeNeuron")]
 public interface IProbeNeuron : INeuron
 {
+    [Alias("FireJsonSignalAsync")]
+    Task FireJsonSignalAsync(string signalName, string json, CancellationToken cancellationToken = default);
 }

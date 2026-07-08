@@ -28,6 +28,28 @@ public class NeuronTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task Timeline_Returns_CopySafe_Json_Payloads_Without_Raw_Json_Strings()
+    {
+        var grain = Grain<IProbeNeuron>("json-payloads");
+        await grain.FireJsonSignalAsync("JsonPayload", """
+            {
+              "nested": { "name": "demo", "count": 2 },
+              "items": [1, { "flag": true }]
+            }
+            """);
+
+        var signal = Assert.Single((await grain.GetOutgoingTimelineAsync()).OfType<Signal>(), s => s.Name == "JsonPayload");
+        var nested = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(signal.Props["nested"]);
+        Assert.Equal("demo", nested["name"]);
+        Assert.Equal(2L, Convert.ToInt64(nested["count"]));
+
+        var items = Assert.IsAssignableFrom<IReadOnlyList<object?>>(signal.Props["items"]);
+        Assert.Equal(1L, Convert.ToInt64(items[0]));
+        var item = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(items[1]);
+        Assert.Equal(true, item["flag"]);
+    }
+
+    [Fact]
     public async Task SystemStatus_Launches_And_Records_Status()
     {
         var status = Grain<ISystemStatus>("status-test");
