@@ -904,7 +904,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["messageIds"] = string.Join(",", summaries.Select(m => m.Id))
         }), cancellationToken);
 
-        var reply = GmailReplyText(summaries);
+        // Redact before InoResponse and memory (apply earlier per review).
+        var redactedSummaries = summaries.Select(s => new GmailMessageSummary(s.Id, SecretText.Redact(s.Body))).ToList();
+        var reply = GmailReplyText(redactedSummaries);
         await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
 
         if (summaries.Count > 0)
@@ -969,7 +971,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["count"] = records.Length
         }), cancellationToken);
 
-        var reply = SalesforceReplyText(records);
+        // Redact before InoResponse and memory (apply earlier per review).
+        var redactedRecords = records.Select(r => SecretText.Redact(r)).ToArray();
+        var reply = SalesforceReplyText(redactedRecords);
         await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
 
         if (records.Length > 0)
