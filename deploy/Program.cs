@@ -1,16 +1,16 @@
 using System.Collections.Generic;
 using Pulumi;
 using Pulumi.AzureNative.Resources;
-using Storage = Pulumi.AzureNative.Storage;
-using StorageInputs = Pulumi.AzureNative.Storage.Inputs;
+using App = Pulumi.AzureNative.App;
+using AppInputs = Pulumi.AzureNative.App.Inputs;
+using AppInsights = Pulumi.AzureNative.ApplicationInsights;
 using Authorization = Pulumi.AzureNative.Authorization;
 using Cognitive = Pulumi.AzureNative.CognitiveServices;
 using CognitiveInputs = Pulumi.AzureNative.CognitiveServices.Inputs;
 using OpInsights = Pulumi.AzureNative.OperationalInsights;
 using OpInsightsInputs = Pulumi.AzureNative.OperationalInsights.Inputs;
-using AppInsights = Pulumi.AzureNative.ApplicationInsights;
-using App = Pulumi.AzureNative.App;
-using AppInputs = Pulumi.AzureNative.App.Inputs;
+using Storage = Pulumi.AzureNative.Storage;
+using StorageInputs = Pulumi.AzureNative.Storage.Inputs;
 
 namespace DigitalBrain.Deploy;
 

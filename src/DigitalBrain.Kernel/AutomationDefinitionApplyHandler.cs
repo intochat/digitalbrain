@@ -19,7 +19,7 @@ public sealed class AutomationDefinitionApplyHandler(IGrainFactory grains) : ISe
         }
 
         var automation = grains.GetGrain<IAutomationNeuron>(proposal.Origin);
-        var staged = (await automation.GetOutgoingTimelineAsync())
+        var staged = (await automation.GetOutgoingTimelineAsync(ct))
             .OfType<AutomationDefinitionStaged>()
             .LastOrDefault(item => string.Equals(item.ProposalId, proposal.ProposalId, StringComparison.Ordinal));
 
@@ -28,8 +28,8 @@ public sealed class AutomationDefinitionApplyHandler(IGrainFactory grains) : ISe
             return Failed(proposal, $"No staged automation definition was found for proposal '{proposal.ProposalId}'.");
         }
 
-        await automation.FireAsync(staged.Script);
-        await automation.FireAsync(staged.Reaction);
+        await automation.FireAsync(staged.Script, ct);
+        await automation.FireAsync(staged.Reaction, ct);
 
         // Register capability for intent classifier / future vector index (part of modern intent arch)
         var cap = new InoIntentClassifier.Capability(
@@ -39,7 +39,7 @@ public sealed class AutomationDefinitionApplyHandler(IGrainFactory grains) : ISe
             "automation");
         InoIntentClassifier.RegisterCapability(cap);
 
-        await automation.FireAsync(new CapabilityRegistered(cap.Id, cap.Description, cap.Examples, cap.Tier, proposal.Origin));
+        await automation.FireAsync(new CapabilityRegistered(cap.Id, cap.Description, cap.Examples, cap.Tier, proposal.Origin), ct);
 
         return new SelfEvolutionApplyResult(
             proposal.ProposalId,

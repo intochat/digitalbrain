@@ -5,6 +5,8 @@ using DigitalBrain.Core;
 [Alias("DigitalBrain.Ui.Contracts.IUserSessionNeuron")]
 public interface IUserSessionNeuron : INeuron, IHandle<LoginRequest>, IHandle<LogoutRequest>
 {
+    const string SingletonKey = "session-main";
+
     [Alias("GetSessionAsync")]
     Task<UserSessionState?> GetSessionAsync(string sessionId);
     [Alias("GetSessionByClientIdAsync")]

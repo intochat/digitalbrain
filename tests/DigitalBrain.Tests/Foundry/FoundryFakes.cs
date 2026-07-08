@@ -8,8 +8,9 @@ public sealed class FakeBuildRunner : IBuildRunner
     public string NextLog { get; set; } = "ok";
     public int Calls { get; private set; }
 
-    public Task<BuildOutcome> VerifyBuildAsync(string moduleName, string source)
+    public Task<BuildOutcome> VerifyBuildAsync(string moduleName, string source, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Calls++;
         return Task.FromResult(new BuildOutcome(NextResult, NextLog));
     }
@@ -18,8 +19,9 @@ public sealed class FakeBuildRunner : IBuildRunner
 public sealed class FakeResourceController : IResourceController
 {
     public int Restarts { get; private set; }
-    public Task RestartKernelAsync(string reason)
+    public Task RestartKernelAsync(string reason, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Restarts++;
         return Task.CompletedTask;
     }

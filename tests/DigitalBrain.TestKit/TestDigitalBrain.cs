@@ -45,7 +45,9 @@ public sealed class TestDigitalBrain(
     public async Task DisposeAsync()
     {
         if (_cluster is not null)
+        {
             await _cluster.DisposeAsync();
+        }
     }
 
     public TGrain Grain<TGrain>(string key) where TGrain : IGrainWithStringKey =>

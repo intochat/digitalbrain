@@ -12,7 +12,7 @@ compile, run, and durably load real C# at runtime.
 
 ## Entry points
 - MCP: `run_code_foundry(spec, tier, autoApply)`
-- Synapse: fire `FoundryRequest` at grain `foundry-main` (`ICodeFoundryLoopNeuron`).
+- Synapse: `FoundryRequest`/`ICodeFoundryLoopNeuron` are dormant compatibility contracts and are not exposed through the current MCP or UI routes.
 
 ## Safety
 - Checkpoint before apply; capability gate (`CapabilityGate`) bans dangerous symbols at

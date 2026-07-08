@@ -115,11 +115,19 @@ public static class DbSchemaGraphMapper
     {
         var badges = new List<string>();
         if (column.PrimaryKeyOrdinal > 0)
+        {
             badges.Add("PK");
+        }
+
         if (isForeignKey)
+        {
             badges.Add("FK");
+        }
+
         if (!column.IsNullable && column.PrimaryKeyOrdinal == 0)
+        {
             badges.Add("NOT NULL");
+        }
 
         return badges.Count == 0 ? null : string.Join(", ", badges);
     }

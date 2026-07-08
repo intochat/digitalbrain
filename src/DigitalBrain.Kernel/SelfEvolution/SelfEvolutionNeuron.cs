@@ -23,11 +23,11 @@ public sealed class SelfEvolutionNeuron(
         RebuildProjection();
     }
 
-    public async Task HandleAsync(SelfEvolutionProposal proposal)
+    public async Task HandleAsync(SelfEvolutionProposal proposal, CancellationToken cancellationToken = default)
     {
         if (RejectIfInvalid(proposal) is { } invalidReason)
         {
-            await FireAsync(new SelfEvolutionProposalRejected(proposal.ProposalId, invalidReason));
+            await FireAsync(new SelfEvolutionProposalRejected(proposal.ProposalId, invalidReason), cancellationToken);
             return;
         }
 
@@ -36,38 +36,38 @@ public sealed class SelfEvolutionNeuron(
             || _applied.Contains(proposal.ProposalId)
             || _expired.Contains(proposal.ProposalId))
         {
-            await FireAsync(new SelfEvolutionProposalRejected(proposal.ProposalId, "ProposalId has already been observed."));
+            await FireAsync(new SelfEvolutionProposalRejected(proposal.ProposalId, "ProposalId has already been observed."), cancellationToken);
             return;
         }
 
         if (IsExpired(proposal))
         {
             _expired.Add(proposal.ProposalId);
-            await FireAsync(new SelfEvolutionProposalExpired(proposal.ProposalId, proposal.ExpiresAt));
+            await FireAsync(new SelfEvolutionProposalExpired(proposal.ProposalId, proposal.ExpiresAt), cancellationToken);
             return;
         }
 
         _pending[proposal.ProposalId] = proposal;
-        await FireAsync(new SelfEvolutionProposalPending(proposal.ProposalId, proposal.ApplyVia, proposal.Risk));
+        await FireAsync(new SelfEvolutionProposalPending(proposal.ProposalId, proposal.ApplyVia, proposal.Risk), cancellationToken);
     }
 
-    public async Task HandleAsync(SelfEvolutionDecision decision)
+    public async Task HandleAsync(SelfEvolutionDecision decision, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(decision.DecidedBy))
         {
-            await FireAsync(new SelfEvolutionDecisionRejected(decision.ProposalId, "DecidedBy is required."));
+            await FireAsync(new SelfEvolutionDecisionRejected(decision.ProposalId, "DecidedBy is required."), cancellationToken);
             return;
         }
 
         if (_decided.Contains(decision.ProposalId) || _applied.Contains(decision.ProposalId))
         {
-            await FireAsync(new SelfEvolutionDecisionRejected(decision.ProposalId, "Proposal has already been decided."));
+            await FireAsync(new SelfEvolutionDecisionRejected(decision.ProposalId, "Proposal has already been decided."), cancellationToken);
             return;
         }
 
         if (!_pending.TryGetValue(decision.ProposalId, out var proposal))
         {
-            await FireAsync(new SelfEvolutionDecisionRejected(decision.ProposalId, "No pending proposal exists for this decision."));
+            await FireAsync(new SelfEvolutionDecisionRejected(decision.ProposalId, "No pending proposal exists for this decision."), cancellationToken);
             return;
         }
 
@@ -75,22 +75,22 @@ public sealed class SelfEvolutionNeuron(
         {
             _pending.Remove(proposal.ProposalId);
             _expired.Add(proposal.ProposalId);
-            await FireAsync(new SelfEvolutionProposalExpired(proposal.ProposalId, proposal.ExpiresAt));
-            await FireAsync(new SelfEvolutionDecisionRejected(decision.ProposalId, "Proposal has expired."));
+            await FireAsync(new SelfEvolutionProposalExpired(proposal.ProposalId, proposal.ExpiresAt), cancellationToken);
+            await FireAsync(new SelfEvolutionDecisionRejected(decision.ProposalId, "Proposal has expired."), cancellationToken);
             return;
         }
 
         _pending.Remove(proposal.ProposalId);
         _decided.Add(proposal.ProposalId);
-        await FireAsync(new SelfEvolutionDecisionRecorded(decision.ProposalId, decision.Approved, decision.DecidedBy, decision.Reason));
+        await FireAsync(new SelfEvolutionDecisionRecorded(decision.ProposalId, decision.Approved, decision.DecidedBy, decision.Reason), cancellationToken);
 
         if (!decision.Approved)
         {
             return;
         }
 
-        var result = await _applyRegistry.ApplyAsync(proposal, CancellationToken.None);
-        await FireAsync(result);
+        var result = await _applyRegistry.ApplyAsync(proposal, cancellationToken);
+        await FireAsync(result, cancellationToken);
         if (result.Succeeded)
         {
             _applied.Add(proposal.ProposalId);
@@ -101,7 +101,7 @@ public sealed class SelfEvolutionNeuron(
                 proposal.ProposalId,
                 proposal.ApplyVia,
                 result.RollbackCheckpointId,
-                result.Details));
+                result.Details), cancellationToken);
         }
     }
 
@@ -152,10 +152,26 @@ public sealed class SelfEvolutionNeuron(
 
     private static string? RejectIfInvalid(SelfEvolutionProposal proposal)
     {
-        if (string.IsNullOrWhiteSpace(proposal.ProposalId)) return "ProposalId is required.";
-        if (string.IsNullOrWhiteSpace(proposal.ApplyVia)) return "ApplyVia is required.";
-        if (string.IsNullOrWhiteSpace(proposal.Origin)) return "Origin is required.";
-        if (string.IsNullOrWhiteSpace(proposal.RollbackPlan)) return "RollbackPlan is required.";
+        if (string.IsNullOrWhiteSpace(proposal.ProposalId))
+        {
+            return "ProposalId is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(proposal.ApplyVia))
+        {
+            return "ApplyVia is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(proposal.Origin))
+        {
+            return "Origin is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(proposal.RollbackPlan))
+        {
+            return "RollbackPlan is required.";
+        }
+
         return null;
     }
 

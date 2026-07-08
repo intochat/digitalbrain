@@ -2,8 +2,7 @@ using DigitalBrain.Core.Distribution;
 
 namespace DigitalBrain.Core;
 
-// A NeuroPack is the distributable unit: metadata + code + ownership + monetization info.
-// This enables private marketplace + commissions without keeping pack identity in Core.
+// Legacy typed bundle metadata. Kept out of Core so current INO/automation contracts stay clean.
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.NeuroPack")]
 public record NeuroPack(
@@ -18,7 +17,7 @@ public record NeuroPack(
     // Empty = unsigned. Signed via PackSignatureVerifier.SignPack at publish, verified at install.
     [property: Id(7)] string AuthorPublicKeyBase64 = "",
     [property: Id(8)] string SignatureBase64 = "",
-    // Economics: price in the marketplace currency. 0 = free. Premium (>0) packs require a license at install.
+    // Legacy economics metadata. Current INO automations do not use this.
     [property: Id(9)] decimal Price = 0m,
     [property: Id(10)] BundleManifest? Manifest = null
 );

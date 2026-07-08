@@ -52,7 +52,9 @@ public sealed class PackAlcEmbodier : IPackEmbodiment
 
         var violations = CapabilityGate.FindViolations(compilation);
         if (violations.Count > 0)
+        {
             throw new PackEmbodimentException($"capability gate rejected pack '{packName}': {string.Join(", ", violations)}");
+        }
 
         using var peStream = new MemoryStream();
         var emit = compilation.Emit(peStream);

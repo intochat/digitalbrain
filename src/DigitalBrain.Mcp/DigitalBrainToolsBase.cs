@@ -1,5 +1,5 @@
-using DigitalBrain.Core;
 using System.Text.Json;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Mcp;
 
@@ -19,37 +19,6 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
         value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(id => !string.IsNullOrWhiteSpace(id));
 
-    protected async Task<IReadOnlyList<NeuroPack>> GetPublishedPacksWithLocalSeedsAsync(IMarketplaceNeuron marketplace)
-    {
-        await marketplace.FireAsync(new ListPublished());
-        var published = await ReadLatestPublishedPacksAsync(marketplace);
-        var publishedKeys = published.Select(PackKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var missingLocalPacks = MarketplaceSeeds.LocalUiPacks
-            .Where(pack => !publishedKeys.Contains(PackKey(pack)))
-            .ToArray();
-
-        if (missingLocalPacks.Length == 0)
-        {
-            return published;
-        }
-
-        foreach (var pack in missingLocalPacks)
-        {
-            await marketplace.FireAsync(MarketplaceSeeds.ToPublishCommand(pack));
-        }
-
-        await marketplace.FireAsync(new ListPublished());
-        return await ReadLatestPublishedPacksAsync(marketplace);
-    }
-
-    protected static async Task<IReadOnlyList<NeuroPack>> ReadLatestPublishedPacksAsync(IMarketplaceNeuron marketplace)
-    {
-        var timeline = await marketplace.GetTimelineAsync();
-        return timeline.OfType<PublishedList>().LastOrDefault()?.Packs ?? Array.Empty<NeuroPack>();
-    }
-
-    protected static string PackKey(NeuroPack pack) => $"{pack.Name}@{pack.Version}";
-
     protected static string Explain(Exception exception)
     {
         var root = exception.GetBaseException();
@@ -68,19 +37,14 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
         return neuronId switch
         {
             "aspire-main" => Grains.GetGrain<IAspireNeuron>(neuronId),
-            "closedloop-main" => Grains.GetGrain<IClosedLoopNeuron>(neuronId),
             "context-main" => Grains.GetGrain<INeuron>(neuronId),
-            "company-main" => Grains.GetGrain<ICompanyKnowledgeNeuron>(neuronId),
-            "company-skill-main" => Grains.GetGrain<ICompanySkillOrchestratorNeuron>(neuronId),
             "chart-main" => Grains.GetGrain<IDataVisualizationNeuron>(neuronId),
             _ when neuronId.StartsWith("chart-", StringComparison.OrdinalIgnoreCase) => Grains.GetGrain<IChartNeuron>(neuronId),
             "db-main" => Grains.GetGrain<IDbSupportNeuron>(neuronId),
-            "foundry-main" => Grains.GetGrain<ICodeFoundryLoopNeuron>(neuronId),
             "ino-main" => Grains.GetGrain<IInoNeuron>(neuronId),
             "llm-main" => Grains.GetGrain<ILlmNeuron>(neuronId),
-            "market-main" => Grains.GetGrain<IMarketplaceNeuron>(neuronId),
             "status-main" => Grains.GetGrain<ISystemStatus>(neuronId),
-            _ => Grains.GetGrain<IGeneratedNeuron>(neuronId) // DemoNeuron removed as trash; using Generated as fallback
+            _ => Grains.GetGrain<IIngressNeuron>(neuronId)
         };
     }
 

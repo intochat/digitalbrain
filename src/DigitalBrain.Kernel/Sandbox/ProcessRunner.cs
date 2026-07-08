@@ -62,7 +62,9 @@ public static class ProcessRunner
     {
         var blocked = Validate(command);
         if (blocked is not null)
+        {
             return Task.FromResult(new CommandResult(-1, "", blocked, TimeSpan.Zero));
+        }
 
         var (shell, args) = OperatingSystem.IsWindows()
             ? ("cmd.exe", $"/c {command}")
@@ -75,7 +77,9 @@ public static class ProcessRunner
     {
         var blocked = Validate(command);
         if (blocked is not null)
+        {
             return Task.FromResult(new CommandResult(-1, "", blocked, TimeSpan.Zero));
+        }
 
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
         var shell = OperatingSystem.IsWindows() ? "powershell.exe" : "pwsh";
@@ -87,10 +91,18 @@ public static class ProcessRunner
         var firstToken = command.Trim().Split([' ', '\t'], 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
         var commandName = Path.GetFileNameWithoutExtension(firstToken);
         if (BlockedCommands.Contains(commandName))
+        {
             return $"Command blocked: '{commandName}' is prohibited.";
+        }
+
         foreach (var pattern in BlockedArgumentPatterns)
+        {
             if (command.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            {
                 return "Command blocked: contains a prohibited pattern.";
+            }
+        }
+
         return null;
     }
 
@@ -99,7 +111,9 @@ public static class ProcessRunner
         try
         {
             if (!process.HasExited)
+            {
                 process.Kill(entireProcessTree: true);
+            }
         }
         catch (InvalidOperationException)
         {
@@ -109,7 +123,11 @@ public static class ProcessRunner
 
     private static string Truncate(string output, int maxLength = 16_384)
     {
-        if (output.Length <= maxLength) return output;
+        if (output.Length <= maxLength)
+        {
+            return output;
+        }
+
         var head = maxLength * 2 / 3;
         var tail = maxLength / 3;
         return $"{output[..head]}\n\n... [{output.Length - maxLength} chars truncated] ...\n\n{output[^tail..]}";

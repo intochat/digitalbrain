@@ -1,9 +1,8 @@
+using System.Reflection;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
 using DigitalBrain.Ino;
-using DigitalBrain.Marketplace.Contracts;
 using DigitalBrain.Ui.Contracts.Ui;
-using System.Reflection;
 
 namespace DigitalBrain.Tests.Architecture;
 
@@ -76,7 +75,7 @@ public class CoreBoundaryTests
     }
 
     [Fact]
-    public void Ui_Contracts_Do_Not_Reference_Runtime_Host_Integration_Or_Marketplace_Packages()
+    public void Ui_Contracts_Do_Not_Reference_Runtime_Host_Integration_Or_Pack_Packages()
     {
         var references = UiContractsReferenceNames();
         var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
@@ -144,11 +143,10 @@ public class CoreBoundaryTests
         var packContractsAssemblyName = typeof(IPackBehavior).Assembly.GetName().Name!;
         var uiContractsAssemblyName = typeof(UiSurface).Assembly.GetName().Name!;
         var uiRuntimeAssemblyName = typeof(UiSurfaceLiveData).Assembly.GetName().Name!;
-        var marketplaceContractsAssemblyName = typeof(MarketplaceUiSurfaces).Assembly.GetName().Name!;
 
         // Ino is a full peer integration (commit 4ee79a4): it legitimately references Core, its own
-        // Google/Salesforce peers, Kernel.Abstractions (to host itself as a real grain), and the Ui/Marketplace
-        // contract layers it emits surfaces through. Anything DigitalBrain.* outside this allowlist -
+        // Google/Salesforce peers, Kernel.Abstractions (to host itself as a real grain), and the UI
+        // contract/runtime layers it emits surfaces through. Anything DigitalBrain.* outside this allowlist -
         // e.g. DigitalBrain.Kernel, DigitalBrain.Mcp, DigitalBrain.AppHost - would be a real boundary violation.
         var allowedDigitalBrainReferences = new[]
         {
@@ -157,7 +155,6 @@ public class CoreBoundaryTests
             packContractsAssemblyName,
             uiContractsAssemblyName,
             uiRuntimeAssemblyName,
-            marketplaceContractsAssemblyName,
             "DigitalBrain.Google",
             "DigitalBrain.Salesforce"
         };
@@ -191,7 +188,7 @@ public class CoreBoundaryTests
         Assert.Empty(offenders);
     }
     [Fact]
-    public void Ui_Runtime_Depends_On_Core_And_Ui_Contracts_Not_Marketplace_Runtime_Host_Or_Integrations()
+    public void Ui_Runtime_Depends_On_Core_And_Ui_Contracts_Not_Runtime_Host_Or_Integrations()
     {
         var references = UiRuntimeReferenceNames();
         var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
@@ -230,53 +227,9 @@ public class CoreBoundaryTests
         Assert.Empty(offenders);
     }
 
-    [Fact]
-    public void Marketplace_Contracts_Depend_On_Core_Pack_And_Ui_Contracts_Not_Runtime_Host_Or_Integrations()
-    {
-        var references = MarketplaceContractsReferenceNames();
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-        var packContractsAssemblyName = typeof(IPackBehavior).Assembly.GetName().Name!;
-        var uiContractsAssemblyName = typeof(UiSurface).Assembly.GetName().Name!;
-
-        Assert.Contains(coreAssemblyName, references);
-        Assert.Contains(packContractsAssemblyName, references);
-        Assert.Contains(uiContractsAssemblyName, references);
-
-        var unexpectedDigitalBrainReferences = references
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
-                !string.Equals(name, coreAssemblyName, StringComparison.Ordinal) &&
-                !string.Equals(name, packContractsAssemblyName, StringComparison.Ordinal) &&
-                !string.Equals(name, uiContractsAssemblyName, StringComparison.Ordinal))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(unexpectedDigitalBrainReferences);
-
-        var offenders = references
-            .Where(name => ForbiddenRuntimeHostOrIntegrationPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(offenders);
-    }
-
-    [Fact]
-    public void Core_Does_Not_Own_Marketplace_Pack_Contracts()
-    {
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-        var marketplaceContractsAssemblyName = typeof(MarketplaceUiSurfaces).Assembly.GetName().Name!;
-
-        Assert.Equal(marketplaceContractsAssemblyName, typeof(PublishToMarketplace).Assembly.GetName().Name);
-        Assert.Equal(marketplaceContractsAssemblyName, typeof(InstallFromMarketplace).Assembly.GetName().Name);
-        Assert.Equal(marketplaceContractsAssemblyName, typeof(PublishedList).Assembly.GetName().Name);
-        Assert.NotEqual(coreAssemblyName, typeof(NeuroPack).Assembly.GetName().Name);
-    }
-
     private static string[] CoreReferenceNames() => ReferenceNames(typeof(Synapse).Assembly);
 
     private static string[] PackContractsReferenceNames() => ReferenceNames(typeof(IPackBehavior).Assembly);
-
-    private static string[] MarketplaceContractsReferenceNames() => ReferenceNames(typeof(MarketplaceUiSurfaces).Assembly);
 
     private static string[] UiContractsReferenceNames() => ReferenceNames(typeof(UiSurface).Assembly);
 

@@ -18,6 +18,15 @@ max_line_length = 160
 [*.{csproj,props,targets,slnx,xml,resx,config,nuspec,manifest,runsettings}]
 indent_size = 2
 
+# slnx is manually curated for logical folder grouping in solution explorer.
+# dotnet format can rewrite XML order/sections undesirably (observed reordering + dup folders).
+# Exclude it when formatting sources: dotnet format --include src/ --include integrations/ ...
+# (Bare `dotnet format` from root may touch it for trivial ws; revert order if it does.)
+[*.slnx]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+trim_trailing_whitespace = true
+
 [*.{json,jsonc,yml,yaml}]
 indent_size = 2
 
@@ -31,6 +40,16 @@ end_of_line = lf
 end_of_line = crlf
 
 [*.{Designer.cs,g.cs,feature.cs}]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+
+# Generated code (pack embodiment, source generators) - exclude from dotnet format and analysis.
+# These may be checked-in outputs; format on them can cause noise (eol) and is meaningless.
+[**/Generated/**]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+
+[*Generated*.cs]
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none
 
@@ -53,6 +72,9 @@ dotnet_analyzer_diagnostic.category-Interoperability.severity = suggestion
 dotnet_analyzer_diagnostic.category-Style.severity = suggestion
 
 dotnet_diagnostic.CA2200.severity = warning
+dotnet_diagnostic.CA1068.severity = error
+dotnet_diagnostic.CA2012.severity = error
+dotnet_diagnostic.CA2016.severity = error
 dotnet_diagnostic.CA2254.severity = warning
 dotnet_diagnostic.IDE0005.severity = suggestion
 dotnet_diagnostic.IDE0040.severity = warning

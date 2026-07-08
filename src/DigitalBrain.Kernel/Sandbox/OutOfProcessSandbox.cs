@@ -29,7 +29,9 @@ public sealed class OutOfProcessSandbox : ISandboxedExecutor
         // section for why this tier is both gated and OS-isolated rather than one or the other.
         var violations = CapabilityGate.FindViolations(compilation);
         if (violations.Count > 0)
+        {
             return new SandboxResult(false, "", "capability gate rejected: " + string.Join(", ", violations));
+        }
 
         var tempDirectory = Path.Combine(Path.GetTempPath(), assemblyName);
         Directory.CreateDirectory(tempDirectory);
@@ -39,7 +41,9 @@ public sealed class OutOfProcessSandbox : ISandboxedExecutor
 
             EmitResult emit;
             using (var stream = new FileStream(dllPath, FileMode.Create))
+            {
                 emit = compilation.Emit(stream, cancellationToken: ct);
+            }
 
             if (!emit.Success)
             {
@@ -65,12 +69,20 @@ public sealed class OutOfProcessSandbox : ISandboxedExecutor
     {
         var hostConfig = Directory.GetFiles(AppContext.BaseDirectory, "*.runtimeconfig.json").FirstOrDefault();
         if (hostConfig is not null)
+        {
             File.Copy(hostConfig, Path.ChangeExtension(dllPath, ".runtimeconfig.json"), overwrite: true);
+        }
     }
 
     private static void TryDelete(string directory)
     {
-        try { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
         catch (IOException) { /* best-effort temp cleanup */ }
         catch (UnauthorizedAccessException) { /* best-effort temp cleanup */ }
     }

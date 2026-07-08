@@ -240,9 +240,19 @@ public class KitExperienceTests
 
     private static UiWidgetTree FindByType(UiWidgetTree node, string type)
     {
-        if (node.Type == type) return node;
-        foreach (var child in node.Children ?? new List<UiWidgetTree>())
-            if (FindByType(child, type) is { } match) return match;
+        if (node.Type == type)
+        {
+            return node;
+        }
+
+        foreach (var child in node.Children ?? [])
+        {
+            if (FindByType(child, type) is { } match)
+            {
+                return match;
+            }
+        }
+
         return null!;
     }
 }

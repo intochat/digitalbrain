@@ -14,7 +14,7 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
 {
     protected override bool ShouldSubscribeToTimeline => true;
 
-    private List<RegisterReaction> _polls = new();
+    private List<RegisterReaction> _polls = [];
     private HashSet<string> _seen = new(StringComparer.OrdinalIgnoreCase); // simple dedup, enhanced from journals on replay
     private Dictionary<string, IGrainReminder> _reminders = new(StringComparer.OrdinalIgnoreCase);
 
@@ -22,7 +22,10 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
     {
         await base.OnActivateAsync(cancellationToken);
         EnsurePolls();
-        foreach (var p in _polls) await RegisterPollReminder(p);
+        foreach (var p in _polls)
+        {
+            await RegisterPollReminder(p, cancellationToken);
+        }
     }
 
     public override async Task OnNextAsync(Synapse item, StreamSequenceToken? token = null)
@@ -44,8 +47,9 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
     private static bool IsPollReaction(RegisterReaction r) =>
         !string.IsNullOrWhiteSpace(r.When) && r.When.Contains("poll", StringComparison.OrdinalIgnoreCase);
 
-    private async Task RegisterPollReminder(RegisterReaction p)
+    private async Task RegisterPollReminder(RegisterReaction p, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_reminders.ContainsKey(p.Id))
         {
             var rem = await this.RegisterOrUpdateReminder(p.Id, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(5));
@@ -58,21 +62,19 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
         Logger.LogInformation("Poll reminder {Name} ticked", reminderName);
         EnsurePolls();
         var reaction = _polls.FirstOrDefault(r => r.Id == reminderName);
-        if (reaction is null) return;
+        if (reaction is null)
+        {
+            return;
+        }
 
         var broker = ServiceProvider.GetService<ICapabilityBroker>();
         string content = string.Empty;
         string source = reaction.Target ?? reaction.When;
         try
         {
-            if (broker != null && !string.IsNullOrWhiteSpace(source) && (source.StartsWith("http", StringComparison.OrdinalIgnoreCase)))
-            {
-                content = await broker.HttpGetAsync(source);
-            }
-            else
-            {
-                content = $"<poll-source>{source}</poll-source>";
-            }
+            content = broker != null && !string.IsNullOrWhiteSpace(source) && (source.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                ? await broker.HttpGetAsync(source)
+                : $"<poll-source>{source}</poll-source>";
         }
         catch (Exception ex)
         {
@@ -93,14 +95,14 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
         }
     }
 
-    protected override async Task DispatchSynapse(Synapse synapse)
+    protected override async Task DispatchSynapse(Synapse synapse, CancellationToken cancellationToken = default)
     {
-        await base.DispatchSynapse(synapse);
+        await base.DispatchSynapse(synapse, cancellationToken);
         switch (synapse)
         {
             case RegisterReaction rr when IsPollReaction(rr):
                 _polls.Add(rr);
-                await RegisterPollReminder(rr);
+                await RegisterPollReminder(rr, cancellationToken);
                 break;
             case RemoveReaction rm:
                 _polls.RemoveAll(r => r.Id == rm.Id);

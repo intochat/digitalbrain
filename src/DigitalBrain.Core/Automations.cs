@@ -2,7 +2,6 @@ namespace DigitalBrain.Core;
 
 /// Lightweight reactive automations: data-driven reactions + small C# scripts.
 /// This is the fast path for self-writing, "when X then Y", personal apps, and glue.
-/// Complements (does not replace) full NeuroPack bundles for rich/marketplace content.
 /// All definitions are journaled and hot-activatable.
 
 [GenerateSerializer]
@@ -63,27 +62,12 @@ public record AutomationRun(
     [property: Id(1)] string? DedupKey,
     [property: Id(2)] int Attempt,
     [property: Id(3)] string Status,
-    [property: Id(4)] DateTimeOffset Timestamp)
+    [property: Id(4)] DateTimeOffset RanAt)
     : Synapse(nameof(AutomationRun), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.RemoveReaction")]
 public record RemoveReaction(string Id) : Synapse(nameof(RemoveReaction), DateTimeOffset.UtcNow);
-
-/// Thin promotion bridge (priority 6): take reactions/scripts and emit a seed that pack pipeline can consume.
-/// Does not replace full authoring; just crystallizes the lightweight def into NeuroPack form for distribution.
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.PromoteAutomationToPack")]
-public record PromoteAutomationToPack(
-    [property: Id(0)] string PackName,
-    [property: Id(1)] string Version,
-    [property: Id(2)] IReadOnlyList<string> ReactionIds,
-    [property: Id(3)] string? OwnerId = null)
-    : Synapse(nameof(PromoteAutomationToPack), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.AutomationPromoted")]
-public record AutomationPromoted(string PackName, string Version, string ManifestSummary) : Synapse(nameof(AutomationPromoted), DateTimeOffset.UtcNow);
 
 /// Audit synapse emitted on any trust bypass (R6). Never silent.
 [GenerateSerializer]
@@ -91,7 +75,7 @@ public record AutomationPromoted(string PackName, string Version, string Manifes
 public record AuditBypass(
     [property: Id(0)] string Kind,
     [property: Id(1)] string Details,
-    [property: Id(2)] DateTimeOffset When = default)
+    [property: Id(2)] DateTimeOffset When)
     : Synapse(nameof(AuditBypass), DateTimeOffset.UtcNow);
 
 [Alias("DigitalBrain.Core.IAutomationNeuron")]
@@ -105,7 +89,7 @@ public interface IAutomationNeuron : INeuron
     /// Trusted/bootstrap convenience: define a reaction + inline script body in one call.
     /// User/MCP-created executable C# must stage AutomationDefinitionStaged through the self-evolution rail first.
     [Alias("DefineReactionAsync")]
-    Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null);
+    Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null, CancellationToken cancellationToken = default);
 
     /// Get script source by id for library/reuse (documented for surfaces + MCP).
     [Alias("GetScriptCodeAsync")]
@@ -117,9 +101,6 @@ public interface IAutomationNeuron : INeuron
     [Alias("ListScriptLibraryAsync")]
     Task<IReadOnlyList<ScriptLibraryEntry>> ListScriptLibraryAsync();
 
-    /// Promote selected reactions to NeuroPack seed (thin bridge to heavy rail).
-    [Alias("PromoteToPackAsync")]
-    Task PromoteToPackAsync(string packName, string version, IReadOnlyList<string> reactionIds, string? ownerId = null);
 }
 
 [GenerateSerializer]

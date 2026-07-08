@@ -12,8 +12,6 @@ public enum SelfEvolutionRisk
 {
     /// <summary>No runtime behavior change (docs, telemetry, config defaults).</summary>
     None,
-    /// <summary>New behavior added via pack install/embodiment; existing behavior untouched.</summary>
-    PackInstall,
     /// <summary>Generated code executes in-process (foundry Run tier, automation scripts).</summary>
     InProcessCode,
     /// <summary>Apply requires restarting kernel resource(s) (deploy tier, host wiring).</summary>
@@ -45,7 +43,6 @@ public static class SelfEvolutionNeuronIds
 
 public static class SelfEvolutionApplyVia
 {
-    public const string MarketplaceInstall = "marketplace.install";
     public const string AutomationDefineReaction = "automation.define-reaction";
     public const string FoundryRun = "foundry.run";
     public const string FoundryDeploy = "foundry.deploy";

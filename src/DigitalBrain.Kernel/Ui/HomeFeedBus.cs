@@ -17,18 +17,32 @@ using DigitalBrain.Ui.Contracts.Ui;
 public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBus>? logger = null)
 {
     private const int MaxSeenEntries = 5_000;
+    private const int SubscriberCapacity = 1_024;
     private const string ProviderName = "HomeFeed";
     private const string StreamNamespace = "homefeed";
     private static readonly Guid UnaddressedKey = Guid.Empty;
-    private readonly HashSet<string> _seen = new();
+    private readonly HashSet<string> _seen = [];
     private readonly Queue<string> _seenOrder = new();
     private readonly object _seenLock = new();
 
-    public async Task BroadcastAsync(RfwCard card)
+    public async Task BroadcastAsync(RfwCard card, CancellationToken cancellationToken = default)
     {
-        if (IsDuplicate(card)) return;
+        var key = SeenKey(card);
+        if (!TryMarkSeen(key))
+        {
+            return;
+        }
 
-        await PublishAsync(card);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await PublishAsync(card, cancellationToken);
+        }
+        catch
+        {
+            ForgetSeen(key);
+            throw;
+        }
     }
 
     // Compatibility path for legacy synchronous callers. Prefer BroadcastAsync from async handlers/tests so
@@ -40,7 +54,11 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
 
     private async Task BroadcastAndLogAsync(RfwCard card)
     {
-        if (IsDuplicate(card)) return;
+        var key = SeenKey(card);
+        if (!TryMarkSeen(key))
+        {
+            return;
+        }
 
         try
         {
@@ -48,15 +66,22 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
         }
         catch (Exception ex)
         {
+            ForgetSeen(key);
             logger?.LogError(ex, "HomeFeed stream publish failed for clientId={ClientId}", card.ClientId);
         }
     }
 
     // One subscription per WatchHomeFeed gRPC call: the caller's own personal stream (only if it supplied a
     // clientId) plus the shared unaddressed stream every connection receives. DisposeAsync unsubscribes both.
-    public async Task<Subscription> SubscribeAsync(string? clientId)
+    public async Task<Subscription> SubscribeAsync(string? clientId, CancellationToken cancellationToken = default)
     {
-        var channel = Channel.CreateUnbounded<RfwCard>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        cancellationToken.ThrowIfCancellationRequested();
+        var channel = Channel.CreateBounded<RfwCard>(new BoundedChannelOptions(SubscriberCapacity)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = false
+        });
         var provider = clusterClient.GetStreamProvider(ProviderName);
 
         Task OnCard(RfwCard card, StreamSequenceToken _)
@@ -81,24 +106,47 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
             ? StreamId.Create(StreamNamespace, UnaddressedKey)
             : StreamId.Create(StreamNamespace, clientId);
 
-    private Task PublishAsync(RfwCard card) =>
+    private Task PublishAsync(RfwCard card, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return
         clusterClient
             .GetStreamProvider(ProviderName)
             .GetStream<RfwCard>(StreamIdFor(card.ClientId))
             .OnNextAsync(card);
+    }
 
-    private bool IsDuplicate(RfwCard card)
+    private bool TryMarkSeen(string key)
     {
-        var key = $"{card.CorrelationId}|{ContentHash(card)}";
         lock (_seenLock)
         {
-            if (!_seen.Add(key)) return true;
+            if (!_seen.Add(key))
+            {
+                return false;
+            }
+
             _seenOrder.Enqueue(key);
             while (_seenOrder.Count > MaxSeenEntries)
-                _seen.Remove(_seenOrder.Dequeue());
-            return false;
+            {
+                var evicted = _seenOrder.Dequeue();
+                if (!_seenOrder.Contains(evicted))
+                {
+                    _seen.Remove(evicted);
+                }
+            }
+            return true;
         }
     }
+
+    private void ForgetSeen(string key)
+    {
+        lock (_seenLock)
+        {
+            _seen.Remove(key);
+        }
+    }
+
+    private static string SeenKey(RfwCard card) => $"{card.CorrelationId}|{ContentHash(card)}";
 
     private static string ContentHash(RfwCard card) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{card.LibraryName}|{card.RootWidget}|{card.DataJson}")));
@@ -114,7 +162,10 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
         {
             await unaddressedHandle.UnsubscribeAsync();
             if (personalHandle is not null)
+            {
                 await personalHandle.UnsubscribeAsync();
+            }
+
             channel.Writer.TryComplete();
         }
     }

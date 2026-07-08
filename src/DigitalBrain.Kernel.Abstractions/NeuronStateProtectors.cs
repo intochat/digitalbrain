@@ -14,7 +14,10 @@ public sealed class AesNeuronStateProtector : INeuronStateProtector
     public AesNeuronStateProtector(byte[] key)
     {
         if (key.Length is not (16 or 24 or 32))
+        {
             throw new ArgumentException("AES key must be 128/192/256-bit.", nameof(key));
+        }
+
         _key = key;
     }
 
@@ -37,7 +40,9 @@ public sealed class AesNeuronStateProtector : INeuronStateProtector
     public byte[] Unprotect(byte[] ciphertext)
     {
         if (ciphertext.Length < NonceSize + TagSize)
+        {
             throw new ArgumentException("Ciphertext is too short.", nameof(ciphertext));
+        }
 
         var nonce = ciphertext.AsSpan(0, NonceSize);
         var tag = ciphertext.AsSpan(NonceSize, TagSize);

@@ -29,31 +29,40 @@ public class SalesforceConnector : IConnector
         RequiredConfigKeys: new[] { SalesforceClientFactory.ClientIdKey, SalesforceClientFactory.ClientSecretKey, SalesforceClientFactory.LoginUrlKey, SalesforceClientFactory.ApiVersionKey, SalesforceClientFactory.OAuthScopeKey, SalesforceClientFactory.RedirectUriKey },
         Scopes: new[] { "api", "refresh_token" });
 
-    public async Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null)
+    public async Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null, CancellationToken cancellationToken = default)
     {
         var scope = string.IsNullOrWhiteSpace(userScope) ? PackConfigScopes.App : userScope;
-        var values = await _store.GetAsync(scope, SalesforceClientFactory.PackName);
+        var values = await _store.GetAsync(scope, SalesforceClientFactory.PackName, cancellationToken);
         foreach (var key in Descriptor.RequiredConfigKeys)
         {
             if (!values.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
+            {
                 return new ConnectorConfigStatus(false, MissingKey: key, Message: $"Missing {key}");
+            }
         }
         return new ConnectorConfigStatus(true);
     }
 
-    public async Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null)
+    public async Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null, CancellationToken cancellationToken = default)
     {
-        var existing = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
+        var existing = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
         var values = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
 
         // props would come from clientIdHint or elsewhere; for simplicity use config
-        if (clientIdHint != null) values[SalesforceClientFactory.ClientIdKey] = clientIdHint;
+        if (clientIdHint != null)
+        {
+            values[SalesforceClientFactory.ClientIdKey] = clientIdHint;
+        }
 
         var configuredRedirectUri = _config?["DigitalBrain:Salesforce:RedirectUri"];
         if (!string.IsNullOrWhiteSpace(configuredRedirectUri))
+        {
             values[SalesforceClientFactory.RedirectUriKey] = configuredRedirectUri.Trim();
+        }
         else if (!values.ContainsKey(SalesforceClientFactory.RedirectUriKey))
+        {
             values[SalesforceClientFactory.RedirectUriKey] = SalesforceClientFactory.DefaultRedirectUri;
+        }
 
         if (!values.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var redirectUri) || string.IsNullOrWhiteSpace(redirectUri))
         {
@@ -80,18 +89,18 @@ public class SalesforceConnector : IConnector
             return new AuthChallenge(UrlOrForm: "error:" + ex.Message, IsForm: true);
         }
 
-        await _store.SetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, values);
+        await _store.SetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, values, cancellationToken);
         var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
         await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>
         {
             [SalesforceClientFactory.OAuthStateKey] = state,
             [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier
-        });
+        }, cancellationToken);
 
         return new AuthChallenge(url, IsForm: false, State: state);
     }
 
-    public async Task<AuthResult> CompleteAuthAsync(OAuthCallback callback)
+    public async Task<AuthResult> CompleteAuthAsync(OAuthCallback callback, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(callback.Error))
         {
@@ -108,8 +117,8 @@ public class SalesforceConnector : IConnector
         var user = new NeuronId(userId);
         var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
 
-        var appValues = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
-        var pending = await _store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName);
+        var appValues = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
+        var pending = await _store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, cancellationToken);
 
         if (!pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) || string.IsNullOrWhiteSpace(expectedState))
         {
@@ -123,24 +132,37 @@ public class SalesforceConnector : IConnector
 
         var redirectUri = appValues.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var stored) ? stored : callback.FallbackRedirectUri;
         if (string.IsNullOrWhiteSpace(redirectUri))
+        {
             redirectUri = SalesforceClientFactory.DefaultRedirectUri;
+        }
 
         try
         {
-            var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri);
+            var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri, cancellationToken: cancellationToken);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in tokenValues)
             {
                 userTokenValues[kv.Key] = kv.Value;
             }
 
-            if (appValues.TryGetValue(SalesforceClientFactory.ClientIdKey, out var cid)) userTokenValues[SalesforceClientFactory.ClientIdKey] = cid;
-            if (appValues.TryGetValue(SalesforceClientFactory.ClientSecretKey, out var cs)) userTokenValues[SalesforceClientFactory.ClientSecretKey] = cs;
+            if (appValues.TryGetValue(SalesforceClientFactory.ClientIdKey, out var cid))
+            {
+                userTokenValues[SalesforceClientFactory.ClientIdKey] = cid;
+            }
 
-            await _store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues);
-            await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
+            if (appValues.TryGetValue(SalesforceClientFactory.ClientSecretKey, out var cs))
+            {
+                userTokenValues[SalesforceClientFactory.ClientSecretKey] = cs;
+            }
+
+            await _store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues, cancellationToken);
+            await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>(), cancellationToken);
 
             return new AuthResult(true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -148,15 +170,19 @@ public class SalesforceConnector : IConnector
         }
     }
 
-    public async Task<ConnectionHealth> TestConnectionAsync(NeuronId user)
+    public async Task<ConnectionHealth> TestConnectionAsync(NeuronId user, CancellationToken cancellationToken = default)
     {
         try
         {
             // Use existing factory to create client (exercises merged scope/credentials).
-            var client = await _factory.CreateAsync(new NeuronScope(new UserId(user.Value), null));  // per-user scope for credential merge
+            var client = await _factory.CreateAsync(new NeuronScope(new UserId(user.Value), null), cancellationToken);  // per-user scope for credential merge
             // Cheap probe: SELECT Id FROM User LIMIT 1
-            await client.QueryAsync("SELECT Id FROM User LIMIT 1", CancellationToken.None);
+            await client.QueryAsync("SELECT Id FROM User LIMIT 1", cancellationToken);
             return new ConnectionHealth(Healthy: true, Detail: "Salesforce connection healthy (query succeeded)", Checked: DateTimeOffset.UtcNow);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

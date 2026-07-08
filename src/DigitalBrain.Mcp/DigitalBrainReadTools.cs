@@ -1,7 +1,7 @@
-using DigitalBrain.Core;
-using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
+using DigitalBrain.Core;
+using ModelContextProtocol.Server;
 
 namespace DigitalBrain.Mcp;
 
@@ -16,9 +16,9 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
     [McpServerTool(Name = "ping_digitalbrain"), Description("Simple ping tool to verify MCP connection to DigitalBrain server works. Always returns success.")]
     public static string PingDigitalBrain() => "DigitalBrain MCP connected successfully. Cluster interaction tools ready when kernel is running.";
 
-    [McpServerTool(Name = "get_timeline"), Description("Get recent timeline (synapses) for a neuron. Useful to see history, responses, published packs etc.")]
+    [McpServerTool(Name = "get_timeline"), Description("Get recent timeline (synapses) for a neuron. Useful to see history, responses, and automation activity.")]
     public async Task<string> GetTimeline(
-        [Description("Neuron ID to query, e.g. 'llm-main', 'market-main', 'status-main'")] string neuronId,
+        [Description("Neuron ID to query, e.g. 'ino-main', 'llm-main', 'status-main'")] string neuronId,
         [Description("Max number of recent entries")] int maxEntries = 10)
     {
         var neuron = ResolveNeuron(neuronId);
@@ -27,7 +27,7 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
         return string.Join("\n", lines);
     }
 
-    [McpServerTool(Name = "get_workbench_surfaces"), Description("Return dynamic UiSurface JSON for the Flutter workbench, derived from task, graph, marketplace, and timeline journals. Pass comma-separated taskIds when the caller knows active kernel tasks.")]
+    [McpServerTool(Name = "get_workbench_surfaces"), Description("Return dynamic UiSurface JSON for the Flutter workbench, derived from task, graph, chart, and timeline journals. Pass comma-separated taskIds when the caller knows active kernel tasks.")]
     public async Task<string> GetWorkbenchSurfaces(
         [Description("Comma-separated kernel task ids to include, if known.")] string taskIds = "",
         [Description("Max graph/timeline events to include")] int maxEvents = 20)
@@ -42,13 +42,10 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
         var graphTimeline = await ResolveNeuron("cluster-vis").GetTimelineAsync();
         var chartTimeline = await Grains.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();
 
-        var marketplaceTimeline = await Grains.GetGrain<IMarketplaceNeuron>("market-main").GetTimelineAsync();
-
         var timeline = taskTimelines
             .SelectMany(t => t.Timeline)
             .Concat(graphTimeline)
             .Concat(chartTimeline)
-            .Concat(marketplaceTimeline)
             .OrderBy(s => s.Timestamp)
             .TakeLast(maxEvents)
             .ToArray();
@@ -57,15 +54,5 @@ public sealed class DigitalBrainReadTools(IGrainFactory grains) : DigitalBrainTo
             taskTimelines, graphTimeline, timeline, maxEvents, chartTimeline);
 
         return JsonSerializer.Serialize(surfaces, SurfaceJsonOptions);
-    }
-
-    [McpServerTool(Name = "list_marketplace"), Description("List currently published packs from the marketplace.")]
-    public async Task<string> ListMarketplace()
-    {
-        var market = Grains.GetGrain<IMarketplaceNeuron>("market-main");
-        var packs = await GetPublishedPacksWithLocalSeedsAsync(market);
-        if (packs.Count == 0) return "No packs published yet.";
-        return string.Join("\n", packs.Select(p =>
-            $"- {p.Name}@{p.Version} (owner: {p.OwnerId}, private: {p.IsPrivate}, comm: {p.CommissionRate:P0})"));
     }
 }

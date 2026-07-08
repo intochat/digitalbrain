@@ -2,8 +2,8 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
-using DigitalBrain.TestKit;
 using DigitalBrain.Pack.Contracts;
+using DigitalBrain.TestKit;
 using DigitalBrain.Ui.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
@@ -224,7 +224,9 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         foreach (var child in tree.Children ?? [])
         {
             foreach (var found in FindNodes(child))
+            {
                 yield return found;
+            }
         }
     }
 
@@ -237,10 +239,14 @@ public class SalesforceAuthNeuronTests : NeuronTestBase
         void Collect(UiWidgetTree node)
         {
             if (node.Props.TryGetValue("text", out var text) && text is not null)
+            {
                 values.Add(text.ToString()!);
+            }
 
             foreach (var child in node.Children ?? [])
+            {
                 Collect(child);
+            }
         }
     }
 }

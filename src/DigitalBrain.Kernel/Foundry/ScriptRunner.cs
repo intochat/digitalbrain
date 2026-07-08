@@ -42,10 +42,14 @@ public static class ScriptRunner
         string scriptBody, Synapse input, NeuronId self, Func<Synapse, Task> fire, ICapabilityBroker? caps = null)
     {
         if (string.IsNullOrWhiteSpace(scriptBody))
+        {
             return Array.Empty<Synapse>();
+        }
 
         if (scriptBody.StartsWith("inline:", StringComparison.OrdinalIgnoreCase))
+        {
             scriptBody = scriptBody["inline:".Length..].Trim();
+        }
 
         // Gate before any execution (same as packs). Use Roslyn compilation for violation check.
         try
@@ -76,9 +80,13 @@ public static class ScriptRunner
 
             var emitted = new List<Synapse>();
             if (runResult.ReturnValue is IReadOnlyList<Synapse> list)
+            {
                 emitted.AddRange(list);
+            }
             else if (runResult.ReturnValue is Synapse single)
+            {
                 emitted.Add(single);
+            }
             // Note: side-effect calls to globals.Fire() already performed during RunAsync.
 
             // Side-effect Fires already executed via globals delegate during RunAsync.

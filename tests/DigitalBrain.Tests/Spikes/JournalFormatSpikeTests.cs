@@ -38,8 +38,10 @@ public class JournalFormatSpikeTests(OrleansJournalClusterFixture fixture)
     }
 }
 
+[Alias("DigitalBrain.Tests.Spikes.IJournalFormatProbeNeuron")]
 public interface IJournalFormatProbeNeuron : INeuron
 {
+    [Alias("GetActivationInstanceIdAsync")]
     Task<string> GetActivationInstanceIdAsync();
 }
 
@@ -55,7 +57,7 @@ public sealed class JournalFormatProbeNeuron(ILogger<JournalFormatProbeNeuron> l
         await base.OnActivateAsync(ct);
     }
 
-    public Task HandleAsync(SpikePayloadSynapse synapse) => Task.CompletedTask;
+    public Task HandleAsync(SpikePayloadSynapse synapse, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Task<string> GetActivationInstanceIdAsync() => Task.FromResult(_activationInstanceId);
 }

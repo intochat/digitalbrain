@@ -21,10 +21,17 @@ public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, Neuro
 
     public Task<string?> GetBoundBundleAsync() => Task.FromResult(BoundBundle());
 
-    public async Task HandleAsync(Signal signal)
+    public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
-        if (signal.IsBroadcast) return;
-        if (signal.Name != InboundName) return;
+        if (signal.IsBroadcast)
+        {
+            return;
+        }
+
+        if (signal.Name != InboundName)
+        {
+            return;
+        }
 
         var text = signal.Props.TryGetValue("text", out var t) ? t?.ToString() ?? "" : "";
         var chatId = signal.Props.TryGetValue("chatId", out var c) ? c : null;
@@ -36,7 +43,7 @@ public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, Neuro
             {
                 ["chatId"] = chatId,
                 ["text"] = $"You're now chatting with {bundleId}."
-            }));
+            }), cancellationToken);
             return;
         }
 
@@ -46,8 +53,8 @@ public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, Neuro
             var excelLike = "[{\"month\":\"Jan\",\"sales\":12},{\"month\":\"Feb\",\"sales\":18},{\"month\":\"Mar\",\"sales\":7}]";
             var vizReq = new VisualizeDataRequest("sales chart from telegram", excelLike, "bar", "tg-" + Guid.NewGuid().ToString("N")[..8]);
             var chart = GrainFactory.GetGrain<IDataVisualizationNeuron>("viz-default");
-            await chart.DeliverAsync(StampCurrent(vizReq)); // reuse chart -> surface delivered to flutter (shared StampCurrent for channel context)
-            await Broadcast(new Signal(ReplyName, new Dictionary<string, object?> { ["chatId"] = chatId, ["text"] = "Viz request sent (excel-like data). Check UI surface." }));
+            await chart.DeliverAsync(StampCurrent(vizReq), cancellationToken); // reuse chart -> surface delivered to flutter (shared StampCurrent for channel context)
+            await Broadcast(new Signal(ReplyName, new Dictionary<string, object?> { ["chatId"] = chatId, ["text"] = "Viz request sent (excel-like data). Check UI surface." }), cancellationToken);
             return;
         }
 
@@ -59,12 +66,12 @@ public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, Neuro
             // Generated neurons are always IGeneratedNeuron, so journal + deliver via that interface directly.
             var stamped = (signal with { Receiver = receiver }).Stamp(Self, CurrentCause);
             OutgoingJournal.Add(stamped);
-            await WriteStateAsync();
-            await GrainFactory.GetGrain<IGeneratedNeuron>(receiver.Value).DeliverAsync(stamped);
+            await WriteStateAsync(cancellationToken);
+            await GrainFactory.GetGrain<IGeneratedNeuron>(receiver.Value).DeliverAsync(stamped, cancellationToken);
         }
         else
         {
-            await Broadcast(signal);
+            await Broadcast(signal, cancellationToken);
         }
     }
 
@@ -90,10 +97,21 @@ public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, Neuro
         // "/startfoo" must NOT match — require exactly "/start" or "/start" followed by whitespace.
         if (trimmed.Length != StartPrefix.Length
             && (trimmed.Length < StartPrefix.Length || !trimmed.StartsWith(StartPrefix, StringComparison.Ordinal) || !char.IsWhiteSpace(trimmed[StartPrefix.Length])))
+        {
             return false;
-        if (trimmed.Length == StartPrefix.Length) return false; // bare "/start" with no payload
+        }
+
+        if (trimmed.Length == StartPrefix.Length)
+        {
+            return false; // bare "/start" with no payload
+        }
+
         var rest = trimmed[StartPrefix.Length..].Trim();
-        if (rest.Length == 0) return false;
+        if (rest.Length == 0)
+        {
+            return false;
+        }
+
         bundleId = rest;
         return true;
     }

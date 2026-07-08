@@ -26,7 +26,10 @@ public class NeuronBroadcastTests : NeuronTestBase
         {
             incoming = await receiver.GetIncomingTimelineAsync();
             if (incoming.Any(s => s is ProbeMessageSynapse d && d.Text == "channel-probe"))
+            {
                 return;
+            }
+
             await Task.Delay(50);
         }
 

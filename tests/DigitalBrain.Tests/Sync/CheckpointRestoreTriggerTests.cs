@@ -135,7 +135,9 @@ public class CheckpointRestoreTriggerTests : NeuronTestBase
         public override Task<Response<BlobDownloadResult>> DownloadContentAsync(CancellationToken cancellationToken = default)
         {
             if (!uploads.TryGetValue(name, out var bytes))
+            {
                 throw new InvalidOperationException($"No blob was uploaded under name '{name}' before this download attempt.");
+            }
 
             var result = BlobsModelFactory.BlobDownloadResult(content: new BinaryData(bytes));
             return Task.FromResult(Response.FromValue(result, null!));

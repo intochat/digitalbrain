@@ -45,12 +45,20 @@ public static class FoundryCompilation
         if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is string trusted)
         {
             foreach (var path in trusted.Split(Path.PathSeparator))
+            {
                 if (!string.IsNullOrWhiteSpace(path))
+                {
                     paths.Add(path);
+                }
+            }
         }
         foreach (var assembly in extraAssemblies)
+        {
             if (!assembly.IsDynamic && !string.IsNullOrWhiteSpace(assembly.Location))
+            {
                 paths.Add(assembly.Location);
+            }
+        }
 
         return paths.Select(path => (MetadataReference)MetadataReference.CreateFromFile(path)).ToList();
     }

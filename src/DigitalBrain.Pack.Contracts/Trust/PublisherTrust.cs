@@ -10,7 +10,11 @@ public static class PublisherTrust
 {
     public static bool IsTrusted(NeuroPack pack, IReadOnlyCollection<string> trustedPublisherKeys)
     {
-        if (!PackSignatureVerifier.VerifyPack(pack)) return false;
+        if (!PackSignatureVerifier.VerifyPack(pack))
+        {
+            return false;
+        }
+
         return trustedPublisherKeys.Contains(pack.AuthorPublicKeyBase64);
     }
 }

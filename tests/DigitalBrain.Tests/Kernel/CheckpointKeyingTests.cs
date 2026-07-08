@@ -12,7 +12,11 @@ public class CheckpointKeyingTests
     private static IConfiguration Config(params (string Key, string? Value)[] pairs)
     {
         var dict = new System.Collections.Generic.Dictionary<string, string?>();
-        foreach (var (key, value) in pairs) dict[key] = value;
+        foreach (var (key, value) in pairs)
+        {
+            dict[key] = value;
+        }
+
         return new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
     }
 

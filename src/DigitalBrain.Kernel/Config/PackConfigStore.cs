@@ -19,24 +19,27 @@ public sealed class PackConfigStore(
     private IDataProtector ValueProtector(string scope, string pack, string key)
         => dpProvider.CreateProtector(RootPurpose, scope, pack, key);
 
-    public async Task SetAsync(string scope, string pack, IReadOnlyDictionary<string, string> values)
+    public async Task SetAsync(string scope, string pack, IReadOnlyDictionary<string, string> values, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var encrypted = values.ToDictionary(
             kv => kv.Key,
             kv => ValueProtector(scope, pack, kv.Key).Protect(kv.Value));
 
         var blob = JsonSerializer.SerializeToUtf8Bytes(encrypted);
-        await backing.SaveAsync(scope, pack, blob);
+        await backing.SaveAsync(scope, pack, blob, cancellationToken);
     }
 
-    public async Task<IReadOnlyDictionary<string, string>> GetAsync(string scope, string pack)
+    public async Task<IReadOnlyDictionary<string, string>> GetAsync(string scope, string pack, CancellationToken cancellationToken = default)
     {
-        var blob = await backing.LoadAsync(scope, pack);
+        var blob = await backing.LoadAsync(scope, pack, cancellationToken);
         if (blob is null)
+        {
             return new Dictionary<string, string>();
+        }
 
         var encrypted = JsonSerializer.Deserialize<Dictionary<string, string>>(blob)
-            ?? new Dictionary<string, string>();
+            ?? [];
 
         // Decrypt per value: a value sealed under a now-unavailable key (rotated/recreated DataProtection key
         // ring, or written by a replica before the shared ring existed) must not poison the whole dictionary or
@@ -45,6 +48,7 @@ public sealed class PackConfigStore(
         var result = new Dictionary<string, string>(encrypted.Count);
         foreach (var (key, ciphertext) in encrypted)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 result[key] = ValueProtector(scope, pack, key).Unprotect(ciphertext);

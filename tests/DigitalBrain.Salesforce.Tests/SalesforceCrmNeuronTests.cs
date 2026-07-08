@@ -40,10 +40,14 @@ public class SalesforceCrmNeuronTests : NeuronTestBase
 
 internal sealed class FakeSalesforceApiClientFactory(ISalesforceApiClient client) : ISalesforceApiClientFactory
 {
-    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope)
+    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (client is RecordingSalesforceApiClient recording)
+        {
             recording.ScopesRequested.Add(scope);
+        }
+
         return Task.FromResult(client);
     }
 }

@@ -6,25 +6,27 @@ namespace DigitalBrain.Kernel.Foundry;
 [GrainType("digitalbrain.codegen.v1")]
 public class CodeGenNeuron(ILogger<CodeGenNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ICodeGenNeuron
 {
-    public async Task HandleAsync(GenerateCode cmd)
+    public async Task HandleAsync(GenerateCode cmd, CancellationToken cancellationToken = default)
     {
-        var source = await GenerateSourceAsync(cmd);
+        var source = await GenerateSourceAsync(cmd, cancellationToken);
         var refs = new[] { "System.Runtime", "DigitalBrain.Core" };
-        await FireAsync(new CodeGenerated(cmd.Spec, source, cmd.Tier, refs));
+        await FireAsync(new CodeGenerated(cmd.Spec, source, cmd.Tier, refs), cancellationToken);
     }
 
-    private async Task<string> GenerateSourceAsync(GenerateCode cmd)
+    private async Task<string> GenerateSourceAsync(GenerateCode cmd, CancellationToken cancellationToken)
     {
         var chat = ServiceProvider.GetService<IChatClient>();
         if (chat is null)
+        {
             return FallbackSource(cmd);
+        }
 
         var system = cmd.Tier == TargetTier.Run
             ? "You generate ONE self-contained C# class with: public static object Run(System.Collections.Generic.IReadOnlyDictionary<string,object?> input). No I/O outside given input. Respond ONLY with a ```csharp block."
             : "You generate ONE Orleans grain neuron deriving from DigitalBrain.Kernel.Neuron with [GrainType] and an IHandle<T> handler. Respond ONLY with a ```csharp block.";
         var prompt = system + "\n\nSpec: " + cmd.Spec + "\nHints: " + cmd.Hints;
 
-        var response = await chat.GetResponseAsync(prompt);
+        var response = await chat.GetResponseAsync(prompt, cancellationToken: cancellationToken);
         var extracted = ExtractCode(response.Text);
         return string.IsNullOrWhiteSpace(extracted) ? FallbackSource(cmd) : extracted;
     }
@@ -35,13 +37,20 @@ public class CodeGenNeuron(ILogger<CodeGenNeuron> logger, NeuronJournals journal
 
     private static string ExtractCode(string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return "";
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "";
+        }
+
         var start = text.IndexOf("```csharp", StringComparison.OrdinalIgnoreCase);
         if (start >= 0)
         {
             start += 9;
             var end = text.IndexOf("```", start, StringComparison.Ordinal);
-            if (end > start) return text.Substring(start, end - start).Trim();
+            if (end > start)
+            {
+                return text.Substring(start, end - start).Trim();
+            }
         }
         return text.Trim();
     }

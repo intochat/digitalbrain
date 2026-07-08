@@ -16,7 +16,9 @@ public sealed class SalesforceAppConfigSeeder(
     {
         var appConfig = SalesforceAppConfig.From(configuration);
         if (!appConfig.HasAnyValue)
+        {
             return;
+        }
 
         if (!appConfig.HasConnectedAppConfig)
         {
@@ -26,7 +28,7 @@ public sealed class SalesforceAppConfigSeeder(
         }
 
         var existing = await store
-            .GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName)
+            .GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, cancellationToken)
             .ConfigureAwait(false);
         var merged = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
 
@@ -47,10 +49,12 @@ public sealed class SalesforceAppConfigSeeder(
         changed |= SetIfConfigured(merged, SalesforceClientFactory.RedirectUriKey, appConfig.RedirectUri);
 
         if (!changed)
+        {
             return;
+        }
 
         await store
-            .SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged)
+            .SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged, cancellationToken)
             .ConfigureAwait(false);
 
         logger.LogInformation("Seeded Salesforce Connected App configuration from host configuration.");
@@ -61,7 +65,9 @@ public sealed class SalesforceAppConfigSeeder(
     private static bool SetIfConfigured(IDictionary<string, string> values, string key, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             return false;
+        }
 
         var trimmed = value.Trim();
         if (values.TryGetValue(key, out var existing) &&

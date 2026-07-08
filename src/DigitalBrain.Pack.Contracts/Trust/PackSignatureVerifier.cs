@@ -4,7 +4,7 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Core.Trust;
 
-// ECDSA-nistP256 + SHA256 signing/verification for marketplace packs. BCL-only (no BouncyCastle).
+// ECDSA-nistP256 + SHA256 signing/verification for legacy typed bundles. BCL-only (no BouncyCastle).
 // Ported from digitalbrain BundleSignatureVerifier; surfaces base64 strings because NeuroPack and the
 // publish/install synapses carry strings and serialize trivially over Orleans + the JSON journal.
 public static class PackSignatureVerifier
@@ -46,7 +46,10 @@ public static class PackSignatureVerifier
     public static bool VerifyPack(NeuroPack pack)
     {
         if (string.IsNullOrEmpty(pack.AuthorPublicKeyBase64) || string.IsNullOrEmpty(pack.SignatureBase64))
+        {
             return false;
+        }
+
         var content = CanonicalContent(pack.Name, pack.Version, pack.Code, pack.AuthorPublicKeyBase64);
         return Verify(content, pack.SignatureBase64, pack.AuthorPublicKeyBase64);
     }

@@ -14,7 +14,7 @@ public record PackConfigField(
     [property: Id(4)] string? DependsOnKey = null,
     [property: Id(5)] string? DependsOnValue = null);
 
-// The contract a typed-C# marketplace pack implements to embody behavior in the already-running kernel.
+// The contract a legacy typed-C# bundle implements to embody behavior in the already-running kernel.
 // Pure and synchronous: the capability is Roslyn-compiled into a collectible AssemblyLoadContext under the
 // CapabilityGate and dispatched to by the host GeneratedNeuron. This is the typed-C# replacement for the old
 // LLM "personality" stub - the pack IS C#, never .ino. A pack assembly references only stable protocol packages.

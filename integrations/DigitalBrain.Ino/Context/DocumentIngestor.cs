@@ -15,15 +15,22 @@ public static class TextChunker
         {
             var words = paragraph.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
             if (current.Count > 0 && current.Count + words.Length > maxWords)
+            {
                 Flush(chunks, current);
+            }
 
             current.AddRange(words);
             if (current.Count >= targetWords)
+            {
                 Flush(chunks, current);
+            }
         }
 
         if (current.Count > 0)
+        {
             chunks.Add(string.Join(' ', current));
+        }
+
         return chunks;
     }
 
@@ -44,7 +51,10 @@ public sealed class DocumentIngestor(IEmbeddingGenerator<string, Embedding<float
     public async Task<int> IngestAsync(string collection, string documentId, string text, CancellationToken ct = default)
     {
         var chunks = TextChunker.Chunk(text);
-        if (chunks.Count == 0) return 0;
+        if (chunks.Count == 0)
+        {
+            return 0;
+        }
 
         var embeddings = await embedder.GenerateAsync(chunks, cancellationToken: ct);
         var dimension = embeddings.Count > 0 ? embeddings[0].Vector.Length : 384;

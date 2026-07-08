@@ -9,5 +9,5 @@ namespace DigitalBrain.Google;
 public interface IGoogleAuthNeuron : INeuron, IHandle<Signal>
 {
     [Alias("CompleteOAuthAsync")]
-    Task<GoogleOAuthCallbackResult> CompleteOAuthAsync(GoogleOAuthCallback callback);
+    Task<GoogleOAuthCallbackResult> CompleteOAuthAsync(GoogleOAuthCallback callback, CancellationToken cancellationToken = default);
 }

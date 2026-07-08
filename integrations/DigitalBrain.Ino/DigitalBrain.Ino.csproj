@@ -17,7 +17,6 @@
     <ProjectReference Include="..\..\integrations\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Marketplace.Contracts\DigitalBrain.Marketplace.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

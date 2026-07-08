@@ -120,7 +120,9 @@ internal static class OtlpProxyEndpoints
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/grpc");
         request.Headers.TryAddWithoutValidation("te", "trailers");
         foreach (var (key, value) in extraHeaders)
+        {
             request.Headers.TryAddWithoutValidation(key, value);
+        }
 
         try
         {
@@ -172,7 +174,9 @@ internal static class OtlpProxyEndpoints
         };
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/x-protobuf");
         foreach (var (key, value) in extraHeaders)
+        {
             request.Headers.TryAddWithoutValidation(key, value);
+        }
 
         try
         {
@@ -208,7 +212,9 @@ internal static class OtlpProxyEndpoints
             var flutterLogger = services.GetRequiredService<ILoggerFactory>().CreateLogger("digitalbrain-flutter");
 
             foreach (var resourceLog in document.RootElement.GetProperty("resourceLogs").EnumerateArray())
+            {
                 foreach (var scopeLog in resourceLog.GetProperty("scopeLogs").EnumerateArray())
+                {
                     foreach (var record in scopeLog.GetProperty("logRecords").EnumerateArray())
                     {
                         var body = record.TryGetProperty("body", out var bodyElement)
@@ -230,6 +236,8 @@ internal static class OtlpProxyEndpoints
 
                         flutterLogger.Log(level, "[flutter] {Message}", body);
                     }
+                }
+            }
 
             context.Response.StatusCode = 200;
         }
@@ -241,14 +249,19 @@ internal static class OtlpProxyEndpoints
 
     private static IReadOnlyDictionary<string, string> ParseHeaders(string? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return EmptyHeaders;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return EmptyHeaders;
+        }
 
         var headers = new Dictionary<string, string>();
         foreach (var pair in raw.Split(',', StringSplitOptions.RemoveEmptyEntries))
         {
             var index = pair.IndexOf('=');
             if (index > 0)
+            {
                 headers[pair[..index].Trim()] = pair[(index + 1)..].Trim();
+            }
         }
 
         return headers;

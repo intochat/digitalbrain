@@ -59,11 +59,15 @@ public static class CapabilityGate
             foreach (var node in root.DescendantNodes())
             {
                 if (node is not (IdentifierNameSyntax or MemberAccessExpressionSyntax or ObjectCreationExpressionSyntax))
+                {
                     continue;
+                }
 
                 var symbol = model.GetSymbolInfo(node).Symbol;
                 if (symbol is null)
+                {
                     continue;
+                }
 
                 // A bare namespace qualifier (the "System" segment of "System.Diagnostics.Process.Start",
                 // a "using System.Net.Http;" import, or the pack's own "namespace Foo.Bar;" declaration) is
@@ -71,7 +75,9 @@ public static class CapabilityGate
                 // FoundryCompilation's implicit-usings prelude (which always brings System.Net.Http and
                 // System.IO into scope) would flag every single compiled snippet.
                 if (symbol.Kind == SymbolKind.Namespace)
+                {
                     continue;
+                }
 
                 // Symbols declared inside the pack's own single-file compilation — locals, parameters,
                 // fields, and the pack's own types/members — aren't external capability usage. Referencing
@@ -79,7 +85,9 @@ public static class CapabilityGate
                 // the pack's own class for these, which would otherwise produce a nonsense fullName (e.g.
                 // "TelegramResponderNeuron.chatId") that fails every allowlist entry.
                 if (SymbolEqualityComparer.Default.Equals(symbol.ContainingAssembly, compilation.Assembly))
+                {
                     continue;
+                }
 
                 var fullName = symbol.ContainingType is null
                     ? symbol.ToDisplayString(FullyQualifiedNoAliasFormat)

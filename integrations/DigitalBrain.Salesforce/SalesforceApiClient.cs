@@ -9,7 +9,9 @@ public sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiClie
     public async Task<string[]> QueryAsync(string soql, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(soql))
+        {
             throw new ArgumentException("SOQL query is required.", nameof(soql));
+        }
 
         ct.ThrowIfCancellationRequested();
         try

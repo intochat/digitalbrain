@@ -10,15 +10,18 @@ public class TabularDataParserTests
         using var workbook = new XLWorkbook();
         var ws = workbook.Worksheets.Add("Sheet1");
         for (var col = 0; col < headers.Length; col++)
+        {
             ws.Cell(1, col + 1).Value = headers[col];
+        }
 
         for (var r = 0; r < rows.Length; r++)
+        {
             for (var c = 0; c < rows[r].Length; c++)
             {
                 var value = rows[r][c];
-                if (value is double d) ws.Cell(r + 2, c + 1).Value = d;
-                else ws.Cell(r + 2, c + 1).Value = value.ToString();
+                ws.Cell(r + 2, c + 1).Value = value is double d ? (XLCellValue)d : (XLCellValue)value.ToString();
             }
+        }
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);

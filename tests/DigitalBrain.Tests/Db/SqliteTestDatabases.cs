@@ -42,7 +42,9 @@ internal static class SqliteTestDatabases
         try
         {
             if (File.Exists(path))
+            {
                 File.Delete(path);
+            }
         }
         catch (IOException)
         {

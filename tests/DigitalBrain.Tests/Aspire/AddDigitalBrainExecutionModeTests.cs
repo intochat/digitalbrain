@@ -1,5 +1,5 @@
-using Aspire.Hosting.Testing;
 using System.Reflection;
+using Aspire.Hosting.Testing;
 
 namespace DigitalBrain.Tests.Aspire;
 

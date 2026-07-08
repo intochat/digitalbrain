@@ -1,4 +1,3 @@
-using DigitalBrain.Core;
 using DigitalBrain.Kernel.Foundry;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -66,17 +65,4 @@ public class CapabilityGateTests
         Assert.Empty(violations);
     }
 
-    [Theory]
-    [MemberData(nameof(AllSeededPackCodes))]
-    public void Every_Seeded_Pack_Compiles_Clean_Under_The_New_Allowlist(string packName, string code)
-    {
-        var compilation = CompileSnippet(code);
-        var violations = CapabilityGate.FindViolations(compilation);
-        Assert.True(violations.Count == 0, $"Pack '{packName}' has capability violations: {string.Join(", ", violations)}");
-    }
-
-    public static IEnumerable<object[]> AllSeededPackCodes() =>
-        MarketplaceSeeds.LocalUiPacks
-            .Where(p => !string.IsNullOrWhiteSpace(p.Code))
-            .Select(p => new object[] { p.Name, p.Code });
 }

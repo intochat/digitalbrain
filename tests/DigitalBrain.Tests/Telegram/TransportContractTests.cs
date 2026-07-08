@@ -1,6 +1,6 @@
 extern alias TransportAssembly;
-
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Google.Protobuf;
 using Grpc.Core;
 using Microsoft.AspNetCore.Builder;
@@ -8,12 +8,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using System.Text.Json;
-using Transport = TransportAssembly::DigitalBrain.Telegram.Transport;
 // The gateway client + SynapseEnvelope used here MUST be the transport's generated
 // copy (not the kernel's), so the forwarder/dispatcher type signatures line up.
 using DigitalBrainGateway = TransportAssembly::DigitalBrain.Runtime.Grpc.DigitalBrainGateway;
 using SynapseEnvelope = TransportAssembly::DigitalBrain.Runtime.Grpc.SynapseEnvelope;
+using Transport = TransportAssembly::DigitalBrain.Telegram.Transport;
 
 namespace DigitalBrain.Tests.Telegram;
 
@@ -154,7 +153,7 @@ public sealed class TransportContractTests
 
     private sealed class RecordingGatewayClient : DigitalBrainGateway.DigitalBrainGatewayClient
     {
-        public List<SynapseEnvelope> Sent { get; } = new();
+        public List<SynapseEnvelope> Sent { get; } = [];
 
         public override AsyncUnaryCall<SynapseEnvelope> SendAsync(
             SynapseEnvelope request, CallOptions options)
@@ -164,7 +163,7 @@ public sealed class TransportContractTests
                 Task.FromResult(request),
                 Task.FromResult(new Metadata()),
                 () => Status.DefaultSuccess,
-                () => new Metadata(),
+                () => [],
                 () => { });
         }
     }
@@ -184,12 +183,15 @@ public sealed class TransportContractTests
             LastInternalKeyHeader = options.Headers?.GetValue("x-internal-key");
             var reply = new TransportAssembly::DigitalBrain.Runtime.Grpc.PackConfigReply();
             foreach (var (k, v) in values)
+            {
                 reply.Values[k] = v;
+            }
+
             return new AsyncUnaryCall<TransportAssembly::DigitalBrain.Runtime.Grpc.PackConfigReply>(
                 Task.FromResult(reply),
                 Task.FromResult(new Metadata()),
                 () => Status.DefaultSuccess,
-                () => new Metadata(),
+                () => [],
                 () => { });
         }
     }
@@ -266,7 +268,9 @@ internal sealed class FakeTelegramServer : IAsyncDisposable
     {
         var match = _calls.FirstOrDefault(c => string.Equals(c.Method, method, StringComparison.OrdinalIgnoreCase));
         if (match is not null)
+        {
             return match;
+        }
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(timeout);
@@ -275,7 +279,9 @@ internal sealed class FakeTelegramServer : IAsyncDisposable
             await foreach (var call in _callChannel.Reader.ReadAllAsync(timeoutCts.Token))
             {
                 if (string.Equals(call.Method, method, StringComparison.OrdinalIgnoreCase))
+                {
                     return call;
+                }
             }
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)

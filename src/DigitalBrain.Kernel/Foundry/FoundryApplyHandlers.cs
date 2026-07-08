@@ -11,33 +11,37 @@ public sealed class FoundryRunApplyHandler(IGrainFactory grains) : ISelfEvolutio
     public async Task<SelfEvolutionApplyResult> ApplyAsync(SelfEvolutionProposal proposal, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var staged = await FindStagedAsync(proposal);
+        var staged = await FindStagedAsync(proposal, ct);
         if (staged is null)
         {
             return Failed(proposal, $"No staged foundry run was found for proposal '{proposal.ProposalId}'.");
         }
 
         var runner = grains.GetGrain<ICodeRunNeuron>("foundry-coderun");
-        await runner.FireAsync(new RunGeneratedCode(staged.Source, Refs: staged.RequiredRefs));
-        var runResult = (await runner.GetOutgoingTimelineAsync()).OfType<CodeRunResult>().LastOrDefault();
+        await runner.FireAsync(new RunGeneratedCode(staged.Source, Refs: staged.RequiredRefs), ct);
+        var runResult = (await runner.GetOutgoingTimelineAsync(ct)).OfType<CodeRunResult>().LastOrDefault();
 
         var foundry = grains.GetGrain<ICodeFoundryLoopNeuron>(staged.FoundryNeuronId);
         if (runResult is { Success: true })
         {
-            await foundry.FireAsync(new FoundryCompleted(staged.Spec, staged.Tier, runResult.Output, Applied: true));
+            await foundry.FireAsync(new FoundryCompleted(staged.Spec, staged.Tier, runResult.Output, Applied: true), ct);
             return new SelfEvolutionApplyResult(proposal.ProposalId, proposal.ApplyVia, Succeeded: true, runResult.Output, staged.CheckpointId);
         }
 
         var reason = runResult?.Error ?? "run-failed";
-        await foundry.FireAsync(new FoundryRolledBack(staged.Spec, reason, staged.CheckpointId));
+        await foundry.FireAsync(new FoundryRolledBack(staged.Spec, reason, staged.CheckpointId), ct);
         return Failed(proposal, reason, staged.CheckpointId);
     }
 
-    private async Task<FoundryApplyStaged?> FindStagedAsync(SelfEvolutionProposal proposal)
+    private async Task<FoundryApplyStaged?> FindStagedAsync(SelfEvolutionProposal proposal, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(proposal.Origin)) return null;
+        if (string.IsNullOrWhiteSpace(proposal.Origin))
+        {
+            return null;
+        }
+
         var foundry = grains.GetGrain<ICodeFoundryLoopNeuron>(proposal.Origin);
-        return (await foundry.GetOutgoingTimelineAsync())
+        return (await foundry.GetOutgoingTimelineAsync(ct))
             .OfType<FoundryApplyStaged>()
             .LastOrDefault(staged => string.Equals(staged.ProposalId, proposal.ProposalId, StringComparison.Ordinal));
     }
@@ -54,33 +58,37 @@ public sealed class FoundryDeployApplyHandler(IGrainFactory grains) : ISelfEvolu
     public async Task<SelfEvolutionApplyResult> ApplyAsync(SelfEvolutionProposal proposal, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var staged = await FindStagedAsync(proposal);
+        var staged = await FindStagedAsync(proposal, ct);
         if (staged is null)
         {
             return Failed(proposal, $"No staged foundry deploy was found for proposal '{proposal.ProposalId}'.");
         }
 
         var deployer = grains.GetGrain<ICodeDeployNeuron>("foundry-codedeploy");
-        await deployer.FireAsync(new DeployGeneratedCode(staged.Source, staged.ModuleName, staged.RequiredRefs, staged.CheckpointId));
-        var built = (await deployer.GetOutgoingTimelineAsync()).OfType<CodeBuilt>().LastOrDefault(b => b.ModuleName == staged.ModuleName);
+        await deployer.FireAsync(new DeployGeneratedCode(staged.Source, staged.ModuleName, staged.RequiredRefs, staged.CheckpointId), ct);
+        var built = (await deployer.GetOutgoingTimelineAsync(ct)).OfType<CodeBuilt>().LastOrDefault(b => b.ModuleName == staged.ModuleName);
 
         var foundry = grains.GetGrain<ICodeFoundryLoopNeuron>(staged.FoundryNeuronId);
         if (built is { Success: true })
         {
             var outcome = "restart-requested:" + staged.ModuleName;
-            await foundry.FireAsync(new FoundryCompleted(staged.Spec, staged.Tier, outcome, Applied: true));
+            await foundry.FireAsync(new FoundryCompleted(staged.Spec, staged.Tier, outcome, Applied: true), ct);
             return new SelfEvolutionApplyResult(proposal.ProposalId, proposal.ApplyVia, Succeeded: true, outcome, staged.CheckpointId);
         }
 
-        await foundry.FireAsync(new FoundryRolledBack(staged.Spec, "build", staged.CheckpointId));
+        await foundry.FireAsync(new FoundryRolledBack(staged.Spec, "build", staged.CheckpointId), ct);
         return Failed(proposal, built?.BuildLog ?? "build", staged.CheckpointId);
     }
 
-    private async Task<FoundryApplyStaged?> FindStagedAsync(SelfEvolutionProposal proposal)
+    private async Task<FoundryApplyStaged?> FindStagedAsync(SelfEvolutionProposal proposal, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(proposal.Origin)) return null;
+        if (string.IsNullOrWhiteSpace(proposal.Origin))
+        {
+            return null;
+        }
+
         var foundry = grains.GetGrain<ICodeFoundryLoopNeuron>(proposal.Origin);
-        return (await foundry.GetOutgoingTimelineAsync())
+        return (await foundry.GetOutgoingTimelineAsync(ct))
             .OfType<FoundryApplyStaged>()
             .LastOrDefault(staged => string.Equals(staged.ProposalId, proposal.ProposalId, StringComparison.Ordinal));
     }

@@ -7,7 +7,7 @@ namespace DigitalBrain.Kernel.Gateway;
 public static class GatewayPayload
 {
     public static Dictionary<string, object?> CaseInsensitive(Dictionary<string, object?>? source) =>
-        new(source ?? new(), StringComparer.OrdinalIgnoreCase);
+        new(source ?? [], StringComparer.OrdinalIgnoreCase);
 
     // STJ deserializes JSON numbers/booleans as JsonElement when the target type is object?.
     // Unwrap them to CLR primitives so Signal consumers read int/long/double/bool/string directly.
@@ -25,9 +25,11 @@ public static class GatewayPayload
     {
         var payloadJson = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
         if (string.IsNullOrWhiteSpace(payloadJson))
+        {
             return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        }
 
-        var raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? new();
+        var raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? [];
         return NormalizeJsonProps(raw);
     }
 

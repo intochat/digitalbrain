@@ -22,7 +22,9 @@ public sealed class TelegramBotAccessor(TelegramTransportOptions options)
     private static ITelegramBotClient? Build(string token, string serverAddress)
     {
         if (string.IsNullOrWhiteSpace(token))
+        {
             return null;
+        }
 
         return string.IsNullOrWhiteSpace(serverAddress)
             ? new TelegramBotClient(token)

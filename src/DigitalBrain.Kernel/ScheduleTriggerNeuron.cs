@@ -14,7 +14,7 @@ public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, Neuron
 {
     protected override bool ShouldSubscribeToTimeline => true;
 
-    private List<RegisterReaction> _scheduled = new();
+    private List<RegisterReaction> _scheduled = [];
     private Dictionary<string, IGrainReminder> _reminders = new(StringComparer.OrdinalIgnoreCase);
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -23,7 +23,7 @@ public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, Neuron
         EnsureScheduled();
         foreach (var r in _scheduled)
         {
-            await RegisterReminderForReaction(r);
+            await RegisterReminderForReaction(r, cancellationToken);
         }
     }
 
@@ -38,7 +38,9 @@ public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, Neuron
     {
         var removes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var rm in OutgoingJournal.Concat(IncomingJournal).OfType<RemoveReaction>())
+        {
             removes.Add(rm.Id);
+        }
 
         _scheduled = OutgoingJournal.Concat(IncomingJournal)
             .OfType<RegisterReaction>()
@@ -46,8 +48,9 @@ public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, Neuron
             .ToList();
     }
 
-    private async Task RegisterReminderForReaction(RegisterReaction r)
+    private async Task RegisterReminderForReaction(RegisterReaction r, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_reminders.ContainsKey(r.Id))
         {
             // Due/period fixed for v1; cron parse would compute next due here (e.g. via NCrontab or custom).
@@ -72,15 +75,15 @@ public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, Neuron
         await FireAsync(new Signal("trigger.schedule." + reminderName, new Dictionary<string, object?> { ["reactionId"] = reminderName }));
     }
 
-    protected override async Task DispatchSynapse(Synapse synapse)
+    protected override async Task DispatchSynapse(Synapse synapse, CancellationToken cancellationToken = default)
     {
-        await base.DispatchSynapse(synapse);
+        await base.DispatchSynapse(synapse, cancellationToken);
 
         switch (synapse)
         {
             case RegisterReaction rr when !string.IsNullOrWhiteSpace(rr.Schedule):
                 _scheduled.Add(rr);
-                await RegisterReminderForReaction(rr);
+                await RegisterReminderForReaction(rr, cancellationToken);
                 break;
             case RemoveReaction rm:
                 _scheduled.RemoveAll(r => r.Id == rm.Id);

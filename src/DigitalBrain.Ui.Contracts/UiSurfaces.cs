@@ -1,7 +1,7 @@
 namespace DigitalBrain.Ui.Contracts;
 
-using DigitalBrain.Core;
 using System.Text.Json.Nodes;
+using DigitalBrain.Core;
 
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.UiSurface")]
@@ -21,8 +21,15 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
             ["rootWidget"] = rootWidget,
             ["dataJson"] = dataJson
         };
-        if (source is not null) props["source"] = source;
-        if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
+        if (source is not null)
+        {
+            props["source"] = source;
+        }
+
+        if (emitter is not null)
+        {
+            props[UiSurfaceKeys.Emitter] = emitter;
+        }
 
         return new UiSurface(RfwKind, props);
     }
@@ -41,7 +48,7 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
         string? emitter = null)
     {
         var experienceRef = $"{pack}/{experienceId}";
-        var payload = JsonNode.Parse(dataJson) as JsonObject ?? new JsonObject();
+        var payload = JsonNode.Parse(dataJson) as JsonObject ?? [];
         payload["activeExperience"] = experienceRef;
         payload["experienceId"] = experienceId;
         payload["surfaceId"] = surfaceId;
@@ -55,8 +62,15 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
             ["experienceId"] = experienceId,
             [UiSurfaceKeys.SurfaceId] = surfaceId,
         };
-        if (title is not null) props[UiSurfaceKeys.Title] = title;
-        if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
+        if (title is not null)
+        {
+            props[UiSurfaceKeys.Title] = title;
+        }
+
+        if (emitter is not null)
+        {
+            props[UiSurfaceKeys.Emitter] = emitter;
+        }
 
         return new UiSurface(RfwKind, props);
     }
@@ -69,8 +83,15 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
         {
             ["tree"] = tree
         };
-        if (title is not null) props[UiSurfaceKeys.Title] = title;
-        if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
+        if (title is not null)
+        {
+            props[UiSurfaceKeys.Title] = title;
+        }
+
+        if (emitter is not null)
+        {
+            props[UiSurfaceKeys.Emitter] = emitter;
+        }
 
         return new UiSurface(WidgetTreeKind, props);
     }
@@ -92,8 +113,16 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
             ["experienceId"] = experienceId,
             [UiSurfaceKeys.SurfaceId] = surfaceId,
         };
-        if (title is not null) props[UiSurfaceKeys.Title] = title;
-        if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
+        if (title is not null)
+        {
+            props[UiSurfaceKeys.Title] = title;
+        }
+
+        if (emitter is not null)
+        {
+            props[UiSurfaceKeys.Emitter] = emitter;
+        }
+
         return new UiSurface(WidgetTreeKind, props);
     }
 }
@@ -139,15 +168,27 @@ public static class NeuronUiKit
     public static UiWidgetTree BuildMenuItem(string label, string? targetSurfaceKind = null, IReadOnlyDictionary<string, object?>? action = null)
     {
         var p = new Dictionary<string, object?> { ["label"] = label };
-        if (targetSurfaceKind is not null) p["targetSurfaceKind"] = targetSurfaceKind;
-        if (action is not null) p["action"] = action;
+        if (targetSurfaceKind is not null)
+        {
+            p["targetSurfaceKind"] = targetSurfaceKind;
+        }
+
+        if (action is not null)
+        {
+            p["action"] = action;
+        }
+
         return new UiWidgetTree(MenuItem, p);
     }
 
     public static UiWidgetTree BuildHeader(string title, string? subtitle = null)
     {
         var p = new Dictionary<string, object?> { ["title"] = title };
-        if (subtitle is not null) p["subtitle"] = subtitle;
+        if (subtitle is not null)
+        {
+            p["subtitle"] = subtitle;
+        }
+
         return new UiWidgetTree(Header, p);
     }
 
@@ -366,8 +407,6 @@ public static class UiSurfaceKinds
     public const string TaskWindow = "task-window";
     public const string TaskManager = "task-manager";
     public const string UserInput = "user-input";
-    public const string MarketplaceList = "marketplace-list";
-    public const string InstalledBundles = "installed-bundles";
     public const string Workspace = "workspace";
     public const string Timeline = "timeline";
     public const string DataChart = "data-chart";
@@ -440,7 +479,7 @@ public record AuthButtonSurface(
 });
 
 /// <summary>
-/// Simple list surface for tasks / marketplace items etc.
+/// Simple list surface for task and workflow items.
 /// </summary>
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.ListSurface")]

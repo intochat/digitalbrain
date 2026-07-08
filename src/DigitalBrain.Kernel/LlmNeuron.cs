@@ -5,20 +5,20 @@ namespace DigitalBrain.Kernel;
 [GrainType("digitalbrain.llm.qwen.v1")]
 public class LlmNeuron(ILogger<LlmNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ILlmNeuron
 {
-    public async Task HandleAsync(LlmPrompt prompt)
+    public async Task HandleAsync(LlmPrompt prompt, CancellationToken cancellationToken = default)
     {
         var chat = ServiceProvider.GetService<IChatClient>();
         if (chat == null)
         {
-            await FireAsync(new LlmResponse(prompt.Prompt, "[no local llm client]", "none"));
+            await FireAsync(new LlmResponse(prompt.Prompt, "[no local llm client]", "none"), cancellationToken);
             return;
         }
 
         var options = string.IsNullOrWhiteSpace(prompt.PreferredModel)
             ? null
             : new Microsoft.Extensions.AI.ChatOptions { ModelId = prompt.PreferredModel };
-        var response = await chat.GetResponseAsync(prompt.Prompt, options);
-        await FireAsync(new LlmResponse(prompt.Prompt, response.Text.Trim(), prompt.PreferredModel ?? "qwen2.5-coder:1.5b"));
+        var response = await chat.GetResponseAsync(prompt.Prompt, options, cancellationToken);
+        await FireAsync(new LlmResponse(prompt.Prompt, response.Text.Trim(), prompt.PreferredModel ?? "qwen2.5-coder:1.5b"), cancellationToken);
     }
 }
 

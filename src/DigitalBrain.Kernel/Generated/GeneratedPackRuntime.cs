@@ -1,3 +1,4 @@
+#nullable enable
 using DigitalBrain.Core;
 using DigitalBrain.Kernel.Foundry;
 
@@ -14,7 +15,9 @@ public sealed class GeneratedPackRuntime(IServiceProvider serviceProvider, ILogg
     public void Install(NeuroPack pack)
     {
         if (string.IsNullOrWhiteSpace(pack.Code))
+        {
             return;
+        }
 
         var embodier = serviceProvider.GetService<IPackEmbodiment>();
         if (embodier is null)
@@ -38,24 +41,12 @@ public sealed class GeneratedPackRuntime(IServiceProvider serviceProvider, ILogg
 
     public void Ensure(IEnumerable<Synapse> journal, string primaryKey)
     {
-        if (_current is not null) return;
-
-        var last = journal.OfType<NeuroPackInstalled>().LastOrDefault();
-        if (last is not null)
+        if (_current is not null)
         {
-            Install(last.Pack);
             return;
         }
 
-        const string generatedPrefix = "generated-";
-        var packName = primaryKey.StartsWith(generatedPrefix, StringComparison.OrdinalIgnoreCase)
-            ? primaryKey[generatedPrefix.Length..]
-            : primaryKey;
-
-        var seed = MarketplaceSeeds.LocalUiPacks.FirstOrDefault(pack =>
-            string.Equals(pack.Name, packName, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(pack.Code));
-        if (seed is not null)
-            Install(seed);
+        logger.LogDebug("No installed pack found for generated neuron '{PrimaryKey}'.", primaryKey);
     }
 
     public void Dispose() => _current?.Dispose();

@@ -8,11 +8,12 @@ public sealed class InMemoryPackConfigBackingStore : IPackConfigBackingStore
 
     private static string BlobKey(string scope, string pack) => $"{scope}/{pack}";
 
-    public Task<byte[]?> LoadAsync(string scope, string pack)
+    public Task<byte[]?> LoadAsync(string scope, string pack, CancellationToken cancellationToken = default)
         => Task.FromResult<byte[]?>(_store.TryGetValue(BlobKey(scope, pack), out var blob) ? blob : null);
 
-    public Task SaveAsync(string scope, string pack, byte[] encryptedBlob)
+    public Task SaveAsync(string scope, string pack, byte[] encryptedBlob, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _store[BlobKey(scope, pack)] = encryptedBlob;
         return Task.CompletedTask;
     }

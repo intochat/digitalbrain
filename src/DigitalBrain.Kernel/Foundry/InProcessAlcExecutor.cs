@@ -13,7 +13,9 @@ public sealed class InProcessAlcExecutor : ICodeExecutor
 
         var violations = CapabilityGate.FindViolations(compilation);
         if (violations.Count > 0)
+        {
             return new CodeExecutionResult(false, "", "capability gate rejected: " + string.Join(", ", violations));
+        }
 
         using var peStream = new MemoryStream();
         var emit = compilation.Emit(peStream);
@@ -32,7 +34,9 @@ public sealed class InProcessAlcExecutor : ICodeExecutor
             var assembly = context.LoadFromStream(peStream);
             var method = FindEntrypoint(assembly, entrypoint);
             if (method is null)
+            {
                 return new CodeExecutionResult(false, "", $"entrypoint '{entrypoint}' not found");
+            }
 
             var captured = new StringBuilder();
             var originalOut = Console.Out;
@@ -43,7 +47,10 @@ public sealed class InProcessAlcExecutor : ICodeExecutor
                 var returned = method.Invoke(null, new object?[] { new Dictionary<string, object?>() });
                 var output = captured.ToString();
                 if (returned is not null)
+                {
                     output += returned;
+                }
+
                 return new CodeExecutionResult(true, output, "");
             }
             catch (TargetInvocationException tie)
@@ -67,7 +74,9 @@ public sealed class InProcessAlcExecutor : ICodeExecutor
         {
             var method = type.GetMethod(entrypoint, BindingFlags.Public | BindingFlags.Static);
             if (method is not null)
+            {
                 return method;
+            }
         }
         return null;
     }

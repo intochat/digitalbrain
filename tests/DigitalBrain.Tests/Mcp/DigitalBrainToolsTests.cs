@@ -1,9 +1,8 @@
 extern alias McpProject;
-
 using DigitalBrain.Core;
-using McpProject::DigitalBrain.Mcp;
-using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
+using DigitalBrain.Tests.TestSupport;
+using McpProject::DigitalBrain.Mcp;
 
 namespace DigitalBrain.Tests.Mcp;
 
@@ -14,19 +13,6 @@ public class DigitalBrainToolsTests : NeuronTestBase
     [Fact]
     public void Ping_Works_Standalone()
         => Assert.Contains("connected", DigitalBrainReadTools.PingDigitalBrain(), StringComparison.OrdinalIgnoreCase);
-
-    [Fact]
-    public async Task Publish_Then_List_Through_InProcess_GrainFactory()
-    {
-        var factory = new TestGrainFactory(this);
-        var mutationTools = new DigitalBrainMutationTools(factory);
-        var readTools = new DigitalBrainReadTools(factory);
-
-        await mutationTools.PublishToMarketplace("McpPack", "1.0", "public class P {}", "mcp-user", false, 0.15);
-        var listing = await readTools.ListMarketplace();
-
-        Assert.Contains("McpPack@1.0", listing);
-    }
 
     [Fact]
     public async Task SimulateXPost_broadcasts_XPostReceived_signal()
@@ -130,22 +116,22 @@ public class DigitalBrainToolsTests : NeuronTestBase
     }
 
     [Fact]
-    public async Task CreateAutomationFromDescription_With_Salesforce_Intent_Uses_LLM_Rail()
+    public async Task CreateAutomationFromDescription_Stages_Automation_Proposal()
     {
-        // Solid test for self-evolution with local Qwen/Foundry: simple Salesforce automation via describe.
-        // LLM identifies intent, generates script + reaction (using general caps or integration).
-        // User can aspire run, use the mcp tool, approve, and it works.
         var factory = new TestGrainFactory(this);
         var mutationTools = new DigitalBrainMutationTools(factory);
 
         var result = await mutationTools.CreateAutomationFromDescription(
             "when poll for new leads from Salesforce then emit LeadCreated signals with name",
-            "sf-llm-example");
+            "sf-chat-example");
 
-        // Verifies the LLM rail is used (intent identification via foundry)
-        Assert.Contains("Foundry LLM rail wired", result);
-        Assert.Contains("sf-llm-example", result);
-        // LLM rail invoked for intent (Foundry handles generation + staging in full flow); test proves the entry point for self-evolution with Qwen.
+        Assert.Contains("Staged automation", result);
+        Assert.Contains("sf-chat-example", result);
+
+        var automation = Grain<IAutomationNeuron>("automation-main");
+        Assert.Contains(
+            (await automation.GetOutgoingTimelineAsync()).OfType<AutomationDefinitionStaged>(),
+            staged => staged.Reaction.Id == "sf-chat-example");
     }
 }
 

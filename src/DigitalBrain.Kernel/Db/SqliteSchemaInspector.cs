@@ -21,11 +21,15 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(path))
+        {
             throw new ArgumentException("SQLite database path is required.", nameof(path));
+        }
 
         var fullPath = Path.GetFullPath(path);
         if (!File.Exists(fullPath))
+        {
             throw new FileNotFoundException("SQLite database file was not found.", fullPath);
+        }
 
         var builder = new SqliteConnectionStringBuilder
         {
@@ -52,7 +56,9 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
+        {
             throw new ArgumentException("SQLite connection string is required.", nameof(connectionString));
+        }
 
         var builder = new SqliteConnectionStringBuilder(connectionString)
         {
@@ -61,7 +67,9 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         };
 
         if (string.IsNullOrWhiteSpace(builder.DataSource))
+        {
             throw new ArgumentException("SQLite connection string must include Data Source.", nameof(connectionString));
+        }
 
         using var connection = new SqliteConnection(builder.ToString());
         await connection.OpenAsync(cancellationToken);
@@ -244,7 +252,9 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         {
             var name = reader.GetString(1);
             if (name.StartsWith("sqlite_autoindex_", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             refs.Add(new IndexRef(
                 Name: name,
@@ -258,7 +268,9 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         {
             var columns = await ReadIndexColumnsAsync(connection, index.Name, cancellationToken);
             if (columns.Count == 0)
+            {
                 continue;
+            }
 
             indexes.Add(new DbIndex(
                 index.Name,
@@ -284,7 +296,9 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
         while (await reader.ReadAsync(cancellationToken))
         {
             if (reader.IsDBNull(2))
+            {
                 continue;
+            }
 
             columns.Add((reader.GetInt32(0), reader.GetString(2)));
         }
@@ -329,13 +343,17 @@ public sealed class SqliteSchemaInspector(ILogger<SqliteSchemaInspector> logger)
     private static void EnforceLimit(int count, int limit, string message)
     {
         if (count > limit)
+        {
             throw new InvalidOperationException($"{message} Limit: {limit}.");
+        }
     }
 
     private static string SafeSourceLabel(string? sourcePath)
     {
         if (string.IsNullOrWhiteSpace(sourcePath))
+        {
             return "sqlite";
+        }
 
         try
         {

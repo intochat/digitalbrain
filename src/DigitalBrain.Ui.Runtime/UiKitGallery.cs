@@ -6,7 +6,7 @@ using DigitalBrain.Ui.Contracts;
 
 /// Simple browsable UiKit component gallery builder.
 /// Emits a UiWidgetTree showcasing the main vocabulary items (server-driven).
-/// Intended for use by Ino, a dedicated gallery experience, or marketplace ui-kit pack.
+/// Intended for use by Ino or a dedicated gallery experience.
 /// This is the foundation for the full "WinUI Gallery" style surface (Phase D).
 public static class UiKitGallery
 {
@@ -30,9 +30,9 @@ public static class UiKitGallery
             BuildDemo(UiKitVocabulary.Badge, "Badge", new() { ["text"] = "New" }),
             BuildDemo(UiKitVocabulary.Table, "Table", new() { ["columns"] = new[] { "Col1", "Col2" }, ["rows"] = new object[] { new[] { "a", "b" }, new[] { "c", "d" } } }),
             BuildDemo(UiKitVocabulary.GraphCanvas, "GraphCanvas", new() { ["title"] = "Sample graph" }),
-            BuildDemo(UiKitVocabulary.Row, "Row layout", new() {  }),
-            BuildDemo(UiKitVocabulary.Column, "Column layout", new() {  }),
-            BuildDemo(UiKitVocabulary.Divider, "Divider", new() { }),
+            BuildDemo(UiKitVocabulary.Row, "Row layout", []),
+            BuildDemo(UiKitVocabulary.Column, "Column layout", []),
+            BuildDemo(UiKitVocabulary.Divider, "Divider", []),
             BuildDemo(UiKitVocabulary.Avatar, "Avatar", new() { ["fallback"] = "IN" }),
             BuildDemo(UiKitVocabulary.Alert, "Alert", new() { ["title"] = "Info", ["description"] = "This is a kit alert." }),
             BuildDemo(UiKitVocabulary.Progress, "Progress", new() { ["value"] = 0.65 }),
@@ -48,6 +48,6 @@ public static class UiKitGallery
     {
         extra["demoFor"] = type;
         return new(UiKitVocabulary.Panel, new Dictionary<string, object?> { ["title"] = label },
-            new List<UiWidgetTree> { new(type, extra) });
+            [new(type, extra)]);
     }
 }

@@ -26,7 +26,9 @@ public sealed class TelegramUpdateForwarder(
         var message = update.Message;
         var text = message?.Text;
         if (message is null || message.From is null || string.IsNullOrEmpty(text))
+        {
             return;
+        }
 
         var props = new Dictionary<string, object?>
         {
@@ -45,7 +47,9 @@ public sealed class TelegramUpdateForwarder(
 
         var headers = new Grpc.Core.Metadata();
         if (!string.IsNullOrEmpty(options.InternalServiceKey))
+        {
             headers.Add(InternalKeyHeader, options.InternalServiceKey);
+        }
 
         try
         {

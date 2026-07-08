@@ -61,7 +61,7 @@ public interface IChannelNeuron : INeuron
 }
 
 // IUser contract lives in Core so kernel can run standalone for security/air-gapped scenarios.
-// Full user accounts, auth, billing live in the private marketplace service.
+// Full identity and billing systems stay outside Core.
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.UserId")]
 public readonly record struct UserId([property: Id(0)] string Value)
@@ -175,14 +175,14 @@ public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
 public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataIngested>, IHandle<DbSchemaInspected>
 {
     [Alias("AskAsync")]
-    Task<string> AskAsync(string prompt);
+    Task<string> AskAsync(string prompt, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Rich interaction entrypoint. Returns the common InoInteractResult contract.
     /// This is the primary surface for MCP agents and verification tests.
     /// </summary>
     [Alias("InteractAsync")]
-    Task<InoInteractResult> InteractAsync(InoInteractRequest request);
+    Task<InoInteractResult> InteractAsync(InoInteractRequest request, CancellationToken cancellationToken = default);
 }
 
 // Self-awareness: SystemStatus + proposals (MVP for auto diagnose + simulate fix)
@@ -356,18 +356,13 @@ public record ArchitectReport(string Path, string Report) : Synapse(nameof(Archi
 [Alias("DigitalBrain.Core.ArchitectResult")]
 public record ArchitectResult(string Path, string Result, string Task) : Synapse(nameof(ArchitectResult), DateTimeOffset.UtcNow);
 
-// Closed loop request (routed exclusively via run_closed_loop MCP).
+// Closed loop request. The public MCP mutation path is intentionally disabled while INO owns automation staging.
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.ClosedLoopRequest")]
 public record ClosedLoopRequest(string LoopType, string Prompt) : Synapse(nameof(ClosedLoopRequest), DateTimeOffset.UtcNow);
 
 [Alias("DigitalBrain.Core.IClosedLoopNeuron")]
 public interface IClosedLoopNeuron : INeuron, IHandle<ClosedLoopRequest>, IHandle<ExperienceUsed> { }
-
-// Skill injection from marketplace packs (used by INO assistant for awareness of installed behaviors).
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.SkillContextInjected")]
-public record SkillContextInjected(string SkillPackName, string Description, string Code) : Synapse(nameof(SkillContextInjected), DateTimeOffset.UtcNow);
 
 // Smart ContextNeuron for INO - manages chat, agent, filter, cluster contexts like context providers
 [GenerateSerializer]
@@ -467,7 +462,10 @@ public record DbIndex(
     [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
 
 [Alias("DigitalBrain.Core.IDbSupportNeuron")]
-public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery>, IHandle<DbInspectSchema> { }
+public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery>, IHandle<DbInspectSchema>
+{
+    const string SingletonKey = "db-main";
+}
 
 // Filter changes - INO/Context must be notified so assistant knows current UI view state
 [GenerateSerializer]
@@ -493,19 +491,6 @@ public record VisualizeDataRequest(
     string UserId = "anonymous",
     string? SessionId = null) : Synapse(nameof(VisualizeDataRequest), DateTimeOffset.UtcNow, CorrelationId: RequestId);
 
-// Company brain skill knowledge ingestion (narrow for process playbooks + transcripts).
-// Used to feed raw domain knowledge into context for crystallization.
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.IngestCompanySource")]
-public record IngestCompanySource(string Collection, string SourceId, string Text) : Synapse(nameof(IngestCompanySource), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.CompanySourceIngested")]
-public record CompanySourceIngested(string Collection, string SourceId, int ChunkCount) : Synapse(nameof(CompanySourceIngested), DateTimeOffset.UtcNow);
-
-[Alias("DigitalBrain.Core.ICompanyKnowledgeNeuron")]
-public interface ICompanyKnowledgeNeuron : INeuron, IHandle<IngestCompanySource> { }
-
 // First-class chart interaction and modification (conversational + selection driven)
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.ChartCommand")]
@@ -522,7 +507,7 @@ public interface IDataVisualizationNeuron : INeuron, IHandle<VisualizeDataReques
 [Alias("DigitalBrain.Core.IChartNeuron")]
 public interface IChartNeuron : IAgent, IHandle<VisualizeDataRequest>, IHandle<ChartCommand>, IHandle<ChartInteraction> { }
 
-// Closed loops for marketplace (UI authoring via Dart MCP + widget tree; SoftwareEngineering runtime mod via Aspire MCP + LLM)
+// Closed-loop UI/system modification records.
 
 
 [GenerateSerializer]

@@ -25,7 +25,7 @@ namespace DigitalBrain.Tests.E2E;
 [Collection(nameof(DigitalBrainE2ECollection))]
 public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
 {
-    readonly DigitalBrainAppHostFixture _fx = fixture;
+    private readonly DigitalBrainAppHostFixture _fx = fixture;
 
     [SkippableFact]
     public async Task Login_over_grpc_web_send_broadcasts_signed_in_session()
@@ -77,7 +77,7 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
         Assert.True(await delivered, "Signed-in session broadcast was not delivered to WatchHomeFeed");
     }
 
-    static async Task<bool> ReadForSignedInAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string clientId, TaskCompletionSource<bool> streamReady, CancellationToken ct)
+    private static async Task<bool> ReadForSignedInAsync(IAsyncStreamReader<RfwCardEnvelope> stream, string clientId, TaskCompletionSource<bool> streamReady, CancellationToken ct)
     {
         try
         {
@@ -85,7 +85,11 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
             {
                 streamReady.TrySetResult(true);
                 var json = stream.Current.DataJson;
-                if (string.IsNullOrEmpty(json)) continue;
+                if (string.IsNullOrEmpty(json))
+                {
+                    continue;
+                }
+
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("status", out var status) && status.GetString() == "signed-in" &&
                     doc.RootElement.TryGetProperty("clientId", out var cid) && cid.GetString() == clientId)
@@ -99,7 +103,7 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
         return false;
     }
 
-    sealed class ForceHttp11Handler(HttpMessageHandler innerHandler) : DelegatingHandler(innerHandler)
+    private sealed class ForceHttp11Handler(HttpMessageHandler innerHandler) : DelegatingHandler(innerHandler)
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {

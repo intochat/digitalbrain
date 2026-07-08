@@ -2,12 +2,12 @@
 
 Aspire hosting package for the DigitalBrain **Kernel** — the minimal Orleans substrate required for the system to function.
 
-## Layering (structure + distribution)
+## Layering
 
 - **Core** (DigitalBrain.Core): stable abstractions — INeuron, Synapse (with SynapseId/CausationId/CorrelationId), dual journals, Checkpoint/Branch/Restore, UiSurface/RfwCard as first-class synapses, and universal runtime messages. This is the non-negotiable center. Everything is expressed through neurons and synapses.
-- **Pack contracts** (DigitalBrain.Pack.Contracts): IPackBehavior + typed dispatch contracts, PackManifest/config fields, trust helpers, and the KitExperience authoring base. Core must not reference this assembly; pack contracts reference Core primitives.
-- **Kernel** (this package + DigitalBrain.Kernel base): the Aspire-orchestrated minimal Orleans kernel runtime + built-in kernel features (journaled marketplace substrate, collectible-ALC embodiment host, kernel tasks, system status/self-healing via checkpoints, foundry for compile/embody, core orchestration). AddDigitalBrain wires clustering, durable journals (blobs), LLM, etc.
-- **Experiences / INO / domain features**: published to the marketplace as signed typed-C# packs. Installed and updated into a running kernel exactly like any other pack. The kernel itself stays the stable base (3 replicas by default enable rolling updates and self-improvement without full downtime).
+- **Pack contracts** (DigitalBrain.Pack.Contracts): connector configuration and UI kit contracts used by in-repo experiences. Marketplace distribution is intentionally not part of the active product path.
+- **Kernel** (this package + DigitalBrain.Kernel base): the Aspire-orchestrated Orleans kernel runtime + built-in INO, automation, connector, task, status, journal, and UI-surface features. AddDigitalBrain wires clustering, durable journals (blobs), LLM, etc.
+- **INO / integrations / domain features**: wired as in-repo capabilities and automations for now. INO can stage automations directly; distribution is out of scope until there is a real product need.
 
 The kernel starts 3 instances by default (see DigitalBrainOptions.KernelReplicas) so the substrate remains available while packs are embodied, behaviors updated, or resources restarted.
 
@@ -20,12 +20,11 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
     // options.WithEmbedding<YourEmbeddingModel>();
     // options.WithVoice2Text<YourVoiceModel>();
     // options.WithVectorDatabase(DigitalBrainProviderIds.Qdrant, "documents");
-    options.UseLocalMarketplace = true;
     // KernelReplicas defaults to 3 for HA during updates/self-improvement
 });
 
 // Wire the kernel resource using the context — this provides the cool built-in kernel features
-// (marketplace, embodiment, journals with causation, UI surfaces, tasks, self-status, 3-replica HA) out of the box.
+// (journals with causation, UI surfaces, tasks, self-status, 3-replica HA) out of the box.
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);
 
@@ -40,12 +39,8 @@ The returned context + resource enable future With* extensions while keeping the
 ## Built-in kernel features (always present substrate)
 - Dual durable journals + full causation on every Fire/Deliver.
 - Checkpoint / Branch / Restore (time-travel and safe simulation inside the kernel).
-- Marketplace (journal-driven publish/install of signed typed-C# packs) + collectible ALC embodiment host (GeneratedNeuron) that turns packs into live typed-Synapse handlers.
 - KernelTask with journal-derived progress.
 - SystemStatus + self-diagnosis (MCP to own Aspire + checkpoint-based simulation).
-- HomeFeedBus + RfwCard/UiSurface streaming + bidirectional UiGateway (EngageUiSession) for dynamic UI that travels with packs (RFW + perf-oriented bidi per best-of-breed).
+- HomeFeedBus + RfwCard/UiSurface streaming + bidirectional UiGateway (EngageUiSession) for dynamic UI.
 
-Higher-level capabilities (INO, specific closed loops, domain experiences, custom UI surfaces) are published to the marketplace and embodied on demand. They receive updates independently of the kernel substrate.
-
-## Distribution model
-Just like any other pack, INO and other experiences are published to the marketplace and installed/updated into the already-running kernel. The kernel (3 replicas) provides the stable execution + journal environment. Self-improvement and pack upgrades can proceed while the system stays available.
+Distribution is deliberately removed from the active architecture. Keep INO, Gmail, Salesforce, automations, and UI surfaces in the repo until marketplace distribution has a concrete design and tests again.

@@ -14,13 +14,13 @@ public class SalesforceCrmNeuron(
 {
     public async Task<string[]> QueryAsync(string soql, CancellationToken ct = default)
     {
-        var client = await apiClientFactory.CreateAsync(Self.AsScope());
+        var client = await apiClientFactory.CreateAsync(Self.AsScope(), ct);
         return await client.QueryAsync(soql, ct);
     }
 
     public async Task<string[]> ListAccountsAsync(int maxResults = 20, CancellationToken ct = default)
     {
-        var client = await apiClientFactory.CreateAsync(Self.AsScope());
+        var client = await apiClientFactory.CreateAsync(Self.AsScope(), ct);
         return await client.ListAccountsAsync(maxResults, ct);
     }
 }

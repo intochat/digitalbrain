@@ -34,7 +34,9 @@ public sealed class QdrantVectorStore(QdrantClient client) : IVectorStore
         }).ToList();
 
         if (points.Count > 0)
+        {
             await client.UpsertAsync(collection, points, cancellationToken: ct);
+        }
     }
 
     public async Task<VectorHit[]> SearchAsync(string collection, float[] query, int top = 5, CancellationToken ct = default)

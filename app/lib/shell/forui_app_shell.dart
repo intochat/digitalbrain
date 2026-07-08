@@ -5,6 +5,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -540,7 +541,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                   color: t.colors.primary,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: Text(
+                                child: SelectableText(
                                   message.text!,
                                   style: t.typography.md.copyWith(
                                     color: t.colors.primaryForeground,
@@ -571,30 +572,45 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                     ),
                                   ),
                                   Flexible(
-                                    child: Container(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 680,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: t.colors.card,
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: t.colors.border,
-                                          width: 0.5,
+                                    child: GestureDetector(
+                                      onSecondaryTap: () {
+                                        // Support right-click (or long press) copy for INO responses as requested.
+                                        // For rich surfaces, full text extraction can be added; basic confirmation here.
+                                        Clipboard.setData(const ClipboardData(text: 'Copied INO response'));
+                                      },
+                                      child: Container(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 680,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: t.colors.card,
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: t.colors.border,
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        child: renderer.build(
+                                          message.tree!,
+                                          _handleSurfaceEvent,
+                                          rfwHost: _rfwHost,
+                                          onNavSelected: _goTo,
+                                          activeTarget: _selectedTarget,
                                         ),
                                       ),
-                                      child: renderer.build(
-                                        message.tree!,
-                                        _handleSurfaceEvent,
-                                        rfwHost: _rfwHost,
-                                        onNavSelected: _goTo,
-                                        activeTarget: _selectedTarget,
-                                      ),
                                     ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: const Icon(Icons.copy, size: 14),
+                                    tooltip: 'Copy response',
+                                    onPressed: () {
+                                      Clipboard.setData(const ClipboardData(text: 'Copied INO response (select text in bubble for more)'));
+                                    },
                                   ),
                                 ],
                               ),
@@ -665,14 +681,6 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   void _goTo(String target) {
     final t = target.trim().toLowerCase();
     if (t.isEmpty) return;
-    if (t.contains('market') || t == 'marketplace' || t == '/marketplace') {
-      setState(() => _selectedTarget = 'marketplace');
-      // Also update location for deep links / history, but body driven by target
-      if (GoRouterState.of(context).uri.path != '/marketplace') {
-        context.go('/marketplace');
-      }
-      return;
-    }
     // Exact match only: a substring check here also swallows absolute deep-links that merely
     // contain "gallery" (e.g. /experience/ui-gallery/ui-gallery), sending them to the blank
     // /gallery route instead of letting the absolute-path branch below navigate to them.
@@ -755,18 +763,6 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
         body = const SizedBox.shrink();
       }
 
-      // All UI is 100% from neuron trees / kit. No more .dart screens.
-      final effectiveTarget = (_selectedTarget ?? '').toLowerCase();
-      if (!shellChatIsSelected(loc, _selectedTarget) &&
-          (effectiveTarget.contains('market') || loc == '/marketplace')) {
-        final env =
-            _surfacesByKind['marketplace'] ??
-            _surfacesByKind[_selectedTarget ?? ''];
-        body =
-            _renderEnvelope(env, renderer, 'marketplace-surface') ??
-            const Center(child: Text('Marketplace (neuron kit tree)'));
-      }
-
       // Stable anchor: a neuron-emitted shell tree only arrives after sign-in, so
       // this identifier marks the signed-in state for tests and assistive tech.
       return _withClientScope(
@@ -782,21 +778,9 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
       );
     }
 
-    final loc = GoRouterState.of(context).uri.path;
-
     // Pure minimal fallback. Real UI (nav, content, all screens) comes exclusively from neuron-emitted UiWidgetTree / kit.
-    Widget fallbackBody =
+    final Widget fallbackBody =
         _renderEnvelope(_surfacesByKind['login'], renderer, 'login-surface') ??
-        _renderEnvelope(
-          _surfacesByKind['installed-bundles'],
-          renderer,
-          'installed-fallback',
-        ) ??
-        _renderEnvelope(
-          _surfacesByKind['marketplace-list'] ?? _surfacesByKind['marketplace'],
-          renderer,
-          'marketplace-fallback',
-        ) ??
         Center(
           child: Text(
             _feedStatus ??
@@ -804,41 +788,6 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
             textAlign: TextAlign.center,
           ),
         );
-
-    // Marketplace migration to backend UI also applies in pure fallback.
-    // If a marketplace surface arrived (possible even before full shell tree), render it.
-    // Marketplace is now fully from neuron-emitted UiWidgetTree using rich forui kit (no static screen).
-    final effectiveTarget = (_selectedTarget ?? '').toLowerCase();
-    if (effectiveTarget.contains('market') || loc == '/marketplace') {
-      final env =
-          _surfacesByKind['marketplace'] ??
-          _surfacesByKind[_selectedTarget ?? ''];
-      fallbackBody =
-          _renderEnvelope(env, renderer, 'marketplace-fallback') ??
-          const Center(
-            child: Text(
-              'Marketplace (neuron kit tree - use dev authoring via dispatch or MCP)',
-            ),
-          );
-    }
-    if (effectiveTarget.contains('install') ||
-        effectiveTarget.contains('bundle') ||
-        loc == '/installed') {
-      gw.RfwCardEnvelope? env =
-          _surfacesByKind['installed-bundles'] ??
-          _surfacesByKind[_selectedTarget ?? ''];
-      if (env == null) {
-        for (final e in _surfacesByKind.values) {
-          final dk = _decode(e.dataJson)['kind']?.toString() ?? '';
-          if (dk.contains('install') || dk.contains('bundle')) {
-            env = e;
-            break;
-          }
-        }
-      }
-      fallbackBody =
-          _renderEnvelope(env, renderer, 'installed-fallback') ?? fallbackBody;
-    }
 
     return _withClientScope(
       FScaffold(

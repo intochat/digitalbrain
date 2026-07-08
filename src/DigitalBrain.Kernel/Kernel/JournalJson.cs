@@ -17,7 +17,9 @@ public static class JournalJson
         resolver.Modifiers.Add(typeInfo =>
         {
             if (typeInfo.Type != typeof(Synapse))
+            {
                 return;
+            }
 
             var polymorphism = new JsonPolymorphismOptions
             {
@@ -57,7 +59,9 @@ public static class JournalJson
         foreach (var name in root.GetReferencedAssemblies())
         {
             if (name.Name?.StartsWith("DigitalBrain.", StringComparison.Ordinal) != true)
+            {
                 continue;
+            }
 
             try
             {

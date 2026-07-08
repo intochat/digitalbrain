@@ -9,7 +9,7 @@ namespace DigitalBrain.Telegram.Transport;
 // brain's WatchSynapses into Telegram API calls.
 //   TelegramReplyRequested -> sendMessage(chatId, text)
 //   PackConfigured         -> point-to-point GetPackConfig pull of the token, then (re)register the webhook
-// The token is NEVER carried on the broadcast — PackConfigured only names the pack/scope that changed, and the
+// The token is NEVER carried on the broadcast — PackConfigured only names the config key/scope that changed, and the
 // transport pulls the secret over the internal gRPC channel. Each Signal arrives as a SynapseEnvelope whose
 // Payload is UTF-8 JSON of the Signal props.
 public sealed class TelegramReplyDispatcher(
@@ -45,7 +45,7 @@ public sealed class TelegramReplyDispatcher(
         }
     }
 
-    // Pull the token for this transport's pack/scope and adopt it. Used both on a PackConfigured notification
+    // Pull the token for this transport's config key/scope and adopt it. Used both on a PackConfigured notification
     // and once at startup (config may already exist). No-op when no token is stored yet.
     public async Task PullConfigAndApplyAsync(CancellationToken ct = default)
     {
@@ -56,7 +56,9 @@ public sealed class TelegramReplyDispatcher(
             // secrets; browsers on the same gateway have no key and are rejected.
             var headers = new Grpc.Core.Metadata();
             if (!string.IsNullOrEmpty(options.InternalServiceKey))
+            {
                 headers.Add(InternalKeyHeader, options.InternalServiceKey);
+            }
 
             reply = await gateway.GetPackConfigAsync(
                 new GetPackConfigRequest { Scope = options.ConfigScope, Pack = options.PackName },
@@ -64,15 +66,17 @@ public sealed class TelegramReplyDispatcher(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "GetPackConfig pull failed for pack {Pack}", options.PackName);
+            logger.LogWarning(ex, "GetPackConfig pull failed for config key {Pack}", options.PackName);
             return;
         }
 
         if (!reply.Values.TryGetValue("telegram_token", out var token) || string.IsNullOrWhiteSpace(token))
+        {
             return;
+        }
 
         botAccessor.SetToken(token);
-        logger.LogInformation("Adopted Telegram token pulled for pack {Pack}; re-registering webhook.", options.PackName);
+        logger.LogInformation("Adopted Telegram token pulled for config key {Pack}; re-registering webhook.", options.PackName);
         await webhookSetup.RegisterAsync(ct);
     }
 
@@ -93,7 +97,9 @@ public sealed class TelegramReplyDispatcher(
 
         var text = props.TryGetValue("text", out var textEl) ? textEl.GetString() ?? string.Empty : string.Empty;
         if (string.IsNullOrEmpty(text))
+        {
             return;
+        }
 
         try
         {
@@ -122,9 +128,11 @@ public sealed class TelegramReplyDispatcher(
     private static IReadOnlyDictionary<string, JsonElement> ReadProps(SynapseEnvelope envelope)
     {
         if (envelope.Payload.IsEmpty)
+        {
             return new Dictionary<string, JsonElement>();
+        }
 
         var parsed = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(envelope.Payload.Span);
-        return parsed ?? new Dictionary<string, JsonElement>();
+        return parsed ?? [];
     }
 }
