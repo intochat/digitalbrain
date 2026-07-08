@@ -15,8 +15,6 @@ internal static class InoIntentHandlers
     [
         new RelationGraphInoIntentHandler(),
         new SchemaVisualizationInoIntentHandler(),
-        new GmailInoIntentHandler(),
-        new SalesforceInoIntentHandler(),
         new LlmSettingsInoIntentHandler(),
         new ApproveProposalInoIntentHandler(),
         new RunAutomationInoIntentHandler(),
@@ -109,38 +107,6 @@ internal sealed class SchemaVisualizationInoIntentHandler : IInoIntentHandler
         }
 
         return neuron.TryHandleSchemaVisualizationIntentAsync(request, workspaceId, cancellationToken);
-    }
-}
-
-internal sealed class GmailInoIntentHandler : IInoIntentHandler
-{
-    public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var classification = InoIntentClassifier.Classify(request.Prompt);
-        if (classification.Intent != "gmail" || classification.Confidence < 0.55)
-        {
-            return false;
-        }
-
-        await neuron.HandleGmailIntentAsync(request, cancellationToken);
-        return true;
-    }
-}
-
-internal sealed class SalesforceInoIntentHandler : IInoIntentHandler
-{
-    public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var classification = InoIntentClassifier.Classify(request.Prompt);
-        if (classification.Intent != "salesforce" || classification.Confidence < 0.55)
-        {
-            return false;
-        }
-
-        await neuron.HandleSalesforceIntentAsync(request, cancellationToken);
-        return true;
     }
 }
 

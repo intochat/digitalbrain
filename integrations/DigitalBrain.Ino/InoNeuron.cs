@@ -2,10 +2,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
-using DigitalBrain.Google;
 using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
-using DigitalBrain.Salesforce;
 using DigitalBrain.Ui.Runtime;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +17,6 @@ using DigitalBrain.Ui.Contracts;
 public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron, IHandle<Signal>
 {
     private sealed record ReplyPlan(string VisibleReply, IReadOnlyList<string> TaskDescriptions, string? BranchDescription);
-    private sealed record GmailMessageSummary(string Id, string Body);
     private sealed record AutomationDraft(string When, string? Target, string Script, string Rationale);
 
     private const string LlmUnavailableReply =
@@ -27,9 +24,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private static readonly string[] AllowedAutomationTriggers =
     [
-        "NeuronActivated",
-        "Signal:GmailMessageReceived",
-        "Signal:SalesforceQueryReady"
+        "NeuronActivated"
     ];
 
     private static readonly IReadOnlyDictionary<string, string> LlmProviderCommands =
@@ -267,22 +262,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     }
     public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
-        if (signal.Name == "PackConfigured" &&
-            signal.Props.TryGetValue("pack", out var pack) &&
-            string.Equals(pack?.ToString(), SalesforceClientFactory.PackName, StringComparison.OrdinalIgnoreCase))
-        {
-            // Connector pack config handling simplified; no pending resumption in Ino core.
-            return;
-        }
-
-        if (signal.Name != GoogleSignals.AuthCompleted)
-        {
-            return;
-        }
-
-        // Simplified auth completion; specific resumption logic removed from Ino (connector specific).
-        await FireAsync(new InoResponse("Google auth", "Google connected successfully.", []), cancellationToken);
-        await DeliverReplySurfaceAsync("Google authentication succeeded.", null, WorkspaceIds.Default, cancellationToken);
+        // Connector-specific signal resumption (gmail/salesforce auth/pack) removed from Ino core per catalog + generic path.
+        // Signals now handled via generic catalog capabilities or connector grains directly.
     }
 
     private async Task<string> ResolveUserIdAsync(string? clientId, CancellationToken cancellationToken = default)
@@ -410,69 +391,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    internal async Task HandleGmailIntentAsync(InoRequest request, CancellationToken cancellationToken = default)
-    {
-        var workspaceId = WorkspaceIds.Effective(request.WorkspaceId);
-
-        var classification = await InoIntentClassifier.ClassifyWithLlmAsync(
-            request.Prompt,
-            ServiceProvider,
-            await LoadCapabilityRecordsAsync(cancellationToken),
-            cancellationToken);
-        if (classification.Intent != "gmail")
-        {
-            await HandleGenericIntentAsync(request, workspaceId, cancellationToken);
-            return;
-        }
-
-        var gmailUserId = await ResolveUserIdAsync(request.ClientId, cancellationToken);
-        if (!await HasGoogleCredentialAsync(gmailUserId, cancellationToken))
-        {
-            var reply = "Google authentication is required to read Gmail.";
-            await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
-            await DeliverGoogleAuthSurfaceAsync(request.ClientId, workspaceId, cancellationToken);
-            return;
-        }
-
-        await FetchRecentGmailAsync(request, gmailUserId, cancellationToken);
-    }
-
-    internal async Task HandleSalesforceIntentAsync(InoRequest request, CancellationToken cancellationToken = default)
-    {
-        var workspaceId = WorkspaceIds.Effective(request.WorkspaceId);
-
-        var classification = await InoIntentClassifier.ClassifyWithLlmAsync(
-            request.Prompt,
-            ServiceProvider,
-            await LoadCapabilityRecordsAsync(cancellationToken),
-            cancellationToken);
-        if (classification.Intent != "salesforce")
-        {
-            await HandleGenericIntentAsync(request, workspaceId, cancellationToken);
-            return;
-        }
-
-        var salesforceSession = await ResolveSessionAsync(request.ClientId, cancellationToken);
-        if (salesforceSession is null)
-        {
-            var reply = "Sign in before connecting Salesforce.";
-            await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
-            await DeliverLoginSurfaceAsync(request.ClientId, cancellationToken);
-            return;
-        }
-
-        var salesforceUserId = salesforceSession.UserId.Value;
-        if (!await HasSalesforceCredentialAsync(salesforceUserId, cancellationToken))
-        {
-            var reply = "Salesforce credentials are required to query CRM records.";
-            await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
-            await DeliverSalesforceCredentialSurfaceAsync(request.ClientId, workspaceId, cancellationToken);
-            return;
-        }
-
-        await FetchSalesforceAccountsAsync(request, salesforceUserId, cancellationToken);
-    }
-
     internal async Task HandleAutomationCreateIntentAsync(
         InoRequest request,
         string workspaceId,
@@ -543,16 +461,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     private static string DefaultAutomationTrigger(string prompt, IReadOnlyList<InoCapabilityRecord> capabilities)
     {
-        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "gmail"))
-        {
-            return "Signal:GmailMessageReceived";
-        }
-
-        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "salesforce"))
-        {
-            return "Signal:SalesforceQueryReady";
-        }
-
+        // Catalog-driven; gmail/salesforce etc now use generic path + capability metadata (no special string mapping in core).
         return "NeuronActivated";
     }
 
@@ -638,93 +547,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             : null;
     }
 
-    private async Task<bool> HasGoogleCredentialAsync(string? gmailUserId = null, CancellationToken cancellationToken = default)
-    {
-        var store = ServiceProvider.GetService<IPackConfigStore>();
-        if (store is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            var scope = string.IsNullOrWhiteSpace(gmailUserId)
-                ? Self.AsScope()
-                : new NeuronScope(new UserId(gmailUserId), null);
-            var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
-            return GoogleClientFactory.HasUsableCredential(values);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogDebug(ex, "Google credential check failed.");
-            return false;
-        }
-    }
-
-    private async Task<bool> HasSalesforceCredentialAsync(string userId, CancellationToken cancellationToken = default)
-    {
-        var store = ServiceProvider.GetService<IPackConfigStore>();
-        if (store is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            var merged = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, new NeuronScope(new UserId(userId), null), cancellationToken);
-            return SalesforceClientFactory.HasUsableCredential(merged);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogDebug(ex, "Salesforce credential check failed.");
-            return false;
-        }
-    }
-
-    private async Task DeliverGoogleAuthSurfaceAsync(string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
-    {
-        workspaceId = WorkspaceIds.Effective(workspaceId);
-        var tree = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(),
-        [
-            new(UiKitVocabulary.Text, new Dictionary<string, object?>
-            {
-                ["text"] = "Connect Google to let INO read your recent Gmail messages."
-            }),
-            new(UiKitVocabulary.Button, new Dictionary<string, object?>
-            {
-                ["label"] = "Authenticate Google",
-                ["icon"] = "gmail",
-                ["synapseType"] = GoogleSignals.AuthRequested
-            })
-        ]);
-
-        var props = new Dictionary<string, object?>
-        {
-            ["tree"] = tree,
-            [UiSurfaceKeys.Title] = "Google",
-            [UiSurfaceKeys.SurfaceId] = "surface.google-auth.gmail",
-            ["role"] = "assistant",
-            ["surfaceKind"] = UiSurfaceKinds.AuthButton,
-            ["workspaceId"] = workspaceId
-        };
-        if (clientId is not null)
-        {
-            props["clientId"] = clientId;
-        }
-
-        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
-        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
-    }
-
     private async Task DeliverLoginSurfaceAsync(string? clientId, CancellationToken cancellationToken = default)
     {
         var session = GrainFactory.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
@@ -733,273 +555,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task DeliverSalesforceCredentialSurfaceAsync(string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
-    {
-        workspaceId = WorkspaceIds.Effective(workspaceId);
-        var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
-        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
-    }
 
-    private async Task FetchRecentGmailAsync(InoRequest request, string gmailUserId, CancellationToken cancellationToken = default)
-    {
-        var workspaceId = WorkspaceIds.Effective(request.WorkspaceId);
-        var classification = await InoIntentClassifier.ClassifyWithLlmAsync(
-            request.Prompt,
-            ServiceProvider,
-            await LoadCapabilityRecordsAsync(cancellationToken),
-            cancellationToken);
-        var maxResults = classification.MaxResults ?? InoPromptSemantics.ResultCount(request.Prompt) ?? 5;
-        var q = classification.Query ?? "";
-        await Broadcast(new Signal(GoogleSignals.GmailFetchRequested, new Dictionary<string, object?>
-        {
-            ["prompt"] = request.Prompt,
-            ["clientId"] = request.ClientId,
-            ["workspaceId"] = workspaceId,
-            ["maxResults"] = maxResults,
-            ["query"] = q
-        }), cancellationToken);
 
-        List<GmailMessageSummary> summaries;
-        string[] ids;
-        try
-        {
-            var gmail = GrainFactory.GetGrain<IGmailNeuron>(gmailUserId);
-            ids = await gmail.ListMessagesAsync(q, maxResults, cancellationToken);
-            summaries = [];
-            foreach (var id in ids.Take(maxResults))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var body = await gmail.ReadMessageAsync(id, cancellationToken);
-                summaries.Add(new GmailMessageSummary(id, body));
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsGoogleIntegrationFailure(ex))
-        {
-            Logger.LogWarning(ex, "Gmail fetch failed after credentials were configured.");
-            var failureReply = GoogleFailureReply(ex);
-            await FireAsync(new InoResponse(request.Prompt, failureReply, []), cancellationToken);
-            await DeliverReplySurfaceAsync(failureReply, request.ClientId, workspaceId, cancellationToken);
-            await DeliverGoogleAuthSurfaceAsync(request.ClientId, workspaceId, cancellationToken);
-            return;
-        }
 
-        await Broadcast(new Signal(GoogleSignals.GmailMessagesReady, new Dictionary<string, object?>
-        {
-            ["clientId"] = request.ClientId,
-            ["workspaceId"] = workspaceId,
-            ["count"] = summaries.Count,
-            ["messageIds"] = string.Join(",", summaries.Select(m => m.Id))
-        }), cancellationToken);
 
-        var redactedSummaries = summaries.Select(s => new GmailMessageSummary(s.Id, SecretText.Redact(s.Body))).ToList();
-        var reply = GmailReplyText(redactedSummaries);
-        await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
 
-        if (summaries.Count > 0)
-        {
-            var bodies = string.Join("\n---\n", summaries.Select(s => s.Body));
-            await FireAsync(new MemorySummary("gmail-recent", SecretText.Redact(bodies), DateTimeOffset.UtcNow, workspaceId, "Gmail", "UntrustedEvidence", "DigitalBrain.Google.IGmailNeuron"), cancellationToken);
-        }
 
-        string? summary = null;
-        if (InoPromptSemantics.HasAny(request.Prompt, "summarize", "summary", "brief") && summaries.Count > 0)
-        {
-            var bodiesToSummarize = string.Join("\n---\n", summaries.Select(s => s.Body));
-            summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + SecretText.Redact(bodiesToSummarize), "", cancellationToken);
-        }
 
-        await DeliverGmailMessagesSurfaceAsync(redactedSummaries, request.ClientId, workspaceId, summary, cancellationToken);
-    }
-
-    private async Task FetchSalesforceAccountsAsync(InoRequest request, string salesforceUserId, CancellationToken cancellationToken = default)
-    {
-        var workspaceId = WorkspaceIds.Effective(request.WorkspaceId);
-        var classification = await InoIntentClassifier.ClassifyWithLlmAsync(
-            request.Prompt,
-            ServiceProvider,
-            await LoadCapabilityRecordsAsync(cancellationToken),
-            cancellationToken);
-        var maxResults = classification.MaxResults ?? InoPromptSemantics.ResultCount(request.Prompt) ?? 5;
-        await Broadcast(new Signal(SalesforceSignals.QueryRequested, new Dictionary<string, object?>
-        {
-            ["prompt"] = request.Prompt,
-            ["clientId"] = request.ClientId,
-            ["workspaceId"] = workspaceId,
-            ["maxResults"] = maxResults
-        }), cancellationToken);
-
-        string[] records;
-        try
-        {
-            var salesforce = GrainFactory.GetGrain<ISalesforceCrmNeuron>(salesforceUserId);
-            records = await salesforce.ListAccountsAsync(maxResults, cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsSalesforceIntegrationFailure(ex))
-        {
-            Logger.LogWarning(ex, "Salesforce query failed after credentials were configured.");
-            var failureReply = SalesforceFailureReply(ex);
-            await FireAsync(new InoResponse(request.Prompt, failureReply, []), cancellationToken);
-            await DeliverReplySurfaceAsync(failureReply, request.ClientId, workspaceId, cancellationToken);
-            await DeliverSalesforceCredentialSurfaceAsync(request.ClientId, workspaceId, cancellationToken);
-            return;
-        }
-
-        await Broadcast(new Signal(SalesforceSignals.QueryResultsReady, new Dictionary<string, object?>
-        {
-            ["clientId"] = request.ClientId,
-            ["workspaceId"] = workspaceId,
-            ["count"] = records.Length
-        }), cancellationToken);
-
-        var redactedRecords = records.Select(r => SecretText.Redact(r)).ToArray();
-        var reply = SalesforceReplyText(redactedRecords);
-        await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
-
-        if (records.Length > 0)
-        {
-            await FireAsync(new MemorySummary("salesforce-recent", SecretText.Redact(string.Join("\n", records)), DateTimeOffset.UtcNow, workspaceId, "Salesforce", "UntrustedEvidence", "DigitalBrain.Salesforce.ISalesforceCrmNeuron"), cancellationToken);
-        }
-
-        await DeliverSalesforceRecordsSurfaceAsync(redactedRecords, request.ClientId, workspaceId, cancellationToken);
-    }
-
-    private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? clientId, string? workspaceId = null, string? summary = null, CancellationToken cancellationToken = default)
-    {
-        workspaceId = WorkspaceIds.Effective(workspaceId);
-        var children = new List<UiWidgetTree>
-        {
-            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Recent Gmail" })
-        };
-
-        if (summary != null)
-        {
-            children.Add(new UiWidgetTree(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Summary" }));
-            children.Add(new UiWidgetTree(UiKitVocabulary.TextArea, new Dictionary<string, object?>
-            {
-                ["text"] = summary
-            }));
-        }
-
-        if (messages.Count == 0)
-        {
-            children.Add(new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?>
-            {
-                ["text"] = "No recent Gmail messages were returned."
-            }));
-        }
-        else
-        {
-            var listItems = new List<UiWidgetTree>();
-            for (var i = 0; i < messages.Count; i++)
-            {
-                var message = messages[i];
-                // Use Tile for richer per-message UI
-                listItems.Add(new UiWidgetTree(UiKitVocabulary.Tile, new Dictionary<string, object?>
-                {
-                    ["title"] = $"Message {i + 1}",
-                    ["subtitle"] = TrimForSurface(message.Body)
-                }));
-            }
-            children.Add(new UiWidgetTree(UiKitVocabulary.List, new Dictionary<string, object?> { ["items"] = listItems }));
-            children.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
-            {
-                ["label"] = "Summarize last message",
-                ["synapseType"] = nameof(InoRequest),
-                ["prompt"] = "summarize the last email",
-                ["clientId"] = clientId,
-                ["workspaceId"] = workspaceId
-            }));
-            children.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
-            {
-                ["label"] = "Find related in Salesforce",
-                ["synapseType"] = nameof(InoRequest),
-                ["prompt"] = "find salesforce accounts related to the last email",
-                ["clientId"] = clientId,
-                ["workspaceId"] = workspaceId
-            }));
-        }
-
-        var props = new Dictionary<string, object?>
-        {
-            ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), children),
-            [UiSurfaceKeys.Title] = "Gmail",
-            [UiSurfaceKeys.SurfaceId] = "surface.gmail.recent",
-            ["role"] = "assistant",
-            ["workspaceId"] = workspaceId
-        };
-        if (clientId is not null)
-        {
-            props["clientId"] = clientId;
-        }
-
-        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
-        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
-    }
-
-    private async Task DeliverSalesforceRecordsSurfaceAsync(IReadOnlyList<string> records, string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
-    {
-        workspaceId = WorkspaceIds.Effective(workspaceId);
-        var children = new List<UiWidgetTree>
-        {
-            new(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Salesforce Accounts" })
-        };
-
-        if (records.Count == 0)
-        {
-            children.Add(new UiWidgetTree(UiKitVocabulary.Text, new Dictionary<string, object?>
-            {
-                ["text"] = "No Salesforce accounts were returned."
-            }));
-        }
-        else
-        {
-            var listItems = new List<UiWidgetTree>();
-            for (var i = 0; i < records.Count; i++)
-            {
-                listItems.Add(new UiWidgetTree(UiKitVocabulary.Tile, new Dictionary<string, object?>
-                {
-                    ["title"] = $"Account {i + 1}",
-                    ["subtitle"] = TrimForSurface(records[i])
-                }));
-            }
-            children.Add(new UiWidgetTree(UiKitVocabulary.List, new Dictionary<string, object?> { ["items"] = listItems }));
-            children.Add(new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
-            {
-                ["label"] = "Summarize last Salesforce",
-                ["synapseType"] = nameof(InoRequest),
-                ["prompt"] = "summarize the last salesforce",
-                ["clientId"] = clientId,
-                ["workspaceId"] = workspaceId
-            }));
-        }
-
-        var props = new Dictionary<string, object?>
-        {
-            ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), children),
-            [UiSurfaceKeys.Title] = "Salesforce",
-            [UiSurfaceKeys.SurfaceId] = "surface.salesforce.accounts",
-            ["role"] = "assistant",
-            ["workspaceId"] = workspaceId
-        };
-        if (clientId is not null)
-        {
-            props["clientId"] = clientId;
-        }
-
-        var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
-        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
-    }
 
     private async Task DeliverUiKitGallerySurfaceAsync(string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
@@ -1429,93 +991,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     }
 
 
-
-    private static string GmailReplyText(IReadOnlyList<GmailMessageSummary> messages)
-    {
-        if (messages.Count == 0)
-        {
-            return "No recent Gmail messages were returned.";
-        }
-
-        var title = messages.Count == 1 ? "Latest Gmail message:" : "Recent Gmail messages:";
-        var lines = messages.Select((m, i) => $"{i + 1}. {TrimForSurface(m.Body)}");
-        return title + Environment.NewLine + string.Join(Environment.NewLine, lines);
-    }
-
-    private static string SalesforceReplyText(IReadOnlyList<string> records)
-    {
-        if (records.Count == 0)
-        {
-            return "No Salesforce accounts were returned.";
-        }
-
-        var title = records.Count == 1 ? "Latest Salesforce account:" : "Salesforce accounts:";
-        var lines = records.Select((record, i) => $"{i + 1}. {TrimForSurface(record)}");
-        return title + Environment.NewLine + string.Join(Environment.NewLine, lines);
-    }
-
-    private static string SalesforceFailureReply(Exception exception)
-    {
-        var message = exception.GetBaseException().Message;
-        if (message.StartsWith(SalesforceClientFactory.AuthenticationFailureMessage, StringComparison.Ordinal))
-        {
-            return TrimForSurface(message);
-        }
-
-        if (message.Contains("authentication", StringComparison.OrdinalIgnoreCase))
-        {
-            return SalesforceClientFactory.AuthenticationFailureMessage;
-        }
-
-        return "I couldn't query Salesforce: " + TrimForSurface(message) +
-               ". Check your Salesforce credentials and try again.";
-    }
-
-    private static bool IsSalesforceIntegrationFailure(Exception exception)
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current.GetType().FullName?.Contains("Salesforce", StringComparison.OrdinalIgnoreCase) == true ||
-                current.Message.Contains("Salesforce", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static string GoogleFailureReply(Exception exception)
-    {
-        var message = exception.GetBaseException().Message;
-        if (message.Contains("auth", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("token", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Google auth issue: " + TrimForSurface(message) + ". Reconnect Google.";
-        }
-
-        return "I couldn't fetch Gmail: " + TrimForSurface(message) +
-               ". Check Google credentials or permissions and try again.";
-    }
-
-    private static bool IsGoogleIntegrationFailure(Exception exception)
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            var name = current.GetType().FullName ?? string.Empty;
-            if (name.Contains("Google", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("GoogleApiException", StringComparison.OrdinalIgnoreCase) ||
-                current.Message.Contains("Google", StringComparison.OrdinalIgnoreCase) ||
-                current.Message.Contains("gmail", StringComparison.OrdinalIgnoreCase) ||
-                current.Message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     private static string TrimForSurface(string value)
     {
