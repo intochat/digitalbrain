@@ -205,7 +205,7 @@ While splitting kernel (Program thin + hosting), reorganize Core and Kernel into
 
 **Kernel split (ties to Program split):**
 - Grains/: move all *Neuron.cs, *TriggerNeuron.cs, SystemNeurons.cs, GeneratedNeuron.cs, KernelTaskNeuron.cs, ScheduleTriggerNeuron.cs etc.
-- Hosting/: Program.cs (post thin), KernelStartupWarmupService.cs, DigitalBrainKernelExtensions.cs, PrototypeJournals.cs, OtlpProxyEndpoints.cs, any startup.
+- Hosting/: Program.cs (post thin), KernelStartupWarmupService.cs, DigitalBrainOrleansExtensions.cs, PrototypeJournals.cs, OtlpProxyEndpoints.cs, any startup.
 - Keep/enhance existing good subdirs (Foundry/, Gateway/, Ui/, Llm/, Config/, Sync/, SelfEvolution/, Auth/, Db/, TabularData/, Uploads/, Voice/, Sandbox/).
 - Endpoints/ for extracted HTTP handlers (upload, oauth callbacks).
 - Delete trash: legacy comments, "Backward compat alias for old code", TODO Task 10, falling back to legacy keys, overly long method comments. Clean vacuous summaries.
@@ -257,7 +257,7 @@ Follow the 5 steps. Use the tools. Ship clean startup.
 **Immediate slices** (executed):
 - Created Hosting/DigitalBrainOrleansExtensions.cs with UseDigitalBrainOrleans, AddDigitalBrainClients, ConfigureDigitalBrainKestrel, MapDigitalBrainSetup (encapsulates per Context7 best practices for extensions).
 - Created DigitalBrainAppEndpoints.cs with MapDigitalBrainHandlers (upload + oauth extracted).
-- Removed all config, detection, clients, setup, handlers trash from Program.cs (now 49 lines <50 goal; only builder creation + calls + Run + minimal).
+- Removed all config, detection, clients, setup, handlers trash from Program.cs (now 11 lines; only builder creation + calls + Run).
 - Extracted Db to Synapses/DbSynapses.cs (plus prior Ino).
 - Deleted comments/summaries per rules.
 - Build: clean (no CS).
@@ -267,8 +267,38 @@ Follow the 5 steps. Use the tools. Ship clean startup.
 - Next: continue Core extracts (Charts, etc), remove experimental pragma if possible, prod review.
 
 **Next immediate**:
-- Slice: extract upload/oauth handlers to Hosting or Endpoints class.
-- Continue Core: extract Db group etc.
+- Continue Core splits and XML summary deletion per the 2026-07-08 cycle update.
 - Always ritual.
 
 Commit done. Branch: codex/fix-local-orleans-startup-errors. Retro: deleted config trash, structure improved.
+
+## Cycle Update (2026-07-08)
+
+**1. Make reqs less dumb**: A thin `Program.cs` is not enough if the local/Testing host is less production-shaped than the Aspire host. Root `dotnet test` proved the local path lacked the Orleans timeline stream provider, so prod readiness means all host modes share required stream registrations.
+
+**2. Delete first**:
+- Deleted stale non-living docs: deploy status/README, app README, Spike README, Aspire README, Foundry README, generated iOS launch-image README.
+- Deleted unreferenced `DigitalBrainKernelExtensions` after `rg` confirmed no call sites.
+- Deleted stale duplicate `Program.cs` tail, endpoint XML summaries, stale AppHost/environment comments, and upload comment noise.
+
+**3. Simplify/optimize**:
+- Centralized Aspire-host detection in `DigitalBrainHostEnvironment`.
+- Shared HomeFeed/timeline stream registration and `PubSubStore` across local and Aspire Orleans silo paths.
+- Removed the `ILogger<Program>` category ambiguity by using an endpoint log category.
+
+**4. Accelerate**:
+- Used `aspire stop` only around build/test to release AppHost locks, then restarted AppHost for `list_resources`.
+- Used full root test polling after edits; no filters.
+
+**5. Automate last**: Skipped. The base cleanup is not finished; automation would freeze remaining bad structure.
+
+**Verified this cycle**:
+- `dotnet build --nologo -v:minimal`
+- `dotnet test --logger "console;verbosity=minimal"`: 286 total, 282 passed, 4 skipped
+- `aspire doctor`: 5/5 passed
+- `aspire list_resources`: storage/journal resources healthy after restart; Ollama model resources downloading and temporarily unhealthy until model pulls finish.
+
+**Next immediate**:
+- Split remaining `src/DigitalBrain.Core/Synapse.cs` groups into `Synapses/UserSynapses.cs`, `TaskSynapses.cs`, `VisualizationSynapses.cs`, and Salesforce/OAuth-specific files.
+- Remove remaining vacuous XML summaries from Core, Aspire, and test support.
+- Move HTTP upload/OAuth endpoint code from `Hosting/DigitalBrainAppEndpoints.cs` into `Endpoints/` when the file grows again.

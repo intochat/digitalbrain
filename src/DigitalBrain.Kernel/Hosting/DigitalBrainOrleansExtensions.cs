@@ -1,9 +1,20 @@
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
+using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Config;
+using DigitalBrain.Kernel.Db;
+using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Kernel;
+using DigitalBrain.Kernel.Llm;
+using DigitalBrain.Kernel.SelfEvolution;
+using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Kernel.Voice;
+using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -14,9 +25,7 @@ public static class DigitalBrainOrleansExtensions
 {
     public static IHostApplicationBuilder UseDigitalBrainOrleans(this IHostApplicationBuilder builder)
     {
-        var isAspireHosted = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__clustering"))
-            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__grainstate"))
-            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__journal"));
+        var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted();
 
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
         var useManagedIdentity = !string.IsNullOrWhiteSpace(storageAccountName);
@@ -81,12 +90,12 @@ public static class DigitalBrainOrleansExtensions
                 }
 
                 siloBuilder.UseJsonJournalFormat(JournalJson.Configure);
-
-                siloBuilder.AddMemoryStreams("HomeFeed");
-                siloBuilder.AddMemoryStreams("DigitalBrainTimeline");
-                siloBuilder.AddMemoryGrainStorage("PubSubStore");
-                siloBuilder.ConfigureServices(services => services.AddSignalEgressStreamSubscriber());
             }
+
+            siloBuilder.AddMemoryStreams("HomeFeed");
+            siloBuilder.AddMemoryStreams(SynapseStream.ProviderName);
+            siloBuilder.AddMemoryGrainStorage("PubSubStore");
+            siloBuilder.ConfigureServices(services => services.AddSignalEgressStreamSubscriber());
         });
 
         return builder;
@@ -118,9 +127,7 @@ public static class DigitalBrainOrleansExtensions
 
         builder.Services.AddHostedService<KernelStartupWarmupService>();
 
-        var isAspireHosted = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__clustering"))
-            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__grainstate"))
-            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__journal"));
+        var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted();
 
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
         var useManagedIdentity = !string.IsNullOrWhiteSpace(storageAccountName);
@@ -225,11 +232,7 @@ public static class DigitalBrainOrleansExtensions
 
         app.MapDigitalBrainOtlpProxy();
 
-        var isAspireHostedForMcp = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__clustering"))
-            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__grainstate"))
-            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__journal"));
-
-        if (!isAspireHostedForMcp)
+        if (!DigitalBrainHostEnvironment.IsAspireHosted())
         {
             app.MapMcp().RequireHost("*:8081");
         }
@@ -249,9 +252,7 @@ public static class DigitalBrainOrleansExtensions
 
     public static WebApplicationBuilder ConfigureDigitalBrainKestrel(this WebApplicationBuilder builder)
     {
-        var isAspireHosted = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__clustering"))
-            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__grainstate"))
-            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__journal"));
+        var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted();
 
         builder.WebHost.ConfigureKestrel(options =>
         {

@@ -2,6 +2,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.TabularData;
+using DigitalBrain.Kernel.Uploads;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -12,8 +13,7 @@ public static class DigitalBrainAppEndpoints
 {
     public static WebApplication MapDigitalBrainHandlers(this WebApplication app)
     {
-        // Chat file-attachment upload
-        app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains, ILogger<Program> logger) =>
+        app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains, ILogger<DigitalBrainAppEndpointLogs> logger) =>
         {
             if (!request.HasFormContentType)
             {
@@ -100,7 +100,8 @@ public static class DigitalBrainAppEndpoints
         app.MapGet("/oauth/callback/{provider}", async (
             string provider,
             HttpRequest request,
-            IServiceProvider sp) =>
+            IServiceProvider sp,
+            ILogger<DigitalBrainAppEndpointLogs> logger) =>
         {
             var connector = sp.GetRequiredKeyedService<DigitalBrain.Kernel.Abstractions.IConnector>(provider);
             var cb = new DigitalBrain.Kernel.Abstractions.OAuthCallback(
@@ -134,7 +135,10 @@ public static class DigitalBrainAppEndpoints
                         await ing.IngestAsync(sigName, p, requestAborted);
                     }
                 }
-                catch { /* best effort */ }
+                catch (Exception ex)
+                {
+                    logger.LogDebug(ex, "OAuth completion signal could not be published for {Provider}.", provider);
+                }
             }
             var title = result.Success ? "Success" : "Error";
             var msg = result.Success ? "Authentication completed." : (result.Error + ": " + result.Details);
@@ -144,4 +148,6 @@ public static class DigitalBrainAppEndpoints
 
         return app;
     }
+
+    private sealed class DigitalBrainAppEndpointLogs;
 }
