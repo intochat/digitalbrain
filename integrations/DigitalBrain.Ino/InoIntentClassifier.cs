@@ -24,6 +24,7 @@ public static class InoIntentClassifier
 
     // RegisterCapability deleted entirely (was source of global mutable state and test pollution).
     // All registration flows through journaled CapabilityRegistered synapses + InoAgentCapabilities (IAgent metadata).
+    // Future: move to durable SystemCatalogNeuron for Phase 3 catalog (journals suffice for now, per plan).
 
     public sealed record Classification(string Intent, double Confidence, string? Query = null, int? MaxResults = null);
 
