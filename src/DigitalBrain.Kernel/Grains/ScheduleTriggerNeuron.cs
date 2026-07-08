@@ -8,9 +8,14 @@ namespace DigitalBrain.Kernel;
 /// Schedule trigger: projects RegisterReaction (with Schedule) from journals, registers durable per-reaction Orleans reminders.
 /// Fires Signal("trigger.schedule.{id}") on tick so AutomationNeuron matches When="Signal:trigger.schedule.{id}".
 /// Handles registration on new reactions, unregister on RemoveReaction. Reminders survive restarts.
+[Alias("DigitalBrain.Kernel.IScheduleTriggerNeuron")]
+public interface IScheduleTriggerNeuron : INeuron
+{
+}
+
 [GrainType("schedule-trigger.v1")]
 public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, NeuronJournals journals)
-    : Neuron(logger, journals), IRemindable
+    : Neuron(logger, journals), IScheduleTriggerNeuron, IRemindable
 {
     protected override bool ShouldSubscribeToTimeline => true;
 

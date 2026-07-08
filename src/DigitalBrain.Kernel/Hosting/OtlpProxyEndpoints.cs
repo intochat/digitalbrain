@@ -5,16 +5,10 @@ using System.Text.Json;
 
 namespace DigitalBrain.Kernel;
 
-/// <summary>
-/// Hosts Flutter-facing OTLP proxy endpoints and forwards traces/metrics to the Aspire dashboard.
-/// </summary>
 internal static class OtlpProxyEndpoints
 {
     private const string OtlpForwardClientName = "digitalbrain-otlp-forward";
 
-    /// <summary>
-    /// Registers the named HttpClient used to forward Flutter OTLP payloads to Aspire.
-    /// </summary>
     public static IServiceCollection AddDigitalBrainOtlpForwardClient(this IServiceCollection services)
     {
         services.AddHttpClient(OtlpForwardClientName)
@@ -25,9 +19,6 @@ internal static class OtlpProxyEndpoints
         return services;
     }
 
-    /// <summary>
-    /// Maps /otlp routes that native and web Flutter clients can post telemetry to.
-    /// </summary>
     public static IEndpointRouteBuilder MapDigitalBrainOtlpProxy(this WebApplication app)
     {
         var otlpEndpoint = app.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];

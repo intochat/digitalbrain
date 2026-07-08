@@ -4,9 +4,7 @@ using DigitalBrain.Ui.Contracts;
 
 namespace DigitalBrain.Kernel;
 
-/// <summary>
-/// Activates singleton grains and seeds trusted built-in automations after the silo starts.
-/// </summary>
+// Activates singletons and seeds automations after silo start.
 public sealed class KernelStartupWarmupService(
     IGrainFactory grainFactory,
     IHostEnvironment environment,
@@ -35,7 +33,7 @@ public sealed class KernelStartupWarmupService(
             await automation.GetTimelineAsync(stoppingToken);
 
             // ScheduleTriggerNeuron warms from activation side effects.
-            _ = grainFactory.GetGrain<ScheduleTriggerNeuron>("schedule-main");
+            await grainFactory.GetGrain<IScheduleTriggerNeuron>("schedule-main").GetTimelineAsync(stoppingToken);
 
             await automation.DefineReactionAsync(
                 "auto-brief-on-activation",

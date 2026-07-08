@@ -47,7 +47,7 @@ public record ExperienceUsed(
     string UserId = "anonymous",
     string? SessionId = null) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
 
-// Core system neuron interfaces (everything is a Neuron)
+
 [Alias("DigitalBrain.Core.IAspireNeuron")]
 public interface IAspireNeuron : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
 
@@ -171,19 +171,7 @@ public record LlmResponse(string Prompt, string Response, string ModelUsed) : Sy
 [Alias("DigitalBrain.Core.ILlmNeuron")]
 public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
 
-[Alias("DigitalBrain.Core.IInoNeuron")]
-public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataIngested>, IHandle<DbSchemaInspected>
-{
-    [Alias("AskAsync")]
-    Task<string> AskAsync(string prompt, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Rich interaction entrypoint. Returns the common InoInteractResult contract.
-    /// This is the primary surface for MCP agents and verification tests.
-    /// </summary>
-    [Alias("InteractAsync")]
-    Task<InoInteractResult> InteractAsync(InoInteractRequest request, CancellationToken cancellationToken = default);
-}
 
 // Self-awareness: SystemStatus + proposals (MVP for auto diagnose + simulate fix)
 [GenerateSerializer]
@@ -251,7 +239,6 @@ public record CancelTask(
     string UserId = "anonymous",
     string? SessionId = null) : Synapse(nameof(CancelTask), DateTimeOffset.UtcNow);
 
-// Rich task state returned by the task grain.
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.TaskInfo")]
 public record TaskInfo(
@@ -259,81 +246,6 @@ public record TaskInfo(
     [property: Id(1)] string Status,
     [property: Id(2)] string? Result = null
 );
-
-// INO - the personal ultra-context assistant.
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.InoRequest")]
-public record InoRequest(
-    string Prompt,
-    string? ClientId = null,
-    string? WorkspaceId = null) : Synapse(nameof(InoRequest), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.InoResponse")]
-public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) : Synapse(nameof(InoResponse), DateTimeOffset.UtcNow);
-
-// For INO excellent long-term/multi-scale context (summaries from journals).
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.MemorySummary")]
-public record MemorySummary(
-    string Topic,
-    string Summary,
-    DateTimeOffset At,
-    string? WorkspaceId = null) : Synapse(nameof(MemorySummary), At);
-
-// =============================================================================
-// INO rich interaction contract (MCP agents, external CLIs, test verification)
-// This is the common standard for driving + observing INO.
-// Product goal: external agents (Claude, Grok, Codex, tests) can reliably verify
-// that new features (direct answers, automation-as-apps, proposals, scoping, rail)
-// continue to work at live time.
-// =============================================================================
-
-/// <summary>
-/// Structured action that an agent (or UI) can take next against INO or the system.
-/// </summary>
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.InoAction")]
-public record InoAction(
-    string Label,
-    string? FollowUpPrompt = null,           // natural language to send back as InoRequest
-    string? SynapseType = null,
-    IReadOnlyDictionary<string, object?>? Props = null
-);
-
-/// <summary>
-/// Request for a rich, observable interaction with INO.
-/// </summary>
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.InoInteractRequest")]
-public record InoInteractRequest(
-    string Prompt,
-    string? ClientId = null,
-    string? WorkspaceId = null,
-    bool IncludeProposals = true,
-    bool IncludeActions = true,
-    int MaxHistory = 5
-) : Synapse(nameof(InoInteractRequest), DateTimeOffset.UtcNow);
-
-/// <summary>
-/// The standardized result of interacting with INO.
-/// Used by MCP, agent harnesses, and contract tests to verify behavior.
-/// </summary>
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.InoInteractResult")]
-public record InoInteractResult(
-    string Prompt,
-    string ResponseText,                     // the direct user-visible answer (key for "no more I'll start..." regression)
-    string? ClassifiedIntent = null,
-    double IntentConfidence = 0.0,
-    string? ClientId = null,
-    string? WorkspaceId = null,
-    IReadOnlyList<string> UsedTaskIds = null!,
-    IReadOnlyList<string> RecentMemoryTopics = null!,
-    IReadOnlyList<InoAction> AvailableActions = null!,   // "Run now", "Approve", "Summarize last", etc.
-    IReadOnlyList<SelfEvolutionProposalPending> PendingProposals = null!,
-    DateTimeOffset Timestamp = default
-) : Synapse(nameof(InoInteractResult), Timestamp);
 
 // NuGet + Roslyn architect for closed loops (SEClosedLoopNeuron).
 [GenerateSerializer]
@@ -373,99 +285,6 @@ public record ContextUpdate(string ContextName, string Key, string Value) : Syna
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.MemoryStored")]
 public record MemoryStored(string Text, float[] Embedding) : Synapse(nameof(MemoryStored), DateTimeOffset.UtcNow);
-
-// Dynamic DB support neuron with typed synapses (inspired by .NET 11 Preview 5 EF/file-based + runtime dynamic)
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbConnect")]
-public record DbConnect(string ConnectionName, string Provider, string ConnectionString) : Synapse(nameof(DbConnect), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbQuery")]
-public record DbQuery(string ConnectionName, string Query, string? Result = null) : Synapse(nameof(DbQuery), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbInspectSchema")]
-public record DbInspectSchema(
-    string ConnectionName,
-    string Provider,
-    string? ConnectionString = null,
-    string? SourcePath = null,
-    string? ClientId = null,
-    string? WorkspaceId = null) : Synapse(nameof(DbInspectSchema), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbSchemaInspected")]
-public record DbSchemaInspected(
-    string ConnectionName,
-    string Provider,
-    DbSchemaModel? Schema,
-    bool Succeeded = true,
-    string? Error = null,
-    string? ClientId = null,
-    string? WorkspaceId = null) : Synapse(nameof(DbSchemaInspected), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbSchemaModel")]
-public record DbSchemaModel(
-    [property: Id(0)] string ConnectionName,
-    [property: Id(1)] string Provider,
-    [property: Id(2)] IReadOnlyList<DbTable> Tables,
-    [property: Id(3)] string? SourcePath = null,
-    [property: Id(4)] string? SessionId = null,
-    [property: Id(5)] IReadOnlyDictionary<string, string?>? Metadata = null,
-    [property: Id(6)] string? WorkspaceId = null);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbTable")]
-public record DbTable(
-    [property: Id(0)] string Name,
-    [property: Id(1)] string Kind,
-    [property: Id(2)] IReadOnlyList<DbColumn> Columns,
-    [property: Id(3)] IReadOnlyList<DbForeignKey> ForeignKeys,
-    [property: Id(4)] IReadOnlyList<DbIndex> Indexes,
-    [property: Id(5)] string? Schema = null,
-    [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbColumn")]
-public record DbColumn(
-    [property: Id(0)] string Name,
-    [property: Id(1)] string? StoreType,
-    [property: Id(2)] bool IsNullable,
-    [property: Id(3)] int PrimaryKeyOrdinal = 0,
-    [property: Id(4)] string? DefaultValue = null,
-    [property: Id(5)] int Ordinal = 0,
-    [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbForeignKey")]
-public record DbForeignKey(
-    [property: Id(0)] string Name,
-    [property: Id(1)] string Table,
-    [property: Id(2)] IReadOnlyList<string> Columns,
-    [property: Id(3)] string PrincipalTable,
-    [property: Id(4)] IReadOnlyList<string> PrincipalColumns,
-    [property: Id(5)] string? OnUpdate = null,
-    [property: Id(6)] string? OnDelete = null,
-    [property: Id(7)] string? Match = null,
-    [property: Id(8)] IReadOnlyDictionary<string, string?>? Metadata = null);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbIndex")]
-public record DbIndex(
-    [property: Id(0)] string Name,
-    [property: Id(1)] string Table,
-    [property: Id(2)] IReadOnlyList<string> Columns,
-    [property: Id(3)] bool IsUnique = false,
-    [property: Id(4)] bool IsPartial = false,
-    [property: Id(5)] string? Origin = null,
-    [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
-
-[Alias("DigitalBrain.Core.IDbSupportNeuron")]
-public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery>, IHandle<DbInspectSchema>
-{
-    const string SingletonKey = "db-main";
-}
 
 // Filter changes - INO/Context must be notified so assistant knows current UI view state
 [GenerateSerializer]

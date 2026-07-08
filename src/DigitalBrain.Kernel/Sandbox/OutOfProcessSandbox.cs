@@ -25,8 +25,7 @@ public sealed class OutOfProcessSandbox : ISandboxedExecutor
             new CSharpCompilationOptions(OutputKind.ConsoleApplication, optimizationLevel: OptimizationLevel.Release));
 
         // Defense-in-depth, not a substitute for the process boundary below: same gate as the in-process
-        // executor, applied before this source ever gets emitted to disk. See Foundry/README.md's Safety
-        // section for why this tier is both gated and OS-isolated rather than one or the other.
+        // executor, applied before this source ever gets emitted to disk.
         var violations = CapabilityGate.FindViolations(compilation);
         if (violations.Count > 0)
         {
@@ -83,7 +82,7 @@ public sealed class OutOfProcessSandbox : ISandboxedExecutor
                 Directory.Delete(directory, recursive: true);
             }
         }
-        catch (IOException) { /* best-effort temp cleanup */ }
-        catch (UnauthorizedAccessException) { /* best-effort temp cleanup */ }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 }
