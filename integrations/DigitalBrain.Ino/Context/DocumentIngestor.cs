@@ -41,8 +41,7 @@ public static class TextChunker
     }
 }
 
-// NOTE: PDF ingestion (UglyToad.PdfPig) is deferred — the configured NuGet feed has no stable PdfPig (only a
-// custom prerelease). TextChunker + DocumentIngestor work on any text; a PDF text source slots in later.
+// NOTE: PDF support deferred (no stable package in feed).
 
 // Ingests a document into a vector store: chunk -> embed -> ensure collection -> upsert. Embeddings come from the
 // registered IEmbeddingGenerator (NoOp by default; real Ollama/OpenAI when configured).

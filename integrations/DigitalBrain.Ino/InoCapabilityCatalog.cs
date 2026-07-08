@@ -27,7 +27,6 @@ public static class InoCapabilityCatalog
         }
         catch
         {
-            // The automation catalog slice is optional in small test hosts.
         }
 
         return records

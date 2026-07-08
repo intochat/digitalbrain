@@ -1,7 +1,5 @@
 namespace DigitalBrain.Ino;
 
-// Prompt helpers for Ino connectors.
-// Delegates to the classifier (owned by Ino integration).
 public static class InoConnectorIntents
 {
     public static bool IsGmail(string prompt) =>

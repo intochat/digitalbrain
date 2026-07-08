@@ -117,7 +117,6 @@ internal sealed class GmailInoIntentHandler : IInoIntentHandler
     public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Uses classifier (keyword fast path + future LLM). Replaced direct Regex in InoConnectorIntents.
         var classification = InoIntentClassifier.Classify(request.Prompt);
         if (classification.Intent != "gmail" || classification.Confidence < 0.55)
         {
@@ -182,7 +181,6 @@ internal sealed class LlmSettingsInoIntentHandler : IInoIntentHandler
     private static async Task<bool> HandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
         await neuron.FireAsync(new InoResponse(request.Prompt, "LLM / model settings:", []), cancellationToken);
-        // surface delivery handled in neuron or via other path for bloat reduction
         return true;
     }
 }
@@ -204,7 +202,6 @@ internal sealed class ApproveProposalInoIntentHandler : IInoIntentHandler
     private static async Task<bool> HandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
         await neuron.FireAsync(new InoResponse(request.Prompt, "Approved via handler (rail).", []), cancellationToken);
-        // full handle moved to reduce bloat
         return true;
     }
 }
@@ -238,7 +235,6 @@ internal sealed class RunAutomationInoIntentHandler : IInoIntentHandler
     {
         var reply = "Running the requested automation (preview or activated). Check the Tasks surface for results.";
         await neuron.FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
-        // surface delivery to reduce bloat in neuron direct calls
         return true;
     }
 }
@@ -259,7 +255,7 @@ internal sealed class SetLlmInoIntentHandler : IInoIntentHandler
 
     private static async Task<bool> HandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
-        await neuron.FireAsync(new InoResponse(request.Prompt, "LLM set command handled (bloat reduction).", []), cancellationToken);
+        await neuron.FireAsync(new InoResponse(request.Prompt, "LLM set command handled.", []), cancellationToken);
         return true;
     }
 }

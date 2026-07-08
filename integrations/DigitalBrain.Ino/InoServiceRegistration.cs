@@ -4,17 +4,12 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Ino;
 
-/// Registration for Ino as a pluggable AI assistant integration.
-/// Call this from the Kernel host (Program.cs) to wire Ino's own AI config
-/// and common assistant services. Mirrors pattern used by Google/Salesforce
-/// clients.
 public static class InoServiceRegistration
 {
     public static IServiceCollection AddInoAi(this IServiceCollection services, IConfigurationSection? section = null)
     {
         if (section is not null)
         {
-            // Bind Ino-owned AI config. Ino ships its AI assistant settings as an integration.
             services.Configure<InoAiOptions>(opt => section.Bind(opt));
         }
         else
@@ -27,14 +22,12 @@ public static class InoServiceRegistration
         return services;
     }
 
-    // Simple accessor for resolved options (used by grain or handlers).
     private sealed class InoAiConfig(IOptions<InoAiOptions> options) : IInoAiConfig
     {
         public InoAiOptions Current => options.Value;
     }
 }
 
-/// Abstraction so Kernel code can depend on Ino integration without taking concrete options.
 public interface IInoAiConfig
 {
     InoAiOptions Current { get; }

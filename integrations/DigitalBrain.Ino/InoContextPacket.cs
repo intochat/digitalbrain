@@ -113,7 +113,6 @@ public static class InoContextPacketBuilder
 
         foreach (var memory in memories)
         {
-            // Trust from declared metadata on MemorySummary (deleted topic sniffing per review).
             var trust = Enum.TryParse<InoContextTrustLevel>(memory.TrustLevel, ignoreCase: true, out var declaredTrust)
                 ? declaredTrust
                 : InoContextTrustLevel.MemorySummary;

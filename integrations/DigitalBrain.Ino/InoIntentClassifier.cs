@@ -5,9 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Ino;
 
-/// Lightweight intent classifier for Ino (AI assistant integration).
-/// Extracted so that Ino can ship as a pluggable integration (like Google/Salesforce)
-/// owning its AI config and classification logic.
 public static class InoIntentClassifier
 {
     public sealed record Capability(string Id, string Description, string[] Examples, string Tier = "generic");
@@ -102,7 +99,6 @@ public static class InoIntentClassifier
         return new("generic", 0.3);
     }
 
-    // LLM-enhanced classification. Uses injected IChatClient (from Ino AI config / scoped factory).
     public static async Task<Classification> ClassifyWithLlmAsync(
         string prompt,
         IServiceProvider? services = null,
@@ -205,7 +201,6 @@ public static class InoIntentClassifier
             }
             catch
             {
-                // degrade gracefully
             }
         }
 
