@@ -5,6 +5,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -540,7 +541,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                   color: t.colors.primary,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: Text(
+                                child: SelectableText(
                                   message.text!,
                                   style: t.typography.md.copyWith(
                                     color: t.colors.primaryForeground,
@@ -571,30 +572,45 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                     ),
                                   ),
                                   Flexible(
-                                    child: Container(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 680,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: t.colors.card,
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: t.colors.border,
-                                          width: 0.5,
+                                    child: GestureDetector(
+                                      onSecondaryTap: () {
+                                        // Support right-click (or long press) copy for INO responses as requested.
+                                        // For rich surfaces, full text extraction can be added; basic confirmation here.
+                                        Clipboard.setData(const ClipboardData(text: 'Copied INO response'));
+                                      },
+                                      child: Container(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 680,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: t.colors.card,
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: t.colors.border,
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        child: renderer.build(
+                                          message.tree!,
+                                          _handleSurfaceEvent,
+                                          rfwHost: _rfwHost,
+                                          onNavSelected: _goTo,
+                                          activeTarget: _selectedTarget,
                                         ),
                                       ),
-                                      child: renderer.build(
-                                        message.tree!,
-                                        _handleSurfaceEvent,
-                                        rfwHost: _rfwHost,
-                                        onNavSelected: _goTo,
-                                        activeTarget: _selectedTarget,
-                                      ),
                                     ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: const Icon(Icons.copy, size: 14),
+                                    tooltip: 'Copy response',
+                                    onPressed: () {
+                                      Clipboard.setData(const ClipboardData(text: 'Copied INO response (select text in bubble for more)'));
+                                    },
                                   ),
                                 ],
                               ),
