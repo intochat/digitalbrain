@@ -4,7 +4,6 @@ using Azure.Storage.Blobs;
 using DigitalBrain.Core;
 using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
-using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
@@ -186,8 +185,6 @@ if (isAspireHosted)
 builder.Services.AddPackConfigStore(packConfigBlobs);
 builder.Services.AddHostedService<DigitalBrain.Salesforce.SalesforceAppConfigSeeder>();
 builder.Services.AddHostedService<DigitalBrain.Google.GoogleAppConfigSeeder>();
-builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
-builder.Services.AddSingleton<SkillPackSynthesizer>();
 
 // Old eager Google Gmail client registration removed in favor of per-user GmailApiClientFactory
 // (see registration below). The factory creates clients on demand inside per-user GmailNeuron using Self.AsScope().
@@ -339,6 +336,8 @@ builder.UseOrleans(siloBuilder =>
     siloBuilder.ConfigureServices(services => services.AddSignalEgressStreamSubscriber());
     siloBuilder.AddFoundry();
 });
+
+builder.Services.AddHostedService<KernelStartupWarmupService>();
 
 #pragma warning restore ORLEANSEXP005
 
@@ -498,83 +497,6 @@ if (serveWebBundle)
     {
         context.Response.ContentType = "text/html";
         await context.Response.SendFileAsync(indexPath);
-    });
-}
-
-// Bootstrap self-awareness (SystemStatusNeuron will connect MCP + fire Launched on activate)
-// Skipped entirely in test mode (DIGITALBRAIN_TEST_MODE=true or Testing env) to keep tests fast + quiet.
-// The warmup activates grains + runs automation seed scripts + can trigger MCP which is undesired in unit/integration.
-var grainFactory = app.Services.GetService<IGrainFactory>();
-var isTestMode = string.Equals(Environment.GetEnvironmentVariable("DIGITALBRAIN_TEST_MODE"), "true", StringComparison.OrdinalIgnoreCase)
-    || string.Equals(app.Environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase);
-if (grainFactory != null && !isTestMode)
-{
-    app.Lifetime.ApplicationStarted.Register(() =>
-    {
-        var stoppingToken = app.Lifetime.ApplicationStopping;
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var status = grainFactory.GetGrain<ISystemStatus>("status-main");
-                await status.GetTimelineAsync(stoppingToken);
-                await grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync(stoppingToken);
-                await grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync(stoppingToken);
-                await grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync(stoppingToken);
-                await grainFactory.GetGrain<IUserSessionNeuron>("session-main").GetTimelineAsync(stoppingToken);
-
-                // Activate the singleton LLM responder so it subscribes to the timeline at startup.
-                // Broadcasts only reach already-activated grains; without this the AskLlm -> reply Signal
-                // chain (e.g. the Telegram experience) would silently never fire in production. GetTimelineAsync
-                // is idempotent — a no-op if the grain is already active.
-                await grainFactory.GetGrain<ILlmResponderNeuron>(ILlmResponderNeuron.SingletonKey).GetTimelineAsync(stoppingToken);
-
-                // AutomationNeuron must be warmed so it receives NeuronActivated and other timeline events.
-                var automation = grainFactory.GetGrain<IAutomationNeuron>("automation-main");
-                await automation.GetTimelineAsync(stoppingToken);
-
-                // ScheduleTriggerNeuron warmed to project journaled reactions + start reminders immediately.
-                _ = grainFactory.GetGrain<ScheduleTriggerNeuron>("schedule-main");
-
-                // Trusted bootstrap seeds: these are built-in startup definitions, not user/MCP-authored
-                // mutations, so they intentionally use AutomationNeuron's low-level registration API.
-                // User-created executable automations are staged through SelfEvolutionProposal instead.
-                // High-quality seeds (priority 5): real C# bodies, useful behaviors, script sharing.
-                // 1. Auto-emit UiSurface on activation (immediate UI value)
-                await automation.DefineReactionAsync(
-                    "auto-brief-on-activation",
-                    "NeuronActivated",
-                    null,
-                    "return new[] { new ListSurface(\"AutomationBrief\", new[] { \"System activated - lightweight reactions live\", \"Use MCP list_automations or define more\" }) };"
-                );
-
-                // 2. React to Signal + context, emit useful signal (glue)
-                await automation.DefineReactionAsync(
-                    "signal-context-reactor",
-                    "Signal:DailyBriefRequested",
-                    null,
-                    "var name = (input as Signal)?.Payload?.GetValueOrDefault(\"neuron\")?.ToString() ?? \"brain\"; return new[] { new Signal(\"DailyBriefGenerated\", new Dictionary<string,object?> { [\"source\"] = \"automation\", [\"neuron\"] = name }) };"
-                );
-
-                // 3+4. Script sharing demo: one script id referenced by two different reactions
-                await automation.FireAsync(new RegisterScript("shared.brief-gen", "return new[] { new Signal(\"SharedBriefEmitted\", new Dictionary<string,object?> { [\"reused\"] = true }) };", "Reusable brief emitter", Array.Empty<string>(), "default"), stoppingToken);
-                await automation.FireAsync(new RegisterReaction("brief-on-pa-activate", "NeuronActivated", "shared.brief-gen", "personal-assistant", Array.Empty<string>(), "default", null), stoppingToken);
-                await automation.FireAsync(new RegisterReaction("brief-on-any-activate", "NeuronActivated", "shared.brief-gen", null, Array.Empty<string>(), "default", null), stoppingToken);
-
-                // Scoped demo (priority 9): only matches for specific user scope (backward default=global)
-                await automation.FireAsync(new RegisterScript("scoped.demo", "return new[] { new Signal(\"ScopedOnly\", null) };", "scoped only", Array.Empty<string>(), "demo-user"), stoppingToken);
-                await automation.FireAsync(new RegisterReaction("scoped-reaction", "NeuronActivated", "scoped.demo", null, Array.Empty<string>(), "demo-user", null), stoppingToken);
-
-
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-            }
-            catch (Exception ex)
-            {
-                app.Logger.LogWarning(ex, "Kernel startup neuron warmup failed.");
-            }
-        }, stoppingToken);
     });
 }
 

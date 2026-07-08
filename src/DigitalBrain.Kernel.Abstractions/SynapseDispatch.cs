@@ -23,10 +23,7 @@ internal static class SynapseDispatch
         var handlers = Handlers(host.GetType());
         if (handlers.TryGetValue(synapse.GetType(), out var method))
         {
-            var arguments = method.GetParameters().Length == 2
-                ? new object[] { synapse, cancellationToken }
-                : new object[] { synapse };
-            return (Task)method.Invoke(host, arguments)!;
+            return (Task)method.Invoke(host, [synapse, cancellationToken])!;
         }
         logger.LogWarning("{Neuron}: no handler for {Synapse}", self, synapse.GetType().Name);
         return Task.CompletedTask;
@@ -40,8 +37,7 @@ internal static class SynapseDispatch
                 .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IHandle<>)))
             {
                 var st = i.GetGenericArguments()[0];
-                map[st] = i.GetMethod(nameof(IHandle<Synapse>.HandleAsync), [st, typeof(CancellationToken)])
-                    ?? i.GetMethod(nameof(IHandle<Synapse>.HandleAsync), [st])!;
+                map[st] = i.GetMethod(nameof(IHandle<Synapse>.HandleAsync), [st, typeof(CancellationToken)])!;
             }
             var fd = map.ToFrozenDictionary();
             HandledTypesCache[t] = fd.Keys.ToFrozenSet();

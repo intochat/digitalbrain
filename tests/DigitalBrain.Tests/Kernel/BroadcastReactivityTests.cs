@@ -30,7 +30,7 @@ public sealed class PingSink(ILogger<PingSink> logger, NeuronJournals journals) 
 
     public Task<int> ReceivedCountAsync() => Task.FromResult(_received);
 
-    public Task HandleAsync(Ping synapse)
+    public Task HandleAsync(Ping synapse, CancellationToken cancellationToken = default)
     {
         _received++;
         return Task.CompletedTask;

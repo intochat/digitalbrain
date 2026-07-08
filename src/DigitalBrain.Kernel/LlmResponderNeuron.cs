@@ -13,15 +13,15 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
     // Cache scoped clients per (provider, key) so a chatty pack does not rebuild a client per message.
     private readonly Dictionary<(string Provider, string? Key), IChatClient> _scopedClients = new();
 
-    public async Task HandleAsync(AskLlm ask)
+    public async Task HandleAsync(AskLlm ask, CancellationToken cancellationToken = default)
     {
-        var chat = await ResolveChatClientAsync(ask);
-        var text = chat is null ? "[no-llm]" : (await chat.GetResponseAsync(ask.Prompt)).Text?.Trim() ?? "[no-llm]";
+        var chat = await ResolveChatClientAsync(ask, cancellationToken);
+        var text = chat is null ? "[no-llm]" : (await chat.GetResponseAsync(ask.Prompt, cancellationToken: cancellationToken)).Text?.Trim() ?? "[no-llm]";
         var props = new Dictionary<string, object?>(ask.ReplyProps) { ["text"] = text };
-        await Broadcast(new Signal(ask.ReplyType, props));
+        await Broadcast(new Signal(ask.ReplyType, props), cancellationToken);
     }
 
-    private async Task<IChatClient?> ResolveChatClientAsync(AskLlm ask)
+    private async Task<IChatClient?> ResolveChatClientAsync(AskLlm ask, CancellationToken cancellationToken)
     {
         var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
         var store = ServiceProvider.GetService<IPackConfigStore>();
@@ -33,7 +33,7 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
         {
             try
             {
-                var sys = await store.GetAsync("system", "llm");
+                var sys = await store.GetAsync("system", "llm", cancellationToken);
                 if (sys.TryGetValue("llm_provider", out var sysProvider) && !string.IsNullOrWhiteSpace(sysProvider))
                 {
                     sys.TryGetValue("llm_key", out var sysKey);
@@ -47,6 +47,10 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
                     if (sysClient is not null) return sysClient;
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch { /* config optional */ }
         }
 
@@ -56,7 +60,7 @@ public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJourna
         if (factory is null || store is null)
             return global;
 
-        var values = await store.GetAsync(ask.ConfigScope ?? "default", ask.ConfigPack);
+        var values = await store.GetAsync(ask.ConfigScope ?? "default", ask.ConfigPack, cancellationToken);
         if (!values.TryGetValue("llm_provider", out var provider) || string.IsNullOrWhiteSpace(provider))
             return global;
 

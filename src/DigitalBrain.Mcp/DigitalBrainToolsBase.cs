@@ -71,7 +71,6 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
             "closedloop-main" => Grains.GetGrain<IClosedLoopNeuron>(neuronId),
             "context-main" => Grains.GetGrain<INeuron>(neuronId),
             "company-main" => Grains.GetGrain<ICompanyKnowledgeNeuron>(neuronId),
-            "company-skill-main" => Grains.GetGrain<ICompanySkillOrchestratorNeuron>(neuronId),
             "chart-main" => Grains.GetGrain<IDataVisualizationNeuron>(neuronId),
             _ when neuronId.StartsWith("chart-", StringComparison.OrdinalIgnoreCase) => Grains.GetGrain<IChartNeuron>(neuronId),
             "db-main" => Grains.GetGrain<IDbSupportNeuron>(neuronId),

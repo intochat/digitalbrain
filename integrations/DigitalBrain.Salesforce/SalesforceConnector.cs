@@ -142,6 +142,10 @@ public class SalesforceConnector : IConnector
 
             return new AuthResult(true);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             return new AuthResult(false, "exchange-failed", ex.Message);
@@ -157,6 +161,10 @@ public class SalesforceConnector : IConnector
             // Cheap probe: SELECT Id FROM User LIMIT 1
             await client.QueryAsync("SELECT Id FROM User LIMIT 1", cancellationToken);
             return new ConnectionHealth(Healthy: true, Detail: "Salesforce connection healthy (query succeeded)", Checked: DateTimeOffset.UtcNow);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

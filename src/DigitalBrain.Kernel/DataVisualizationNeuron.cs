@@ -23,7 +23,7 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
     public static string AgentInstructions => "You are Chart. Visualize data and modify live views on natural language instructions. Maintain per-surface context and emit updated surfaces using the same surfaceId for live panel identity.";
     public static string[] AgentRoutingExamples => new[] { "show sales trend", "filter last 7 days", "switch to area chart and highlight outliers" };
 
-    public async Task HandleAsync(VisualizeDataRequest request)
+    public async Task HandleAsync(VisualizeDataRequest request, CancellationToken cancellationToken = default)
     {
         var surfaceId = !string.IsNullOrWhiteSpace(request.RequestId) ? request.RequestId! : request.CorrelationId ?? "chart-" + Guid.NewGuid().ToString("N")[..8];
         var rows = DataChartBuilder.ParseRows(request.DataJson).Select(r => (IReadOnlyDictionary<string, object?>)r).ToArray();
@@ -51,19 +51,19 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
             surface = surface with { Props = merged };
         }
 
-        await FireAsync(new DataChartGenerated(surfaceId, surface));
-        await BroadcastRfwCard(surface);
+        await FireAsync(new DataChartGenerated(surfaceId, surface), cancellationToken);
+        await BroadcastRfwCard(surface, cancellationToken);
 
         // P0-5: also deliver UiSurface to dedicated FlutterUiNeuron (point-to-point via I* contract) so it owns handling for thin client.
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(surface.Stamp(Self, CurrentCause));
+        await flutter.DeliverAsync(surface.Stamp(Self, CurrentCause), cancellationToken);
     }
 
-    public async Task HandleAsync(ChartCommand command)
+    public async Task HandleAsync(ChartCommand command, CancellationToken cancellationToken = default)
     {
         if (!_sessions.TryGetValue(command.SurfaceId, out var session))
         {
-            await FireAsync(new DataChartFailed(command.SurfaceId, "no session"));
+            await FireAsync(new DataChartFailed(command.SurfaceId, "no session"), cancellationToken);
             return;
         }
 
@@ -78,7 +78,7 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
             var summary = $"{session.Rows.Count} rows";
             try
             {
-                var resp = await chat.GetResponseAsync($"Data: {summary}. Instruction: {command.Instruction}. Reply with short action like: filter:7, area, outliers, group, remove-below:10");
+                var resp = await chat.GetResponseAsync($"Data: {summary}. Instruction: {command.Instruction}. Reply with short action like: filter:7, area, outliers, group, remove-below:10", cancellationToken: cancellationToken);
                 var t = (resp.Text ?? "").ToLowerInvariant();
                 if (t.Contains("filter") || instruction.Contains("last") || instruction.Contains("7 day")) { action = "filter"; arg = "7"; }
                 else if (t.Contains("area")) action = "area";
@@ -99,16 +99,16 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
         session.Current = newSpec;
 
         var s = UiSurfaceSamples.Chart(command.SurfaceId, Self.Value, newSpec);
-        await FireAsync(new DataChartGenerated(command.SurfaceId, s));
-        await BroadcastRfwCard(s);
+        await FireAsync(new DataChartGenerated(command.SurfaceId, s), cancellationToken);
+        await BroadcastRfwCard(s, cancellationToken);
     }
 
-    public async Task HandleAsync(ChartInteraction inter)
+    public async Task HandleAsync(ChartInteraction inter, CancellationToken cancellationToken = default)
     {
         if (!_sessions.TryGetValue(inter.SurfaceId, out var session) || session.Current == null) return;
         var s = UiSurfaceSamples.Chart(inter.SurfaceId, Self.Value, session.Current);
-        await FireAsync(new DataChartGenerated(inter.SurfaceId, s));
-        await BroadcastRfwCard(s);
+        await FireAsync(new DataChartGenerated(inter.SurfaceId, s), cancellationToken);
+        await BroadcastRfwCard(s, cancellationToken);
     }
 
     private IReadOnlyList<IReadOnlyDictionary<string, object?>> Apply(ChartSession ses, string action, string? arg)
@@ -178,15 +178,13 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
         return surface with { Props = props };
     }
 
-    private async Task BroadcastRfwCard(UiSurface surface)
+    private async Task BroadcastRfwCard(UiSurface surface, CancellationToken cancellationToken)
     {
         // Prefer routing through dedicated IFlutterUiNeuron (item 14) so it owns the UI channel, applies bridge, and broadcasts.
         // Uses CorrelationId from surface for context sharing (per channel marker).
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
-
-    public new Task<IReadOnlyList<Synapse>> GetTimelineAsync() => Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal.ToList());
 
     private sealed class ChartSession
     {

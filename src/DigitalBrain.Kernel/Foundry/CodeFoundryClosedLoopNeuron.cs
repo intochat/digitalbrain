@@ -8,21 +8,21 @@ namespace DigitalBrain.Kernel.Foundry;
 [GrainType("digitalbrain.foundry.loop.v1")]
 public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ICodeFoundryLoopNeuron
 {
-    public async Task HandleAsync(FoundryRequest request)
+    public async Task HandleAsync(FoundryRequest request, CancellationToken cancellationToken = default)
     {
-        var checkpoint = await CreateCheckpointAsync();
+        var checkpoint = await CreateCheckpointAsync(cancellationToken);
         var checkpointId = checkpoint.Timestamp.ToUnixTimeMilliseconds().ToString();
-        await FireAsync(new FoundryCheckpointed(request.Spec, checkpointId));
+        await FireAsync(new FoundryCheckpointed(request.Spec, checkpointId), cancellationToken);
 
         var codeGen = GrainFactory.GetGrain<ICodeGenNeuron>("foundry-codegen");
-        await codeGen.FireAsync(new GenerateCode(request.Spec, request.Tier));
-        var generated = (await codeGen.GetOutgoingTimelineAsync())
+        await codeGen.FireAsync(new GenerateCode(request.Spec, request.Tier), cancellationToken);
+        var generated = (await codeGen.GetOutgoingTimelineAsync(cancellationToken))
             .OfType<CodeGenerated>()
             .LastOrDefault(g => g.Spec == request.Spec);
 
         if (generated is null)
         {
-            await FireAsync(new FoundryRolledBack(request.Spec, "no-source", checkpointId));
+            await FireAsync(new FoundryRolledBack(request.Spec, "no-source", checkpointId), cancellationToken);
             return;
         }
 
@@ -30,19 +30,19 @@ public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> lo
         {
             if (!TrustedAutoApply)
             {
-                await FireAsync(new FoundryRolledBack(request.Spec, "auto-apply-requires-trusted-config", checkpointId));
+                await FireAsync(new FoundryRolledBack(request.Spec, "auto-apply-requires-trusted-config", checkpointId), cancellationToken);
                 return;
             }
 
-            await FireAsync(new AuditBypass("TrustedAutoApply", $"Foundry auto-apply tier {request.Tier} spec", DateTimeOffset.UtcNow));
-            await ApplyImmediatelyAsync(request, generated, checkpointId);
+            await FireAsync(new AuditBypass("TrustedAutoApply", $"Foundry auto-apply tier {request.Tier} spec", DateTimeOffset.UtcNow), cancellationToken);
+            await ApplyImmediatelyAsync(request, generated, checkpointId, cancellationToken);
             return;
         }
 
-        await StageApplyAsync(request, generated, checkpointId);
+        await StageApplyAsync(request, generated, checkpointId, cancellationToken);
     }
 
-    private async Task StageApplyAsync(FoundryRequest request, CodeGenerated generated, string checkpointId)
+    private async Task StageApplyAsync(FoundryRequest request, CodeGenerated generated, string checkpointId, CancellationToken cancellationToken)
     {
         var moduleName = request.Tier == TargetTier.Deploy ? StableModuleName(request.Spec) : string.Empty;
         var proposalId = "foundry-" + Guid.NewGuid().ToString("N");
@@ -55,7 +55,7 @@ public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> lo
             generated.RequiredRefs,
             checkpointId,
             moduleName);
-        await FireAsync(staged);
+        await FireAsync(staged, cancellationToken);
 
         var risk = request.Tier == TargetTier.Run ? SelfEvolutionRisk.InProcessCode : SelfEvolutionRisk.KernelRestart;
         var applyVia = request.Tier == TargetTier.Run ? SelfEvolutionApplyVia.FoundryRun : SelfEvolutionApplyVia.FoundryDeploy;
@@ -78,33 +78,33 @@ public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> lo
             Timestamp = DateTimeOffset.UtcNow,
             CorrelationId = CurrentCause?.CorrelationId ?? CurrentCause?.SynapseId,
             CausationId = CurrentCause?.SynapseId
-        });
+        }, cancellationToken);
     }
 
-    private async Task ApplyImmediatelyAsync(FoundryRequest request, CodeGenerated generated, string checkpointId)
+    private async Task ApplyImmediatelyAsync(FoundryRequest request, CodeGenerated generated, string checkpointId, CancellationToken cancellationToken)
     {
         if (request.Tier == TargetTier.Run)
         {
             var runner = GrainFactory.GetGrain<ICodeRunNeuron>("foundry-coderun");
-            await runner.FireAsync(new RunGeneratedCode(generated.Source, Refs: generated.RequiredRefs));
-            var runResult = (await runner.GetOutgoingTimelineAsync()).OfType<CodeRunResult>().LastOrDefault();
+            await runner.FireAsync(new RunGeneratedCode(generated.Source, Refs: generated.RequiredRefs), cancellationToken);
+            var runResult = (await runner.GetOutgoingTimelineAsync(cancellationToken)).OfType<CodeRunResult>().LastOrDefault();
 
             if (runResult is { Success: true })
-                await FireAsync(new FoundryCompleted(request.Spec, request.Tier, runResult.Output, Applied: true));
+                await FireAsync(new FoundryCompleted(request.Spec, request.Tier, runResult.Output, Applied: true), cancellationToken);
             else
-                await FireAsync(new FoundryRolledBack(request.Spec, runResult?.Error ?? "run-failed", checkpointId));
+                await FireAsync(new FoundryRolledBack(request.Spec, runResult?.Error ?? "run-failed", checkpointId), cancellationToken);
             return;
         }
 
         var moduleName = StableModuleName(request.Spec);
         var deployer = GrainFactory.GetGrain<ICodeDeployNeuron>("foundry-codedeploy");
-        await deployer.FireAsync(new DeployGeneratedCode(generated.Source, moduleName, generated.RequiredRefs, checkpointId));
-        var built = (await deployer.GetOutgoingTimelineAsync()).OfType<CodeBuilt>().LastOrDefault(b => b.ModuleName == moduleName);
+        await deployer.FireAsync(new DeployGeneratedCode(generated.Source, moduleName, generated.RequiredRefs, checkpointId), cancellationToken);
+        var built = (await deployer.GetOutgoingTimelineAsync(cancellationToken)).OfType<CodeBuilt>().LastOrDefault(b => b.ModuleName == moduleName);
 
         if (built is { Success: true })
-            await FireAsync(new FoundryCompleted(request.Spec, request.Tier, "restart-requested:" + moduleName, Applied: true));
+            await FireAsync(new FoundryCompleted(request.Spec, request.Tier, "restart-requested:" + moduleName, Applied: true), cancellationToken);
         else
-            await FireAsync(new FoundryRolledBack(request.Spec, "build", checkpointId));
+            await FireAsync(new FoundryRolledBack(request.Spec, "build", checkpointId), cancellationToken);
     }
 
     private bool TrustedAutoApply =>

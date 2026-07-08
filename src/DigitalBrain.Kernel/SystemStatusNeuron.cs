@@ -10,6 +10,7 @@ namespace DigitalBrain.Kernel;
 public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ISystemStatus
 {
     private McpClient? _mcp;
+    private IGrainTimer? _pollTimer;
 
     public override async Task OnActivateAsync(CancellationToken ct)
     {
@@ -21,18 +22,22 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         // In tests we do not poll; avoid background loops and repeated MCP attempts that log noise.
         if (IsTestMode()) return;
 
-        _pollCts = new CancellationTokenSource();
-        _ = Task.Run(() => PollLoop(_pollCts.Token), _pollCts.Token);
+        _pollTimer = this.RegisterGrainTimer(
+            static (grain, token) => grain.PollOnceAsync(token),
+            this,
+            new GrainTimerCreationOptions
+            {
+                DueTime = TimeSpan.FromSeconds(25),
+                Period = TimeSpan.FromSeconds(25),
+                KeepAlive = false,
+                Interleave = false
+            });
     }
 
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        if (_pollCts is not null)
-        {
-            await _pollCts.CancelAsync();
-            _pollCts.Dispose();
-            _pollCts = null;
-        }
+        _pollTimer?.Dispose();
+        _pollTimer = null;
 
         await base.OnDeactivateAsync(reason, cancellationToken);
     }
@@ -86,40 +91,25 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         }
     }
 
-    private CancellationTokenSource? _pollCts;
-
-    private async Task PollLoop(CancellationToken ct)
+    private async Task PollOnceAsync(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested)
+        try
         {
-            try
+            if (_mcp == null)
             {
-                if (_mcp == null)
-                {
-                    await TryConnectMcpAsync(ct);
-                }
-                if (_mcp != null)
-                {
-                    await PollHealthAsync(ct);
-                }
+                await TryConnectMcpAsync(ct);
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            if (_mcp != null)
             {
-                break;
+                await PollHealthAsync(ct);
             }
-            catch (Exception ex)
-            {
-                Logger.LogDebug(ex, "SystemStatus poll iteration failed.");
-            }
-
-            try
-            {
-                await Task.Delay(25000, ct);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                break;
-            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "SystemStatus poll iteration failed.");
         }
     }
 
@@ -167,18 +157,18 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         return null;
     }
 
-    public async Task HandleAsync(SystemStatusChanged status)
+    public async Task HandleAsync(SystemStatusChanged status, CancellationToken cancellationToken = default)
     {
         Logger.LogInformation("System status: {Component} = {Status}", status.Component, status.Status);
 
         if (status.Status.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
             status.Status.Contains("unhealthy", StringComparison.OrdinalIgnoreCase))
         {
-            await DiagnoseAndProposeAsync(status, default);
+            await DiagnoseAndProposeAsync(status, cancellationToken);
         }
     }
 
-    public Task HandleAsync(FixProposal proposal)
+    public Task HandleAsync(FixProposal proposal, CancellationToken cancellationToken = default)
     {
         Logger.LogInformation("Fix proposal received: {Issue} -> {Fix}", proposal.Issue, proposal.ProposedFix);
         return Task.CompletedTask;

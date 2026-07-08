@@ -17,26 +17,26 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         Icon: "salesforce",
         Action: SalesforceSignals.AuthRequested);
 
-    public async Task HandleAsync(Signal signal)
+    public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
         if (signal.Name != SalesforceSignals.AuthRequested)
             return;
 
         if (IsOAuthStart(signal.Props))
         {
-            await StartOAuthAsync(signal.Props);
+            await StartOAuthAsync(signal.Props, cancellationToken);
             return;
         }
 
         var clientId = signal.Props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
-        await FireAsync(surface);
+        await FireAsync(surface, cancellationToken);
     }
 
-    private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props)
+    private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props, CancellationToken cancellationToken)
     {
         var store = ServiceProvider.GetRequiredService<IPackConfigStore>();
-        var existing = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
+        var existing = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
         var values = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
 
         CopyIfPresent(props, values, SalesforceClientFactory.ClientIdKey);
@@ -61,7 +61,7 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
 
         if (!SalesforceClientFactory.HasConnectedAppConfig(values))
         {
-            await PublishCredentialFormAsync(props, SalesforceClientFactory.MissingConnectedAppConfigMessage);
+            await PublishCredentialFormAsync(props, SalesforceClientFactory.MissingConnectedAppConfigMessage, cancellationToken);
             return;
         }
 
@@ -76,11 +76,11 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         }
         catch (InvalidOperationException ex)
         {
-            await PublishCredentialFormAsync(props, ex.Message);
+            await PublishCredentialFormAsync(props, ex.Message, cancellationToken);
             return;
         }
 
-        await store.SetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, values);
+        await store.SetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, values, cancellationToken);
 
         // Pending PKCE state lives under the caller's OWN per-user scope (I3/I4): each user's grain activation
         // is the single writer of its own pending slot, so two users starting OAuth concurrently never clobber
@@ -91,12 +91,12 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         {
             [SalesforceClientFactory.OAuthStateKey] = state,
             [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier
-        });
+        }, cancellationToken);
         await Broadcast(new Signal(SalesforceSignals.AuthUrl, new Dictionary<string, object?>
         {
             ["provider"] = "salesforce",
             ["url"] = url
-        }));
+        }), cancellationToken);
     }
 
     public async Task<SalesforceOAuthCallbackResult> CompleteOAuthAsync(SalesforceOAuthCallback callback, CancellationToken cancellationToken = default)
@@ -190,12 +190,12 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         }
     }
 
-    private async Task PublishCredentialFormAsync(IReadOnlyDictionary<string, object?> props, string message)
+    private async Task PublishCredentialFormAsync(IReadOnlyDictionary<string, object?> props, string message, CancellationToken cancellationToken)
     {
         var clientId = props.TryGetValue("clientId", out var value) ? value?.ToString() : null;
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId, message);
 
-        await FireAsync(surface);
+        await FireAsync(surface, cancellationToken);
     }
 
     private static bool IsOAuthStart(IReadOnlyDictionary<string, object?> props) =>

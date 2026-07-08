@@ -11,7 +11,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
     private const string AspireInspectionEnabledKey = "DigitalBrain:ClosedLoop:InspectAspireMcp";
     private McpClient? _aspireMcp;
 
-    public async Task HandleAsync(ClosedLoopRequest req)
+    public async Task HandleAsync(ClosedLoopRequest req, CancellationToken cancellationToken = default)
     {
         Logger.LogInformation("ClosedLoop {Type} requested: {Prompt}", req.LoopType, req.Prompt);
 
@@ -32,9 +32,13 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             var full = sysPrompt + "\nPROMPT: " + req.Prompt + "\nCTX: journal-driven";
             try
             {
-                var response = await chat.GetResponseAsync(full);
+                var response = await chat.GetResponseAsync(full, cancellationToken: cancellationToken);
                 var acc = response.Text;
                 analysis = string.IsNullOrWhiteSpace(acc) ? "processed" : acc.Trim();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -43,7 +47,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             }
         }
 
-        await FireAsync(new ClosedLoopCompleted(req.LoopType, analysis.Length > 20 ? analysis : "processed", false));
+        await FireAsync(new ClosedLoopCompleted(req.LoopType, analysis.Length > 20 ? analysis : "processed", false), cancellationToken);
 
         var shouldStageSelfEvolution =
             !req.LoopType.Contains("ui", StringComparison.OrdinalIgnoreCase) &&
@@ -52,38 +56,42 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
 
         if (shouldStageSelfEvolution)
         {
-            await StageSelfEvolutionProposalAsync(req, analysis);
+            await StageSelfEvolutionProposalAsync(req, analysis, cancellationToken);
 
             if (!ShouldInspectAspireMcp())
                 return;
 
-            await EnsureAspireMcpAsync();
+            await EnsureAspireMcpAsync(cancellationToken);
             if (_aspireMcp != null)
             {
                 try
                 {
-                    var res = await CallAspireMcpAsync("list_resources");
+                    var res = await CallAspireMcpAsync("list_resources", ct: cancellationToken);
                     Logger.LogInformation("ClosedLoop staged self-evolution proposal with Aspire resources visible: {Res}", res.Substring(0, Math.Min(200, res.Length)));
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch { }
             }
         }
     }
 
-    public async Task HandleAsync(ExperienceUsed used)
+    public async Task HandleAsync(ExperienceUsed used, CancellationToken cancellationToken = default)
     {
         if (used.Pack.Contains("ClosedLoop", StringComparison.OrdinalIgnoreCase) || used.Pack.Contains("UIClosed", StringComparison.OrdinalIgnoreCase))
         {
             Logger.LogInformation("ClosedLoop embodied from pack {Pack}", used.Pack);
-            await FireAsync(new ClosedLoopRequest(used.Pack.Contains("UI") ? "ui" : "se", "Embodied pack activation: begin closed improvement loop"));
+            await FireAsync(new ClosedLoopRequest(used.Pack.Contains("UI") ? "ui" : "se", "Embodied pack activation: begin closed improvement loop"), cancellationToken);
         }
     }
 
-    private async Task StageSelfEvolutionProposalAsync(ClosedLoopRequest req, string analysis)
+    private async Task StageSelfEvolutionProposalAsync(ClosedLoopRequest req, string analysis, CancellationToken cancellationToken)
     {
         const string applyVia = "aspire-mcp";
 
-        await FireAsync(new SystemModificationProposed("aspire", "closedloop", analysis, applyVia));
+        await FireAsync(new SystemModificationProposed("aspire", "closedloop", analysis, applyVia), cancellationToken);
         var proposal = new SelfEvolutionProposal(
             ProposalId: "closedloop-" + req.SynapseId,
             Scope: "kernel",
@@ -102,7 +110,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             CausationId = CurrentCause?.SynapseId
         };
 
-        await GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main).DeliverAsync(proposal);
+        await GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main).DeliverAsync(proposal, cancellationToken);
     }
 
     private bool ShouldInspectAspireMcp()
@@ -111,7 +119,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
         return config?.GetValue(AspireInspectionEnabledKey, true) ?? true;
     }
 
-    private async Task EnsureAspireMcpAsync()
+    private async Task EnsureAspireMcpAsync(CancellationToken cancellationToken)
     {
         if (_aspireMcp != null) return;
         try
@@ -124,8 +132,13 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
                     Command = "aspire",
                     Arguments = ["agent", "mcp"],
                     WorkingDirectory = workDir
-                }));
-            await FireAsync(new SystemStatusChanged("closedloop-aspire-mcp", "connected"));
+                }),
+                cancellationToken: cancellationToken);
+            await FireAsync(new SystemStatusChanged("closedloop-aspire-mcp", "connected"), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -133,7 +146,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
         }
     }
 
-    private async Task<string> CallAspireMcpAsync(string tool, object? args = null)
+    private async Task<string> CallAspireMcpAsync(string tool, object? args = null, CancellationToken ct = default)
     {
         if (_aspireMcp == null) return "mcp-unavailable";
         var dict = new Dictionary<string, object?>();
@@ -142,7 +155,7 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             foreach (var p in args.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
                 dict[p.Name] = p.GetValue(args);
         }
-        var res = await _aspireMcp.CallToolAsync(tool, dict);
+        var res = await _aspireMcp.CallToolAsync(tool, dict, cancellationToken: ct);
         return res.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "no-data";
     }
 }

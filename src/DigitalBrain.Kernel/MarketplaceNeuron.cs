@@ -13,7 +13,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
 {
     private Dictionary<string, NeuroPack>? _publishedCache;
 
-    public async Task HandleAsync(PublishToMarketplace cmd)
+    public async Task HandleAsync(PublishToMarketplace cmd, CancellationToken cancellationToken = default)
     {
         if (GatePublishing && !PublisherTrust.IsTrusted(ToNeuroPack(cmd), TrustedPublisherKeys()))
         {
@@ -31,10 +31,10 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         var published = _publishedCache!.Values.ToList();
         var listSurface = MarketplaceUiSurfaces.MarketplaceListFromPacks(published, published);
-        await FireAsync(listSurface);
+        await FireAsync(listSurface, cancellationToken);
         if (bus != null)
         {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(listSurface, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(listSurface, Self.Value), cancellationToken);
         }
     }
 
@@ -65,7 +65,7 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
         }
     }
 
-    public async Task HandleAsync(InstallFromMarketplace cmd)
+    public async Task HandleAsync(InstallFromMarketplace cmd, CancellationToken cancellationToken = default)
     {
         var pack = FindPublishedPack(cmd.PackName, cmd.Version);
         if (pack == null)
@@ -110,17 +110,18 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
             BuyerId: cmd.BuyerId,
             SessionId: cmd.SessionId,
             CommissionAmount: commissionAmount);
-        await FireAsync(staged);
+        await FireAsync(staged, cancellationToken);
 
         if (TrustedLocalInstallBypass)
         {
-            await FireAsync(new AuditBypass("TrustedLocalInstallBypass", $"Unsigned/ local install bypass for {pack.Name}@{pack.Version}", DateTimeOffset.UtcNow));
+            await FireAsync(new AuditBypass("TrustedLocalInstallBypass", $"Unsigned/ local install bypass for {pack.Name}@{pack.Version}", DateTimeOffset.UtcNow), cancellationToken);
             await MarketplaceInstallActivation.ApplyAsync(
                 staged,
-                synapse => FireAsync(synapse),
+                synapse => FireAsync(synapse, cancellationToken),
                 GrainFactory,
                 ServiceProvider.GetService<HomeFeedBus>(),
-                Logger);
+                Logger,
+                cancellationToken);
             return;
         }
 
@@ -142,28 +143,28 @@ public class MarketplaceNeuron(ILogger<MarketplaceNeuron> logger, NeuronJournals
             CausationId = CurrentCause?.SynapseId
         };
 
-        await GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main).DeliverAsync(proposal);
+        await GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main).DeliverAsync(proposal, cancellationToken);
         Logger.LogInformation("Marketplace install staged for approval: {Key} by {Buyer} proposal={ProposalId}",
             cmd.PackName + "@" + cmd.Version, cmd.BuyerId, staged.ProposalId);
     }
 
-    public async Task HandleAsync(ListPublished _cmd)
+    public async Task HandleAsync(ListPublished _cmd, CancellationToken cancellationToken = default)
     {
         var packs = GetPublishedPacks();
         Logger.LogInformation("Marketplace listing {Count} real packs", packs.Count);
-        await FireAsync(new PublishedList(packs));
+        await FireAsync(new PublishedList(packs), cancellationToken);
     }
 
-    public async Task HandleAsync(FilterMarketplace cmd)
+    public async Task HandleAsync(FilterMarketplace cmd, CancellationToken cancellationToken = default)
     {
         var published = GetPublishedPacks();
         var surface = MarketplaceUiSurfaces.MarketplaceTreeSurface(
             published, Array.Empty<NeuroPack>(), cmd.Tier, cmd.Channel, Self.Value);
-        await FireAsync(surface);
+        await FireAsync(surface, cancellationToken);
 
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus is not null)
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value), cancellationToken);
     }
 
     private IReadOnlyList<NeuroPack> GetPublishedPacks()

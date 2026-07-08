@@ -17,16 +17,16 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
         Icon: "gmail",
         Action: GoogleSignals.AuthRequested);
 
-    public async Task HandleAsync(Signal signal)
+    public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
         if (signal.Name != GoogleSignals.AuthRequested) return;
 
         // Always attempt to start OAuth flow (will use seeded app config or props).
         // This supports both direct button from INO and credential form paths.
-        await StartOAuthAsync(signal.Props);
+        await StartOAuthAsync(signal.Props, cancellationToken);
     }
 
-    private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props)
+    private async Task StartOAuthAsync(IReadOnlyDictionary<string, object?> props, CancellationToken cancellationToken)
     {
         IPackConfigStore? store = null;
         try
@@ -40,8 +40,12 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
         {
             try
             {
-                var existing = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName);
+                var existing = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, cancellationToken);
                 values = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch { }
         }
@@ -68,7 +72,7 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
             // User fills client id/secret via form -> saves -> re-triggers OAuth.
             var message = "Google OAuth client configuration required. Enter Client ID and Secret from Google Cloud Console.";
             var form = GoogleAuthSurfaces.CredentialForm(Self.Value, clientId: null, message);
-            await FireAsync(form);
+            await FireAsync(form, cancellationToken);
             return;
         }
 
@@ -85,19 +89,19 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
             return;
         }
 
-        await store.SetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, values);
+        await store.SetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, values, cancellationToken);
 
         var userScope = PackConfigScopes.ForUser(Self.AsScope().UserId);
         await store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, new Dictionary<string, string>
         {
             [GoogleClientFactory.OAuthStateKey] = state
-        });
+        }, cancellationToken);
 
         await Broadcast(new Signal(GoogleSignals.AuthUrl, new Dictionary<string, object?>
         {
             ["provider"] = "google",
             ["url"] = authUrl
-        }));
+        }), cancellationToken);
     }
 
     public async Task<GoogleOAuthCallbackResult> CompleteOAuthAsync(GoogleOAuthCallback callback, CancellationToken cancellationToken = default)

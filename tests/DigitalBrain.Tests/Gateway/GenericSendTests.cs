@@ -136,7 +136,7 @@ public sealed class SignalSinkGrain(
     public Task<IReadOnlyList<Signal>> GetReceivedSignalsAsync() =>
         Task.FromResult<IReadOnlyList<Signal>>(_received.ToList());
 
-    public Task HandleAsync(Signal signal)
+    public Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
         _received.Add(signal);
         return Task.CompletedTask;

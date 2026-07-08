@@ -52,6 +52,10 @@ public class GoogleConnector : IConnector
                 var existing = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, cancellationToken);
                 values = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch { }
         }
 
@@ -205,6 +209,10 @@ public class GoogleConnector : IConnector
             var labelsResponse = await service.Users.Labels.List("me").ExecuteAsync(cancellationToken);
             var count = labelsResponse.Labels?.Count ?? 0;
             return new ConnectionHealth(Healthy: true, Detail: $"Google labels.list succeeded ({count} labels)", Checked: DateTimeOffset.UtcNow);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

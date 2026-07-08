@@ -47,15 +47,3 @@ public sealed record RefundApproved(string RequestId, decimal ApprovedAmount, st
 [Alias("DigitalBrain.Core.RefundDenied")]
 public sealed record RefundDenied(string RequestId, string DenialReason)
     : Synapse(nameof(RefundDenied), DateTimeOffset.UtcNow);
-
-// Orchestration commands for automated company skill creation (ingest -> crystallize -> synthesize -> verify -> install).
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.CreateCompanySkill")]
-public record CreateCompanySkill(string ProcessName) : Synapse(nameof(CreateCompanySkill), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.CompanySkillCreationResult")]
-public record CompanySkillCreationResult(string ProcessName, string Version, bool Success, string Details) : Synapse(nameof(CompanySkillCreationResult), DateTimeOffset.UtcNow);
-
-[Alias("DigitalBrain.Core.ICompanySkillOrchestratorNeuron")]
-public interface ICompanySkillOrchestratorNeuron : INeuron, IHandle<CreateCompanySkill> { }

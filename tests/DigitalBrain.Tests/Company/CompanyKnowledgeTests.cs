@@ -166,18 +166,4 @@ public sealed class CompanyKnowledgeTests : NeuronTestBase
         Assert.NotNull(recent);
     }
 
-    [Fact]
-    public async Task Orchestrator_Creates_Skill_EndToEnd_And_Reports_Result()
-    {
-        var orch = Grain<ICompanySkillOrchestratorNeuron>("orchestrator-test");
-        await orch.FireAsync(new CreateCompanySkill("RefundHandling"));
-
-        await Task.Delay(150);
-
-        var tl = await orch.GetOutgoingTimelineAsync();
-        var result = tl.OfType<CompanySkillCreationResult>().LastOrDefault();
-        Assert.NotNull(result);
-        Assert.Equal("RefundHandling", result.ProcessName);
-        Assert.True(result.Details.Length > 5);
-    }
 }

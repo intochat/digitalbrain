@@ -10,13 +10,13 @@ public class DbSupportNeuron(
     NeuronJournals journals,
     SqliteSchemaInspector sqliteSchemaInspector) : Neuron(logger, journals), IDbSupportNeuron
 {
-    public async Task HandleAsync(DbConnect cmd)
+    public async Task HandleAsync(DbConnect cmd, CancellationToken cancellationToken = default)
     {
         Logger.LogInformation("DB connected {Name} via {Provider}", cmd.ConnectionName, cmd.Provider);
         // Input already journaled by initiating FireAsync; omit re-fire of handled type to prevent dispatch recursion on echo.
     }
 
-    public async Task HandleAsync(DbQuery cmd)
+    public async Task HandleAsync(DbQuery cmd, CancellationToken cancellationToken = default)
     {
         if (cmd.Result is not null)
         {
@@ -25,10 +25,10 @@ public class DbSupportNeuron(
         }
         Logger.LogInformation("DB query on {Name}: {Q}", cmd.ConnectionName, cmd.Query);
         var result = $"[DB result for {cmd.Query}] 42 rows";
-        await FireAsync(new DbQuery(cmd.ConnectionName, cmd.Query, result));
+        await FireAsync(new DbQuery(cmd.ConnectionName, cmd.Query, result), cancellationToken);
     }
 
-    public async Task HandleAsync(DbInspectSchema cmd)
+    public async Task HandleAsync(DbInspectSchema cmd, CancellationToken cancellationToken = default)
     {
         if (!IsSqliteRequest(cmd))
         {
@@ -39,7 +39,7 @@ public class DbSupportNeuron(
                 Succeeded: false,
                 Error: $"Unsupported database provider '{cmd.Provider}'. Schema inspection currently supports SQLite files.",
                 ClientId: cmd.ClientId,
-                WorkspaceId: WorkspaceIds.Effective(cmd.WorkspaceId)));
+                WorkspaceId: WorkspaceIds.Effective(cmd.WorkspaceId)), cancellationToken);
             return;
         }
 
@@ -57,13 +57,15 @@ public class DbSupportNeuron(
                     cmd.ConnectionName,
                     cmd.SourcePath,
                     cmd.ClientId,
-                    cmd.WorkspaceId)
+                    cmd.WorkspaceId,
+                    cancellationToken)
                 : await sqliteSchemaInspector.InspectFileAsync(
                     cmd.SourcePath ?? string.Empty,
                     cmd.ConnectionName,
                     cmd.SourcePath,
                     cmd.ClientId,
-                    cmd.WorkspaceId);
+                    cmd.WorkspaceId,
+                    cancellationToken);
 
             await FireAsync(new DbSchemaInspected(
                 cmd.ConnectionName,
@@ -72,7 +74,11 @@ public class DbSupportNeuron(
                 Succeeded: true,
                 Error: null,
                 ClientId: cmd.ClientId,
-                WorkspaceId: WorkspaceIds.Effective(cmd.WorkspaceId)));
+                WorkspaceId: WorkspaceIds.Effective(cmd.WorkspaceId)), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -89,7 +95,7 @@ public class DbSupportNeuron(
                 Succeeded: false,
                 Error: ex.GetBaseException().Message,
                 ClientId: cmd.ClientId,
-                WorkspaceId: WorkspaceIds.Effective(cmd.WorkspaceId)));
+                WorkspaceId: WorkspaceIds.Effective(cmd.WorkspaceId)), cancellationToken);
         }
     }
 

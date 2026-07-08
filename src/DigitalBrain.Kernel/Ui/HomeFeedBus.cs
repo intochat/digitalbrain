@@ -27,9 +27,19 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
 
     public async Task BroadcastAsync(RfwCard card, CancellationToken cancellationToken = default)
     {
-        if (IsDuplicate(card)) return;
+        cancellationToken.ThrowIfCancellationRequested();
+        var key = SeenKey(card);
+        if (!TryMarkSeen(key)) return;
 
-        await PublishAsync(card, cancellationToken);
+        try
+        {
+            await PublishAsync(card, cancellationToken);
+        }
+        catch
+        {
+            ForgetSeen(key);
+            throw;
+        }
     }
 
     // Compatibility path for legacy synchronous callers. Prefer BroadcastAsync from async handlers/tests so
@@ -41,7 +51,8 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
 
     private async Task BroadcastAndLogAsync(RfwCard card)
     {
-        if (IsDuplicate(card)) return;
+        var key = SeenKey(card);
+        if (!TryMarkSeen(key)) return;
 
         try
         {
@@ -49,6 +60,7 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
         }
         catch (Exception ex)
         {
+            ForgetSeen(key);
             logger?.LogError(ex, "HomeFeed stream publish failed for clientId={ClientId}", card.ClientId);
         }
     }
@@ -98,18 +110,33 @@ public sealed class HomeFeedBus(IClusterClient clusterClient, ILogger<HomeFeedBu
             .OnNextAsync(card);
     }
 
-    private bool IsDuplicate(RfwCard card)
+    private bool TryMarkSeen(string key)
     {
-        var key = $"{card.CorrelationId}|{ContentHash(card)}";
         lock (_seenLock)
         {
-            if (!_seen.Add(key)) return true;
+            if (!_seen.Add(key)) return false;
             _seenOrder.Enqueue(key);
             while (_seenOrder.Count > MaxSeenEntries)
-                _seen.Remove(_seenOrder.Dequeue());
-            return false;
+            {
+                var evicted = _seenOrder.Dequeue();
+                if (!_seenOrder.Contains(evicted))
+                {
+                    _seen.Remove(evicted);
+                }
+            }
+            return true;
         }
     }
+
+    private void ForgetSeen(string key)
+    {
+        lock (_seenLock)
+        {
+            _seen.Remove(key);
+        }
+    }
+
+    private static string SeenKey(RfwCard card) => $"{card.CorrelationId}|{ContentHash(card)}";
 
     private static string ContentHash(RfwCard card) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{card.LibraryName}|{card.RootWidget}|{card.DataJson}")));

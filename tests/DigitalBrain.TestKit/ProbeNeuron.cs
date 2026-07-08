@@ -8,5 +8,5 @@ namespace DigitalBrain.TestKit;
 public class ProbeNeuron(ILogger<ProbeNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IProbeNeuron, IHandle<ProbeMessageSynapse>
 {
-    public Task HandleAsync(ProbeMessageSynapse synapse) => Task.CompletedTask;
+    public Task HandleAsync(ProbeMessageSynapse synapse, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

@@ -18,7 +18,7 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
     private GeneratedPackRuntime PackRuntime => _packRuntime ??= new GeneratedPackRuntime(ServiceProvider, Logger);
 
-    public Task HandleAsync(NeuronTelemetry telemetry) => Task.CompletedTask;
+    public Task HandleAsync(NeuronTelemetry telemetry, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     protected override bool ShouldSubscribeToTimeline => true;
 
@@ -51,11 +51,11 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         {
             case NeuroPackInstalled installed:
                 PackRuntime.Install(installed.Pack);
-                await EmitConfigFormIfRequiredAsync();
+                await EmitConfigFormIfRequiredAsync(cancellationToken);
                 return;
         }
 
-        if (await TryDispatchEmbodiedAsync(synapse))
+        if (await TryDispatchEmbodiedAsync(synapse, cancellationToken))
         {
             return;
         }
@@ -66,12 +66,12 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
                 Logger.LogInformation("Generated handled demo message");
                 break;
             case ExperienceUsed used:
-                await UseExperienceAsync(used);
+                await UseExperienceAsync(used, cancellationToken);
                 break;
         }
     }
 
-    private async Task EmitConfigFormIfRequiredAsync()
+    private async Task EmitConfigFormIfRequiredAsync(CancellationToken cancellationToken)
     {
         var embodied = PackRuntime.Current;
         if (embodied is null) return;
@@ -80,10 +80,10 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         if (required is null || required.Count == 0) return;
 
         var surface = ConfigFormSurface.Build(embodied.PackName, required, Self.Value);
-        await FireAsync(surface);
+        await FireAsync(surface, cancellationToken);
         if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
         {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value), cancellationToken);
         }
         Logger.LogInformation("GeneratedNeuron emitted config form for pack '{Pack}' ({FieldCount} fields).", embodied.PackName, required.Count);
     }
@@ -91,8 +91,9 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
     private void EnsureEmbodied() =>
         PackRuntime.Ensure(OutgoingJournal.Concat(IncomingJournal), this.GetPrimaryKeyString() ?? string.Empty);
 
-    private async Task<bool> TryDispatchEmbodiedAsync(Synapse synapse)
+    private async Task<bool> TryDispatchEmbodiedAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureEmbodied();
         var embodied = PackRuntime.Current;
         if (embodied is null || !embodied.CanHandle(synapse))
@@ -109,15 +110,15 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Embodied pack '{Pack}' failed while handling {SynapseType}.", embodied.PackName, synapse.Type);
-            await FireAsync(new PackEmission(embodied.PackName, synapse.Type, "pack-error:" + ex.GetBaseException().Message));
+            await FireAsync(new PackEmission(embodied.PackName, synapse.Type, "pack-error:" + ex.GetBaseException().Message), cancellationToken);
             return true;
         }
 
         foreach (var output in outputs)
         {
             var normalized = NormalizePackOutput(embodied.PackName, output);
-            await Broadcast(normalized);
-            await BroadcastPackSurfaceAsync(normalized, embodied.PackName);
+            await Broadcast(normalized, cancellationToken);
+            await BroadcastPackSurfaceAsync(normalized, embodied.PackName, cancellationToken);
         }
 
         Logger.LogInformation(
@@ -143,26 +144,26 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         };
     }
 
-    private async Task BroadcastPackSurfaceAsync(Synapse output, string packName)
+    private async Task BroadcastPackSurfaceAsync(Synapse output, string packName, CancellationToken cancellationToken)
     {
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus is null) return;
 
         if (output is UiSurface surface)
         {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, packName));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, packName), cancellationToken);
         }
         else if (output is RfwCard card)
         {
-            await bus.BroadcastAsync(card);
+            await bus.BroadcastAsync(card, cancellationToken);
         }
     }
 
-    private async Task UseExperienceAsync(ExperienceUsed used)
+    private async Task UseExperienceAsync(ExperienceUsed used, CancellationToken cancellationToken)
     {
         if (IsGmailInsightsExperience(used))
         {
-            await RunGmailInsightsExperienceAsync(used);
+            await RunGmailInsightsExperienceAsync(used, cancellationToken);
             return;
         }
 
@@ -172,17 +173,17 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         if (embodied is not null)
         {
             var output = embodied.Respond(used.Action);
-            await FireAsync(new PackEmission(embodied.PackName, used.Action, output));
+            await FireAsync(new PackEmission(embodied.PackName, used.Action, output), cancellationToken);
             Logger.LogInformation("GeneratedNeuron ran embodied pack '{Pack}' for action '{Action}'", embodied.PackName, used.Action);
             if (used.Action is "open" or "emit-test-surface" or "self-test")
             {
                 var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, new List<UiWidgetTree> { new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live from embodied " + used.Pack }) });
                 var surf = new UiSurface(used.Pack, new Dictionary<string, object?> { [UiSurfaceKeys.Title] = used.Pack, ["pack"] = used.Pack, ["tree"] = winTree });
-                await FireAsync(surf);
+                await FireAsync(surf, cancellationToken);
                 var b = ServiceProvider.GetService<HomeFeedBus>();
                 if (b is not null)
                 {
-                    await b.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
+                    await b.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value), cancellationToken);
                 }
             }
         }
@@ -198,7 +199,7 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         var chat = ServiceProvider.GetService<IChatClient>();
         if (chat is null)
         {
-            await FireAsync(new LlmResponse(used.Pack, $"[Embodied: {packKey}] Simulated response to {used.Action} using installed experience.", "sim"));
+            await FireAsync(new LlmResponse(used.Pack, $"[Embodied: {packKey}] Simulated response to {used.Action} using installed experience.", "sim"), cancellationToken);
         }
         else
         {
@@ -207,8 +208,8 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
                                  $"Implementation guidance/code:\n{code}\n\n" +
                                  $"Handle the following usage: {used.Action} on input related to '{used.Pack}'.\n" +
                                  "Respond in character as this specific installed neuron/experience would. Be concise and useful.";
-            var response = await chat.GetResponseAsync(behaviorPrompt);
-            await FireAsync(new LlmResponse(behaviorPrompt, response.Text.Trim(), "embodied-pack"));
+            var response = await chat.GetResponseAsync(behaviorPrompt, cancellationToken: cancellationToken);
+            await FireAsync(new LlmResponse(behaviorPrompt, response.Text.Trim(), "embodied-pack"), cancellationToken);
             Logger.LogInformation("GeneratedNeuron LLM-embodied pack '{Pack}' for action '{Action}'", packKey, used.Action);
         }
 
@@ -221,16 +222,16 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
                 ["pack"] = used.Pack,
                 ["tree"] = winTree
             });
-            await FireAsync(surf);
+            await FireAsync(surf, cancellationToken);
             var bus = ServiceProvider.GetService<HomeFeedBus>();
             if (bus != null)
             {
-                await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
+                await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value), cancellationToken);
             }
         }
     }
 
-    private async Task RunGmailInsightsExperienceAsync(ExperienceUsed used)
+    private async Task RunGmailInsightsExperienceAsync(ExperienceUsed used, CancellationToken cancellationToken)
     {
         var userId = EffectiveUserId(used.UserId);
         var emails = BuildGmailSampleRows(100);
@@ -244,15 +245,15 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
             })
             .ToArray();
 
-        var summary = await SummarizeGmailRowsAsync(emails);
+        var summary = await SummarizeGmailRowsAsync(emails, cancellationToken);
         var chartRequestId = "gmail-last-100-" + StableKey(userId);
-        await FireAsync(new PackEmission(used.Pack, used.Action, summary));
+        await FireAsync(new PackEmission(used.Pack, used.Action, summary), cancellationToken);
 
         var surface = BuildGmailInsightsSurface(used, summary, emails.Count, chartRequestId);
-        await FireAsync(surface);
+        await FireAsync(surface, cancellationToken);
         if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
         {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value), cancellationToken);
         }
 
         var chart = GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-" + chartRequestId);
@@ -262,10 +263,10 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
             "bar",
             chartRequestId,
             userId,
-            used.SessionId));
+            used.SessionId), cancellationToken);
     }
 
-    private async Task<string> SummarizeGmailRowsAsync(IReadOnlyList<IReadOnlyDictionary<string, object?>> emails)
+    private async Task<string> SummarizeGmailRowsAsync(IReadOnlyList<IReadOnlyDictionary<string, object?>> emails, CancellationToken cancellationToken)
     {
         var fallback = $"Local Gmail Insights analyzed {emails.Count} messages. Top categories: " +
             string.Join(", ", emails
@@ -287,9 +288,14 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
             var response = await chat.GetResponseAsync(
                 "You are the local DigitalBrain Gmail insights experience. " +
                 "Summarize these recent Gmail messages in two concise bullets and name the dominant categories.\n" +
-                sample);
+                sample,
+                cancellationToken: cancellationToken);
             var text = response.Text.Trim();
             return string.IsNullOrWhiteSpace(text) ? fallback : text;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

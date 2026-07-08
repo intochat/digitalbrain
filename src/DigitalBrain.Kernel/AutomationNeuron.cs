@@ -40,12 +40,12 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
             case RegisterScript rs:
                 _scripts[rs.Id] = rs.Code;
                 await FireAsync(new Signal("ScriptRegistered", new Dictionary<string, object?> { ["id"] = rs.Id }), cancellationToken);
-                await EmitAutomationsSurfaceAsync();
+                await EmitAutomationsSurfaceAsync(cancellationToken);
                 return;
             case RegisterReaction rr:
                 _reactions.Add(rr);
                 await FireAsync(new Signal("ReactionRegistered", new Dictionary<string, object?> { ["id"] = rr.Id, ["when"] = rr.When }), cancellationToken);
-                await EmitAutomationsSurfaceAsync();
+                await EmitAutomationsSurfaceAsync(cancellationToken);
                 return;
             case AutomationApp app:
                 foreach (var s in app.Scripts ?? Array.Empty<RegisterScript>())
@@ -53,7 +53,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 foreach (var r in app.Reactions ?? Array.Empty<RegisterReaction>())
                     _reactions.Add(r);
                 await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = app.AppId }), cancellationToken);
-                await EmitAutomationsSurfaceAsync();
+                await EmitAutomationsSurfaceAsync(cancellationToken);
                 return;
             case CreateAutomationApp create:
                 if (create.Scripts is not null)
@@ -61,23 +61,24 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 if (create.Reactions is not null)
                     foreach (var r in create.Reactions) _reactions.Add(r);
                 await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = create.AppId }), cancellationToken);
-                await EmitAutomationsSurfaceAsync();
+                await EmitAutomationsSurfaceAsync(cancellationToken);
                 return;
             case RemoveReaction rm:
                 _reactions.RemoveAll(r => r.Id == rm.Id);
                 await FireAsync(new Signal("ReactionRemoved", new Dictionary<string, object?> { ["id"] = rm.Id }), cancellationToken);
-                await EmitAutomationsSurfaceAsync();
+                await EmitAutomationsSurfaceAsync(cancellationToken);
                 return;
             case PromoteAutomationToPack promo:
-                await HandlePromoteAsync(promo);
+                await HandlePromoteAsync(promo, cancellationToken);
                 return;
         }
 
-        await TryExecuteMatchingAsync(synapse);
+        await TryExecuteMatchingAsync(synapse, cancellationToken);
     }
 
-    private async Task TryExecuteMatchingAsync(Synapse synapse)
+    private async Task TryExecuteMatchingAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var matches = _reactions.Where(r => IsMatch(r, synapse)).ToList();
         if (matches.Count == 0) return;
 
@@ -101,7 +102,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 code,
                 synapse,
                 Self,
-                s => FireAsync(StampCurrent(s)),
+                s => FireAsync(StampCurrent(s), cancellationToken),
                 caps);
 
             // Light declared-emits enforcement (plan Task 9)
@@ -118,13 +119,13 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
 
             foreach (var output in outputs)
             {
-                await FireAsync(StampCurrent(output));
+                await FireAsync(StampCurrent(output), cancellationToken);
             }
 
             // Minimal run ledger entry (P1). Persisted via journal.
-            await FireAsync(StampCurrent(new AutomationRun(reaction.Id, null, _execCounts[reaction.Id], "completed", DateTimeOffset.UtcNow)));
+            await FireAsync(StampCurrent(new AutomationRun(reaction.Id, null, _execCounts[reaction.Id], "completed", DateTimeOffset.UtcNow)), cancellationToken);
 
-            await EmitAutomationsSurfaceAsync();
+            await EmitAutomationsSurfaceAsync(cancellationToken);
         }
     }
 
@@ -212,14 +213,14 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         return _reactions.Select(r => r.Id).ToList();
     }
 
-    public async Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null)
+    public async Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null, CancellationToken cancellationToken = default)
     {
         // Low-level / internal only. Public entry points (MCP define_reaction, Ino chat-to-automation, etc.)
         // must stage a SelfEvolutionProposal first (see AutomationDefinitionApplyHandler and MCP tools).
         // Direct calls bypass the approval rail and are only for trusted bootstrap or internal apply handlers.
         var scriptId = id + "-script";
-        await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction", Array.Empty<string>(), "default"));
-        await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>(), "default", null));
+        await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction", Array.Empty<string>(), "default"), cancellationToken);
+        await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>(), "default", null), cancellationToken);
     }
 
     public Task<string?> GetScriptCodeAsync(string id)
@@ -242,7 +243,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         await FireAsync(new PromoteAutomationToPack(packName, version, reactionIds, ownerId));
     }
 
-    private async Task HandlePromoteAsync(PromoteAutomationToPack promo)
+    private async Task HandlePromoteAsync(PromoteAutomationToPack promo, CancellationToken cancellationToken)
     {
         EnsureProjections();
         var selected = _reactions.Where(r => promo.ReactionIds.Contains(r.Id)).ToList();
@@ -250,9 +251,9 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         // Flow example: MCP promote_automations_to_pack -> this emits AutomationPromoted + Signal("AutomationCrystallized") with stub -> CodeFoundry or marketplace seeds can consume.
         var summary = $"Promoted {selected.Count} reactions to {promo.PackName}@{promo.Version}. Reactions: {string.Join(",", selected.Select(r => r.Id))}";
         var stubCode = $"// Auto-crystallized from automations\n// Reactions: {string.Join(", ", selected.Select(r => r.Id))}\npublic sealed class {promo.PackName}Pack : DigitalBrain.Core.Distribution.IPackBehavior {{ /* TODO: implement from scripts */ public string Respond(string i) => i; }}";
-        await FireAsync(new AutomationPromoted(promo.PackName, promo.Version, summary));
+        await FireAsync(new AutomationPromoted(promo.PackName, promo.Version, summary), cancellationToken);
         // Fire a signal carrying the stub so CodeFoundry or marketplace can pick it up
-        await FireAsync(new Signal("AutomationCrystallized", new Dictionary<string, object?> { ["pack"] = promo.PackName, ["code"] = stubCode }));
+        await FireAsync(new Signal("AutomationCrystallized", new Dictionary<string, object?> { ["pack"] = promo.PackName, ["code"] = stubCode }), cancellationToken);
     }
 
     public Task<IReadOnlyList<ScriptLibraryEntry>> ListScriptLibraryAsync()
@@ -268,8 +269,9 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         return Task.FromResult<IReadOnlyList<ScriptLibraryEntry>>(entries);
     }
 
-    private async Task EmitAutomationsSurfaceAsync()
+    private async Task EmitAutomationsSurfaceAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureProjections();
         var now = DateTimeOffset.UtcNow;
 
@@ -285,19 +287,19 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
             })
             .ToList();
 
-        await FireAsync(new AutomationSurface(reactionViews, scriptViews, now));
+        await FireAsync(new AutomationSurface(reactionViews, scriptViews, now), cancellationToken);
 
         // Visual graph foundation (data-only; future UI consumes + emits Register* back)
-        await EmitAutomationGraphSurfaceAsync(reactionViews, scriptViews, now);
+        await EmitAutomationGraphSurfaceAsync(reactionViews, scriptViews, now, cancellationToken);
 
         // Also keep lightweight list for timeline consumers that expect ListSurface
         var reactionItems = _reactions.Any()
             ? _reactions.Select(r => $"{r.Id}: when {r.When} -> {r.ScriptRef}").ToList()
             : new List<string> { "No active reactions. Define via MCP or synapses." };
-        await FireAsync(new ListSurface("Active Reactions", reactionItems));
+        await FireAsync(new ListSurface("Active Reactions", reactionItems), cancellationToken);
     }
 
-    private async Task EmitAutomationGraphSurfaceAsync(IReadOnlyList<ReactionView> reactions, IReadOnlyList<ScriptView> scripts, DateTimeOffset now)
+    private async Task EmitAutomationGraphSurfaceAsync(IReadOnlyList<ReactionView> reactions, IReadOnlyList<ScriptView> scripts, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var nodes = new List<AutomationGraphNode>();
         var edges = new List<AutomationGraphEdge>();
@@ -310,6 +312,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 edges.Add(new AutomationGraphEdge(r.Id, r.ScriptRef, "uses-script"));
             edges.Add(new AutomationGraphEdge("timeline", r.Id, $"when:{r.When}"));
         }
-        await FireAsync(new AutomationGraphSurface("Automations Graph", nodes, edges, now));
+        await FireAsync(new AutomationGraphSurface("Automations Graph", nodes, edges, now), cancellationToken);
     }
 }

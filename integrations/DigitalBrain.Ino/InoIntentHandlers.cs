@@ -5,7 +5,7 @@ namespace DigitalBrain.Ino;
 
 internal interface IInoIntentHandler
 {
-    Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId);
+    Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken);
 }
 
 internal static class InoIntentHandlers
@@ -22,42 +22,45 @@ internal static class InoIntentHandlers
 
 internal sealed class RelationGraphInoIntentHandler : IInoIntentHandler
 {
-    public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
+    public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var cls = InoIntentClassifier.Classify(request.Prompt);
         if (cls.Intent != "relation_graph" || cls.Confidence < 0.7)
         {
             return Task.FromResult(false);
         }
 
-        return HandleAsync(neuron, request, workspaceId);
+        return HandleAsync(neuron, request, workspaceId, cancellationToken);
     }
 
-    private static async Task<bool> HandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
+    private static async Task<bool> HandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
-        await neuron.HandleRelationGraphIntentAsync(request, workspaceId);
+        await neuron.HandleRelationGraphIntentAsync(request, workspaceId, cancellationToken);
         return true;
     }
 }
 
 internal sealed class SchemaVisualizationInoIntentHandler : IInoIntentHandler
 {
-    public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
+    public Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var cls = InoIntentClassifier.Classify(request.Prompt);
         if (cls.Intent != "schema_viz" || cls.Confidence < 0.7)
         {
             return Task.FromResult(false);
         }
 
-        return neuron.TryHandleSchemaVisualizationIntentAsync(request, workspaceId);
+        return neuron.TryHandleSchemaVisualizationIntentAsync(request, workspaceId, cancellationToken);
     }
 }
 
 internal sealed class GmailInoIntentHandler : IInoIntentHandler
 {
-    public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
+    public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         // Uses classifier (keyword fast path + future LLM). Replaced direct Regex in InoConnectorIntents.
         var classification = InoIntentClassifier.Classify(request.Prompt);
         if (classification.Intent != "gmail" || classification.Confidence < 0.55)
@@ -65,31 +68,32 @@ internal sealed class GmailInoIntentHandler : IInoIntentHandler
             return false;
         }
 
-        await neuron.HandleGmailIntentAsync(request);
+        await neuron.HandleGmailIntentAsync(request, cancellationToken);
         return true;
     }
 }
 
 internal sealed class SalesforceInoIntentHandler : IInoIntentHandler
 {
-    public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
+    public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var classification = InoIntentClassifier.Classify(request.Prompt);
         if (classification.Intent != "salesforce" || classification.Confidence < 0.55)
         {
             return false;
         }
 
-        await neuron.HandleSalesforceIntentAsync(request);
+        await neuron.HandleSalesforceIntentAsync(request, cancellationToken);
         return true;
     }
 }
 
 internal sealed class GenericLlmInoIntentHandler : IInoIntentHandler
 {
-    public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId)
+    public async Task<bool> TryHandleAsync(InoNeuron neuron, InoRequest request, string workspaceId, CancellationToken cancellationToken)
     {
-        await neuron.HandleGenericIntentAsync(request, workspaceId);
+        await neuron.HandleGenericIntentAsync(request, workspaceId, cancellationToken);
         return true;
     }
 }

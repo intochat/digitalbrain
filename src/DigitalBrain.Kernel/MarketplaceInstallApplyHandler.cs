@@ -36,7 +36,8 @@ public sealed class MarketplaceInstallApplyHandler(
             synapse => marketplace.FireAsync(synapse, ct),
             grains,
             services.GetService<HomeFeedBus>(),
-            logger);
+            logger,
+            ct);
 
         // Register installed pack as capability for modern intent classifier / vector search
         var cap = new InoIntentClassifier.Capability(
@@ -77,8 +78,10 @@ internal static class MarketplaceInstallActivation
         Func<Synapse, Task> fireMarketplaceAsync,
         IGrainFactory grains,
         HomeFeedBus? bus,
-        ILogger logger)
+        ILogger logger,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var pack = staged.Pack;
 
         await fireMarketplaceAsync(new CommissionTaken(
@@ -94,13 +97,13 @@ internal static class MarketplaceInstallActivation
         if (string.Equals(pack.Name, KernelPack.Name, StringComparison.OrdinalIgnoreCase))
         {
             var aspire = grains.GetGrain<IAspireNeuron>("aspire-main");
-            await aspire.FireAsync(new PerformKernelSelfUpdate(pack.Version));
+            await aspire.FireAsync(new PerformKernelSelfUpdate(pack.Version), cancellationToken);
         }
 
         var genKey = "generated-" + pack.Name.ToLowerInvariant();
         var generated = grains.GetGrain<IGeneratedNeuron>(genKey);
-        await generated.DeliverAsync(new NeuroPackInstalled(pack));
-        await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated", staged.BuyerId, staged.SessionId));
+        await generated.DeliverAsync(new NeuroPackInstalled(pack), cancellationToken);
+        await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated", staged.BuyerId, staged.SessionId), cancellationToken);
 
         var published = new List<NeuroPack> { pack };
         var installed = new List<NeuroPack> { pack };
@@ -113,7 +116,7 @@ internal static class MarketplaceInstallActivation
 
         if (bus is not null)
         {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(installedSurface, staged.MarketplaceNeuronId));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(installedSurface, staged.MarketplaceNeuronId), cancellationToken);
         }
 
         logger.LogInformation(

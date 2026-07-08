@@ -1,9 +1,7 @@
-using DigitalBrain.Kernel.Company;
 using Ino = DigitalBrain.Ino;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
-using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Kernel;
 
@@ -33,8 +31,6 @@ public static class DigitalBrainKernelExtensions
         });
 
         builder.Services.AddDigitalBrainChat(builder.Configuration);
-        builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
-        builder.Services.AddSingleton<SkillPackSynthesizer>();
 
         return builder;
     }

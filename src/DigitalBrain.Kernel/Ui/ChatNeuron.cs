@@ -11,7 +11,7 @@ using DigitalBrain.Ui.Contracts.Ui;
 [GrainType("digitalbrain.chat.v1")]
 public class ChatNeuron(ILogger<ChatNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IChatNeuron
 {
-    public async Task HandleAsync(VisualizeDataRequest request)
+    public async Task HandleAsync(VisualizeDataRequest request, CancellationToken cancellationToken = default)
     {
         var dataJson = JsonSerializer.Serialize(new
         {
@@ -21,7 +21,7 @@ public class ChatNeuron(ILogger<ChatNeuron> logger, NeuronJournals journals) : N
         });
         var card = new RfwCard("digitalbrain", "DataChartCard", dataJson);
 
-        await FireAsync(card);  // keep for conversation journal compat
+        await FireAsync(card, cancellationToken);  // keep for conversation journal compat
         // Prefer routing through IFlutterUiNeuron (item 14) for dedicated UI channel + context.
         var surface = new UiSurface(UiSurfaceKinds.DataChart, new Dictionary<string, object?>
         {
@@ -30,7 +30,7 @@ public class ChatNeuron(ILogger<ChatNeuron> logger, NeuronJournals journals) : N
             ["chartHint"] = request.ChartHint
         });
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
     public Task<RfwCard[]> GetConversationAsync()

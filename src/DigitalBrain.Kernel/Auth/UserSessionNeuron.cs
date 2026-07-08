@@ -22,24 +22,24 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
 
         if (!ActiveSessions().Any())
         {
-            await BroadcastAsync(LoginSurface());
+            await BroadcastAsync(LoginSurface(), ct);
         }
     }
 
-    public async Task HandleAsync(LoginRequest request)
+    public async Task HandleAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
         var username = NormalizeUsername(request.Username);
         var clientId = string.IsNullOrWhiteSpace(request.ClientId) ? "flutter" : request.ClientId.Trim();
 
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(request.Password))
         {
-            await RejectAsync(username, "username and password are required", clientId);
+            await RejectAsync(username, "username and password are required", clientId, cancellationToken);
             return;
         }
 
         if (!IsValidUsernameCharset(username))
         {
-            await RejectAsync(username, "username may not contain invalid characters ('/', whitespace, or quotes)", clientId);
+            await RejectAsync(username, "username may not contain invalid characters ('/', whitespace, or quotes)", clientId, cancellationToken);
             return;
         }
 
@@ -55,42 +55,42 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         {
             if (!isDevCredentials && (!AllowFirstUserProvisioning() || users.Count > 0))
             {
-                await RejectAsync(username, "invalid username or password", clientId);
+                await RejectAsync(username, "invalid username or password", clientId, cancellationToken);
                 return;
             }
 
             user = CreateLocalUser(username, request.Password);
-            await FireAsync(user);
+            await FireAsync(user, cancellationToken);
         }
         else if (!isDevCredentials && !VerifyPassword(request.Password, user.PasswordSaltBase64, user.PasswordHashBase64))
         {
-            await RejectAsync(username, "invalid username or password", clientId);
+            await RejectAsync(username, "invalid username or password", clientId, cancellationToken);
             return;
         }
 
         var sessionId = "session-" + Guid.NewGuid().ToString("N");
         var expiresAt = DateTimeOffset.UtcNow.Add(SessionLifetime);
 
-        await FireAsync(new LoginSucceeded(user.UserId, sessionId, user.DisplayName, user.Roles, clientId));
-        await FireAsync(new UserSessionCreated(user.UserId, sessionId, expiresAt, clientId));
+        await FireAsync(new LoginSucceeded(user.UserId, sessionId, user.DisplayName, user.Roles, clientId), cancellationToken);
+        await FireAsync(new UserSessionCreated(user.UserId, sessionId, expiresAt, clientId), cancellationToken);
 
-        await BroadcastSignedInAsync(user, sessionId, clientId);
+        await BroadcastSignedInAsync(user, sessionId, clientId, cancellationToken);
 
         // Reuse the existing product-surface startup path after a real session exists.
-        await GrainFactory.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new StartDistributedApp("digitalbrain"));
-        await BroadcastProductHomeAsync(user, sessionId, clientId);
+        await GrainFactory.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new StartDistributedApp("digitalbrain"), cancellationToken);
+        await BroadcastProductHomeAsync(user, sessionId, clientId, cancellationToken);
     }
 
-    public async Task HandleAsync(LogoutRequest request)
+    public async Task HandleAsync(LogoutRequest request, CancellationToken cancellationToken = default)
     {
         var clientId = string.IsNullOrWhiteSpace(request.ClientId) ? "flutter" : request.ClientId.Trim();
 
         if (!string.IsNullOrWhiteSpace(request.SessionId))
         {
-            await FireAsync(new UserSessionEnded(request.SessionId, clientId));
+            await FireAsync(new UserSessionEnded(request.SessionId, clientId), cancellationToken);
         }
 
-        await BroadcastAsync(LoginSurface(clientId: clientId));
+        await BroadcastAsync(LoginSurface(clientId: clientId), cancellationToken);
     }
 
     public Task<UserSessionState?> GetSessionAsync(string sessionId)
@@ -129,7 +129,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
     private bool DevAuthEnabled() =>
         DevAuth.Enabled(ServiceProvider.GetService<IConfiguration>(), ServiceProvider.GetService<IHostEnvironment>());
 
-    private async Task BroadcastProductHomeAsync(LocalUserRegistered user, string sessionId, string clientId)
+    private async Task BroadcastProductHomeAsync(LocalUserRegistered user, string sessionId, string clientId, CancellationToken cancellationToken)
     {
         var userId = user.UserId.Value;
         var taskEvents = OutgoingJournal.Concat(IncomingJournal).ToList();
@@ -144,8 +144,8 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
 
         foreach (var surface in surfaces)
         {
-            await FireAsync(surface);
-            await BroadcastAsync(surface);
+            await FireAsync(surface, cancellationToken);
+            await BroadcastAsync(surface, cancellationToken);
         }
     }
 
@@ -216,13 +216,13 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             ["targetSurfaceKind"] = targetSurfaceKind
         });
 
-    private async Task RejectAsync(string username, string reason, string clientId)
+    private async Task RejectAsync(string username, string reason, string clientId, CancellationToken cancellationToken)
     {
-        await FireAsync(new LoginFailed(username, reason, clientId));
-        await BroadcastAsync(LoginSurface(reason, clientId));
+        await FireAsync(new LoginFailed(username, reason, clientId), cancellationToken);
+        await BroadcastAsync(LoginSurface(reason, clientId), cancellationToken);
     }
 
-    private async Task BroadcastSignedInAsync(LocalUserRegistered user, string sessionId, string clientId)
+    private async Task BroadcastSignedInAsync(LocalUserRegistered user, string sessionId, string clientId, CancellationToken cancellationToken)
     {
         var surface = new UiSurface("session-status", new Dictionary<string, object?>
         {
@@ -239,15 +239,15 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             ["body"] = $"Signed in as {user.DisplayName}"
         });
 
-        await BroadcastAsync(surface);
+        await BroadcastAsync(surface, cancellationToken);
     }
 
-    private async Task BroadcastAsync(UiSurface surface)
+    private async Task BroadcastAsync(UiSurface surface, CancellationToken cancellationToken = default)
     {
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus is not null)
         {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value), cancellationToken);
         }
     }
 

@@ -109,6 +109,10 @@ public static class InoIntentClassifier
 
             return fast;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch
         {
             return fast;
@@ -143,6 +147,10 @@ public static class InoIntentClassifier
                         }
                     }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {

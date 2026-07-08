@@ -10,62 +10,62 @@ using DigitalBrain.Ui.Runtime;
 [GrainType("kernel.task.v1")]
 public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IKernelTask
 {
-    public async Task HandleAsync(RunTask cmd)
+    public async Task HandleAsync(RunTask cmd, CancellationToken cancellationToken = default)
     {
-        await FireAsync(new TaskCreated(cmd.TaskId, cmd.Description));
-        await FireAsync(new TaskStarted(cmd.TaskId));
-        await FireAsync(new TaskProgress(cmd.TaskId, "planning"));
+        await FireAsync(new TaskCreated(cmd.TaskId, cmd.Description), cancellationToken);
+        await FireAsync(new TaskStarted(cmd.TaskId), cancellationToken);
+        await FireAsync(new TaskProgress(cmd.TaskId, "planning"), cancellationToken);
         string result;
         var chat = ServiceProvider.GetService<IChatClient>();
         if (chat != null)
         {
-            await FireAsync(new TaskProgress(cmd.TaskId, "running-llm"));
+            await FireAsync(new TaskProgress(cmd.TaskId, "running-llm"), cancellationToken);
             var prompt = $"Perform the task and output ONLY the concise result value: {cmd.Description}";
-            var response = await chat.GetResponseAsync(prompt);
+            var response = await chat.GetResponseAsync(prompt, cancellationToken: cancellationToken);
             result = response.Text.Trim();
             if (string.IsNullOrWhiteSpace(result)) result = "completed:" + cmd.Description;
         }
         else
         {
-            await FireAsync(new TaskProgress(cmd.TaskId, "running-fallback"));
+            await FireAsync(new TaskProgress(cmd.TaskId, "running-fallback"), cancellationToken);
             result = "completed-no-llm:" + cmd.Description;
         }
-        await FireAsync(new TaskProgress(cmd.TaskId, "finalizing"));
-        await FireAsync(new TaskCompleted(cmd.TaskId, result));
+        await FireAsync(new TaskProgress(cmd.TaskId, "finalizing"), cancellationToken);
+        await FireAsync(new TaskCompleted(cmd.TaskId, result), cancellationToken);
 
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus != null)
         {
             var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
             var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, clientId: cmd.SessionId);
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value), cancellationToken);
 
             var directData = System.Text.Json.JsonSerializer.Serialize(new
             {
                 totals = tm.Props.GetValueOrDefault("totals"),
                 tasks = tm.Props.GetValueOrDefault("tasks")
             });
-            await bus.BroadcastAsync(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+            await bus.BroadcastAsync(new RfwCard("digitalbrain", "TaskManagerCard", directData), cancellationToken);
         }
     }
 
-    public async Task HandleAsync(CancelTask cmd)
+    public async Task HandleAsync(CancelTask cmd, CancellationToken cancellationToken = default)
     {
-        await FireAsync(new TaskCancelled(cmd.TaskId));
+        await FireAsync(new TaskCancelled(cmd.TaskId), cancellationToken);
 
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus != null)
         {
             var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
             var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, clientId: cmd.SessionId);
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
+            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value), cancellationToken);
 
             var directData = System.Text.Json.JsonSerializer.Serialize(new
             {
                 totals = tm.Props.GetValueOrDefault("totals"),
                 tasks = tm.Props.GetValueOrDefault("tasks")
             });
-            await bus.BroadcastAsync(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+            await bus.BroadcastAsync(new RfwCard("digitalbrain", "TaskManagerCard", directData), cancellationToken);
         }
     }
 

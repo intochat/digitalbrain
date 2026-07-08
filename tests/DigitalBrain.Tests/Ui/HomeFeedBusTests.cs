@@ -46,6 +46,24 @@ public class HomeFeedBusTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task Cancelled_Broadcast_Does_Not_Poison_Dedup_Key()
+    {
+        await using var subscription = await Bus.SubscribeAsync(clientId: null);
+
+        var card = new RfwCard("digitalbrain", "CardAfterCancel", "{\"a\":1}");
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Bus.BroadcastAsync(card, cancelled.Token));
+
+        await Bus.BroadcastAsync(card);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var received = await subscription.Reader.ReadAsync(cts.Token);
+        Assert.Equal("CardAfterCancel", received.RootWidget);
+    }
+
+    [Fact]
     public async Task Subscriber_With_ClientId_Only_Receives_Cards_Addressed_To_It_Or_Unaddressed()
     {
         await using var subscriptionA = await Bus.SubscribeAsync(clientId: "client-a");

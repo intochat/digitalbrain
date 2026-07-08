@@ -337,16 +337,12 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             if (handledType != synapse.GetType() && !handledType.IsAssignableFrom(synapse.GetType()))
                 continue;
 
-            var handleMethod = iface.GetMethod("HandleAsync", new[] { handledType, typeof(CancellationToken) })
-                ?? iface.GetMethod("HandleAsync", new[] { handledType });
+            var handleMethod = iface.GetMethod("HandleAsync", new[] { handledType, typeof(CancellationToken) });
             if (handleMethod is null)
                 continue;
 
             Logger.LogDebug("Reflection IHandle<> dispatch for synapse {Type} on {GrainType}", synapse.Type, grainType.Name);
-            var parameters = handleMethod.GetParameters().Length == 2
-                ? new object[] { synapse, cancellationToken }
-                : new object[] { synapse };
-            var result = handleMethod.Invoke(this, parameters);
+            var result = handleMethod.Invoke(this, new object[] { synapse, cancellationToken });
             if (result is Task t) await t;
             else if (result is ValueTask vt) await vt;
             return true;

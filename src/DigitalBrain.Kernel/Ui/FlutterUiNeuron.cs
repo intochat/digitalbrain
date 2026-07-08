@@ -9,13 +9,13 @@ using DigitalBrain.Ui.Contracts;
 [GrainType("digitalbrain.flutter-ui.v1")]
 public sealed class FlutterUiNeuron(ILogger<FlutterUiNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IFlutterUiNeuron
 {
-    public async Task HandleAsync(UiSurface surface)
+    public async Task HandleAsync(UiSurface surface, CancellationToken cancellationToken = default)
     {
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus is not null)
         {
             var card = UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value);
-            await bus.BroadcastAsync(card);
+            await bus.BroadcastAsync(card, cancellationToken);
         }
 
         Logger.LogInformation("FlutterUiNeuron handled UiSurface kind={Kind}", surface.Kind);

@@ -2,7 +2,6 @@ using DigitalBrain.Ino.Context;
 using DigitalBrain.Core;
 using DigitalBrain.Ino;
 using DigitalBrain.Kernel;
-using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
@@ -53,8 +52,6 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
                 services.AddSingleton<IVectorStore, InMemoryVectorStore>();
                 services.AddSingleton<DocumentIngestor>();
-                services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
-                services.AddSingleton<SkillPackSynthesizer>();
                 services.AddSingleton<SqliteSchemaInspector>();
                 services.AddSingleton<HomeFeedBus>();
                 services.AddSingleton<SignalEgressBus>();

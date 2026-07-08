@@ -105,7 +105,7 @@ public interface IAutomationNeuron : INeuron
     /// Trusted/bootstrap convenience: define a reaction + inline script body in one call.
     /// User/MCP-created executable C# must stage AutomationDefinitionStaged through the self-evolution rail first.
     [Alias("DefineReactionAsync")]
-    Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null);
+    Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null, CancellationToken cancellationToken = default);
 
     /// Get script source by id for library/reuse (documented for surfaces + MCP).
     [Alias("GetScriptCodeAsync")]

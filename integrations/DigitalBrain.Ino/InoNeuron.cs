@@ -34,10 +34,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         await base.OnActivateAsync(ct);
         LoadCapabilitiesFromJournal();
-        await RememberCapabilitiesAsync();
+        await RememberCapabilitiesAsync(ct);
     }
 
-    private async Task RememberCapabilitiesAsync()
+    private async Task RememberCapabilitiesAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -46,8 +46,12 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             {
                 var text = $"capability:{cap.Id} {cap.Description} examples:{string.Join(" ", cap.Examples)} tier:{cap.Tier}";
                 // Remember will embed via Context and store as MemoryStored for vector recall
-                await context.RememberAsync(text);
+                await context.RememberAsync(text, cancellationToken);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch { /* context optional for classifier grounding */ }
     }
@@ -63,16 +67,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 
-    public async Task HandleAsync(InoRequest req)
+    public async Task HandleAsync(InoRequest req, CancellationToken cancellationToken = default)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Check for gallery early (before generic handler which always matches)
-        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider, cancellationToken);
         if (cls.Intent == "uikit_gallery")
         {
-            await DeliverUiKitGallerySurfaceAsync(req.ClientId, workspaceId);
-            await FireAsync(new InoResponse(req.Prompt, "UiKit component gallery:", []));
+            await DeliverUiKitGallerySurfaceAsync(req.ClientId, workspaceId, cancellationToken);
+            await FireAsync(new InoResponse(req.Prompt, "UiKit component gallery:", []), cancellationToken);
             return;
         }
 
@@ -80,27 +85,27 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var pForCheck = req.Prompt.ToLowerInvariant();
         if (pForCheck.Contains("set-llm") || pForCheck.Contains("use qwen") || pForCheck.Contains("use local") || pForCheck.Contains("use gpt") || pForCheck.Contains("use azure"))
         {
-            await HandleLlmSetCommandAsync(req, workspaceId);
+            await HandleLlmSetCommandAsync(req, workspaceId, cancellationToken);
             return;
         }
 
         // Approve via chat: "approve proposal <id>" or "approve that automation" routes to decision (rail)
         if (pForCheck.Contains("approve") && (pForCheck.Contains("proposal") || pForCheck.Contains("automation") || pForCheck.Contains("self-evolution")))
         {
-            await HandleApproveProposalIntentAsync(req, workspaceId);
+            await HandleApproveProposalIntentAsync(req, workspaceId, cancellationToken);
             return;
         }
 
         if (cls.Intent == "llm_settings")
         {
-            await DeliverLlmSettingsSurfaceAsync(req.ClientId, workspaceId);
-            await FireAsync(new InoResponse(req.Prompt, "LLM / model settings:", []));
+            await DeliverLlmSettingsSurfaceAsync(req.ClientId, workspaceId, cancellationToken);
+            await FireAsync(new InoResponse(req.Prompt, "LLM / model settings:", []), cancellationToken);
             return;
         }
 
         if (cls.Intent == "automation_create")
         {
-            await HandleAutomationCreateIntentAsync(req, workspaceId);
+            await HandleAutomationCreateIntentAsync(req, workspaceId, cancellationToken);
             return;
         }
 
@@ -108,40 +113,41 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (p.Contains("run automation") || p.Contains("run now") || p.Contains("execute automation"))
         {
             var reply = "Running the requested automation (preview or activated). Check the Tasks surface for results.";
-            await FireAsync(new InoResponse(req.Prompt, reply, []));
-            await DeliverReplySurfaceAsync(reply, req.ClientId, workspaceId);
+            await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
+            await DeliverReplySurfaceAsync(reply, req.ClientId, workspaceId, cancellationToken);
             return;
         }
 
         foreach (var handler in InoIntentHandlers.Default)
         {
-            if (await handler.TryHandleAsync(this, req, workspaceId))
+            if (await handler.TryHandleAsync(this, req, workspaceId, cancellationToken))
             {
                 return;
             }
         }
     }
 
-    internal async Task HandleRelationGraphIntentAsync(InoRequest req, string workspaceId)
+    internal async Task HandleRelationGraphIntentAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken = default)
     {
-        await FireAsync(new InoResponse(req.Prompt, "Rendered a relation graph.", []));
+        await FireAsync(new InoResponse(req.Prompt, "Rendered a relation graph.", []), cancellationToken);
         await DeliverGraphSurfaceAsync(
             DbSchemaGraphMapper.RelationOfTwoObjectsTree(),
             req.ClientId,
             workspaceId,
             "Object relation",
-            "surface.graph.relation");
+            "surface.graph.relation",
+            cancellationToken);
     }
 
-    internal async Task<bool> TryHandleSchemaVisualizationIntentAsync(InoRequest req, string workspaceId)
+    internal async Task<bool> TryHandleSchemaVisualizationIntentAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken = default)
     {
         if (TryExtractDatabasePath(req.Prompt, out var databasePath))
         {
-            var inspected = await InspectReferencedDatabaseAsync(databasePath, req.ClientId, workspaceId);
+            var inspected = await InspectReferencedDatabaseAsync(databasePath, req.ClientId, workspaceId, cancellationToken);
             if (inspected is not null)
             {
-                await FireAsync(new InoResponse(req.Prompt, SchemaReplyText(inspected), []));
-                await FireAsync(inspected);
+                await FireAsync(new InoResponse(req.Prompt, SchemaReplyText(inspected), []), cancellationToken);
+                await FireAsync(inspected, cancellationToken);
                 return true;
             }
         }
@@ -149,15 +155,15 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var latest = LatestSuccessfulSchema(req.ClientId, workspaceId);
         if (latest?.Schema is not null)
         {
-            await FireAsync(new InoResponse(req.Prompt, "Rendered the most recent database schema.", []));
-            await ProcessSchemaInspectedAsync(latest, req.ClientId ?? latest.ClientId, workspaceId);
+            await FireAsync(new InoResponse(req.Prompt, "Rendered the most recent database schema.", []), cancellationToken);
+            await ProcessSchemaInspectedAsync(latest, req.ClientId ?? latest.ClientId, workspaceId, cancellationToken);
             return true;
         }
 
         return false;
     }
 
-    internal async Task HandleGenericIntentAsync(InoRequest req, string workspaceId)
+    internal async Task HandleGenericIntentAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken = default)
     {
         var p = req.Prompt.ToLowerInvariant();
         bool gmailFollowupSummarize = (p.Contains("summar") || p.Contains("brief") || p.Contains("what was")) &&
@@ -179,10 +185,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var lastBodies = GetLastGmailBodiesFromJournal(workspaceId);
             if (!string.IsNullOrWhiteSpace(lastBodies))
             {
-                var sum = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + lastBodies, "");
-                await FireAsync(new InoResponse(req.Prompt, "Summary of last Gmail: " + sum, []));
-                await DeliverReplySurfaceAsync("Summary of previous Gmail messages:\n" + sum, req.ClientId, workspaceId);
-                await CreateMemorySummaryAsync(workspaceId);
+                var sum = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + lastBodies, "", cancellationToken);
+                await FireAsync(new InoResponse(req.Prompt, "Summary of last Gmail: " + sum, []), cancellationToken);
+                await DeliverReplySurfaceAsync("Summary of previous Gmail messages:\n" + sum, req.ClientId, workspaceId, cancellationToken);
+                await CreateMemorySummaryAsync(workspaceId, cancellationToken);
                 return;
             }
         }
@@ -195,10 +201,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var lastGmail = GetLastGmailBodiesFromJournal(workspaceId);
             if (!string.IsNullOrWhiteSpace(lastGmail))
             {
-                var suggestion = await ReasonWithLlmAsync("Relate this Gmail to Salesforce context. Email:\n" + lastGmail + "\nRequest: " + req.Prompt, "");
-                await FireAsync(new InoResponse(req.Prompt, "Cross Gmail->SF (journal): " + suggestion, []));
-                await DeliverReplySurfaceAsync(suggestion, req.ClientId, workspaceId);
-                await CreateMemorySummaryAsync(workspaceId);
+                var suggestion = await ReasonWithLlmAsync("Relate this Gmail to Salesforce context. Email:\n" + lastGmail + "\nRequest: " + req.Prompt, "", cancellationToken);
+                await FireAsync(new InoResponse(req.Prompt, "Cross Gmail->SF (journal): " + suggestion, []), cancellationToken);
+                await DeliverReplySurfaceAsync(suggestion, req.ClientId, workspaceId, cancellationToken);
+                await CreateMemorySummaryAsync(workspaceId, cancellationToken);
                 return;
             }
         }
@@ -206,30 +212,30 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         // Fallback for text "set llm" prompts (button sets are handled early via HandleLlmSetCommandAsync)
         if (p.Contains("set-llm") || p.Contains("use qwen") || p.Contains("use local") || p.Contains("use gpt") || p.Contains("use azure"))
         {
-            await HandleLlmSetCommandAsync(req, workspaceId);
+            await HandleLlmSetCommandAsync(req, workspaceId, cancellationToken);
             return;
         }
 
-        var ctx = await BuildContextAsync(req.Prompt, workspaceId);
-        var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx);
+        var ctx = await BuildContextAsync(req.Prompt, workspaceId, cancellationToken);
+        var rawReply = await ReasonWithLlmAsync(req.Prompt, ctx, cancellationToken);
         var replyPlan = BuildReplyPlan(req.Prompt, rawReply);
         // Always ensure a clean direct visible answer for the user (fixes cases where LLM emits only TASK/BRANCH or mixes for simple asks like jokes).
         // Tasks/Branches still get orchestrated from the plan if present.
         if (string.IsNullOrWhiteSpace(replyPlan.VisibleReply) || replyPlan.TaskDescriptions.Count > 0 || !string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
         {
-            var directReply = await ReasonDirectlyWithLlmAsync(req.Prompt, ctx);
+            var directReply = await ReasonDirectlyWithLlmAsync(req.Prompt, ctx, cancellationToken);
             replyPlan = replyPlan with { VisibleReply = directReply };
         }
 
-        var taskIds = await OrchestrateActionsIfNeededAsync(replyPlan);
+        var taskIds = await OrchestrateActionsIfNeededAsync(replyPlan, cancellationToken);
 
-        await FireAsync(new InoResponse(req.Prompt, replyPlan.VisibleReply, taskIds.ToArray()));
-        await DeliverReplySurfaceAsync(replyPlan.VisibleReply, req.ClientId, workspaceId);
+        await FireAsync(new InoResponse(req.Prompt, replyPlan.VisibleReply, taskIds.ToArray()), cancellationToken);
+        await DeliverReplySurfaceAsync(replyPlan.VisibleReply, req.ClientId, workspaceId, cancellationToken);
 
         // Compress recent activity to long-term memory summary (journal driven).
-        await CreateMemorySummaryAsync(workspaceId);
+        await CreateMemorySummaryAsync(workspaceId, cancellationToken);
     }
-    public async Task HandleAsync(Signal signal)
+    public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
         if (signal.Name == "PackConfigured" &&
             signal.Props.TryGetValue("pack", out var pack) &&
@@ -240,11 +246,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
             if (pendingSalesforce is not null)
             {
-                var salesforceUserId = await ResolveUserIdAsync(pendingSalesforce.ClientId);
-                if (await HasSalesforceCredentialAsync(salesforceUserId))
+                var salesforceUserId = await ResolveUserIdAsync(pendingSalesforce.ClientId, cancellationToken);
+                if (await HasSalesforceCredentialAsync(salesforceUserId, cancellationToken))
                 {
                     _pendingSalesforceRequest = null;
-                    await FetchSalesforceAccountsAsync(pendingSalesforce, salesforceUserId);
+                    await FetchSalesforceAccountsAsync(pendingSalesforce, salesforceUserId, cancellationToken);
                 }
             }
 
@@ -260,8 +266,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (pending is null)
         {
             // Confirm success visibly even without a pending Gmail intent (auth via direct button/surface).
-            await FireAsync(new InoResponse("Google auth", "Google connected successfully.", []));
-            await DeliverReplySurfaceAsync("Google authentication succeeded.", null, WorkspaceIds.Default);
+            await FireAsync(new InoResponse("Google auth", "Google connected successfully.", []), cancellationToken);
+            await DeliverReplySurfaceAsync("Google authentication succeeded.", null, WorkspaceIds.Default, cancellationToken);
             return;
         }
 
@@ -271,31 +277,32 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         else if (signal.Props.TryGetValue("scope", out var sc) && sc is string scs && scs.StartsWith("user:", StringComparison.Ordinal))
             gmailUserId = scs.Substring(5);
         if (string.IsNullOrWhiteSpace(gmailUserId))
-            gmailUserId = await ResolveUserIdAsync(pending.ClientId);
+            gmailUserId = await ResolveUserIdAsync(pending.ClientId, cancellationToken);
 
-        if (!await HasGoogleCredentialAsync(gmailUserId))
+        if (!await HasGoogleCredentialAsync(gmailUserId, cancellationToken))
         {
             _pendingGmailRequest = null;
             var workspaceId = WorkspaceIds.Effective(pending.WorkspaceId);
             var reply = "Google auth succeeded but no usable credential was stored (missing refresh token).";
-            await FireAsync(new InoResponse(pending.Prompt, reply, []));
-            await DeliverReplySurfaceAsync(reply, pending.ClientId, workspaceId);
-            await DeliverGoogleAuthSurfaceAsync(pending.ClientId, workspaceId);
+            await FireAsync(new InoResponse(pending.Prompt, reply, []), cancellationToken);
+            await DeliverReplySurfaceAsync(reply, pending.ClientId, workspaceId, cancellationToken);
+            await DeliverGoogleAuthSurfaceAsync(pending.ClientId, workspaceId, cancellationToken);
             return;
         }
 
         _pendingGmailRequest = null;
-        await FetchRecentGmailAsync(pending, gmailUserId);
+        await FetchRecentGmailAsync(pending, gmailUserId, cancellationToken);
     }
 
-    private async Task<string> ResolveUserIdAsync(string? clientId)
+    private async Task<string> ResolveUserIdAsync(string? clientId, CancellationToken cancellationToken = default)
     {
-        var state = await ResolveSessionAsync(clientId);
+        var state = await ResolveSessionAsync(clientId, cancellationToken);
         return state?.UserId.Value ?? UserId.Anonymous.Value;
     }
 
-    private async Task<UserSessionState?> ResolveSessionAsync(string? clientId)
+    private async Task<UserSessionState?> ResolveSessionAsync(string? clientId, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(clientId))
             return null;
 
@@ -303,9 +310,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return await session.GetSessionByClientIdAsync(clientId);
     }
 
-    public async Task HandleAsync(TabularDataIngested ingested)
+    public async Task HandleAsync(TabularDataIngested ingested, CancellationToken cancellationToken = default)
     {
         var workspaceId = WorkspaceIds.Effective(ingested.WorkspaceId);
+        cancellationToken.ThrowIfCancellationRequested();
         var headers = JsonSerializer.Deserialize<List<string>>(ingested.HeadersJson) ?? [];
         var rows = JsonSerializer.Deserialize<List<List<string>>>(ingested.RowsJson) ?? [];
 
@@ -326,24 +334,24 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
 
         // Deterministic (not LLM-generated) so follow-up questions can find this data via BuildContextAsync
         // even when no IChatClient is configured (the [no-llm] fallback path).
         var summary = $"Uploaded '{ingested.FileName}' with columns [{string.Join(", ", headers)}] and {rows.Count} data rows. Column stats: {ingested.ColumnStatsJson}";
-        await FireAsync(new MemorySummary(ingested.FileName, summary, DateTimeOffset.UtcNow, workspaceId));
+        await FireAsync(new MemorySummary(ingested.FileName, summary, DateTimeOffset.UtcNow, workspaceId), cancellationToken);
     }
 
-    public Task HandleAsync(DbSchemaInspected inspected) =>
-        ProcessSchemaInspectedAsync(inspected, inspected.ClientId, inspected.WorkspaceId);
+    public Task HandleAsync(DbSchemaInspected inspected, CancellationToken cancellationToken = default) =>
+        ProcessSchemaInspectedAsync(inspected, inspected.ClientId, inspected.WorkspaceId, cancellationToken);
 
-    private async Task ProcessSchemaInspectedAsync(DbSchemaInspected inspected, string? clientId, string? workspaceId)
+    private async Task ProcessSchemaInspectedAsync(DbSchemaInspected inspected, string? clientId, string? workspaceId, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         if (!inspected.Succeeded || inspected.Schema is null)
         {
             var message = $"I could not inspect database schema '{inspected.ConnectionName}': {inspected.Error ?? "unknown error"}.";
-            await DeliverReplySurfaceAsync(message, clientId, workspaceId);
+            await DeliverReplySurfaceAsync(message, clientId, workspaceId, cancellationToken);
             return;
         }
 
@@ -357,16 +365,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             clientId ?? schema.SessionId,
             workspaceId,
             $"{schema.ConnectionName} schema",
-            "surface.db-schema." + StableSurfaceId(schema.ConnectionName));
+            "surface.db-schema." + StableSurfaceId(schema.ConnectionName),
+            cancellationToken);
 
         await FireAsync(new MemorySummary(
             schema.ConnectionName,
             SchemaMemorySummary(schema),
             DateTimeOffset.UtcNow,
-            workspaceId));
+            workspaceId), cancellationToken);
     }
 
-    private async Task<DbSchemaInspected?> InspectReferencedDatabaseAsync(string databasePath, string? clientId, string? workspaceId)
+    private async Task<DbSchemaInspected?> InspectReferencedDatabaseAsync(string databasePath, string? clientId, string? workspaceId, CancellationToken cancellationToken = default)
     {
         var connectionName = Path.GetFileNameWithoutExtension(databasePath);
         if (string.IsNullOrWhiteSpace(connectionName))
@@ -375,16 +384,16 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var cmd = new DbInspectSchema(connectionName, "sqlite", SourcePath: databasePath, ClientId: clientId, WorkspaceId: workspaceId);
         var db = GrainFactory.GetGrain<IDbSupportNeuron>("db-main");
-        await db.FireAsync(cmd);
+        await db.FireAsync(cmd, cancellationToken);
 
-        var timeline = await db.GetTimelineAsync();
+        var timeline = await db.GetTimelineAsync(cancellationToken);
         return timeline
             .OfType<DbSchemaInspected>()
             .LastOrDefault(result => result.CorrelationId == cmd.SynapseId)
             ?? timeline.OfType<DbSchemaInspected>().LastOrDefault(result => result.ConnectionName == connectionName);
     }
 
-    private async Task DeliverReplySurfaceAsync(string reply, string? clientId, string? workspaceId = null)
+    private async Task DeliverReplySurfaceAsync(string reply, string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var props = new Dictionary<string, object?>
@@ -398,20 +407,20 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    internal async Task HandleGmailIntentAsync(InoRequest req)
+    internal async Task HandleGmailIntentAsync(InoRequest req, CancellationToken cancellationToken = default)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
 
         // Use LLM classifier for natural language understanding (beyond simple keywords).
         // Falls back gracefully if no LLM.
-        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider, cancellationToken);
         if (cls.Intent != "gmail")
         {
             // Not confident enough after LLM — fall through to generic in caller if needed.
-            await HandleGenericIntentAsync(req, workspaceId);
+            await HandleGenericIntentAsync(req, workspaceId, cancellationToken);
             return;
         }
 
@@ -424,34 +433,34 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var lastBodies = GetLastGmailBodiesFromJournal(workspaceId);
             if (!string.IsNullOrWhiteSpace(lastBodies))
             {
-                var sum = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + lastBodies, "");
-                await FireAsync(new InoResponse(req.Prompt, "Summary of last Gmail: " + sum, []));
-                await DeliverReplySurfaceAsync("Summary of previous Gmail messages:\n" + sum, req.ClientId, workspaceId);
+                var sum = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + lastBodies, "", cancellationToken);
+                await FireAsync(new InoResponse(req.Prompt, "Summary of last Gmail: " + sum, []), cancellationToken);
+                await DeliverReplySurfaceAsync("Summary of previous Gmail messages:\n" + sum, req.ClientId, workspaceId, cancellationToken);
                 return;
             }
         }
 
-        var gmailUserId = await ResolveUserIdAsync(req.ClientId);
-        if (!await HasGoogleCredentialAsync(gmailUserId))
+        var gmailUserId = await ResolveUserIdAsync(req.ClientId, cancellationToken);
+        if (!await HasGoogleCredentialAsync(gmailUserId, cancellationToken))
         {
             _pendingGmailRequest = req;
             var reply = "Google authentication is required to read Gmail.";
-            await FireAsync(new InoResponse(req.Prompt, reply, []));
-            await DeliverGoogleAuthSurfaceAsync(req.ClientId, workspaceId);
+            await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
+            await DeliverGoogleAuthSurfaceAsync(req.ClientId, workspaceId, cancellationToken);
             return;
         }
 
-        await FetchRecentGmailAsync(req, gmailUserId);
+        await FetchRecentGmailAsync(req, gmailUserId, cancellationToken);
     }
 
-    internal async Task HandleSalesforceIntentAsync(InoRequest req)
+    internal async Task HandleSalesforceIntentAsync(InoRequest req, CancellationToken cancellationToken = default)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
 
-        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider, cancellationToken);
         if (cls.Intent != "salesforce")
         {
-            await HandleGenericIntentAsync(req, workspaceId);
+            await HandleGenericIntentAsync(req, workspaceId, cancellationToken);
             return;
         }
 
@@ -464,9 +473,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var last = GetLastSalesforceFromJournal(workspaceId);
             if (!string.IsNullOrWhiteSpace(last))
             {
-                var sum = await ReasonWithLlmAsync("Provide a concise summary of these Salesforce accounts:\n" + last, "");
-                await FireAsync(new InoResponse(req.Prompt, "Summary of last Salesforce: " + sum, []));
-                await DeliverReplySurfaceAsync("Summary of previous Salesforce data:\n" + sum, req.ClientId, workspaceId);
+                var sum = await ReasonWithLlmAsync("Provide a concise summary of these Salesforce accounts:\n" + last, "", cancellationToken);
+                await FireAsync(new InoResponse(req.Prompt, "Summary of last Salesforce: " + sum, []), cancellationToken);
+                await DeliverReplySurfaceAsync("Summary of previous Salesforce data:\n" + sum, req.ClientId, workspaceId, cancellationToken);
                 return;
             }
         }
@@ -481,44 +490,44 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             {
                 var suggestion = await ReasonWithLlmAsync(
                     "User wants Salesforce CRM info related to this recent Gmail. Last email content:\n" + lastGmail + "\n\nUser request: " + req.Prompt +
-                    "\n\nProvide a concise helpful response (suggest matching accounts/topics, key names/companies from the email). If fetching live data is needed later, note it.", "");
-                await FireAsync(new InoResponse(req.Prompt, "Related to last email (using journal): " + suggestion, []));
-                await DeliverReplySurfaceAsync("Based on previous Gmail + Salesforce context:\n" + suggestion, req.ClientId, workspaceId);
-                await CreateMemorySummaryAsync(workspaceId);
+                    "\n\nProvide a concise helpful response (suggest matching accounts/topics, key names/companies from the email). If fetching live data is needed later, note it.", "", cancellationToken);
+                await FireAsync(new InoResponse(req.Prompt, "Related to last email (using journal): " + suggestion, []), cancellationToken);
+                await DeliverReplySurfaceAsync("Based on previous Gmail + Salesforce context:\n" + suggestion, req.ClientId, workspaceId, cancellationToken);
+                await CreateMemorySummaryAsync(workspaceId, cancellationToken);
                 return;
             }
         }
 
-        var salesforceSession = await ResolveSessionAsync(req.ClientId);
+        var salesforceSession = await ResolveSessionAsync(req.ClientId, cancellationToken);
         if (salesforceSession is null)
         {
             var reply = "Sign in before connecting Salesforce.";
-            await FireAsync(new InoResponse(req.Prompt, reply, []));
-            await DeliverLoginSurfaceAsync(req.ClientId);
+            await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
+            await DeliverLoginSurfaceAsync(req.ClientId, cancellationToken);
             return;
         }
 
         var salesforceUserId = salesforceSession.UserId.Value;
-        if (!await HasSalesforceCredentialAsync(salesforceUserId))
+        if (!await HasSalesforceCredentialAsync(salesforceUserId, cancellationToken))
         {
             _pendingSalesforceRequest = req;
             var reply = "Salesforce credentials are required to query CRM records.";
-            await FireAsync(new InoResponse(req.Prompt, reply, []));
-            await DeliverSalesforceCredentialSurfaceAsync(req.ClientId, workspaceId);
+            await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
+            await DeliverSalesforceCredentialSurfaceAsync(req.ClientId, workspaceId, cancellationToken);
             return;
         }
 
-        await FetchSalesforceAccountsAsync(req, salesforceUserId);
+        await FetchSalesforceAccountsAsync(req, salesforceUserId, cancellationToken);
     }
 
-    internal async Task HandleAutomationCreateIntentAsync(InoRequest req, string workspaceId)
+    internal async Task HandleAutomationCreateIntentAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
 
         // Structured LLM extraction for high quality automation (Gmail/SF examples supported).
         // Use direct chat for clean JSON output (generic Reason wrapper may add prose).
         string raw;
-        var chat = await ResolveGlobalLlmClientAsync() ?? ServiceProvider.GetService<IChatClient>();
+        var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
         if (chat is not null)
         {
             var specPrompt =
@@ -529,14 +538,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 "Rules: when must be Signal:GmailMessageReceived (for gmail), Signal:SalesforceQueryReady (for sf/crm), or NeuronActivated. " +
                 "script: short safe C# returning Signal[] (example uses realistic emitted signals for follow-on G/SF glue). No file system, loops or unsafe. " +
                 "User request: " + req.Prompt;
-            var resp = await chat.GetResponseAsync(specPrompt);
+            var resp = await chat.GetResponseAsync(specPrompt, cancellationToken: cancellationToken);
             raw = resp.Text?.Trim() ?? "";
         }
         else
         {
-            var ctx = await BuildContextAsync(req.Prompt, workspaceId);
+            var ctx = await BuildContextAsync(req.Prompt, workspaceId, cancellationToken);
             var llmPrompt = "You are helping create a safe DigitalBrain automation. Output ONLY the JSON: {\"when\":\"...\",\"target\":null,\"script\":\"...\",\"rationale\":\"...\"}. User: " + req.Prompt;
-            raw = await ReasonWithLlmAsync(llmPrompt, ctx);
+            raw = await ReasonWithLlmAsync(llmPrompt, ctx, cancellationToken);
         }
 
         // Robust parse preferring JSON, with keyword fallback for G/SF.
@@ -595,7 +604,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         var regReaction = new RegisterReaction(autoId, when, scriptId, target, Array.Empty<string>(), "default", null);
 
         var autoGrain = GrainFactory.GetGrain<IAutomationNeuron>("automation-main");
-        await autoGrain.FireAsync(new AutomationDefinitionStaged(proposalId, "automation-main", regScript, regReaction));
+        await autoGrain.FireAsync(new AutomationDefinitionStaged(proposalId, "automation-main", regScript, regReaction), cancellationToken);
 
         var approval = GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
         await approval.DeliverAsync(new SelfEvolutionProposal(
@@ -611,13 +620,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             Sender = Self,
             Receiver = new NeuronId(SelfEvolutionNeuronIds.Main)
-        });
+        }, cancellationToken);
 
-        await FireAsync(new InoResponse(req.Prompt, $"Staged automation proposal {proposalId} (when={when}).", []));
-        await DeliverAutomationProposalSurfaceAsync(proposalId, rationale, when, script, req.ClientId, workspaceId);
+        await FireAsync(new InoResponse(req.Prompt, $"Staged automation proposal {proposalId} (when={when}).", []), cancellationToken);
+        await DeliverAutomationProposalSurfaceAsync(proposalId, rationale, when, script, req.ClientId, workspaceId, cancellationToken);
     }
 
-    private async Task<bool> HasGoogleCredentialAsync(string? gmailUserId = null)
+    private async Task<bool> HasGoogleCredentialAsync(string? gmailUserId = null, CancellationToken cancellationToken = default)
     {
         var store = ServiceProvider.GetService<IPackConfigStore>();
         if (store is null)
@@ -628,8 +637,12 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var scope = string.IsNullOrWhiteSpace(gmailUserId)
                 ? Self.AsScope()
                 : new NeuronScope(new UserId(gmailUserId), null);
-            var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope);
+            var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
             return GoogleClientFactory.HasUsableCredential(values);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -638,7 +651,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 
-    private async Task<bool> HasSalesforceCredentialAsync(string userId)
+    private async Task<bool> HasSalesforceCredentialAsync(string userId, CancellationToken cancellationToken = default)
     {
         var store = ServiceProvider.GetService<IPackConfigStore>();
         if (store is null)
@@ -646,8 +659,12 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         try
         {
-            var merged = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, new NeuronScope(new UserId(userId), null));
+            var merged = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, new NeuronScope(new UserId(userId), null), cancellationToken);
             return SalesforceClientFactory.HasUsableCredential(merged);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -656,7 +673,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 
-    private async Task DeliverGoogleAuthSurfaceAsync(string? clientId, string? workspaceId = null)
+    private async Task DeliverGoogleAuthSurfaceAsync(string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var tree = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(), new List<UiWidgetTree>
@@ -686,29 +703,29 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task DeliverLoginSurfaceAsync(string? clientId)
+    private async Task DeliverLoginSurfaceAsync(string? clientId, CancellationToken cancellationToken = default)
     {
         var session = GrainFactory.GetGrain<IUserSessionNeuron>("session-main");
         var surface = await session.BuildLoginSurfaceAsync(clientId);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task DeliverSalesforceCredentialSurfaceAsync(string? clientId, string? workspaceId = null)
+    private async Task DeliverSalesforceCredentialSurfaceAsync(string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var surface = SalesforceAuthSurfaces.CredentialForm(Self.Value, clientId);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task FetchRecentGmailAsync(InoRequest req, string gmailUserId)
+    private async Task FetchRecentGmailAsync(InoRequest req, string gmailUserId, CancellationToken cancellationToken = default)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
-        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider, cancellationToken);
         var maxResults = cls.MaxResults ?? InoConnectorIntents.ResultCount(req.Prompt);
         var q = cls.Query ?? "";
         await Broadcast(new Signal(GoogleSignals.GmailFetchRequested, new Dictionary<string, object?>
@@ -718,28 +735,33 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["workspaceId"] = workspaceId,
             ["maxResults"] = maxResults,
             ["query"] = q
-        }));
+        }), cancellationToken);
 
         List<GmailMessageSummary> summaries;
         string[] ids;
         try
         {
             var gmail = GrainFactory.GetGrain<IGmailNeuron>(gmailUserId);
-            ids = await gmail.ListMessagesAsync(q, maxResults);
+            ids = await gmail.ListMessagesAsync(q, maxResults, cancellationToken);
             summaries = new List<GmailMessageSummary>();
             foreach (var id in ids.Take(maxResults))
             {
-                var body = await gmail.ReadMessageAsync(id);
+                cancellationToken.ThrowIfCancellationRequested();
+                var body = await gmail.ReadMessageAsync(id, cancellationToken);
                 summaries.Add(new GmailMessageSummary(id, body));
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex) when (IsGoogleIntegrationFailure(ex))
         {
             Logger.LogWarning(ex, "Gmail fetch failed after credentials were configured.");
             var failureReply = GoogleFailureReply(ex);
-            await FireAsync(new InoResponse(req.Prompt, failureReply, []));
-            await DeliverReplySurfaceAsync(failureReply, req.ClientId, workspaceId);
-            await DeliverGoogleAuthSurfaceAsync(req.ClientId, workspaceId);
+            await FireAsync(new InoResponse(req.Prompt, failureReply, []), cancellationToken);
+            await DeliverReplySurfaceAsync(failureReply, req.ClientId, workspaceId, cancellationToken);
+            await DeliverGoogleAuthSurfaceAsync(req.ClientId, workspaceId, cancellationToken);
             return;
         }
 
@@ -749,15 +771,15 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["workspaceId"] = workspaceId,
             ["count"] = summaries.Count,
             ["messageIds"] = string.Join(",", summaries.Select(m => m.Id))
-        }));
+        }), cancellationToken);
 
         var reply = GmailReplyText(summaries);
-        await FireAsync(new InoResponse(req.Prompt, reply, []));
+        await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
 
         if (summaries.Count > 0)
         {
             var bodies = string.Join("\n---\n", summaries.Select(s => s.Body));
-            await FireAsync(new MemorySummary("last-gmail", bodies, DateTimeOffset.UtcNow, workspaceId));
+            await FireAsync(new MemorySummary("last-gmail", bodies, DateTimeOffset.UtcNow, workspaceId), cancellationToken);
         }
 
         string? summary = null;
@@ -769,17 +791,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 : GetLastGmailBodiesFromJournal(workspaceId) ?? "";
             if (!string.IsNullOrWhiteSpace(bodiesToSummarize))
             {
-                summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + bodiesToSummarize, "");
+                summary = await ReasonWithLlmAsync("Provide a concise 3-5 bullet point summary of these emails (key points only):\n" + bodiesToSummarize, "", cancellationToken);
             }
         }
 
-        await DeliverGmailMessagesSurfaceAsync(summaries, req.ClientId, workspaceId, summary);
+        await DeliverGmailMessagesSurfaceAsync(summaries, req.ClientId, workspaceId, summary, cancellationToken);
     }
 
-    private async Task FetchSalesforceAccountsAsync(InoRequest req, string salesforceUserId)
+    private async Task FetchSalesforceAccountsAsync(InoRequest req, string salesforceUserId, CancellationToken cancellationToken = default)
     {
         var workspaceId = WorkspaceIds.Effective(req.WorkspaceId);
-        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider);
+        var cls = await InoIntentClassifier.ClassifyWithLlmAsync(req.Prompt, ServiceProvider, cancellationToken);
         var maxResults = cls.MaxResults ?? InoConnectorIntents.ResultCount(req.Prompt);
         await Broadcast(new Signal(SalesforceSignals.QueryRequested, new Dictionary<string, object?>
         {
@@ -787,21 +809,25 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["clientId"] = req.ClientId,
             ["workspaceId"] = workspaceId,
             ["maxResults"] = maxResults
-        }));
+        }), cancellationToken);
 
         string[] records;
         try
         {
             var salesforce = GrainFactory.GetGrain<ISalesforceCrmNeuron>(salesforceUserId);
-            records = await salesforce.ListAccountsAsync(maxResults);
+            records = await salesforce.ListAccountsAsync(maxResults, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex) when (IsSalesforceIntegrationFailure(ex))
         {
             Logger.LogWarning(ex, "Salesforce query failed after credentials were configured.");
             var failureReply = SalesforceFailureReply(ex);
-            await FireAsync(new InoResponse(req.Prompt, failureReply, []));
-            await DeliverReplySurfaceAsync(failureReply, req.ClientId, workspaceId);
-            await DeliverSalesforceCredentialSurfaceAsync(req.ClientId, workspaceId);
+            await FireAsync(new InoResponse(req.Prompt, failureReply, []), cancellationToken);
+            await DeliverReplySurfaceAsync(failureReply, req.ClientId, workspaceId, cancellationToken);
+            await DeliverSalesforceCredentialSurfaceAsync(req.ClientId, workspaceId, cancellationToken);
             return;
         }
 
@@ -810,20 +836,20 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["clientId"] = req.ClientId,
             ["workspaceId"] = workspaceId,
             ["count"] = records.Length
-        }));
+        }), cancellationToken);
 
         var reply = SalesforceReplyText(records);
-        await FireAsync(new InoResponse(req.Prompt, reply, []));
+        await FireAsync(new InoResponse(req.Prompt, reply, []), cancellationToken);
 
         if (records.Length > 0)
         {
-            await FireAsync(new MemorySummary("last-salesforce", string.Join("\n", records), DateTimeOffset.UtcNow, workspaceId));
+            await FireAsync(new MemorySummary("last-salesforce", string.Join("\n", records), DateTimeOffset.UtcNow, workspaceId), cancellationToken);
         }
 
-        await DeliverSalesforceRecordsSurfaceAsync(records, req.ClientId, workspaceId);
+        await DeliverSalesforceRecordsSurfaceAsync(records, req.ClientId, workspaceId, cancellationToken);
     }
 
-    private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? clientId, string? workspaceId = null, string? summary = null)
+    private async Task DeliverGmailMessagesSurfaceAsync(IReadOnlyList<GmailMessageSummary> messages, string? clientId, string? workspaceId = null, string? summary = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var children = new List<UiWidgetTree>
@@ -891,10 +917,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task DeliverSalesforceRecordsSurfaceAsync(IReadOnlyList<string> records, string? clientId, string? workspaceId = null)
+    private async Task DeliverSalesforceRecordsSurfaceAsync(IReadOnlyList<string> records, string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var children = new List<UiWidgetTree>
@@ -943,10 +969,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task DeliverUiKitGallerySurfaceAsync(string? clientId, string? workspaceId = null)
+    private async Task DeliverUiKitGallerySurfaceAsync(string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var tree = UiKitGallery.Build("UiKit Gallery (via INO)");
@@ -962,10 +988,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task DeliverLlmSettingsSurfaceAsync(string? clientId, string? workspaceId = null)
+    private async Task DeliverLlmSettingsSurfaceAsync(string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
 
@@ -975,9 +1001,13 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             try
             {
-                var sys = await store.GetAsync("system", "llm");
+                var sys = await store.GetAsync("system", "llm", cancellationToken);
                 if (sys.TryGetValue("llm_provider", out var prov) && !string.IsNullOrWhiteSpace(prov))
                     current = prov;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch { /* optional */ }
         }
@@ -1035,16 +1065,16 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task HandleLlmSetCommandAsync(InoRequest req, string workspaceId)
+    private async Task HandleLlmSetCommandAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken = default)
     {
         var p = req.Prompt.ToLowerInvariant();
         var store = ServiceProvider.GetService<IPackConfigStore>();
         if (store == null)
         {
-            await FireAsync(new InoResponse(req.Prompt, "No config store available to change LLM.", []));
+            await FireAsync(new InoResponse(req.Prompt, "No config store available to change LLM.", []), cancellationToken);
             return;
         }
 
@@ -1067,17 +1097,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             else if (val.Contains("gpt") || val.Contains("azure")) provider = "azureopenai";
         }
 
-        await store.SetAsync("system", "llm", new Dictionary<string, string> { ["llm_provider"] = provider, ["llm_key"] = key });
+        await store.SetAsync("system", "llm", new Dictionary<string, string> { ["llm_provider"] = provider, ["llm_key"] = key }, cancellationToken);
 
-        await FireAsync(new InoResponse(req.Prompt, $"LLM provider set to {provider}.", []));
-        await DeliverReplySurfaceAsync($"Active LLM updated to {provider} via system config. New requests will use it.", req.ClientId, workspaceId);
+        await FireAsync(new InoResponse(req.Prompt, $"LLM provider set to {provider}.", []), cancellationToken);
+        await DeliverReplySurfaceAsync($"Active LLM updated to {provider} via system config. New requests will use it.", req.ClientId, workspaceId, cancellationToken);
 
         // Refresh the settings surface so user sees the current value updated (feedback)
-        await DeliverLlmSettingsSurfaceAsync(req.ClientId, workspaceId);
-        await CreateMemorySummaryAsync(workspaceId);
+        await DeliverLlmSettingsSurfaceAsync(req.ClientId, workspaceId, cancellationToken);
+        await CreateMemorySummaryAsync(workspaceId, cancellationToken);
     }
 
-    private async Task HandleApproveProposalIntentAsync(InoRequest req, string workspaceId)
+    private async Task HandleApproveProposalIntentAsync(InoRequest req, string workspaceId, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var p = req.Prompt.ToLowerInvariant();
@@ -1116,25 +1146,29 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         if (string.IsNullOrWhiteSpace(proposalId))
         {
-            await DeliverReplySurfaceAsync("No proposal id found to approve. Say 'approve proposal automation-xxxx'.", req.ClientId, workspaceId);
+            await DeliverReplySurfaceAsync("No proposal id found to approve. Say 'approve proposal automation-xxxx'.", req.ClientId, workspaceId, cancellationToken);
             return;
         }
 
         try
         {
             var approvalGrain = GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
-            await approvalGrain.DeliverAsync(new SelfEvolutionDecision(proposalId, Approved: true, DecidedBy: "user-via-ino", Reason: "Approved from Ino chat"));
-            await FireAsync(new InoResponse(req.Prompt, $"Approved proposal {proposalId}.", []));
-            await DeliverReplySurfaceAsync($"Proposal {proposalId} approved. It will activate if the apply handler succeeds.", req.ClientId, workspaceId);
+            await approvalGrain.DeliverAsync(new SelfEvolutionDecision(proposalId, Approved: true, DecidedBy: "user-via-ino", Reason: "Approved from Ino chat"), cancellationToken);
+            await FireAsync(new InoResponse(req.Prompt, $"Approved proposal {proposalId}.", []), cancellationToken);
+            await DeliverReplySurfaceAsync($"Proposal {proposalId} approved. It will activate if the apply handler succeeds.", req.ClientId, workspaceId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to deliver approval decision for {Proposal}", proposalId);
-            await DeliverReplySurfaceAsync($"Could not record approval for {proposalId}. Check self-evolution status.", req.ClientId, workspaceId);
+            await DeliverReplySurfaceAsync($"Could not record approval for {proposalId}. Check self-evolution status.", req.ClientId, workspaceId, cancellationToken);
         }
     }
 
-    private async Task DeliverAutomationProposalSurfaceAsync(string proposalId, string rationale, string when, string script, string? clientId, string? workspaceId = null)
+    private async Task DeliverAutomationProposalSurfaceAsync(string proposalId, string rationale, string when, string script, string? clientId, string? workspaceId = null, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
 
@@ -1181,10 +1215,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
-    private async Task DeliverGraphSurfaceAsync(UiWidgetTree tree, string? clientId, string? workspaceId, string title, string surfaceId)
+    private async Task DeliverGraphSurfaceAsync(UiWidgetTree tree, string? clientId, string? workspaceId, string title, string surfaceId, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var props = new Dictionary<string, object?>
@@ -1200,7 +1234,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var surface = new UiSurface(UiSurface.WidgetTreeKind, props);
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(StampCurrent(surface));
+        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
     public async Task<string> AskAsync(string prompt, CancellationToken cancellationToken = default)
@@ -1245,6 +1279,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                     .TakeLast(request.MaxHistory)
                     .ToList();
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch { /* self-evo optional in some test setups */ }
         }
 
@@ -1288,8 +1326,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         );
     }
 
-    private async Task<string> BuildContextAsync(string prompt, string? workspaceId)
+    private Task<string> BuildContextAsync(string prompt, string? workspaceId, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var recentOut = OutgoingJournal.TakeLast(8).Select(s => s.Type + ":" + s.ToString()).ToList();
         var recentIn = IncomingJournal.TakeLast(5).Select(s => "in:" + s.ToString()).ToList();
@@ -1310,7 +1349,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             .Select(p => p.Pack.Name + "@" + p.Pack.Version);
         var skillCtx = string.Join(";", skills.Concat(packs));
 
-        return $"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nskills:{skillCtx}";
+        return Task.FromResult($"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nskills:{skillCtx}");
     }
 
     private DbSchemaInspected? LatestSuccessfulSchema(string? clientId, string? workspaceId)
@@ -1469,39 +1508,44 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return string.IsNullOrWhiteSpace(id) ? "sqlite" : id;
     }
 
-    private async Task<string> ReasonWithLlmAsync(string prompt, string context)
+    private async Task<string> ReasonWithLlmAsync(string prompt, string context, CancellationToken cancellationToken = default)
     {
-        var chat = await ResolveGlobalLlmClientAsync() ?? ServiceProvider.GetService<IChatClient>();
+        var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
         if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
 
         var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. ALWAYS answer the user's request directly and visibly first with the actual content (e.g. the joke, summary, fact or help). Put any TASK: or BRANCH: directives ONLY on their own separate lines AFTER the answer, and ONLY if user explicitly asked to create a task/automation/branch. Never output only a directive. For a plain request like 'tell a joke' or 'generate a joke' just reply with the joke text directly.";
         var full = sys + "\nCTX:\n" + context + "\nUSER: " + prompt;
-        var (text, _) = await GetChatTextOrFallbackAsync(chat, full);
+        var (text, _) = await GetChatTextOrFallbackAsync(chat, full, cancellationToken);
         return text;
     }
 
-    private async Task<string> ReasonDirectlyWithLlmAsync(string prompt, string context)
+    private async Task<string> ReasonDirectlyWithLlmAsync(string prompt, string context, CancellationToken cancellationToken = default)
     {
-        var chat = await ResolveGlobalLlmClientAsync() ?? ServiceProvider.GetService<IChatClient>();
+        var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
         if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
 
         var (text, _) = await GetChatTextOrFallbackAsync(
             chat,
             "Answer the user's request directly in one or two sentences. Do not output TASK or BRANCH directives.\nCTX:\n"
-            + context + "\nUSER: " + prompt);
+            + context + "\nUSER: " + prompt,
+            cancellationToken);
         return text;
     }
 
     // TaskCanceledException also covers the Ollama-model-still-loading case: OllamaApiClient's HttpClient has
     // no explicit timeout configured, so a slow model pull/load times out via HttpClient's default timeout
     // rather than failing fast with a connection-refused HttpRequestException.
-    private async Task<(string Text, bool Available)> GetChatTextOrFallbackAsync(IChatClient chat, string prompt)
+    private async Task<(string Text, bool Available)> GetChatTextOrFallbackAsync(IChatClient chat, string prompt, CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await chat.GetResponseAsync(prompt);
+            var response = await chat.GetResponseAsync(prompt, cancellationToken: cancellationToken);
             var text = response.Text.Trim();
             return (string.IsNullOrWhiteSpace(text) ? "I do not have a useful answer yet." : text, true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
@@ -1510,7 +1554,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 
-    private async Task<IChatClient?> ResolveGlobalLlmClientAsync()
+    private async Task<IChatClient?> ResolveGlobalLlmClientAsync(CancellationToken cancellationToken = default)
     {
         var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
         var store = ServiceProvider.GetService<IPackConfigStore>();
@@ -1518,12 +1562,16 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         try
         {
-            var sys = await store.GetAsync("system", "llm");
+            var sys = await store.GetAsync("system", "llm", cancellationToken);
             if (sys.TryGetValue("llm_provider", out var provider) && !string.IsNullOrWhiteSpace(provider))
             {
                 sys.TryGetValue("llm_key", out var key);
                 return factory.Create(provider, string.IsNullOrWhiteSpace(key) ? null : key);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch { /* optional */ }
         return null;
@@ -1569,8 +1617,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         prompt.Contains("branch", StringComparison.OrdinalIgnoreCase) ||
         prompt.Contains("simulate", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<List<string>> OrchestrateActionsIfNeededAsync(ReplyPlan replyPlan)
+    private async Task<List<string>> OrchestrateActionsIfNeededAsync(ReplyPlan replyPlan, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var created = new List<string>();
         foreach (var taskDesc in replyPlan.TaskDescriptions)
         {
@@ -1580,16 +1629,17 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
         if (!string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
         {
-            var cp = await CreateCheckpointAsync();
-            var bid = await BranchAsync(cp);
+            var cp = await CreateCheckpointAsync(cancellationToken);
+            var bid = await BranchAsync(cp, cancellationToken);
             created.Add("branch:" + bid.Value);
         }
         return created;
     }
 
-    private async Task CreateMemorySummaryAsync(string? workspaceId)
+    private async Task CreateMemorySummaryAsync(string? workspaceId, CancellationToken cancellationToken = default)
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
+        cancellationToken.ThrowIfCancellationRequested();
         var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(20).ToList();
         if (recent.Count < 5) return;
 
@@ -1598,7 +1648,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         var ctx = string.Join("\n", recent.Select(s => s.Type + ": " + s.ToString()));
         var prompt = "Summarize the following recent activity in DigitalBrain for personal assistant memory. One short topic + 1-sentence summary. Activity:\n" + ctx;
-        var (summaryText, available) = await GetChatTextOrFallbackAsync(chat, prompt);
+        var (summaryText, available) = await GetChatTextOrFallbackAsync(chat, prompt, cancellationToken);
         if (!available)
             return;
 
@@ -1606,7 +1656,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             var topic = summaryText.Split('.')[0].Trim();
             var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0, 30) : topic, summaryText, DateTimeOffset.UtcNow, workspaceId);
-            await FireAsync(mem);
+            await FireAsync(mem, cancellationToken);
         }
     }
 
