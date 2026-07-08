@@ -215,6 +215,14 @@ public static class DigitalBrainBuilderExtensions
             .WithExternalHttpEndpoints()
             .WithReplicas(ctx.KernelReplicas);
 
+        // Ensure storage emulator (Azurite) resources are healthy before launching kernel process.
+        // This sequences azurite ready (for clustering/journals/grainstate/sync) ahead of silo init + health probe, reducing races and time-to-healthy in E2E/CI.
+        // LLM waits already present below; storage waits complement the WithReference calls.
+        kernel.WaitFor(ctx.ClusteringTable);
+        kernel.WaitFor(ctx.GrainBlobs);
+        kernel.WaitFor(ctx.JournalBlobs);
+        kernel.WaitFor(ctx.SyncBlobs);
+
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
         // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks). Provider/model come from

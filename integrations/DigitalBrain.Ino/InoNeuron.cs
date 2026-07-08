@@ -749,7 +749,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ServiceProvider,
             await LoadCapabilityRecordsAsync(cancellationToken),
             cancellationToken);
-        var maxResults = classification.MaxResults ?? InoConnectorIntents.ResultCount(request.Prompt);
+        var maxResults = classification.MaxResults ?? InoPromptSemantics.ResultCount(request.Prompt) ?? 5;
         var q = classification.Query ?? "";
         await Broadcast(new Signal(GoogleSignals.GmailFetchRequested, new Dictionary<string, object?>
         {
@@ -824,7 +824,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ServiceProvider,
             await LoadCapabilityRecordsAsync(cancellationToken),
             cancellationToken);
-        var maxResults = classification.MaxResults ?? InoConnectorIntents.ResultCount(request.Prompt);
+        var maxResults = classification.MaxResults ?? InoPromptSemantics.ResultCount(request.Prompt) ?? 5;
         await Broadcast(new Signal(SalesforceSignals.QueryRequested, new Dictionary<string, object?>
         {
             ["prompt"] = request.Prompt,
@@ -1365,19 +1365,24 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         cancellationToken.ThrowIfCancellationRequested();
         workspaceId = WorkspaceIds.Effective(workspaceId);
-        var recentOut = OutgoingJournal.TakeLast(8).ToList();
-        var recentIn = IncomingJournal.TakeLast(5).ToList();
-        var completed = OutgoingJournal.OfType<TaskCompleted>().TakeLast(3).ToList();
+        const int recentOutgoing = 8;
+        const int recentIncoming = 5;
+        const int recentCompleted = 3;
+        const int recentMems = 5;
+        const int recentAutomations = 3;
+        var recentOut = OutgoingJournal.TakeLast(recentOutgoing).ToList();
+        var recentIn = IncomingJournal.TakeLast(recentIncoming).ToList();
+        var completed = OutgoingJournal.OfType<TaskCompleted>().TakeLast(recentCompleted).ToList();
 
         var mems = OutgoingJournal
             .OfType<MemorySummary>()
             .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId)
-            .TakeLast(5)
+            .TakeLast(recentMems)
             .ToList();
 
         var automations = OutgoingJournal.Concat(IncomingJournal)
             .OfType<AutomationDefinitionStaged>()
-            .TakeLast(3)
+            .TakeLast(recentAutomations)
             .ToList();
 
         var packet = InoContextPacketBuilder.Build(
@@ -1712,7 +1717,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         cancellationToken.ThrowIfCancellationRequested();
-        var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(20).ToList();
+        const int recentCombinedForMemory = 20;
+        var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(recentCombinedForMemory).ToList();
         if (recent.Count < 5)
         {
             return;

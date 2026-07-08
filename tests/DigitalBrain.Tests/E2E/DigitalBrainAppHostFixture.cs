@@ -85,7 +85,10 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
         App = await builder.BuildAsync();
         await App.StartAsync();
 
-        using var startupCts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        // Cold E2E boots pull Azurite emulator + Ollama (qwen+embed) + whisper images/models + form Orleans cluster with journals.
+        // Warm attach path (ports 8080/8081) skips entirely for local dev. Default 8min for CI reliability; override DIGITALBRAIN_E2E_STARTUP_TIMEOUT_MINUTES.
+        var startupTimeoutMinutes = int.TryParse(Environment.GetEnvironmentVariable("DIGITALBRAIN_E2E_STARTUP_TIMEOUT_MINUTES"), out var m) && m > 0 ? m : 8;
+        using var startupCts = new CancellationTokenSource(TimeSpan.FromMinutes(startupTimeoutMinutes));
         await App.ResourceNotifications.WaitForResourceHealthyAsync("kernel", startupCts.Token);
 
         // Browser nav target: the kernel "web" endpoint (static bundle + gRPC-Web).

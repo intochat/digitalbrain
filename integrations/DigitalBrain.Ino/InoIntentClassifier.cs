@@ -118,7 +118,7 @@ public static class InoIntentClassifier
             var capsText = string.Join("\n", relevant.Select(c => $"- {c.Id}: {c.Description} (e.g. {string.Join(", ", c.Examples)})"));
 
             const string sys = "You are an intent classifier for a personal AI assistant. " +
-                               "Reply with ONLY a single JSON object: {\"intent\":\"gmail\",\"confidence\":0.92}. " +
+                               "Reply with ONLY a single JSON object: {\"intent\":\"generic\",\"confidence\":0.7}. " +
                                "Use only listed capability ids or generic/explain/approve/run_automation/uikit_gallery/schema_viz/relation_graph:\n";
 
             var fullPrompt = sys + capsText + "\nUser request: " + SecretText.Redact(prompt);
