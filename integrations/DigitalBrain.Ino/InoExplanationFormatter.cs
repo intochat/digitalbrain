@@ -15,6 +15,8 @@ public sealed record InoExplanationRequest(InoExplanationRequestKind Kind, strin
 
 public static partial class InoExplanationFormatter
 {
+    private const int MaxEvidenceInLineageFormat = 6;
+
     public static bool IsExplanationQuestion(string prompt) => TryParse(prompt).Kind != InoExplanationRequestKind.None;
 
     public static InoExplanationRequest TryParse(string prompt)
@@ -91,7 +93,7 @@ public static partial class InoExplanationFormatter
 
         if (packet is not null)
         {
-            var evidence = packet.Evidence.Take(6).Select(e => $"{e.EvidenceId}:{e.SourceKind}/{e.TrustLevel}");
+            var evidence = packet.Evidence.Take(MaxEvidenceInLineageFormat).Select(e => $"{e.EvidenceId}:{e.SourceKind}/{e.TrustLevel}");
             builder.AppendLine("Selected context evidence: " + string.Join(", ", evidence));
         }
         else

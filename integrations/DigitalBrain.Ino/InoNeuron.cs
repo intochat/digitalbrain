@@ -37,6 +37,14 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private static readonly Regex LlmProviderCommandRegex =
         new(@"^\s*set-llm:(?<provider>[A-Za-z0-9._-]+)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    private const int RecentOutgoingForContext = 8;
+    private const int RecentIncomingForContext = 5;
+    private const int RecentCompletedTasksForContext = 3;
+    private const int RecentMemoriesForContext = 5;
+    private const int RecentAutomationsForContext = 3;
+    private const int RecentCombinedForMemorySummary = 20;
+    private const int MinJournalsForMemorySummary = 5;
+
     public override async Task OnActivateAsync(CancellationToken ct)
     {
         await base.OnActivateAsync(ct);
@@ -262,8 +270,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     }
     public async Task HandleAsync(Signal signal, CancellationToken cancellationToken = default)
     {
-        // Connector-specific signal resumption (gmail/salesforce auth/pack) removed from Ino core per catalog + generic path.
-        // Signals now handled via generic catalog capabilities or connector grains directly.
+        // Signals handled via generic catalog + packet path or by owning connector grains.
     }
 
     private async Task<string> ResolveUserIdAsync(string? clientId, CancellationToken cancellationToken = default)
@@ -399,7 +406,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
 
-        // Structured LLM extraction for high quality automation (Gmail/SF examples supported).
+        // Structured LLM extraction for high quality automation via catalog-driven signals.
         // Use direct chat for clean JSON output (generic Reason wrapper may add prose).
         string raw;
         var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
@@ -409,9 +416,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                 "You are a precise automation designer for DigitalBrain. " +
                 "Turn the user request into a safe reaction. " +
                 "Reply with ONLY minified JSON and nothing else (no code fences, no prose):\n" +
-                "{\"when\":\"Signal:GmailMessageReceived\",\"target\":null,\"script\":\"return new[] { new Signal(\\\"EmailSummarized\\\", new Dictionary<string,object?>{[\\\"summary\\\"]=\\\"...\\\"}) }; \",\"rationale\":\"short reason\"}\n" +
-                "Rules: when must be Signal:GmailMessageReceived (for gmail), Signal:SalesforceQueryReady (for sf/crm), or NeuronActivated. " +
-                "script: short safe C# returning Signal[] (example uses realistic emitted signals for follow-on G/SF glue). No file system, loops or unsafe. " +
+                "{\"when\":\"NeuronActivated\",\"target\":null,\"script\":\"return new[] { new Signal(\\\"TaskCreated\\\", new Dictionary<string,object?>{[\\\"desc\\\"]=\\\"...\\\"}) }; \",\"rationale\":\"short reason\"}\n" +
+                "Rules: when must be one of AllowedAutomationTriggers (e.g. NeuronActivated) or from capability signals. " +
+                "script: short safe C# returning Signal[]. No file system, loops or unsafe. " +
                 "User request: " + request.Prompt;
             var resp = await chat.GetResponseAsync(specPrompt, cancellationToken: cancellationToken);
             raw = resp.Text?.Trim() ?? "";
@@ -423,7 +430,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             raw = await ReasonWithLlmAsync(llmPrompt, ctx, cancellationToken);
         }
 
-        var defaultWhen = DefaultAutomationTrigger(request.Prompt, capabilities);
+        var defaultWhen = DefaultAutomationTrigger(request.Prompt);
         var defaultScript = "return new[] { new Signal(\"AutomationFired\", new Dictionary<string,object?> { [\"desc\"] = \"from chat\" }) };";
         var defaultRationale = $"Automation proposed from: {request.Prompt}";
         var draft = TryReadAutomationDraft(raw, defaultWhen, defaultScript, defaultRationale, out var parsedDraft)
@@ -459,9 +466,9 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await DeliverAutomationProposalSurfaceAsync(proposalId, draft.Rationale, draft.When, draft.Script, request.ClientId, workspaceId, cancellationToken);
     }
 
-    private static string DefaultAutomationTrigger(string prompt, IReadOnlyList<InoCapabilityRecord> capabilities)
+    private static string DefaultAutomationTrigger(string prompt)
     {
-        // Catalog-driven; gmail/salesforce etc now use generic path + capability metadata (no special string mapping in core).
+        // Catalog + generic path only; triggers sourced from capability inventory and journals.
         return "NeuronActivated";
     }
 
@@ -901,11 +908,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             {
                 actions.Add(new InoAction("Refresh gallery", FollowUpPrompt: "uikit gallery"));
             }
-
-            if (classification.Intent is "gmail" or "salesforce")
-            {
-                actions.Add(new InoAction("Summarize last", FollowUpPrompt: "summarize the last one"));
-            }
         }
 
         return new InoInteractResult(
@@ -927,24 +929,19 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         cancellationToken.ThrowIfCancellationRequested();
         workspaceId = WorkspaceIds.Effective(workspaceId);
-        const int recentOutgoing = 8;
-        const int recentIncoming = 5;
-        const int recentCompleted = 3;
-        const int recentMems = 5;
-        const int recentAutomations = 3;
-        var recentOut = OutgoingJournal.TakeLast(recentOutgoing).ToList();
-        var recentIn = IncomingJournal.TakeLast(recentIncoming).ToList();
-        var completed = OutgoingJournal.OfType<TaskCompleted>().TakeLast(recentCompleted).ToList();
+        var recentOut = OutgoingJournal.TakeLast(RecentOutgoingForContext).ToList();
+        var recentIn = IncomingJournal.TakeLast(RecentIncomingForContext).ToList();
+        var completed = OutgoingJournal.OfType<TaskCompleted>().TakeLast(RecentCompletedTasksForContext).ToList();
 
         var mems = OutgoingJournal
             .OfType<MemorySummary>()
             .Where(m => WorkspaceIds.Effective(m.WorkspaceId) == workspaceId)
-            .TakeLast(recentMems)
+            .TakeLast(RecentMemoriesForContext)
             .ToList();
 
         var automations = OutgoingJournal.Concat(IncomingJournal)
             .OfType<AutomationDefinitionStaged>()
-            .TakeLast(recentAutomations)
+            .TakeLast(RecentAutomationsForContext)
             .ToList();
 
         var packet = InoContextPacketBuilder.Build(
@@ -1192,9 +1189,8 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     {
         workspaceId = WorkspaceIds.Effective(workspaceId);
         cancellationToken.ThrowIfCancellationRequested();
-        const int recentCombinedForMemory = 20;
-        var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(recentCombinedForMemory).ToList();
-        if (recent.Count < 5)
+        var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(RecentCombinedForMemorySummary).ToList();
+        if (recent.Count < MinJournalsForMemorySummary)
         {
             return;
         }

@@ -30,7 +30,7 @@ internal static class InoIntentHandlers
                     "Automation creation",
                     "Stage a new reaction/automation proposal through the self-evolution rail.",
                     ["automation_create", "automation", "reaction"],
-                    ["when gmail then summarize", "if email then note in crm"],
+                    ["when signal then react", "on event create summary"],
                     "automation"),
                 HandlerCapability(
                     "uikit_gallery",

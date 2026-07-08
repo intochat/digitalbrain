@@ -10,6 +10,8 @@ public static class InoIntentClassifier
 
     public sealed record Classification(string Intent, double Confidence, string? Query = null, int? MaxResults = null);
 
+    private const int MaxKeywordCapabilities = 5;
+
     public static Classification Classify(string prompt, IReadOnlyList<InoCapabilityRecord>? capabilities = null)
     {
         if (string.IsNullOrWhiteSpace(prompt))
@@ -33,16 +35,6 @@ public static class InoIntentClassifier
 
         var max = InoPromptSemantics.ResultCount(prompt);
         var query = InoPromptSemantics.TryExtractFromQuery(prompt);
-
-        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "salesforce"))
-        {
-            return new("salesforce", 0.88, query, max);
-        }
-
-        if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "gmail"))
-        {
-            return new("gmail", 0.85, query, max);
-        }
 
         if (InoPromptSemantics.MatchesCapability(prompt, capabilities, "relation_graph"))
         {
@@ -205,7 +197,7 @@ public static class InoIntentClassifier
             .Concat(vectorCaps)
             .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
-            .Take(5)
+            .Take(MaxKeywordCapabilities)
             .ToList();
 
         return combined;
@@ -216,7 +208,7 @@ public static class InoIntentClassifier
         return caps
             .Where(c => c.Matches(prompt))
             .OrderByDescending(c => InoPromptSemantics.HasAny(prompt, c.Id) ? 2 : 1)
-            .Take(5)
+            .Take(MaxKeywordCapabilities)
             .ToList();
     }
 
