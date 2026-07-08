@@ -118,7 +118,8 @@ public static class DigitalBrainBuilderExtensions
             var ollama = builder.AddOllama("ollama")
                 .WithGPUSupport()
                 .WithDataVolume()
-                .WithOpenWebUI();
+                .WithLifetime(ContainerLifetime.Persistent)
+                .WithOpenWebUI(webui => webui.WithLifetime(ContainerLifetime.Persistent).WithDataVolume());
             qwen = ollama.AddModel("qwen", ollamaFallbackModel);
             embeddingModel = ollama.AddModel("embed", "nomic-embed-text");
             ollamaEndpoint = ollama.GetEndpoint("http");
