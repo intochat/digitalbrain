@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <!-- digitalbrain.tech is the sole canonical domain; www is kept bound only to 301-equivalent redirect legacy links here. -->
+  <script>
+    if (window.location.hostname === 'www.digitalbrain.tech') {
+      window.location.replace('https://digitalbrain.tech' + window.location.pathname + window.location.search + window.location.hash);
+    }
+  </script>
+
   <!--
     If you are serving your web app in a path other than the root, change the
     href value below to reflect the base path you are serving from.
@@ -19,6 +26,7 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="DigitalBrain — an AI-native runtime. Describe what you want in plain English; DigitalBrain writes the spec, proves it with a test, and grows the behavior live. Built on .NET Aspire, Orleans, and Reqnroll.">
+  <link rel="canonical" href="https://digitalbrain.tech/">
 
   <!-- Open Graph / social share -->
   <meta property="og:type" content="website">

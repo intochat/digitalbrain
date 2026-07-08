@@ -1,11 +1,13 @@
 # Deploy status — sub-project A (Azure Deploy Foundation)
 
-## LIVE (2026-07-07) — custom domain migration
+## LIVE (2026-07-08) — digitalbrain.tech is the sole canonical frontend domain
 
-- Frontend target: `www.digitalbrain.tech` on Azure Static Web Apps (`digitalbrain-web-prod`).
-- Apex target: `digitalbrain.tech` forwards to `www.digitalbrain.tech` at GoDaddy because the Static Web App currently has no `stableInboundIP` for a GoDaddy apex `A` record.
+- DNS is fully on Azure DNS (`digitalbrain.tech` zone in `digitalbrain-rg`, NS delegated from the registrar) — no GoDaddy-side DNS records or forwarding involved anymore.
+- Canonical frontend: `digitalbrain.tech` (apex) on Azure Static Web Apps (`digitalbrain-web-prod`). Apex routing uses an Azure DNS **alias A record** targeting the SWA resource directly (`az network dns record-set a create --target-resource <swa-resource-id>`) — this is the same wiring the Portal's "Custom Domain on Azure DNS" flow creates automatically; the plain `az staticwebapp hostname set` CLI path only handles TXT ownership validation and does **not** create this record, so it must be added manually whenever the apex custom domain is re-added (e.g. after recreating the SWA).
+- `www.digitalbrain.tech` stays bound to the same SWA (CNAME to the default hostname + `_dnsauth.www` TXT validation, same as apex) purely so it has a valid cert and can serve a same-origin client-side redirect (`app/web/index.html`) to the apex — it carries no app logic of its own. No Azure Front Door/redirect-capable resource is provisioned; `staticwebapp.config.json` routing is path-based only and can't do host-based redirects, so the redirect lives in the app shell instead.
+- **Managed-certificate issuance requires an explicit CAA record.** Despite CAA being opt-in by DNS spec (no CAA = any CA allowed), Azure's SWA/DigiCert cert pipeline silently fails with `"An unknown error has occurred while adding your custom domain."` unless a CAA record explicitly authorizes DigiCert. Zone has `digitalbrain.tech. CAA 0 issue "digicert.com"` at the apex (inherited by all subdomains). This is undocumented by Microsoft but confirmed by multiple independent reports of this exact error string — if custom domain validation ever starts failing generically again after a from-scratch SWA recreate, check this first.
 - Backend target: `api.digitalbrain.tech` on Azure Container Apps (`digitalbrain-jobs`) with an Azure-managed certificate.
-- Release deploys build Flutter with `KERNEL_ENDPOINT=https://api.digitalbrain.tech` and validate custom frontend/backend domains after deployment.
+- Release deploys build Flutter with `KERNEL_ENDPOINT=https://api.digitalbrain.tech` and validate custom frontend/backend domains after deployment. The workflow's `ensure_swa_hostname` also only handles TXT validation, not DNS writes — same manual-TXT-record caveat as above applies to both `www` and apex whenever a domain is re-added from a `Failed`/fresh state.
 
 ## LIVE (2026-06-23) — Elon Algorithm Pass 1 applied
 
