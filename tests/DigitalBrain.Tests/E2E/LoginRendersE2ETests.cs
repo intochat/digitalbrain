@@ -27,9 +27,11 @@ public sealed class LoginRendersE2ETests(DigitalBrainAppHostFixture fixture)
 {
     private readonly DigitalBrainAppHostFixture _fx = fixture;
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_over_grpc_web_send_broadcasts_signed_in_session()
     {
+        Skip.IfNot(_fx.Ready, E2EPrerequisites.SkipReason);
+
         var clientId = "e2e-login-" + Guid.NewGuid().ToString("N")[..8];
         var httpHandler = new HttpClientHandler
         {

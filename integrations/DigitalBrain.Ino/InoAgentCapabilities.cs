@@ -80,8 +80,9 @@ public static partial class InoAgentCapabilities
     public const string AgentSourceKind = "IAgent";
     public const string SystemTrustLevel = "System";
 
-    public static IReadOnlyList<InoCapabilityRecord> DiscoverAgentRecords() =>
-        AppDomain.CurrentDomain.GetAssemblies()
+    public static IReadOnlyList<InoCapabilityRecord> DiscoverAgentRecords(IEnumerable<Assembly>? assemblies = null) =>
+        (assemblies ?? AppDomain.CurrentDomain.GetAssemblies())
+            .Distinct()
             .SelectMany(GetLoadableTypes)
             .Where(type => type is { IsInterface: true } &&
                            type != typeof(IAgent) &&

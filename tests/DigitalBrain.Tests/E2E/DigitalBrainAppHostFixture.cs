@@ -62,6 +62,12 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
             return; // App stays null: attached to a warm cluster we don't own, nothing to boot or dispose.
         }
 
+        if (!E2EPrerequisites.ColdStartEnabled)
+        {
+            Ready = false;
+            return;
+        }
+
         var testId = Guid.NewGuid().ToString("N")[..8];
         Environment.SetEnvironmentVariable("DIGITALBRAIN_TEST_MODE", "true");
         Environment.SetEnvironmentVariable("DIGITALBRAIN_SURFACES_ENABLED", "true");

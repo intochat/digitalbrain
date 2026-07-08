@@ -15,9 +15,11 @@ public sealed class NativeGrpcGalleryDeliveryE2ETests(DigitalBrainAppHostFixture
 {
     private readonly DigitalBrainAppHostFixture _fx = fixture;
 
-    [Fact]
+    [SkippableFact]
     public async Task Ino_uikit_gallery_surface_is_delivered_over_native_grpc()
     {
+        Skip.IfNot(_fx.Ready, E2EPrerequisites.SkipReason);
+
         var clientId = "e2e-gallery-" + Guid.NewGuid().ToString("N")[..8];
         using var channel = _fx.CreateGatewayGrpcChannel();
         var client = new DigitalBrainGateway.DigitalBrainGatewayClient(channel);

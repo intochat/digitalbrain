@@ -1,6 +1,8 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Sdk;
+using DigitalBrain.Google;
 using DigitalBrain.Ino;
+using DigitalBrain.Salesforce;
 using Xunit;
 
 namespace DigitalBrain.Ino.Tests;
@@ -10,7 +12,11 @@ public class InoAwarenessTests
     [Fact]
     public void DiscoverAgentRecords_Reads_Gmail_And_Salesforce_Metadata_From_IAgent()
     {
-        var records = InoAgentCapabilities.DiscoverAgentRecords();
+        var records = InoAgentCapabilities.DiscoverAgentRecords([
+            typeof(ITestCalendarAgent).Assembly,
+            typeof(IGmailNeuron).Assembly,
+            typeof(ISalesforceCrmNeuron).Assembly
+        ]);
         var gmail = Assert.Single(records, record => record.Id == "gmail");
         Assert.Equal("Gmail", gmail.DisplayName);
         Assert.Equal("IAgent", gmail.SourceKind);
