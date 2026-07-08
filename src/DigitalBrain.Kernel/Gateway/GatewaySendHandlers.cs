@@ -129,7 +129,7 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
     {
         var session = context.Grains.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? [];
+        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr, SynapsePayloadJson.Options) ?? [];
         var username = p.TryGetValue("username", out var u) ? u?.ToString() ?? "" : "";
         var password = p.TryGetValue("password", out var pw) ? pw?.ToString() ?? "" : "";
         var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
@@ -140,7 +140,7 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
     {
         var session = context.Grains.GetGrain<IUserSessionNeuron>(IUserSessionNeuron.SingletonKey);
         var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? [];
+        var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr, SynapsePayloadJson.Options) ?? [];
         var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
         var logoutSession = await context.ResolveSessionByClientIdAsync(clientId);
         await session.FireAsync(new LogoutRequest(logoutSession?.SessionId ?? "", clientId), serverContext.CancellationToken);
@@ -162,7 +162,7 @@ internal sealed class GatewayConfigSendHandler : IGatewaySendHandler
         }
 
         var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
+        var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr, SynapsePayloadJson.Options));
         string? Field(string key) => p.TryGetValue(key, out var v) ? v?.ToString() : null;
 
         var pack = Field("pack") ?? Field("packName") ?? request.CorrelationId;
@@ -209,7 +209,7 @@ internal sealed class GatewayInoSendHandler : IGatewaySendHandler
         }
 
         var payloadStr = GatewaySendHandlers.PayloadString(request);
-        var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
+        var p = GatewayPayload.CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr, SynapsePayloadJson.Options));
         var prompt = p.TryGetValue("prompt", out var pr) ? pr?.ToString() ?? "" : "";
         var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() : null;
         var workspaceId = p.TryGetValue("workspaceId", out var wid) ? wid?.ToString() : null;
@@ -254,10 +254,9 @@ internal sealed class GatewayGenericSignalSendHandler : IGatewaySendHandler
         GatewayInternalAuth.Enforce(context.Configuration, context.Environment, context.Logger, serverContext, nameof(GatewayService.Send));
 
         var payloadJson = GatewaySendHandlers.PayloadString(request);
-        var rawProps = string.IsNullOrWhiteSpace(payloadJson)
-            ? []
-            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? [];
-        var signalProps = GatewayPayload.NormalizeJsonProps(rawProps);
+        var signalProps = string.IsNullOrWhiteSpace(payloadJson)
+            ? new Dictionary<string, object?>()
+            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson, SynapsePayloadJson.Options) ?? [];
 
         if (string.Equals(request.TypeName, TelegramSignals.MessageReceived, StringComparison.Ordinal)
             && signalProps.TryGetValue("chatId", out var chatIdValue) && chatIdValue is not null)

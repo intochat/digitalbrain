@@ -13,7 +13,7 @@ public class ProbeNeuron(ILogger<ProbeNeuron> logger, NeuronJournals journals)
 
     public Task FireJsonSignalAsync(string signalName, string json, CancellationToken cancellationToken = default)
     {
-        var props = JsonSerializer.Deserialize<Dictionary<string, object?>>(json)
+        var props = JsonSerializer.Deserialize<Dictionary<string, object?>>(json, SynapsePayloadJson.Options)
             ?? throw new ArgumentException("JSON signal payload must be an object.", nameof(json));
 
         return FireAsync(new Signal(signalName, props), cancellationToken);
