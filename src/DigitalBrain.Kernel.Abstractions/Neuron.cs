@@ -1,5 +1,8 @@
+using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Reflection;
+using System.Text.Json;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -68,6 +71,7 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     private void AddToJournal(ref IDurableList<Synapse>? journalField, string key, Synapse synapse)
     {
         var target = journalField ??= ResolveRequiredJournal(key);
+        SanitizeForOrleansCopy(synapse);
         try
         {
             target.Add(synapse);
@@ -222,21 +226,21 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     protected Task Broadcast(Synapse s, CancellationToken cancellationToken = default) => FireAsync(s with { IsBroadcast = true }, cancellationToken);
 
     public Task<IReadOnlyList<Synapse>> GetTimelineAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal.ToList());
+        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(OutgoingJournal));
 
     public Task<IReadOnlyList<Synapse>> GetIncomingTimelineAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Synapse>>(IncomingJournal.ToList());
+        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(IncomingJournal));
 
     public Task<IReadOnlyList<Synapse>> GetOutgoingTimelineAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal.ToList());
+        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(OutgoingJournal));
 
     public Task<IReadOnlyList<Synapse>> GetCausalLineageAsync(string correlationId, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal
+        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(OutgoingJournal
             .Where(s => s.CorrelationId == correlationId || s.SynapseId == correlationId)
             .Concat(IncomingJournal.Where(s => s.CorrelationId == correlationId || s.SynapseId == correlationId))
             .OrderBy(s => s.Timestamp)
             .DistinctBy(s => s.SynapseId)
-            .ToList());
+            .ToList()));
 
     public Task<IReadOnlyList<Synapse>> GetTimelineForCorrelationAsync(string correlationId, CancellationToken cancellationToken = default) =>
         GetCausalLineageAsync(correlationId, cancellationToken);
@@ -383,6 +387,150 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
 
     private static bool IsJournalWriterUninitialized(Exception exception) =>
         exception.GetBaseException().Message.Contains("state journal stream writer is not initialized", StringComparison.OrdinalIgnoreCase);
+
+    private static IReadOnlyList<Synapse> SnapshotTimeline(IEnumerable<Synapse> journal)
+    {
+        var snapshot = journal.ToList();
+        foreach (var synapse in snapshot)
+        {
+            SanitizeForOrleansCopy(synapse);
+        }
+
+        return snapshot;
+    }
+
+    private static void SanitizeForOrleansCopy(Synapse synapse)
+    {
+        // STJ object-valued dictionaries deserialize nested JSON as JsonElement, which Orleans
+        // cannot deep-copy by default when returning grain responses. Normalize at the journal
+        // boundary so old persisted entries and new traffic both stay copyable.
+        SanitizeValue(synapse, new HashSet<object>(ReferenceEqualityComparer.Instance));
+    }
+
+    private static object? SanitizeValue(object? value, HashSet<object> visited)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (value is JsonElement element)
+        {
+            return UnwrapJsonElement(element);
+        }
+
+        var type = value.GetType();
+        if (type.IsPrimitive || type.IsEnum || value is string or decimal or DateTime or DateTimeOffset or Guid or TimeSpan)
+        {
+            return value;
+        }
+
+        if (!visited.Add(value))
+        {
+            return value;
+        }
+
+        if (value is IDictionary<string, object?> objectDictionary)
+        {
+            var keys = objectDictionary.Keys.ToArray();
+            foreach (var key in keys)
+            {
+                objectDictionary[key] = SanitizeValue(objectDictionary[key], visited);
+            }
+            return value;
+        }
+
+        if (value is IDictionary dictionary)
+        {
+            var keys = dictionary.Keys.Cast<object>().ToArray();
+            foreach (var key in keys)
+            {
+                try
+                {
+                    dictionary[key] = SanitizeValue(dictionary[key], visited);
+                }
+                catch (NotSupportedException)
+                {
+                }
+            }
+            return value;
+        }
+
+        if (value is IList list)
+        {
+            for (var i = 0; i < list.Count; i++)
+            {
+                try
+                {
+                    list[i] = SanitizeValue(list[i], visited);
+                }
+                catch (NotSupportedException)
+                {
+                }
+            }
+            return value;
+        }
+
+        if (value is Array array && array.Rank == 1)
+        {
+            var elementType = array.GetType().GetElementType();
+            for (var i = 0; i < array.Length; i++)
+            {
+                var current = array.GetValue(i);
+                var sanitized = SanitizeValue(current, visited);
+                if (ReferenceEquals(current, sanitized) ||
+                    (sanitized is not null && elementType is not null && !elementType.IsInstanceOfType(sanitized)))
+                {
+                    continue;
+                }
+
+                array.SetValue(sanitized, i);
+            }
+            return value;
+        }
+
+        if (ShouldInspectProperties(type))
+        {
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.GetIndexParameters().Length > 0)
+                {
+                    continue;
+                }
+
+                object? propertyValue;
+                try
+                {
+                    propertyValue = property.GetValue(value);
+                }
+                catch (TargetInvocationException)
+                {
+                    continue;
+                }
+
+                SanitizeValue(propertyValue, visited);
+            }
+        }
+
+        return value;
+    }
+
+    private static bool ShouldInspectProperties(Type type)
+    {
+        var ns = type.Namespace ?? string.Empty;
+        return ns.StartsWith("DigitalBrain.", StringComparison.Ordinal);
+    }
+
+    private static object? UnwrapJsonElement(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Null or JsonValueKind.Undefined => null,
+        JsonValueKind.Number => element.TryGetInt64(out var integer) ? integer : element.GetDouble(),
+        JsonValueKind.Object => element.GetRawText(),
+        JsonValueKind.Array => element.GetRawText(),
+        _ => element.GetString()
+    };
 
     public static class NeuronInstrumentation
     {
