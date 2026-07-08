@@ -40,11 +40,12 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         return base.OnDeactivateAsync(reason, cancellationToken);
     }
 
-    protected override async Task DispatchSynapse(Synapse synapse)
+    protected override async Task DispatchSynapse(Synapse synapse, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var id = this.GetPrimaryKeyString() ?? "unknown-generated";
         Logger.LogInformation("GeneratedNeuron {Id} dispatched {Type}", id, synapse.Type);
-        await FireAsync(new NeuronTelemetry(Self, "generated-dispatched"));
+        await FireAsync(new NeuronTelemetry(Self, "generated-dispatched"), cancellationToken);
 
         switch (synapse)
         {

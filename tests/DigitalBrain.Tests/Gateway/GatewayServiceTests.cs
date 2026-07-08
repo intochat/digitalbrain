@@ -602,8 +602,9 @@ internal sealed class RecordingSalesforceApiClientFactory : ISalesforceApiClient
 {
     public List<NeuronScope> Scopes { get; } = [];
 
-    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope)
+    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Scopes.Add(scope);
         return Task.FromResult<ISalesforceApiClient>(new FakeSalesforceApiClient());
     }

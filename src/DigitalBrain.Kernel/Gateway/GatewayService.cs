@@ -75,12 +75,14 @@ public sealed class GatewayService(
         var initialLogin = DevAuth.Enabled(configuration, environment)
             ? UiSurfaceSamples.Login(clientId: clientId ?? "flutter", defaultUsername: DevAuth.Username, defaultPassword: DevAuth.Password)
             : UiSurfaceSamples.Login(clientId: clientId ?? "flutter");
+        context.CancellationToken.ThrowIfCancellationRequested();
         await WriteCardAsync(responseStream, UiSurfaceRfwBridge.FromUiSurface(initialLogin, "session-main"));
         logger.LogInformation("WatchHomeFeed sent initial login surface to {Peer}", context.Peer);
 
-        await using var subscription = await homeFeedBus.SubscribeAsync(clientId);
+        await using var subscription = await homeFeedBus.SubscribeAsync(clientId, context.CancellationToken);
         await foreach (var card in subscription.Reader.ReadAllAsync(context.CancellationToken))
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             await WriteCardAsync(responseStream, card);
         }
     }
@@ -102,6 +104,7 @@ public sealed class GatewayService(
         using var subscription = signalEgressBus.Subscribe(request.TypeFilter.ToArray());
         await foreach (var signal in subscription.Reader.ReadAllAsync(context.CancellationToken))
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             await responseStream.WriteAsync(new SynapseEnvelope
             {
                 TypeName = signal.Name,
@@ -127,7 +130,7 @@ public sealed class GatewayService(
             throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pack config store is not configured."));
 
         var scope = string.IsNullOrWhiteSpace(request.Scope) ? "default" : request.Scope;
-        var values = await packConfigStore.GetAsync(scope, request.Pack);
+        var values = await packConfigStore.GetAsync(scope, request.Pack, context.CancellationToken);
 
         var reply = new PackConfigReply();
         foreach (var (key, value) in values)
@@ -165,7 +168,7 @@ public sealed class GatewayService(
         try
         {
             var ino = grains.GetGrain<IInoNeuron>(neuronId);
-            return new AskReply { Text = await ino.AskAsync(request.Prompt) };
+            return new AskReply { Text = await ino.AskAsync(request.Prompt, context.CancellationToken) };
         }
         catch (Exception ex)
         {
@@ -179,7 +182,7 @@ public sealed class GatewayService(
         try
         {
             var neuron = NeuronResolver.Resolve(grains, request.NeuronId);
-            await neuron.FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["text"] = request.Text }));
+            await neuron.FireAsync(new Signal("DemoMessage", new Dictionary<string, object?> { ["text"] = request.Text }), context.CancellationToken);
             return new FireReply { Accepted = true };
         }
         catch (ArgumentException ex)
@@ -207,7 +210,7 @@ public sealed class GatewayService(
         }
         try
         {
-            var timeline = await neuron.GetTimelineAsync();
+            var timeline = await neuron.GetTimelineAsync(context.CancellationToken);
             var reply = new TimelineReply();
             foreach (var s in timeline.TakeLast(max))
             {

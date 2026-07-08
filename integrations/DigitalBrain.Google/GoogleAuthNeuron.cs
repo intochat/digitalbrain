@@ -100,7 +100,7 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
         }));
     }
 
-    public async Task<GoogleOAuthCallbackResult> CompleteOAuthAsync(GoogleOAuthCallback callback)
+    public async Task<GoogleOAuthCallbackResult> CompleteOAuthAsync(GoogleOAuthCallback callback, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(callback.Error))
         {
@@ -114,8 +114,8 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
 
         var store = ServiceProvider.GetRequiredService<IPackConfigStore>();
         var userScope = PackConfigScopes.ForUser(Self.AsScope().UserId);
-        var appValues = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName);
-        var pending = await store.GetAsync(userScope, GoogleClientFactory.OAuthPendingPackName);
+        var appValues = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, cancellationToken);
+        var pending = await store.GetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, cancellationToken);
 
         if (!pending.TryGetValue(GoogleClientFactory.OAuthStateKey, out var expectedState) || string.IsNullOrWhiteSpace(expectedState))
         {
@@ -129,9 +129,11 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
 
         var redirectUri = appValues.TryGetValue(GoogleClientFactory.RedirectUriKey, out var stored) ? stored : callback.FallbackRedirectUri;
 
+        var existingUser = await store.GetAsync(userScope, GoogleClientFactory.PackName, cancellationToken);
+
         try
         {
-            var tokenValues = await GoogleClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri);
+            var tokenValues = await GoogleClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri, cancellationToken: cancellationToken);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var (k, v) in tokenValues)
                 userTokenValues[k] = v;
@@ -142,20 +144,29 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
             if (appValues.TryGetValue(GoogleClientFactory.ClientSecretKey, out var cs))
                 userTokenValues[GoogleClientFactory.ClientSecretKey] = cs;
 
-            await store.SetAsync(userScope, GoogleClientFactory.PackName, userTokenValues);
-            await store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
+            if (!userTokenValues.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var newRt) || string.IsNullOrWhiteSpace(newRt))
+            {
+                if (existingUser.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var priorRt) && !string.IsNullOrWhiteSpace(priorRt))
+                    userTokenValues[GoogleClientFactory.RefreshTokenKey] = priorRt;
+            }
 
+            await store.SetAsync(userScope, GoogleClientFactory.PackName, userTokenValues, cancellationToken);
+            await store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, new Dictionary<string, string>(), cancellationToken);
+
+            var authedUserId = Self.AsScope().UserId.Value;
             await Broadcast(new Signal("PackConfigured", new Dictionary<string, object?>
             {
                 ["pack"] = GoogleClientFactory.PackName,
+                ["userId"] = authedUserId,
                 ["scope"] = userScope
-            }));
+            }), cancellationToken);
             await Broadcast(new Signal(GoogleSignals.AuthCompleted, new Dictionary<string, object?>
             {
                 ["provider"] = "google",
                 ["pack"] = GoogleClientFactory.PackName,
+                ["userId"] = authedUserId,
                 ["scope"] = userScope
-            }));
+            }), cancellationToken);
 
             return new GoogleOAuthCallbackResult(true, "Google connected", "You can close this browser tab and return to DigitalBrain.");
         }

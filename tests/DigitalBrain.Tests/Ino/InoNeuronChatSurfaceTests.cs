@@ -643,7 +643,7 @@ internal sealed class FailingSalesforceApiClient : ISalesforceApiClient
 
 internal sealed class FailingSalesforceApiClientFactory : ISalesforceApiClientFactory
 {
-    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope) =>
+    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default) =>
         Task.FromResult<ISalesforceApiClient>(new FailingSalesforceApiClient());
 }
 
@@ -688,6 +688,7 @@ internal sealed class RecordingGmailApiClient : IGmailApiClient
 
 internal sealed class TestGmailApiClientFactory(RecordingGmailApiClient client) : IGmailApiClientFactory
 {
-    public Task<IGmailApiClient> CreateAsync(NeuronScope scope) => Task.FromResult<IGmailApiClient>(client);
+    public Task<IGmailApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IGmailApiClient>(client);
 }
 

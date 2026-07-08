@@ -18,14 +18,14 @@ public sealed class PackSpecDriver(INeuronTestHost host)
 
     public Task PublishPackAsync(string name, string version, string code, string ownerId = "spec-author") =>
         host.Grain<IMarketplaceNeuron>("market-spec").FireAsync(
-            new PublishToMarketplace(name, version, Code: code, OwnerId: ownerId, IsPrivate: false, CommissionRate: 0.0)).AsTask();
+            new PublishToMarketplace(name, version, Code: code, OwnerId: ownerId, IsPrivate: false, CommissionRate: 0.0));
 
     public Task InstallPackAsync(string name, string version, string buyerId = "spec-buyer") =>
         host.Grain<IMarketplaceNeuron>("market-spec").FireAsync(
-            new InstallFromMarketplace(name, version, BuyerId: buyerId)).AsTask();
+            new InstallFromMarketplace(name, version, BuyerId: buyerId));
 
     public Task FireSynapseAtPackAsync(string packName, Synapse synapse) =>
-        host.Grain<IGeneratedNeuron>(GeneratedKeyFor(packName)).FireAsync(synapse).AsTask();
+        host.Grain<IGeneratedNeuron>(GeneratedKeyFor(packName)).FireAsync(synapse);
 
     // Finds (and activates) an IProbeNeuron whose activation lands on a different silo than the named
     // pack's already-activated grain, so a subsequent broadcast from it is real proof of cross-silo
@@ -53,7 +53,7 @@ public sealed class PackSpecDriver(INeuronTestHost host)
     }
 
     public Task BroadcastFromAsync<T>(string broadcasterKey, T synapse) where T : Synapse =>
-        host.Grain<IProbeNeuron>(broadcasterKey).FireAsync(synapse).AsTask();
+        host.Grain<IProbeNeuron>(broadcasterKey).FireAsync(synapse);
 
     public async Task AssertBroadcastObservedAsync(string packName)
     {

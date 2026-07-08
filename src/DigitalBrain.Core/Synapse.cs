@@ -175,14 +175,14 @@ public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
 public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataIngested>, IHandle<DbSchemaInspected>
 {
     [Alias("AskAsync")]
-    Task<string> AskAsync(string prompt);
+    Task<string> AskAsync(string prompt, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Rich interaction entrypoint. Returns the common InoInteractResult contract.
     /// This is the primary surface for MCP agents and verification tests.
     /// </summary>
     [Alias("InteractAsync")]
-    Task<InoInteractResult> InteractAsync(InoInteractRequest request);
+    Task<InoInteractResult> InteractAsync(InoInteractRequest request, CancellationToken cancellationToken = default);
 }
 
 // Self-awareness: SystemStatus + proposals (MVP for auto diagnose + simulate fix)

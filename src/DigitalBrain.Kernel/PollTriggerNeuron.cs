@@ -22,7 +22,7 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
     {
         await base.OnActivateAsync(cancellationToken);
         EnsurePolls();
-        foreach (var p in _polls) await RegisterPollReminder(p);
+        foreach (var p in _polls) await RegisterPollReminder(p, cancellationToken);
     }
 
     public override async Task OnNextAsync(Synapse item, StreamSequenceToken? token = null)
@@ -44,8 +44,9 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
     private static bool IsPollReaction(RegisterReaction r) =>
         !string.IsNullOrWhiteSpace(r.When) && r.When.Contains("poll", StringComparison.OrdinalIgnoreCase);
 
-    private async Task RegisterPollReminder(RegisterReaction p)
+    private async Task RegisterPollReminder(RegisterReaction p, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_reminders.ContainsKey(p.Id))
         {
             var rem = await this.RegisterOrUpdateReminder(p.Id, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(5));
@@ -93,14 +94,14 @@ public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals
         }
     }
 
-    protected override async Task DispatchSynapse(Synapse synapse)
+    protected override async Task DispatchSynapse(Synapse synapse, CancellationToken cancellationToken = default)
     {
-        await base.DispatchSynapse(synapse);
+        await base.DispatchSynapse(synapse, cancellationToken);
         switch (synapse)
         {
             case RegisterReaction rr when IsPollReaction(rr):
                 _polls.Add(rr);
-                await RegisterPollReminder(rr);
+                await RegisterPollReminder(rr, cancellationToken);
                 break;
             case RemoveReaction rm:
                 _polls.RemoveAll(r => r.Id == rm.Id);

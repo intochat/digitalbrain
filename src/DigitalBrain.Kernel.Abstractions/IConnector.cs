@@ -8,14 +8,14 @@ public interface IConnector
 {
     ConnectorDescriptor Descriptor { get; }
 
-    Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null);
+    Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null, CancellationToken cancellationToken = default);
 
-    Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null);
+    Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null, CancellationToken cancellationToken = default);
 
-    Task<AuthResult> CompleteAuthAsync(OAuthCallback callback);
+    Task<AuthResult> CompleteAuthAsync(OAuthCallback callback, CancellationToken cancellationToken = default);
 
     /// Connection health (G-I3): cheap probe (labels.list for gmail, etc). Used for Aspire health + UI status.
-    Task<ConnectionHealth> TestConnectionAsync(NeuronId user);
+    Task<ConnectionHealth> TestConnectionAsync(NeuronId user, CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer]

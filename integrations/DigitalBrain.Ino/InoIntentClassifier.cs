@@ -80,7 +80,7 @@ public static class InoIntentClassifier
     }
 
     // LLM-enhanced classification. Uses injected IChatClient (from Ino AI config / scoped factory).
-    public static async Task<Classification> ClassifyWithLlmAsync(string prompt, IServiceProvider? services = null)
+    public static async Task<Classification> ClassifyWithLlmAsync(string prompt, IServiceProvider? services = null, CancellationToken cancellationToken = default)
     {
         var fast = Classify(prompt);
         if (fast.Confidence >= 0.8)
@@ -92,7 +92,7 @@ public static class InoIntentClassifier
 
         try
         {
-            var relevant = await RetrieveCapabilitiesAsync(prompt, services);
+            var relevant = await RetrieveCapabilitiesAsync(prompt, services, cancellationToken);
             var capsText = string.Join("\n", relevant.Select(c => $"- {c.Id}: {c.Description} (e.g. {string.Join(", ", c.Examples)})"));
 
             const string sys = "You are an intent classifier for a personal AI assistant. " +
@@ -100,7 +100,7 @@ public static class InoIntentClassifier
                                "Ground on these capabilities (use best match):\n";
 
             var fullPrompt = sys + capsText + "\nUser request: " + prompt;
-            var response = await chat.GetResponseAsync(fullPrompt);
+            var response = await chat.GetResponseAsync(fullPrompt, cancellationToken: cancellationToken);
 
             var text = response.Text?.Trim() ?? "";
             var parsed = TryParseClassification(text);
@@ -116,16 +116,11 @@ public static class InoIntentClassifier
     }
 
     public static List<Capability> RetrieveCapabilities(string prompt) =>
-        RetrieveCapabilitiesAsync(prompt, null).GetAwaiter().GetResult();
+        KeywordCapabilities(prompt);
 
-    public static async Task<List<Capability>> RetrieveCapabilitiesAsync(string prompt, IServiceProvider? services = null)
+    public static async Task<List<Capability>> RetrieveCapabilitiesAsync(string prompt, IServiceProvider? services = null, CancellationToken cancellationToken = default)
     {
-        var p = prompt.ToLowerInvariant();
-        var keyword = Capabilities
-            .Where(c => p.Contains(c.Id) || c.Examples.Any(e => p.Contains(e.ToLowerInvariant())))
-            .OrderByDescending(c => p.Contains(c.Id) ? 2 : 1)
-            .Take(5)
-            .ToList();
+        var keyword = KeywordCapabilities(prompt);
 
         var vectorCaps = new List<Capability>();
         if (services != null)
@@ -135,7 +130,7 @@ public static class InoIntentClassifier
                 var recall = services.GetService<IInoCapabilityRecall>();
                 if (recall != null)
                 {
-                    var recalled = await recall.RecallAsync(prompt, top: 5);
+                    var recalled = await recall.RecallAsync(prompt, top: 5, cancellationToken);
                     foreach (var text in recalled ?? Array.Empty<string>())
                     {
                         var idMatch = Regex.Match(text, @"capability:(\S+)");
@@ -163,6 +158,16 @@ public static class InoIntentClassifier
             .ToList();
 
         return combined;
+    }
+
+    private static List<Capability> KeywordCapabilities(string prompt)
+    {
+        var p = prompt.ToLowerInvariant();
+        return Capabilities
+            .Where(c => p.Contains(c.Id) || c.Examples.Any(e => p.Contains(e.ToLowerInvariant())))
+            .OrderByDescending(c => p.Contains(c.Id) ? 2 : 1)
+            .Take(5)
+            .ToList();
     }
 
     private static Classification? TryParseClassification(string text)

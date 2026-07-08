@@ -29,8 +29,9 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         await TryExecuteMatchingAsync(item);
     }
 
-    protected override async Task DispatchSynapse(Synapse synapse)
+    protected override async Task DispatchSynapse(Synapse synapse, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureProjections();
 
         // Handle registrations first (they update our live view)
@@ -38,12 +39,12 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         {
             case RegisterScript rs:
                 _scripts[rs.Id] = rs.Code;
-                await FireAsync(new Signal("ScriptRegistered", new Dictionary<string, object?> { ["id"] = rs.Id }));
+                await FireAsync(new Signal("ScriptRegistered", new Dictionary<string, object?> { ["id"] = rs.Id }), cancellationToken);
                 await EmitAutomationsSurfaceAsync();
                 return;
             case RegisterReaction rr:
                 _reactions.Add(rr);
-                await FireAsync(new Signal("ReactionRegistered", new Dictionary<string, object?> { ["id"] = rr.Id, ["when"] = rr.When }));
+                await FireAsync(new Signal("ReactionRegistered", new Dictionary<string, object?> { ["id"] = rr.Id, ["when"] = rr.When }), cancellationToken);
                 await EmitAutomationsSurfaceAsync();
                 return;
             case AutomationApp app:
@@ -51,7 +52,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                     _scripts[s.Id] = s.Code;
                 foreach (var r in app.Reactions ?? Array.Empty<RegisterReaction>())
                     _reactions.Add(r);
-                await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = app.AppId }));
+                await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = app.AppId }), cancellationToken);
                 await EmitAutomationsSurfaceAsync();
                 return;
             case CreateAutomationApp create:
@@ -59,12 +60,12 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                     foreach (var s in create.Scripts) _scripts[s.Id] = s.Code;
                 if (create.Reactions is not null)
                     foreach (var r in create.Reactions) _reactions.Add(r);
-                await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = create.AppId }));
+                await FireAsync(new Signal("AutomationAppRegistered", new Dictionary<string, object?> { ["appId"] = create.AppId }), cancellationToken);
                 await EmitAutomationsSurfaceAsync();
                 return;
             case RemoveReaction rm:
                 _reactions.RemoveAll(r => r.Id == rm.Id);
-                await FireAsync(new Signal("ReactionRemoved", new Dictionary<string, object?> { ["id"] = rm.Id }));
+                await FireAsync(new Signal("ReactionRemoved", new Dictionary<string, object?> { ["id"] = rm.Id }), cancellationToken);
                 await EmitAutomationsSurfaceAsync();
                 return;
             case PromoteAutomationToPack promo:
@@ -100,7 +101,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 code,
                 synapse,
                 Self,
-                s => FireAsync(StampCurrent(s)).AsTask(),
+                s => FireAsync(StampCurrent(s)),
                 caps);
 
             // Light declared-emits enforcement (plan Task 9)

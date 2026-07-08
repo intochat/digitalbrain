@@ -368,7 +368,8 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
     if (!request.HasFormContentType)
         return Results.BadRequest("Expected multipart/form-data.");
 
-    var form = await request.ReadFormAsync();
+    var requestAborted = request.HttpContext.RequestAborted;
+    var form = await request.ReadFormAsync(cancellationToken: requestAborted);
     var file = form.Files.GetFile("file");
     if (file is null || file.Length == 0)
         return Results.BadRequest("No file uploaded.");
@@ -384,14 +385,14 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
         {
             await using (var temp = File.Create(tempPath))
             {
-                await file.CopyToAsync(temp);
+                await file.CopyToAsync(temp, requestAborted);
             }
 
             var cmd = ChatUploadClassifier.BuildDbInspectSchema(file.FileName, tempPath, clientId, workspaceId);
             var db = grains.GetGrain<IDbSupportNeuron>("db-main");
-            await db.FireAsync(cmd);
+            await db.FireAsync(cmd, requestAborted);
 
-            var dbTimeline = await db.GetTimelineAsync();
+            var dbTimeline = await db.GetTimelineAsync(requestAborted);
             var inspected = dbTimeline
                 .OfType<DbSchemaInspected>()
                 .LastOrDefault(result => result.CorrelationId == cmd.SynapseId)
@@ -400,7 +401,7 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
             if (inspected is not null)
             {
                 var schemaIno = grains.GetGrain<IInoNeuron>("ino-main");
-                await schemaIno.FireAsync(inspected);
+                await schemaIno.FireAsync(inspected, requestAborted);
             }
 
             return Results.Ok();
@@ -423,7 +424,7 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
         return Results.BadRequest("Unsupported upload type.");
 
     using var fileStream = new MemoryStream();
-    await file.CopyToAsync(fileStream);
+    await file.CopyToAsync(fileStream, requestAborted);
     var dataset = DigitalBrain.Kernel.TabularData.TabularDataParser.Parse(fileStream.ToArray());
 
     var ino = grains.GetGrain<IInoNeuron>("ino-main");
@@ -433,7 +434,7 @@ app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains) =>
         System.Text.Json.JsonSerializer.Serialize(dataset.Rows),
         System.Text.Json.JsonSerializer.Serialize(dataset.ColumnStats),
         clientId,
-        workspaceId));
+        workspaceId), requestAborted);
 
     return Results.Ok();
 });
@@ -450,7 +451,33 @@ app.MapGet("/oauth/callback/{provider}", async (
         Error: request.Query["error"].FirstOrDefault(),
         ErrorDescription: request.Query["error_description"].FirstOrDefault(),
         FallbackRedirectUri: request.Query["redirect_uri"].FirstOrDefault());
-    var result = await connector.CompleteAuthAsync(cb);
+    var requestAborted = request.HttpContext.RequestAborted;
+    var result = await connector.CompleteAuthAsync(cb, requestAborted);
+    if (result.Success)
+    {
+        try
+        {
+            var gf = sp.GetService<IGrainFactory>();
+            if (gf is not null)
+            {
+                var uid = cb.State?.Split(':')[0] ?? "default";
+                var uscope = PackConfigScopes.ForUser(new UserId(uid));
+                var ikey = "google-auth-completed";
+                var ing = gf.GetGrain<IIngressNeuron>(ikey);
+                var p = new Dictionary<string, object?>
+                {
+                    ["provider"] = provider,
+                    ["pack"] = provider == "google" ? GoogleClientFactory.PackName : "salesforce",
+                    ["userId"] = uid,
+                    ["scope"] = uscope
+                };
+                await ing.IngestAsync("PackConfigured", p, requestAborted);
+                var sigName = provider == "google" ? GoogleSignals.AuthCompleted : SalesforceSignals.AuthCompleted;
+                await ing.IngestAsync(sigName, p, requestAborted);
+            }
+        }
+        catch { /* best effort to ensure INO sees completion */ }
+    }
     var title = result.Success ? "Success" : "Error";
     var msg = result.Success ? "Authentication completed." : (result.Error + ": " + result.Details);
     return Results.Content($"<html><body><h1>{title}</h1><p>{msg}</p><p>Provider: {provider}</p></body></html>", "text/html",
@@ -484,26 +511,27 @@ if (grainFactory != null && !isTestMode)
 {
     app.Lifetime.ApplicationStarted.Register(() =>
     {
+        var stoppingToken = app.Lifetime.ApplicationStopping;
         _ = Task.Run(async () =>
         {
             try
             {
                 var status = grainFactory.GetGrain<ISystemStatus>("status-main");
-                await status.GetTimelineAsync();
-                await grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
-                await grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
-                await grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();
-                await grainFactory.GetGrain<IUserSessionNeuron>("session-main").GetTimelineAsync();
+                await status.GetTimelineAsync(stoppingToken);
+                await grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync(stoppingToken);
+                await grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync(stoppingToken);
+                await grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync(stoppingToken);
+                await grainFactory.GetGrain<IUserSessionNeuron>("session-main").GetTimelineAsync(stoppingToken);
 
                 // Activate the singleton LLM responder so it subscribes to the timeline at startup.
                 // Broadcasts only reach already-activated grains; without this the AskLlm -> reply Signal
                 // chain (e.g. the Telegram experience) would silently never fire in production. GetTimelineAsync
                 // is idempotent — a no-op if the grain is already active.
-                await grainFactory.GetGrain<ILlmResponderNeuron>(ILlmResponderNeuron.SingletonKey).GetTimelineAsync();
+                await grainFactory.GetGrain<ILlmResponderNeuron>(ILlmResponderNeuron.SingletonKey).GetTimelineAsync(stoppingToken);
 
                 // AutomationNeuron must be warmed so it receives NeuronActivated and other timeline events.
                 var automation = grainFactory.GetGrain<IAutomationNeuron>("automation-main");
-                await automation.GetTimelineAsync();
+                await automation.GetTimelineAsync(stoppingToken);
 
                 // ScheduleTriggerNeuron warmed to project journaled reactions + start reminders immediately.
                 _ = grainFactory.GetGrain<ScheduleTriggerNeuron>("schedule-main");
@@ -529,22 +557,24 @@ if (grainFactory != null && !isTestMode)
                 );
 
                 // 3+4. Script sharing demo: one script id referenced by two different reactions
-                await automation.FireAsync(new RegisterScript("shared.brief-gen", "return new[] { new Signal(\"SharedBriefEmitted\", new Dictionary<string,object?> { [\"reused\"] = true }) };", "Reusable brief emitter", Array.Empty<string>(), "default"));
-                await automation.FireAsync(new RegisterReaction("brief-on-pa-activate", "NeuronActivated", "shared.brief-gen", "personal-assistant", Array.Empty<string>(), "default", null));
-                await automation.FireAsync(new RegisterReaction("brief-on-any-activate", "NeuronActivated", "shared.brief-gen", null, Array.Empty<string>(), "default", null));
+                await automation.FireAsync(new RegisterScript("shared.brief-gen", "return new[] { new Signal(\"SharedBriefEmitted\", new Dictionary<string,object?> { [\"reused\"] = true }) };", "Reusable brief emitter", Array.Empty<string>(), "default"), stoppingToken);
+                await automation.FireAsync(new RegisterReaction("brief-on-pa-activate", "NeuronActivated", "shared.brief-gen", "personal-assistant", Array.Empty<string>(), "default", null), stoppingToken);
+                await automation.FireAsync(new RegisterReaction("brief-on-any-activate", "NeuronActivated", "shared.brief-gen", null, Array.Empty<string>(), "default", null), stoppingToken);
 
                 // Scoped demo (priority 9): only matches for specific user scope (backward default=global)
-                await automation.FireAsync(new RegisterScript("scoped.demo", "return new[] { new Signal(\"ScopedOnly\", null) };", "scoped only", Array.Empty<string>(), "demo-user"));
-                await automation.FireAsync(new RegisterReaction("scoped-reaction", "NeuronActivated", "scoped.demo", null, Array.Empty<string>(), "demo-user", null));
+                await automation.FireAsync(new RegisterScript("scoped.demo", "return new[] { new Signal(\"ScopedOnly\", null) };", "scoped only", Array.Empty<string>(), "demo-user"), stoppingToken);
+                await automation.FireAsync(new RegisterReaction("scoped-reaction", "NeuronActivated", "scoped.demo", null, Array.Empty<string>(), "demo-user", null), stoppingToken);
 
 
-
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
             }
             catch (Exception ex)
             {
                 app.Logger.LogWarning(ex, "Kernel startup neuron warmup failed.");
             }
-        });
+        }, stoppingToken);
     });
 }
 

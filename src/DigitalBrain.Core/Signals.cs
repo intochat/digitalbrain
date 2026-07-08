@@ -76,5 +76,5 @@ public interface ILlmResponderNeuron : INeuron, IHandle<AskLlm>
 public interface IIngressNeuron : INeuron
 {
     [Alias("IngestAsync")]
-    Task IngestAsync(string signalName, IReadOnlyDictionary<string, object?> props);
+    Task IngestAsync(string signalName, IReadOnlyDictionary<string, object?> props, CancellationToken cancellationToken = default);
 }

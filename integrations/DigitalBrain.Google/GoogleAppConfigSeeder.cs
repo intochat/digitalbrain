@@ -24,7 +24,7 @@ public sealed class GoogleAppConfigSeeder(
             return;
         }
 
-        var existing = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName).ConfigureAwait(false);
+        var existing = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, cancellationToken).ConfigureAwait(false);
         var merged = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
 
         var changed = SetIfConfigured(merged, GoogleClientFactory.ClientIdKey, appConfig.ClientId);
@@ -34,7 +34,7 @@ public sealed class GoogleAppConfigSeeder(
         if (!changed)
             return;
 
-        await store.SetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, merged).ConfigureAwait(false);
+        await store.SetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, merged, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Seeded Google OAuth client configuration.");
     }
 

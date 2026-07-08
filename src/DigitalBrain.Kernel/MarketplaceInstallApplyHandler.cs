@@ -33,7 +33,7 @@ public sealed class MarketplaceInstallApplyHandler(
         var marketplace = grains.GetGrain<IMarketplaceNeuron>(staged.MarketplaceNeuronId);
         await MarketplaceInstallActivation.ApplyAsync(
             staged,
-            synapse => marketplace.FireAsync(synapse),
+            synapse => marketplace.FireAsync(synapse, ct),
             grains,
             services.GetService<HomeFeedBus>(),
             logger);
@@ -46,7 +46,7 @@ public sealed class MarketplaceInstallApplyHandler(
             "pack");
         InoIntentClassifier.RegisterCapability(cap);
 
-        await marketplace.FireAsync(new CapabilityRegistered(cap.Id, cap.Description, cap.Examples, cap.Tier, staged.Pack.Name));
+        await marketplace.FireAsync(new CapabilityRegistered(cap.Id, cap.Description, cap.Examples, cap.Tier, staged.Pack.Name), ct);
 
         return new SelfEvolutionApplyResult(
             proposal.ProposalId,
@@ -74,7 +74,7 @@ internal static class MarketplaceInstallActivation
 {
     public static async Task ApplyAsync(
         MarketplaceInstallStaged staged,
-        Func<Synapse, ValueTask> fireMarketplaceAsync,
+        Func<Synapse, Task> fireMarketplaceAsync,
         IGrainFactory grains,
         HomeFeedBus? bus,
         ILogger logger)

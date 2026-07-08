@@ -6,5 +6,5 @@ namespace DigitalBrain.Salesforce;
 public interface ISalesforceAuthNeuron : INeuron, IHandle<Signal>
 {
     [Alias("CompleteOAuthAsync")]
-    Task<SalesforceOAuthCallbackResult> CompleteOAuthAsync(SalesforceOAuthCallback callback);
+    Task<SalesforceOAuthCallbackResult> CompleteOAuthAsync(SalesforceOAuthCallback callback, CancellationToken cancellationToken = default);
 }

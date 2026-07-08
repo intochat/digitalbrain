@@ -104,7 +104,7 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             try
             {
                 AddToJournal(ref _outgoingSynapses, "out-journal", new NeuronActivated(Self).Stamp(Self));
-                await WriteJournalStateAsync();
+                await WriteJournalStateAsync(ct);
                 NeuronInstrumentation.SynapsesOut.Add(1);
             }
             catch (Exception ex) when (IsJournalWriterUninitialized(ex))
@@ -113,7 +113,7 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             }
         }
 
-        await SubscribeTimelineIfNeeded();
+        await SubscribeTimelineIfNeeded(ct);
     }
 
     // A neuron subscribes to the broadcast timeline iff it has a way to react to broadcasts. The default rule
@@ -126,10 +126,12 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     // a reactivated neuron resumes via GetAllSubscriptionHandles + ResumeAsync rather than re-subscribing
     // (avoids duplicate deliveries). Silos that don't register the timeline provider (minimal/legacy test
     // hosts) degrade gracefully: the neuron activates without broadcast reception instead of failing.
-    private async Task SubscribeTimelineIfNeeded()
+    private async Task SubscribeTimelineIfNeeded(CancellationToken cancellationToken)
     {
         if (!ShouldSubscribeToTimeline)
             return;
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         IAsyncStream<Synapse> stream;
         try
@@ -143,6 +145,7 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         }
 
         var existing = await stream.GetAllSubscriptionHandles();
+        cancellationToken.ThrowIfCancellationRequested();
         if (existing.Count == 0)
         {
             _timelineSubscription = await stream.SubscribeAsync(this);
@@ -151,23 +154,27 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
 
         _timelineSubscription = await existing[0].ResumeAsync(this);
         for (var i = 1; i < existing.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             await existing[i].UnsubscribeAsync();
+        }
     }
 
     // Broadcast reception mirrors DeliverAsync's point-to-point contract: record the observed synapse
     // in the incoming journal first (so GetIncomingTimelineAsync reflects everything this neuron has
     // witnessed, not just what it had a declared handler for), then dispatch to it if applicable.
-    protected Task RecordBroadcastReceivedAsync(Synapse synapse)
+    protected Task RecordBroadcastReceivedAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         AddToJournal(ref _incomingSynapses, "in-journal", synapse);
-        return WriteJournalStateAsync();
+        return WriteJournalStateAsync(cancellationToken);
     }
 
     // Default broadcast reception: dispatch only synapse types this neuron statically declares IHandle<T> for.
     // Dynamic hosts override to filter through their own runtime manifest instead.
-    protected Task DispatchBroadcastIfHandledAsync(Synapse item) =>
+    protected Task DispatchBroadcastIfHandledAsync(Synapse item, CancellationToken cancellationToken = default) =>
         SynapseDispatch.HandledTypes(GetType()).Contains(item.GetType())
-            ? SynapseDispatch.DispatchAsync(this, Logger, Self, item)
+            ? SynapseDispatch.DispatchAsync(this, Logger, Self, item, cancellationToken)
             : Task.CompletedTask;
 
     public virtual async Task OnNextAsync(Synapse item, StreamSequenceToken? token = null)
@@ -184,42 +191,44 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         return Task.CompletedTask;
     }
 
-    public async ValueTask FireAsync<T>(T payload) where T : Synapse
+    public async Task FireAsync<T>(T payload, CancellationToken cancellationToken = default) where T : Synapse
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var stamped = payload.Stamp(Self, _currentCause);
         AddToJournal(ref _outgoingSynapses, "out-journal", stamped);
-        await WriteJournalStateAsync();
+        await WriteJournalStateAsync(cancellationToken);
 
         if (stamped.IsBroadcast)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await this.GetStreamProvider(SynapseStream.ProviderName).Timeline().OnNextAsync(stamped);
         }
         else if (stamped.Receiver is not null)
         {
             var target = GrainFactory.GetGrain<INeuron>(stamped.Receiver.Value);
-            await target.DeliverAsync(stamped);
+            await target.DeliverAsync(stamped, cancellationToken);
         }
         else
         {
-            await DeliverAsync(stamped);
+            await DeliverAsync(stamped, cancellationToken);
         }
 
         NeuronInstrumentation.SynapsesOut.Add(1);
         Logger.LogDebug("Fired {Type} from {Self}", typeof(T).Name, Self);
     }
 
-    protected Task Broadcast(Synapse s) => FireAsync(s with { IsBroadcast = true }).AsTask();
+    protected Task Broadcast(Synapse s, CancellationToken cancellationToken = default) => FireAsync(s with { IsBroadcast = true }, cancellationToken);
 
-    public Task<IReadOnlyList<Synapse>> GetTimelineAsync() =>
+    public Task<IReadOnlyList<Synapse>> GetTimelineAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal.ToList());
 
-    public Task<IReadOnlyList<Synapse>> GetIncomingTimelineAsync() =>
+    public Task<IReadOnlyList<Synapse>> GetIncomingTimelineAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Synapse>>(IncomingJournal.ToList());
 
-    public Task<IReadOnlyList<Synapse>> GetOutgoingTimelineAsync() =>
+    public Task<IReadOnlyList<Synapse>> GetOutgoingTimelineAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal.ToList());
 
-    public Task<IReadOnlyList<Synapse>> GetCausalLineageAsync(string correlationId) =>
+    public Task<IReadOnlyList<Synapse>> GetCausalLineageAsync(string correlationId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal
             .Where(s => s.CorrelationId == correlationId || s.SynapseId == correlationId)
             .Concat(IncomingJournal.Where(s => s.CorrelationId == correlationId || s.SynapseId == correlationId))
@@ -227,53 +236,58 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             .DistinctBy(s => s.SynapseId)
             .ToList());
 
-    public Task<IReadOnlyList<Synapse>> GetTimelineForCorrelationAsync(string correlationId) =>
-        GetCausalLineageAsync(correlationId);
+    public Task<IReadOnlyList<Synapse>> GetTimelineForCorrelationAsync(string correlationId, CancellationToken cancellationToken = default) =>
+        GetCausalLineageAsync(correlationId, cancellationToken);
 
-    public Task<string> GetSiloIdentityAsync() => Task.FromResult(
+    public Task<string> GetSiloIdentityAsync(CancellationToken cancellationToken = default) => Task.FromResult(
         GrainContext.Address.SiloAddress?.ToString()
             ?? throw new InvalidOperationException($"SiloAddress unavailable for activated grain {Self}."));
 
-    public async ValueTask<Checkpoint> CreateCheckpointAsync()
+    public async Task<Checkpoint> CreateCheckpointAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         // Dedup by the stable SynapseId (a synapse fired then self-delivered appears in both journals as the
         // same instance) — robust vs. the old {Timestamp,Type,Sender,Receiver} heuristic.
         var snap = OutgoingJournal.Concat(IncomingJournal).DistinctBy(s => s.SynapseId).ToList();
         var cp = new Checkpoint(Self, snap.AsReadOnly(), DateTimeOffset.UtcNow);
-        await FireAsync(cp);
+        await FireAsync(cp, cancellationToken);
         return cp;
     }
 
-    public async Task<NeuronId> BranchAsync(Checkpoint checkpoint)
+    public async Task<NeuronId> BranchAsync(Checkpoint checkpoint, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var branchKey = $"{Self.Value}@branch-{Guid.NewGuid():N}";
         // Branch into a NEW grain of the SAME concrete type as this neuron (was hardcoded to IDemoNeuron),
         // so the fork really is a copy of *this* neuron's behavior, replayed from the checkpoint.
         var branch = GrainFactory.GetGrain<INeuron>(GrainId.Create(this.GetGrainId().Type, branchKey));
         foreach (var s in checkpoint.Snapshot)
         {
-            await branch.DeliverAsync(s);
+            cancellationToken.ThrowIfCancellationRequested();
+            await branch.DeliverAsync(s, cancellationToken);
         }
-        await branch.FireAsync(new BranchCreated(Self, branchKey));
+        await branch.FireAsync(new BranchCreated(Self, branchKey), cancellationToken);
         return new NeuronId(branchKey);
     }
 
     // Restore: seed this neuron's incoming journal from a checkpoint WITHOUT re-dispatching handlers
     // (state recovery, not re-execution). Branching, by contrast, replays into a fresh grain.
-    public async Task RestoreCheckpointAsync(Checkpoint checkpoint)
+    public async Task RestoreCheckpointAsync(Checkpoint checkpoint, CancellationToken cancellationToken = default)
     {
         foreach (var s in checkpoint.Snapshot)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             AddToJournal(ref _incomingSynapses, "in-journal", s);
         }
-        await WriteJournalStateAsync();
+        await WriteJournalStateAsync(cancellationToken);
     }
 
     // Internal for point to point. Incoming synapses are auto-recorded here (called by sender Fire or direct).
-    public async Task DeliverAsync(Synapse synapse)
+    public async Task DeliverAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         AddToJournal(ref _incomingSynapses, "in-journal", synapse);
-        await WriteJournalStateAsync();
+        await WriteJournalStateAsync(cancellationToken);
 
         var previousCause = _currentCause;
         _currentCause = synapse;
@@ -291,9 +305,9 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             }
 
             var handleStopwatch = Stopwatch.StartNew();
-            if (!await TryHandleViaDeclaredInterfaceAsync(synapse))
+            if (!await TryHandleViaDeclaredInterfaceAsync(synapse, cancellationToken))
             {
-                await DispatchSynapse(synapse);
+                await DispatchSynapse(synapse, cancellationToken);
             }
             handleStopwatch.Stop();
 
@@ -306,12 +320,12 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         }
     }
 
-    protected virtual Task DispatchSynapse(Synapse synapse) => Task.CompletedTask;
+    protected virtual Task DispatchSynapse(Synapse synapse, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     // Tries to locate and invoke IHandle<T>.HandleAsync via declared interfaces on this grain (prototype path).
     // Concrete grains should prefer listing IHandle<T> so Orleans + source-gen can handle; this remains for flexibility with dynamic synapses.
     // Logs at Debug when used so prototype reliance is observable.
-    private async ValueTask<bool> TryHandleViaDeclaredInterfaceAsync(Synapse synapse)
+    private async ValueTask<bool> TryHandleViaDeclaredInterfaceAsync(Synapse synapse, CancellationToken cancellationToken)
     {
         var grainType = GetType();
         foreach (var iface in grainType.GetInterfaces())
@@ -323,12 +337,16 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
             if (handledType != synapse.GetType() && !handledType.IsAssignableFrom(synapse.GetType()))
                 continue;
 
-            var handleMethod = iface.GetMethod("HandleAsync", new[] { handledType });
+            var handleMethod = iface.GetMethod("HandleAsync", new[] { handledType, typeof(CancellationToken) })
+                ?? iface.GetMethod("HandleAsync", new[] { handledType });
             if (handleMethod is null)
                 continue;
 
             Logger.LogDebug("Reflection IHandle<> dispatch for synapse {Type} on {GrainType}", synapse.Type, grainType.Name);
-            var result = handleMethod.Invoke(this, new object[] { synapse });
+            var parameters = handleMethod.GetParameters().Length == 2
+                ? new object[] { synapse, cancellationToken }
+                : new object[] { synapse };
+            var result = handleMethod.Invoke(this, parameters);
             if (result is Task t) await t;
             else if (result is ValueTask vt) await vt;
             return true;
@@ -336,11 +354,12 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         return false;
     }
 
-    private async Task WriteJournalStateAsync()
+    private async Task WriteJournalStateAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            await WriteStateAsync();
+            await WriteStateAsync(cancellationToken);
         }
         catch (Exception ex) when (IsJournalWriterUninitialized(ex))
         {

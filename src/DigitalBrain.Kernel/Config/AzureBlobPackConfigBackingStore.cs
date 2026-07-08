@@ -13,22 +13,22 @@ public sealed class AzureBlobPackConfigBackingStore(BlobServiceClient blobs) : I
     private BlobClient EntryBlob(string scope, string pack)
         => blobs.GetBlobContainerClient(ContainerName).GetBlobClient($"{scope}/{pack}.bin");
 
-    public async Task<byte[]?> LoadAsync(string scope, string pack)
+    public async Task<byte[]?> LoadAsync(string scope, string pack, CancellationToken cancellationToken = default)
     {
         var blob = EntryBlob(scope, pack);
-        if (!await blob.ExistsAsync())
+        if (!await blob.ExistsAsync(cancellationToken))
             return null;
 
         using var stream = new MemoryStream();
-        await blob.DownloadToAsync(stream);
+        await blob.DownloadToAsync(stream, cancellationToken);
         return stream.ToArray();
     }
 
-    public async Task SaveAsync(string scope, string pack, byte[] encryptedBlob)
+    public async Task SaveAsync(string scope, string pack, byte[] encryptedBlob, CancellationToken cancellationToken = default)
     {
         var container = blobs.GetBlobContainerClient(ContainerName);
-        await container.CreateIfNotExistsAsync(PublicAccessType.None);
+        await container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
         await container.GetBlobClient($"{scope}/{pack}.bin")
-            .UploadAsync(new BinaryData(encryptedBlob), overwrite: true);
+            .UploadAsync(new BinaryData(encryptedBlob), overwrite: true, cancellationToken);
     }
 }

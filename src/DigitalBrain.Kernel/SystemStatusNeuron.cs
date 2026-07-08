@@ -15,14 +15,26 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
     {
         await base.OnActivateAsync(ct);
         await TryConnectMcpAsync(ct);
-        await FireAsync(new SystemLaunched("digitalbrain", DateTimeOffset.UtcNow));
-        await FireAsync(new SystemStatusChanged("kernel", "launched"));
+        await FireAsync(new SystemLaunched("digitalbrain", DateTimeOffset.UtcNow), ct);
+        await FireAsync(new SystemStatusChanged("kernel", "launched"), ct);
 
         // In tests we do not poll; avoid background loops and repeated MCP attempts that log noise.
         if (IsTestMode()) return;
 
         _pollCts = new CancellationTokenSource();
         _ = Task.Run(() => PollLoop(_pollCts.Token), _pollCts.Token);
+    }
+
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        if (_pollCts is not null)
+        {
+            await _pollCts.CancelAsync();
+            _pollCts.Dispose();
+            _pollCts = null;
+        }
+
+        await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
     private static bool IsTestMode() =>
@@ -35,7 +47,7 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         if (IsTestMode())
         {
             // Tests run without Aspire MCP / CLI available; self-awareness is telemetry + LLM only. No spawn, no long cancel.
-            await FireAsync(new SystemStatusChanged("aspire-mcp", "unavailable"));
+            await FireAsync(new SystemStatusChanged("aspire-mcp", "unavailable"), ct);
             return;
         }
 
@@ -58,19 +70,19 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
             var tools = await _mcp.ListToolsAsync(cancellationToken: shortCts.Token);
             var toolNames = string.Join(",", tools.Select(t => t.Name));
             Logger.LogInformation("SystemStatus connected to Aspire MCP ({Count} tools: {Names}) from {Dir}", tools.Count, toolNames, workDir);
-            await FireAsync(new SystemStatusChanged("aspire-mcp", "connected", $"tools={tools.Count}"));
+            await FireAsync(new SystemStatusChanged("aspire-mcp", "connected", $"tools={tools.Count}"), ct);
 
             await PollHealthAsync(shortCts.Token);
         }
         catch (OperationCanceledException)
         {
             // Expected in constrained envs or shutdown; do not spam warnings.
-            await FireAsync(new SystemStatusChanged("aspire-mcp", "unavailable"));
+            await FireAsync(new SystemStatusChanged("aspire-mcp", "unavailable"), ct);
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "SystemStatus MCP connect failed. Self-awareness limited to internal telemetry + LLM.");
-            await FireAsync(new SystemStatusChanged("aspire-mcp", "unavailable"));
+            await FireAsync(new SystemStatusChanged("aspire-mcp", "unavailable"), ct);
         }
     }
 
@@ -91,8 +103,23 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
                     await PollHealthAsync(ct);
                 }
             }
-            catch { }
-            try { await Task.Delay(25000, ct); } catch { }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "SystemStatus poll iteration failed.");
+            }
+
+            try
+            {
+                await Task.Delay(25000, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
         }
     }
 
@@ -102,7 +129,7 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         var resources = await CallMcpAsync("list_resources", ct: ct);
         if (resources.Contains("Failed", StringComparison.OrdinalIgnoreCase) || resources.Contains("Unhealthy", StringComparison.OrdinalIgnoreCase) || resources.Contains("Exited", StringComparison.OrdinalIgnoreCase))
         {
-            await FireAsync(new SystemStatusChanged("aspire", "unhealthy", resources));
+            await FireAsync(new SystemStatusChanged("aspire", "unhealthy", resources), ct);
         }
     }
 
@@ -177,7 +204,7 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
         }
 
         var proposal = $"Apply: {analysis}";
-        await FireAsync(new FixProposal(bad.Component, proposal, "SystemStatusNeuron"));
+        await FireAsync(new FixProposal(bad.Component, proposal, "SystemStatusNeuron"), ct);
 
         if (analysis.Contains("restart", StringComparison.OrdinalIgnoreCase) && _mcp != null)
         {
@@ -209,9 +236,9 @@ public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJourna
 
     private async Task RunIsolatedSimulationAsync(SystemStatusChanged bad, string proposedFix, CancellationToken ct)
     {
-        var cp = await CreateCheckpointAsync();
+        var cp = await CreateCheckpointAsync(ct);
         var result = ComputeSimulationResult(cp.Snapshot, bad, proposedFix);
-        await FireAsync(result);
+        await FireAsync(result, ct);
     }
 
     private static SimulationResult ComputeSimulationResult(IReadOnlyList<Synapse> checkpoint, SystemStatusChanged bad, string proposedFix)

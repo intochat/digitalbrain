@@ -50,20 +50,20 @@ internal sealed class GatewayMarketplaceSendHandler : IGatewaySendHandler
     {
         if (GatewaySendHandlers.TypeMatches(request, nameof(PublishToMarketplace)))
         {
-            await PublishAsync(request, context);
+            await PublishAsync(request, serverContext, context);
             return true;
         }
 
         if (GatewaySendHandlers.TypeMatches(request, nameof(InstallFromMarketplace)))
         {
-            await InstallAsync(request, context);
+            await InstallAsync(request, serverContext, context);
             return true;
         }
 
         return false;
     }
 
-    private static async Task PublishAsync(SynapseEnvelope request, GatewaySendContext context)
+    private static async Task PublishAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
         var market = context.Grains.GetGrain<IMarketplaceNeuron>("market-main");
         var payloadStr = GatewaySendHandlers.PayloadString(request);
@@ -76,10 +76,10 @@ internal sealed class GatewayMarketplaceSendHandler : IGatewaySendHandler
         await market.FireAsync(new PublishToMarketplace(
             packName, Field("version"), Field("code"), Field("ownerId", "anonymous"),
             isPrivate, commissionRate, Field("description"),
-            Field("authorPublicKeyBase64"), Field("signatureBase64"), price));
+            Field("authorPublicKeyBase64"), Field("signatureBase64"), price), serverContext.CancellationToken);
     }
 
-    private static async Task InstallAsync(SynapseEnvelope request, GatewaySendContext context)
+    private static async Task InstallAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
         var market = context.Grains.GetGrain<IMarketplaceNeuron>("market-main");
         var payloadStr = GatewaySendHandlers.PayloadString(request);
@@ -90,7 +90,7 @@ internal sealed class GatewayMarketplaceSendHandler : IGatewaySendHandler
         var installSession = await context.ResolveSessionByClientIdAsync(clientId);
         var buyer = installSession?.UserId.Value ?? "anonymous";
         if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId;
-        await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer, clientId));
+        await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer, clientId), serverContext.CancellationToken);
     }
 }
 
@@ -100,38 +100,38 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
     {
         if (GatewaySendHandlers.TypeMatches(request, GoogleSignals.AuthRequested))
         {
-            await HandleGoogleAuthRequestedAsync(request, context);
+            await HandleGoogleAuthRequestedAsync(request, serverContext, context);
             return true;
         }
 
         if (GatewaySendHandlers.TypeMatches(request, GoogleSignals.AuthCompleted))
         {
-            await HandleGoogleAuthCompletedAsync(request, context);
+            await HandleGoogleAuthCompletedAsync(request, serverContext, context);
             return true;
         }
 
         if (GatewaySendHandlers.TypeMatches(request, SalesforceSignals.AuthRequested))
         {
-            await HandleSalesforceAuthRequestedAsync(request, context);
+            await HandleSalesforceAuthRequestedAsync(request, serverContext, context);
             return true;
         }
 
         if (GatewaySendHandlers.TypeMatches(request, nameof(LoginRequest)))
         {
-            await HandleLoginAsync(request, context);
+            await HandleLoginAsync(request, serverContext, context);
             return true;
         }
 
         if (GatewaySendHandlers.TypeMatches(request, nameof(LogoutRequest)))
         {
-            await HandleLogoutAsync(request, context);
+            await HandleLogoutAsync(request, serverContext, context);
             return true;
         }
 
         return false;
     }
 
-    private static async Task HandleGoogleAuthRequestedAsync(SynapseEnvelope request, GatewaySendContext context)
+    private static async Task HandleGoogleAuthRequestedAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
         var authProps = GatewayPayload.PayloadProps(request);
         var authClientId = authProps.TryGetValue("clientId", out var authCid) ? authCid?.ToString() : null;
@@ -144,19 +144,19 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
         {
             Receiver = new NeuronId(authSession.UserId.Value)
         };
-        await auth.DeliverAsync(signal);
+        await auth.DeliverAsync(signal, serverContext.CancellationToken);
     }
 
-    private static async Task HandleGoogleAuthCompletedAsync(SynapseEnvelope request, GatewaySendContext context)
+    private static async Task HandleGoogleAuthCompletedAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
         var key = string.IsNullOrWhiteSpace(request.CorrelationId)
             ? "google-auth-completed"
             : request.CorrelationId;
         var authCompletedIngress = context.Grains.GetGrain<IIngressNeuron>(key);
-        await authCompletedIngress.IngestAsync(GoogleSignals.AuthCompleted, GatewayPayload.PayloadProps(request));
+        await authCompletedIngress.IngestAsync(GoogleSignals.AuthCompleted, GatewayPayload.PayloadProps(request), serverContext.CancellationToken);
     }
 
-    private static async Task HandleSalesforceAuthRequestedAsync(SynapseEnvelope request, GatewaySendContext context)
+    private static async Task HandleSalesforceAuthRequestedAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
         var authProps = GatewayPayload.PayloadProps(request);
         var authClientId = authProps.TryGetValue("clientId", out var authCid) ? authCid?.ToString() : null;
@@ -169,10 +169,10 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
         {
             Receiver = new NeuronId(authSession.UserId.Value)
         };
-        await auth.DeliverAsync(signal);
+        await auth.DeliverAsync(signal, serverContext.CancellationToken);
     }
 
-    private static async Task HandleLoginAsync(SynapseEnvelope request, GatewaySendContext context)
+    private static async Task HandleLoginAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
         var session = context.Grains.GetGrain<IUserSessionNeuron>("session-main");
         var payloadStr = GatewaySendHandlers.PayloadString(request);
@@ -180,17 +180,17 @@ internal sealed class GatewayAuthSessionSendHandler : IGatewaySendHandler
         var username = p.TryGetValue("username", out var u) ? u?.ToString() ?? "" : "";
         var password = p.TryGetValue("password", out var pw) ? pw?.ToString() ?? "" : "";
         var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
-        await session.FireAsync(new LoginRequest(username, password, clientId));
+        await session.FireAsync(new LoginRequest(username, password, clientId), serverContext.CancellationToken);
     }
 
-    private static async Task HandleLogoutAsync(SynapseEnvelope request, GatewaySendContext context)
+    private static async Task HandleLogoutAsync(SynapseEnvelope request, ServerCallContext serverContext, GatewaySendContext context)
     {
         var session = context.Grains.GetGrain<IUserSessionNeuron>("session-main");
         var payloadStr = GatewaySendHandlers.PayloadString(request);
         var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
         var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
         var logoutSession = await context.ResolveSessionByClientIdAsync(clientId);
-        await session.FireAsync(new LogoutRequest(logoutSession?.SessionId ?? "", clientId));
+        await session.FireAsync(new LogoutRequest(logoutSession?.SessionId ?? "", clientId), serverContext.CancellationToken);
     }
 }
 
@@ -226,7 +226,7 @@ internal sealed class GatewayConfigSendHandler : IGatewaySendHandler
             .Where(kv => !controlKeys.Contains(kv.Key))
             .ToDictionary(kv => kv.Key, kv => kv.Value?.ToString() ?? string.Empty);
 
-        await context.PackConfigStore.SetAsync(scope, pack, values);
+        await context.PackConfigStore.SetAsync(scope, pack, values, serverContext.CancellationToken);
         context.Logger.LogInformation("Stored configuration for pack {Pack} ({FieldCount} fields).", pack, values.Count);
 
         var notifyKey = string.IsNullOrWhiteSpace(request.CorrelationId)
@@ -237,7 +237,7 @@ internal sealed class GatewayConfigSendHandler : IGatewaySendHandler
         {
             ["pack"] = pack,
             ["scope"] = scope
-        });
+        }, serverContext.CancellationToken);
         return true;
     }
 }
@@ -258,7 +258,7 @@ internal sealed class GatewayInoSendHandler : IGatewaySendHandler
         var workspaceId = p.TryGetValue("workspaceId", out var wid) ? wid?.ToString() : null;
 
         var ino = context.Grains.GetGrain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new InoRequest(prompt, clientId, workspaceId));
+        await ino.FireAsync(new InoRequest(prompt, clientId, workspaceId), serverContext.CancellationToken);
         return true;
     }
 }
@@ -280,7 +280,7 @@ internal sealed class GatewayExperienceStepSendHandler : IGatewaySendHandler
         var args = p.Where(kv => kv.Key is not ("pack" or "experienceId" or "eventName" or "synapseType"))
                     .ToDictionary(kv => kv.Key, kv => kv.Value);
         var generated = context.Grains.GetGrain<IGeneratedNeuron>("generated-" + pack.ToLowerInvariant());
-        await generated.FireAsync(new ExperienceStep(pack, experienceId, eventName, args));
+        await generated.FireAsync(new ExperienceStep(pack, experienceId, eventName, args), serverContext.CancellationToken);
         return true;
     }
 }
@@ -305,12 +305,12 @@ internal sealed class GatewayGenericSignalSendHandler : IGatewaySendHandler
         {
             var chatKey = "tg-chat-" + Convert.ToInt64(chatIdValue);
             var chat = context.Grains.GetGrain<ITelegramChatNeuron>(chatKey);
-            await chat.DeliverAsync(new Signal(request.TypeName, signalProps));
+            await chat.DeliverAsync(new Signal(request.TypeName, signalProps), serverContext.CancellationToken);
             return true;
         }
 
         var ingress = context.Grains.GetGrain<IIngressNeuron>(request.CorrelationId);
-        await ingress.IngestAsync(request.TypeName, signalProps);
+        await ingress.IngestAsync(request.TypeName, signalProps, serverContext.CancellationToken);
         return true;
     }
 }

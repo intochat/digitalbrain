@@ -39,10 +39,11 @@ public static class SalesforceClientFactory
 
     public static async Task<IReadOnlyDictionary<string, string>> GetMergedScopedValuesAsync(
         IPackConfigStore store,
-        NeuronScope scope)
+        NeuronScope scope,
+        CancellationToken cancellationToken = default)
     {
-        var appValues = await store.GetAsync(PackConfigScopes.App, PackName).ConfigureAwait(false);
-        var userValues = await store.GetAsync(PackConfigScopes.ForUser(scope.UserId), PackName).ConfigureAwait(false);
+        var appValues = await store.GetAsync(PackConfigScopes.App, PackName, cancellationToken).ConfigureAwait(false);
+        var userValues = await store.GetAsync(PackConfigScopes.ForUser(scope.UserId), PackName, cancellationToken).ConfigureAwait(false);
 
         var merged = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in userValues)
@@ -51,12 +52,12 @@ public static class SalesforceClientFactory
         return merged;
     }
 
-    public static async Task<ForceClient> CreateForceClientAsync(IReadOnlyDictionary<string, string> values)
+    public static async Task<ForceClient> CreateForceClientAsync(IReadOnlyDictionary<string, string> values, CancellationToken cancellationToken = default)
     {
         var apiVersion = NormalizeApiVersion(Optional(values, ApiVersionKey, DefaultApiVersion));
 
         if (HasOAuthCredential(values))
-            return await CreateOAuthForceClientAsync(values, apiVersion).ConfigureAwait(false);
+            return await CreateOAuthForceClientAsync(values, apiVersion, cancellationToken).ConfigureAwait(false);
 
         var clientId = Required(values, ClientIdKey);
         var clientSecret = Required(values, ClientSecretKey);
@@ -73,7 +74,7 @@ public static class SalesforceClientFactory
             ["client_secret"] = clientSecret,
             ["username"] = username,
             ["password"] = passwordWithToken
-        })
+        }, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.InstanceUrl))
         {
@@ -132,7 +133,8 @@ public static class SalesforceClientFactory
         IReadOnlyDictionary<string, string> values,
         string code,
         string redirectUri,
-        HttpMessageHandler? tokenEndpointHandler = null)
+        HttpMessageHandler? tokenEndpointHandler = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(code))
             throw new InvalidOperationException("Salesforce authorization callback did not include a code.");
@@ -158,7 +160,7 @@ public static class SalesforceClientFactory
             form["code_verifier"] = codeVerifier.Trim();
         }
 
-        var token = await RequestTokenAsync(TokenEndpoint(loginUrl), form, tokenEndpointHandler)
+        var token = await RequestTokenAsync(TokenEndpoint(loginUrl), form, tokenEndpointHandler, cancellationToken)
             .ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.InstanceUrl))
@@ -261,7 +263,8 @@ public static class SalesforceClientFactory
 
     private static async Task<ForceClient> CreateOAuthForceClientAsync(
         IReadOnlyDictionary<string, string> values,
-        string apiVersion)
+        string apiVersion,
+        CancellationToken cancellationToken = default)
     {
         if (HasValue(values, RefreshTokenKey) && HasConnectedAppConfig(values))
         {
@@ -274,7 +277,7 @@ public static class SalesforceClientFactory
                 ["refresh_token"] = Required(values, RefreshTokenKey),
                 ["client_id"] = clientId,
                 ["client_secret"] = clientSecret
-            })
+            }, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             var instanceUrl = string.IsNullOrWhiteSpace(token.InstanceUrl)
@@ -307,7 +310,8 @@ public static class SalesforceClientFactory
     private static async Task<SalesforceTokenResponse> RequestTokenAsync(
         string tokenEndpoint,
         IReadOnlyDictionary<string, string> form,
-        HttpMessageHandler? handler = null)
+        HttpMessageHandler? handler = null,
+        CancellationToken cancellationToken = default)
     {
         using var http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
         using var content = new FormUrlEncodedContent(form);
@@ -316,8 +320,8 @@ public static class SalesforceClientFactory
         string responseBody;
         try
         {
-            response = await http.PostAsync(tokenEndpoint, content).ConfigureAwait(false);
-            responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            response = await http.PostAsync(tokenEndpoint, content, cancellationToken).ConfigureAwait(false);
+            responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {

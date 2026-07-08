@@ -99,7 +99,7 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
         }));
     }
 
-    public async Task<SalesforceOAuthCallbackResult> CompleteOAuthAsync(SalesforceOAuthCallback callback)
+    public async Task<SalesforceOAuthCallbackResult> CompleteOAuthAsync(SalesforceOAuthCallback callback, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(callback.Error))
         {
@@ -119,8 +119,8 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
 
         var store = ServiceProvider.GetRequiredService<IPackConfigStore>();
         var userScope = PackConfigScopes.ForUser(Self.AsScope().UserId);
-        var appValues = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName);
-        var pending = await store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName);
+        var appValues = await store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
+        var pending = await store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, cancellationToken);
 
         // No pending flow at all (e.g. the "salesforce-auth-unknown" routing sentinel, or any per-user
         // grain that never started a flow) must reject immediately rather than fall through to a token
@@ -154,7 +154,7 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
                 exchangeValues[SalesforceClientFactory.OAuthCodeVerifierKey] = pendingCodeVerifier;
 
             var handler = ServiceProvider.GetService<HttpMessageHandler>();
-            var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(exchangeValues, callback.Code, redirectUri, handler);
+            var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(exchangeValues, callback.Code, redirectUri, handler, cancellationToken);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kvp in tokenValues)
             {
@@ -163,20 +163,20 @@ public class SalesforceAuthNeuron(ILogger<SalesforceAuthNeuron> logger, NeuronJo
                 userTokenValues[key] = value;
             }
 
-            await store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues);
-            await store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>());
+            await store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues, cancellationToken);
+            await store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>(), cancellationToken);
 
             await Broadcast(new Signal("PackConfigured", new Dictionary<string, object?>
             {
                 ["pack"] = SalesforceClientFactory.PackName,
                 ["scope"] = userScope
-            }));
+            }), cancellationToken);
             await Broadcast(new Signal(SalesforceSignals.AuthCompleted, new Dictionary<string, object?>
             {
                 ["provider"] = "salesforce",
                 ["pack"] = SalesforceClientFactory.PackName,
                 ["scope"] = userScope
-            }));
+            }), cancellationToken);
 
             return new SalesforceOAuthCallbackResult(
                 true,

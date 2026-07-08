@@ -32,5 +32,6 @@ public class GmailNeuronTests : NeuronTestBase
 
 internal sealed class TestGmailFactory(FakeGmailApiClient client) : IGmailApiClientFactory
 {
-    public Task<IGmailApiClient> CreateAsync(NeuronScope scope) => Task.FromResult<IGmailApiClient>(client);
+    public Task<IGmailApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IGmailApiClient>(client);
 }

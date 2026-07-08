@@ -258,11 +258,31 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ?? IncomingJournal.OfType<InoRequest>().LastOrDefault(r => InoConnectorIntents.IsGmail(r.Prompt));
 
         if (pending is null)
+        {
+            // Confirm success visibly even without a pending Gmail intent (auth via direct button/surface).
+            await FireAsync(new InoResponse("Google auth", "Google connected successfully.", []));
+            await DeliverReplySurfaceAsync("Google authentication succeeded.", null, WorkspaceIds.Default);
             return;
+        }
 
-        var gmailUserId = await ResolveUserIdAsync(pending.ClientId);
+        string? gmailUserId = null;
+        if (signal.Props.TryGetValue("userId", out var uid) && uid is string us && !string.IsNullOrWhiteSpace(us))
+            gmailUserId = us;
+        else if (signal.Props.TryGetValue("scope", out var sc) && sc is string scs && scs.StartsWith("user:", StringComparison.Ordinal))
+            gmailUserId = scs.Substring(5);
+        if (string.IsNullOrWhiteSpace(gmailUserId))
+            gmailUserId = await ResolveUserIdAsync(pending.ClientId);
+
         if (!await HasGoogleCredentialAsync(gmailUserId))
+        {
+            _pendingGmailRequest = null;
+            var workspaceId = WorkspaceIds.Effective(pending.WorkspaceId);
+            var reply = "Google auth succeeded but no usable credential was stored (missing refresh token).";
+            await FireAsync(new InoResponse(pending.Prompt, reply, []));
+            await DeliverReplySurfaceAsync(reply, pending.ClientId, workspaceId);
+            await DeliverGoogleAuthSurfaceAsync(pending.ClientId, workspaceId);
             return;
+        }
 
         _pendingGmailRequest = null;
         await FetchRecentGmailAsync(pending, gmailUserId);
@@ -700,16 +720,27 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             ["query"] = q
         }));
 
-        // Use per-user grain key (gmailUserId) so the GmailNeuron can resolve creds via its Self.AsScope() + factory.
-        // Mirrors SalesforceCrmNeuron pattern for isolation.
-        var gmail = GrainFactory.GetGrain<IGmailNeuron>(gmailUserId);
-        var ids = await gmail.ListMessagesAsync(q, maxResults);
-        var summaries = new List<GmailMessageSummary>();
-
-        foreach (var id in ids.Take(maxResults))
+        List<GmailMessageSummary> summaries;
+        string[] ids;
+        try
         {
-            var body = await gmail.ReadMessageAsync(id);
-            summaries.Add(new GmailMessageSummary(id, body));
+            var gmail = GrainFactory.GetGrain<IGmailNeuron>(gmailUserId);
+            ids = await gmail.ListMessagesAsync(q, maxResults);
+            summaries = new List<GmailMessageSummary>();
+            foreach (var id in ids.Take(maxResults))
+            {
+                var body = await gmail.ReadMessageAsync(id);
+                summaries.Add(new GmailMessageSummary(id, body));
+            }
+        }
+        catch (Exception ex) when (IsGoogleIntegrationFailure(ex))
+        {
+            Logger.LogWarning(ex, "Gmail fetch failed after credentials were configured.");
+            var failureReply = GoogleFailureReply(ex);
+            await FireAsync(new InoResponse(req.Prompt, failureReply, []));
+            await DeliverReplySurfaceAsync(failureReply, req.ClientId, workspaceId);
+            await DeliverGoogleAuthSurfaceAsync(req.ClientId, workspaceId);
+            return;
         }
 
         await Broadcast(new Signal(GoogleSignals.GmailMessagesReady, new Dictionary<string, object?>
@@ -1172,24 +1203,24 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         await flutter.DeliverAsync(StampCurrent(surface));
     }
 
-    public async Task<string> AskAsync(string prompt)
+    public async Task<string> AskAsync(string prompt, CancellationToken cancellationToken = default)
     {
-        var result = await InteractAsync(new InoInteractRequest(prompt));
+        var result = await InteractAsync(new InoInteractRequest(prompt), cancellationToken);
         return result.ResponseText;
     }
 
-    public async Task<InoInteractResult> InteractAsync(InoInteractRequest request)
+    public async Task<InoInteractResult> InteractAsync(InoInteractRequest request, CancellationToken cancellationToken = default)
     {
         var clientId = request.ClientId;
         var workspaceId = WorkspaceIds.Effective(request.WorkspaceId);
 
-        await FireAsync(new InoRequest(request.Prompt, clientId, workspaceId));
+        await FireAsync(new InoRequest(request.Prompt, clientId, workspaceId), cancellationToken);
 
         // Allow handlers (classifier, LLM, surface delivery, proposal staging) to run.
         // In real use, journals are the source of truth; this is the contract collector.
-        await Task.Delay(50);
+        await Task.Delay(50, cancellationToken);
 
-        var tl = await GetOutgoingTimelineAsync();
+        var tl = await GetOutgoingTimelineAsync(cancellationToken);
         var response = tl.OfType<InoResponse>().LastOrDefault();
 
         // Intent
@@ -1209,7 +1240,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             try
             {
                 var se = GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main);
-                proposals = (await se.GetTimelineAsync())
+                proposals = (await se.GetTimelineAsync(cancellationToken))
                     .OfType<SelfEvolutionProposalPending>()
                     .TakeLast(request.MaxHistory)
                     .ToList();
@@ -1348,6 +1379,34 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             if (current.GetType().FullName?.Contains("Salesforce", StringComparison.OrdinalIgnoreCase) == true ||
                 current.Message.Contains("Salesforce", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string GoogleFailureReply(Exception exception)
+    {
+        var message = exception.GetBaseException().Message;
+        if (message.Contains("auth", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("token", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase))
+            return "Google auth issue: " + TrimForSurface(message) + ". Reconnect Google.";
+
+        return "I couldn't fetch Gmail: " + TrimForSurface(message) +
+               ". Check Google credentials or permissions and try again.";
+    }
+
+    private static bool IsGoogleIntegrationFailure(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            var name = current.GetType().FullName ?? string.Empty;
+            if (name.Contains("Google", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("GoogleApiException", StringComparison.OrdinalIgnoreCase) ||
+                current.Message.Contains("Google", StringComparison.OrdinalIgnoreCase) ||
+                current.Message.Contains("gmail", StringComparison.OrdinalIgnoreCase) ||
+                current.Message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase))
                 return true;
         }
 

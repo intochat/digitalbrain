@@ -53,6 +53,9 @@ dotnet_analyzer_diagnostic.category-Interoperability.severity = suggestion
 dotnet_analyzer_diagnostic.category-Style.severity = suggestion
 
 dotnet_diagnostic.CA2200.severity = warning
+dotnet_diagnostic.CA1068.severity = warning
+dotnet_diagnostic.CA2012.severity = warning
+dotnet_diagnostic.CA2016.severity = warning
 dotnet_diagnostic.CA2254.severity = warning
 dotnet_diagnostic.IDE0005.severity = suggestion
 dotnet_diagnostic.IDE0040.severity = warning

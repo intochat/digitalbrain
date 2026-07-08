@@ -72,16 +72,16 @@ public sealed class DummyConnector : IConnector
 {
     public ConnectorDescriptor Descriptor => new("dummy", "Dummy", Array.Empty<string>(), Array.Empty<string>());
 
-    public Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null) =>
+    public Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(new ConnectorConfigStatus(true));
 
-    public Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null) =>
+    public Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(new AuthChallenge("https://example.com/auth"));
 
-    public Task<AuthResult> CompleteAuthAsync(OAuthCallback callback) =>
+    public Task<AuthResult> CompleteAuthAsync(OAuthCallback callback, CancellationToken cancellationToken = default) =>
         Task.FromResult(new AuthResult(true));
 
-    public Task<ConnectionHealth> TestConnectionAsync(NeuronId user) =>
+    public Task<ConnectionHealth> TestConnectionAsync(NeuronId user, CancellationToken cancellationToken = default) =>
         Task.FromResult(new ConnectionHealth(true, "dummy healthy"));
 }
 
@@ -96,14 +96,16 @@ internal sealed class FakePackConfigStore : IPackConfigStore
 {
     private readonly Dictionary<(string scope, string pack), Dictionary<string, string>> _data = new();
 
-    public Task SetAsync(string scope, string pack, IReadOnlyDictionary<string, string> values)
+    public Task SetAsync(string scope, string pack, IReadOnlyDictionary<string, string> values, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _data[(scope, pack)] = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyDictionary<string, string>> GetAsync(string scope, string pack)
+    public Task<IReadOnlyDictionary<string, string>> GetAsync(string scope, string pack, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return _data.TryGetValue((scope, pack), out var d)
             ? Task.FromResult<IReadOnlyDictionary<string, string>>(d)
             : Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
@@ -112,7 +114,7 @@ internal sealed class FakePackConfigStore : IPackConfigStore
 
 internal sealed class FakeSalesforceApiClientFactory : ISalesforceApiClientFactory
 {
-    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope) =>
+    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default) =>
         Task.FromResult<ISalesforceApiClient>(new FakeSalesforceApiClient());
 }
 

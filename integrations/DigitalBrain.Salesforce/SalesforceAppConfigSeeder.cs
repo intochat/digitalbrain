@@ -26,7 +26,7 @@ public sealed class SalesforceAppConfigSeeder(
         }
 
         var existing = await store
-            .GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName)
+            .GetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, cancellationToken)
             .ConfigureAwait(false);
         var merged = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
 
@@ -50,7 +50,7 @@ public sealed class SalesforceAppConfigSeeder(
             return;
 
         await store
-            .SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged)
+            .SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, merged, cancellationToken)
             .ConfigureAwait(false);
 
         logger.LogInformation("Seeded Salesforce Connected App configuration from host configuration.");
