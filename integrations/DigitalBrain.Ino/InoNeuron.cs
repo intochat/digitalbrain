@@ -437,7 +437,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         // Deterministic (not LLM-generated) so follow-up questions can find this data via BuildContextAsync
         // even when no IChatClient is configured (the [no-llm] fallback path).
         var summary = $"Uploaded '{ingested.FileName}' with columns [{string.Join(", ", headers)}] and {rows.Count} data rows. Column stats: {ingested.ColumnStatsJson}";
-        await FireAsync(new MemorySummary(ingested.FileName, summary, DateTimeOffset.UtcNow, workspaceId), cancellationToken);
+        await FireAsync(new MemorySummary(ingested.FileName, summary, DateTimeOffset.UtcNow, workspaceId, "Upload", "UntrustedEvidence", "TabularDataIngested"), cancellationToken);
     }
 
     public Task HandleAsync(DbSchemaInspected inspected, CancellationToken cancellationToken = default) =>
@@ -470,7 +470,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             schema.ConnectionName,
             SchemaMemorySummary(schema),
             DateTimeOffset.UtcNow,
-            workspaceId), cancellationToken);
+            workspaceId, "DbSchema", "JournalFact", "DbSupportNeuron"), cancellationToken);
     }
 
     private async Task<DbSchemaInspected?> InspectReferencedDatabaseAsync(string databasePath, string? clientId, string? workspaceId, CancellationToken cancellationToken = default)
@@ -910,7 +910,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         if (summaries.Count > 0)
         {
             var bodies = string.Join("\n---\n", summaries.Select(s => s.Body));
-            await FireAsync(new MemorySummary("last-gmail", SecretText.Redact(bodies), DateTimeOffset.UtcNow, workspaceId), cancellationToken);
+            await FireAsync(new MemorySummary("last-gmail", SecretText.Redact(bodies), DateTimeOffset.UtcNow, workspaceId, "Gmail", "UntrustedEvidence", "DigitalBrain.Google.IGmailNeuron"), cancellationToken);
         }
 
         string? summary = null;
@@ -974,7 +974,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
         if (records.Length > 0)
         {
-            await FireAsync(new MemorySummary("last-salesforce", SecretText.Redact(string.Join("\n", records)), DateTimeOffset.UtcNow, workspaceId), cancellationToken);
+            await FireAsync(new MemorySummary("last-salesforce", SecretText.Redact(string.Join("\n", records)), DateTimeOffset.UtcNow, workspaceId, "Salesforce", "UntrustedEvidence", "DigitalBrain.Salesforce.ISalesforceCrmNeuron"), cancellationToken);
         }
 
         await DeliverSalesforceRecordsSurfaceAsync(records, req.ClientId, workspaceId, cancellationToken);
@@ -1870,7 +1870,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             var sanitizedSummary = SecretText.Redact(summaryText);
             var topic = sanitizedSummary.Split('.')[0].Trim();
-            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0, 30) : topic, sanitizedSummary, DateTimeOffset.UtcNow, workspaceId);
+            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0, 30) : topic, sanitizedSummary, DateTimeOffset.UtcNow, workspaceId, "ActivitySummary", "JournalFact", "InoNeuron");
             await FireAsync(mem, cancellationToken);
         }
     }

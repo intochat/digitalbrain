@@ -40,7 +40,10 @@ public record MemorySummary(
     string Topic,
     string Summary,
     DateTimeOffset At,
-    string? WorkspaceId = null) : Synapse(nameof(MemorySummary), At);
+    string? WorkspaceId = null,
+    string? SourceKind = null,
+    string? TrustLevel = null,
+    string? Origin = null) : Synapse(nameof(MemorySummary), At);
 
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.InoAction")]

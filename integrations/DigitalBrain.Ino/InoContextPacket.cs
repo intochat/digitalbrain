@@ -113,7 +113,8 @@ public static class InoContextPacketBuilder
 
         foreach (var memory in memories)
         {
-            var trust = IsExternalMemory(memory)
+            // Trust from declared metadata on MemorySummary (deleted topic sniffing per review).
+            var trust = string.Equals(memory.TrustLevel, "UntrustedEvidence", StringComparison.OrdinalIgnoreCase)
                 ? InoContextTrustLevel.UntrustedEvidence
                 : InoContextTrustLevel.MemorySummary;
             Add(items, "RetrievedMemories", $"{memory.Topic}={memory.Summary}", InoContextSourceKind.Memory,
@@ -135,17 +136,6 @@ public static class InoContextPacketBuilder
             DateTimeOffset.UtcNow, null, null, trustedInstruction: true);
 
         return new InoContextPacket(packetId, workspaceId, items);
-    }
-
-    private static bool IsExternalMemory(MemorySummary memory)
-    {
-        var topic = memory.Topic.ToLowerInvariant();
-        return topic.Contains("gmail") ||
-               topic.Contains("email") ||
-               topic.Contains("salesforce") ||
-               topic.Contains("crm") ||
-               topic.Contains("upload") ||
-               topic.Contains("document");
     }
 
     private static void Add(
