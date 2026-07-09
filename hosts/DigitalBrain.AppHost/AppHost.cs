@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using DigitalBrain.Aspire;
+using DigitalBrain.Core.Models;
 
 var builder = DistributedApplication.CreateBuilder(args);
 

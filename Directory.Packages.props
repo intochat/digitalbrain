@@ -96,14 +96,13 @@
     <!-- TUI -->
     <PackageVersion Include="Spectre.Console" Version="0.57.0" />
     <PackageVersion Include="Spectre.Console.Cli" Version="0.55.0" />
-    <!-- gRPC gateway co-hosted in the silo (2.80.0: floor required once DigitalBrain.Kernel started
-         referencing DigitalBrain.Aspire, whose Aspire.Hosting 13.4.6 dependency requires Grpc.AspNetCore >= 2.80.0) -->
-    <PackageVersion Include="Grpc.AspNetCore" Version="2.80.0" />
-    <PackageVersion Include="Grpc.AspNetCore.Web" Version="2.80.0" />
-    <PackageVersion Include="Grpc.Net.Client" Version="2.80.0" />
-    <PackageVersion Include="Grpc.Net.Client.Web" Version="2.80.0" />
-    <PackageVersion Include="Grpc.Net.ClientFactory" Version="2.80.0" />
-    <PackageVersion Include="Grpc.Tools" Version="2.80.0" />
+    <!-- gRPC gateway co-hosted in the silo -->
+    <PackageVersion Include="Grpc.AspNetCore" Version="2.71.0" />
+    <PackageVersion Include="Grpc.AspNetCore.Web" Version="2.71.0" />
+    <PackageVersion Include="Grpc.Net.Client" Version="2.71.0" />
+    <PackageVersion Include="Grpc.Net.Client.Web" Version="2.71.0" />
+    <PackageVersion Include="Grpc.Net.ClientFactory" Version="2.71.0" />
+    <PackageVersion Include="Grpc.Tools" Version="2.71.0" />
     <PackageVersion Include="Google.Protobuf" Version="3.31.0" />
     <!-- Roslyn 5.6.0 (bumped per dead-neuron-cleanup plan; unifies analysis + scripting, removes skew). -->
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="5.6.0" />

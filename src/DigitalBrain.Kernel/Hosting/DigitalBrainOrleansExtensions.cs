@@ -175,8 +175,8 @@ public static class DigitalBrainOrleansExtensions
         // constructors can declare [Llm<SomeModel>] IChatClient chatClient — Orleans' GrainConstructorArgumentFactory
         // resolves the mapper keyed by the parameter attribute's closed generic type, so this can't be a single
         // open-generic registration; it must be done reflectively, once per concrete DigitalBrainModel type.
-        foreach (var modelType in typeof(DigitalBrain.Aspire.LlmModel).Assembly.GetTypes()
-            .Where(t => typeof(DigitalBrain.Aspire.LlmModel).IsAssignableFrom(t) && !t.IsAbstract))
+        foreach (var modelType in typeof(DigitalBrain.Core.Models.LlmModel).Assembly.GetTypes()
+            .Where(t => typeof(DigitalBrain.Core.Models.LlmModel).IsAssignableFrom(t) && !t.IsAbstract))
         {
             var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
                 typeof(DigitalBrain.Kernel.Llm.LlmAttribute<>).MakeGenericType(modelType));

@@ -1,6 +1,4 @@
-using DigitalBrain.Core.Models;
-
-namespace DigitalBrain.Aspire;
+namespace DigitalBrain.Core.Models;
 
 /// <summary>
 /// Typed provider/model marker used by the Aspire DSL instead of raw strings.
@@ -14,7 +12,7 @@ public abstract class DigitalBrainModel
     public virtual string DisplayName => Id;
     public virtual DigitalBrainModelCapabilities Capabilities => DigitalBrainModelCapabilities.FullyCapable;
 
-    internal DigitalBrainModelDescriptor Describe() => new(Kind, Provider, Id, DisplayName, Capabilities);
+    public DigitalBrainModelDescriptor Describe() => new(Kind, Provider, Id, DisplayName, Capabilities);
 }
 
 /// <summary>
