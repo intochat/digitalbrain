@@ -184,6 +184,16 @@ public static class DigitalBrainOrleansExtensions
             builder.Services.AddSingleton(mapperInterface, mapperImpl);
         }
 
+        // Same as above, for [Voice2Text<TModel>] IVoiceTranscriber over VoiceToTextModel-derived types.
+        foreach (var modelType in typeof(DigitalBrain.Core.Models.VoiceToTextModel).Assembly.GetTypes()
+            .Where(t => typeof(DigitalBrain.Core.Models.VoiceToTextModel).IsAssignableFrom(t) && !t.IsAbstract))
+        {
+            var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
+                typeof(DigitalBrain.Kernel.Voice.Voice2TextAttribute<>).MakeGenericType(modelType));
+            var mapperImpl = typeof(DigitalBrain.Kernel.Voice.Voice2TextAttributeMapper<>).MakeGenericType(modelType);
+            builder.Services.AddSingleton(mapperInterface, mapperImpl);
+        }
+
         builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
         builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
         builder.Services.AddContextStore(builder.Configuration);

@@ -231,6 +231,22 @@ public static class DigitalBrainVoiceTranscription
                 ? sp.GetRequiredService<OpenAICompatibleVoiceTranscriber>()
                 : sp.GetRequiredService<NoOpVoiceTranscriber>();
         });
+
+        // Keyed registration per declared voice-to-text model, symmetric to
+        // DigitalBrainChatClientRegistration.AddDigitalBrainChatClients — lets [Voice2Text<TModel>] resolve
+        // a specific model's transcriber instead of only ever getting the flat unkeyed default above.
+        var entries = DigitalBrainModelRegistrySnapshot.Read(config);
+        foreach (var entry in entries)
+        {
+            if (entry.Kind != DigitalBrainCapabilityKind.VoiceToText || string.IsNullOrWhiteSpace(entry.ServiceKey))
+            {
+                continue;
+            }
+
+            services.AddKeyedSingleton<IVoiceTranscriber>(entry.ServiceKey, (sp, _) =>
+                sp.GetRequiredService<IVoiceTranscriber>());
+        }
+
         return services;
     }
 }

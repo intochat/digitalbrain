@@ -35,7 +35,9 @@ public sealed class LlmAttributeMapper<TModel> : IAttributeToFactoryMapper<LlmAt
 // Maps a model marker type to the ServiceKey DigitalBrainChatClientRegistration registered it under, so
 // [Llm<TModel>] can stay a zero-argument generic instead of repeating the key as a string literal.
 // Model marker types must expose a public static string member (property or const/field) named "ServiceKey".
-internal static class LlmServiceKeys
+// Public (not internal): Voice2TextAttributeMapper<TModel> in DigitalBrain.Kernel reuses this exact
+// reflection helper for [Voice2Text<TModel>], and there is no InternalsVisibleTo between the two assemblies.
+public static class LlmServiceKeys
 {
     public static string For(Type modelType)
     {
