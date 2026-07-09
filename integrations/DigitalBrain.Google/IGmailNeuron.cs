@@ -23,6 +23,10 @@ public interface IGmailNeuron : IAgent, IHandle<CapabilityInvocation>
     static string IAgent.AgentInvocationGrainType => "digitalbrain.google.gmail.v1";
     static string IAgent.AgentInvocationGrainKey => "gmail-capability-main";
 
+    [Description("Checks whether the caller has an active session and a usable Google credential; if not, shows the user a login/connect surface and returns false.")]
+    [Alias("EnsureConnectedAsync")]
+    Task<bool> EnsureConnectedAsync(string? clientId, CancellationToken ct = default);
+
     [Description("List messages matching a Gmail search query, up to maxResults.")]
     [Alias("ListMessagesAsync")]
     Task<string[]> ListMessagesAsync(string query, int maxResults = 20, CancellationToken ct = default);

@@ -15,17 +15,14 @@ public class GmailNeuron(ILogger<GmailNeuron> logger, NeuronJournals journals, I
 {
     private const int DefaultMessageLimit = 10;
 
+    public async Task<bool> EnsureConnectedAsync(string? clientId, CancellationToken cancellationToken = default) =>
+        await TryGetConnectedScopeAsync(clientId, cancellationToken) is not null;
+
     public async Task HandleAsync(CapabilityInvocation invocation, CancellationToken cancellationToken = default)
     {
-        var scope = await ResolveUserScopeOrPromptLoginAsync(invocation.ClientId, cancellationToken);
+        var scope = await TryGetConnectedScopeAsync(invocation.ClientId, cancellationToken);
         if (scope is null)
         {
-            return;
-        }
-
-        if (!await HasCredentialAsync(scope.Value, cancellationToken))
-        {
-            await RequestAuthAsync(scope.Value.UserId, invocation.ClientId, cancellationToken);
             return;
         }
 
@@ -87,6 +84,23 @@ public class GmailNeuron(ILogger<GmailNeuron> logger, NeuronJournals journals, I
         var factory = gmailApiClientFactory ?? throw new InvalidOperationException("Gmail API client factory is not configured.");
         var client = await factory.CreateAsync(Self.AsScope(), ct);
         await client.SendMessageAsync(to, subject, body, ct);
+    }
+
+    private async Task<NeuronScope?> TryGetConnectedScopeAsync(string? clientId, CancellationToken cancellationToken)
+    {
+        var scope = await ResolveUserScopeOrPromptLoginAsync(clientId, cancellationToken);
+        if (scope is null)
+        {
+            return null;
+        }
+
+        if (!await HasCredentialAsync(scope.Value, cancellationToken))
+        {
+            await RequestAuthAsync(scope.Value.UserId, clientId, cancellationToken);
+            return null;
+        }
+
+        return scope;
     }
 
     private async Task<NeuronScope?> ResolveUserScopeOrPromptLoginAsync(string? clientId, CancellationToken cancellationToken)
