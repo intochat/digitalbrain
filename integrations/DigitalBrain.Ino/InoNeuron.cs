@@ -322,13 +322,15 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         // In production keep per-session List<ChatMessage> loaded from journals/state, compact on growth.
         if (messages.Count > 12)
         {
-            var toSummarize = messages.Take(6).ToList();
+            // Skip messages[0] (persona) and messages[1] ("CAPABILITIES AND CONTEXT") - only summarize and
+            // drop actual conversation history turns, never the two fixed system messages.
+            var toSummarize = messages.Skip(2).Take(6).ToList();
             var summaryPrompt = "Summarize the following old conversation turns into one concise context paragraph (preserve key facts, no new info): " + string.Join(" | ", toSummarize.Select(m => m.Text ?? ""));
             try
             {
                 var sumResp = await chat.GetResponseAsync(summaryPrompt, cancellationToken: cancellationToken);
                 var summaryMsg = new ChatMessage(ChatRole.System, "PREVIOUS_CONTEXT_SUMMARY: " + sumResp.Text);
-                messages = [messages[0], summaryMsg, ..messages.Skip(6)];
+                messages = [messages[0], messages[1], summaryMsg, .. messages.Skip(8)];
             }
             catch { /* keep original */ }
         }

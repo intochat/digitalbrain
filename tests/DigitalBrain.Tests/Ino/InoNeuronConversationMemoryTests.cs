@@ -69,4 +69,40 @@ public sealed class InoNeuronConversationMemoryTests : NeuronTestBase
         Assert.Contains(turns, turn => turn.ClientId == "client-a" && turn.Text.Contains("Bob"));
         Assert.DoesNotContain(turns, turn => turn.ClientId == "client-b" && turn.Text.Contains("Bob"));
     }
+
+    [Fact]
+    public async Task Fourth_turn_with_the_same_client_still_carries_the_capabilities_and_context_message()
+    {
+        CapturingInoChatClient.Reset();
+        for (var turn = 1; turn <= 4; turn++)
+        {
+            CapturingInoChatClient.Replies.Enqueue("{\"intent\":\"generic\",\"confidence\":0.4}");
+            CapturingInoChatClient.Replies.Enqueue($"Acknowledged turn {turn}.");
+        }
+
+        // Phrasing avoids the same pre-existing fast-path regexes called out on the first test above
+        // (CapabilityNameRegex's bare "is"/"do you have"/"can you use" shapes, InventoryRegex, ExplainLastRegex).
+        var ino = Grain<IInoNeuron>("ino-memory-compaction");
+        for (var turn = 1; turn <= 4; turn++)
+        {
+            await InoTestHarness.Interact(ino, $"Turn {turn} context, remember this fact please.", clientId: "compaction-client");
+        }
+
+        // By the 4th completed exchange with the same clientId, LoadConversationHistory's own journal reads
+        // (2 InoConversationTurn facts per exchange, doubled to 4 raw items via Neuron.FireAsync's self-delivery
+        // mirroring into the incoming journal - see Neuron.FireAsync) push messages.Count past
+        // HandleGenericIntentAsync's compaction threshold of 12 for the first time. That reactivates the
+        // pre-existing compaction block (dead code before conversation history was wired in), which - unless
+        // it explicitly preserves both fixed system messages - drops messages[1], the "CAPABILITIES AND
+        // CONTEXT" system message carrying the capability catalog and response policy, and replaces it with
+        // a lossy LLM-generated paraphrase.
+        //
+        // Prompts[^1] is NOT reliably this turn's generic call (see the sibling test above: CreateMemorySummaryAsync
+        // fires its own chat call afterward), so select the generic call the same way: by its unique system
+        // preamble marker.
+        var fourthTurnGenericPrompt = CapturingInoChatClient.Prompts.Last(
+            p => p.Contains("You are INO, the personal AI in DigitalBrain"));
+
+        Assert.Contains("CAPABILITIES AND CONTEXT", fourthTurnGenericPrompt);
+    }
 }
