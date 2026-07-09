@@ -18,6 +18,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
+using Orleans.Runtime;
 
 namespace DigitalBrain.Kernel.Hosting;
 
@@ -168,6 +169,21 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
         builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
         builder.Services.AddSingleton<DigitalBrain.Kernel.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
+        builder.Services.AddDigitalBrainChatClients(builder.Configuration);
+
+        // One IAttributeToFactoryMapper<LlmAttribute<TModel>> registration per declared model type, so grain
+        // constructors can declare [Llm<SomeModel>] IChatClient chatClient — Orleans' GrainConstructorArgumentFactory
+        // resolves the mapper keyed by the parameter attribute's closed generic type, so this can't be a single
+        // open-generic registration; it must be done reflectively, once per concrete DigitalBrainModel type.
+        foreach (var modelType in typeof(DigitalBrain.Aspire.LlmModel).Assembly.GetTypes()
+            .Where(t => typeof(DigitalBrain.Aspire.LlmModel).IsAssignableFrom(t) && !t.IsAbstract))
+        {
+            var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
+                typeof(DigitalBrain.Kernel.Llm.LlmAttribute<>).MakeGenericType(modelType));
+            var mapperImpl = typeof(DigitalBrain.Kernel.Llm.LlmAttributeMapper<>).MakeGenericType(modelType);
+            builder.Services.AddSingleton(mapperInterface, mapperImpl);
+        }
+
         builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
         builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
         builder.Services.AddContextStore(builder.Configuration);

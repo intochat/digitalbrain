@@ -52,6 +52,7 @@
 
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
 
     <ProjectReference Include="..\..\integrations\DigitalBrain.Google\DigitalBrain.Google.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Ino\DigitalBrain.Ino.csproj" />
