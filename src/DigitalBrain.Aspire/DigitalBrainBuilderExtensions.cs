@@ -313,6 +313,11 @@ public static class DigitalBrainBuilderExtensions
             kernel.WithEnvironment($"{prefix}__Id", registration.Model.Id);
             kernel.WithEnvironment($"{prefix}__DisplayName", registration.Model.DisplayName);
             kernel.WithEnvironment($"{prefix}__Role", registration.Role.ToString());
+            kernel.WithEnvironment($"{prefix}__ServiceKey", registration.Model.ServiceKey);
+            kernel.WithEnvironment($"{prefix}__SupportsTools", registration.Model.Capabilities.SupportsTools.ToString());
+            kernel.WithEnvironment($"{prefix}__SupportsVision", registration.Model.Capabilities.SupportsVision.ToString());
+            kernel.WithEnvironment($"{prefix}__SupportsStreaming", registration.Model.Capabilities.SupportsStreaming.ToString());
+            kernel.WithEnvironment($"{prefix}__SupportsStructuredOutput", registration.Model.Capabilities.SupportsStructuredOutput.ToString());
         }
     }
 

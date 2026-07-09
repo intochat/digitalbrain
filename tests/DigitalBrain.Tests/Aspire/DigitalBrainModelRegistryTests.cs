@@ -111,6 +111,18 @@ public sealed class DigitalBrainModelRegistryTests
         Assert.Contains("Register a model", ex.Message);
     }
 
+    [Fact]
+    public void RegistrationsCarryServiceKeyAndCapabilitiesReadyForEnvExport()
+    {
+        var options = new DigitalBrainOptions();
+
+        options.WithLLM<Qwen25Coder1_5B>().AsBalanced();
+
+        var registration = Assert.Single(options.ModelRegistry.Registrations);
+        Assert.Equal("ollama-qwen2-5-coder-1-5b", registration.Model.ServiceKey);
+        Assert.False(registration.Model.Capabilities.SupportsTools);
+    }
+
     private sealed class FastTestModel : LlmModel
     {
         public override string Provider => DigitalBrainProviderIds.OpenAI;
