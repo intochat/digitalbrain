@@ -2,6 +2,8 @@
   <PropertyGroup>
     <!-- Sentinel so we only run dotnet tool restore once per clean -->
     <_ToolsRestoredSentinel>$(MSBuildThisFileDirectory).config\.tools-restored</_ToolsRestoredSentinel>
+    <!-- Sentinel for CodeGraph - forces re-init after git clean -fdx etc. -->
+    <_CodeGraphSentinel>$(MSBuildThisFileDirectory).config\.codegraph-initialized</_CodeGraphSentinel>
   </PropertyGroup>
 
   <!-- Ensure dotnet tools (csharp-ls, etc.) are available for .lsp.json and agents -->
@@ -9,5 +11,17 @@
           Condition="!Exists('$(_ToolsRestoredSentinel)')">
     <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildThisFileDirectory)" />
     <Touch Files="$(_ToolsRestoredSentinel)" AlwaysCreate="true" />
+  </Target>
+
+  <!-- Auto-initialize CodeGraph index for the MCP server (code intelligence).
+       Runs before Build (covers `dotnet build`, `aspire run` etc.).
+       Re-triggers after `git clean -fdx` (sentinel + .codegraph/ are cleaned away).
+       Uses npx --yes for non-interactive. Safe to fail (ContinueOnError). -->
+  <Target Name="InitCodeGraph" BeforeTargets="Build"
+          Condition="!Exists('$(_CodeGraphSentinel)')">
+    <Message Text="Initializing CodeGraph index (for codegraph MCP)..." Importance="high" />
+    <MakeDir Directories="$(MSBuildThisFileDirectory).config" />
+    <Exec Command="npx --yes @colbymchenry/codegraph init" WorkingDirectory="$(MSBuildThisFileDirectory)" ContinueOnError="true" />
+    <Touch Files="$(_CodeGraphSentinel)" AlwaysCreate="true" />
   </Target>
 </Project>

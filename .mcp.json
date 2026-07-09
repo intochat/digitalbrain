@@ -19,7 +19,7 @@
     },
     "codegraph": {
       "command": "npx",
-      "args": ["@colbymchenry/codegraph"]
+      "args": ["@colbymchenry/codegraph", "serve", "--mcp"]
     },
     "aspire": {
       "command": "aspire",

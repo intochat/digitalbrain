@@ -449,3 +449,6 @@ aspire_*.log
 
 # Local git worktrees used for isolated plan execution
 .worktrees/
+
+# CodeGraph local index (SQLite graph) - rebuilt automatically on build after cleans
+.codegraph/
