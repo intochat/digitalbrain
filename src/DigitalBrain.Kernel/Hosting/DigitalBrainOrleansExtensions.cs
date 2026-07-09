@@ -197,6 +197,8 @@ public static class DigitalBrainOrleansExtensions
 
         builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
         builder.Services.AddSingleton<DigitalBrain.Google.IGmailApiClientFactory, DigitalBrain.Google.GmailApiClientFactory>();
+        builder.Services.AddSingleton<DigitalBrain.Kernel.IInoToolProvider, DigitalBrain.Google.GmailInoToolProvider>();
+        builder.Services.AddSingleton<DigitalBrain.Kernel.IInoToolProvider, DigitalBrain.Salesforce.SalesforceInoToolProvider>();
 
         builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("salesforce", (sp, _) => new DigitalBrain.Salesforce.SalesforceConnector(
             sp.GetRequiredService<DigitalBrain.Salesforce.ISalesforceApiClientFactory>(),
