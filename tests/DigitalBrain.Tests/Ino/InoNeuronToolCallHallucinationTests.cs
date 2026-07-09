@@ -8,6 +8,10 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Ino;
 
+// Shares QueuedInoChatClient's static Replies queue with InoNeuronActionDirectiveTests (in
+// InoNeuronChatSurfaceTests.cs), so both are pinned to the same xUnit collection to avoid a
+// cross-class race on that static state under xUnit's parallel collection execution.
+[Collection("Ino.QueuedInoChatClient")]
 public sealed class InoNeuronToolCallHallucinationTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>

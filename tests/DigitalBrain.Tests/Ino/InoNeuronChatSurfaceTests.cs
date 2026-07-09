@@ -369,6 +369,10 @@ internal sealed class ToolCallingInoChatClient : IChatClient
     public void Dispose() { }
 }
 
+// Shares QueuedInoChatClient's static Replies queue with InoNeuronToolCallHallucinationTests (a
+// separate file), so both are pinned to the same xUnit collection - see the [Collection] comment on
+// InoNeuronAuthGateTests for why this is needed (cross-class race on shared static fake-client state).
+[Collection("Ino.QueuedInoChatClient")]
 public sealed class InoNeuronActionDirectiveTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>
