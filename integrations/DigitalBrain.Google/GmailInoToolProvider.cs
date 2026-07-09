@@ -6,6 +6,7 @@ using Orleans;
 
 public sealed class GmailInoToolProvider(IGrainFactory grainFactory) : IInoToolProvider
 {
+    public string Provider => "google";
     private const string GmailGrainKey = "gmail-capability-main";
     private const int MaxEnrichedMessages = 3;
 

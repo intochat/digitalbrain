@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Ino;
 using DigitalBrain.Kernel.Llm;
+using DigitalBrain.Kernel;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -36,6 +37,8 @@ public sealed class InoNeuronToolCapableModelResolutionTests : NeuronTestBase
             // prove Ino picks the tool-capable one instead of just grabbing whatever the unkeyed default is.
             services.AddKeyedSingleton<IChatClient>("test-provider-chat-only-test", new RecordingChatClient("chat-only"));
             services.AddKeyedSingleton<IChatClient>("ollama-llama3-1-8b", new RecordingChatClient("tool-capable"));
+            services.AddSingleton<IChatClient>(new RecordingChatClient("flat-default"));
+            services.AddSingleton<IInoToolProvider, TestToolProvider>();
         });
 
     [Fact]
@@ -46,6 +49,7 @@ public sealed class InoNeuronToolCapableModelResolutionTests : NeuronTestBase
 
         var response = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().Last();
         Assert.Contains("tool-capable", response.Response);
+        Assert.DoesNotContain(await ino.GetOutgoingTimelineAsync(), s => s is InoToolCallStarted or InoToolCallCompleted or InoToolCallFailed);
     }
 
     private sealed class RecordingChatClient(string tag) : IChatClient
@@ -56,5 +60,13 @@ public sealed class InoNeuronToolCapableModelResolutionTests : NeuronTestBase
             throw new NotSupportedException();
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
         public void Dispose() { }
+    }
+
+    private sealed class TestToolProvider : IInoToolProvider
+    {
+        public string Provider => "test";
+
+        public IReadOnlyList<AIFunction> BuildTools(string? clientId, CancellationToken cancellationToken) =>
+            [AIFunctionFactory.Create(() => "tool result", name: "test_tool")];
     }
 }

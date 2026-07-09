@@ -7,5 +7,9 @@ using Microsoft.Extensions.AI;
 // all registered providers and never references a concrete integration project directly.
 public interface IInoToolProvider
 {
+    // Optional stable provider label used by Ino telemetry. Existing providers
+    // remain source-compatible and fall back to their type name when omitted.
+    string? Provider => null;
+
     IReadOnlyList<AIFunction> BuildTools(string? clientId, CancellationToken cancellationToken);
 }

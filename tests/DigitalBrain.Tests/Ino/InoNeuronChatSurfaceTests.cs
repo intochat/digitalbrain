@@ -239,6 +239,11 @@ public sealed class InoNeuronAuthGateTests : NeuronTestBase
             surface.Kind == ConfigFormSurface.Kind &&
             Equals(surface.Props.GetValueOrDefault("pack"), GoogleClientFactory.PackName) &&
             Equals(surface.Props.GetValueOrDefault("clientId"), clientId));
+
+        var telemetry = (await ino.GetOutgoingTimelineAsync()).Where(s => s is InoToolCallStarted or InoToolCallCompleted or InoToolCallFailed).ToList();
+        Assert.Contains(telemetry, s => s is InoToolCallStarted started && started.ToolName == "gmail_get_messages" && started.Provider == "google" && started.ClientId == clientId);
+        Assert.Contains(telemetry, s => s is InoToolCallFailed failed && failed.ToolName == "gmail_get_messages" && failed.Provider == "google" && failed.ClientId == clientId);
+        Assert.DoesNotContain(telemetry, s => s is InoToolCallCompleted completed && completed.ToolName == "salesforce_query");
     }
 
     [Fact]
@@ -611,6 +616,11 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
         // Special gmail fetch path deleted from Ino core (moved to catalog/generic + connector); test updated.
         var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
         Assert.Contains("gmail", response.Response, StringComparison.OrdinalIgnoreCase);
+
+        var telemetry = (await ino.GetOutgoingTimelineAsync()).Where(s => s is InoToolCallStarted or InoToolCallCompleted or InoToolCallFailed).ToList();
+        Assert.Contains(telemetry, s => s is InoToolCallStarted started && started.ToolName == "gmail_get_messages" && started.Provider == "google" && started.ClientId == clientId);
+        Assert.Contains(telemetry, s => s is InoToolCallCompleted completed && completed.ToolName == "gmail_get_messages" && completed.Provider == "google" && completed.ClientId == clientId && !string.IsNullOrWhiteSpace(completed.ResultSummary));
+        Assert.DoesNotContain(telemetry, s => s is InoToolCallStarted started && started.ToolName == "salesforce_query");
 
         // (special gmail neuron calls and signals deleted; generic path now; test relaxed for catalog/generic simplify)
     }

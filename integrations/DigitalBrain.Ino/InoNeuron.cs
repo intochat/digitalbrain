@@ -282,9 +282,9 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
 
         var ctx = await BuildContextAsync(request.Prompt, workspaceId, cancellationToken);
 
-        // Prefer tool-capable model first (for gmail etc paths). Global fallback only when no tools.
-        var chat = await ResolveToolCapableChatClientAsync(cancellationToken)
-            ?? await ResolveGlobalLlmClientAsync(cancellationToken)
+        // Ordinary requests follow the configured/global/default client. Tool
+        // routing is decided only after the model has actually been given tools.
+        var chat = await ResolveGlobalLlmClientAsync(cancellationToken)
             ?? ServiceProvider.GetService<IChatClient>();
         if (chat is null)
         {
@@ -301,19 +301,19 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             new(ChatRole.System, "CAPABILITIES AND CONTEXT:\n" + ctx)
         };
 
-        messages.AddRange(LoadConversationHistory(request.ClientId));
+        messages.AddRange(LoadConversationHistory(request.ClientId, workspaceId));
         messages.Add(new ChatMessage(ChatRole.User, SecretText.Redact(request.Prompt)));
 
         // Tools from IInoToolProvider registrations (gmail_get_messages etc). LLM decides.
         var tools = ServiceProvider.GetServices<IInoToolProvider>()
-            .SelectMany(provider => provider.BuildTools(request.ClientId, cancellationToken))
+            .SelectMany(provider => provider.BuildTools(request.ClientId, cancellationToken)
+                .Select(tool => new InoTelemetryAIFunction(
+                    tool,
+                    provider.Provider ?? InferProviderName(provider),
+                    request.ClientId,
+                    workspaceId,
+                    FireAsync)))
             .ToList();
-
-        // Phase 0: fire Ino domain events for tool usage visibility (from Ino context to avoid reentrancy)
-        foreach (var t in tools)
-        {
-            await FireAsync(new InoToolCallStarted(t.Name, Provider: null, request.ClientId, workspaceId), cancellationToken);
-        }
 
         // Phase 2: strictly enforce tool-capable model for tool paths.
         if (tools.Count > 0)
@@ -366,10 +366,6 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
 
             // Fire completed with summary for visibility (rich for traces/journals).
             var resultSummary = finalText.Contains("Gmail:") ? finalText : null;
-            foreach (var t in tools)
-            {
-                await FireAsync(new InoToolCallCompleted(t.Name, ResultSummary: resultSummary, Provider: null, request.ClientId, workspaceId), cancellationToken);
-            }
 
             // Deterministic for last incoming gmail facts (bypass LLM paraphrase on labeled tool output).
             // Matches "last incoming gmail", "my last gmail" etc. Use tool result directly.
@@ -401,8 +397,8 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         }
 
         var conversationClientId = request.ClientId ?? AnonymousClientId;
-        await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnUserRole, SecretText.Redact(request.Prompt)), cancellationToken);
-        await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnAssistantRole, finalText), cancellationToken);
+        await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnUserRole, SecretText.Redact(request.Prompt), workspaceId), cancellationToken);
+        await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnAssistantRole, finalText, workspaceId), cancellationToken);
 
         // The generic tool-calling path (ChatClientAgent) never produces TASK:/BRANCH: directives itself -
         // that only ever came from the deleted directive-parsing flow - so there is nothing to orchestrate here.
@@ -1029,7 +1025,7 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
                     .TakeLast(request.MaxHistory)
                     .ToList();
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
                 throw;
             }
@@ -1070,12 +1066,17 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         );
     }
 
-    private IReadOnlyList<ChatMessage> LoadConversationHistory(string? clientId)
+    private IReadOnlyList<ChatMessage> LoadConversationHistory(string? clientId, string? workspaceId)
     {
         var effectiveClientId = clientId ?? AnonymousClientId;
+        var effectiveWorkspaceId = WorkspaceIds.Effective(workspaceId);
         return OutgoingJournal.Concat(IncomingJournal)
             .OfType<InoConversationTurn>()
             .Where(turn => turn.ClientId == effectiveClientId)
+            // WorkspaceId was added after the original journal contract. Old
+            // entries deserialize as null and intentionally belong to the
+            // default workspace for backwards-compatible anonymous behavior.
+            .Where(turn => WorkspaceIds.Effective(turn.WorkspaceId) == effectiveWorkspaceId)
             // FireAsync self-delivers every fired synapse into both journals (same SynapseId), so without
             // this the same turn is read - and counted - twice.
             .DistinctBy(turn => turn.SynapseId)
@@ -1243,9 +1244,8 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         }
     }
 
-    // The generic tool-calling path needs a model that actually supports native function-calling, not just
-    // whatever the flat unkeyed default happens to be. Picks the first registry entry flagged SupportsTools
-    // and resolves its keyed IChatClient.
+    // Resolve the selected/default model first. Only if that model cannot call
+    // tools do we choose the best tool-capable fallback by routing role.
     private async Task<IChatClient?> ResolveToolCapableChatClientAsync(CancellationToken cancellationToken)
     {
         var config = ServiceProvider.GetService<IConfiguration>();
@@ -1254,22 +1254,39 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             return null;
         }
 
-        var entries = DigitalBrainModelRegistrySnapshot.Read(config);
-        var toolCapable = DigitalBrainModelRegistrySnapshot.FirstOrDefault(
-            entries, DigitalBrainCapabilityKind.LargeLanguageModel, e => e.Capabilities.SupportsTools);
-        if (toolCapable is null || string.IsNullOrWhiteSpace(toolCapable.ServiceKey))
+        var entries = DigitalBrainModelRegistrySnapshot.Read(config)
+            .Where(e => e.Kind == DigitalBrainCapabilityKind.LargeLanguageModel)
+            .ToList();
+        if (entries.Count == 0)
         {
             return null;
         }
 
-        return ServiceProvider.GetKeyedService<IChatClient>(toolCapable.ServiceKey);
+        var selected = await ResolveConfiguredRegistryEntryAsync(config, entries, cancellationToken);
+        selected ??= PreferredModel(entries);
+
+        if (selected is not null && selected.Capabilities.SupportsTools && !string.IsNullOrWhiteSpace(selected.ServiceKey))
+        {
+            return ServiceProvider.GetKeyedService<IChatClient>(selected.ServiceKey);
+        }
+
+        var fallback = entries
+            .Where(e => e.Capabilities.SupportsTools)
+            .OrderByDescending(e => RolePriority(e.Role))
+            .ThenByDescending(e => entries.IndexOf(e))
+            .FirstOrDefault();
+        return fallback is null || string.IsNullOrWhiteSpace(fallback.ServiceKey)
+            ? null
+            : ServiceProvider.GetKeyedService<IChatClient>(fallback.ServiceKey);
     }
 
-    private async Task<IChatClient?> ResolveGlobalLlmClientAsync(CancellationToken cancellationToken = default)
+    private async Task<DigitalBrainRegistryEntry?> ResolveConfiguredRegistryEntryAsync(
+        IConfiguration config,
+        IReadOnlyList<DigitalBrainRegistryEntry> entries,
+        CancellationToken cancellationToken)
     {
-        var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
         var store = ServiceProvider.GetService<IPackConfigStore>();
-        if (factory is null || store is null)
+        if (store is null)
         {
             return null;
         }
@@ -1277,17 +1294,128 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         try
         {
             var sys = await store.GetAsync("system", "llm", cancellationToken);
-            if (sys.TryGetValue("llm_provider", out var provider) && !string.IsNullOrWhiteSpace(provider))
+            if (!sys.TryGetValue("llm_provider", out var provider) || string.IsNullOrWhiteSpace(provider))
             {
-                sys.TryGetValue("llm_key", out var key);
-                return factory.Create(provider, string.IsNullOrWhiteSpace(key) ? null : key);
+                return null;
             }
+
+            sys.TryGetValue("llm_key", out var key);
+            return entries.FirstOrDefault(e =>
+                string.Equals(e.Provider, provider, StringComparison.OrdinalIgnoreCase) &&
+                (string.IsNullOrWhiteSpace(key) ||
+                 string.Equals(e.Id, key, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(e.ServiceKey, key, StringComparison.OrdinalIgnoreCase)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch { /* optional */ }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static DigitalBrainRegistryEntry? PreferredModel(IReadOnlyList<DigitalBrainRegistryEntry> entries) =>
+        entries.LastOrDefault(e => e.Role == DigitalBrainModelRole.Balanced) ??
+        entries.LastOrDefault(e => e.Role == DigitalBrainModelRole.Default) ??
+        entries.LastOrDefault(e => e.Role == DigitalBrainModelRole.Reasoning) ??
+        entries.LastOrDefault(e => e.Role == DigitalBrainModelRole.Fast) ??
+        entries.LastOrDefault();
+
+    private static int RolePriority(DigitalBrainModelRole role) => role switch
+    {
+        DigitalBrainModelRole.Balanced => 4,
+        DigitalBrainModelRole.Default => 3,
+        DigitalBrainModelRole.Reasoning => 2,
+        DigitalBrainModelRole.Fast => 1,
+        _ => 0
+    };
+
+    private static string? InferProviderName(IInoToolProvider provider)
+    {
+        var name = provider.GetType().Name;
+        return name.EndsWith("InoToolProvider", StringComparison.Ordinal)
+            ? name[..^"InoToolProvider".Length].ToLowerInvariant()
+            : name.ToLowerInvariant();
+    }
+
+    private sealed class InoTelemetryAIFunction(
+        AIFunction inner,
+        string? provider,
+        string? clientId,
+        string workspaceId,
+        Func<Synapse, CancellationToken, Task> fireAsync) : DelegatingAIFunction(inner)
+    {
+        protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+        {
+            await fireAsync(new InoToolCallStarted(Name, provider, clientId, workspaceId), cancellationToken);
+            try
+            {
+                var result = await InnerFunction.InvokeAsync(arguments, cancellationToken);
+                if (InnerFunction is AuthRequiredAIFunction auth && auth.LastInvocationRequiredAuthentication)
+                {
+                    await fireAsync(new InoToolCallFailed(Name, result?.ToString(), provider, clientId, workspaceId), cancellationToken);
+                }
+                else
+                {
+                    await fireAsync(new InoToolCallCompleted(Name, result?.ToString(), provider, clientId, workspaceId), cancellationToken);
+                }
+
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await fireAsync(new InoToolCallFailed(Name, ex.Message, provider, clientId, workspaceId), cancellationToken);
+                throw;
+            }
+        }
+    }
+
+    private async Task<IChatClient?> ResolveGlobalLlmClientAsync(CancellationToken cancellationToken = default)
+    {
+        var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
+        var store = ServiceProvider.GetService<IPackConfigStore>();
+        if (factory is not null && store is not null)
+        {
+            try
+            {
+                var sys = await store.GetAsync("system", "llm", cancellationToken);
+                if (sys.TryGetValue("llm_provider", out var provider) && !string.IsNullOrWhiteSpace(provider))
+                {
+                    sys.TryGetValue("llm_key", out var key);
+                    var configured = factory.Create(provider, string.IsNullOrWhiteSpace(key) ? null : key);
+                    if (configured is not null)
+                    {
+                        return configured;
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch { /* optional */ }
+        }
+
+        var config = ServiceProvider.GetService<IConfiguration>();
+        if (config is not null)
+        {
+            var entries = DigitalBrainModelRegistrySnapshot.Read(config)
+                .Where(e => e.Kind == DigitalBrainCapabilityKind.LargeLanguageModel)
+                .ToList();
+            var selected = await ResolveConfiguredRegistryEntryAsync(config, entries, cancellationToken)
+                ?? PreferredModel(entries);
+            if (selected is not null && !string.IsNullOrWhiteSpace(selected.ServiceKey))
+            {
+                return ServiceProvider.GetKeyedService<IChatClient>(selected.ServiceKey);
+            }
+        }
+
         return null;
     }
 

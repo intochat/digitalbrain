@@ -6,6 +6,7 @@ using Orleans;
 
 public sealed class SalesforceInoToolProvider(IGrainFactory grainFactory) : IInoToolProvider
 {
+    public string Provider => "salesforce";
     private const string SalesforceGrainKey = "salesforce-capability-main";
 
     public IReadOnlyList<AIFunction> BuildTools(string? clientId, CancellationToken cancellationToken)

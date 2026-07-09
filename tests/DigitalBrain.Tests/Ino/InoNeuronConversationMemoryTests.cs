@@ -111,6 +111,29 @@ public sealed class InoNeuronConversationMemoryTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task Same_client_in_another_workspace_does_not_see_the_first_workspaces_history()
+    {
+        CapturingInoChatClient.Reset();
+        CapturingInoChatClient.Replies.Enqueue("{\"intent\":\"generic\",\"confidence\":0.4}");
+        CapturingInoChatClient.Replies.Enqueue("Workspace A secret.");
+        CapturingInoChatClient.Replies.Enqueue("{\"intent\":\"generic\",\"confidence\":0.4}");
+        CapturingInoChatClient.Replies.Enqueue("Workspace B response.");
+
+        var ino = Grain<IInoNeuron>("ino-memory-workspace-isolation");
+        await InoTestHarness.Interact(ino, "Remember workspace A secret: alpha-unique.", "shared-client", "workspace-a");
+        await InoTestHarness.Interact(ino, "What did I tell you in this workspace?", "shared-client", "workspace-b");
+
+        var secondPrompt = CapturingInoChatClient.Prompts.Last(
+            p => p.Contains("You are Ino, a neuron in DigitalBrain", StringComparison.Ordinal));
+        var afterContextPacket = secondPrompt.Split("Unknown or unpermitted capabilities fail closed.").Last();
+        Assert.DoesNotContain("alpha-unique", afterContextPacket);
+
+        var turns = (await ino.GetOutgoingTimelineAsync()).OfType<InoConversationTurn>().ToList();
+        Assert.Contains(turns, turn => turn.WorkspaceId == "workspace-a" && turn.Role == "user");
+        Assert.DoesNotContain(turns, turn => turn.WorkspaceId == "workspace-b" && turn.Text.Contains("Workspace A secret"));
+    }
+
+    [Fact]
     public async Task Fourth_turn_with_the_same_client_still_carries_the_capabilities_and_context_message()
     {
         CapturingInoChatClient.Reset();

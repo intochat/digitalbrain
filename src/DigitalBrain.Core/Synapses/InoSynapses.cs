@@ -21,7 +21,10 @@ public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) 
 public record InoConversationTurn(
     [property: Id(0)] string ClientId,
     [property: Id(1)] string Role,
-    [property: Id(2)] string Text)
+    [property: Id(2)] string Text,
+    // Added at the end to preserve the existing Orleans field ids and allow old
+    // journal entries to deserialize with the default workspace.
+    [property: Id(3)] string? WorkspaceId = null)
     : Synapse(nameof(InoConversationTurn), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]

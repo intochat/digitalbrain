@@ -15,6 +15,11 @@ public sealed class AuthRequiredAIFunction : DelegatingAIFunction
     private readonly string _unauthorizedMessage;
     private readonly Func<CancellationToken, Task>? _onAuthRequired;
 
+    // The wrapper used by Ino reads this immediately after an invocation. A
+    // tool instance is created per request, so this does not leak state between
+    // requests and lets auth failures be distinguished from successful results.
+    public bool LastInvocationRequiredAuthentication { get; private set; }
+
     public AuthRequiredAIFunction(
         AIFunction innerFunction,
         Func<CancellationToken, Task<bool>> isConnectedAsync,
@@ -31,11 +36,14 @@ public sealed class AuthRequiredAIFunction : DelegatingAIFunction
         AIFunctionArguments arguments,
         CancellationToken cancellationToken)
     {
+        LastInvocationRequiredAuthentication = false;
         var connected = await _isConnectedAsync(cancellationToken);
         if (connected)
         {
             return await InnerFunction.InvokeAsync(arguments, cancellationToken);
         }
+
+        LastInvocationRequiredAuthentication = true;
 
         if (_onAuthRequired != null)
         {
