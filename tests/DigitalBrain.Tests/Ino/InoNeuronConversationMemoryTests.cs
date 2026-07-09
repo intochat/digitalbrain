@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Ino;
 using DigitalBrain.TestKit;
@@ -43,6 +44,45 @@ public sealed class InoNeuronConversationMemoryTests : NeuronTestBase
         Assert.Contains("I am Alice, remember that please.", genericTurnPrompt);
         Assert.Contains("Nice to meet you, Alice.", genericTurnPrompt);
         Assert.Contains("Do you remember my name?", genericTurnPrompt);
+    }
+
+    [Fact]
+    public async Task Second_turns_prompt_carries_the_first_turns_exchange_exactly_once()
+    {
+        // Neuron.FireAsync self-delivers every fired synapse into both OutgoingJournal and IncomingJournal
+        // (same stamped instance/SynapseId). LoadConversationHistory used to read
+        // OutgoingJournal.Concat(IncomingJournal) with no de-duplication, so each turn 1 fact was counted
+        // twice and landed as adjacent duplicates after the OrderBy(Timestamp).
+        //
+        // The full prompt is not a clean surface to assert on directly: BuildContextAsync's separate,
+        // pre-existing "RecentCausalHistory" section (see InoContextPacketBuilder) legitimately dumps the
+        // same reply text twice more via two distinct journal fact types (InoConversationTurn.Text and
+        // InoResponse.Response) - that duplication is real but out of scope here. Since InoContextPacket
+        // always renders its fixed "ResponsePolicy" section last (InoContextPacketBuilder.Build adds it
+        // after every other section), everything after that section's fixed marker text in the prompt is
+        // exactly what HandleGenericIntentAsync appended afterward: LoadConversationHistory's messages plus
+        // the new user turn. Slicing there isolates the thing this fix actually changes.
+        CapturingInoChatClient.Reset();
+        CapturingInoChatClient.Replies.Enqueue("{\"intent\":\"generic\",\"confidence\":0.4}");
+        CapturingInoChatClient.Replies.Enqueue("Nice to meet you, Alice.");
+        CapturingInoChatClient.Replies.Enqueue("{\"intent\":\"generic\",\"confidence\":0.4}");
+        CapturingInoChatClient.Replies.Enqueue("Your name is Alice.");
+
+        var ino = Grain<IInoNeuron>("ino-memory-dedup");
+        await InoTestHarness.Interact(ino, "I am Alice, remember that please.", clientId: "dedup-client");
+        await InoTestHarness.Interact(ino, "Do you remember my name?", clientId: "dedup-client");
+
+        // Same selection rationale as the sibling tests above: CreateMemorySummaryAsync fires its own chat
+        // call after the generic answer, so pick the generic call by its unique system preamble, not by index.
+        var secondTurnGenericPrompt = CapturingInoChatClient.Prompts.Last(
+            p => p.Contains("You are INO, the personal AI in DigitalBrain"));
+
+        const string responsePolicyMarker =
+            "Unknown or unpermitted capabilities fail closed.";
+        var afterContextPacket = secondTurnGenericPrompt.Split(responsePolicyMarker).Last();
+
+        var occurrences = Regex.Matches(afterContextPacket, Regex.Escape("Nice to meet you, Alice.")).Count;
+        Assert.Equal(1, occurrences);
     }
 
     [Fact]

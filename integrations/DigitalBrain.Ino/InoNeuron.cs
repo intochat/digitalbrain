@@ -1037,6 +1037,9 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         return OutgoingJournal.Concat(IncomingJournal)
             .OfType<InoConversationTurn>()
             .Where(turn => turn.ClientId == effectiveClientId)
+            // FireAsync self-delivers every fired synapse into both journals (same SynapseId), so without
+            // this the same turn is read - and counted - twice.
+            .DistinctBy(turn => turn.SynapseId)
             .OrderBy(turn => turn.Timestamp)
             .TakeLast(RecentConversationTurnsForContext)
             .Select(turn => new ChatMessage(
