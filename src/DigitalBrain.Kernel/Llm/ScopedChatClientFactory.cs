@@ -21,12 +21,25 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
                 return null;
             }
 
-            var openAiClient = new OpenAI.Chat.ChatClient(options.OpenAIModel, apiKey).AsIChatClient();
-            return new ChatClientBuilder(openAiClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+            return DigitalBrainChatClients.BuildOpenAi(options.OpenAIModel, apiKey);
         }
 
         // Default / "ollama": mirror DigitalBrainChat's Ollama wiring.
-        var ollamaClient = new OllamaSharp.OllamaApiClient(new Uri(options.OllamaEndpoint), options.Model);
-        return new ChatClientBuilder(ollamaClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+        return DigitalBrainChatClients.BuildOllama(options.OllamaEndpoint, options.Model);
     }
+}
+
+// Shared, provider-id-driven IChatClient construction, used by both the per-request scoped factory above
+// and the startup-time keyed registration in DigitalBrainChatClientRegistration.
+internal static class DigitalBrainChatClients
+{
+    public static IChatClient BuildOllama(string endpoint, string model) =>
+        new ChatClientBuilder(new OllamaSharp.OllamaApiClient(new Uri(endpoint), model))
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .Build();
+
+    public static IChatClient BuildOpenAi(string model, string apiKey) =>
+        new ChatClientBuilder(new OpenAI.Chat.ChatClient(model, apiKey).AsIChatClient())
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .Build();
 }
