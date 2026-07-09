@@ -24,7 +24,9 @@ public class AuthRequiredAIFunctionTests
 
         var result = await gated.InvokeAsync(new AIFunctionArguments(), CancellationToken.None);
 
-        Assert.Equal("real result", result);
+        // AIFunctionFactory.Create marshals delegate return values through JSON (the AIFunction returns
+        // a JsonElement, not the raw CLR string), so compare via ToString() rather than Assert.Equal(string, object?).
+        Assert.Equal("real result", result?.ToString());
         Assert.Equal(1, callCount);
     }
 
