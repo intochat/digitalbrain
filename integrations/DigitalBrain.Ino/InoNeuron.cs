@@ -18,7 +18,6 @@ using DigitalBrain.Ui.Contracts;
 [GrainType("ino.personal.v1")]
 public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron, IHandle<Signal>
 {
-    private sealed record ReplyPlan(string VisibleReply, IReadOnlyList<string> TaskDescriptions, string? BranchDescription);
     private sealed record AutomationDraft(string When, string? Target, string Script, string Rationale);
 
     private const string LlmUnavailableReply =
@@ -367,7 +366,9 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnUserRole, SecretText.Redact(request.Prompt)), cancellationToken);
         await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnAssistantRole, finalText), cancellationToken);
 
-        var taskIds = await OrchestrateActionsIfNeededAsync(new ReplyPlan(finalText, [], null), cancellationToken);
+        // The generic tool-calling path (ChatClientAgent) never produces TASK:/BRANCH: directives itself -
+        // that only ever came from the deleted directive-parsing flow - so there is nothing to orchestrate here.
+        var taskIds = Array.Empty<string>();
 
         await FireAsync(new InoResponse(request.Prompt, finalText, taskIds.ToArray()), cancellationToken);
         await DeliverReplySurfaceAsync(finalText, request.ClientId, workspaceId, cancellationToken);
@@ -1182,22 +1183,6 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         return text;
     }
 
-    private async Task<string> ReasonDirectlyWithLlmAsync(string prompt, string context, CancellationToken cancellationToken = default)
-    {
-        var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
-        if (chat == null)
-        {
-            return $"[no-llm] INO would act on: {SecretText.Redact(prompt)} (ctx len {context.Length})";
-        }
-
-        var (text, _) = await GetChatTextOrFallbackAsync(
-            chat,
-            "Answer the user's request directly in one or two sentences. Do not output TASK or BRANCH directives.\nCTX:\n"
-            + context + "\nUSER: " + SecretText.Redact(prompt),
-            cancellationToken);
-        return text;
-    }
-
     // TaskCanceledException also covers the Ollama-model-still-loading case: OllamaApiClient's HttpClient has
     // no explicit timeout configured, so a slow model pull/load times out via HttpClient's default timeout
     // rather than failing fast with a connection-refused HttpRequestException.
@@ -1244,68 +1229,6 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         }
         catch { /* optional */ }
         return null;
-    }
-
-    private static ReplyPlan BuildReplyPlan(string rawReply)
-    {
-        var visibleLines = new List<string>();
-        var taskDescriptions = new List<string>();
-        string? branchDescription = null;
-
-        foreach (var line in rawReply.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
-        {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("TASK:", StringComparison.OrdinalIgnoreCase))
-            {
-                var task = trimmed["TASK:".Length..].Trim();
-                if (task.Length > 0)
-                {
-                    taskDescriptions.Add(task);
-                }
-
-                continue;
-            }
-
-            if (trimmed.StartsWith("BRANCH:", StringComparison.OrdinalIgnoreCase))
-            {
-                var branch = trimmed["BRANCH:".Length..].Trim();
-                if (branch.Length > 0)
-                {
-                    branchDescription = branch;
-                }
-
-                continue;
-            }
-
-            if (line.Length > 0)
-            {
-                visibleLines.Add(line);
-            }
-        }
-
-        var visible = string.Join(Environment.NewLine, visibleLines).Trim();
-        // No longer synthesize "I'll start..." prefixes here — caller ensures direct visible answer via ReasonDirectly.
-        // Directives are sidecar only; visible should be the answer or empty (then overridden).
-        return new ReplyPlan(visible, taskDescriptions, branchDescription);
-    }
-
-    private async Task<List<string>> OrchestrateActionsIfNeededAsync(ReplyPlan replyPlan, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var created = new List<string>();
-        foreach (var taskDesc in replyPlan.TaskDescriptions)
-        {
-            var tid = "task-" + Guid.NewGuid().ToString("N")[..8];
-            // Placeholder; full durable task orchestration via IKernelTask is coordinated from Kernel layer.
-            created.Add(tid);
-        }
-        if (!string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
-        {
-            var cp = await CreateCheckpointAsync(cancellationToken);
-            var bid = await BranchAsync(cp, cancellationToken);
-            created.Add("branch:" + bid.Value);
-        }
-        return created;
     }
 
     private async Task CreateMemorySummaryAsync(string? workspaceId, CancellationToken cancellationToken = default)
