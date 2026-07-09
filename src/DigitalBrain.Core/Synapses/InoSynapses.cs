@@ -98,3 +98,38 @@ public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataI
     [Alias("InteractAsync")]
     Task<InoInteractResult> InteractAsync(InoInteractRequest request, CancellationToken cancellationToken = default);
 }
+
+// Phase 0 observability synapses for making Ino tool usage and auth requirements first-class and visible in traces/journals.
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.InoToolCallStarted")]
+public record InoToolCallStarted(
+    string ToolName,
+    string? Provider = null,
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(InoToolCallStarted), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.InoToolCallCompleted")]
+public record InoToolCallCompleted(
+    string ToolName,
+    string? ResultSummary = null,
+    string? Provider = null,
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(InoToolCallCompleted), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.InoToolCallFailed")]
+public record InoToolCallFailed(
+    string ToolName,
+    string? Error = null,
+    string? Provider = null,
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(InoToolCallFailed), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.InoConnectorAuthRequired")]
+public record InoConnectorAuthRequired(
+    string Provider,
+    string? ClientId = null,
+    string? WorkspaceId = null,
+    string? Message = null) : Synapse(nameof(InoConnectorAuthRequired), DateTimeOffset.UtcNow);

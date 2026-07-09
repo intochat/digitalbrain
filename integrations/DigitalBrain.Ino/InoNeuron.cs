@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Core;
@@ -315,6 +316,12 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             .SelectMany(provider => provider.BuildTools(request.ClientId, cancellationToken))
             .ToList();
 
+        // Phase 0: fire Ino domain events for tool usage visibility (from Ino context to avoid reentrancy)
+        foreach (var t in tools)
+        {
+            await FireAsync(new InoToolCallStarted(t.Name, Provider: null, request.ClientId, workspaceId), cancellationToken);
+        }
+
         var chatOptions = new ChatOptions
         {
             // Spread (not a direct List<AIFunction> assignment) so each element converts to
@@ -342,9 +349,24 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         string finalText;
         try
         {
+            using var activity = new ActivitySource("DigitalBrain.Ino").StartActivity("Ino.ToolCall");
+            if (activity is not null)
+            {
+                activity.SetTag("ino.tool.count", tools.Count);
+                if (request.ClientId is not null) activity.SetTag("client.id", request.ClientId);
+                if (!string.IsNullOrEmpty(workspaceId)) activity.SetTag("workspace.id", workspaceId);
+            }
+
             AIAgent agent = new ChatClientAgent(chat);
             var response = await agent.RunAsync(messages, session: null, options: new ChatClientAgentRunOptions(chatOptions), cancellationToken: cancellationToken);
             finalText = string.IsNullOrWhiteSpace(response.Text) ? "Done via tools." : response.Text.Trim();
+
+            // Phase 0: mark tool calls completed (from Ino context)
+            foreach (var t in tools)
+            {
+                await FireAsync(new InoToolCallCompleted(t.Name, ResultSummary: null, Provider: null, request.ClientId, workspaceId), cancellationToken);
+            }
+
             if (LooksLikeUnexecutedToolCall(finalText))
             {
                 Logger.LogWarning("Ino's model emitted an unexecuted tool-call-shaped reply instead of a native tool call: {Reply}", finalText);

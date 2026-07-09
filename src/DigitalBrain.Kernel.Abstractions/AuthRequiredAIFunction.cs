@@ -13,15 +13,18 @@ public sealed class AuthRequiredAIFunction : DelegatingAIFunction
 {
     private readonly Func<CancellationToken, Task<bool>> _isConnectedAsync;
     private readonly string _unauthorizedMessage;
+    private readonly Func<CancellationToken, Task>? _onAuthRequired;
 
     public AuthRequiredAIFunction(
         AIFunction innerFunction,
         Func<CancellationToken, Task<bool>> isConnectedAsync,
-        string unauthorizedMessage)
+        string unauthorizedMessage,
+        Func<CancellationToken, Task>? onAuthRequired = null)
         : base(innerFunction)
     {
         _isConnectedAsync = isConnectedAsync;
         _unauthorizedMessage = unauthorizedMessage;
+        _onAuthRequired = onAuthRequired;
     }
 
     protected override async ValueTask<object?> InvokeCoreAsync(
@@ -29,8 +32,16 @@ public sealed class AuthRequiredAIFunction : DelegatingAIFunction
         CancellationToken cancellationToken)
     {
         var connected = await _isConnectedAsync(cancellationToken);
-        return connected
-            ? await InnerFunction.InvokeAsync(arguments, cancellationToken)
-            : _unauthorizedMessage;
+        if (connected)
+        {
+            return await InnerFunction.InvokeAsync(arguments, cancellationToken);
+        }
+
+        if (_onAuthRequired != null)
+        {
+            await _onAuthRequired(cancellationToken);
+        }
+
+        return _unauthorizedMessage;
     }
 }
