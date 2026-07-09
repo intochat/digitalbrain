@@ -148,6 +148,23 @@ public static class DigitalBrainBuilderExtensions
                 .WithOpenWebUI(webui => webui.WithLifetime(ContainerLifetime.Persistent).WithDataVolume());
             qwen = ollama.AddModel("qwen", ollamaFallbackModel);
             embeddingModel = ollama.AddModel("embed", "nomic-embed-text");
+
+            // Pre-pull every other distinct Ollama LLM tag in the registry (e.g. Llama31_8B, registered
+            // .AsReasoning() for Ino's tool-calling path) into this same container. Without this, a model
+            // the registry points Ino at would never actually exist in the running container, and the first
+            // real chat call to it would fail with a "model not found" error from Ollama.
+            var pulledOllamaModelIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ollamaFallbackModel };
+            foreach (var entry in options.ModelRegistry.Registrations)
+            {
+                if (entry.Model.Kind != DigitalBrainCapabilityKind.LargeLanguageModel ||
+                    !string.Equals(entry.Model.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase) ||
+                    !pulledOllamaModelIds.Add(entry.Model.Id))
+                {
+                    continue;
+                }
+                ollama.AddModel(OllamaModelResourceName(entry.Model.Id), entry.Model.Id);
+            }
+
             ollamaEndpoint = ollama.GetEndpoint("http");
             // Same container as qwen — Ollama serves every pulled model from one endpoint,
             // selected by model name in the request, not by a per-model endpoint.
@@ -316,6 +333,11 @@ public static class DigitalBrainBuilderExtensions
     // host/port interpolation lives in exactly one place.
     private static ReferenceExpression HttpUrl(EndpointReference endpoint, string pathSuffix = "") =>
         ReferenceExpression.Create($"http://{endpoint.Property(EndpointProperty.Host)}:{endpoint.Property(EndpointProperty.Port)}{pathSuffix}");
+
+    // Aspire resource names must be lowercase alphanumeric plus hyphens; Ollama tags routinely carry ':' and
+    // '.' (e.g. "llama3.1:8b"), so normalize the same way DigitalBrainModelDescriptor.ServiceKey does.
+    private static string OllamaModelResourceName(string modelId) =>
+        modelId.Replace(':', '-').Replace('.', '-').ToLowerInvariant();
 
     private static void WithModelRegistry(this IResourceBuilder<ProjectResource> kernel, DigitalBrainContext ctx)
     {
