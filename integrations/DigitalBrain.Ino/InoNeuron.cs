@@ -5,6 +5,7 @@ using DigitalBrain.Core.Config;
 using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
 using DigitalBrain.Ui.Runtime;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -164,7 +165,7 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         }
 
         // Capability routing for IAgent (gmail, salesforce etc) is now handled via LLM tool calling
-        // in the generic path using Microsoft.Extensions.AI ChatClientBuilder + UseFunctionInvocation + AIFunctions.
+        // in the generic path using Microsoft.Agents.AI's ChatClientAgent + AIFunctions.
         // This follows official patterns for tool use, eliminates "Routed to X" dead-ends, and lets the model decide + incorporate results.
         // Custom early dispatch + "routed" reply deleted per 5-steps (trash removal, no duplication of intent logic).
 
@@ -282,23 +283,23 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             return;
         }
 
-        // Proper Microsoft.Extensions.AI usage (from Context7 research on Ext.AI + Agent Framework patterns):
+        // Proper Microsoft.Extensions.AI / Agent Framework usage (from Context7 research):
         // - ChatMessage list for conversation history (instead of raw concatenated prompt)
-        // - ChatClientBuilder + UseFunctionInvocation for native tool calling (AIFunctions for caps like Gmail)
+        // - ChatClientAgent.RunAsync for native tool calling (default agent middleware wraps FunctionInvokingChatClient)
         // - Context providers pattern: inject capability catalog + memories + recent journal as messages
         // - Compaction: simple threshold-based summarization of old turns (inspired by SK ChatHistorySummarizationReducer + Agent FW SlidingWindowCompaction)
         // This deletes custom intent classification duplication for agent capabilities; LLM + tools decide and incorporate results directly.
-        var client = new ChatClientBuilder(chat)
-            .UseFunctionInvocation()
-            .Build();
-
+        //
+        // The persona line stays a ChatMessage (not ChatClientAgent's `instructions:` parameter) deliberately:
+        // Context7 confirms `instructions` travels to the model via a channel separate from `messages` (e.g.
+        // ChatOptions.Instructions), which a plain IChatClient is not guaranteed to fold back into the messages
+        // it receives - verified empirically against this repo's fake IChatClient test doubles. Keeping it as a
+        // message guarantees every IChatClient implementation (real or fake) actually sees it.
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, "You are INO, the personal AI in DigitalBrain (NeuroOS). Use tools for real actions like Gmail access. Always give the useful answer first, then any directives. Incorporate tool results naturally.")
+            new(ChatRole.System, "You are INO, the personal AI in DigitalBrain (NeuroOS). Use tools for real actions like Gmail access. Always give the useful answer first, then any directives. Incorporate tool results naturally."),
+            new(ChatRole.System, "CAPABILITIES AND CONTEXT:\n" + ctx)
         };
-
-        // Inject context (capabilities, recent history, memories) as context messages per research context provider pattern.
-        messages.Add(new ChatMessage(ChatRole.System, "CAPABILITIES AND CONTEXT:\n" + ctx));
 
         messages.AddRange(LoadConversationHistory(request.ClientId));
         messages.Add(new ChatMessage(ChatRole.User, SecretText.Redact(request.Prompt)));
@@ -338,7 +339,8 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         string finalText;
         try
         {
-            var response = await client.GetResponseAsync(messages, chatOptions, cancellationToken);
+            AIAgent agent = new ChatClientAgent(chat);
+            var response = await agent.RunAsync(messages, session: null, options: new ChatClientAgentRunOptions(chatOptions), cancellationToken: cancellationToken);
             finalText = string.IsNullOrWhiteSpace(response.Text) ? "Done via tools." : response.Text.Trim();
             if (LooksLikeUnexecutedToolCall(finalText))
             {
