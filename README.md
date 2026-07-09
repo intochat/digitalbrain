@@ -18,13 +18,18 @@ dotnet build
 dotnet test --logger "console;verbosity=minimal"
 ```
 
+- After `git clean -fdx`, `dotnet build` (or `aspire run`) auto-initializes the CodeGraph index via MSBuild target.
+- Use the `codegraph` MCP server for architecture queries.
+
 Full stack:
 
 ```sh
 aspire run
 ```
 
-See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, iteration speed rules (MCP-first, parallel Context7, bg tests + polling, metrics + retro, self-evolution for WoW proposals), and pre-change ritual (Context7 + Aspire MCP + todo).
+See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, iteration speed rules (MCP-first, parallel Context7, bg tests + polling, metrics + retro, self-evolution for WoW proposals), and pre-change ritual (Context7 + Aspire MCP + CodeGraph + todo).
+
+**Rely on CodeGraph** (configured in .mcp.json) for architecture understanding, symbol exploration, and call-path analysis.
 
 ## Test Suites
 
@@ -47,9 +52,12 @@ Do not keep a separate `aspire run` / `aspire start` session alive while running
 - **UI**: Neurons emit rich server-driven surfaces. Client is thin renderer.
 - **Aspire hosting**:  AppHost wires replicas, Ollama, storage, MCP, flutter client.
 
+Use the CodeGraph MCP (see .mcp.json and CLAUDE.md) as the primary tool for architecture and codebase understanding.
+
 ## Working Rules (see CLAUDE.md)
 
 - Always follow Elon's 5 steps **in order**: less dumb reqs → delete (target 10%+) → simplify → accelerate → automate last.
+- **CodeGraph MCP for architecture understanding**: Use the `codegraph` server (from .mcp.json; auto-inits on build after `git clean -fdx`) for symbols, call graphs, impact analysis, and architecture exploration. Prefer it over manual file reads or grep.
 - **Context7** for every library/framework API before touching code.
 - **Aspire MCP + CLI** for fast inspection/restarts/logs/traces (prefer over full runs). Use resource-targeted restarts.
 - Tests: `dotnet test --logger "console;verbosity=minimal"` from root only. No --filter. Launch bg + poll with MCP logs.
@@ -65,13 +73,13 @@ The OS evolves itself safely through one explicit rail. Durable journals capture
 
 Packs, Ino creations, automations, foundry outputs — all flow the same way.
 
-This is the architecture north star. See the SelfEvolution types + handlers in Core/Kernel for the implementation.
+This is the architecture north star. Use the CodeGraph MCP for exploring the implementation. See the SelfEvolution types + handlers in Core/Kernel for the implementation.
 
 ## Status
 
-AppHost + kernels + self-evolution rail are live. Use `aspire doctor` and MCP tools for state.
+AppHost + kernels + self-evolution rail are live. Use `aspire doctor`, MCP tools (incl. `codegraph` for architecture), and `codegraph status` for state.
 
-For detailed rules and iteration improvements, read CLAUDE.md.
+For detailed rules and iteration improvements (including CodeGraph for architecture), read CLAUDE.md.
 
 ---
 

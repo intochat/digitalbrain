@@ -37,15 +37,17 @@ Key: Order matters. Jumping to optimize/automate locks in waste.
 
 Before every edit, brainstorm, or code change:
 1. Use Context7 to query docs for ALL package/framework APIs involved (Orleans, Aspire, MCP, .NET, etc.). No exceptions.
-2. Run `aspire doctor` (CLI or `aspire__doctor` MCP) + `aspire__list_resources`.
-3. If task has >2 steps, `todo_write` first.
-4. Follow Elon's 5 steps in order.
+2. Use the `codegraph` MCP server (from .mcp.json) to explore architecture, symbols, call paths, and relationships. Run `codegraph init` (or rely on auto-init via build) after `git clean -fdx`.
+3. Run `aspire doctor` (CLI or `aspire__doctor` MCP) + `aspire__list_resources`.
+4. If task has >2 steps, `todo_write` first.
+5. Follow Elon's 5 steps in order.
 
-Prefix all prompts with the ritual.
+Prefix all prompts with the ritual. Rely on CodeGraph for architecture understanding instead of manual file reads or grep.
 
 ## Core Principles for Fast Iteration (Local Dev)
 
 - **Use Context7 for EVERY package/framework API** before writing code that touches it (Orleans, Aspire, .NET, Google.Apis, etc.). No exceptions. Never use local NuGet cache or C:\ paths.
+- **Use CodeGraph MCP for architecture understanding**: The `codegraph` server (configured in .mcp.json) provides the pre-indexed knowledge graph. Use it (via `codegraph_explore`, status, etc.) for symbols, call graphs, impact analysis, and architecture instead of raw file exploration. Auto-rebuilds on build after cleans.
 - **Parallel tools**: Always call Context7 + multiple Aspire MCP tools (`aspire__*`) in parallel at start of responses.
 - **Use Aspire MCP tools + `aspire` CLI for speed**:
   - `aspire__doctor`, `aspire__list_resources`, `aspire__list_console_logs`, `aspire__list_traces`, `aspire__list_structured_logs`, `aspire__execute_resource_command` (restart specific kernel/flutter-ui without full stop).
@@ -86,6 +88,7 @@ See the self-evolution rail in Core + Kernel/SelfEvolution + apply handlers. Byp
 
 To accelerate iteration cycles (using Context7 + Aspire MCP/CLI + 5 steps):
 
+- **CodeGraph for architecture**: Use the `codegraph` MCP (not manual reads/grep) for fast queries on structure, call paths, and blast radius. Prefer `codegraph_explore` over file crawling.
 - **MCP-first inspection**: Before any `aspire run` or manual debug, use `aspire__list_resources`, execute "restart" on specific resource, pull logs/traces. This replaces slow full restarts and log tailing.
 - To start digitalbrain-http server on fixed port: `DIGITALBRAIN_MCP_TRANSPORT=http ASPNETCORE_URLS=http://localhost:5000 dotnet run --project src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj --no-launch-profile --no-build` (then connect via url in .mcp.json). Pre-build first.
 - **Context7 + parallel tools**: Lookup APIs in parallel while editing. Never context-switch to docs/search.
@@ -100,6 +103,7 @@ To accelerate iteration cycles (using Context7 + Aspire MCP/CLI + 5 steps):
 ## Rules (Non-Negotiable)
 
 - Context7 before any API-touching code.
+- **CodeGraph MCP first for architecture**: Use `codegraph` server (init after clean via build target or `codegraph init`) for all codebase structure, symbols, and impact questions. Do not manually explore files for architecture.
 - Aspire MCP/CLI + doctor in every cycle.
 - `dotnet test` root + min verbosity only. No filters.
 - Delete > add. Clean docs = fast brains.

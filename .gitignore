@@ -452,3 +452,7 @@ aspire_*.log
 
 # CodeGraph local index (SQLite graph) - rebuilt automatically on build after cleans
 .codegraph/
+
+# Build sentinels (local only, recreated on demand, deleted by `git clean -fdx`)
+.config/.codegraph-initialized
+.config/.tools-restored
