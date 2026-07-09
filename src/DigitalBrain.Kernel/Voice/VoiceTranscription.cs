@@ -68,18 +68,9 @@ public sealed record DigitalBrainVoiceRuntimeOptions(
 
     private static (string? Provider, string? Model) FindRegisteredVoiceToText(IConfiguration config)
     {
-        foreach (var child in config.GetSection("DigitalBrain:ModelRegistry:Registrations").GetChildren())
-        {
-            var kind = child["Kind"];
-            if (!string.Equals(kind, DigitalBrainCapabilityKind.VoiceToText.ToString(), StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            return (child["Provider"], child["Id"]);
-        }
-
-        return (null, null);
+        var entries = DigitalBrainModelRegistrySnapshot.Read(config);
+        var match = DigitalBrainModelRegistrySnapshot.FirstOrDefault(entries, DigitalBrainCapabilityKind.VoiceToText);
+        return (match?.Provider, match?.Id);
     }
 
     private static string? FirstNonWhiteSpace(params string?[] values) =>

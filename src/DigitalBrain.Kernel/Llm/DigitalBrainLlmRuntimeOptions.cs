@@ -44,24 +44,12 @@ public sealed record DigitalBrainLlmRuntimeOptions(
 
     private static string? FindRegisteredLlmModel(IConfiguration config, string provider)
     {
-        foreach (var child in config.GetSection("DigitalBrain:ModelRegistry:Registrations").GetChildren())
-        {
-            var kind = child["Kind"];
-            var registrationProvider = child["Provider"];
-            if (!string.Equals(kind, DigitalBrainCapabilityKind.LargeLanguageModel.ToString(), StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(registrationProvider, provider, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var model = child["Id"];
-            if (!string.IsNullOrWhiteSpace(model))
-            {
-                return model;
-            }
-        }
-
-        return null;
+        var entries = DigitalBrainModelRegistrySnapshot.Read(config);
+        var match = DigitalBrainModelRegistrySnapshot.FirstOrDefault(
+            entries,
+            DigitalBrainCapabilityKind.LargeLanguageModel,
+            entry => string.Equals(entry.Provider, provider, StringComparison.OrdinalIgnoreCase));
+        return string.IsNullOrWhiteSpace(match?.Id) ? null : match.Id;
     }
 
     private static string? FirstNonWhiteSpace(params string?[] values) =>
