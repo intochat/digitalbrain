@@ -17,6 +17,14 @@ public record InoRequest(
 public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) : Synapse(nameof(InoResponse), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.InoConversationTurn")]
+public record InoConversationTurn(
+    [property: Id(0)] string ClientId,
+    [property: Id(1)] string Role,
+    [property: Id(2)] string Text)
+    : Synapse(nameof(InoConversationTurn), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
 [Alias("DigitalBrain.Core.ContextEvidenceRef")]
 public record ContextEvidenceRef(
     [property: Id(0)] string EvidenceId,

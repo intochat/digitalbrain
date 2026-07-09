@@ -53,6 +53,10 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
     private const int RecentAutomationsForContext = 3;
     private const int RecentCombinedForMemorySummary = 20;
     private const int MinJournalsForMemorySummary = 5;
+    private const int RecentConversationTurnsForContext = 12;
+    private const string AnonymousClientId = "anonymous";
+    private const string ConversationTurnUserRole = "user";
+    private const string ConversationTurnAssistantRole = "assistant";
 
     public override async Task OnActivateAsync(CancellationToken ct)
     {
@@ -296,8 +300,7 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         // Inject context (capabilities, recent history, memories) as context messages per research context provider pattern.
         messages.Add(new ChatMessage(ChatRole.System, "CAPABILITIES AND CONTEXT:\n" + ctx));
 
-        // Add recent history (compacted) - in real would load per clientId session.
-        // For now use empty + current; compaction applied on future turns.
+        messages.AddRange(LoadConversationHistory(request.ClientId));
         messages.Add(new ChatMessage(ChatRole.User, SecretText.Redact(request.Prompt)));
 
         // Define tools for capabilities using proper Microsoft.Extensions.AI AIFunction (per Context7 research).
@@ -355,6 +358,10 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             Logger.LogWarning(ex, "Tool-enabled LLM call failed");
             finalText = "I attempted to use tools for your request but hit an issue.";
         }
+
+        var conversationClientId = request.ClientId ?? AnonymousClientId;
+        await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnUserRole, SecretText.Redact(request.Prompt)), cancellationToken);
+        await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnAssistantRole, finalText), cancellationToken);
 
         var taskIds = await OrchestrateActionsIfNeededAsync(new ReplyPlan(finalText, [], null), cancellationToken);
 
@@ -1018,6 +1025,20 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             PendingProposals: proposals,
             Timestamp: DateTimeOffset.UtcNow
         );
+    }
+
+    private IReadOnlyList<ChatMessage> LoadConversationHistory(string? clientId)
+    {
+        var effectiveClientId = clientId ?? AnonymousClientId;
+        return OutgoingJournal.Concat(IncomingJournal)
+            .OfType<InoConversationTurn>()
+            .Where(turn => turn.ClientId == effectiveClientId)
+            .OrderBy(turn => turn.Timestamp)
+            .TakeLast(RecentConversationTurnsForContext)
+            .Select(turn => new ChatMessage(
+                string.Equals(turn.Role, ConversationTurnUserRole, StringComparison.Ordinal) ? ChatRole.User : ChatRole.Assistant,
+                turn.Text))
+            .ToList();
     }
 
     private async Task<string> BuildContextAsync(string prompt, string? workspaceId, CancellationToken cancellationToken = default)

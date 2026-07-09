@@ -202,6 +202,11 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
     }
 }
 
+// Shares ToolCallingInoChatClient's static Steps queue with InoNeuronAuthenticatedGmailTests and
+// InoNeuronAuthenticatedSalesforceFailureTests, so all three are pinned to the same xUnit collection
+// to avoid a cross-class race on that static state under xUnit's parallel collection execution (see
+// AssemblyInfo.cs's MaxParallelThreads and the analogous CapturingInoChatClient collection below).
+[Collection("Ino.ToolCallingInoChatClient")]
 public sealed class InoNeuronAuthGateTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>
@@ -521,6 +526,10 @@ internal sealed class CapturingInoChatClient : IChatClient
     public void Dispose() { }
 }
 
+// Shares CapturingInoChatClient's static Prompts/Replies with InoNeuronConversationMemoryTests, so both
+// are pinned to the same xUnit collection: different collections can run truly concurrently (see
+// AssemblyInfo.cs's MaxParallelThreads), and that static state isn't safe for concurrent Reset()/use.
+[Collection("Ino.CapturingInoChatClient")]
 public sealed class InoNeuronSecretRedactionTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>
@@ -546,6 +555,9 @@ public sealed class InoNeuronSecretRedactionTests : NeuronTestBase
     }
 }
 
+// Shares ToolCallingInoChatClient's static Steps queue with InoNeuronAuthGateTests and
+// InoNeuronAuthenticatedSalesforceFailureTests - see the [Collection] comment on InoNeuronAuthGateTests.
+[Collection("Ino.ToolCallingInoChatClient")]
 public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
 {
     private readonly RecordingGmailApiClient _gmail = new();
@@ -727,6 +739,9 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
     }
 }
 
+// Shares ToolCallingInoChatClient's static Steps queue with InoNeuronAuthGateTests and
+// InoNeuronAuthenticatedGmailTests - see the [Collection] comment on InoNeuronAuthGateTests.
+[Collection("Ino.ToolCallingInoChatClient")]
 public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>
