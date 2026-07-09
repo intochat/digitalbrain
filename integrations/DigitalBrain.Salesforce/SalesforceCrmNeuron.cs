@@ -18,17 +18,14 @@ public class SalesforceCrmNeuron(
 {
     private const int DefaultAccountLimit = 20;
 
+    public async Task<bool> EnsureConnectedAsync(string? clientId, CancellationToken cancellationToken = default) =>
+        await TryGetConnectedScopeAsync(clientId, cancellationToken) is not null;
+
     public async Task HandleAsync(CapabilityInvocation invocation, CancellationToken cancellationToken = default)
     {
-        var scope = await ResolveUserScopeOrPromptLoginAsync(invocation.ClientId, cancellationToken);
+        var scope = await TryGetConnectedScopeAsync(invocation.ClientId, cancellationToken);
         if (scope is null)
         {
-            return;
-        }
-
-        if (!await HasCredentialAsync(scope.Value, cancellationToken))
-        {
-            await RequestAuthAsync(scope.Value.UserId, invocation.ClientId, cancellationToken);
             return;
         }
 
@@ -83,6 +80,23 @@ public class SalesforceCrmNeuron(
         var factory = apiClientFactory ?? throw new InvalidOperationException("Salesforce API client factory is not configured.");
         var client = await factory.CreateAsync(Self.AsScope(), ct);
         return await client.ListAccountsAsync(maxResults, ct);
+    }
+
+    private async Task<NeuronScope?> TryGetConnectedScopeAsync(string? clientId, CancellationToken cancellationToken)
+    {
+        var scope = await ResolveUserScopeOrPromptLoginAsync(clientId, cancellationToken);
+        if (scope is null)
+        {
+            return null;
+        }
+
+        if (!await HasCredentialAsync(scope.Value, cancellationToken))
+        {
+            await RequestAuthAsync(scope.Value.UserId, clientId, cancellationToken);
+            return null;
+        }
+
+        return scope;
     }
 
     private async Task<NeuronScope?> ResolveUserScopeOrPromptLoginAsync(string? clientId, CancellationToken cancellationToken)

@@ -23,6 +23,10 @@ public interface ISalesforceCrmNeuron : IAgent, IHandle<CapabilityInvocation>
     static string IAgent.AgentInvocationGrainType => "digitalbrain.salesforce.crm.v1";
     static string IAgent.AgentInvocationGrainKey => "salesforce-capability-main";
 
+    [Description("Checks whether the caller has an active session and a usable Salesforce credential; if not, shows the user a login/connect surface and returns false.")]
+    [Alias("EnsureConnectedAsync")]
+    Task<bool> EnsureConnectedAsync(string? clientId, CancellationToken ct = default);
+
     [Description("Run a read-only SOQL query and return JSON records.")]
     [Alias("QueryAsync")]
     Task<string[]> QueryAsync(string soql, CancellationToken ct = default);
