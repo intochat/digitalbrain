@@ -44,6 +44,9 @@ public sealed class DigitalBrainContext
     // single-model LlmProvider selection — see AddDigitalBrain's anthropicApiKey block).
     public IResourceBuilder<ParameterResource>? AnthropicApiKey { get; init; }
 
+    // Set only when the model registry has at least one "xai" registration, same lazy pattern as AnthropicApiKey.
+    public IResourceBuilder<ParameterResource>? XaiApiKey { get; init; }
+
     // Storage resources exposed so AppHost can wire WithReference on kernel
     public required IResourceBuilder<AzureBlobStorageResource> GrainBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> JournalBlobs { get; init; }
@@ -89,6 +92,12 @@ public static class DigitalBrainBuilderExtensions
         if (options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase)))
         {
             anthropicApiKey = builder.AddParameter("anthropic-api-key", secret: true);
+        }
+
+        IResourceBuilder<ParameterResource>? xaiApiKey = null;
+        if (options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase)))
+        {
+            xaiApiKey = builder.AddParameter("xai-api-key", secret: true);
         }
 
         var isRunMode = builder.ExecutionContext.IsRunMode;
@@ -191,6 +200,7 @@ public static class DigitalBrainBuilderExtensions
             AzureOpenAIEndpoint = azureOpenAIEndpoint,
             AzureOpenAIKey = azureOpenAIKey,
             AnthropicApiKey = anthropicApiKey,
+            XaiApiKey = xaiApiKey,
             EnableOrleansDashboard = options.EnableOrleansDashboard,
             OrleansDashboardPort = options.OrleansDashboardPort,
             EnableMcp = options.EnableMcp,
@@ -266,6 +276,10 @@ public static class DigitalBrainBuilderExtensions
         if (ctx.AnthropicApiKey is not null)
         {
             kernel.WithEnvironment("DigitalBrain__Llm__AnthropicApiKey", ctx.AnthropicApiKey);
+        }
+        if (ctx.XaiApiKey is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__XaiApiKey", ctx.XaiApiKey);
         }
 
         kernel.WithOptionalEnvironment("DigitalBrain:Voice:Provider", "DIGITALBRAIN_VOICE_PROVIDER", "DigitalBrain__Voice__Provider");

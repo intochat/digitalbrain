@@ -30,6 +30,7 @@ public static class DigitalBrainChatClientRegistration
                 {
                     var p when string.Equals(p, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase) => BuildAzureOpenAi(runtimeOptions, entry.Id),
                     var p when string.Equals(p, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase) => BuildAnthropic(runtimeOptions, entry.Id),
+                    var p when string.Equals(p, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase) => BuildXai(runtimeOptions, entry.Id),
                     _ => DigitalBrainChatClients.BuildOllama(runtimeOptions.OllamaEndpoint, entry.Id)
                 });
         }
@@ -69,6 +70,23 @@ public static class DigitalBrainChatClientRegistration
 
         var client = new Anthropic.AnthropicClient { ApiKey = options.AnthropicApiKey };
         return new ChatClientBuilder(client.AsIChatClient(modelId))
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .Build();
+    }
+
+    // xAI has no dedicated SDK — Grok's API is OpenAI-API-compatible, so this reuses the official OpenAI
+    // .NET SDK pointed at x.ai's base URL via OpenAIClientOptions.Endpoint instead of the default OpenAI one.
+    private static IChatClient BuildXai(DigitalBrainLlmRuntimeOptions options, string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(options.XaiApiKey))
+        {
+            throw new InvalidOperationException(
+                $"Registered xai model '{modelId}' has no DigitalBrain:Llm:XaiApiKey configured.");
+        }
+
+        var clientOptions = new OpenAI.OpenAIClientOptions { Endpoint = new Uri("https://api.x.ai/v1") };
+        var openAiClient = new OpenAI.OpenAIClient(new System.ClientModel.ApiKeyCredential(options.XaiApiKey), clientOptions);
+        return new ChatClientBuilder(openAiClient.GetChatClient(modelId).AsIChatClient())
             .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
             .Build();
     }

@@ -13,6 +13,7 @@ public sealed record DigitalBrainLlmRuntimeOptions(
     string? AzureOpenAIEndpoint,
     string? AzureOpenAIKey,
     string? AnthropicApiKey,
+    string? XaiApiKey,
     string OpenAIModel)
 {
     public const string DefaultOllamaModel = "qwen2.5-coder:1.5b";
@@ -39,6 +40,7 @@ public sealed record DigitalBrainLlmRuntimeOptions(
             config["DigitalBrain:Llm:AzureOpenAIEndpoint"],
             config["DigitalBrain:Llm:AzureOpenAIKey"],
             config["DigitalBrain:Llm:AnthropicApiKey"],
+            config["DigitalBrain:Llm:XaiApiKey"],
             FindRegisteredLlmModel(config, DigitalBrainProviderIds.OpenAI)
                 ?? config["DigitalBrain:Llm:OpenAIModel"]
                 ?? DefaultOpenAIModel);

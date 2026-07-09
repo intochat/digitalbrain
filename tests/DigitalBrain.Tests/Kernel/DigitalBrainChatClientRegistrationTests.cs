@@ -82,4 +82,42 @@ public class DigitalBrainChatClientRegistrationTests
         var ex = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredKeyedService<IChatClient>("anthropic-claude-haiku-4-5"));
         Assert.Contains("AnthropicApiKey", ex.Message);
     }
+
+    [Fact]
+    public void RegistersXaiChatClientWhenApiKeyIsConfigured()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = "LargeLanguageModel",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = "xai",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "grok-4-1-fast",
+            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "xai-grok-4-1-fast",
+            ["DigitalBrain:Llm:XaiApiKey"] = "test-key",
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddDigitalBrainChatClients(config);
+        var provider = services.BuildServiceProvider();
+
+        Assert.NotNull(provider.GetKeyedService<IChatClient>("xai-grok-4-1-fast"));
+    }
+
+    [Fact]
+    public void ThrowsAClearErrorWhenXaiModelIsRegisteredWithoutAnApiKey()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = "LargeLanguageModel",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = "xai",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "grok-4-1-fast",
+            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "xai-grok-4-1-fast",
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddDigitalBrainChatClients(config);
+        var provider = services.BuildServiceProvider();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredKeyedService<IChatClient>("xai-grok-4-1-fast"));
+        Assert.Contains("XaiApiKey", ex.Message);
+    }
 }
