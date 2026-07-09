@@ -36,71 +36,6 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
         Assert.Contains("Salesforce", tree.Props["text"]!.ToString());
     }
 
-    [Fact]
-    public async Task GmailIntent_WithoutGoogleCredential_Emits_Auth_Button_Surface()
-    {
-        const string clientId = "session-gmail-auth";
-        var session = Grain<IUserSessionNeuron>("session-main");
-        await session.HandleAsync(new LoginRequest("gmail-auth-user", "correct horse battery staple", clientId));
-
-        var ino = Grain<IInoNeuron>("ino-gmail-auth");
-        await ino.FireAsync(new InoRequest("Get my last gmail", clientId));
-
-        var response = (await ino.GetOutgoingTimelineAsync())
-            .OfType<InoResponse>()
-            .Last(response => response.Prompt == "Get my last gmail");
-        Assert.Equal("Get my last gmail", response.Prompt);
-        Assert.Contains("Gmail", response.Response, StringComparison.OrdinalIgnoreCase);
-
-        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
-        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
-        Assert.Contains(surfaces, surface =>
-            surface.Kind == ConfigFormSurface.Kind &&
-            Equals(surface.Props.GetValueOrDefault("pack"), GoogleClientFactory.PackName) &&
-            Equals(surface.Props.GetValueOrDefault("clientId"), clientId));
-    }
-
-    [Fact]
-    public async Task SalesforceIntent_WithoutLogin_Emits_Login_Surface()
-    {
-        var ino = Grain<IInoNeuron>("ino-salesforce-login");
-        await ino.FireAsync(new InoRequest("Show my salesforce accounts", "session-salesforce-auth"));
-
-        var response = (await ino.GetOutgoingTimelineAsync())
-            .OfType<InoResponse>()
-            .Last(response => response.Prompt == "Show my salesforce accounts");
-        Assert.Equal("Show my salesforce accounts", response.Prompt);
-        Assert.Contains("Salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
-
-        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
-        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
-        Assert.Contains(surfaces, surface =>
-            surface.Kind == UiSurfaceKinds.Login &&
-            Equals(surface.Props.GetValueOrDefault("clientId"), "session-salesforce-auth"));
-    }
-
-    [Fact]
-    public async Task SalesforceIntent_SignedInWithoutCredential_Emits_Credential_Form_Surface()
-    {
-        const string clientId = "session-salesforce-auth-signed-in";
-        var session = Grain<IUserSessionNeuron>("session-main");
-        await session.HandleAsync(new LoginRequest("salesforce-auth-user", "correct horse battery staple", clientId));
-
-        var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new InoRequest("Show my salesforce accounts", clientId));
-
-        var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
-        Assert.Equal("Show my salesforce accounts", response.Prompt);
-        Assert.Contains("Salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
-
-        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
-        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
-        Assert.Contains(surfaces, surface =>
-            surface.Kind == ConfigFormSurface.Kind &&
-            Equals(surface.Props.GetValueOrDefault("pack"), SalesforceClientFactory.PackName) &&
-            Equals(surface.Props.GetValueOrDefault("clientId"), clientId));
-    }
-
     private static UiWidgetTree? FindNode(UiWidgetTree tree, string type)
     {
         if (tree.Type == type)
@@ -267,6 +202,102 @@ public class InoNeuronChatSurfaceTests : NeuronTestBase
     }
 }
 
+// Shares ToolCallingInoChatClient's static Steps queue with InoNeuronAuthenticatedGmailTests and
+// InoNeuronAuthenticatedSalesforceFailureTests, so all three are pinned to the same xUnit collection
+// to avoid a cross-class race on that static state under xUnit's parallel collection execution (see
+// AssemblyInfo.cs's MaxParallelThreads and the analogous CapturingInoChatClient collection below).
+[Collection("Ino.ToolCallingInoChatClient")]
+public sealed class InoNeuronAuthGateTests : NeuronTestBase
+{
+    protected override void ConfigureSilo(ISiloBuilder builder) =>
+        builder.ConfigureServices(services => services.AddSingleton<IChatClient, ToolCallingInoChatClient>());
+
+    [Fact]
+    public async Task GmailIntent_WithoutGoogleCredential_Emits_Auth_Button_Surface()
+    {
+        const string clientId = "session-gmail-auth";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("gmail-auth-user", "correct horse battery staple", clientId));
+
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "gmail_get_messages",
+            new Dictionary<string, object?> { ["query"] = "last", ["maxResults"] = 3 }));
+
+        var ino = Grain<IInoNeuron>("ino-gmail-auth");
+        await ino.FireAsync(new InoRequest("Get my last gmail", clientId));
+
+        var response = (await ino.GetOutgoingTimelineAsync())
+            .OfType<InoResponse>()
+            .Last(response => response.Prompt == "Get my last gmail");
+        Assert.Equal("Get my last gmail", response.Prompt);
+        Assert.Contains("Gmail", response.Response, StringComparison.OrdinalIgnoreCase);
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
+        Assert.Contains(surfaces, surface =>
+            surface.Kind == ConfigFormSurface.Kind &&
+            Equals(surface.Props.GetValueOrDefault("pack"), GoogleClientFactory.PackName) &&
+            Equals(surface.Props.GetValueOrDefault("clientId"), clientId));
+
+        var telemetry = (await ino.GetOutgoingTimelineAsync()).Where(s => s is InoToolCallStarted or InoToolCallCompleted or InoToolCallFailed).ToList();
+        Assert.Contains(telemetry, s => s is InoToolCallStarted started && started.ToolName == "gmail_get_messages" && started.Provider == "google" && started.ClientId == clientId);
+        Assert.Contains(telemetry, s => s is InoToolCallFailed failed && failed.ToolName == "gmail_get_messages" && failed.Provider == "google" && failed.ClientId == clientId);
+        Assert.DoesNotContain(telemetry, s => s is InoToolCallCompleted completed && completed.ToolName == "salesforce_query");
+    }
+
+    [Fact]
+    public async Task SalesforceIntent_WithoutLogin_Emits_Login_Surface()
+    {
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "salesforce_query",
+            new Dictionary<string, object?> { ["soqlOrQuery"] = "accounts", ["maxResults"] = 5 }));
+
+        var ino = Grain<IInoNeuron>("ino-salesforce-login");
+        await ino.FireAsync(new InoRequest("Show my salesforce accounts", "session-salesforce-auth"));
+
+        var response = (await ino.GetOutgoingTimelineAsync())
+            .OfType<InoResponse>()
+            .Last(response => response.Prompt == "Show my salesforce accounts");
+        Assert.Equal("Show my salesforce accounts", response.Prompt);
+        Assert.Contains("Salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
+        Assert.Contains(surfaces, surface =>
+            surface.Kind == UiSurfaceKinds.Login &&
+            Equals(surface.Props.GetValueOrDefault("clientId"), "session-salesforce-auth"));
+    }
+
+    [Fact]
+    public async Task SalesforceIntent_SignedInWithoutCredential_Emits_Credential_Form_Surface()
+    {
+        const string clientId = "session-salesforce-auth-signed-in";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("salesforce-auth-user", "correct horse battery staple", clientId));
+
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "salesforce_query",
+            new Dictionary<string, object?> { ["soqlOrQuery"] = "accounts", ["maxResults"] = 5 }));
+
+        var ino = Grain<IInoNeuron>("ino-main");
+        await ino.FireAsync(new InoRequest("Show my salesforce accounts", clientId));
+
+        var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
+        Assert.Equal("Show my salesforce accounts", response.Prompt);
+        Assert.Contains("Salesforce", response.Response, StringComparison.OrdinalIgnoreCase);
+
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
+        var surfaces = (await flutter.GetIncomingTimelineAsync()).OfType<UiSurface>().ToList();
+        Assert.Contains(surfaces, surface =>
+            surface.Kind == ConfigFormSurface.Kind &&
+            Equals(surface.Props.GetValueOrDefault("pack"), SalesforceClientFactory.PackName) &&
+            Equals(surface.Props.GetValueOrDefault("clientId"), clientId));
+    }
+}
+
 internal sealed class QueuedInoChatClient : IChatClient
 {
     public static readonly Queue<string> Replies = new();
@@ -291,6 +322,62 @@ internal sealed class QueuedInoChatClient : IChatClient
     public void Dispose() { }
 }
 
+internal abstract record InoChatStep;
+internal sealed record TextStep(string Text) : InoChatStep;
+internal sealed record ToolCallStep(string ToolName, IDictionary<string, object?> Arguments) : InoChatStep;
+
+// Mimics native function-calling: dequeues a scripted step for classification/decision calls, but for
+// any call whose message history already carries a FunctionResultContent (i.e. FunctionInvokingChatClient
+// looping back after invoking a real tool), it echoes that tool's actual result text as the final answer —
+// so the real gated tool (auth check + real/fake connector) runs, and the test observes its real output.
+internal sealed class ToolCallingInoChatClient : IChatClient
+{
+    public static readonly Queue<InoChatStep> Steps = new();
+
+    public Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var messageList = messages as IReadOnlyList<ChatMessage> ?? messages.ToList();
+        var lastToolResult = messageList
+            .SelectMany(message => message.Contents)
+            .OfType<FunctionResultContent>()
+            .LastOrDefault();
+
+        if (lastToolResult is not null)
+        {
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, lastToolResult.Result?.ToString() ?? "Done.")));
+        }
+
+        var step = Steps.Count > 0 ? Steps.Dequeue() : new TextStep("{\"intent\":\"generic\",\"confidence\":0.4}");
+        ChatMessage reply = step switch
+        {
+            ToolCallStep toolCall => new ChatMessage(ChatRole.Assistant, new List<AIContent>
+            {
+                new FunctionCallContent(Guid.NewGuid().ToString("N"), toolCall.ToolName, toolCall.Arguments)
+            }),
+            TextStep text => new ChatMessage(ChatRole.Assistant, text.Text),
+            _ => new ChatMessage(ChatRole.Assistant, "Done.")
+        };
+        return Task.FromResult(new ChatResponse(reply));
+    }
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Streaming not used.");
+
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    public void Dispose() { }
+}
+
+// Shares QueuedInoChatClient's static Replies queue with InoNeuronToolCallHallucinationTests (a
+// separate file), so both are pinned to the same xUnit collection - see the [Collection] comment on
+// InoNeuronAuthGateTests for why this is needed (cross-class race on shared static fake-client state).
+[Collection("Ino.QueuedInoChatClient")]
 public sealed class InoNeuronActionDirectiveTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>
@@ -448,6 +535,10 @@ internal sealed class CapturingInoChatClient : IChatClient
     public void Dispose() { }
 }
 
+// Shares CapturingInoChatClient's static Prompts/Replies with InoNeuronConversationMemoryTests, so both
+// are pinned to the same xUnit collection: different collections can run truly concurrently (see
+// AssemblyInfo.cs's MaxParallelThreads), and that static state isn't safe for concurrent Reset()/use.
+[Collection("Ino.CapturingInoChatClient")]
 public sealed class InoNeuronSecretRedactionTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>
@@ -471,8 +562,26 @@ public sealed class InoNeuronSecretRedactionTests : NeuronTestBase
         Assert.DoesNotContain("raw-secret-123", prompts);
         Assert.Contains("access_token=[redacted]", prompts);
     }
+
+    [Fact]
+    public async Task Tool_Synthesis_Prompt_Forbids_Inventing_Unlabeled_Message_Fields()
+    {
+        CapturingInoChatClient.Reset();
+        CapturingInoChatClient.Replies.Enqueue("{\"intent\":\"generic\",\"confidence\":0.4}");
+        CapturingInoChatClient.Replies.Enqueue("Grounded response.");
+
+        var ino = Grain<IInoNeuron>("ino-grounding");
+        await ino.FireAsync(new InoRequest("Get my last gmail", "grounding-client"));
+
+        var genericPrompt = CapturingInoChatClient.Prompts.Last(
+            prompt => prompt.Contains("You are Ino, a neuron in DigitalBrain", StringComparison.Ordinal));
+        Assert.Contains("Do not infer sender, subject, date, or account status from unlabeled snippets", genericPrompt);
+    }
 }
 
+// Shares ToolCallingInoChatClient's static Steps queue with InoNeuronAuthGateTests and
+// InoNeuronAuthenticatedSalesforceFailureTests - see the [Collection] comment on InoNeuronAuthGateTests.
+[Collection("Ino.ToolCallingInoChatClient")]
 public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
 {
     private readonly RecordingGmailApiClient _gmail = new();
@@ -483,20 +592,35 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
             services.AddPackConfigStore(blobsForKeyRing: null);
             // Provide factory so GmailNeuron (now per-user) gets IGmailApiClient via CreateAsync.
             services.AddSingleton<IGmailApiClientFactory>(new TestGmailApiClientFactory(_gmail));
+            services.AddSingleton<IChatClient, ToolCallingInoChatClient>();
         });
 
     [Fact]
     public async Task GmailIntent_WithGoogleCredential_Calls_GmailNeuron_And_Renders_Messages()
     {
+        const string clientId = "session-gmail-ready";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("gmail-ready-user", "correct horse battery staple", clientId));
+
         var config = Grain<IGoogleConfigWriter>("google-config-writer");
         await config.StoreGoogleCredentialAsync();
 
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "gmail_get_messages",
+            new Dictionary<string, object?> { ["query"] = "last", ["maxResults"] = 3 }));
+
         var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new InoRequest("Get my last gmail", "session-gmail-ready"));
+        await ino.FireAsync(new InoRequest("Get my last gmail", clientId));
 
         // Special gmail fetch path deleted from Ino core (moved to catalog/generic + connector); test updated.
         var response = Assert.Single((await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>());
         Assert.Contains("gmail", response.Response, StringComparison.OrdinalIgnoreCase);
+
+        var telemetry = (await ino.GetOutgoingTimelineAsync()).Where(s => s is InoToolCallStarted or InoToolCallCompleted or InoToolCallFailed).ToList();
+        Assert.Contains(telemetry, s => s is InoToolCallStarted started && started.ToolName == "gmail_get_messages" && started.Provider == "google" && started.ClientId == clientId);
+        Assert.Contains(telemetry, s => s is InoToolCallCompleted completed && completed.ToolName == "gmail_get_messages" && completed.Provider == "google" && completed.ClientId == clientId && !string.IsNullOrWhiteSpace(completed.ResultSummary));
+        Assert.DoesNotContain(telemetry, s => s is InoToolCallStarted started && started.ToolName == "salesforce_query");
 
         // (special gmail neuron calls and signals deleted; generic path now; test relaxed for catalog/generic simplify)
     }
@@ -504,14 +628,24 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
     [Fact]
     public async Task GmailFollowup_SummarizeLast_Uses_Journal_MemorySummary_Without_ReFetching()
     {
+        const string clientId = "session-gmail-followup";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("gmail-followup-user", "correct horse battery staple", clientId));
+
         var config = Grain<IGoogleConfigWriter>("google-config-writer");
         await config.StoreGoogleCredentialAsync();
 
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "gmail_get_messages",
+            new Dictionary<string, object?> { ["query"] = "last", ["maxResults"] = 3 }));
+
         var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new InoRequest("Get my last gmail", "session-gmail-followup"));
+        await ino.FireAsync(new InoRequest("Get my last gmail", clientId));
 
         // Special gmail fetch removed from Ino core; no longer asserts direct neuron calls (catalog/generic path).
-        await ino.FireAsync(new InoRequest("summarize the last email", "session-gmail-followup"));
+        ToolCallingInoChatClient.Steps.Enqueue(new TextStep("Here is a summary of that email."));
+        await ino.FireAsync(new InoRequest("summarize the last email", clientId));
 
         var responses = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().ToList();
         var followupResp = responses.LastOrDefault(r => r.Prompt.Contains("summarize", StringComparison.OrdinalIgnoreCase));
@@ -526,16 +660,26 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
     [Fact]
     public async Task GenericGmailFollowup_SummarizeThatOne_UsesJournal_WithoutFetch()
     {
+        const string clientId = "session-gmail-generic-follow";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("gmail-generic-follow-user", "correct horse battery staple", clientId));
+
         var config = Grain<IGoogleConfigWriter>("google-config-writer");
         await config.StoreGoogleCredentialAsync();
 
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "gmail_get_messages",
+            new Dictionary<string, object?> { ["query"] = "last", ["maxResults"] = 3 }));
+
         var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new InoRequest("show recent emails about project", "session-gmail-generic-follow"));
+        await ino.FireAsync(new InoRequest("show recent emails about project", clientId));
 
         var callsBefore = _gmail.ListCalls.Count;
 
         // Followup now relies on catalog-driven dispatch + packet context (no hidden inference or special last-gmail in Ino).
-        await ino.FireAsync(new InoRequest("summarize that gmail", "session-gmail-generic-follow"));
+        ToolCallingInoChatClient.Steps.Enqueue(new TextStep("Here is a summary of that email."));
+        await ino.FireAsync(new InoRequest("summarize that gmail", clientId));
 
         var responses = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().ToList();
         Assert.NotEmpty(responses);
@@ -545,14 +689,24 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
     [Fact]
     public async Task CrossGmailToSalesforceFollowup_Uses_GmailJournal_Without_SfCred()
     {
+        const string clientId = "session-cross-gsf";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest("cross-gsf-user", "correct horse battery staple", clientId));
+
         var config = Grain<IGoogleConfigWriter>("google-config-writer");
         await config.StoreGoogleCredentialAsync();
 
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "gmail_get_messages",
+            new Dictionary<string, object?> { ["query"] = "last", ["maxResults"] = 3 }));
+
         var ino = Grain<IInoNeuron>("ino-main");
-        await ino.FireAsync(new InoRequest("Get my last gmail about Acme deal", "session-cross-gsf"));
+        await ino.FireAsync(new InoRequest("Get my last gmail about Acme deal", clientId));
 
         // Cross now handled via generic + packet context (no special cross block in Ino).
-        await ino.FireAsync(new InoRequest("find salesforce accounts related to the last email", "session-cross-gsf"));
+        ToolCallingInoChatClient.Steps.Enqueue(new TextStep("Here is a summary of that email."));
+        await ino.FireAsync(new InoRequest("find salesforce accounts related to the last email", clientId));
 
         var responses = (await ino.GetOutgoingTimelineAsync()).OfType<InoResponse>().ToList();
         Assert.NotEmpty(responses);
@@ -614,6 +768,9 @@ public sealed class InoNeuronAuthenticatedGmailTests : NeuronTestBase
     }
 }
 
+// Shares ToolCallingInoChatClient's static Steps queue with InoNeuronAuthGateTests and
+// InoNeuronAuthenticatedGmailTests - see the [Collection] comment on InoNeuronAuthGateTests.
+[Collection("Ino.ToolCallingInoChatClient")]
 public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBase
 {
     protected override void ConfigureSilo(ISiloBuilder builder) =>
@@ -621,6 +778,7 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
         {
             services.AddPackConfigStore(blobsForKeyRing: null);
             services.AddSingleton<ISalesforceApiClientFactory>(new FailingSalesforceApiClientFactory());
+            services.AddSingleton<IChatClient, ToolCallingInoChatClient>();
         });
 
     [Fact]
@@ -632,6 +790,11 @@ public sealed class InoNeuronAuthenticatedSalesforceFailureTests : NeuronTestBas
 
         var config = Grain<ISalesforceConfigWriter>("salesforce-config-writer");
         await config.StoreSalesforceCredentialAsync();
+
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "salesforce_query",
+            new Dictionary<string, object?> { ["soqlOrQuery"] = "accounts", ["maxResults"] = 5 }));
 
         var ino = Grain<IInoNeuron>("ino-main");
         await ino.FireAsync(new InoRequest("Show my salesforce accounts", clientId));

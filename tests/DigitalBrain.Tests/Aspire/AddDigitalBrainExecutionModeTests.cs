@@ -4,7 +4,7 @@ using Aspire.Hosting.Testing;
 namespace DigitalBrain.Tests.Aspire;
 
 // Real, executed coverage for the builder.ExecutionContext.IsRunMode branching added to
-// AddDigitalBrain (storage emulator + Ollama container vs. AddConnectionString("qwen")
+// AddDigitalBrain (storage emulator + Ollama container vs. AddConnectionString("llm")
 // placeholder). Uses DistributedApplicationTestingBuilder.CreateAsync against the real
 // DigitalBrain.AppHost entry point.
 // but deliberately stops after CreateAsync — never calling BuildAsync/StartAsync — so it only
@@ -38,10 +38,9 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         Assert.Contains(builder.Resources, r => r.Name == "ollama" && r.GetType().Name == "OllamaResource");
 
-        var qwen = Assert.Single(builder.Resources, r => r.Name == "qwen");
-        Assert.Equal("OllamaModelResource", qwen.GetType().Name);
+        var llm = Assert.Single(builder.Resources, r => r.Name == "llm");
+        Assert.Equal("OllamaModelResource", llm.GetType().Name);
 
-        // nomic-embed-text pulled into the same Ollama container as qwen (see Task 15).
         var embed = Assert.Single(builder.Resources, r => r.Name == "embed");
         Assert.Equal("OllamaModelResource", embed.GetType().Name);
 
@@ -67,8 +66,8 @@ public sealed class AddDigitalBrainExecutionModeTests
         var storage = Assert.Single(builder.Resources, r => r.Name == "storage");
         Assert.DoesNotContain(storage.Annotations, a => a.GetType().Name == "EmulatorResourceAnnotation");
 
-        var qwen = Assert.Single(builder.Resources, r => r.Name == "qwen");
-        Assert.Equal("ConnectionStringParameterResource", qwen.GetType().Name);
+        var llm = Assert.Single(builder.Resources, r => r.Name == "llm");
+        Assert.Equal("ConnectionStringParameterResource", llm.GetType().Name);
 
         // No local Ollama container in publish mode, so no "embed" model resource either (see Task 15).
         Assert.DoesNotContain(builder.Resources, r => r.Name == "embed");

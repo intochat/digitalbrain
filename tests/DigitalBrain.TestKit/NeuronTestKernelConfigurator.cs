@@ -48,6 +48,8 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
+                services.AddSingleton<IInoToolProvider, DigitalBrain.Google.GmailInoToolProvider>();
+                services.AddSingleton<IInoToolProvider, DigitalBrain.Salesforce.SalesforceInoToolProvider>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
                 services.AddSingleton<IVectorStore, InMemoryVectorStore>();
                 services.AddSingleton<DocumentIngestor>();

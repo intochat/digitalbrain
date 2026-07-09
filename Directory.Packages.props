@@ -47,6 +47,11 @@
     <!-- LLM abstraction (IChatClient) -->
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
+    <!-- Official anthropics/anthropic-sdk-csharp — first-party AsIChatClient() (Task 7 real Anthropic provider) -->
+    <PackageVersion Include="Anthropic" Version="12.35.1" />
+    <!-- Agent orchestration (ChatClientAgent) for Ino's generic chat path -->
+    <!-- Young, fast-moving upstream (Microsoft Agent Framework, evaluation-grade as of this writing): re-verify ChatClientAgent/AIAgent.RunAsync/ChatClientAgentRunOptions via Context7 before bumping; treat as potentially breaking, not a routine version bump. -->
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
     <!-- For Ino integration AI config (IConfigurationSection binding) -->
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
@@ -65,6 +70,7 @@
     <!-- DataProtection Azure Blob key persistence (cluster-wide shared key ring) -->
     <PackageVersion Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" Version="1.5.3" />
     <!-- Marketplace economics -->
+    <PackageVersion Include="OpenAI" Version="2.12.0" />
     <PackageVersion Include="Stripe.net" Version="50.0.0" />
     <!-- Context phase 2: vector store + document ingestion (latest verified) -->
     <PackageVersion Include="Qdrant.Client" Version="1.18.1" />

@@ -7,8 +7,9 @@
     <RootNamespace>DigitalBrain.Kernel</RootNamespace>
     <AssemblyName>DigitalBrain.Kernel</AssemblyName>
     <UserSecretsId>dotnet-DigitalBrain.Kernel-ea55b00e-5a06-4791-b7d3-a9f3aabb83f9</UserSecretsId>
-    <!-- Allow alpha/experimental Orleans Journalling APIs (DurableGrain etc) -->
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <!-- Allow alpha/experimental Orleans Journalling APIs (DurableGrain etc); MEAI001 is the official
+         Anthropic SDK's AsIChatClient() experimental-API marker (Task 7 real Anthropic provider). -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005;MEAI001</NoWarn>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerRepository>digitalbrain-kernel</ContainerRepository>
     <!-- noble-chiseled not yet published for .NET 11 preview; use standard preview base -->
@@ -20,6 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Anthropic" />
     <PackageReference Include="Aspire.Azure.Data.Tables" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" />
     <PackageReference Include="Azure.Identity" />
@@ -27,6 +29,7 @@
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="ClosedXML" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="OpenAI" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" />
     <PackageReference Include="Microsoft.Extensions.AI" />

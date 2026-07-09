@@ -145,7 +145,8 @@ public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals j
 
         try
         {
-            var tokenValues = await GoogleClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri, cancellationToken: cancellationToken);
+            var handler = ServiceProvider.GetService<HttpMessageHandler>();
+            var tokenValues = await GoogleClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri, handler, cancellationToken);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var (k, v) in tokenValues)
             {

@@ -17,6 +17,17 @@ public record InoRequest(
 public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) : Synapse(nameof(InoResponse), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
+[Alias("DigitalBrain.Core.InoConversationTurn")]
+public record InoConversationTurn(
+    [property: Id(0)] string ClientId,
+    [property: Id(1)] string Role,
+    [property: Id(2)] string Text,
+    // Added at the end to preserve the existing Orleans field ids and allow old
+    // journal entries to deserialize with the default workspace.
+    [property: Id(3)] string? WorkspaceId = null)
+    : Synapse(nameof(InoConversationTurn), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
 [Alias("DigitalBrain.Core.ContextEvidenceRef")]
 public record ContextEvidenceRef(
     [property: Id(0)] string EvidenceId,
@@ -90,3 +101,47 @@ public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataI
     [Alias("InteractAsync")]
     Task<InoInteractResult> InteractAsync(InoInteractRequest request, CancellationToken cancellationToken = default);
 }
+
+// Phase 1+: Typed tool results (replaces plain strings for determinism and auth visibility).
+public abstract record ToolResult
+{
+    public sealed record Success(string Content) : ToolResult;
+    public sealed record NeedsAuth(string Provider, string ClientId, string Message) : ToolResult;
+    public sealed record Denied(string Provider, string Reason) : ToolResult;
+    public sealed record Failed(string Provider, string Error, bool Retryable = true) : ToolResult;
+}
+
+// Phase 0 observability synapses for making Ino tool usage and auth requirements first-class and visible in traces/journals.
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.InoToolCallStarted")]
+public record InoToolCallStarted(
+    string ToolName,
+    string? Provider = null,
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(InoToolCallStarted), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.InoToolCallCompleted")]
+public record InoToolCallCompleted(
+    string ToolName,
+    string? ResultSummary = null,
+    string? Provider = null,
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(InoToolCallCompleted), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.InoToolCallFailed")]
+public record InoToolCallFailed(
+    string ToolName,
+    string? Error = null,
+    string? Provider = null,
+    string? ClientId = null,
+    string? WorkspaceId = null) : Synapse(nameof(InoToolCallFailed), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+[Alias("DigitalBrain.Core.InoConnectorAuthRequired")]
+public record InoConnectorAuthRequired(
+    string Provider,
+    string? ClientId = null,
+    string? WorkspaceId = null,
+    string? Message = null) : Synapse(nameof(InoConnectorAuthRequired), DateTimeOffset.UtcNow);

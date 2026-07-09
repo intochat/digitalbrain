@@ -12,10 +12,17 @@ public sealed record DigitalBrainLlmRuntimeOptions(
     string OllamaEndpoint,
     string? AzureOpenAIEndpoint,
     string? AzureOpenAIKey,
+    string? AnthropicApiKey,
+    string? XaiApiKey,
+    string? OpenAIApiKey,
+    string? GitHubModelsToken,
+    string GitHubModelsEndpoint,
     string OpenAIModel)
 {
-    public const string DefaultOllamaModel = "qwen2.5-coder:1.5b";
+    public const string DefaultOllamaModel = "llama3.1:8b";
     public const string DefaultOpenAIModel = "gpt-4o-mini";
+    public const string DefaultGitHubModelsModel = "openai/gpt-4.1-mini";
+    public const string DefaultGitHubModelsEndpoint = "https://models.github.ai/inference";
 
     /// <summary>
     /// Builds runtime LLM options from the registry-shaped configuration emitted by Aspire,
@@ -27,9 +34,7 @@ public sealed record DigitalBrainLlmRuntimeOptions(
         var registryModel = config["DigitalBrain:ModelRegistry:DefaultLlm:Id"];
         var provider = FirstNonWhiteSpace(registryProvider, config["DigitalBrain:Llm:Provider"]);
         var model = FirstNonWhiteSpace(registryModel, config["DigitalBrain:Llm:Model"])
-            ?? (string.Equals(provider, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase)
-                ? DefaultOpenAIModel
-                : DefaultOllamaModel);
+            ?? DefaultModelForProvider(provider);
 
         return new DigitalBrainLlmRuntimeOptions(
             provider,
@@ -37,6 +42,11 @@ public sealed record DigitalBrainLlmRuntimeOptions(
             config["DigitalBrain:Llm:OllamaEndpoint"] ?? "http://localhost:11434",
             config["DigitalBrain:Llm:AzureOpenAIEndpoint"],
             config["DigitalBrain:Llm:AzureOpenAIKey"],
+            config["DigitalBrain:Llm:AnthropicApiKey"],
+            config["DigitalBrain:Llm:XaiApiKey"],
+            config["DigitalBrain:Llm:OpenAIApiKey"],
+            config["DigitalBrain:Llm:GitHubModelsToken"],
+            config["DigitalBrain:Llm:GitHubModelsEndpoint"] ?? DefaultGitHubModelsEndpoint,
             FindRegisteredLlmModel(config, DigitalBrainProviderIds.OpenAI)
                 ?? config["DigitalBrain:Llm:OpenAIModel"]
                 ?? DefaultOpenAIModel);
@@ -44,26 +54,30 @@ public sealed record DigitalBrainLlmRuntimeOptions(
 
     private static string? FindRegisteredLlmModel(IConfiguration config, string provider)
     {
-        foreach (var child in config.GetSection("DigitalBrain:ModelRegistry:Registrations").GetChildren())
-        {
-            var kind = child["Kind"];
-            var registrationProvider = child["Provider"];
-            if (!string.Equals(kind, DigitalBrainCapabilityKind.LargeLanguageModel.ToString(), StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(registrationProvider, provider, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var model = child["Id"];
-            if (!string.IsNullOrWhiteSpace(model))
-            {
-                return model;
-            }
-        }
-
-        return null;
+        var entries = DigitalBrainModelRegistrySnapshot.Read(config);
+        var match = DigitalBrainModelRegistrySnapshot.FirstOrDefault(
+            entries,
+            DigitalBrainCapabilityKind.LargeLanguageModel,
+            entry => string.Equals(entry.Provider, provider, StringComparison.OrdinalIgnoreCase));
+        return string.IsNullOrWhiteSpace(match?.Id) ? null : match.Id;
     }
 
     private static string? FirstNonWhiteSpace(params string?[] values) =>
         values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+
+    private static string DefaultModelForProvider(string? provider)
+    {
+        if (string.Equals(provider, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(provider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase))
+        {
+            return DefaultOpenAIModel;
+        }
+
+        if (string.Equals(provider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase))
+        {
+            return DefaultGitHubModelsModel;
+        }
+
+        return DefaultOllamaModel;
+    }
 }

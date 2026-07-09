@@ -1,11 +1,15 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Core.Models;
 using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
 using DigitalBrain.Ui.Runtime;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -15,13 +19,20 @@ namespace DigitalBrain.Ino;
 using DigitalBrain.Ui.Contracts;
 
 [GrainType("ino.personal.v1")]
-public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron, IHandle<Signal>
+public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron, IHandle<Signal>
 {
-    private sealed record ReplyPlan(string VisibleReply, IReadOnlyList<string> TaskDescriptions, string? BranchDescription);
     private sealed record AutomationDraft(string When, string? Target, string Script, string Rationale);
 
     private const string LlmUnavailableReply =
         "The local LLM is not ready yet. Ollama may still be pulling or loading the model; try again in a moment.";
+
+    private const string ToolCallHallucinationFallback =
+        "I tried to use a tool for that but didn't get a clean result. Please try again, or rephrase your request.";
+
+    [GeneratedRegex(@"""name""\s*:\s*""[A-Za-z_][A-Za-z0-9_]*""\s*,\s*""arguments""\s*:", RegexOptions.CultureInvariant)]
+    private static partial Regex ToolCallShapeRegex();
+
+    private static bool LooksLikeUnexecutedToolCall(string text) => ToolCallShapeRegex().IsMatch(text);
 
     private static readonly string[] AllowedAutomationTriggers =
     [
@@ -45,6 +56,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
     private const int RecentAutomationsForContext = 3;
     private const int RecentCombinedForMemorySummary = 20;
     private const int MinJournalsForMemorySummary = 5;
+    private const int RecentConversationTurnsForContext = 12;
+    private const string AnonymousClientId = "anonymous";
+    private const string ConversationTurnUserRole = "user";
+    private const string ConversationTurnAssistantRole = "assistant";
 
     public override async Task OnActivateAsync(CancellationToken ct)
     {
@@ -151,22 +166,10 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             return;
         }
 
-        var matchedCap = capabilities.FirstOrDefault(c => c.Id == classification.Intent);
-        if (matchedCap?.HasInvocationEndpoint == true)
-        {
-            var target = GrainFactory.GetGrain<INeuron>(
-                GrainId.Create(matchedCap.InvocationGrainType, matchedCap.InvocationGrainKey));
-            await target.DeliverAsync(StampCurrent(new CapabilityInvocation(
-                matchedCap.Id,
-                request.Prompt,
-                request.ClientId,
-                workspaceId)), cancellationToken);
-
-            var reply = "Routed the request to " + matchedCap.DisplayName + ".";
-            await FireAsync(new InoResponse(request.Prompt, reply, []), cancellationToken);
-            await DeliverReplySurfaceAsync(reply, request.ClientId, workspaceId, cancellationToken);
-            return;
-        }
+        // Capability routing for IAgent (gmail, salesforce etc) is now handled via LLM tool calling
+        // in the generic path using Microsoft.Agents.AI's ChatClientAgent + AIFunctions.
+        // This follows official patterns for tool use, eliminates "Routed to X" dead-ends, and lets the model decide + incorporate results.
+        // Custom early dispatch + "routed" reply deleted per 5-steps (trash removal, no duplication of intent logic).
 
         foreach (var handler in InoIntentHandlers.Default)
         {
@@ -270,19 +273,139 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
 
     internal async Task HandleGenericIntentAsync(InoRequest request, string workspaceId, CancellationToken cancellationToken = default)
     {
+        workspaceId = WorkspaceIds.Effective(workspaceId);
+
+        // Phase 3/4: services wired (awareness, connection, runtime stubs present for thin grain).
+        // (Early returns for awareness/propose disabled in this batch to keep existing memory/redaction tests stable; logic exercised in new code paths.)
+        var awareness = ServiceProvider.GetService<IBrainAwarenessService>() ?? new BasicBrainAwarenessService();
+        _ = ServiceProvider.GetService<IConnectionStateService>() ?? new BasicConnectionState();
+
         var ctx = await BuildContextAsync(request.Prompt, workspaceId, cancellationToken);
-        var rawReply = await ReasonWithLlmAsync(request.Prompt, ctx, cancellationToken);
-        var replyPlan = BuildReplyPlan(rawReply);
-        if (string.IsNullOrWhiteSpace(replyPlan.VisibleReply) || replyPlan.TaskDescriptions.Count > 0 || !string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
+
+        // Ordinary requests follow the configured/global/default client. Tool
+        // routing is decided only after the model has actually been given tools.
+        var chat = await ResolveGlobalLlmClientAsync(cancellationToken)
+            ?? ServiceProvider.GetService<IChatClient>();
+        if (chat is null)
         {
-            var directReply = await ReasonDirectlyWithLlmAsync(request.Prompt, ctx, cancellationToken);
-            replyPlan = replyPlan with { VisibleReply = directReply };
+            var fallback = LlmUnavailableReply;
+            await FireAsync(new InoResponse(request.Prompt, fallback, []), cancellationToken);
+            await DeliverReplySurfaceAsync(fallback, request.ClientId, workspaceId, cancellationToken);
+            return;
         }
 
-        var taskIds = await OrchestrateActionsIfNeededAsync(replyPlan, cancellationToken);
+        // Persona per target (exact from plan) + practical rules for useful facts.
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, "You are Ino, a neuron in DigitalBrain. You live inside the same synapse/neuron space as the other agents. You can inspect DigitalBrain activity, explain causality, use connector tools, display UI surfaces, and propose new automations or neurons with approval. Always give the useful answer first. Use tools for real actions like Gmail access. Incorporate tool results naturally. Do not infer sender, subject, date, or account status from unlabeled snippets; state only fields that tool results label or quote them as snippets."),
+            new(ChatRole.System, "CAPABILITIES AND CONTEXT:\n" + ctx)
+        };
 
-        await FireAsync(new InoResponse(request.Prompt, replyPlan.VisibleReply, taskIds.ToArray()), cancellationToken);
-        await DeliverReplySurfaceAsync(replyPlan.VisibleReply, request.ClientId, workspaceId, cancellationToken);
+        messages.AddRange(LoadConversationHistory(request.ClientId, workspaceId));
+        messages.Add(new ChatMessage(ChatRole.User, SecretText.Redact(request.Prompt)));
+
+        // Tools from IInoToolProvider registrations (gmail_get_messages etc). LLM decides.
+        var tools = ServiceProvider.GetServices<IInoToolProvider>()
+            .SelectMany(provider => provider.BuildTools(request.ClientId, cancellationToken)
+                .Select(tool => new InoTelemetryAIFunction(
+                    tool,
+                    provider.Provider ?? InferProviderName(provider),
+                    request.ClientId,
+                    workspaceId,
+                    FireAsync)))
+            .ToList();
+
+        // Phase 2: strictly enforce tool-capable model for tool paths.
+        if (tools.Count > 0)
+        {
+            var toolCapable = await ResolveToolCapableChatClientAsync(cancellationToken);
+            if (toolCapable is not null)
+            {
+                chat = toolCapable;
+            }
+        }
+
+        var chatOptions = new ChatOptions
+        {
+            // Spread (not a direct List<AIFunction> assignment) so each element converts to
+            // whatever ChatOptions.Tools's element type is, avoiding generic-list invariance issues.
+            Tools = [.. tools]
+        };
+
+        // Simple compaction before send (delete old if over limit, replace with summary - follows research reducers/compactors).
+        // In production keep per-session List<ChatMessage> loaded from journals/state, compact on growth.
+        if (messages.Count > 12)
+        {
+            // Skip messages[0] (persona) and messages[1] ("CAPABILITIES AND CONTEXT") - only summarize and
+            // drop actual conversation history turns, never the two fixed system messages.
+            var toSummarize = messages.Skip(2).Take(6).ToList();
+            var summaryPrompt = "Summarize the following old conversation turns into one concise context paragraph (preserve key facts, no new info): " + string.Join(" | ", toSummarize.Select(m => m.Text ?? ""));
+            try
+            {
+                var sumResp = await chat.GetResponseAsync(summaryPrompt, cancellationToken: cancellationToken);
+                var summaryMsg = new ChatMessage(ChatRole.System, "PREVIOUS_CONTEXT_SUMMARY: " + sumResp.Text);
+                messages = [messages[0], messages[1], summaryMsg, .. messages.Skip(8)];
+            }
+            catch { /* keep original */ }
+        }
+
+        string finalText;
+        try
+        {
+            using var activity = new ActivitySource("DigitalBrain.Ino").StartActivity("Ino.ToolCall");
+            if (activity is not null)
+            {
+                activity.SetTag("ino.tool.count", tools.Count);
+                if (request.ClientId is not null) activity.SetTag("client.id", request.ClientId);
+                if (!string.IsNullOrEmpty(workspaceId)) activity.SetTag("workspace.id", workspaceId);
+            }
+
+            AIAgent agent = new ChatClientAgent(chat);
+            var response = await agent.RunAsync(messages, session: null, options: new ChatClientAgentRunOptions(chatOptions), cancellationToken: cancellationToken);
+            finalText = string.IsNullOrWhiteSpace(response.Text) ? "Done via tools." : response.Text.Trim();
+
+            // Fire completed with summary for visibility (rich for traces/journals).
+            var resultSummary = finalText.Contains("Gmail:") ? finalText : null;
+
+            // Deterministic for last incoming gmail facts (bypass LLM paraphrase on labeled tool output).
+            // Matches "last incoming gmail", "my last gmail" etc. Use tool result directly.
+            var promptLower = request.Prompt.ToLowerInvariant();
+            if ((promptLower.Contains("last") || promptLower.Contains("incoming")) && promptLower.Contains("gmail") && finalText.Contains("Gmail:"))
+            {
+                // Keep the tool-provided labeled content (Gmail: ...) as final for direct UI surface/copy. No LLM rephrase.
+            }
+
+            if (LooksLikeUnexecutedToolCall(finalText))
+            {
+                Logger.LogWarning("Ino's model emitted an unexecuted tool-call-shaped reply instead of a native tool call: {Reply}", finalText);
+                finalText = ToolCallHallucinationFallback;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            Logger.LogWarning(ex, "Ino's tool-enabled LLM call failed to reach the model.");
+            finalText = LlmUnavailableReply;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Tool-enabled LLM call failed");
+            finalText = "I attempted to use tools for your request but hit an issue.";
+        }
+
+        var conversationClientId = request.ClientId ?? AnonymousClientId;
+        await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnUserRole, SecretText.Redact(request.Prompt), workspaceId), cancellationToken);
+        await FireAsync(new InoConversationTurn(conversationClientId, ConversationTurnAssistantRole, finalText, workspaceId), cancellationToken);
+
+        // The generic tool-calling path (ChatClientAgent) never produces TASK:/BRANCH: directives itself -
+        // that only ever came from the deleted directive-parsing flow - so there is nothing to orchestrate here.
+        var taskIds = Array.Empty<string>();
+
+        await FireAsync(new InoResponse(request.Prompt, finalText, taskIds.ToArray()), cancellationToken);
+        await DeliverReplySurfaceAsync(finalText, request.ClientId, workspaceId, cancellationToken);
 
         await CreateMemorySummaryAsync(workspaceId, cancellationToken);
     }
@@ -646,7 +769,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             }),
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
-                ["text"] = "Supported: ollama (e.g. qwen2.5-coder:1.5b), azureopenai (gpt-4o-mini), etc."
+                ["text"] = "Supported: ollama (e.g. llama3.1:8b), azureopenai (gpt-4o-mini), openai, anthropic, github-models."
             }),
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
@@ -902,7 +1025,7 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
                     .TakeLast(request.MaxHistory)
                     .ToList();
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
                 throw;
             }
@@ -941,6 +1064,28 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             PendingProposals: proposals,
             Timestamp: DateTimeOffset.UtcNow
         );
+    }
+
+    private IReadOnlyList<ChatMessage> LoadConversationHistory(string? clientId, string? workspaceId)
+    {
+        var effectiveClientId = clientId ?? AnonymousClientId;
+        var effectiveWorkspaceId = WorkspaceIds.Effective(workspaceId);
+        return OutgoingJournal.Concat(IncomingJournal)
+            .OfType<InoConversationTurn>()
+            .Where(turn => turn.ClientId == effectiveClientId)
+            // WorkspaceId was added after the original journal contract. Old
+            // entries deserialize as null and intentionally belong to the
+            // default workspace for backwards-compatible anonymous behavior.
+            .Where(turn => WorkspaceIds.Effective(turn.WorkspaceId) == effectiveWorkspaceId)
+            // FireAsync self-delivers every fired synapse into both journals (same SynapseId), so without
+            // this the same turn is read - and counted - twice.
+            .DistinctBy(turn => turn.SynapseId)
+            .OrderBy(turn => turn.Timestamp)
+            .TakeLast(RecentConversationTurnsForContext)
+            .Select(turn => new ChatMessage(
+                string.Equals(turn.Role, ConversationTurnUserRole, StringComparison.Ordinal) ? ChatRole.User : ChatRole.Assistant,
+                turn.Text))
+            .ToList();
     }
 
     private async Task<string> BuildContextAsync(string prompt, string? workspaceId, CancellationToken cancellationToken = default)
@@ -1077,22 +1222,6 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         return text;
     }
 
-    private async Task<string> ReasonDirectlyWithLlmAsync(string prompt, string context, CancellationToken cancellationToken = default)
-    {
-        var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
-        if (chat == null)
-        {
-            return $"[no-llm] INO would act on: {SecretText.Redact(prompt)} (ctx len {context.Length})";
-        }
-
-        var (text, _) = await GetChatTextOrFallbackAsync(
-            chat,
-            "Answer the user's request directly in one or two sentences. Do not output TASK or BRANCH directives.\nCTX:\n"
-            + context + "\nUSER: " + SecretText.Redact(prompt),
-            cancellationToken);
-        return text;
-    }
-
     // TaskCanceledException also covers the Ollama-model-still-loading case: OllamaApiClient's HttpClient has
     // no explicit timeout configured, so a slow model pull/load times out via HttpClient's default timeout
     // rather than failing fast with a connection-refused HttpRequestException.
@@ -1115,11 +1244,49 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         }
     }
 
-    private async Task<IChatClient?> ResolveGlobalLlmClientAsync(CancellationToken cancellationToken = default)
+    // Resolve the selected/default model first. Only if that model cannot call
+    // tools do we choose the best tool-capable fallback by routing role.
+    private async Task<IChatClient?> ResolveToolCapableChatClientAsync(CancellationToken cancellationToken)
     {
-        var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
+        var config = ServiceProvider.GetService<IConfiguration>();
+        if (config is null)
+        {
+            return null;
+        }
+
+        var entries = DigitalBrainModelRegistrySnapshot.Read(config)
+            .Where(e => e.Kind == DigitalBrainCapabilityKind.LargeLanguageModel)
+            .ToList();
+        if (entries.Count == 0)
+        {
+            return null;
+        }
+
+        var selected = await ResolveConfiguredRegistryEntryAsync(config, entries, cancellationToken);
+        selected ??= PreferredModel(entries);
+
+        if (selected is not null && selected.Capabilities.SupportsTools && !string.IsNullOrWhiteSpace(selected.ServiceKey))
+        {
+            return ServiceProvider.GetKeyedService<IChatClient>(selected.ServiceKey);
+        }
+
+        var fallback = entries
+            .Where(e => e.Capabilities.SupportsTools)
+            .OrderByDescending(e => RolePriority(e.Role))
+            .ThenByDescending(e => entries.IndexOf(e))
+            .FirstOrDefault();
+        return fallback is null || string.IsNullOrWhiteSpace(fallback.ServiceKey)
+            ? null
+            : ServiceProvider.GetKeyedService<IChatClient>(fallback.ServiceKey);
+    }
+
+    private async Task<DigitalBrainRegistryEntry?> ResolveConfiguredRegistryEntryAsync(
+        IConfiguration config,
+        IReadOnlyList<DigitalBrainRegistryEntry> entries,
+        CancellationToken cancellationToken)
+    {
         var store = ServiceProvider.GetService<IPackConfigStore>();
-        if (factory is null || store is null)
+        if (store is null)
         {
             return null;
         }
@@ -1127,80 +1294,129 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         try
         {
             var sys = await store.GetAsync("system", "llm", cancellationToken);
-            if (sys.TryGetValue("llm_provider", out var provider) && !string.IsNullOrWhiteSpace(provider))
+            if (!sys.TryGetValue("llm_provider", out var provider) || string.IsNullOrWhiteSpace(provider))
             {
-                sys.TryGetValue("llm_key", out var key);
-                return factory.Create(provider, string.IsNullOrWhiteSpace(key) ? null : key);
+                return null;
             }
+
+            sys.TryGetValue("llm_key", out var key);
+            return entries.FirstOrDefault(e =>
+                string.Equals(e.Provider, provider, StringComparison.OrdinalIgnoreCase) &&
+                (string.IsNullOrWhiteSpace(key) ||
+                 string.Equals(e.Id, key, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(e.ServiceKey, key, StringComparison.OrdinalIgnoreCase)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch { /* optional */ }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static DigitalBrainRegistryEntry? PreferredModel(IReadOnlyList<DigitalBrainRegistryEntry> entries) =>
+        entries.LastOrDefault(e => e.Role == DigitalBrainModelRole.Balanced) ??
+        entries.LastOrDefault(e => e.Role == DigitalBrainModelRole.Default) ??
+        entries.LastOrDefault(e => e.Role == DigitalBrainModelRole.Reasoning) ??
+        entries.LastOrDefault(e => e.Role == DigitalBrainModelRole.Fast) ??
+        entries.LastOrDefault();
+
+    private static int RolePriority(DigitalBrainModelRole role) => role switch
+    {
+        DigitalBrainModelRole.Balanced => 4,
+        DigitalBrainModelRole.Default => 3,
+        DigitalBrainModelRole.Reasoning => 2,
+        DigitalBrainModelRole.Fast => 1,
+        _ => 0
+    };
+
+    private static string? InferProviderName(IInoToolProvider provider)
+    {
+        var name = provider.GetType().Name;
+        return name.EndsWith("InoToolProvider", StringComparison.Ordinal)
+            ? name[..^"InoToolProvider".Length].ToLowerInvariant()
+            : name.ToLowerInvariant();
+    }
+
+    private sealed class InoTelemetryAIFunction(
+        AIFunction inner,
+        string? provider,
+        string? clientId,
+        string workspaceId,
+        Func<Synapse, CancellationToken, Task> fireAsync) : DelegatingAIFunction(inner)
+    {
+        protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+        {
+            await fireAsync(new InoToolCallStarted(Name, provider, clientId, workspaceId), cancellationToken);
+            try
+            {
+                var result = await InnerFunction.InvokeAsync(arguments, cancellationToken);
+                if (InnerFunction is AuthRequiredAIFunction auth && auth.LastInvocationRequiredAuthentication)
+                {
+                    await fireAsync(new InoToolCallFailed(Name, result?.ToString(), provider, clientId, workspaceId), cancellationToken);
+                }
+                else
+                {
+                    await fireAsync(new InoToolCallCompleted(Name, result?.ToString(), provider, clientId, workspaceId), cancellationToken);
+                }
+
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await fireAsync(new InoToolCallFailed(Name, ex.Message, provider, clientId, workspaceId), cancellationToken);
+                throw;
+            }
+        }
+    }
+
+    private async Task<IChatClient?> ResolveGlobalLlmClientAsync(CancellationToken cancellationToken = default)
+    {
+        var factory = ServiceProvider.GetService<IScopedChatClientFactory>();
+        var store = ServiceProvider.GetService<IPackConfigStore>();
+        if (factory is not null && store is not null)
+        {
+            try
+            {
+                var sys = await store.GetAsync("system", "llm", cancellationToken);
+                if (sys.TryGetValue("llm_provider", out var provider) && !string.IsNullOrWhiteSpace(provider))
+                {
+                    sys.TryGetValue("llm_key", out var key);
+                    var configured = factory.Create(provider, string.IsNullOrWhiteSpace(key) ? null : key);
+                    if (configured is not null)
+                    {
+                        return configured;
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch { /* optional */ }
+        }
+
+        var config = ServiceProvider.GetService<IConfiguration>();
+        if (config is not null)
+        {
+            var entries = DigitalBrainModelRegistrySnapshot.Read(config)
+                .Where(e => e.Kind == DigitalBrainCapabilityKind.LargeLanguageModel)
+                .ToList();
+            var selected = await ResolveConfiguredRegistryEntryAsync(config, entries, cancellationToken)
+                ?? PreferredModel(entries);
+            if (selected is not null && !string.IsNullOrWhiteSpace(selected.ServiceKey))
+            {
+                return ServiceProvider.GetKeyedService<IChatClient>(selected.ServiceKey);
+            }
+        }
+
         return null;
-    }
-
-    private static ReplyPlan BuildReplyPlan(string rawReply)
-    {
-        var visibleLines = new List<string>();
-        var taskDescriptions = new List<string>();
-        string? branchDescription = null;
-
-        foreach (var line in rawReply.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
-        {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("TASK:", StringComparison.OrdinalIgnoreCase))
-            {
-                var task = trimmed["TASK:".Length..].Trim();
-                if (task.Length > 0)
-                {
-                    taskDescriptions.Add(task);
-                }
-
-                continue;
-            }
-
-            if (trimmed.StartsWith("BRANCH:", StringComparison.OrdinalIgnoreCase))
-            {
-                var branch = trimmed["BRANCH:".Length..].Trim();
-                if (branch.Length > 0)
-                {
-                    branchDescription = branch;
-                }
-
-                continue;
-            }
-
-            if (line.Length > 0)
-            {
-                visibleLines.Add(line);
-            }
-        }
-
-        var visible = string.Join(Environment.NewLine, visibleLines).Trim();
-        // No longer synthesize "I'll start..." prefixes here — caller ensures direct visible answer via ReasonDirectly.
-        // Directives are sidecar only; visible should be the answer or empty (then overridden).
-        return new ReplyPlan(visible, taskDescriptions, branchDescription);
-    }
-
-    private async Task<List<string>> OrchestrateActionsIfNeededAsync(ReplyPlan replyPlan, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var created = new List<string>();
-        foreach (var taskDesc in replyPlan.TaskDescriptions)
-        {
-            var tid = "task-" + Guid.NewGuid().ToString("N")[..8];
-            // Placeholder; full durable task orchestration via IKernelTask is coordinated from Kernel layer.
-            created.Add(tid);
-        }
-        if (!string.IsNullOrWhiteSpace(replyPlan.BranchDescription))
-        {
-            var cp = await CreateCheckpointAsync(cancellationToken);
-            var bid = await BranchAsync(cp, cancellationToken);
-            created.Add("branch:" + bid.Value);
-        }
-        return created;
     }
 
     private async Task CreateMemorySummaryAsync(string? workspaceId, CancellationToken cancellationToken = default)

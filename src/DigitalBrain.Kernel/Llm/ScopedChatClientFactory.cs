@@ -21,12 +21,55 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
                 return null;
             }
 
-            var openAiClient = new OpenAI.Chat.ChatClient(options.OpenAIModel, apiKey).AsIChatClient();
-            return new ChatClientBuilder(openAiClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+            return DigitalBrainChatClients.BuildOpenAi(options.OpenAIModel, apiKey);
         }
 
-        // Default / "ollama": mirror DigitalBrainChat's Ollama wiring.
-        var ollamaClient = new OllamaSharp.OllamaApiClient(new Uri(options.OllamaEndpoint), options.Model);
-        return new ChatClientBuilder(ollamaClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+        if (string.Equals(provider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                logger.LogWarning("github-models provider requested but no token is configured — falling back to global client.");
+                return null;
+            }
+
+            return DigitalBrainChatClients.BuildGitHubModels(options.GitHubModelsEndpoint, options.Model, apiKey);
+        }
+
+        if (string.IsNullOrWhiteSpace(provider) ||
+            string.Equals(provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase))
+        {
+            return DigitalBrainChatClients.BuildOllama(options.OllamaEndpoint, options.Model);
+        }
+
+        logger.LogWarning("Unsupported scoped LLM provider '{Provider}' requested — falling back to global client.", provider);
+        return null;
     }
+}
+
+// Shared, provider-id-driven IChatClient construction, used by both the per-request scoped factory above
+// and the startup-time keyed registration in DigitalBrainChatClientRegistration.
+internal static class DigitalBrainChatClients
+{
+    public static IChatClient BuildOllama(string endpoint, string model) =>
+        new ChatClientBuilder(new OllamaSharp.OllamaApiClient(new Uri(endpoint), model))
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .Build();
+
+    public static IChatClient BuildOpenAi(string model, string apiKey) =>
+        new ChatClientBuilder(new OpenAI.Chat.ChatClient(model, apiKey).AsIChatClient())
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .Build();
+
+    public static IChatClient BuildOpenAiCompatible(string endpoint, string model, string apiKey) =>
+        new ChatClientBuilder(
+                new OpenAI.OpenAIClient(
+                        new System.ClientModel.ApiKeyCredential(apiKey),
+                        new OpenAI.OpenAIClientOptions { Endpoint = new Uri(endpoint) })
+                    .GetChatClient(model)
+                    .AsIChatClient())
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .Build();
+
+    public static IChatClient BuildGitHubModels(string endpoint, string model, string token) =>
+        BuildOpenAiCompatible(endpoint, model, token);
 }

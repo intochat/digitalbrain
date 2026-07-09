@@ -6,52 +6,6 @@ using DigitalBrain.Core.Models;
 
 namespace DigitalBrain.Aspire;
 
-public sealed class DigitalBrainContext
-{
-    public required string Name { get; init; }
-    public required IDistributedApplicationBuilder ApplicationBuilder { get; init; }
-    public required OrleansService Orleans { get; init; }
-    public required IResourceBuilder<IResourceWithConnectionString> Llm { get; init; }
-    public IResourceBuilder<IResourceWithConnectionString>? EmbeddingModel { get; init; }
-    public required OrleansServiceClient OrleansClient { get; init; }
-    public required int KernelReplicas { get; init; }
-    public required DigitalBrainModelRegistry ModelRegistry { get; init; }
-
-    // The resolved LLM model name (e.g. "qwen2.5-coder:1.5b") for env injection.
-    public required string LlmModel { get; init; }
-
-    // The resolved LLM provider ("ollama" | "azureopenai"), set via DigitalBrainOptions.WithLLM<TModel>().
-    public required string LlmProvider { get; init; }
-
-    // Ollama container http endpoint for DigitalBrain__Llm__OllamaEndpoint injection; null in publish mode
-    // (no local Ollama container — the else branch in AddDigitalBrain uses a connection-string placeholder).
-    public EndpointReference? OllamaEndpoint { get; init; }
-
-    // Same Ollama container's http endpoint, for DigitalBrain__Embedding__OllamaEndpoint injection; null in
-    // publish mode for the same reason as OllamaEndpoint (no local Ollama container to point at).
-    public EndpointReference? EmbeddingOllamaEndpoint { get; init; }
-
-    // Local Whisper (speaches) container http endpoint for DigitalBrain__Voice__Endpoint injection; null in
-    // publish mode (no local Whisper container — externally-hosted voice endpoints are wired via a manually
-    // configured DigitalBrain:Voice:Endpoint instead, same as prod LLM/embedding wiring).
-    public EndpointReference? WhisperEndpoint { get; init; }
-
-    // Set only when LlmProvider is "azureopenai" (WithLLM<TModel>() where TModel.Provider == "azureopenai")
-    public IResourceBuilder<ParameterResource>? AzureOpenAIEndpoint { get; init; }
-    public IResourceBuilder<ParameterResource>? AzureOpenAIKey { get; init; }
-
-    // Storage resources exposed so AppHost can wire WithReference on kernel
-    public required IResourceBuilder<AzureBlobStorageResource> GrainBlobs { get; init; }
-    public required IResourceBuilder<AzureBlobStorageResource> JournalBlobs { get; init; }
-    public required IResourceBuilder<AzureBlobStorageResource> SyncBlobs { get; init; }
-    public required IResourceBuilder<AzureTableStorageResource> ClusteringTable { get; init; }
-
-    // For encapsulated dashboard + MCP (set from DigitalBrainOptions at construction, single source of truth)
-    public bool EnableOrleansDashboard { get; init; }
-    public int? OrleansDashboardPort { get; init; }
-    public bool EnableMcp { get; init; }
-}
-
 public static class DigitalBrainBuilderExtensions
 {
     public const int DefaultKernelWebPort = 51014;
@@ -71,7 +25,7 @@ public static class DigitalBrainBuilderExtensions
         var llmProvider = options.ResolvedLlmProvider;
         var llmModel = options.ResolvedLlmModel ?? (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase)
             ? "gpt-4o-mini"
-            : "qwen2.5-coder:1.5b");
+            : "llama3.1:8b");
 
         IResourceBuilder<ParameterResource>? azureOpenAIEndpoint = null;
         IResourceBuilder<ParameterResource>? azureOpenAIKey = null;
@@ -79,6 +33,32 @@ public static class DigitalBrainBuilderExtensions
         {
             azureOpenAIEndpoint = builder.AddParameter("azure-openai-endpoint");
             azureOpenAIKey = builder.AddParameter("azure-openai-key", secret: true);
+        }
+
+        IResourceBuilder<ParameterResource>? openAIApiKey = null;
+        if (string.Equals(llmProvider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase) ||
+            options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase)))
+        {
+            openAIApiKey = builder.AddParameter("openai-api-key", secret: true);
+        }
+
+        IResourceBuilder<ParameterResource>? anthropicApiKey = null;
+        if (options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase)))
+        {
+            anthropicApiKey = builder.AddParameter("anthropic-api-key", secret: true);
+        }
+
+        IResourceBuilder<ParameterResource>? githubModelsToken = null;
+        if (string.Equals(llmProvider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase) ||
+            options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase)))
+        {
+            githubModelsToken = builder.AddParameter("github-models-token", secret: true);
+        }
+
+        IResourceBuilder<ParameterResource>? xaiApiKey = null;
+        if (options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase)))
+        {
+            xaiApiKey = builder.AddParameter("xai-api-key", secret: true);
         }
 
         var isRunMode = builder.ExecutionContext.IsRunMode;
@@ -110,13 +90,17 @@ public static class DigitalBrainBuilderExtensions
             orleans.WithClusterId(ResolveLocalClusterId());
         }
 
-        // Ollama always runs as the offline fallback (per DEMO-PLAN), independent of the chosen primary
-        // provider — it must pull its own real model tag, never the primary provider's model/deployment
-        // name (e.g. an azureopenai deployment name like "gpt-4o-mini" is not a pullable Ollama tag). But
-        // only in run mode: `aspire publish` should never emit a local Ollama container into a publish
-        // manifest — prod gets its LLM from Azure OpenAI via Pulumi, wired separately (see WireKernelSilo method).
-        const string ollamaFallbackModel = "qwen2.5-coder:1.5b";
-        IResourceBuilder<IResourceWithConnectionString> qwen;
+        var defaultLlm = options.ModelRegistry.DefaultLlm?.Model;
+        var defaultOllamaLlm = defaultLlm is not null &&
+            string.Equals(defaultLlm.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase)
+                ? defaultLlm.Id
+                : "llama3.1:8b";
+        var defaultEmbedding = options.ModelRegistry.DefaultEmbedding?.Model;
+        var defaultOllamaEmbedding = defaultEmbedding is not null &&
+            string.Equals(defaultEmbedding.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase)
+                ? defaultEmbedding.Id
+                : "mxbai-embed-large";
+        IResourceBuilder<IResourceWithConnectionString> llm;
         IResourceBuilder<IResourceWithConnectionString>? embeddingModel = null;
         EndpointReference? ollamaEndpoint = null;
         EndpointReference? embeddingOllamaEndpoint = null;
@@ -127,16 +111,33 @@ public static class DigitalBrainBuilderExtensions
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
                 .WithOpenWebUI(webui => webui.WithLifetime(ContainerLifetime.Persistent).WithDataVolume());
-            qwen = ollama.AddModel("qwen", ollamaFallbackModel);
-            embeddingModel = ollama.AddModel("embed", "nomic-embed-text");
+            llm = ollama.AddModel("llm", defaultOllamaLlm);
+            embeddingModel = ollama.AddModel("embed", defaultOllamaEmbedding);
+
+            // Pre-pull every other distinct Ollama LLM tag in the registry (e.g. Llama31_8B, registered
+            // .AsReasoning() for Ino's tool-calling path) into this same container. Without this, a model
+            // the registry points Ino at would never actually exist in the running container, and the first
+            // real chat call to it would fail with a "model not found" error from Ollama.
+            var pulledOllamaModelIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { defaultOllamaLlm };
+            foreach (var entry in options.ModelRegistry.Registrations)
+            {
+                if (entry.Model.Kind != DigitalBrainCapabilityKind.LargeLanguageModel ||
+                    !string.Equals(entry.Model.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase) ||
+                    !pulledOllamaModelIds.Add(entry.Model.Id))
+                {
+                    continue;
+                }
+                ollama.AddModel(OllamaModelResourceName(entry.Model.Id), entry.Model.Id);
+            }
+
             ollamaEndpoint = ollama.GetEndpoint("http");
-            // Same container as qwen — Ollama serves every pulled model from one endpoint,
+            // Same container as the LLM resource: Ollama serves every pulled model from one endpoint,
             // selected by model name in the request, not by a per-model endpoint.
             embeddingOllamaEndpoint = ollamaEndpoint;
         }
         else
         {
-            qwen = builder.AddConnectionString("qwen");
+            llm = builder.AddConnectionString("llm");
         }
 
         // Local Whisper server for voice-to-text (speech-to-text), same run-mode-only guard as Ollama above:
@@ -168,7 +169,7 @@ public static class DigitalBrainBuilderExtensions
             Name = name,
             ApplicationBuilder = builder,
             Orleans = orleans,
-            Llm = qwen,
+            Llm = llm,
             EmbeddingModel = embeddingModel,
             OrleansClient = orleans.AsClient(),
             KernelReplicas = options.KernelReplicas,
@@ -180,6 +181,10 @@ public static class DigitalBrainBuilderExtensions
             WhisperEndpoint = whisperEndpoint,
             AzureOpenAIEndpoint = azureOpenAIEndpoint,
             AzureOpenAIKey = azureOpenAIKey,
+            OpenAIApiKey = openAIApiKey,
+            AnthropicApiKey = anthropicApiKey,
+            GitHubModelsToken = githubModelsToken,
+            XaiApiKey = xaiApiKey,
             EnableOrleansDashboard = options.EnableOrleansDashboard,
             OrleansDashboardPort = options.OrleansDashboardPort,
             EnableMcp = options.EnableMcp,
@@ -226,7 +231,7 @@ public static class DigitalBrainBuilderExtensions
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
         // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks). Provider/model come from
-        // DigitalBrainOptions.WithLLM<TModel>() (see LlmModels.cs) rather than a hardcoded string.
+        // DigitalBrainOptions.WithLLM<TModel>() (see DigitalBrain.Core/Models/DigitalBrainModels.cs) rather than a hardcoded string.
         kernel.WithEnvironment("DigitalBrain__Llm__Provider", ctx.LlmProvider);
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
         if (ctx.OllamaEndpoint is not null)
@@ -251,6 +256,22 @@ public static class DigitalBrainBuilderExtensions
         if (ctx.AzureOpenAIKey is not null)
         {
             kernel.WithEnvironment("DigitalBrain__Llm__AzureOpenAIKey", ctx.AzureOpenAIKey);
+        }
+        if (ctx.OpenAIApiKey is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__OpenAIApiKey", ctx.OpenAIApiKey);
+        }
+        if (ctx.AnthropicApiKey is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__AnthropicApiKey", ctx.AnthropicApiKey);
+        }
+        if (ctx.GitHubModelsToken is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__GitHubModelsToken", ctx.GitHubModelsToken);
+        }
+        if (ctx.XaiApiKey is not null)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__XaiApiKey", ctx.XaiApiKey);
         }
 
         kernel.WithOptionalEnvironment("DigitalBrain:Voice:Provider", "DIGITALBRAIN_VOICE_PROVIDER", "DigitalBrain__Voice__Provider");
@@ -288,6 +309,11 @@ public static class DigitalBrainBuilderExtensions
     private static ReferenceExpression HttpUrl(EndpointReference endpoint, string pathSuffix = "") =>
         ReferenceExpression.Create($"http://{endpoint.Property(EndpointProperty.Host)}:{endpoint.Property(EndpointProperty.Port)}{pathSuffix}");
 
+    // Aspire resource names must be lowercase alphanumeric plus hyphens; Ollama tags routinely carry ':' and
+    // '.' (e.g. "llama3.1:8b"), so normalize the same way DigitalBrainModelDescriptor.ServiceKey does.
+    private static string OllamaModelResourceName(string modelId) =>
+        modelId.Replace(':', '-').Replace('.', '-').ToLowerInvariant();
+
     private static void WithModelRegistry(this IResourceBuilder<ProjectResource> kernel, DigitalBrainContext ctx)
     {
         if (ctx.ModelRegistry.DefaultLlm is not null)
@@ -313,6 +339,11 @@ public static class DigitalBrainBuilderExtensions
             kernel.WithEnvironment($"{prefix}__Id", registration.Model.Id);
             kernel.WithEnvironment($"{prefix}__DisplayName", registration.Model.DisplayName);
             kernel.WithEnvironment($"{prefix}__Role", registration.Role.ToString());
+            kernel.WithEnvironment($"{prefix}__ServiceKey", registration.Model.ServiceKey);
+            kernel.WithEnvironment($"{prefix}__SupportsTools", registration.Model.Capabilities.SupportsTools.ToString());
+            kernel.WithEnvironment($"{prefix}__SupportsVision", registration.Model.Capabilities.SupportsVision.ToString());
+            kernel.WithEnvironment($"{prefix}__SupportsStreaming", registration.Model.Capabilities.SupportsStreaming.ToString());
+            kernel.WithEnvironment($"{prefix}__SupportsStructuredOutput", registration.Model.Capabilities.SupportsStructuredOutput.ToString());
         }
     }
 
@@ -352,145 +383,4 @@ public static class DigitalBrainBuilderExtensions
             ?? $"digitalbrain-dev-{Guid.NewGuid():N}";
     }
 
-}
-
-public sealed class DigitalBrainOptions
-{
-    private int? lastModelRegistration;
-    private string? llmModel;
-    private string llmProvider = DigitalBrainProviderIds.Ollama;
-    private bool llmModelOverridden;
-    private bool llmProviderOverridden;
-
-    /// <summary>
-    /// Provider/model capabilities declared by the AppHost.
-    /// </summary>
-    public DigitalBrainModelRegistry ModelRegistry { get; } = new();
-
-    /// <summary>
-    /// Optional single-model runtime override. Leave unset when using the model registry roles.
-    /// </summary>
-    public string? LlmModel
-    {
-        get => llmModel;
-        set
-        {
-            llmModel = value;
-            llmModelOverridden = true;
-        }
-    }
-
-    /// <summary>
-    /// Optional single-provider runtime override. Leave unset when using the model registry roles.
-    /// </summary>
-    public string LlmProvider
-    {
-        get => llmProvider;
-        set
-        {
-            llmProvider = value;
-            llmProviderOverridden = true;
-        }
-    }
-
-    /// <summary>
-    /// Provider that will be injected into the current single-model kernel runtime.
-    /// </summary>
-    public string ResolvedLlmProvider =>
-        !llmProviderOverridden && ModelRegistry.DefaultLlm is { } defaultLlm
-            ? defaultLlm.Model.Provider
-            : llmProvider;
-
-    /// <summary>
-    /// Model id or deployment name that will be injected into the current single-model kernel runtime.
-    /// </summary>
-    public string? ResolvedLlmModel =>
-        !llmModelOverridden && ModelRegistry.DefaultLlm is { } defaultLlm
-            ? defaultLlm.Model.Id
-            : llmModel;
-
-    public int KernelReplicas { get; set; } = 3;
-
-    public bool EnableOrleansDashboard { get; set; } = true;
-    public int? OrleansDashboardPort { get; set; } = 8080;
-    public bool EnableMcp { get; set; } = true;
-
-    /// <summary>
-    /// Registers an LLM capability and makes it the kernel's current single-model runtime selection.
-    /// </summary>
-    public DigitalBrainOptions WithLLM<TModel>() where TModel : LlmModel, new()
-    {
-        var model = new TModel();
-        lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Balanced);
-        SelectLlm(model);
-        return this;
-    }
-
-    /// <summary>
-    /// Registers an embedding model for the future context/vector pipeline without changing chat routing.
-    /// </summary>
-    public DigitalBrainOptions WithEmbedding<TModel>() where TModel : EmbeddingModel, new()
-    {
-        var model = new TModel();
-        lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Default);
-        return this;
-    }
-
-    /// <summary>
-    /// Registers a voice-to-text model without changing chat routing.
-    /// </summary>
-    public DigitalBrainOptions WithVoice2Text<TModel>() where TModel : VoiceToTextModel, new()
-    {
-        var model = new TModel();
-        lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Default);
-        return this;
-    }
-
-    /// <summary>
-    /// Registers the vector database provider intended for embedding persistence.
-    /// </summary>
-    public DigitalBrainOptions WithVectorDatabase(string provider, string id = "default")
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
-        ArgumentException.ThrowIfNullOrWhiteSpace(id);
-
-        lastModelRegistration = ModelRegistry.Register(
-            new DigitalBrainModelDescriptor(DigitalBrainCapabilityKind.VectorDatabase, provider, id, id),
-            DigitalBrainModelRole.Default);
-        return this;
-    }
-
-    /// <summary>
-    /// Marks the most recently registered model as the fast LLM route.
-    /// </summary>
-    public DigitalBrainOptions AsFast() => SetLastModelRole(DigitalBrainModelRole.Fast);
-
-    /// <summary>
-    /// Marks the most recently registered model as the balanced/default LLM route.
-    /// </summary>
-    public DigitalBrainOptions AsBalanced() => SetLastModelRole(DigitalBrainModelRole.Balanced);
-
-    /// <summary>
-    /// Marks the most recently registered model as the reasoning LLM route.
-    /// </summary>
-    public DigitalBrainOptions AsReasoning() => SetLastModelRole(DigitalBrainModelRole.Reasoning);
-
-    private DigitalBrainOptions SetLastModelRole(DigitalBrainModelRole role)
-    {
-        if (lastModelRegistration is null)
-        {
-            throw new InvalidOperationException("Register a model before assigning a routing role.");
-        }
-
-        ModelRegistry.SetRole(lastModelRegistration.Value, role);
-        return this;
-    }
-
-    private void SelectLlm(DigitalBrainModel model)
-    {
-        llmProvider = model.Provider;
-        llmModel = model.Id;
-        llmProviderOverridden = false;
-        llmModelOverridden = false;
-    }
 }

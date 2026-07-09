@@ -18,6 +18,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
+using Orleans.Runtime;
 
 namespace DigitalBrain.Kernel.Hosting;
 
@@ -168,6 +169,31 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
         builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
         builder.Services.AddSingleton<DigitalBrain.Kernel.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
+        builder.Services.AddDigitalBrainChatClients(builder.Configuration);
+
+        // One IAttributeToFactoryMapper<LlmAttribute<TModel>> registration per declared model type, so grain
+        // constructors can declare [Llm<SomeModel>] IChatClient chatClient — Orleans' GrainConstructorArgumentFactory
+        // resolves the mapper keyed by the parameter attribute's closed generic type, so this can't be a single
+        // open-generic registration; it must be done reflectively, once per concrete DigitalBrainModel type.
+        foreach (var modelType in typeof(DigitalBrain.Core.Models.LlmModel).Assembly.GetTypes()
+            .Where(t => typeof(DigitalBrain.Core.Models.LlmModel).IsAssignableFrom(t) && !t.IsAbstract))
+        {
+            var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
+                typeof(DigitalBrain.Kernel.Llm.LlmAttribute<>).MakeGenericType(modelType));
+            var mapperImpl = typeof(DigitalBrain.Kernel.Llm.LlmAttributeMapper<>).MakeGenericType(modelType);
+            builder.Services.AddSingleton(mapperInterface, mapperImpl);
+        }
+
+        // Same as above, for [Voice2Text<TModel>] IVoiceTranscriber over VoiceToTextModel-derived types.
+        foreach (var modelType in typeof(DigitalBrain.Core.Models.VoiceToTextModel).Assembly.GetTypes()
+            .Where(t => typeof(DigitalBrain.Core.Models.VoiceToTextModel).IsAssignableFrom(t) && !t.IsAbstract))
+        {
+            var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
+                typeof(DigitalBrain.Kernel.Voice.Voice2TextAttribute<>).MakeGenericType(modelType));
+            var mapperImpl = typeof(DigitalBrain.Kernel.Voice.Voice2TextAttributeMapper<>).MakeGenericType(modelType);
+            builder.Services.AddSingleton(mapperInterface, mapperImpl);
+        }
+
         builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
         builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
         builder.Services.AddContextStore(builder.Configuration);
@@ -197,6 +223,8 @@ public static class DigitalBrainOrleansExtensions
 
         builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
         builder.Services.AddSingleton<DigitalBrain.Google.IGmailApiClientFactory, DigitalBrain.Google.GmailApiClientFactory>();
+        builder.Services.AddSingleton<DigitalBrain.Kernel.IInoToolProvider, DigitalBrain.Google.GmailInoToolProvider>();
+        builder.Services.AddSingleton<DigitalBrain.Kernel.IInoToolProvider, DigitalBrain.Salesforce.SalesforceInoToolProvider>();
 
         builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("salesforce", (sp, _) => new DigitalBrain.Salesforce.SalesforceConnector(
             sp.GetRequiredService<DigitalBrain.Salesforce.ISalesforceApiClientFactory>(),

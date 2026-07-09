@@ -11,9 +11,11 @@ using DigitalBrain.Pack.Contracts;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Salesforce;
 using DigitalBrain.TestKit;
+using DigitalBrain.Tests.Ino;
 using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.Ui.Contracts.Ui;
 using Grpc.Core;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -461,6 +463,7 @@ public class GatewayServiceTests : NeuronTestBase
 // shared "default"/app scope, then confirms the chat-driven query actually reaches Salesforce under that exact
 // user scope. If ResolveUserIdAsync still resolved the clientId to "anonymous" (the pre-fix bug), the
 // user-scoped credential would be invisible and the flow would ask for credentials instead of querying.
+[Collection("Ino.ToolCallingInoChatClient")]
 public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBase
 {
     private readonly RecordingSalesforceApiClientFactory _salesforceFactory = new();
@@ -485,6 +488,7 @@ public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBas
             services.AddSingleton<HomeFeedBus>();
             services.AddPackConfigStore(blobsForKeyRing: null);
             services.AddSingleton<ISalesforceApiClientFactory>(_salesforceFactory);
+            services.AddSingleton<IChatClient, ToolCallingInoChatClient>();
         });
 
     private GatewayService NewService() =>
@@ -519,6 +523,11 @@ public sealed class GatewayServiceSalesforceViaChatIdentityTests : NeuronTestBas
             [SalesforceClientFactory.UsernameKey] = "salesforce-user@example.com",
             [SalesforceClientFactory.PasswordKey] = "salesforce-password"
         });
+
+        ToolCallingInoChatClient.Steps.Clear();
+        ToolCallingInoChatClient.Steps.Enqueue(new ToolCallStep(
+            "salesforce_query",
+            new Dictionary<string, object?> { ["soqlOrQuery"] = "accounts", ["maxResults"] = 5 }));
 
         await svc.Send(new SynapseEnvelope
         {

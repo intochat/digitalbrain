@@ -1,5 +1,10 @@
 using Aspire.Hosting;
 using DigitalBrain.Aspire;
+using AnthropicModels = DigitalBrain.Core.Models.Anthropic;
+using GitHubModels = DigitalBrain.Core.Models.GitHub;
+using OllamaModels = DigitalBrain.Core.Models.Ollama;
+using OpenAIModels = DigitalBrain.Core.Models.OpenAI;
+using VoiceModels = DigitalBrain.Core.Models.Voice;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -9,14 +14,34 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Experiences emit UiSurface (AuthButtonSurface etc) for sdk/flutter_demo + Telegram skeleton.
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
-    options.WithLLM<Qwen25Coder1_5B>();
-    options.WithEmbedding<NomicEmbedText>();
-    // Local Whisper container is always present in run mode (see AddDigitalBrain), so this is safe to
-    // register unconditionally — the kernel wiring extension's voice wiring falls back gracefully whether or not a real
-    // endpoint ends up set (manual override > local Whisper container > unset).
-    options.WithVoice2Text<Whisper1Local>();
-    // To switch to Azure OpenAI, call options.WithLLM<Gpt4oMini>() instead — it needs the
-    // azure-openai-endpoint/-key parameters wired below (see README "LLM provider switch").
+    // --- Ollama (local first, 3060 Ti / 8GB VRAM) ---
+    options
+        .WithLLM<OllamaModels.Llama31_8B>().AsBalanced()
+        .WithEmbedding<OllamaModels.MxbaiEmbedLarge>();
+
+    // --- OpenAI ---
+    // options
+    //     .WithLLM<OpenAIModels.Gpt54Nano>().AsFast()
+    //     .WithLLM<OpenAIModels.Gpt54Mini>().AsBalanced()
+    //     .WithLLM<OpenAIModels.Gpt54>().AsReasoning()
+    //     .WithEmbedding<OpenAIModels.TextEmbedding3Small>();
+
+    // --- Anthropic (no embedding API; uses OpenAI embedding) ---
+    // options
+    //     .WithLLM<AnthropicModels.Claude45Haiku>().AsFast()
+    //     .WithLLM<AnthropicModels.Sonnet46>().AsBalanced()
+    //     .WithLLM<AnthropicModels.Opus46>().AsReasoning()
+    //     .WithEmbedding<OpenAIModels.TextEmbedding3Small>();
+
+    // --- GitHub Models (full tool calling, OpenAI-compatible endpoint) ---
+    // options
+    //     .WithLLM<GitHubModels.Gpt41Nano>().AsFast()
+    //     .WithLLM<GitHubModels.Gpt41Mini>().AsBalanced()
+    //     .WithLLM<GitHubModels.O4Mini>().AsReasoning()
+    //     .WithEmbedding<GitHubModels.TextEmbedding3Small>();
+
+    // --- Local voice-to-text via Whisper with CPU fallback ---
+    options.WithVoice2Text<VoiceModels.WhisperLargeV3Turbo>();
 });
 
 // Service-to-service secret gating the secrets-returning GetPackConfig RPC. Shared (same value) between the

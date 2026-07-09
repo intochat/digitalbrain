@@ -14,12 +14,18 @@ public class GoogleConnector : IConnector
     private readonly IPackConfigStore _store;
     private readonly IConfiguration? _config;
     private readonly IGrainFactory? _grainFactory;
+    private readonly HttpMessageHandler? _tokenEndpointHandler;
 
-    public GoogleConnector(IPackConfigStore store, IConfiguration? config = null, IGrainFactory? grainFactory = null)
+    public GoogleConnector(
+        IPackConfigStore store,
+        IConfiguration? config = null,
+        IGrainFactory? grainFactory = null,
+        HttpMessageHandler? tokenEndpointHandler = null)
     {
         _store = store;
         _config = config;
         _grainFactory = grainFactory;
+        _tokenEndpointHandler = tokenEndpointHandler;
     }
 
     public ConnectorDescriptor Descriptor => new(
@@ -153,7 +159,7 @@ public class GoogleConnector : IConnector
 
         try
         {
-            var tokenValues = await GoogleClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri, cancellationToken: cancellationToken);
+            var tokenValues = await GoogleClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri, _tokenEndpointHandler, cancellationToken);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in tokenValues)
             {
