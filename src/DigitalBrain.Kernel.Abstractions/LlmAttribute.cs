@@ -1,6 +1,7 @@
 namespace DigitalBrain.Kernel.Llm;
 
 using System.Reflection;
+using DigitalBrain.Core.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -34,32 +35,22 @@ public sealed class LlmAttributeMapper<TModel> : IAttributeToFactoryMapper<LlmAt
 
 // Maps a model marker type to the ServiceKey DigitalBrainChatClientRegistration registered it under, so
 // [Llm<TModel>] can stay a zero-argument generic instead of repeating the key as a string literal.
-// Model marker types must expose a public static string member (property or const/field) named "ServiceKey".
+// Derives the key the same way every other consumer does — instantiate the model and read its own
+// Describe().ServiceKey — rather than reflecting for a separately-declared string member (nothing in
+// DigitalBrain.Core.Models declares one; DigitalBrainModelDescriptor.ServiceKey is the single source of truth).
 // Public (not internal): Voice2TextAttributeMapper<TModel> in DigitalBrain.Kernel reuses this exact
-// reflection helper for [Voice2Text<TModel>], and there is no InternalsVisibleTo between the two assemblies.
+// helper for [Voice2Text<TModel>], and there is no InternalsVisibleTo between the two assemblies.
 public static class LlmServiceKeys
 {
     public static string For(Type modelType)
     {
-        // FlattenHierarchy: GetProperty/GetField only search static members declared on the exact type
-        // unless told otherwise, so a shared ServiceKey on a common base (e.g. LlmModel) would otherwise
-        // be invisible to subclasses.
-        const BindingFlags staticMemberLookup = BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy;
-        var member = modelType.GetProperty("ServiceKey", staticMemberLookup)
-            ?? (MemberInfo?)modelType.GetField("ServiceKey", staticMemberLookup);
-        if (member is null)
+        if (!typeof(DigitalBrainModel).IsAssignableFrom(modelType))
         {
             throw new InvalidOperationException(
-                $"Type '{modelType.Name}' used with [Llm<{modelType.Name}>] has no public static ServiceKey member.");
+                $"Type '{modelType.Name}' used with [Llm<{modelType.Name}>] must derive from DigitalBrainModel.");
         }
 
-        var value = member switch
-        {
-            PropertyInfo property => property.GetValue(null) as string,
-            FieldInfo field => field.GetValue(null) as string,
-            _ => null
-        };
-
-        return value ?? throw new InvalidOperationException($"Type '{modelType.Name}'.ServiceKey returned null.");
+        var model = (DigitalBrainModel)Activator.CreateInstance(modelType)!;
+        return model.Describe().ServiceKey;
     }
 }

@@ -264,7 +264,7 @@ public static class DigitalBrainBuilderExtensions
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
         // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks). Provider/model come from
-        // DigitalBrainOptions.WithLLM<TModel>() (see LlmModels.cs) rather than a hardcoded string.
+        // DigitalBrainOptions.WithLLM<TModel>() (see DigitalBrain.Core/Models/DigitalBrainModels.cs) rather than a hardcoded string.
         kernel.WithEnvironment("DigitalBrain__Llm__Provider", ctx.LlmProvider);
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
         if (ctx.OllamaEndpoint is not null)

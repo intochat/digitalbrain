@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Models;
 using DigitalBrain.Kernel.Voice;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -6,12 +7,16 @@ namespace DigitalBrain.Tests.Kernel;
 
 public class Voice2TextAttributeTests
 {
+    // Provider "test-provider" + Id "test-voice-model" contain no ':' or '.', so
+    // DigitalBrainModelDescriptor.Normalize leaves them untouched beyond lowercasing (already lowercase).
+    private const string TestVoiceModelServiceKey = "test-provider-test-voice-model";
+
     [Fact]
     public async Task MapperResolvesTheKeyedTranscriberForTheAttributesModelType()
     {
         var services = new ServiceCollection();
         var expected = new FakeTranscriber();
-        services.AddKeyedSingleton<IVoiceTranscriber>(TestVoiceModel.ServiceKey, expected);
+        services.AddKeyedSingleton<IVoiceTranscriber>(TestVoiceModelServiceKey, expected);
         var provider = services.BuildServiceProvider();
 
         var mapper = new Voice2TextAttributeMapper<TestVoiceModel>();
@@ -35,11 +40,10 @@ public class Voice2TextAttributeTests
         Assert.Contains("IVoiceTranscriber", ex.Message);
     }
 
-    private sealed class TestVoiceModel
+    private sealed class TestVoiceModel : VoiceToTextModel
     {
-        // LlmServiceKeys.For reflects for a public static member literally named "ServiceKey" — this is
-        // the same reflection contract Task 5's TestModel.ServiceKey exercises, just for voice models.
-        public const string ServiceKey = "openai-compatible-whisper-test";
+        public override string Provider => "test-provider";
+        public override string Id => "test-voice-model";
     }
 
     private sealed class FakeTranscriber : IVoiceTranscriber
