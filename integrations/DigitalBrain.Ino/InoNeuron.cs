@@ -328,10 +328,19 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
             var response = await client.GetResponseAsync(messages, chatOptions, cancellationToken);
             finalText = string.IsNullOrWhiteSpace(response.Text) ? "Done via tools." : response.Text.Trim();
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            Logger.LogWarning(ex, "Ino's tool-enabled LLM call failed to reach the model.");
+            finalText = LlmUnavailableReply;
+        }
+        catch (Exception ex)
         {
             Logger.LogWarning(ex, "Tool-enabled LLM call failed");
-            finalText = "I attempted to use tools for your request but hit an issue. " + (ex.Message.Contains("auth") ? "Gmail may need connection." : "");
+            finalText = "I attempted to use tools for your request but hit an issue.";
         }
 
         var taskIds = await OrchestrateActionsIfNeededAsync(new ReplyPlan(finalText, [], null), cancellationToken);
