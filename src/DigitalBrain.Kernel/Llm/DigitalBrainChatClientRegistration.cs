@@ -26,9 +26,12 @@ public static class DigitalBrainChatClientRegistration
             }
 
             services.AddKeyedSingleton<IChatClient>(entry.ServiceKey, (_, _) =>
-                string.Equals(entry.Provider, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase)
-                    ? BuildAzureOpenAi(runtimeOptions, entry.Id)
-                    : DigitalBrainChatClients.BuildOllama(runtimeOptions.OllamaEndpoint, entry.Id));
+                entry.Provider switch
+                {
+                    var p when string.Equals(p, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase) => BuildAzureOpenAi(runtimeOptions, entry.Id),
+                    var p when string.Equals(p, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase) => BuildAnthropic(runtimeOptions, entry.Id),
+                    _ => DigitalBrainChatClients.BuildOllama(runtimeOptions.OllamaEndpoint, entry.Id)
+                });
         }
 
         return services;
@@ -52,5 +55,21 @@ public static class DigitalBrainChatClientRegistration
             .AsIChatClient();
 
         return new ChatClientBuilder(azureClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+    }
+
+    // Official anthropics/anthropic-sdk-csharp AsIChatClient() is [Experimental("MEAI001")] — suppressed
+    // repo-wide in DigitalBrain.Kernel.csproj's <NoWarn>, matching the existing ORLEANSEXP005 pattern.
+    private static IChatClient BuildAnthropic(DigitalBrainLlmRuntimeOptions options, string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(options.AnthropicApiKey))
+        {
+            throw new InvalidOperationException(
+                $"Registered anthropic model '{modelId}' has no DigitalBrain:Llm:AnthropicApiKey configured.");
+        }
+
+        var client = new Anthropic.AnthropicClient { ApiKey = options.AnthropicApiKey };
+        return new ChatClientBuilder(client.AsIChatClient(modelId))
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .Build();
     }
 }

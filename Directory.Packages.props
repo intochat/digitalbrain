@@ -47,6 +47,8 @@
     <!-- LLM abstraction (IChatClient) -->
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
+    <!-- Official anthropics/anthropic-sdk-csharp — first-party AsIChatClient() (Task 7 real Anthropic provider) -->
+    <PackageVersion Include="Anthropic" Version="12.35.1" />
     <!-- Agent orchestration (ChatClientAgent) for Ino's generic chat path -->
     <!-- Young, fast-moving upstream (Microsoft Agent Framework, evaluation-grade as of this writing): re-verify ChatClientAgent/AIAgent.RunAsync/ChatClientAgentRunOptions via Context7 before bumping; treat as potentially breaking, not a routine version bump. -->
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
