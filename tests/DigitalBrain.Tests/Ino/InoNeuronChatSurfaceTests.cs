@@ -569,7 +569,7 @@ public sealed class InoNeuronSecretRedactionTests : NeuronTestBase
         await ino.FireAsync(new InoRequest("Get my last gmail", "grounding-client"));
 
         var genericPrompt = CapturingInoChatClient.Prompts.Last(
-            prompt => prompt.Contains("You are INO, the personal AI in DigitalBrain", StringComparison.Ordinal));
+            prompt => prompt.Contains("You are Ino, a neuron in DigitalBrain", StringComparison.Ordinal));
         Assert.Contains("Do not infer sender, subject, date, or account status from unlabeled snippets", genericPrompt);
     }
 }

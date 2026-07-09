@@ -42,6 +42,7 @@ public sealed class AuthRequiredAIFunction : DelegatingAIFunction
             await _onAuthRequired(cancellationToken);
         }
 
+        // Phase 1: typed path (Success/NeedsAuth etc) - see ToolResult in Core. Current returns string for LLM compat; full switch in composer.
         return _unauthorizedMessage;
     }
 }

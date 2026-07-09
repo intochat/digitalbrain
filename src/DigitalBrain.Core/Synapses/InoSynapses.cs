@@ -99,6 +99,15 @@ public interface IInoNeuron : INeuron, IHandle<InoRequest>, IHandle<TabularDataI
     Task<InoInteractResult> InteractAsync(InoInteractRequest request, CancellationToken cancellationToken = default);
 }
 
+// Phase 1+: Typed tool results (replaces plain strings for determinism and auth visibility).
+public abstract record ToolResult
+{
+    public sealed record Success(string Content) : ToolResult;
+    public sealed record NeedsAuth(string Provider, string ClientId, string Message) : ToolResult;
+    public sealed record Denied(string Provider, string Reason) : ToolResult;
+    public sealed record Failed(string Provider, string Error, bool Retryable = true) : ToolResult;
+}
+
 // Phase 0 observability synapses for making Ino tool usage and auth requirements first-class and visible in traces/journals.
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.InoToolCallStarted")]

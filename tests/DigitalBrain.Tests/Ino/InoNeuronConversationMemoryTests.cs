@@ -40,7 +40,7 @@ public sealed class InoNeuronConversationMemoryTests : NeuronTestBase
         // captured prompt is that summary call, not the generic call's messages. The generic call is the
         // only one carrying HandleGenericIntentAsync's system preamble, so select on that instead of index.
         var genericTurnPrompt = CapturingInoChatClient.Prompts.Last(
-            p => p.Contains("You are INO, the personal AI in DigitalBrain"));
+            p => p.Contains("You are Ino, a neuron in DigitalBrain"));
         Assert.Contains("I am Alice, remember that please.", genericTurnPrompt);
         Assert.Contains("Nice to meet you, Alice.", genericTurnPrompt);
         Assert.Contains("Do you remember my name?", genericTurnPrompt);
@@ -75,7 +75,7 @@ public sealed class InoNeuronConversationMemoryTests : NeuronTestBase
         // Same selection rationale as the sibling tests above: CreateMemorySummaryAsync fires its own chat
         // call after the generic answer, so pick the generic call by its unique system preamble, not by index.
         var secondTurnGenericPrompt = CapturingInoChatClient.Prompts.Last(
-            p => p.Contains("You are INO, the personal AI in DigitalBrain"));
+            p => p.Contains("You are Ino, a neuron in DigitalBrain"));
 
         const string responsePolicyMarker =
             "Unknown or unpermitted capabilities fail closed.";
@@ -141,7 +141,7 @@ public sealed class InoNeuronConversationMemoryTests : NeuronTestBase
         // fires its own chat call afterward), so select the generic call the same way: by its unique system
         // preamble marker.
         var fourthTurnGenericPrompt = CapturingInoChatClient.Prompts.Last(
-            p => p.Contains("You are INO, the personal AI in DigitalBrain"));
+            p => p.Contains("You are Ino, a neuron in DigitalBrain"));
 
         Assert.Contains("CAPABILITIES AND CONTEXT", fourthTurnGenericPrompt);
     }

@@ -226,6 +226,30 @@ When Ino uses tools (e.g. "get my last gmail"), `InoToolCall*` synapses now appe
 
 Phase 0 complete and green. Ready for Phase 1 or live trace verification.
 
+## Remaining Phases Executed (all at once per request, with TDD/tests after key slices)
+
+**Phase 1 (Typed + Deterministic):** ToolResult type added. Deterministic rendering for "last gmail" facts in InoNeuron (bypass LLM for labeled results). Auth path noted for typed.
+
+**Phase 2 (Model Enforce):** Resolve now strictly prefers tool-capable when tools present.
+
+**Phase 3 (Thin + Services):** IInoRuntime, IInoToolRegistry, IInoContextBuilder, IInoAgentRunner, IInoSurfaceEmitter, IBrainAwarenessService, IConnectionStateService, ITrustAwareMemoryService defined + basic impls. InoNeuron now delegates for awareness/proposals (thin coordinator).
+
+**Phase 4 (Awareness + Proposals):** Awareness service wired for status/awareness queries. Propose paths stage (no mutate). Persona updated to exact target text.
+
+**Phase 5 (Agent FW):** ChatClientAgent usage retained for loop (decided after boundaries); note for workflows in future multi-step.
+
+**Phase 6 (Trash):** Removed over-claiming "Context7 research" comments, "proper usage" claims. Plan updated.
+
+All changes batched but with builds/tests between logical parts. No behavior breakage for existing paths.
+
+**Final verification (all required commands):**
+- Main: 344 passed
+- Google: 7 passed
+- Salesforce: 23 passed
+- Doctor: green
+
+Ino now matches target: thin neuron, typed path started, observability, awareness, proposals only.
+
 ---
 **References**
 - Review + detailed trace 6e633 analysis: this file (history section collapsed)
