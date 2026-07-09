@@ -2,11 +2,13 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Core.Models;
 using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
 using DigitalBrain.Ui.Runtime;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -273,7 +275,9 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         workspaceId = WorkspaceIds.Effective(workspaceId);
         var ctx = await BuildContextAsync(request.Prompt, workspaceId, cancellationToken);
 
-        var chat = await ResolveGlobalLlmClientAsync(cancellationToken) ?? ServiceProvider.GetService<IChatClient>();
+        var chat = await ResolveGlobalLlmClientAsync(cancellationToken)
+            ?? await ResolveToolCapableChatClientAsync(cancellationToken)
+            ?? ServiceProvider.GetService<IChatClient>();
         if (chat is null)
         {
             var fallback = LlmUnavailableReply;
@@ -1203,6 +1207,28 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             Logger.LogWarning(ex, "INO LLM request failed; returning an unavailable response.");
             return (LlmUnavailableReply, false);
         }
+    }
+
+    // The generic tool-calling path needs a model that actually supports native function-calling, not just
+    // whatever the flat unkeyed default happens to be (see Llama31_8B's doc comment for why that distinction
+    // matters). Picks the first registry entry flagged SupportsTools and resolves its keyed IChatClient.
+    private async Task<IChatClient?> ResolveToolCapableChatClientAsync(CancellationToken cancellationToken)
+    {
+        var config = ServiceProvider.GetService<IConfiguration>();
+        if (config is null)
+        {
+            return null;
+        }
+
+        var entries = DigitalBrainModelRegistrySnapshot.Read(config);
+        var toolCapable = DigitalBrainModelRegistrySnapshot.FirstOrDefault(
+            entries, DigitalBrainCapabilityKind.LargeLanguageModel, e => e.Capabilities.SupportsTools);
+        if (toolCapable is null || string.IsNullOrWhiteSpace(toolCapable.ServiceKey))
+        {
+            return null;
+        }
+
+        return ServiceProvider.GetKeyedService<IChatClient>(toolCapable.ServiceKey);
     }
 
     private async Task<IChatClient?> ResolveGlobalLlmClientAsync(CancellationToken cancellationToken = default)

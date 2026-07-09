@@ -10,14 +10,23 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Experiences emit UiSurface (AuthButtonSurface etc) for sdk/flutter_demo + Telegram skeleton.
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
-    options.WithLLM<Qwen25Coder1_5B>();
+    // Explicit .AsBalanced() (not left implicit) so this stays the whole app's DefaultLlm even after
+    // Llama31_8B is registered below — DefaultLlm picks Balanced first, then Reasoning, then Fast (see
+    // DigitalBrainModelRegistry.DefaultLlm). Without an explicit Balanced entry, DefaultLlm would fall
+    // through to Llama31_8B's Reasoning tier and silently make the 8B model the app-wide default, not just
+    // Ino's tool-calling path. Ino's tool-capable resolution keys off Capabilities.SupportsTools directly
+    // (see InoNeuron.ResolveToolCapableChatClientAsync), not Role, so it still finds Llama31_8B regardless.
+    options.WithLLM<Qwen25Coder1_5B>().AsBalanced();
+    options.WithLLM<Llama31_8B>().AsReasoning();
     options.WithEmbedding<NomicEmbedText>();
     // Local Whisper container is always present in run mode (see AddDigitalBrain), so this is safe to
     // register unconditionally — the kernel wiring extension's voice wiring falls back gracefully whether or not a real
     // endpoint ends up set (manual override > local Whisper container > unset).
     options.WithVoice2Text<Whisper1Local>();
-    // To switch to Azure OpenAI, call options.WithLLM<Gpt4oMini>() instead — it needs the
-    // azure-openai-endpoint/-key parameters wired below (see README "LLM provider switch").
+    // To switch to Azure OpenAI, Anthropic, or xAI instead of local Ollama, call
+    // options.WithLLM<Gpt4oMini>() / .WithLLM<Claude45Haiku>() / .WithLLM<Grok41>() — each needs its
+    // matching secret parameter (azure-openai-endpoint/-key, anthropic-api-key, xai-api-key respectively),
+    // wired automatically by AddDigitalBrain when that provider is registered.
 });
 
 // Service-to-service secret gating the secrets-returning GetPackConfig RPC. Shared (same value) between the

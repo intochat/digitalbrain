@@ -49,6 +49,20 @@ public sealed class Qwen25Coder1_5B : LlmModel
     public override DigitalBrainModelCapabilities Capabilities => DigitalBrainModelCapabilities.ChatOnly;
 }
 
+// A real tool-calling-capable local Ollama model, for roles (like Ino's generic tool-calling path) that
+// specifically need native function-calling support — unlike Qwen25Coder1_5B (a code-completion model
+// that does not reliably use native tool-calling; this was the root cause of Ino showing raw hallucinated
+// tool-call text to users instead of actually invoking tools). Confirmed against Ollama's own library page
+// (ollama.com/library/llama3.1) that the 8b tag carries the "tools" capability badge; if that changes,
+// swap to a different confirmed tool-capable tag. Also confirm your local Ollama has GPU/RAM headroom for
+// an 8B model beyond the 1.5B fallback.
+public sealed class Llama31_8B : LlmModel
+{
+    public override string Provider => DigitalBrainProviderIds.Ollama;
+    public override string Id => "llama3.1:8b";
+    public override DigitalBrainModelCapabilities Capabilities => DigitalBrainModelCapabilities.ToolCapable;
+}
+
 /// <summary>
 /// Azure OpenAI chat deployment default. Override <see cref="DigitalBrainOptions.LlmModel"/>
 /// when the Azure deployment name is not the model id.
