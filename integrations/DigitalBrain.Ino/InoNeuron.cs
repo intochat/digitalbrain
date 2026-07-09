@@ -15,13 +15,21 @@ namespace DigitalBrain.Ino;
 using DigitalBrain.Ui.Contracts;
 
 [GrainType("ino.personal.v1")]
-public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron, IHandle<Signal>
+public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IInoNeuron, IHandle<Signal>
 {
     private sealed record ReplyPlan(string VisibleReply, IReadOnlyList<string> TaskDescriptions, string? BranchDescription);
     private sealed record AutomationDraft(string When, string? Target, string Script, string Rationale);
 
     private const string LlmUnavailableReply =
         "The local LLM is not ready yet. Ollama may still be pulling or loading the model; try again in a moment.";
+
+    private const string ToolCallHallucinationFallback =
+        "I tried to use a tool for that but didn't get a clean result. Please try again, or rephrase your request.";
+
+    [GeneratedRegex(@"""name""\s*:\s*""[A-Za-z_][A-Za-z0-9_]*""\s*,\s*""arguments""\s*:", RegexOptions.CultureInvariant)]
+    private static partial Regex ToolCallShapeRegex();
+
+    private static bool LooksLikeUnexecutedToolCall(string text) => ToolCallShapeRegex().IsMatch(text);
 
     private static readonly string[] AllowedAutomationTriggers =
     [
@@ -327,6 +335,11 @@ public class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journals) : Neu
         {
             var response = await client.GetResponseAsync(messages, chatOptions, cancellationToken);
             finalText = string.IsNullOrWhiteSpace(response.Text) ? "Done via tools." : response.Text.Trim();
+            if (LooksLikeUnexecutedToolCall(finalText))
+            {
+                Logger.LogWarning("Ino's model emitted an unexecuted tool-call-shaped reply instead of a native tool call: {Reply}", finalText);
+                finalText = ToolCallHallucinationFallback;
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
