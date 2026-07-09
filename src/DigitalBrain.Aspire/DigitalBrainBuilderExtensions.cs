@@ -455,7 +455,7 @@ public sealed class DigitalBrainOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
 
         lastModelRegistration = ModelRegistry.Register(
-            new DigitalBrainModelDescriptor(DigitalBrainCapabilityKind.VectorDatabase, provider, id, id),
+            new DigitalBrainModelDescriptor(DigitalBrainCapabilityKind.VectorDatabase, provider, id, id, DigitalBrainModelCapabilities.FullyCapable),
             DigitalBrainModelRole.Default);
         return this;
     }

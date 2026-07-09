@@ -38,13 +38,40 @@ public enum DigitalBrainModelRole
 }
 
 /// <summary>
+/// Capability flags for a provider/model registration, orthogonal to <see cref="DigitalBrainModelRole"/>
+/// (a quality/cost tier). A Fast-tier model and a Reasoning-tier model can each independently support or
+/// lack tool-calling — role says "how good," capabilities say "what it can actually do."
+/// </summary>
+public sealed record DigitalBrainModelCapabilities(
+    bool SupportsTools,
+    bool SupportsVision,
+    bool SupportsStreaming,
+    bool SupportsStructuredOutput)
+{
+    public static readonly DigitalBrainModelCapabilities FullyCapable = new(true, true, true, true);
+    public static readonly DigitalBrainModelCapabilities ChatOnly = new(false, false, true, false);
+    public static readonly DigitalBrainModelCapabilities ToolCapable = new(true, false, true, true);
+}
+
+/// <summary>
 /// Provider/model metadata shared between Aspire configuration and kernel runtime.
 /// </summary>
 public sealed record DigitalBrainModelDescriptor(
     DigitalBrainCapabilityKind Kind,
     string Provider,
     string Id,
-    string DisplayName);
+    string DisplayName,
+    DigitalBrainModelCapabilities Capabilities)
+{
+    /// <summary>
+    /// Stable identifier for this provider/model pair, safe to use as a .NET keyed-service key
+    /// (colons and dots — common in Ollama tags like "qwen2.5-coder:1.5b" — are normalized to hyphens).
+    /// </summary>
+    public string ServiceKey { get; } = Normalize($"{Provider}-{Id}");
+
+    private static string Normalize(string value) =>
+        value.Replace(':', '-').Replace('.', '-').ToLowerInvariant();
+}
 
 /// <summary>
 /// A configured provider/model capability and its intended routing role.

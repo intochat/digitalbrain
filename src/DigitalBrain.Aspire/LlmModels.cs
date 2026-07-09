@@ -12,8 +12,9 @@ public abstract class DigitalBrainModel
     public abstract string Id { get; }
 
     public virtual string DisplayName => Id;
+    public virtual DigitalBrainModelCapabilities Capabilities => DigitalBrainModelCapabilities.FullyCapable;
 
-    internal DigitalBrainModelDescriptor Describe() => new(Kind, Provider, Id, DisplayName);
+    internal DigitalBrainModelDescriptor Describe() => new(Kind, Provider, Id, DisplayName, Capabilities);
 }
 
 /// <summary>
@@ -47,6 +48,7 @@ public sealed class Qwen25Coder1_5B : LlmModel
 {
     public override string Provider => DigitalBrainProviderIds.Ollama;
     public override string Id => "qwen2.5-coder:1.5b";
+    public override DigitalBrainModelCapabilities Capabilities => DigitalBrainModelCapabilities.ChatOnly;
 }
 
 /// <summary>
