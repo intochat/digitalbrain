@@ -1,5 +1,8 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Core.Models;
+using AzureOpenAIModels = DigitalBrain.Core.Models.AzureOpenAI;
+using OllamaModels = DigitalBrain.Core.Models.Ollama;
+using VoiceModels = DigitalBrain.Core.Models.Voice;
 
 namespace DigitalBrain.Tests.Aspire;
 
@@ -10,17 +13,17 @@ public sealed class DigitalBrainModelRegistryTests
     {
         var options = new DigitalBrainOptions();
 
-        options.WithLLM<Qwen25Coder1_5B>().AsFast();
+        options.WithLLM<OllamaModels.Llama31_8B>().AsFast();
 
         var registration = Assert.Single(options.ModelRegistry.Registrations);
         Assert.Equal(DigitalBrainCapabilityKind.LargeLanguageModel, registration.Model.Kind);
         Assert.Equal(DigitalBrainProviderIds.Ollama, registration.Model.Provider);
-        Assert.Equal("qwen2.5-coder:1.5b", registration.Model.Id);
+        Assert.Equal("llama3.1:8b", registration.Model.Id);
         Assert.Equal(DigitalBrainModelRole.Fast, registration.Role);
         Assert.Equal(DigitalBrainProviderIds.Ollama, options.LlmProvider);
-        Assert.Equal("qwen2.5-coder:1.5b", options.LlmModel);
+        Assert.Equal("llama3.1:8b", options.LlmModel);
         Assert.Equal(DigitalBrainProviderIds.Ollama, options.ResolvedLlmProvider);
-        Assert.Equal("qwen2.5-coder:1.5b", options.ResolvedLlmModel);
+        Assert.Equal("llama3.1:8b", options.ResolvedLlmModel);
     }
 
     [Fact]
@@ -49,7 +52,7 @@ public sealed class DigitalBrainModelRegistryTests
     {
         var options = new DigitalBrainOptions();
 
-        options.WithLLM<Gpt4oMini>().AsBalanced();
+        options.WithLLM<AzureOpenAIModels.Gpt4oMini>().AsBalanced();
         options.LlmModel = "chat";
 
         Assert.Equal(DigitalBrainProviderIds.AzureOpenAI, options.ResolvedLlmProvider);
@@ -62,13 +65,13 @@ public sealed class DigitalBrainModelRegistryTests
         var options = new DigitalBrainOptions();
 
         options
-            .WithLLM<Qwen25Coder1_5B>().AsBalanced()
+            .WithLLM<OllamaModels.Llama31_8B>().AsBalanced()
             .WithEmbedding<TestEmbeddingModel>()
             .WithVoice2Text<TestVoiceModel>()
             .WithVectorDatabase(DigitalBrainProviderIds.Qdrant, "documents");
 
         Assert.Equal(DigitalBrainProviderIds.Ollama, options.LlmProvider);
-        Assert.Equal("qwen2.5-coder:1.5b", options.LlmModel);
+        Assert.Equal("llama3.1:8b", options.LlmModel);
 
         Assert.Contains(options.ModelRegistry.Registrations, registration =>
             registration.Model.Kind == DigitalBrainCapabilityKind.Embedding &&
@@ -92,7 +95,7 @@ public sealed class DigitalBrainModelRegistryTests
     {
         var options = new DigitalBrainOptions();
 
-        options.WithVoice2Text<Whisper1Local>();
+        options.WithVoice2Text<VoiceModels.Whisper1Local>();
 
         var voice = Assert.Single(options.ModelRegistry.Registrations);
         Assert.Equal(DigitalBrainCapabilityKind.VoiceToText, voice.Model.Kind);
@@ -116,11 +119,28 @@ public sealed class DigitalBrainModelRegistryTests
     {
         var options = new DigitalBrainOptions();
 
-        options.WithLLM<Qwen25Coder1_5B>().AsBalanced();
+        options.WithLLM<ChatOnlyTestModel>().AsBalanced();
 
         var registration = Assert.Single(options.ModelRegistry.Registrations);
-        Assert.Equal("ollama-qwen2-5-coder-1-5b", registration.Model.ServiceKey);
+        Assert.Equal("test-provider-chat-only-test", registration.Model.ServiceKey);
         Assert.False(registration.Model.Capabilities.SupportsTools);
+    }
+
+    [Fact]
+    public void ProductionLlmModelDescriptorsAreToolCapable()
+    {
+        var assemblies = new[] { typeof(LlmModel).Assembly, typeof(DigitalBrainOptions).Assembly }.Distinct();
+        var productionModels = assemblies
+            .SelectMany(static assembly => assembly.GetTypes())
+            .Where(static type =>
+                typeof(LlmModel).IsAssignableFrom(type) &&
+                !type.IsAbstract &&
+                !type.IsNested &&
+                type.GetConstructor(Type.EmptyTypes) is not null)
+            .Select(static type => (LlmModel)Activator.CreateInstance(type)!)
+            .ToArray();
+
+        Assert.DoesNotContain(productionModels, model => !model.Capabilities.SupportsTools);
     }
 
     private sealed class FastTestModel : LlmModel
@@ -139,6 +159,13 @@ public sealed class DigitalBrainModelRegistryTests
     {
         public override string Provider => DigitalBrainProviderIds.OpenAI;
         public override string Id => "reasoning-test";
+    }
+
+    private sealed class ChatOnlyTestModel : LlmModel
+    {
+        public override string Provider => "test-provider";
+        public override string Id => "chat-only-test";
+        public override DigitalBrainModelCapabilities Capabilities => DigitalBrainModelCapabilities.ChatOnly;
     }
 
     private sealed class TestEmbeddingModel : EmbeddingModel

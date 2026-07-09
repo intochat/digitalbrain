@@ -75,10 +75,26 @@ public class SalesforceCrmNeuron(
         return await client.QueryAsync(soql, ct);
     }
 
+    public async Task<string[]> QueryForClientAsync(string? clientId, string soql, CancellationToken ct = default)
+    {
+        var factory = apiClientFactory ?? throw new InvalidOperationException("Salesforce API client factory is not configured.");
+        var scope = await ResolveConnectedScopeOrThrowAsync(clientId, ct);
+        var client = await factory.CreateAsync(scope, ct);
+        return await client.QueryAsync(soql, ct);
+    }
+
     public async Task<string[]> ListAccountsAsync(int maxResults = 20, CancellationToken ct = default)
     {
         var factory = apiClientFactory ?? throw new InvalidOperationException("Salesforce API client factory is not configured.");
         var client = await factory.CreateAsync(Self.AsScope(), ct);
+        return await client.ListAccountsAsync(maxResults, ct);
+    }
+
+    public async Task<string[]> ListAccountsForClientAsync(string? clientId, int maxResults = 20, CancellationToken ct = default)
+    {
+        var factory = apiClientFactory ?? throw new InvalidOperationException("Salesforce API client factory is not configured.");
+        var scope = await ResolveConnectedScopeOrThrowAsync(clientId, ct);
+        var client = await factory.CreateAsync(scope, ct);
         return await client.ListAccountsAsync(maxResults, ct);
     }
 
@@ -97,6 +113,12 @@ public class SalesforceCrmNeuron(
         }
 
         return scope;
+    }
+
+    private async Task<NeuronScope> ResolveConnectedScopeOrThrowAsync(string? clientId, CancellationToken cancellationToken)
+    {
+        var scope = await TryGetConnectedScopeAsync(clientId, cancellationToken);
+        return scope ?? throw new InvalidOperationException("Salesforce account is not connected for this session.");
     }
 
     private async Task<NeuronScope?> ResolveUserScopeOrPromptLoginAsync(string? clientId, CancellationToken cancellationToken)

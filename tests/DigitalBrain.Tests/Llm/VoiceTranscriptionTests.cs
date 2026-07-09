@@ -17,7 +17,7 @@ public sealed class VoiceTranscriptionTests
             {
                 ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = DigitalBrainCapabilityKind.LargeLanguageModel.ToString(),
                 ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = DigitalBrainProviderIds.Ollama,
-                ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "qwen2.5-coder:1.5b",
+                ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "llama3.1:8b",
                 ["DigitalBrain:ModelRegistry:Registrations:1:Kind"] = DigitalBrainCapabilityKind.VoiceToText.ToString(),
                 ["DigitalBrain:ModelRegistry:Registrations:1:Provider"] = DigitalBrainProviderIds.OpenAI,
                 ["DigitalBrain:ModelRegistry:Registrations:1:Id"] = "whisper-test",

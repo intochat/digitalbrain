@@ -12,11 +12,11 @@ public class DigitalBrainModelRegistrySnapshotTests
         var config = BuildConfig(new Dictionary<string, string?>
         {
             ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = "LargeLanguageModel",
-            ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = "ollama",
-            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "qwen2.5-coder:1.5b",
-            ["DigitalBrain:ModelRegistry:Registrations:0:DisplayName"] = "Qwen 2.5 Coder 1.5B",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = "test-provider",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "chat-only-test",
+            ["DigitalBrain:ModelRegistry:Registrations:0:DisplayName"] = "Chat Only Test",
             ["DigitalBrain:ModelRegistry:Registrations:0:Role"] = "Balanced",
-            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "ollama-qwen2-5-coder-1-5b",
+            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "test-provider-chat-only-test",
             ["DigitalBrain:ModelRegistry:Registrations:0:SupportsTools"] = "false",
             ["DigitalBrain:ModelRegistry:Registrations:1:Kind"] = "LargeLanguageModel",
             ["DigitalBrain:ModelRegistry:Registrations:1:Provider"] = "ollama",

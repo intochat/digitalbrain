@@ -4,7 +4,7 @@ using Aspire.Hosting.Testing;
 namespace DigitalBrain.Tests.Aspire;
 
 // Real, executed coverage for the builder.ExecutionContext.IsRunMode branching added to
-// AddDigitalBrain (storage emulator + Ollama container vs. AddConnectionString("qwen")
+// AddDigitalBrain (storage emulator + Ollama container vs. AddConnectionString("llm")
 // placeholder). Uses DistributedApplicationTestingBuilder.CreateAsync against the real
 // DigitalBrain.AppHost entry point.
 // but deliberately stops after CreateAsync — never calling BuildAsync/StartAsync — so it only
@@ -38,18 +38,11 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         Assert.Contains(builder.Resources, r => r.Name == "ollama" && r.GetType().Name == "OllamaResource");
 
-        var qwen = Assert.Single(builder.Resources, r => r.Name == "qwen");
-        Assert.Equal("OllamaModelResource", qwen.GetType().Name);
+        var llm = Assert.Single(builder.Resources, r => r.Name == "llm");
+        Assert.Equal("OllamaModelResource", llm.GetType().Name);
 
-        // nomic-embed-text pulled into the same Ollama container as qwen (see Task 15).
         var embed = Assert.Single(builder.Resources, r => r.Name == "embed");
         Assert.Equal("OllamaModelResource", embed.GetType().Name);
-
-        // llama3.1:8b (Llama31_8B, registered .AsReasoning() for Ino's tool-calling path in AppHost.cs) must
-        // also be pre-pulled into the same Ollama container — otherwise Ino's tool-capable model resolution
-        // points at a tag Ollama never actually has, and the first real call to it fails with "model not found".
-        var reasoningModel = Assert.Single(builder.Resources, r => r.Name == "llama3-1-8b");
-        Assert.Equal("OllamaModelResource", reasoningModel.GetType().Name);
 
         // Local Whisper (speaches) container for voice-to-text, always present in run mode (see Task 16).
         Assert.Contains(builder.Resources, r => r.Name == "whisper" && r.GetType().Name == "ContainerResource");
@@ -73,14 +66,11 @@ public sealed class AddDigitalBrainExecutionModeTests
         var storage = Assert.Single(builder.Resources, r => r.Name == "storage");
         Assert.DoesNotContain(storage.Annotations, a => a.GetType().Name == "EmulatorResourceAnnotation");
 
-        var qwen = Assert.Single(builder.Resources, r => r.Name == "qwen");
-        Assert.Equal("ConnectionStringParameterResource", qwen.GetType().Name);
+        var llm = Assert.Single(builder.Resources, r => r.Name == "llm");
+        Assert.Equal("ConnectionStringParameterResource", llm.GetType().Name);
 
         // No local Ollama container in publish mode, so no "embed" model resource either (see Task 15).
         Assert.DoesNotContain(builder.Resources, r => r.Name == "embed");
-
-        // Nor the reasoning-tier llama3.1:8b pre-pull — it only exists inside the run-mode-only Ollama container.
-        Assert.DoesNotContain(builder.Resources, r => r.Name == "llama3-1-8b");
 
         // No local Whisper container in publish mode either (see Task 16).
         Assert.DoesNotContain(builder.Resources, r => r.Name == "whisper");

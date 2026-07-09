@@ -31,7 +31,15 @@ public interface ISalesforceCrmNeuron : IAgent, IHandle<CapabilityInvocation>
     [Alias("QueryAsync")]
     Task<string[]> QueryAsync(string soql, CancellationToken ct = default);
 
+    [Description("Run a read-only SOQL query for the active user session identified by clientId.")]
+    [Alias("QueryForClientAsync")]
+    Task<string[]> QueryForClientAsync(string? clientId, string soql, CancellationToken ct = default);
+
     [Description("List Salesforce Account records, up to maxResults.")]
     [Alias("ListAccountsAsync")]
     Task<string[]> ListAccountsAsync(int maxResults = 20, CancellationToken ct = default);
+
+    [Description("List Salesforce Account records for the active user session identified by clientId.")]
+    [Alias("ListAccountsForClientAsync")]
+    Task<string[]> ListAccountsForClientAsync(string? clientId, int maxResults = 20, CancellationToken ct = default);
 }

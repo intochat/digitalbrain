@@ -12,10 +12,10 @@ using DigitalBrain.Ui.Contracts;
 [McpServerToolType]
 public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBrainToolsBase(grains)
 {
-    [McpServerTool(Name = "ask_llm_neuron"), Description("Ask the LLM neuron (powered by local Qwen/Ollama) a question or prompt. Returns the response. Requires the kernel cluster and Ollama to be running.")]
+    [McpServerTool(Name = "ask_llm_neuron"), Description("Ask the LLM neuron (powered by the configured local/cloud model) a question or prompt. Returns the response. Requires the kernel cluster and LLM provider to be running.")]
     public async Task<string> AskLlmNeuron(
         [Description("The prompt or question to send to the LLM neuron")] string prompt,
-        [Description("Optional preferred model, e.g. 'qwen2.5-coder:1.5b'")] string? preferredModel = null,
+        [Description("Optional preferred model, e.g. 'llama3.1:8b'")] string? preferredModel = null,
         CancellationToken cancellationToken = default)
     {
         var llm = Grains.GetGrain<ILlmNeuron>("llm-main");

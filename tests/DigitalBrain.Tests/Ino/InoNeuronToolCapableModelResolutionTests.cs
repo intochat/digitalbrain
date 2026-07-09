@@ -18,9 +18,9 @@ public sealed class InoNeuronToolCapableModelResolutionTests : NeuronTestBase
             var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = "LargeLanguageModel",
-                ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = "ollama",
-                ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "qwen2.5-coder:1.5b",
-                ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "ollama-qwen2-5-coder-1-5b",
+                ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = "test-provider",
+                ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "chat-only-test",
+                ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "test-provider-chat-only-test",
                 ["DigitalBrain:ModelRegistry:Registrations:0:Role"] = "Balanced",
                 ["DigitalBrain:ModelRegistry:Registrations:0:SupportsTools"] = "false",
                 ["DigitalBrain:ModelRegistry:Registrations:1:Kind"] = "LargeLanguageModel",
@@ -34,7 +34,7 @@ public sealed class InoNeuronToolCapableModelResolutionTests : NeuronTestBase
             services.AddDigitalBrainChatClients(config);
             // The "flat default" IChatClient is deliberately the chat-only model here, so this test can
             // prove Ino picks the tool-capable one instead of just grabbing whatever the unkeyed default is.
-            services.AddKeyedSingleton<IChatClient>("ollama-qwen2-5-coder-1-5b", new RecordingChatClient("chat-only"));
+            services.AddKeyedSingleton<IChatClient>("test-provider-chat-only-test", new RecordingChatClient("chat-only"));
             services.AddKeyedSingleton<IChatClient>("ollama-llama3-1-8b", new RecordingChatClient("tool-capable"));
         });
 

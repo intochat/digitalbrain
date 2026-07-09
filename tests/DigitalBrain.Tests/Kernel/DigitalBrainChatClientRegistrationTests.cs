@@ -16,13 +16,13 @@ public class DigitalBrainChatClientRegistrationTests
         {
             ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = "LargeLanguageModel",
             ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = "ollama",
-            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "qwen2.5-coder:1.5b",
-            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "ollama-qwen2-5-coder-1-5b",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "llama3.1:8b",
+            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "ollama-llama3-1-8b",
             ["DigitalBrain:ModelRegistry:Registrations:0:Role"] = "Fast",
             ["DigitalBrain:ModelRegistry:Registrations:1:Kind"] = "LargeLanguageModel",
             ["DigitalBrain:ModelRegistry:Registrations:1:Provider"] = "ollama",
-            ["DigitalBrain:ModelRegistry:Registrations:1:Id"] = "llama3.1:8b",
-            ["DigitalBrain:ModelRegistry:Registrations:1:ServiceKey"] = "ollama-llama3-1-8b",
+            ["DigitalBrain:ModelRegistry:Registrations:1:Id"] = "llama3.2:3b",
+            ["DigitalBrain:ModelRegistry:Registrations:1:ServiceKey"] = "ollama-llama3-2-3b",
             ["DigitalBrain:ModelRegistry:Registrations:1:Role"] = "Reasoning",
             ["DigitalBrain:ModelRegistry:Registrations:1:SupportsTools"] = "true",
             ["DigitalBrain:Llm:OllamaEndpoint"] = "http://localhost:11434",
@@ -33,8 +33,8 @@ public class DigitalBrainChatClientRegistrationTests
         services.AddDigitalBrainChatClients(config);
         var provider = services.BuildServiceProvider();
 
-        var fast = provider.GetKeyedService<IChatClient>("ollama-qwen2-5-coder-1-5b");
-        var reasoning = provider.GetKeyedService<IChatClient>("ollama-llama3-1-8b");
+        var fast = provider.GetKeyedService<IChatClient>("ollama-llama3-1-8b");
+        var reasoning = provider.GetKeyedService<IChatClient>("ollama-llama3-2-3b");
 
         Assert.NotNull(fast);
         Assert.NotNull(reasoning);
@@ -119,5 +119,62 @@ public class DigitalBrainChatClientRegistrationTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredKeyedService<IChatClient>("xai-grok-4-1-fast"));
         Assert.Contains("XaiApiKey", ex.Message);
+    }
+
+    [Fact]
+    public void ThrowsAClearErrorWhenOpenAiModelIsRegisteredWithoutAnApiKey()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = "LargeLanguageModel",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = DigitalBrainProviderIds.OpenAI,
+            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "gpt-test",
+            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "openai-gpt-test",
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddDigitalBrainChatClients(config);
+        var provider = services.BuildServiceProvider();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredKeyedService<IChatClient>("openai-gpt-test"));
+        Assert.Contains("OpenAIApiKey", ex.Message);
+    }
+
+    [Fact]
+    public void ThrowsAClearErrorWhenGitHubModelIsRegisteredWithoutToken()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = "LargeLanguageModel",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = DigitalBrainProviderIds.GitHubModels,
+            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "openai/gpt-4.1-mini",
+            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "github-models-openai-gpt-4-1-mini",
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddDigitalBrainChatClients(config);
+        var provider = services.BuildServiceProvider();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredKeyedService<IChatClient>("github-models-openai-gpt-4-1-mini"));
+        Assert.Contains("GitHubModelsToken", ex.Message);
+    }
+
+    [Fact]
+    public void UnsupportedProviderDoesNotFallBackToOllama()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:ModelRegistry:Registrations:0:Kind"] = "LargeLanguageModel",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Provider"] = "unsupported-provider",
+            ["DigitalBrain:ModelRegistry:Registrations:0:Id"] = "some-model",
+            ["DigitalBrain:ModelRegistry:Registrations:0:ServiceKey"] = "unsupported-provider-some-model",
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddDigitalBrainChatClients(config);
+        var provider = services.BuildServiceProvider();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredKeyedService<IChatClient>("unsupported-provider-some-model"));
+        Assert.Contains("Unsupported LLM provider", ex.Message);
     }
 }

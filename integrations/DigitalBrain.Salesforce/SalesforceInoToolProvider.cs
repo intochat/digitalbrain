@@ -19,11 +19,11 @@ public sealed class SalesforceInoToolProvider(IGrainFactory grainFactory) : IIno
                 {
                     if (!string.IsNullOrWhiteSpace(soqlOrQuery) && soqlOrQuery.Contains("select", StringComparison.OrdinalIgnoreCase))
                     {
-                        var rows = await salesforce.QueryAsync(soqlOrQuery, cancellationToken);
+                        var rows = await salesforce.QueryForClientAsync(clientId, soqlOrQuery, cancellationToken);
                         return "Salesforce query results: " + string.Join("; ", rows.Take(maxResults));
                     }
 
-                    var accounts = await salesforce.ListAccountsAsync(Math.Clamp(maxResults, 1, 20), cancellationToken);
+                    var accounts = await salesforce.ListAccountsForClientAsync(clientId, Math.Clamp(maxResults, 1, 20), cancellationToken);
                     return "Salesforce accounts: " + string.Join(", ", accounts.Take(maxResults));
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)

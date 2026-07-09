@@ -739,7 +739,7 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             }),
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
-                ["text"] = "Supported: ollama (e.g. qwen2.5-coder:1.5b), azureopenai (gpt-4o-mini), etc."
+                ["text"] = "Supported: ollama (e.g. llama3.1:8b), azureopenai (gpt-4o-mini), openai, anthropic, github-models."
             }),
             new(UiKitVocabulary.Text, new Dictionary<string, object?>
             {
@@ -1210,8 +1210,8 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
     }
 
     // The generic tool-calling path needs a model that actually supports native function-calling, not just
-    // whatever the flat unkeyed default happens to be (see Llama31_8B's doc comment for why that distinction
-    // matters). Picks the first registry entry flagged SupportsTools and resolves its keyed IChatClient.
+    // whatever the flat unkeyed default happens to be. Picks the first registry entry flagged SupportsTools
+    // and resolves its keyed IChatClient.
     private async Task<IChatClient?> ResolveToolCapableChatClientAsync(CancellationToken cancellationToken)
     {
         var config = ServiceProvider.GetService<IConfiguration>();

@@ -25,7 +25,7 @@ public class ChatClientRegistrationTests
         {
             ["DigitalBrain:Llm:Provider"] = "ollama",
             ["DigitalBrain:Llm:OllamaEndpoint"] = "http://localhost:11434",
-            ["DigitalBrain:Llm:Model"] = "qwen2.5-coder:1.5b",
+            ["DigitalBrain:Llm:Model"] = "llama3.1:8b",
         }).Build();
         var services = new ServiceCollection();
         services.AddDigitalBrainChat(config);
@@ -39,7 +39,7 @@ public class ChatClientRegistrationTests
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["DigitalBrain:ModelRegistry:DefaultLlm:Provider"] = DigitalBrainProviderIds.Ollama,
-            ["DigitalBrain:ModelRegistry:DefaultLlm:Id"] = "qwen2.5-coder:1.5b",
+            ["DigitalBrain:ModelRegistry:DefaultLlm:Id"] = "llama3.1:8b",
             ["DigitalBrain:Llm:OllamaEndpoint"] = "http://localhost:11434",
         }).Build();
         var services = new ServiceCollection();
@@ -118,5 +118,39 @@ public class ChatClientRegistrationTests
         var options = DigitalBrainLlmRuntimeOptions.FromConfiguration(config);
 
         Assert.Equal("gpt-test", options.OpenAIModel);
+    }
+
+    [Fact]
+    public void DirectOpenAIConfiguredWithKey_RegistersChatClient()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:Llm:Provider"] = DigitalBrainProviderIds.OpenAI,
+            ["DigitalBrain:Llm:OpenAIApiKey"] = "test-openai-key",
+            ["DigitalBrain:Llm:Model"] = "gpt-test",
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddDigitalBrainChat(config);
+        using var sp = services.BuildServiceProvider();
+
+        Assert.NotNull(sp.GetService<IChatClient>());
+    }
+
+    [Fact]
+    public void GitHubModelsConfiguredWithToken_RegistersChatClient()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:Llm:Provider"] = DigitalBrainProviderIds.GitHubModels,
+            ["DigitalBrain:Llm:GitHubModelsToken"] = "test-github-token",
+            ["DigitalBrain:Llm:Model"] = "openai/gpt-4.1-mini",
+        }).Build();
+
+        var services = new ServiceCollection();
+        services.AddDigitalBrainChat(config);
+        using var sp = services.BuildServiceProvider();
+
+        Assert.NotNull(sp.GetService<IChatClient>());
     }
 }

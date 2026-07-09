@@ -31,9 +31,17 @@ public interface IGmailNeuron : IAgent, IHandle<CapabilityInvocation>
     [Alias("ListMessagesAsync")]
     Task<string[]> ListMessagesAsync(string query, int maxResults = 20, CancellationToken ct = default);
 
+    [Description("List messages for the active user session identified by clientId.")]
+    [Alias("ListMessagesForClientAsync")]
+    Task<string[]> ListMessagesForClientAsync(string? clientId, string query, int maxResults = 20, CancellationToken ct = default);
+
     [Description("Read a single message's body by its Gmail message id.")]
     [Alias("ReadMessageAsync")]
     Task<string> ReadMessageAsync(string messageId, CancellationToken ct = default);
+
+    [Description("Read a single message for the active user session identified by clientId.")]
+    [Alias("ReadMessageForClientAsync")]
+    Task<string> ReadMessageForClientAsync(string? clientId, string messageId, CancellationToken ct = default);
 
     [Description("Send an email. Mutates the user's mailbox.")]
     [Alias("SendMessageAsync")]

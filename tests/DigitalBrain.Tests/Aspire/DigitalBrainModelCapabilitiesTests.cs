@@ -30,11 +30,11 @@ public class DigitalBrainModelCapabilitiesTests
         var descriptor = new DigitalBrainModelDescriptor(
             DigitalBrainCapabilityKind.LargeLanguageModel,
             "ollama",
-            "qwen2.5-coder:1.5b",
-            "Qwen 2.5 Coder 1.5B",
-            DigitalBrainModelCapabilities.ChatOnly);
+            "llama3.1:8b",
+            "Llama 3.1 8B",
+            DigitalBrainModelCapabilities.ToolCapable);
 
-        Assert.Equal("ollama-qwen2-5-coder-1-5b", descriptor.ServiceKey);
+        Assert.Equal("ollama-llama3-1-8b", descriptor.ServiceKey);
     }
 
     private sealed class ToolCapableTestModel : LlmModel

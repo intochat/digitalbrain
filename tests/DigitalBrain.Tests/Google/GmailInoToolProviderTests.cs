@@ -16,12 +16,18 @@ namespace DigitalBrain.Tests.Google;
 public class GmailInoToolProviderTests : NeuronTestBase
 {
     private readonly RecordingGmailApiClient _gmail = new();
+    private readonly RecordingGmailApiClientFactory _gmailFactory;
+
+    public GmailInoToolProviderTests()
+    {
+        _gmailFactory = new RecordingGmailApiClientFactory(_gmail);
+    }
 
     protected override void ConfigureSilo(ISiloBuilder builder) =>
         builder.ConfigureServices(services =>
         {
             services.AddPackConfigStore(blobsForKeyRing: null);
-            services.AddSingleton<IGmailApiClientFactory>(new TestGmailApiClientFactory(_gmail));
+            services.AddSingleton<IGmailApiClientFactory>(_gmailFactory);
         });
 
     [Fact]
@@ -68,5 +74,53 @@ public class GmailInoToolProviderTests : NeuronTestBase
 
         Assert.Contains("Gmail:", result?.ToString());
         Assert.Single(_gmail.ListCalls);
+    }
+
+    [Fact]
+    public async Task Tool_uses_logged_in_user_scope_when_google_credential_is_user_scoped()
+    {
+        const string userId = "gmail-tool-oauth-user";
+        const string clientId = "session-gmail-tool-oauth-user";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest(userId, "correct horse battery staple", clientId));
+        await StoreOAuthShapedGoogleCredentialAsync(userId);
+
+        var provider = new GmailInoToolProvider(Cluster.GrainFactory);
+        var tool = provider.BuildTools(clientId, CancellationToken.None)[0];
+
+        var result = await tool.InvokeAsync(
+            new AIFunctionArguments(new Dictionary<string, object?> { ["query"] = "last", ["maxResults"] = 3 }),
+            CancellationToken.None);
+
+        Assert.Contains("Gmail:", result?.ToString());
+        Assert.Contains(_gmailFactory.Scopes, scope => scope.UserId.Value == userId);
+        Assert.DoesNotContain(_gmailFactory.Scopes, scope => scope.UserId.Value == "gmail-capability-main");
+    }
+
+    private async Task StoreOAuthShapedGoogleCredentialAsync(string userId)
+    {
+        var store = ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<IPackConfigStore>();
+        await store.SetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, new Dictionary<string, string>
+        {
+            [GoogleClientFactory.ClientIdKey] = "client-id",
+            [GoogleClientFactory.ClientSecretKey] = "client-secret",
+            [GoogleClientFactory.RedirectUriKey] = GoogleClientFactory.DefaultRedirectUri
+        });
+        await store.SetAsync(PackConfigScopes.ForUser(new UserId(userId)), GoogleClientFactory.PackName, new Dictionary<string, string>
+        {
+            [GoogleClientFactory.RefreshTokenKey] = "refresh-token"
+        });
+    }
+}
+
+internal sealed class RecordingGmailApiClientFactory(RecordingGmailApiClient client) : IGmailApiClientFactory
+{
+    public List<NeuronScope> Scopes { get; } = [];
+
+    public Task<IGmailApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Scopes.Add(scope);
+        return Task.FromResult<IGmailApiClient>(client);
     }
 }

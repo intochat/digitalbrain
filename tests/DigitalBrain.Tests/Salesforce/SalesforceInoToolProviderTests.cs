@@ -33,19 +33,31 @@ internal sealed class RecordingSalesforceApiClient : ISalesforceApiClient
 
 internal sealed class TestSalesforceApiClientFactory(RecordingSalesforceApiClient client) : ISalesforceApiClientFactory
 {
-    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default) =>
-        Task.FromResult<ISalesforceApiClient>(client);
+    public List<NeuronScope> Scopes { get; } = [];
+
+    public Task<ISalesforceApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Scopes.Add(scope);
+        return Task.FromResult<ISalesforceApiClient>(client);
+    }
 }
 
 public class SalesforceInoToolProviderTests : NeuronTestBase
 {
     private readonly RecordingSalesforceApiClient _salesforce = new();
+    private readonly TestSalesforceApiClientFactory _salesforceFactory;
+
+    public SalesforceInoToolProviderTests()
+    {
+        _salesforceFactory = new TestSalesforceApiClientFactory(_salesforce);
+    }
 
     protected override void ConfigureSilo(ISiloBuilder builder) =>
         builder.ConfigureServices(services =>
         {
             services.AddPackConfigStore(blobsForKeyRing: null);
-            services.AddSingleton<ISalesforceApiClientFactory>(new TestSalesforceApiClientFactory(_salesforce));
+            services.AddSingleton<ISalesforceApiClientFactory>(_salesforceFactory);
         });
 
     [Fact]
@@ -91,5 +103,43 @@ public class SalesforceInoToolProviderTests : NeuronTestBase
 
         Assert.Contains("Salesforce accounts:", result?.ToString());
         Assert.Single(_salesforce.ListAccountsCalls);
+    }
+
+    [Fact]
+    public async Task Tool_uses_logged_in_user_scope_when_salesforce_credential_is_user_scoped()
+    {
+        const string userId = "sf-tool-oauth-user";
+        const string clientId = "session-sf-tool-oauth-user";
+        var session = Grain<IUserSessionNeuron>("session-main");
+        await session.HandleAsync(new LoginRequest(userId, "correct horse battery staple", clientId));
+        await StoreOAuthShapedSalesforceCredentialAsync(userId);
+
+        var provider = new SalesforceInoToolProvider(Cluster.GrainFactory);
+        var tool = provider.BuildTools(clientId, CancellationToken.None)[0];
+
+        var result = await tool.InvokeAsync(
+            new AIFunctionArguments(new Dictionary<string, object?> { ["soqlOrQuery"] = "opportunities", ["maxResults"] = 5 }),
+            CancellationToken.None);
+
+        Assert.Contains("Salesforce accounts:", result?.ToString());
+        Assert.Contains(_salesforceFactory.Scopes, scope => scope.UserId.Value == userId);
+        Assert.DoesNotContain(_salesforceFactory.Scopes, scope => scope.UserId.Value == "salesforce-capability-main");
+    }
+
+    private async Task StoreOAuthShapedSalesforceCredentialAsync(string userId)
+    {
+        var store = ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<IPackConfigStore>();
+        await store.SetAsync(SalesforceClientFactory.DefaultScope, SalesforceClientFactory.PackName, new Dictionary<string, string>
+        {
+            [SalesforceClientFactory.ClientIdKey] = "client-id",
+            [SalesforceClientFactory.ClientSecretKey] = "client-secret",
+            [SalesforceClientFactory.LoginUrlKey] = SalesforceClientFactory.DefaultLoginUrl,
+            [SalesforceClientFactory.ApiVersionKey] = SalesforceClientFactory.DefaultApiVersion,
+            [SalesforceClientFactory.RedirectUriKey] = SalesforceClientFactory.DefaultRedirectUri
+        });
+        await store.SetAsync(PackConfigScopes.ForUser(new UserId(userId)), SalesforceClientFactory.PackName, new Dictionary<string, string>
+        {
+            [SalesforceClientFactory.RefreshTokenKey] = "refresh-token"
+        });
     }
 }

@@ -65,7 +65,7 @@ public sealed record DigitalBrainModelDescriptor(
 {
     /// <summary>
     /// Stable identifier for this provider/model pair, safe to use as a .NET keyed-service key
-    /// (colons and dots — common in Ollama tags like "qwen2.5-coder:1.5b" — are normalized to hyphens).
+    /// (colons and dots, common in Ollama tags like "llama3.1:8b", are normalized to hyphens).
     /// </summary>
     public string ServiceKey => Normalize($"{Provider}-{Id}");
 

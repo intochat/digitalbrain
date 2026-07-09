@@ -21,7 +21,7 @@ public sealed class GmailInoToolProvider(IGrainFactory grainFactory) : IInoToolP
                     var effectiveQuery = string.IsNullOrWhiteSpace(query) || query.Contains("last", StringComparison.OrdinalIgnoreCase)
                         ? ""
                         : query;
-                    var ids = await gmail.ListMessagesAsync(effectiveQuery, Math.Clamp(maxResults, 1, 5), cancellationToken);
+                    var ids = await gmail.ListMessagesForClientAsync(clientId, effectiveQuery, Math.Clamp(maxResults, 1, 5), cancellationToken);
                     if (ids.Length == 0)
                     {
                         return "No matching Gmail messages found.";
@@ -30,7 +30,7 @@ public sealed class GmailInoToolProvider(IGrainFactory grainFactory) : IInoToolP
                     var details = new List<string>();
                     foreach (var id in ids.Take(MaxEnrichedMessages))
                     {
-                        var snippet = await gmail.ReadMessageAsync(id, cancellationToken);
+                        var snippet = await gmail.ReadMessageForClientAsync(clientId, id, cancellationToken);
                         details.Add($"ID:{id} - {snippet}");
                     }
 

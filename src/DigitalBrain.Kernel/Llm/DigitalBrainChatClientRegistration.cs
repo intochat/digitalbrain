@@ -28,10 +28,13 @@ public static class DigitalBrainChatClientRegistration
             services.AddKeyedSingleton<IChatClient>(entry.ServiceKey, (_, _) =>
                 entry.Provider switch
                 {
+                    var p when string.Equals(p, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase) => DigitalBrainChatClients.BuildOllama(runtimeOptions.OllamaEndpoint, entry.Id),
                     var p when string.Equals(p, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase) => BuildAzureOpenAi(runtimeOptions, entry.Id),
+                    var p when string.Equals(p, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase) => BuildOpenAi(runtimeOptions, entry.Id),
                     var p when string.Equals(p, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase) => BuildAnthropic(runtimeOptions, entry.Id),
                     var p when string.Equals(p, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase) => BuildXai(runtimeOptions, entry.Id),
-                    _ => DigitalBrainChatClients.BuildOllama(runtimeOptions.OllamaEndpoint, entry.Id)
+                    var p when string.Equals(p, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase) => BuildGitHubModels(runtimeOptions, entry.Id),
+                    _ => throw new InvalidOperationException($"Unsupported LLM provider '{entry.Provider}' for registered model '{entry.Id}'.")
                 });
         }
 
@@ -56,6 +59,17 @@ public static class DigitalBrainChatClientRegistration
             .AsIChatClient();
 
         return new ChatClientBuilder(azureClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+    }
+
+    private static IChatClient BuildOpenAi(DigitalBrainLlmRuntimeOptions options, string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(options.OpenAIApiKey))
+        {
+            throw new InvalidOperationException(
+                $"Registered openai model '{modelId}' has no DigitalBrain:Llm:OpenAIApiKey configured.");
+        }
+
+        return DigitalBrainChatClients.BuildOpenAi(modelId, options.OpenAIApiKey);
     }
 
     // Official anthropics/anthropic-sdk-csharp AsIChatClient() is [Experimental("MEAI001")] — suppressed
@@ -84,10 +98,17 @@ public static class DigitalBrainChatClientRegistration
                 $"Registered xai model '{modelId}' has no DigitalBrain:Llm:XaiApiKey configured.");
         }
 
-        var clientOptions = new OpenAI.OpenAIClientOptions { Endpoint = new Uri("https://api.x.ai/v1") };
-        var openAiClient = new OpenAI.OpenAIClient(new System.ClientModel.ApiKeyCredential(options.XaiApiKey), clientOptions);
-        return new ChatClientBuilder(openAiClient.GetChatClient(modelId).AsIChatClient())
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
-            .Build();
+        return DigitalBrainChatClients.BuildOpenAiCompatible("https://api.x.ai/v1", modelId, options.XaiApiKey);
+    }
+
+    private static IChatClient BuildGitHubModels(DigitalBrainLlmRuntimeOptions options, string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(options.GitHubModelsToken))
+        {
+            throw new InvalidOperationException(
+                $"Registered github-models model '{modelId}' has no DigitalBrain:Llm:GitHubModelsToken configured.");
+        }
+
+        return DigitalBrainChatClients.BuildGitHubModels(options.GitHubModelsEndpoint, modelId, options.GitHubModelsToken);
     }
 }

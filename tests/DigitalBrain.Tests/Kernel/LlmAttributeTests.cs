@@ -3,6 +3,7 @@ using DigitalBrain.Kernel.Llm;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using OllamaModels = DigitalBrain.Core.Models.Ollama;
 
 namespace DigitalBrain.Tests.Kernel;
 
@@ -47,15 +48,15 @@ public class LlmAttributeTests
     {
         var services = new ServiceCollection();
         var expectedClient = new FakeChatClient();
-        var realModelServiceKey = new Llama31_8B().Describe().ServiceKey;
+        var realModelServiceKey = new OllamaModels.Llama31_8B().Describe().ServiceKey;
         services.AddKeyedSingleton<IChatClient>(realModelServiceKey, expectedClient);
         var provider = services.BuildServiceProvider();
 
-        Assert.Equal(realModelServiceKey, LlmServiceKeys.For(typeof(Llama31_8B)));
+        Assert.Equal(realModelServiceKey, LlmServiceKeys.For(typeof(OllamaModels.Llama31_8B)));
 
-        var mapper = new LlmAttributeMapper<Llama31_8B>();
+        var mapper = new LlmAttributeMapper<OllamaModels.Llama31_8B>();
         var parameter = typeof(FakeGrain).GetConstructors()[0].GetParameters()[0];
-        var factory = mapper.GetFactory(parameter, new LlmAttribute<Llama31_8B>());
+        var factory = mapper.GetFactory(parameter, new LlmAttribute<OllamaModels.Llama31_8B>());
 
         var resolved = factory(new FakeGrainContext(provider));
 
