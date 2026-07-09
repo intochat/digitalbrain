@@ -300,7 +300,7 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
         // message guarantees every IChatClient implementation (real or fake) actually sees it.
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, "You are INO, the personal AI in DigitalBrain (NeuroOS). Use tools for real actions like Gmail access. Always give the useful answer first, then any directives. Incorporate tool results naturally."),
+            new(ChatRole.System, "You are INO, the personal AI in DigitalBrain (NeuroOS). Use tools for real actions like Gmail access. Always give the useful answer first, then any directives. Incorporate tool results naturally. Do not infer sender, subject, date, or account status from unlabeled snippets; state only fields that tool results label or quote them as snippets."),
             new(ChatRole.System, "CAPABILITIES AND CONTEXT:\n" + ctx)
         };
 

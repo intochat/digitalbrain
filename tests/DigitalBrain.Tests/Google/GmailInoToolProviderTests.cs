@@ -72,7 +72,11 @@ public class GmailInoToolProviderTests : NeuronTestBase
             new AIFunctionArguments(new Dictionary<string, object?> { ["query"] = "last", ["maxResults"] = 3 }),
             CancellationToken.None);
 
-        Assert.Contains("Gmail:", result?.ToString());
+        var text = result?.ToString();
+        Assert.Contains("Gmail:", text);
+        Assert.Contains("MessageId:fake-message-1", text);
+        Assert.Contains("Snippet:", text);
+        Assert.DoesNotContain("ID:fake-message-1 -", text);
         Assert.Single(_gmail.ListCalls);
     }
 

@@ -31,7 +31,7 @@ public sealed class GmailInoToolProvider(IGrainFactory grainFactory) : IInoToolP
                     foreach (var id in ids.Take(MaxEnrichedMessages))
                     {
                         var snippet = await gmail.ReadMessageForClientAsync(clientId, id, cancellationToken);
-                        details.Add($"ID:{id} - {snippet}");
+                        details.Add($"MessageId:{id}; Snippet:{snippet}");
                     }
 
                     return "Gmail: " + string.Join(" | ", details);

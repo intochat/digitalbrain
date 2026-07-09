@@ -557,6 +557,21 @@ public sealed class InoNeuronSecretRedactionTests : NeuronTestBase
         Assert.DoesNotContain("raw-secret-123", prompts);
         Assert.Contains("access_token=[redacted]", prompts);
     }
+
+    [Fact]
+    public async Task Tool_Synthesis_Prompt_Forbids_Inventing_Unlabeled_Message_Fields()
+    {
+        CapturingInoChatClient.Reset();
+        CapturingInoChatClient.Replies.Enqueue("{\"intent\":\"generic\",\"confidence\":0.4}");
+        CapturingInoChatClient.Replies.Enqueue("Grounded response.");
+
+        var ino = Grain<IInoNeuron>("ino-grounding");
+        await ino.FireAsync(new InoRequest("Get my last gmail", "grounding-client"));
+
+        var genericPrompt = CapturingInoChatClient.Prompts.Last(
+            prompt => prompt.Contains("You are INO, the personal AI in DigitalBrain", StringComparison.Ordinal));
+        Assert.Contains("Do not infer sender, subject, date, or account status from unlabeled snippets", genericPrompt);
+    }
 }
 
 // Shares ToolCallingInoChatClient's static Steps queue with InoNeuronAuthGateTests and
