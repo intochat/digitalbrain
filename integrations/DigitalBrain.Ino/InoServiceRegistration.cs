@@ -19,6 +19,12 @@ public static class InoServiceRegistration
 
         services.AddSingleton<IInoAiConfig, InoAiConfig>();
 
+        // Wire real (even if basic) services for thin InoNeuron split. Ino delegates where possible.
+        services.AddSingleton<IInoRuntime, BasicInoRuntime>();
+        services.AddSingleton<IInoToolRegistry, BasicInoToolRegistry>();
+        services.AddSingleton<IBrainAwarenessService, BasicBrainAwarenessService>();
+        services.AddSingleton<IConnectionStateService, BasicConnectionState>();
+
         return services;
     }
 

@@ -574,9 +574,12 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                   Flexible(
                                     child: GestureDetector(
                                       onSecondaryTap: () {
-                                        // Support right-click (or long press) copy for INO responses as requested.
-                                        // For rich surfaces, full text extraction can be added; basic confirmation here.
-                                        Clipboard.setData(const ClipboardData(text: 'Copied INO response'));
+                                        // Support right-click (or long press) copy for INO responses.
+                                        // Extract real text from the delivered tree (text surfaces from InoResponse) so actual Gmail content etc is copied.
+                                        final actual = (message.tree != null && message.tree!['text'] is String)
+                                            ? (message.tree!['text'] as String)
+                                            : 'INO response';
+                                        Clipboard.setData(ClipboardData(text: actual));
                                       },
                                       child: Container(
                                         constraints: const BoxConstraints(
@@ -609,7 +612,10 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
                                     icon: const Icon(Icons.copy, size: 14),
                                     tooltip: 'Copy response',
                                     onPressed: () {
-                                      Clipboard.setData(const ClipboardData(text: 'Copied INO response (select text in bubble for more)'));
+                                      final actual = (message.tree != null && message.tree!['text'] is String)
+                                          ? (message.tree!['text'] as String)
+                                          : 'INO response';
+                                      Clipboard.setData(ClipboardData(text: actual));
                                     },
                                   ),
                                 ],

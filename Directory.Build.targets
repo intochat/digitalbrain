@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <!-- Sentinel so we only run dotnet tool restore once per clean -->
+    <_ToolsRestoredSentinel>$(MSBuildThisFileDirectory).config\.tools-restored</_ToolsRestoredSentinel>
+  </PropertyGroup>
+
+  <!-- Ensure dotnet tools (csharp-ls, etc.) are available for .lsp.json and agents -->
+  <Target Name="RestoreDotnetTools" BeforeTargets="Restore;Build"
+          Condition="!Exists('$(_ToolsRestoredSentinel)')">
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildThisFileDirectory)" />
+    <Touch Files="$(_ToolsRestoredSentinel)" AlwaysCreate="true" />
+  </Target>
+</Project>

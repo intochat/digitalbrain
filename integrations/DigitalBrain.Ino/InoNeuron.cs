@@ -282,8 +282,9 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
 
         var ctx = await BuildContextAsync(request.Prompt, workspaceId, cancellationToken);
 
-        var chat = await ResolveGlobalLlmClientAsync(cancellationToken)
-            ?? await ResolveToolCapableChatClientAsync(cancellationToken)
+        // Prefer tool-capable model first (for gmail etc paths). Global fallback only when no tools.
+        var chat = await ResolveToolCapableChatClientAsync(cancellationToken)
+            ?? await ResolveGlobalLlmClientAsync(cancellationToken)
             ?? ServiceProvider.GetService<IChatClient>();
         if (chat is null)
         {
@@ -293,21 +294,17 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             return;
         }
 
-        // Persona updated per target architecture. Tool calling via ChatClientAgent.
-        // Model selection enforces tool-capable when tools present (Phase 2).
+        // Persona per target (exact from plan) + practical rules for useful facts.
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, "You are Ino, a neuron in DigitalBrain. You live inside the same synapse/neuron space as the other agents. You can inspect DigitalBrain activity, explain causality, use connector tools, display UI surfaces, and propose new automations or neurons with approval. Use tools for real actions like Gmail access. Always give the useful answer first, then any directives. Incorporate tool results naturally. Do not infer sender, subject, date, or account status from unlabeled snippets; state only fields that tool results label or quote them as snippets."),
+            new(ChatRole.System, "You are Ino, a neuron in DigitalBrain. You live inside the same synapse/neuron space as the other agents. You can inspect DigitalBrain activity, explain causality, use connector tools, display UI surfaces, and propose new automations or neurons with approval. Always give the useful answer first. Use tools for real actions like Gmail access. Incorporate tool results naturally. Do not infer sender, subject, date, or account status from unlabeled snippets; state only fields that tool results label or quote them as snippets."),
             new(ChatRole.System, "CAPABILITIES AND CONTEXT:\n" + ctx)
         };
 
         messages.AddRange(LoadConversationHistory(request.ClientId));
         messages.Add(new ChatMessage(ChatRole.User, SecretText.Redact(request.Prompt)));
 
-        // Define tools for capabilities using proper Microsoft.Extensions.AI AIFunction (per Context7 research).
-        // LLM decides when to call (e.g. "get my last gmail", "check Salesforce deals").
-        // Tools return useful text for LLM + trigger surfaces via grains (real agent access).
-        // Scope: for demo/single user the main grain works; full user scope via clientId in production.
+        // Tools from IInoToolProvider registrations (gmail_get_messages etc). LLM decides.
         var tools = ServiceProvider.GetServices<IInoToolProvider>()
             .SelectMany(provider => provider.BuildTools(request.ClientId, cancellationToken))
             .ToList();
@@ -367,16 +364,19 @@ public partial class InoNeuron(ILogger<InoNeuron> logger, NeuronJournals journal
             var response = await agent.RunAsync(messages, session: null, options: new ChatClientAgentRunOptions(chatOptions), cancellationToken: cancellationToken);
             finalText = string.IsNullOrWhiteSpace(response.Text) ? "Done via tools." : response.Text.Trim();
 
-            // Phase 0: mark tool calls completed (from Ino context)
+            // Fire completed with summary for visibility (rich for traces/journals).
+            var resultSummary = finalText.Contains("Gmail:") ? finalText : null;
             foreach (var t in tools)
             {
-                await FireAsync(new InoToolCallCompleted(t.Name, ResultSummary: null, Provider: null, request.ClientId, workspaceId), cancellationToken);
+                await FireAsync(new InoToolCallCompleted(t.Name, ResultSummary: resultSummary, Provider: null, request.ClientId, workspaceId), cancellationToken);
             }
 
-            // Phase 1: deterministic facts for simple queries (bypass LLM inference on labeled tool results).
-            if (request.Prompt.Contains("last gmail", StringComparison.OrdinalIgnoreCase) && finalText.Contains("Gmail:"))
+            // Deterministic for last incoming gmail facts (bypass LLM paraphrase on labeled tool output).
+            // Matches "last incoming gmail", "my last gmail" etc. Use tool result directly.
+            var promptLower = request.Prompt.ToLowerInvariant();
+            if ((promptLower.Contains("last") || promptLower.Contains("incoming")) && promptLower.Contains("gmail") && finalText.Contains("Gmail:"))
             {
-                finalText = "Latest Gmail from tool (deterministic): " + finalText;
+                // Keep the tool-provided labeled content (Gmail: ...) as final for direct UI surface/copy. No LLM rephrase.
             }
 
             if (LooksLikeUnexecutedToolCall(finalText))

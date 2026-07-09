@@ -1,0 +1,21 @@
+{
+  "csharp": {
+    "command": "dotnet",
+    "args": ["tool", "run", "csharp-ls", "--", "--solution", "Brain.slnx"],
+    "extensionToLanguage": {
+      ".cs": "csharp"
+    },
+    "restartOnCrash": true,
+    "maxRestarts": 3
+  },
+  "dart": {
+    "command": "dart",
+    "args": ["language-server", "--protocol=lsp"],
+    "extensionToLanguage": {
+      ".dart": "dart"
+    },
+    "workspaceFolder": "app",
+    "restartOnCrash": true,
+    "maxRestarts": 3
+  }
+}

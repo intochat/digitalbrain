@@ -18,9 +18,12 @@ public sealed class GmailInoToolProvider(IGrainFactory grainFactory) : IInoToolP
             {
                 try
                 {
-                    var effectiveQuery = string.IsNullOrWhiteSpace(query) || query.Contains("last", StringComparison.OrdinalIgnoreCase)
-                        ? ""
-                        : query;
+                    // Deterministic for "last incoming" facts: prefer inbox recent (incoming) over arbitrary query.
+                    // Empty or inbox query yields the most recent received messages from Gmail API.
+                    var isLastIncoming = query.Contains("last", StringComparison.OrdinalIgnoreCase) ||
+                                         query.Contains("incoming", StringComparison.OrdinalIgnoreCase) ||
+                                         query.Contains("my gmail", StringComparison.OrdinalIgnoreCase);
+                    var effectiveQuery = isLastIncoming ? "in:inbox" : (string.IsNullOrWhiteSpace(query) ? "" : query);
                     var ids = await gmail.ListMessagesForClientAsync(clientId, effectiveQuery, Math.Clamp(maxResults, 1, 5), cancellationToken);
                     if (ids.Length == 0)
                     {
@@ -45,7 +48,7 @@ public sealed class GmailInoToolProvider(IGrainFactory grainFactory) : IInoToolP
                 }
             },
             name: "gmail_get_messages",
-            description: "Access Gmail for the user. Use for 'get my last gmail', 'recent emails', 'search gmail about X'. query can be Gmail syntax or natural (e.g. 'last', 'unread', 'Acme'). Returns enriched content.");
+            description: "Access Gmail for the user. Use for 'get my last gmail', 'last incoming gmail', 'recent emails', 'search gmail about X'. query can be Gmail syntax or natural (e.g. 'last', 'unread', 'Acme'). Returns enriched content with labeled snippets.");
 
         var gatedTool = new AuthRequiredAIFunction(
             innerTool,
