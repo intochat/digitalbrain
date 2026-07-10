@@ -634,6 +634,12 @@ public sealed class V2McpIntegrationPlanner(IV2InoConversationStore? conversatio
         var requestsPrevious = text.Contains("one before that", StringComparison.Ordinal) ||
                                (words.Contains("previous") &&
                                 (mentionsMail || text.TrimStart().StartsWith("and previous", StringComparison.Ordinal)));
+        var requestsSummary = words.Overlaps(["summary", "summarize", "summarise", "sumamry"]);
+        if (!requestsMailMutation && requestsSummary &&
+            (mentionsMail || HasImmediateGmailGrounding(request)))
+            return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
+                new V2ToolInvocation(V2GmailTools.SummarizeIncoming, emptyInput)
+            ]);
         if (!requestsMailMutation && requestsPrevious && !requestsSecondToLast)
             return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
                 GmailInvocation(PreviousRequest(request))
@@ -701,9 +707,7 @@ public sealed class V2McpIntegrationPlanner(IV2InoConversationStore? conversatio
 
     private V2GmailReadRequest PreviousRequest(V2ConversationRequest request)
     {
-        var previous = conversations?.Read(request.Context).Operations
-            .Reverse()
-            .FirstOrDefault(static operation => !V2InoConversationStates.IsActive(operation.State));
+        var previous = PreviousCompletedOperation(request);
         if (previous is null ||
             !string.Equals(previous.State, V2InoConversationStates.Succeeded, StringComparison.Ordinal) ||
             previous.Grounding is not { } grounding ||
@@ -719,6 +723,22 @@ public sealed class V2McpIntegrationPlanner(IV2InoConversationStore? conversatio
             depth + 1,
             RequiresAnchor: true);
     }
+
+    private bool HasImmediateGmailGrounding(V2ConversationRequest request)
+    {
+        var previous = PreviousCompletedOperation(request);
+        return previous is not null &&
+               string.Equals(previous.State, V2InoConversationStates.Succeeded, StringComparison.Ordinal) &&
+               string.Equals(
+                   previous.Grounding?.ToolId,
+                   V2GmailTools.ReadIncomingAtOffset,
+                   StringComparison.Ordinal);
+    }
+
+    private V2InoConversationOperation? PreviousCompletedOperation(V2ConversationRequest request) =>
+        conversations?.Read(request.Context).Operations
+            .Reverse()
+            .FirstOrDefault(static operation => !V2InoConversationStates.IsActive(operation.State));
 
     private static bool TryReadAnchor(
         JsonElement content,
@@ -795,6 +815,18 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (string.Equals(invocation.ToolId, V2GmailTools.SummarizeIncoming, StringComparison.Ordinal))
+        {
+            if (invocation.Input.ValueKind != JsonValueKind.Object || invocation.Input.EnumerateObject().Any())
+                return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That Gmail request is not allowed.");
+            if (context.Principal.Kind != PrincipalKind.User || !context.Grants.Contains("gmail.read"))
+                return new V2ToolOutcome(
+                    V2ToolOutcomeKind.Denied,
+                    SafeReason: "You don’t have permission to read Gmail in this workspace.");
+            return new V2ToolOutcome(
+                V2ToolOutcomeKind.PermanentFailure,
+                SafeReason: "I can’t summarize email content because Gmail access is limited to sender metadata. I won’t read bodies or snippets.");
+        }
         if (string.Equals(invocation.ToolId, V2GmailTools.ReadIncomingAtOffset, StringComparison.Ordinal))
         {
             if (!TryParseGmailRequest(invocation.Input, out var gmailRequest))
@@ -957,7 +989,7 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
 
 public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
 {
-    private const string UngroundedMailboxReason = "I couldn’t verify mailbox sender metadata from Gmail, so I won’t guess.";
+    private const string UngroundedMailboxReason = "I couldn’t verify that mailbox claim from a successful Gmail result, so I won’t guess.";
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(250);
     private static readonly Regex EmailAddress = new(
         @"(?<![\p{L}\p{N}._%+-])[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?![\p{L}\p{N}._%+-])",
@@ -966,6 +998,10 @@ public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
     private static readonly Regex MailboxSenderClaim = new(
         @"\b(?:gmail|email|mailbox|incoming message)\b.{0,120}\b(?:sent by|sender|from)\b|" +
         @"\b(?:sent by|sender)\b.{0,120}\b(?:gmail|email|mailbox|message)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeout);
+    private static readonly Regex MailboxReference = new(
+        @"\b(?:gmail|email|mailbox|incoming message|sender)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         RegexTimeout);
     private static readonly Regex UnsafeAddress = new(
@@ -1001,7 +1037,8 @@ public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
         if (string.IsNullOrWhiteSpace(response.Text))
             throw new InvalidOperationException("The configured model returned no answer.");
         var text = response.Text.Trim();
-        if (EmailAddress.IsMatch(text) || MailboxSenderClaim.IsMatch(text))
+        if (MailboxSenderClaim.IsMatch(text) ||
+            (EmailAddress.IsMatch(text) && MailboxReference.IsMatch(text)))
             return Task.FromResult(UngroundedMailboxReason);
         if (UnsafeAddress.IsMatch(text) || UnsafeTerm.IsMatch(text) || ContainsSensitiveContextValue(text, context))
             throw new InvalidOperationException("The configured model returned an answer that is unsafe to display.");

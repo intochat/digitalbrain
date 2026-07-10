@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DigitalBrain.Core.Models;
 using DigitalBrain.Kernel.Llm;
 using Microsoft.Extensions.AI;
@@ -152,5 +153,65 @@ public class ChatClientRegistrationTests
         using var sp = services.BuildServiceProvider();
 
         Assert.NotNull(sp.GetService<IChatClient>());
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("false", false)]
+    [InlineData("true", true)]
+    public void SensitiveTelemetryRequiresExplicitConfiguration(string? configured, bool expected)
+    {
+        var values = new Dictionary<string, string?>();
+        if (configured is not null) values["DigitalBrain:Llm:EnableSensitiveTelemetry"] = configured;
+        var options = DigitalBrainLlmRuntimeOptions.FromConfiguration(
+            new ConfigurationBuilder().AddInMemoryCollection(values).Build());
+
+        Assert.Equal(expected, options.EnableSensitiveTelemetry);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ChatTelemetryIncludesMessagesOnlyWhenExplicitlyEnabled(bool enabled)
+    {
+        const string prompt = "telemetry-secret-prompt";
+        var stopped = new List<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = static source => source.Name == "DigitalBrain.Neuron",
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            SampleUsingParentId = static (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = stopped.Add
+        };
+        ActivitySource.AddActivityListener(listener);
+        using var client = DigitalBrainChatTelemetry.Wrap(new EchoChatClient(), enabled);
+
+        await client.GetResponseAsync(prompt);
+
+        var telemetry = string.Join('\n', stopped.SelectMany(static activity =>
+            activity.Tags.Select(static tag => $"{tag.Key}={tag.Value}")
+                .Concat(activity.Events.SelectMany(static activityEvent => activityEvent.Tags.Select(tag =>
+                    $"{activityEvent.Name}:{tag.Key}={tag.Value}")))));
+        Assert.Equal(enabled, telemetry.Contains(prompt, StringComparison.Ordinal));
+        Assert.Equal(enabled, telemetry.Contains("telemetry-response", StringComparison.Ordinal));
+    }
+
+    private sealed class EchoChatClient : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "telemetry-response")));
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
     }
 }

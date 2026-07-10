@@ -22,7 +22,10 @@ public static class DigitalBrainChat
 
         if (string.Equals(options.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase))
         {
-            services.AddChatClient(DigitalBrainChatClients.BuildOllama(options.OllamaEndpoint, options.Model));
+            services.AddChatClient(DigitalBrainChatClients.BuildOllama(
+                options.OllamaEndpoint,
+                options.Model,
+                options.EnableSensitiveTelemetry));
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase))
         {
@@ -37,37 +40,46 @@ public static class DigitalBrainChat
                     : new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(options.AzureOpenAIKey)))
                 .GetChatClient(options.Model)
                 .AsIChatClient();
-            var chatClient = new ChatClientBuilder(azureClient)
-                .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
-                .Build();
+            var chatClient = DigitalBrainChatTelemetry.Wrap(azureClient, options.EnableSensitiveTelemetry);
             services.AddChatClient(chatClient);
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase))
         {
             var apiKey = options.OpenAIApiKey
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:OpenAIApiKey is required for openai provider.");
-            services.AddChatClient(DigitalBrainChatClients.BuildOpenAi(options.Model, apiKey));
+            services.AddChatClient(DigitalBrainChatClients.BuildOpenAi(
+                options.Model,
+                apiKey,
+                options.EnableSensitiveTelemetry));
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase))
         {
             var apiKey = options.AnthropicApiKey
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:AnthropicApiKey is required for anthropic provider.");
             var client = new Anthropic.AnthropicClient { ApiKey = apiKey };
-            services.AddChatClient(new ChatClientBuilder(client.AsIChatClient(options.Model))
-                .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
-                .Build());
+            services.AddChatClient(DigitalBrainChatTelemetry.Wrap(
+                client.AsIChatClient(options.Model),
+                options.EnableSensitiveTelemetry));
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase))
         {
             var apiKey = options.XaiApiKey
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:XaiApiKey is required for xai provider.");
-            services.AddChatClient(DigitalBrainChatClients.BuildOpenAiCompatible("https://api.x.ai/v1", options.Model, apiKey));
+            services.AddChatClient(DigitalBrainChatClients.BuildOpenAiCompatible(
+                "https://api.x.ai/v1",
+                options.Model,
+                apiKey,
+                options.EnableSensitiveTelemetry));
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase))
         {
             var token = options.GitHubModelsToken
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:GitHubModelsToken is required for github-models provider.");
-            services.AddChatClient(DigitalBrainChatClients.BuildGitHubModels(options.GitHubModelsEndpoint, options.Model, token));
+            services.AddChatClient(DigitalBrainChatClients.BuildGitHubModels(
+                options.GitHubModelsEndpoint,
+                options.Model,
+                token,
+                options.EnableSensitiveTelemetry));
         }
         else if (!string.IsNullOrWhiteSpace(options.Provider))
         {

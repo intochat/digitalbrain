@@ -229,6 +229,10 @@ public static class DigitalBrainBuilderExtensions
         kernel.WaitFor(ctx.SyncBlobs);
 
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
+        if (ctx.ApplicationBuilder.ExecutionContext.IsRunMode)
+        {
+            kernel.WithEnvironment("DigitalBrain__Llm__EnableSensitiveTelemetry", "true");
+        }
 
         // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks). Provider/model come from
         // DigitalBrainOptions.WithLLM<TModel>() (see DigitalBrain.Core/Models/DigitalBrainModels.cs) rather than a hardcoded string.

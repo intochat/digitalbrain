@@ -28,7 +28,7 @@ public static class DigitalBrainChatClientRegistration
             services.AddKeyedSingleton<IChatClient>(entry.ServiceKey, (_, _) =>
                 entry.Provider switch
                 {
-                    var p when string.Equals(p, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase) => DigitalBrainChatClients.BuildOllama(runtimeOptions.OllamaEndpoint, entry.Id),
+                    var p when string.Equals(p, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase) => DigitalBrainChatClients.BuildOllama(runtimeOptions.OllamaEndpoint, entry.Id, runtimeOptions.EnableSensitiveTelemetry),
                     var p when string.Equals(p, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase) => BuildAzureOpenAi(runtimeOptions, entry.Id),
                     var p when string.Equals(p, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase) => BuildOpenAi(runtimeOptions, entry.Id),
                     var p when string.Equals(p, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase) => BuildAnthropic(runtimeOptions, entry.Id),
@@ -58,9 +58,7 @@ public static class DigitalBrainChatClientRegistration
             .GetChatClient(deploymentId)
             .AsIChatClient();
 
-        return new ChatClientBuilder(azureClient)
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
-            .Build();
+        return DigitalBrainChatTelemetry.Wrap(azureClient, options.EnableSensitiveTelemetry);
     }
 
     private static IChatClient BuildOpenAi(DigitalBrainLlmRuntimeOptions options, string modelId)
@@ -71,7 +69,7 @@ public static class DigitalBrainChatClientRegistration
                 $"Registered openai model '{modelId}' has no DigitalBrain:Llm:OpenAIApiKey configured.");
         }
 
-        return DigitalBrainChatClients.BuildOpenAi(modelId, options.OpenAIApiKey);
+        return DigitalBrainChatClients.BuildOpenAi(modelId, options.OpenAIApiKey, options.EnableSensitiveTelemetry);
     }
 
     // Official anthropics/anthropic-sdk-csharp AsIChatClient() is [Experimental("MEAI001")] — suppressed
@@ -85,9 +83,7 @@ public static class DigitalBrainChatClientRegistration
         }
 
         var client = new Anthropic.AnthropicClient { ApiKey = options.AnthropicApiKey };
-        return new ChatClientBuilder(client.AsIChatClient(modelId))
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
-            .Build();
+        return DigitalBrainChatTelemetry.Wrap(client.AsIChatClient(modelId), options.EnableSensitiveTelemetry);
     }
 
     // xAI has no dedicated SDK — Grok's API is OpenAI-API-compatible, so this reuses the official OpenAI
@@ -100,7 +96,11 @@ public static class DigitalBrainChatClientRegistration
                 $"Registered xai model '{modelId}' has no DigitalBrain:Llm:XaiApiKey configured.");
         }
 
-        return DigitalBrainChatClients.BuildOpenAiCompatible("https://api.x.ai/v1", modelId, options.XaiApiKey);
+        return DigitalBrainChatClients.BuildOpenAiCompatible(
+            "https://api.x.ai/v1",
+            modelId,
+            options.XaiApiKey,
+            options.EnableSensitiveTelemetry);
     }
 
     private static IChatClient BuildGitHubModels(DigitalBrainLlmRuntimeOptions options, string modelId)
@@ -111,6 +111,10 @@ public static class DigitalBrainChatClientRegistration
                 $"Registered github-models model '{modelId}' has no DigitalBrain:Llm:GitHubModelsToken configured.");
         }
 
-        return DigitalBrainChatClients.BuildGitHubModels(options.GitHubModelsEndpoint, modelId, options.GitHubModelsToken);
+        return DigitalBrainChatClients.BuildGitHubModels(
+            options.GitHubModelsEndpoint,
+            modelId,
+            options.GitHubModelsToken,
+            options.EnableSensitiveTelemetry);
     }
 }

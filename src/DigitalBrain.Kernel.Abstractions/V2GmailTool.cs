@@ -5,6 +5,7 @@ namespace DigitalBrain.Kernel.V2;
 public static class V2GmailTools
 {
     public const string ReadIncomingAtOffset = "gmail.read.incoming-at-offset";
+    public const string SummarizeIncoming = "gmail.read.summary";
     public const int MaximumOffset = 4;
 }
 

@@ -432,7 +432,59 @@ public sealed class V2IntegrationToolTests
                 true),
             []);
 
-        Assert.Equal("I couldn’t verify mailbox sender metadata from Gmail, so I won’t guess.", answer);
+        Assert.Equal("I couldn’t verify that mailbox claim from a successful Gmail result, so I won’t guess.", answer);
+    }
+
+    [Fact]
+    public async Task Grounded_elliptical_mail_summary_is_denied_without_reading_content_or_calling_gmail_again()
+    {
+        var context = Context("user", "workspace", "gmail.read", "brain.act", "ui.action");
+        var store = new V2InoEffectStore();
+        var gateway = new RecordingGateway(gmailRead: request => GmailResult(
+            request,
+            "latest",
+            1000,
+            "Latest <latest@example.com>"));
+        var handler = ConversationHandler(store, gateway);
+
+        await handler.ExecuteAsync(Command(context, "mail", "Who sent my latest incoming email?"));
+        await handler.ExecuteAsync(Command(context, "summary", "Give me sumamry of last 6"));
+
+        Assert.Single(gateway.GmailRequests);
+        var answer = store.Read(context).Turns.Last(static turn => turn.Role == "assistant").Text;
+        Assert.Equal(
+            "I can’t summarize email content because Gmail access is limited to sender metadata. I won’t read bodies or snippets.",
+            answer);
+    }
+
+    [Fact]
+    public async Task Explicit_mail_summary_requires_gmail_read_and_never_calls_the_provider()
+    {
+        var gateway = new RecordingGateway();
+        var planner = new V2McpIntegrationPlanner();
+        var invocation = Assert.Single(await planner.PlanAsync(Request("Summarize my last 6 emails")));
+        var catalog = new V2McpAuthorizedToolCatalog(gateway);
+
+        var denied = await catalog.InvokeAsync(Context("user", "workspace"), invocation);
+        var unsupported = await catalog.InvokeAsync(Context("user", "workspace", "gmail.read"), invocation);
+
+        Assert.Equal(V2GmailTools.SummarizeIncoming, invocation.ToolId);
+        Assert.Equal(V2ToolOutcomeKind.Denied, denied.Kind);
+        Assert.Equal(V2ToolOutcomeKind.PermanentFailure, unsupported.Kind);
+        Assert.Empty(gateway.GmailRequests);
+    }
+
+    [Fact]
+    public async Task Non_mailbox_email_address_is_not_mislabeled_as_a_gmail_sender_claim()
+    {
+        const string expected = "Contact support@example.com for help.";
+
+        var answer = await new V2McpResponseComposer().ComposeAsync(
+            Context("user", "workspace"),
+            new V2ModelResponse(expected, "test", true),
+            []);
+
+        Assert.Equal(expected, answer);
     }
 
     [Fact]
