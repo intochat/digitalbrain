@@ -1,6 +1,7 @@
 using System.Net.Mail;
 using System.Text;
 using System.Text.RegularExpressions;
+using DigitalBrain.Kernel.V2;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Services;
@@ -10,6 +11,7 @@ namespace DigitalBrain.Google;
 
 public sealed class GoogleGmailApiClient : IGmailApiClient
 {
+    internal const int CandidateWindowSize = 16;
     private static readonly Regex EncodedWord = new(
         @"=\?([^?\s]+)\?([bq])\?([^?]*)\?=",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
@@ -30,26 +32,70 @@ public sealed class GoogleGmailApiClient : IGmailApiClient
 
     internal GoogleGmailApiClient(GmailService service) => _service = service;
 
-    public async Task<GmailLatestIncomingMessage> ReadLatestIncomingAsync(
+    public async Task<GmailLatestIncomingMessage> ReadIncomingAtOffsetAsync(
+        GmailIncomingReadRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (request.Offset is < 0 or > V2GmailTools.MaximumOffset)
+            throw new ArgumentOutOfRangeException(nameof(request));
+        if ((request.AnchorMessageId is null) != (request.AnchorInternalDate is null))
+            throw new ArgumentException("A complete Gmail anchor is required.", nameof(request));
+
         var list = _service.Users.Messages.List("me");
         list.LabelIds = new Repeatable<string>(["INBOX"]);
         list.Q = "-in:sent -in:drafts";
-        list.MaxResults = 1;
+        list.MaxResults = CandidateWindowSize;
         list.IncludeSpamTrash = false;
         var messages = await list.ExecuteAsync(cancellationToken).ConfigureAwait(false);
-        var messageId = messages.Messages?.FirstOrDefault()?.Id;
-        if (string.IsNullOrWhiteSpace(messageId))
+        var messageIds = messages.Messages?
+            .Select(static message => message.Id)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .Take(CandidateWindowSize)
+            .ToArray() ?? [];
+        if (messageIds.Length == 0)
             return new GmailLatestIncomingMessage(GmailLatestIncomingState.EmptyInbox);
 
-        var get = _service.Users.Messages.Get("me", messageId);
-        get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
-        get.MetadataHeaders = new Repeatable<string>(["From"]);
-        var message = await get.ExecuteAsync(cancellationToken).ConfigureAwait(false);
-        var from = message.Payload?.Headers?.FirstOrDefault(static header =>
-            string.Equals(header.Name, "From", StringComparison.OrdinalIgnoreCase))?.Value;
-        return ParseSender(from);
+        var candidates = new List<GmailCandidate>(messageIds.Length);
+        foreach (var messageId in messageIds)
+        {
+            var get = _service.Users.Messages.Get("me", messageId);
+            get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
+            get.MetadataHeaders = new Repeatable<string>(["From"]);
+            var message = await get.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+            if (message.InternalDate is not long internalDate) continue;
+            var from = message.Payload?.Headers?.FirstOrDefault(static header =>
+                string.Equals(header.Name, "From", StringComparison.OrdinalIgnoreCase))?.Value;
+            candidates.Add(new GmailCandidate(messageId, internalDate, from));
+        }
+
+        var ordered = candidates
+            .OrderByDescending(static message => message.InternalDate)
+            .ThenBy(static message => message.MessageId, StringComparer.Ordinal)
+            .ToArray();
+        if (ordered.Length == 0)
+            return new GmailLatestIncomingMessage(GmailLatestIncomingState.PositionUnavailable);
+
+        var start = 0;
+        if (request.AnchorMessageId is not null)
+        {
+            var anchorIndex = Array.FindIndex(ordered, candidate =>
+                string.Equals(candidate.MessageId, request.AnchorMessageId, StringComparison.Ordinal) &&
+                candidate.InternalDate == request.AnchorInternalDate);
+            if (anchorIndex < 0)
+                return new GmailLatestIncomingMessage(GmailLatestIncomingState.PositionUnavailable);
+            start = anchorIndex;
+        }
+
+        var requestedIndex = start + request.Offset;
+        if (requestedIndex >= ordered.Length)
+            return new GmailLatestIncomingMessage(GmailLatestIncomingState.PositionUnavailable);
+        var requested = ordered[requestedIndex];
+        return ParseSender(requested.From) with
+        {
+            MessageId = requested.MessageId,
+            InternalDate = requested.InternalDate
+        };
     }
 
     internal static GmailLatestIncomingMessage ParseSender(string? from)
@@ -129,4 +175,6 @@ public sealed class GoogleGmailApiClient : IGmailApiClient
         }
         return bytes.ToArray();
     }
+
+    private sealed record GmailCandidate(string MessageId, long InternalDate, string? From);
 }

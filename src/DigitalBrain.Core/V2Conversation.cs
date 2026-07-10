@@ -53,7 +53,8 @@ public sealed record V2InoConversationOperation(
     string? SafeReason,
     bool Retryable,
     DateTimeOffset UpdatedAt,
-    V2ToolAction? Action = null);
+    V2ToolAction? Action = null,
+    V2ToolGrounding? Grounding = null);
 
 public sealed record V2InoConversationSnapshot(
     string ConversationId,
@@ -76,19 +77,24 @@ public interface IV2InoConversationStore
         RequestContext context,
         string commandId,
         string response,
-        V2ToolAction? action = null);
+        V2ToolAction? action = null,
+        V2ToolGrounding? grounding = null);
     V2InoConversationSnapshot Fail(RequestContext context, string commandId, string safeReason, bool retryable);
 }
 
 public enum V2ToolOutcomeKind { Success, NeedsAuth, Denied, RetryableFailure, PermanentFailure, OutcomeUnknown, Cancelled }
 public sealed record V2ToolAction(string Kind, string Label, string Target);
+public sealed record V2ToolGrounding(string ToolId, JsonElement Content);
 public sealed record V2ToolOutcome(
     V2ToolOutcomeKind Kind,
     JsonElement? Content = null,
     string? SafeReason = null,
     V2ToolAction? Action = null);
 public sealed record V2ToolInvocation(string ToolId, JsonElement Input);
-public sealed record V2ConversationExecutionResult(string Text, V2ToolAction? Action = null);
+public sealed record V2ConversationExecutionResult(
+    string Text,
+    V2ToolAction? Action = null,
+    V2ToolGrounding? Grounding = null);
 
 public interface IV2IntentCapabilityPlanner
 {
@@ -148,16 +154,30 @@ public sealed class V2ConversationOwner(
             throw new UnauthorizedAccessException("V2 context assembler returned an out-of-scope context.");
 
         var outcomes = new List<V2ToolOutcome>();
+        var invocations = new List<V2ToolInvocation>();
         if (request.AllowTools)
         {
             foreach (var invocation in await planner.PlanAsync(request, cancellationToken))
+            {
+                invocations.Add(invocation);
                 outcomes.Add(await toolCatalog.InvokeAsync(request.Context, invocation, cancellationToken));
+            }
         }
 
         var model = await modelRouter.CompleteAsync(
             new V2ModelRequest(request.Text, scoped, StructuredOutput: true, outcomes),
             cancellationToken);
         var text = await composer.ComposeAsync(request.Context, model, outcomes, cancellationToken);
-        return new V2ConversationExecutionResult(text, outcomes.Select(static outcome => outcome.Action).FirstOrDefault(static action => action is not null));
+        var grounding = invocations
+            .Zip(outcomes)
+            .Where(static pair => pair.Second.Kind == V2ToolOutcomeKind.Success &&
+                                  pair.Second.Content is not null &&
+                                  pair.First.ToolId.StartsWith("gmail.read.", StringComparison.Ordinal))
+            .Select(static pair => new V2ToolGrounding(pair.First.ToolId, pair.Second.Content!.Value.Clone()))
+            .FirstOrDefault();
+        return new V2ConversationExecutionResult(
+            text,
+            outcomes.Select(static outcome => outcome.Action).FirstOrDefault(static action => action is not null),
+            grounding);
     }
 }

@@ -33,7 +33,7 @@ public sealed class V2IntegrationToolTests
         var update = await planner.PlanAsync(Request("Update my Salesforce account"));
         var query = await planner.PlanAsync(Request("Run this Salesforce SOQL query"));
 
-        Assert.Equal(V2GmailTools.ReadLatest, Assert.Single(gmail).ToolId);
+        Assert.Equal(V2GmailTools.ReadIncomingAtOffset, Assert.Single(gmail).ToolId);
         Assert.Equal(V2SalesforceTools.ReadLatestAccount, Assert.Single(latestAccount).ToolId);
         Assert.Equal(V2SalesforceTools.ReadRecentAccounts, Assert.Single(accounts).ToolId);
         Assert.Equal(V2SalesforceTools.ReadRecentContacts, Assert.Single(contacts).ToolId);
@@ -54,8 +54,8 @@ public sealed class V2IntegrationToolTests
     {
         var invocation = Assert.Single(await new V2McpIntegrationPlanner().PlanAsync(Request(prompt)));
 
-        Assert.Equal(V2GmailTools.ReadLatest, invocation.ToolId);
-        Assert.Empty(invocation.Input.EnumerateObject());
+        Assert.Equal(V2GmailTools.ReadIncomingAtOffset, invocation.ToolId);
+        Assert.Equal(0, invocation.Input.GetProperty("offset").GetInt32());
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class V2IntegrationToolTests
             GmailInvocation());
 
         Assert.Equal(V2ToolOutcomeKind.Success, firstResult.Kind);
-        var grounded = firstResult.Content!.Value.GetProperty("latestIncomingMessage");
+        var grounded = firstResult.Content!.Value.GetProperty("incomingMessage");
         Assert.Equal("senderAvailable", grounded.GetProperty("status").GetString());
         Assert.Equal("Ada Lovelace <ada@example.com>", grounded.GetProperty("sender").GetString());
         Assert.Equal("ada@example.com", grounded.GetProperty("senderAddress").GetString());
@@ -196,7 +196,7 @@ public sealed class V2IntegrationToolTests
 
     [Theory]
     [InlineData(V2GmailMailboxState.EmptyInbox, "No incoming Gmail messages were found.")]
-    [InlineData(V2GmailMailboxState.SenderUnavailable, "The latest incoming Gmail message’s sender metadata was unavailable.")]
+    [InlineData(V2GmailMailboxState.SenderUnavailable, "The latest incoming email’s sender metadata was unavailable.")]
     public async Task Composer_reports_empty_or_unavailable_sender_metadata_without_inference(
         V2GmailMailboxState state,
         string expected)
@@ -300,18 +300,189 @@ public sealed class V2IntegrationToolTests
         Assert.Equal(V2ToolOutcomeKind.Success, received.ToolOutcomes![0].Kind);
         if (isGmail)
         {
-            var sender = received.ToolOutcomes[0].Content!.Value.GetProperty("latestIncomingMessage");
+            var sender = received.ToolOutcomes[0].Content!.Value.GetProperty("incomingMessage");
             Assert.Equal("grounded@example.com", sender.GetProperty("senderAddress").GetString());
         }
         Assert.Equal(1, isGmail ? gateway.GmailOwnerScopes.Count : gateway.SalesforceOwnerScopes.Count);
         Assert.Equal(2, store.Read(context).Turns.Count);
     }
 
+    [Fact]
+    public async Task Previous_email_follow_up_is_grounded_by_a_second_provider_call_and_replays_once()
+    {
+        var context = Context("user", "workspace", "gmail.read", "brain.act", "ui.action");
+        var store = new V2InoEffectStore();
+        var gateway = new RecordingGateway(gmailRead: request => request.RequiresAnchor
+            ? GmailResult(request, "amazon", 2000, "Amazon <action-requests@services.amazon.com>")
+            : GmailResult(request, "godaddy", 3000, "GoDaddy <donotreply@godaddy.com>"));
+        var handler = ConversationHandler(store, gateway);
+
+        Assert.Equal(WorkflowState.Succeeded, (await handler.ExecuteAsync(Command(
+            context,
+            "latest",
+            "Who sent my latest incoming email? Include the sender email address."))).State);
+        Assert.Equal(WorkflowState.Succeeded, (await handler.ExecuteAsync(Command(
+            context,
+            "previous",
+            "and previous email?"))).State);
+        Assert.Equal(WorkflowState.Succeeded, (await handler.ExecuteAsync(Command(
+            context,
+            "previous",
+            "and previous email?"))).State);
+
+        var assistants = store.Read(context).Turns.Where(static turn => turn.Role == "assistant").ToArray();
+        Assert.Equal("The latest incoming email was sent by GoDaddy <donotreply@godaddy.com>.", assistants[0].Text);
+        Assert.Equal(
+            "The incoming email immediately before that was sent by Amazon <action-requests@services.amazon.com>.",
+            assistants[1].Text);
+        Assert.Equal(2, gateway.GmailRequests.Count);
+        Assert.Equal("godaddy", gateway.GmailRequests[1].AnchorMessageId);
+        Assert.Equal(3000, gateway.GmailRequests[1].AnchorInternalDate);
+        Assert.Equal(1, gateway.GmailRequests[1].TraversalDepth);
+    }
+
+    [Fact]
+    public async Task Direct_second_to_last_email_uses_the_bounded_offset()
+    {
+        var planner = new V2McpIntegrationPlanner();
+
+        var invocation = Assert.Single(await planner.PlanAsync(Request(
+            "Who sent the second-to-last incoming email?")));
+
+        Assert.Equal(V2GmailTools.ReadIncomingAtOffset, invocation.ToolId);
+        Assert.Equal(1, invocation.Input.GetProperty("offset").GetInt32());
+        Assert.Equal(1, invocation.Input.GetProperty("traversalDepth").GetInt32());
+        Assert.False(invocation.Input.GetProperty("requiresAnchor").GetBoolean());
+    }
+
+    [Fact]
+    public async Task One_before_that_and_consecutive_previous_reads_stop_at_the_safe_bound()
+    {
+        var context = Context("user", "workspace", "gmail.read", "brain.act", "ui.action");
+        var store = new V2InoEffectStore();
+        var gateway = new RecordingGateway(gmailRead: request => GmailResult(
+            request,
+            "message-" + request.TraversalDepth,
+            5000 - request.TraversalDepth,
+            $"Sender {request.TraversalDepth} <sender{request.TraversalDepth}@example.com>"));
+        var handler = ConversationHandler(store, gateway);
+
+        await handler.ExecuteAsync(Command(context, "ordinal-0", "Who sent my latest incoming email?"));
+        await handler.ExecuteAsync(Command(context, "ordinal-1", "And the one before that?"));
+        await handler.ExecuteAsync(Command(context, "ordinal-2", "And the one before that?"));
+        await handler.ExecuteAsync(Command(context, "ordinal-3", "And the one before that?"));
+        await handler.ExecuteAsync(Command(context, "ordinal-4", "And the one before that?"));
+        await handler.ExecuteAsync(Command(context, "ordinal-5", "And the one before that?"));
+
+        Assert.Equal([0, 1, 2, 3, 4], gateway.GmailRequests.Select(static request => request.TraversalDepth).ToArray());
+        var last = store.Read(context).Turns.Last(static turn => turn.Role == "assistant");
+        Assert.Contains("can’t safely resolve", last.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain('@', last.Text);
+    }
+
+    [Fact]
+    public async Task Previous_without_immediate_grounding_clarifies_without_calling_gmail()
+    {
+        var context = Context("user", "workspace", "gmail.read", "brain.act", "ui.action");
+        var store = new V2InoEffectStore();
+        var gateway = new RecordingGateway(gmailRead: request => GmailResult(
+            request,
+            "unused",
+            1000,
+            "Unused <unused@example.com>"));
+        var handler = ConversationHandler(store, gateway);
+
+        await handler.ExecuteAsync(Command(context, "previous-only", "And the one before that?"));
+
+        Assert.Empty(gateway.GmailRequests);
+        var answer = store.Read(context).Turns.Last(static turn => turn.Role == "assistant").Text;
+        Assert.Contains("immediately preceding turn", answer, StringComparison.Ordinal);
+        Assert.DoesNotContain('@', answer);
+    }
+
+    [Fact]
+    public async Task Unrelated_turn_breaks_elliptical_gmail_grounding()
+    {
+        var context = Context("user", "workspace", "gmail.read", "brain.act", "ui.action");
+        var store = new V2InoEffectStore();
+        var gateway = new RecordingGateway(gmailRead: request => GmailResult(
+            request,
+            "latest",
+            1000,
+            "Latest <latest@example.com>"));
+        var handler = ConversationHandler(store, gateway);
+
+        await handler.ExecuteAsync(Command(context, "mail", "Who sent my latest incoming email?"));
+        await handler.ExecuteAsync(Command(context, "unrelated", "What is two plus two?"));
+        await handler.ExecuteAsync(Command(context, "previous-after-unrelated", "And the one before that?"));
+
+        Assert.Single(gateway.GmailRequests);
+        var answer = store.Read(context).Turns.Last(static turn => turn.Role == "assistant").Text;
+        Assert.Contains("immediately preceding turn", answer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Model_cannot_claim_mailbox_sender_metadata_without_a_gmail_outcome()
+    {
+        var answer = await new V2McpResponseComposer().ComposeAsync(
+            Context("user", "workspace", "gmail.read"),
+            new V2ModelResponse(
+                "The second-to-last incoming email was sent by Amazon <action-requests@services.amazon.com>.",
+                "test",
+                true),
+            []);
+
+        Assert.Equal("I couldn’t verify mailbox sender metadata from Gmail, so I won’t guess.", answer);
+    }
+
+    [Fact]
+    public async Task Gmail_mutations_and_arbitrary_queries_remain_denied()
+    {
+        var planner = new V2McpIntegrationPlanner();
+
+        Assert.Empty(await planner.PlanAsync(Request("Move the previous email to trash")));
+        Assert.Empty(await planner.PlanAsync(Request("Search Gmail using from:boss@example.com newer_than:7d")));
+
+        var catalog = new V2McpAuthorizedToolCatalog(new RecordingGateway());
+        var arbitrary = await catalog.InvokeAsync(
+            Context("user", "workspace", "gmail.read"),
+            new V2ToolInvocation(
+                V2GmailTools.ReadIncomingAtOffset,
+                JsonSerializer.SerializeToElement(new { offset = 0, query = "from:boss@example.com" })));
+        Assert.Equal(V2ToolOutcomeKind.Denied, arbitrary.Kind);
+    }
+
+    [Fact]
+    public void Durable_operations_without_grounding_remain_deserializable()
+    {
+        var json = """
+                   {
+                     "CommandId":"old-command",
+                     "Prompt":"old prompt",
+                     "State":"succeeded",
+                     "SafeReason":null,
+                     "Retryable":false,
+                     "UpdatedAt":"2026-01-01T00:00:00+00:00",
+                     "Action":null
+                   }
+                   """;
+
+        var operation = JsonSerializer.Deserialize<V2InoConversationOperation>(json);
+
+        Assert.NotNull(operation);
+        Assert.Null(operation.Grounding);
+    }
+
     private static V2ConversationRequest Request(string text) =>
         new(Context("user", "workspace", "gmail.read", "salesforce.read"), "conversation", text);
 
     private static V2ToolInvocation GmailInvocation() =>
-        new(V2GmailTools.ReadLatest, JsonSerializer.SerializeToElement(new { }));
+        GmailInvocation(new V2GmailReadRequest(0));
+
+    private static V2ToolInvocation GmailInvocation(V2GmailReadRequest request) =>
+        new(
+            V2GmailTools.ReadIncomingAtOffset,
+            JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
     private static V2ToolInvocation SalesforceInvocation(string toolId) =>
         new(toolId, JsonSerializer.SerializeToElement(new { }));
@@ -326,20 +497,67 @@ public sealed class V2IntegrationToolTests
         "idempotency",
         grants.ToHashSet(StringComparer.Ordinal));
 
+    private static V2McpInoCommandHandler ConversationHandler(
+        V2InoEffectStore store,
+        RecordingGateway gateway)
+    {
+        var feed = new V2PrivateFeedStore();
+        var surfaces = new V2WorkspaceSurfaceProducer(feed, new V2ActionExecutor(feed), store);
+        var owner = new V2ConversationOwner(
+            new V2McpConversationContextAssembler(store),
+            new V2McpIntegrationPlanner(store),
+            new RecordingModelRouter(_ => new V2ModelResponse(
+                "The mailbox sender was Hallucinated <hallucinated@example.com>.",
+                "test",
+                true)),
+            new V2McpAuthorizedToolCatalog(gateway),
+            new V2McpResponseComposer());
+        return new V2McpInoCommandHandler(store, surfaces, owner);
+    }
+
+    private static V2CommandEnvelope Command(V2RequestContext context, string id, string prompt) => new(
+        V2McpInoCommandHandler.CommandType,
+        2,
+        id,
+        context,
+        JsonSerializer.SerializeToElement(new { prompt }));
+
+    private static V2GmailReadResult GmailResult(
+        V2GmailReadRequest request,
+        string messageId,
+        long internalDate,
+        string sender)
+    {
+        var addressStart = sender.LastIndexOf('<') + 1;
+        var address = sender[addressStart..^1];
+        return new V2GmailReadResult(
+            V2GmailReadStatus.Success,
+            sender,
+            SenderAddress: address,
+            MessageId: messageId,
+            InternalDate: internalDate,
+            TraversalDepth: request.TraversalDepth,
+            AnchoredPrevious: request.RequiresAnchor);
+    }
+
     private sealed class RecordingGateway(
         V2GmailReadResult? gmail = null,
-        V2SalesforceReadResult? salesforce = null) : IV2McpIntegrationToolGateway
+        V2SalesforceReadResult? salesforce = null,
+        Func<V2GmailReadRequest, V2GmailReadResult>? gmailRead = null) : IV2McpIntegrationToolGateway
     {
         public List<string> GmailOwnerScopes { get; } = [];
+        public List<V2GmailReadRequest> GmailRequests { get; } = [];
         public List<string> SalesforceOwnerScopes { get; } = [];
         public List<string> SalesforceToolIds { get; } = [];
 
-        public Task<V2GmailReadResult> ReadLatestIncomingAsync(
+        public Task<V2GmailReadResult> ReadIncomingAtOffsetAsync(
             string ownerScope,
+            V2GmailReadRequest request,
             CancellationToken cancellationToken = default)
         {
             GmailOwnerScopes.Add(ownerScope);
-            return Task.FromResult(gmail ?? new V2GmailReadResult(V2GmailReadStatus.Unavailable));
+            GmailRequests.Add(request);
+            return Task.FromResult(gmailRead?.Invoke(request) ?? gmail ?? new V2GmailReadResult(V2GmailReadStatus.Unavailable));
         }
 
         public Task<V2SalesforceReadResult> ReadSalesforceAsync(

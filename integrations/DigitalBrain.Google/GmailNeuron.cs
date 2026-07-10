@@ -16,7 +16,9 @@ public sealed class GmailReadNeuron(
     IPackConfigStore store,
     [FromKeyedServices("google")] IConnector connector) : Grain, IV2GmailReadToolGrain
 {
-    public async Task<V2GmailReadResult> ReadLatestIncomingAsync(CancellationToken cancellationToken = default)
+    public async Task<V2GmailReadResult> ReadIncomingAtOffsetAsync(
+        V2GmailReadRequest request,
+        CancellationToken cancellationToken = default)
     {
         var owner = new NeuronId(this.GetPrimaryKeyString());
         var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
@@ -33,20 +35,39 @@ public sealed class GmailReadNeuron(
         try
         {
             var client = await gmailApiClientFactory.CreateAsync(scope, cancellationToken);
-            var latest = await client.ReadLatestIncomingAsync(cancellationToken);
+            if (!Valid(request))
+                return new V2GmailReadResult(
+                    V2GmailReadStatus.Unavailable,
+                    SafeReason: "That Gmail position cannot be read safely.");
+            var latest = await client.ReadIncomingAtOffsetAsync(
+                new GmailIncomingReadRequest(request.Offset, request.AnchorMessageId, request.AnchorInternalDate),
+                cancellationToken);
             return latest.State switch
             {
                 GmailLatestIncomingState.SenderAvailable => new V2GmailReadResult(
                     V2GmailReadStatus.Success,
                     Sender: latest.Sender,
                     SenderAddress: latest.SenderAddress,
-                    MailboxState: V2GmailMailboxState.SenderAvailable),
+                    MailboxState: V2GmailMailboxState.SenderAvailable,
+                    MessageId: latest.MessageId,
+                    InternalDate: latest.InternalDate,
+                    TraversalDepth: request.TraversalDepth,
+                    AnchoredPrevious: request.RequiresAnchor),
                 GmailLatestIncomingState.EmptyInbox => new V2GmailReadResult(
                     V2GmailReadStatus.Success,
                     MailboxState: V2GmailMailboxState.EmptyInbox),
+                GmailLatestIncomingState.PositionUnavailable => new V2GmailReadResult(
+                    V2GmailReadStatus.Success,
+                    MailboxState: V2GmailMailboxState.PositionUnavailable,
+                    TraversalDepth: request.TraversalDepth,
+                    AnchoredPrevious: request.RequiresAnchor),
                 _ => new V2GmailReadResult(
                     V2GmailReadStatus.Success,
-                    MailboxState: V2GmailMailboxState.SenderUnavailable)
+                    MailboxState: V2GmailMailboxState.SenderUnavailable,
+                    MessageId: latest.MessageId,
+                    InternalDate: latest.InternalDate,
+                    TraversalDepth: request.TraversalDepth,
+                    AnchoredPrevious: request.RequiresAnchor)
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -97,6 +118,14 @@ public sealed class GmailReadNeuron(
         Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
         uri.Scheme == Uri.UriSchemeHttps &&
         string.Equals(uri.Host, "accounts.google.com", StringComparison.OrdinalIgnoreCase);
+
+    private static bool Valid(V2GmailReadRequest request) =>
+        request.Offset is >= 0 and <= V2GmailTools.MaximumOffset &&
+        request.TraversalDepth is >= 0 and <= V2GmailTools.MaximumOffset &&
+        (request.AnchorMessageId is null
+            ? !request.RequiresAnchor && request.AnchorInternalDate is null && request.TraversalDepth == request.Offset
+            : request.RequiresAnchor && request.Offset == 1 && request.AnchorInternalDate is not null &&
+              request.AnchorMessageId.Length is > 0 and <= 256);
 
     private static bool IsAuthorizationFailure(Exception exception)
     {

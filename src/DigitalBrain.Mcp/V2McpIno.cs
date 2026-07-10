@@ -99,7 +99,8 @@ public sealed class V2InoEffectStore : IV2InoConversationStore
         V2RequestContext context,
         string commandId,
         string response,
-        V2ToolAction? action = null)
+        V2ToolAction? action = null,
+        V2ToolGrounding? grounding = null)
     {
         if (string.IsNullOrWhiteSpace(response))
             throw new ArgumentException("A non-empty assistant response is required.", nameof(response));
@@ -143,6 +144,7 @@ public sealed class V2InoEffectStore : IV2InoConversationStore
                 SafeReason = null,
                 Retryable = false,
                 Action = action,
+                Grounding = grounding,
                 UpdatedAt = DateTimeOffset.UtcNow
             }, V2InoConversationStates.Succeeded);
             next = next with
@@ -484,7 +486,12 @@ public sealed class V2McpInoCommandHandler(
                 snapshot.ConversationId,
                 prompt,
                 AllowTools: true), cancellationToken).ConfigureAwait(false);
-            snapshot = conversations.Complete(command.Context, command.CommandId, response.Text, response.Action);
+            snapshot = conversations.Complete(
+                command.Context,
+                command.CommandId,
+                response.Text,
+                response.Action,
+                response.Grounding);
             surfaces.PublishInoConversation(command.Context, snapshot);
             return V2CommandExecutionResult.Success();
         }
@@ -578,8 +585,10 @@ public sealed class V2McpNoToolCatalog : IV2AuthorizedToolCatalog
         Task.FromResult(new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "Tools are unavailable in this conversation."));
 }
 
-public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
+public sealed class V2McpIntegrationPlanner(IV2InoConversationStore? conversations = null) : IV2IntentCapabilityPlanner
 {
+    private static readonly JsonSerializerOptions ToolJson = new(JsonSerializerDefaults.Web);
+
     public Task<IReadOnlyList<V2ToolInvocation>> PlanAsync(
         V2ConversationRequest request,
         CancellationToken cancellationToken = default)
@@ -617,9 +626,23 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
                                    words.Contains("move") ||
                                    words.Contains("mark");
         var requestsLatestIncoming = explicitlyIncoming || (requestsLatest && !explicitlyOutgoing);
-        if (mentionsMail && requestsLatestIncoming && !requestsMailMutation)
+        var requestsSecondToLast = Regex.IsMatch(
+            text,
+            @"\bsecond(?:\s+|-)(?:to(?:\s+|-))?last\b",
+            RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
+        var requestsPrevious = text.Contains("one before that", StringComparison.Ordinal) ||
+                               (words.Contains("previous") &&
+                                (mentionsMail || text.TrimStart().StartsWith("and previous", StringComparison.Ordinal)));
+        if (!requestsMailMutation && requestsPrevious && !requestsSecondToLast)
             return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
-                new V2ToolInvocation(V2GmailTools.ReadLatest, emptyInput)
+                GmailInvocation(PreviousRequest(request))
+            ]);
+        if (mentionsMail && (requestsLatestIncoming || requestsSecondToLast) && !requestsMailMutation)
+            return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
+                GmailInvocation(new V2GmailReadRequest(
+                    requestsSecondToLast ? 1 : 0,
+                    TraversalDepth: requestsSecondToLast ? 1 : 0))
             ]);
 
         var mentionsSalesforce = text.Contains("salesforce", StringComparison.Ordinal) ||
@@ -675,11 +698,62 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
 
         return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([]);
     }
+
+    private V2GmailReadRequest PreviousRequest(V2ConversationRequest request)
+    {
+        var previous = conversations?.Read(request.Context).Operations
+            .Reverse()
+            .FirstOrDefault(static operation => !V2InoConversationStates.IsActive(operation.State));
+        if (previous is null ||
+            !string.Equals(previous.State, V2InoConversationStates.Succeeded, StringComparison.Ordinal) ||
+            previous.Grounding is not { } grounding ||
+            !string.Equals(grounding.ToolId, V2GmailTools.ReadIncomingAtOffset, StringComparison.Ordinal) ||
+            !TryReadAnchor(grounding.Content, out var messageId, out var internalDate, out var depth) ||
+            depth >= V2GmailTools.MaximumOffset)
+            return new V2GmailReadRequest(1, TraversalDepth: V2GmailTools.MaximumOffset + 1, RequiresAnchor: true);
+
+        return new V2GmailReadRequest(
+            1,
+            messageId,
+            internalDate,
+            depth + 1,
+            RequiresAnchor: true);
+    }
+
+    private static bool TryReadAnchor(
+        JsonElement content,
+        out string messageId,
+        out long internalDate,
+        out int traversalDepth)
+    {
+        messageId = string.Empty;
+        internalDate = 0;
+        traversalDepth = 0;
+        if (content.ValueKind != JsonValueKind.Object ||
+            !content.TryGetProperty("incomingMessage", out var message) ||
+            message.ValueKind != JsonValueKind.Object ||
+            !message.TryGetProperty("messageId", out var idElement) ||
+            idElement.ValueKind != JsonValueKind.String ||
+            !message.TryGetProperty("internalDate", out var dateElement) ||
+            !dateElement.TryGetInt64(out internalDate) ||
+            !message.TryGetProperty("traversalDepth", out var depthElement) ||
+            !depthElement.TryGetInt32(out traversalDepth))
+            return false;
+        messageId = idElement.GetString() ?? string.Empty;
+        return messageId.Length is > 0 and <= 256 && internalDate >= 0 &&
+               traversalDepth is >= 0 and <= V2GmailTools.MaximumOffset;
+    }
+
+    private static V2ToolInvocation GmailInvocation(V2GmailReadRequest request) =>
+        new(V2GmailTools.ReadIncomingAtOffset, JsonSerializer.SerializeToElement(request, ToolJson));
 }
 
 public interface IV2McpIntegrationToolGateway
 {
-    Task<V2GmailReadResult> ReadLatestIncomingAsync(string ownerScope, CancellationToken cancellationToken = default);
+    Task<V2GmailReadResult> ReadIncomingAtOffsetAsync(
+        string ownerScope,
+        V2GmailReadRequest request,
+        CancellationToken cancellationToken = default);
 
     Task<V2SalesforceReadResult> ReadSalesforceAsync(
         string ownerScope,
@@ -689,10 +763,11 @@ public interface IV2McpIntegrationToolGateway
 
 public sealed class V2McpIntegrationToolGateway(IClusterClient cluster) : IV2McpIntegrationToolGateway
 {
-    public Task<V2GmailReadResult> ReadLatestIncomingAsync(
+    public Task<V2GmailReadResult> ReadIncomingAtOffsetAsync(
         string ownerScope,
+        V2GmailReadRequest request,
         CancellationToken cancellationToken = default) =>
-        cluster.GetGrain<IV2GmailReadToolGrain>(ownerScope).ReadLatestIncomingAsync(cancellationToken);
+        cluster.GetGrain<IV2GmailReadToolGrain>(ownerScope).ReadIncomingAtOffsetAsync(request, cancellationToken);
 
     public Task<V2SalesforceReadResult> ReadSalesforceAsync(
         string ownerScope,
@@ -720,11 +795,20 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (invocation.Input.ValueKind != JsonValueKind.Object ||
-            invocation.Input.EnumerateObject().Any())
+        if (string.Equals(invocation.ToolId, V2GmailTools.ReadIncomingAtOffset, StringComparison.Ordinal))
+        {
+            if (!TryParseGmailRequest(invocation.Input, out var gmailRequest))
+                return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That Gmail position cannot be read safely.");
+            if (gmailRequest.RequiresAnchor &&
+                (string.IsNullOrWhiteSpace(gmailRequest.AnchorMessageId) || gmailRequest.AnchorInternalDate is null ||
+                 gmailRequest.TraversalDepth > V2GmailTools.MaximumOffset))
+                return new V2ToolOutcome(
+                    V2ToolOutcomeKind.PermanentFailure,
+                    SafeReason: "I can’t safely resolve that previous email from the immediately preceding turn. Ask for the latest incoming email to start again.");
+            return await InvokeGmailAsync(context, gmailRequest, cancellationToken);
+        }
+        if (invocation.Input.ValueKind != JsonValueKind.Object || invocation.Input.EnumerateObject().Any())
             return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That tool request is not allowed.");
-        if (string.Equals(invocation.ToolId, V2GmailTools.ReadLatest, StringComparison.Ordinal))
-            return await InvokeGmailAsync(context, cancellationToken);
         if (IsSalesforceReadTool(invocation.ToolId))
             return await InvokeSalesforceAsync(context, invocation.ToolId, cancellationToken);
         return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That tool request is not allowed.");
@@ -732,6 +816,7 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
 
     private async Task<V2ToolOutcome> InvokeGmailAsync(
         V2RequestContext context,
+        V2GmailReadRequest request,
         CancellationToken cancellationToken)
     {
         if (context.Principal.Kind != PrincipalKind.User || !context.Grants.Contains("gmail.read"))
@@ -739,18 +824,22 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
                 V2ToolOutcomeKind.Denied,
                 SafeReason: "You don’t have permission to read Gmail in this workspace.");
 
-        var result = await integrations.ReadLatestIncomingAsync(V2RequestScope.Id(context), cancellationToken);
+        var result = await integrations.ReadIncomingAtOffsetAsync(V2RequestScope.Id(context), request, cancellationToken);
         return result.Status switch
         {
             V2GmailReadStatus.Success => new V2ToolOutcome(
                 V2ToolOutcomeKind.Success,
                 JsonSerializer.SerializeToElement(new
                 {
-                    latestIncomingMessage = new
+                    incomingMessage = new
                     {
                         status = GmailMailboxStatus(result.MailboxState),
                         sender = result.Sender,
-                        senderAddress = result.SenderAddress
+                        senderAddress = result.SenderAddress,
+                        messageId = result.MessageId,
+                        internalDate = result.InternalDate,
+                        traversalDepth = result.TraversalDepth,
+                        anchoredPrevious = result.AnchoredPrevious
                     }
                 })),
             V2GmailReadStatus.NeedsAuth when IsAllowedGoogleAuthorizationUrl(result.ConnectionUrl) => new V2ToolOutcome(
@@ -815,8 +904,34 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
     {
         V2GmailMailboxState.SenderAvailable => "senderAvailable",
         V2GmailMailboxState.EmptyInbox => "emptyInbox",
-        _ => "senderUnavailable"
+        V2GmailMailboxState.SenderUnavailable => "senderUnavailable",
+        _ => "positionUnavailable"
     };
+
+    private static bool TryParseGmailRequest(JsonElement input, out V2GmailReadRequest request)
+    {
+        request = new V2GmailReadRequest(-1);
+        if (input.ValueKind != JsonValueKind.Object || input.EnumerateObject().Any(static property => property.Name is not
+                ("offset" or "anchorMessageId" or "anchorInternalDate" or "traversalDepth" or "requiresAnchor")))
+            return false;
+        try
+        {
+            request = input.Deserialize<V2GmailReadRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        return request is not null &&
+               request.Offset is >= 0 and <= V2GmailTools.MaximumOffset &&
+               request.TraversalDepth is >= 0 and <= V2GmailTools.MaximumOffset + 1 &&
+               (request.AnchorMessageId is null
+                   ? request.AnchorInternalDate is null &&
+                     (!request.RequiresAnchor || request.TraversalDepth == V2GmailTools.MaximumOffset + 1) &&
+                     (request.RequiresAnchor || request.TraversalDepth == request.Offset)
+                   : request.RequiresAnchor && request.Offset == 1 && request.AnchorInternalDate is >= 0 &&
+                     request.AnchorMessageId.Length is > 0 and <= 256);
+    }
 
     private static string SalesforceResultField(string toolId) => toolId switch
     {
@@ -842,7 +957,17 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
 
 public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
 {
+    private const string UngroundedMailboxReason = "I couldn’t verify mailbox sender metadata from Gmail, so I won’t guess.";
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(250);
+    private static readonly Regex EmailAddress = new(
+        @"(?<![\p{L}\p{N}._%+-])[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?![\p{L}\p{N}._%+-])",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeout);
+    private static readonly Regex MailboxSenderClaim = new(
+        @"\b(?:gmail|email|mailbox|incoming message)\b.{0,120}\b(?:sent by|sender|from)\b|" +
+        @"\b(?:sent by|sender)\b.{0,120}\b(?:gmail|email|mailbox|message)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeout);
     private static readonly Regex UnsafeAddress = new(
         @"\b[a-z][a-z0-9+.-]*://|\bwww\.|(?<![\p{L}\p{N}_/@.-])(?:[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?::\d{2,5})?(?![\p{L}\p{N}_-])|" +
         @"(?<![\p{L}\p{N}.-])(?=[a-z0-9.-]*[a-z])(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):\d{2,5}(?!\d)|" +
@@ -869,22 +994,24 @@ public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
         if (blockingOutcome is not null)
             return Task.FromResult(blockingOutcome.SafeReason ?? "I couldn’t complete that request safely.");
         var groundedGmailResponse = toolOutcomes
-            .Select(static outcome => ComposeLatestIncomingGmail(outcome.Content))
+            .Select(static outcome => ComposeIncomingGmail(outcome.Content))
             .FirstOrDefault(static text => text is not null);
         if (groundedGmailResponse is not null)
             return Task.FromResult(groundedGmailResponse);
         if (string.IsNullOrWhiteSpace(response.Text))
             throw new InvalidOperationException("The configured model returned no answer.");
         var text = response.Text.Trim();
+        if (EmailAddress.IsMatch(text) || MailboxSenderClaim.IsMatch(text))
+            return Task.FromResult(UngroundedMailboxReason);
         if (UnsafeAddress.IsMatch(text) || UnsafeTerm.IsMatch(text) || ContainsSensitiveContextValue(text, context))
             throw new InvalidOperationException("The configured model returned an answer that is unsafe to display.");
         return Task.FromResult(text);
     }
 
-    private static string? ComposeLatestIncomingGmail(JsonElement? content)
+    private static string? ComposeIncomingGmail(JsonElement? content)
     {
         if (content is not { ValueKind: JsonValueKind.Object } root ||
-            !root.TryGetProperty("latestIncomingMessage", out var message) ||
+            !root.TryGetProperty("incomingMessage", out var message) ||
             message.ValueKind != JsonValueKind.Object ||
             !message.TryGetProperty("status", out var statusElement) ||
             statusElement.ValueKind != JsonValueKind.String)
@@ -893,7 +1020,8 @@ public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
         return statusElement.GetString() switch
         {
             "emptyInbox" => "No incoming Gmail messages were found.",
-            "senderUnavailable" => "The latest incoming Gmail message’s sender metadata was unavailable.",
+            "positionUnavailable" => "I couldn’t safely resolve that incoming Gmail position. Ask for the latest incoming email to start again.",
+            "senderUnavailable" => ComposeUnavailableSender(message),
             "senderAvailable" => ComposeAvailableSender(message),
             _ => throw new InvalidOperationException("The Gmail tool returned an unknown mailbox state.")
         };
@@ -910,10 +1038,32 @@ public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
         if (string.IsNullOrWhiteSpace(sender) || string.IsNullOrWhiteSpace(address) ||
             !sender.Contains(address, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("The Gmail tool returned incomplete sender metadata.");
-        var response = $"The latest incoming email was sent by {sender}.";
+        var response = $"{PositionPrefix(message)} was sent by {sender}.";
         if (UnsafeAddress.IsMatch(response))
             throw new InvalidOperationException("The Gmail tool returned unsafe sender metadata.");
         return response;
+    }
+
+    private static string ComposeUnavailableSender(JsonElement message) =>
+        $"{PositionPrefix(message)}’s sender metadata was unavailable.";
+
+    private static string PositionPrefix(JsonElement message)
+    {
+        var anchored = message.TryGetProperty("anchoredPrevious", out var anchoredElement) &&
+                       anchoredElement.ValueKind is JsonValueKind.True;
+        if (anchored) return "The incoming email immediately before that";
+        var depth = message.TryGetProperty("traversalDepth", out var depthElement) && depthElement.TryGetInt32(out var value)
+            ? value
+            : 0;
+        return depth switch
+        {
+            0 => "The latest incoming email",
+            1 => "The second-to-last incoming email",
+            2 => "The third-to-last incoming email",
+            3 => "The fourth-to-last incoming email",
+            4 => "The fifth-to-last incoming email",
+            _ => throw new InvalidOperationException("The Gmail tool returned an invalid traversal depth.")
+        };
     }
 
     private static bool ContainsSensitiveContextValue(string text, V2RequestContext context) =>
