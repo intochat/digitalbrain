@@ -201,18 +201,56 @@ public sealed class V2ContractsTests
     }
 
     [Fact]
-    public async Task Application_port_is_idempotent_and_workspace_scoped()
+    public async Task Application_port_scopes_operations_and_idempotency_to_the_full_principal()
     {
         var service = new V2ApplicationService(capabilities: [new V2Capability("brain.read", 2, true, false)]);
         var grants = new HashSet<string> { "brain.read", "brain.act" };
         var context = new V2RequestContext(new("tenant"), new("workspace-a"), new("user-a", PrincipalKind.User), "session", AuthAssurance.Password, "corr", "idem-1", grants);
-        var payload = JsonDocument.Parse("{\"type\":\"noop\",\"commandId\":\"cmd-1\"}").RootElement.Clone();
+        var payload = JsonDocument.Parse("{\"prompt\":\"hello\"}").RootElement.Clone();
         var first = await service.SubmitAsync(context, new V2CommandEnvelope("noop", 2, "cmd-1", context, payload));
         var second = await service.SubmitAsync(context, new V2CommandEnvelope("noop", 2, "cmd-2", context, payload));
         Assert.Equal(first.OperationId, second.OperationId);
-        var other = context with { WorkspaceId = new WorkspaceId("workspace-b") };
-        var otherOperations = await service.GetOperationsAsync(other, null, 10);
-        Assert.Empty(otherOperations.Items);
+
+        var otherPrincipal = context with { Principal = new PrincipalRef("user-b", PrincipalKind.User), SessionId = "session-b" };
+        var otherKind = context with { Principal = new PrincipalRef("user-a", PrincipalKind.Service), SessionId = "session-service" };
+        var otherPrincipalOperation = await service.SubmitAsync(otherPrincipal,
+            new V2CommandEnvelope("noop", 2, "cmd-3", otherPrincipal, payload));
+        var otherKindOperation = await service.SubmitAsync(otherKind,
+            new V2CommandEnvelope("noop", 2, "cmd-4", otherKind, payload));
+
+        Assert.NotEqual(first.OperationId, otherPrincipalOperation.OperationId);
+        Assert.NotEqual(first.OperationId, otherKindOperation.OperationId);
+        Assert.Null(await service.GetOperationAsync(otherPrincipal, first.OperationId));
+        Assert.Null(await service.GetOperationAsync(otherKind, first.OperationId));
+        Assert.Equal(otherPrincipalOperation.OperationId,
+            Assert.Single((await service.GetOperationsAsync(otherPrincipal, null, 10)).Items).OperationId);
+        Assert.Equal(otherKindOperation.OperationId,
+            Assert.Single((await service.GetOperationsAsync(otherKind, null, 10)).Items).OperationId);
+    }
+
+    [Fact]
+    public async Task Application_port_replays_only_the_same_type_version_and_canonical_input()
+    {
+        var service = new V2ApplicationService();
+        var context = new V2RequestContext(new("tenant"), new("workspace"), new("user", PrincipalKind.User), "session",
+            AuthAssurance.Password, "corr", "idem", new HashSet<string> { "brain.act", "brain.read" });
+        var firstPayload = JsonDocument.Parse("{\"prompt\":\"hello\",\"options\":{\"b\":2,\"a\":1}}").RootElement.Clone();
+        var reorderedPayload = JsonDocument.Parse("{\"options\":{\"a\":1,\"b\":2},\"prompt\":\"hello\"}").RootElement.Clone();
+        var first = await service.SubmitAsync(context, new V2CommandEnvelope("ino.interact", 2, "cmd-1", context, firstPayload));
+        var replay = await service.SubmitAsync(context, new V2CommandEnvelope("ino.interact", 2, "cmd-2", context, reorderedPayload));
+
+        Assert.Equal(first.OperationId, replay.OperationId);
+        await Assert.ThrowsAsync<V2IdempotencyConflictException>(() => service.SubmitAsync(context,
+            new V2CommandEnvelope("ino.interact", 2, "cmd-3", context,
+                JsonDocument.Parse("{\"prompt\":\"changed\",\"options\":{\"a\":1,\"b\":2}}").RootElement.Clone())));
+        await Assert.ThrowsAsync<V2IdempotencyConflictException>(() => service.SubmitAsync(context,
+            new V2CommandEnvelope("ino.other", 2, "cmd-4", context, reorderedPayload)));
+        await Assert.ThrowsAsync<V2IdempotencyConflictException>(() => service.SubmitAsync(context,
+            new V2CommandEnvelope("ino.interact", 3, "cmd-5", context, reorderedPayload)));
+
+        var forgedContext = context with { Principal = new PrincipalRef("other", PrincipalKind.User) };
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SubmitAsync(context,
+            new V2CommandEnvelope("ino.interact", 2, "cmd-6", forgedContext, reorderedPayload)));
     }
 
     [Fact]
@@ -567,7 +605,7 @@ public sealed class V2ContractsTests
     }
 
     [Fact]
-    public async Task V2_operations_reopen_from_local_persistence_without_cross_workspace_visibility()
+    public async Task V2_operations_reopen_with_principal_ownership_and_exact_replay_receipt()
     {
         var root = Path.Combine(Path.GetTempPath(), "v2-ops-" + Guid.NewGuid().ToString("N"));
         try
@@ -583,6 +621,12 @@ public sealed class V2ContractsTests
             Assert.NotNull(await reopened.GetOperationAsync(context, operation.OperationId));
             var other = context with { WorkspaceId = new WorkspaceId("other") };
             Assert.Null(await reopened.GetOperationAsync(other, operation.OperationId));
+            var otherPrincipal = context with { Principal = new PrincipalRef("other", PrincipalKind.User) };
+            Assert.Null(await reopened.GetOperationAsync(otherPrincipal, operation.OperationId));
+            var replay = await reopened.SubmitAsync(context, command with { CommandId = "cmd-after-restart" });
+            Assert.Equal(operation.OperationId, replay.OperationId);
+            await Assert.ThrowsAsync<V2IdempotencyConflictException>(() => reopened.SubmitAsync(context,
+                command with { CommandId = "changed-after-restart", Payload = JsonSerializer.SerializeToElement(new { changed = true }) }));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -713,6 +757,36 @@ public sealed class V2ContractsTests
             var reopened = new V2ApplicationService(storagePath: Path.Combine(root, "operations.jsonl"));
             var status = await reopened.GetOperationAsync(context, submitted.OperationId);
             Assert.Equal(WorkflowState.OutcomeUnknown, status!.State);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task Applying_command_reopens_as_outcome_unknown_without_being_requeued()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-applying-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var path = Path.Combine(root, "operations.jsonl");
+            var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s",
+                AuthAssurance.Password, "c", "idem", new HashSet<string> { "brain.act", "brain.read" });
+            var service = new V2ApplicationService(storagePath: path);
+            var submitted = await service.SubmitAsync(context,
+                new V2CommandEnvelope("connector.send", 2, "cmd", context, JsonSerializer.SerializeToElement(new { })));
+            Assert.True(service.TryClaimPending(submitted.OperationId, out _));
+
+            var reopened = new V2ApplicationService(storagePath: path);
+            var recovered = await reopened.GetOperationAsync(context, submitted.OperationId);
+            Assert.Equal(WorkflowState.OutcomeUnknown, recovered!.State);
+            Assert.Equal("The previous attempt ended before its outcome was confirmed.", recovered.SafeReason);
+            Assert.DoesNotContain(submitted.OperationId, recovered.SafeReason, StringComparison.Ordinal);
+            Assert.Empty(reopened.GetPendingOperationIds());
+            var lineCount = File.ReadLines(path).Count();
+
+            var reopenedAgain = new V2ApplicationService(storagePath: path);
+            Assert.Equal(WorkflowState.OutcomeUnknown,
+                (await reopenedAgain.GetOperationAsync(context, submitted.OperationId))!.State);
+            Assert.Equal(lineCount, File.ReadLines(path).Count());
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }

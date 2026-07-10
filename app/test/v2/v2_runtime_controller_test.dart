@@ -263,6 +263,230 @@ void main() {
         await runtime.stop();
       },
     );
+
+    test(
+      'identity rebind clears prior scope before notifying listeners',
+      () async {
+        final first = _FakeFeedCall.open();
+        final second = _FakeFeedCall.open();
+        final transport = _FakeUiTransport(
+          [first, second],
+          bootstrapResults: [
+            testSession(),
+            testSession(
+              identity: testIdentity(
+                session: 'session-b',
+              ),
+            ),
+          ],
+        );
+        final runtime = _runtime(transport);
+
+        await runtime.authenticateWithBootstrap('bootstrap-a');
+        await _eventually(() => runtime.status == V2RuntimeStatus.streaming);
+        first.add(
+          V2FeedSurfaceJson(
+            surfaceJsonString(sequence: 1, actions: [testActionJson()]),
+          ),
+        );
+        await _eventually(() => runtime.latestSurface != null);
+        final priorSurface = runtime.latestSurface!;
+        runtime.lastReset = const V2FeedReset('prior-scope');
+        final priorEpoch = runtime.scopeEpoch;
+        var observedNewScope = false;
+        var observedMixedScope = false;
+        runtime.addListener(() {
+          if (runtime.session.sessionId != 'session-b') return;
+          observedNewScope = true;
+          observedMixedScope |=
+              runtime.feed.surfaces.isNotEmpty ||
+              runtime.feed.lastSequence != 0 ||
+              runtime.feed.needsReset ||
+              runtime.latestSurface != null ||
+              runtime.lastReset != null;
+        });
+
+        await runtime.authenticateWithBootstrap('bootstrap-b');
+        await _eventually(() => transport.watchAfter.length == 2);
+
+        expect(observedNewScope, isTrue);
+        expect(observedMixedScope, isFalse);
+        expect(runtime.scopeEpoch, priorEpoch + 1);
+        expect(runtime.feed.surfaces, isEmpty);
+        expect(runtime.feed.lastSequence, 0);
+        expect(runtime.feed.needsReset, isFalse);
+        expect(runtime.latestSurface, isNull);
+        expect(runtime.lastReset, isNull);
+        await expectLater(
+          runtime.submitAction(
+            priorSurface,
+            'refresh-binding',
+            const <String, Object?>{},
+            now: v2TestNow,
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        await runtime.stop();
+      },
+    );
+
+    test(
+      'transient reconnect preserves scoped surface state and epoch',
+      () async {
+        final first = _FakeFeedCall.open();
+        final second = _FakeFeedCall.open();
+        final transport = _FakeUiTransport([first, second]);
+        final runtime = _runtime(transport);
+
+        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _eventually(() => runtime.status == V2RuntimeStatus.streaming);
+        first.add(V2FeedSurfaceJson(surfaceJsonString(sequence: 1)));
+        await _eventually(() => runtime.latestSurface != null);
+        final surface = runtime.latestSurface;
+        final epoch = runtime.scopeEpoch;
+
+        first.addError(
+          const V2TransportException(
+            V2TransportErrorCode.unavailable,
+            'Temporary V2 feed failure.',
+          ),
+        );
+        await _eventually(() => transport.watchAfter.length == 2);
+
+        expect(runtime.scopeEpoch, epoch);
+        expect(runtime.feed.lastSequence, 1);
+        expect(runtime.latestSurface, same(surface));
+        expect(runtime.status, V2RuntimeStatus.streaming);
+
+        await runtime.stop();
+      },
+    );
+
+    test('failed bootstrap clears protected in-memory scope state', () async {
+      final call = _FakeFeedCall.open();
+      final transport = _FakeUiTransport(
+        [call],
+        bootstrapResults: [
+          testSession(),
+          const V2AuthenticationException('Bootstrap was denied.'),
+        ],
+      );
+      final runtime = _runtime(transport);
+
+      await runtime.authenticateWithBootstrap('bootstrap-once');
+      await _eventually(() => runtime.status == V2RuntimeStatus.streaming);
+      call.add(V2FeedSurfaceJson(surfaceJsonString(sequence: 1)));
+      await _eventually(() => runtime.latestSurface != null);
+      runtime.lastReset = const V2FeedReset('prior-scope');
+      final epoch = runtime.scopeEpoch;
+
+      await expectLater(
+        runtime.authenticateWithBootstrap('bootstrap-invalid'),
+        throwsA(isA<V2AuthenticationException>()),
+      );
+
+      expect(runtime.scopeEpoch, epoch + 1);
+      expect(runtime.status, V2RuntimeStatus.awaitingSignIn);
+      expect(runtime.session.identity, isNull);
+      expect(runtime.feed.surfaces, isEmpty);
+      expect(runtime.feed.lastSequence, 0);
+      expect(runtime.latestSurface, isNull);
+      expect(runtime.lastReset, isNull);
+      expect(
+        () => runtime.feed.accept(testSurface(sequence: 2, revision: 2)),
+        throwsA(isA<V2ScopeViolation>()),
+      );
+
+      await runtime.stop();
+    });
+
+    test(
+      'authentication expiry clears protected in-memory scope state',
+      () async {
+        final call = _FakeFeedCall.open();
+        final transport = _FakeUiTransport(
+          [call],
+          refreshError: const V2AuthenticationException('Refresh was denied.'),
+        );
+        final runtime = _runtime(transport);
+
+        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _eventually(() => runtime.status == V2RuntimeStatus.streaming);
+        call.add(V2FeedSurfaceJson(surfaceJsonString(sequence: 1)));
+        await _eventually(() => runtime.latestSurface != null);
+        runtime.lastReset = const V2FeedReset('prior-scope');
+        final epoch = runtime.scopeEpoch;
+
+        call.addError(const V2AuthenticationException('Session expired.'));
+        await _eventually(
+          () => runtime.status == V2RuntimeStatus.awaitingSignIn,
+        );
+
+        expect(runtime.scopeEpoch, epoch + 1);
+        expect(runtime.session.identity, isNull);
+        expect(runtime.feed.surfaces, isEmpty);
+        expect(runtime.feed.lastSequence, 0);
+        expect(runtime.latestSurface, isNull);
+        expect(runtime.lastReset, isNull);
+        expect(
+          () => runtime.feed.accept(testSurface(sequence: 2, revision: 2)),
+          throwsA(isA<V2ScopeViolation>()),
+        );
+
+        await runtime.stop();
+      },
+    );
+
+    test('rejects an action receipt completed after a scope change', () async {
+      final first = _FakeFeedCall.open();
+      final second = _FakeFeedCall.open();
+      final receipt = Completer<V2ActionResult>();
+      final transport = _FakeUiTransport(
+        [first, second],
+        bootstrapResults: [
+          testSession(),
+          testSession(
+            identity: testIdentity(
+              principal: 'principal-b',
+              session: 'session-b',
+            ),
+          ),
+        ],
+        actionResult: receipt.future,
+      );
+      final runtime = _runtime(transport);
+
+      await runtime.authenticateWithBootstrap('bootstrap-a');
+      await _eventually(() => runtime.status == V2RuntimeStatus.streaming);
+      first.add(
+        V2FeedSurfaceJson(
+          surfaceJsonString(sequence: 1, actions: [testActionJson()]),
+        ),
+      );
+      await _eventually(() => runtime.latestSurface != null);
+      final surface = runtime.latestSurface!;
+      final submission = runtime.submitAction(
+        surface,
+        'refresh-binding',
+        const <String, Object?>{},
+        now: v2TestNow,
+      );
+      await _eventually(() => transport.submittedAction != null);
+
+      await runtime.authenticateWithBootstrap('bootstrap-b');
+      await _eventually(() => transport.watchAfter.length == 2);
+      receipt.complete(
+        const V2ActionResult(
+          operationId: 'operation-a',
+          idempotencyKey: 'idempotency-a',
+        ),
+      );
+
+      await expectLater(submission, throwsA(isA<StateError>()));
+
+      await runtime.stop();
+    });
   });
 }
 
@@ -287,9 +511,20 @@ Future<void> _eventually(bool Function() condition) async {
 }
 
 class _FakeUiTransport implements V2UiTransport {
-  _FakeUiTransport(Iterable<_FakeFeedCall> calls) : _calls = Queue.of(calls);
+  _FakeUiTransport(
+    Iterable<_FakeFeedCall> calls, {
+    Iterable<Object>? bootstrapResults,
+    this.refreshError,
+    this.actionResult,
+  }) : _calls = Queue.of(calls),
+       _bootstrapResults = Queue.of(
+         bootstrapResults ?? <Object>[testSession()],
+       );
 
   final Queue<_FakeFeedCall> _calls;
+  final Queue<Object> _bootstrapResults;
+  final Object? refreshError;
+  final Future<V2ActionResult>? actionResult;
   final List<int> watchAfter = [];
   final List<String> watchAccessTokens = [];
   final List<int> acknowledged = [];
@@ -302,12 +537,19 @@ class _FakeUiTransport implements V2UiTransport {
   @override
   Future<V2SessionBundle> bootstrapSession(String bootstrapSecret) async {
     this.bootstrapSecret = bootstrapSecret;
-    return testSession();
+    if (_bootstrapResults.isEmpty) {
+      throw StateError('No fake bootstrap result is available.');
+    }
+    final result = _bootstrapResults.removeFirst();
+    if (result is V2SessionBundle) return result;
+    throw result;
   }
 
   @override
   Future<V2SessionBundle> refreshSession({required String refreshToken}) async {
     refreshCount++;
+    final error = refreshError;
+    if (error != null) throw error;
     return testSession(
       accessToken: 'access-refreshed',
       refreshToken: 'refresh-rotated',
@@ -350,6 +592,8 @@ class _FakeUiTransport implements V2UiTransport {
   }) async {
     submittedAction = action;
     submittedInput = input;
+    final pendingResult = actionResult;
+    if (pendingResult != null) return pendingResult;
     return const V2ActionResult(
       operationId: 'operation-a',
       idempotencyKey: 'idempotency-a',
@@ -392,6 +636,8 @@ class _FakeFeedCall implements V2FeedCall {
   bool cancelled = false;
 
   void add(V2FeedEvent event) => _controller.add(event);
+
+  void addError(Object error) => _controller.addError(error);
 
   @override
   Stream<V2FeedEvent> get events => _controller.stream;

@@ -322,12 +322,18 @@ public sealed class V2UiGrpcService(
         {
             operation = await application.SubmitAsync(commandContext, command, context.CancellationToken).ConfigureAwait(false);
         }
+        catch (V2IdempotencyConflictException)
+        {
+            actionExecutor.Release(authorization);
+            throw new RpcException(new Status(StatusCode.AlreadyExists,
+                "The action was already submitted with different input."));
+        }
         catch
         {
             actionExecutor.Release(authorization);
             throw;
         }
-        if (!actionExecutor.Commit(authorization))
+        if (!actionExecutor.Commit(authorization, operation.OperationId))
             throw new RpcException(new Status(StatusCode.AlreadyExists, "V2 action authorization failed."));
         using var activity = ActivitySource.StartActivity("v2.ui.action.submit", ActivityKind.Internal);
         activity?.SetTag("db.v2.ui.action_type", submission.ActionType);

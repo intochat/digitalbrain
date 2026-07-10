@@ -150,10 +150,13 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
           if (surface == null)
             _buildWaiting(controller)
           else
-            V2SurfaceView(
-              key: v2RuntimeSurfaceKey,
-              surface: surface,
-              onSubmitAction: controller.submitAction,
+            KeyedSubtree(
+              key: ValueKey<int>(controller.scopeEpoch),
+              child: V2SurfaceView(
+                key: v2RuntimeSurfaceKey,
+                surface: surface,
+                onSubmitAction: controller.submitAction,
+              ),
             ),
           if (surface != null &&
               controller.status == V2RuntimeStatus.reconnecting)

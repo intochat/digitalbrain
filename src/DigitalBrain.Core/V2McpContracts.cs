@@ -5,6 +5,9 @@ public sealed record V2OperationStatus(string OperationId, WorkflowState State, 
 public sealed record V2McpError(string Code, string Message, string CorrelationId);
 public sealed record V2Capability(string Id, int Version, bool Enabled, bool RequiresApproval);
 
+public sealed class V2IdempotencyConflictException()
+    : InvalidOperationException("The idempotency key was already used for a different command input.");
+
 public interface IV2QueryPort
 {
     Task<V2OperationStatus?> GetOperationAsync(RequestContext context, string operationId, CancellationToken cancellationToken = default);

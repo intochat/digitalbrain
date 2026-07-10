@@ -456,3 +456,4 @@ aspire_*.log
 # Build sentinels (local only, recreated on demand, deleted by `git clean -fdx`)
 .config/.codegraph-initialized
 .config/.tools-restored
+qa-artifacts/

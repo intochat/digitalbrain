@@ -592,8 +592,6 @@ public sealed class V2UiTransportTests
         Assert.Equal(StatusCode.InvalidArgument, rejectedScope.StatusCode);
         var accepted = await fixture.Service.SubmitAction(actionRequest, authContext);
         Assert.StartsWith("v2-op-", accepted.OperationId);
-        var replay = await Assert.ThrowsAsync<RpcException>(() => fixture.Service.SubmitAction(actionRequest, authContext));
-        Assert.Equal(StatusCode.AlreadyExists, replay.StatusCode);
 
         var dispatcher = new V2CommandDispatcher(fixture.Application,
             [new V2SurfaceRefreshCommandHandler(fixture.Producer)]);
@@ -602,6 +600,12 @@ public sealed class V2UiTransportTests
         var projected = fixture.Feed.CatchUp(authenticated, V2SurfaceAudienceKind.Principal, 0);
         Assert.True(projected.ResetRequired);
         Assert.Equal(2, Assert.Single(projected.Items).Revision);
+
+        var replay = await fixture.Service.SubmitAction(actionRequest, authContext);
+        Assert.Equal(accepted.OperationId, replay.OperationId);
+        Assert.Equal(accepted.IdempotencyKey, replay.IdempotencyKey);
+        Assert.True(fixture.Actions.TryGetUse(accepted.IdempotencyKey, out var use));
+        Assert.Equal(accepted.OperationId, use!.OperationId);
     }
 
     [Fact]
@@ -634,20 +638,10 @@ public sealed class V2UiTransportTests
         await Assert.ThrowsAsync<IOException>(() => fixture.Service.SubmitAction(request, AuthContext(session.AccessToken)));
         Assert.Empty(application.GetPendingOperationIds());
         fail = false;
-        var outcomes = await Task.WhenAll(Enumerable.Range(0, 2).Select(async _ =>
-        {
-            try
-            {
-                await fixture.Service.SubmitAction(request, AuthContext(session.AccessToken));
-                return (StatusCode?)null;
-            }
-            catch (RpcException exception)
-            {
-                return exception.StatusCode;
-            }
-        }));
-        Assert.Single(outcomes, static status => status is null);
-        Assert.Single(outcomes, static status => status == StatusCode.AlreadyExists);
+        var outcomes = await Task.WhenAll(Enumerable.Range(0, 2)
+            .Select(_ => fixture.Service.SubmitAction(request, AuthContext(session.AccessToken))));
+        Assert.Single(outcomes.Select(static reply => reply.OperationId).Distinct(StringComparer.Ordinal));
+        Assert.Single(outcomes.Select(static reply => reply.IdempotencyKey).Distinct(StringComparer.Ordinal));
         Assert.Single(application.GetPendingOperationIds());
         Assert.Equal(1, writes);
     }

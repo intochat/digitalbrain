@@ -913,10 +913,11 @@ public sealed class V2ActionExecutor(IV2PrivateFeedStore? feed = null)
             var used = binding.OwnerKey is { } owner
                 ? _bindingUses.GetValueOrDefault(owner)
                 : _uses.GetValueOrDefault(binding.TokenHash);
-            if (used >= binding.MaxUses)
-                throw binding.SurfaceId is null
-                    ? new InvalidOperationException("V2 action binding usage limit exceeded.")
-                    : new V2ActionRejectedException(V2ActionRejection.Replay);
+            if (used >= binding.MaxUses && !authorization.IsReplay)
+            {
+                if (binding.SurfaceId is null) throw new InvalidOperationException("V2 action binding usage limit exceeded.");
+                throw new V2ActionRejectedException(V2ActionRejection.Replay);
+            }
             return authorization;
         }
         catch
@@ -958,25 +959,29 @@ public sealed class V2ActionExecutor(IV2PrivateFeedStore? feed = null)
             throw new V2ActionRejectedException(V2ActionRejection.PolicyDenied);
         if (binding.SurfaceId is not null && (!string.Equals(binding.SurfaceId, surfaceId, StringComparison.Ordinal) || binding.Revision != surfaceRevision))
             throw new V2ActionRejectedException(V2ActionRejection.WrongRevision);
-        if (binding.SurfaceId is not null && binding.OwnerKey is { } revisionOwner && _latestRevisions.TryGetValue(
+        var idempotency = binding.SurfaceId is null
+            ? $"v2-action-{Guid.NewGuid():N}"
+            : StableIdempotency(binding);
+        var recordedReplay = binding.SurfaceId is not null && _records.ContainsKey(idempotency);
+        if (!recordedReplay && binding.SurfaceId is not null && binding.OwnerKey is { } revisionOwner && _latestRevisions.TryGetValue(
                 new(context.TenantId.Value, context.WorkspaceId.Value, context.Principal.Value, context.Principal.Kind,
                     revisionOwner.AudienceKind, revisionOwner.AudienceId, binding.SurfaceId), out var latest) &&
             latest != binding.Revision)
             throw new V2ActionRejectedException(V2ActionRejection.WrongRevision);
-        if (binding.SurfaceId is not null && feed is not null &&
+        if (!recordedReplay && binding.SurfaceId is not null && feed is not null &&
             feed.LatestRevision(context, binding.AudienceKind, binding.SurfaceId) != binding.Revision)
             throw new V2ActionRejectedException(V2ActionRejection.WrongRevision);
         if (binding.SurfaceId is not null) DemandInputSchema(binding.InputSchemaRef, input);
 
         var operationId = $"v2-op-{Guid.NewGuid():N}";
-        var idempotency = binding.SurfaceId is null
-            ? $"v2-action-{Guid.NewGuid():N}"
-            : StableIdempotency(binding);
         return new Authorization(binding,
-            new V2ActionSubmission(operationId, idempotency, input.Clone(), binding.ActionType));
+            new V2ActionSubmission(operationId, idempotency, input.Clone(), binding.ActionType))
+        {
+            IsReplay = recordedReplay
+        };
     }
 
-    public bool Commit(Authorization authorization)
+    public bool Commit(Authorization authorization, string? durableOperationId = null)
     {
         ArgumentNullException.ThrowIfNull(authorization);
         if (Interlocked.Exchange(ref authorization.Completed, 1) != 0)
@@ -984,6 +989,11 @@ public sealed class V2ActionExecutor(IV2PrivateFeedStore? feed = null)
         try
         {
             var binding = (IssuedBinding)authorization.BindingState;
+            var submission = authorization.Submission;
+            if (authorization.IsReplay)
+                return durableOperationId is not null &&
+                       _records.TryGetValue(submission.IdempotencyKey, out var recorded) &&
+                       string.Equals(recorded.OperationId, durableOperationId, StringComparison.Ordinal);
             var hash = binding.TokenHash;
             var use = binding.OwnerKey is { } bindingOwner
                 ? _bindingUses.AddOrUpdate(bindingOwner, 1, static (_, current) => checked(current + 1))
@@ -996,9 +1006,8 @@ public sealed class V2ActionExecutor(IV2PrivateFeedStore? feed = null)
                     _uses.AddOrUpdate(hash, 0, static (_, current) => Math.Max(0, current - 1));
                 return false;
             }
-            var submission = authorization.Submission;
             _records[submission.IdempotencyKey] = new V2UiActionUseRecord(
-                binding.BindingId, submission.OperationId, submission.IdempotencyKey, DateTimeOffset.UtcNow);
+                binding.BindingId, durableOperationId ?? submission.OperationId, submission.IdempotencyKey, DateTimeOffset.UtcNow);
             return true;
         }
         finally { ReleaseLinearization(authorization); }
@@ -1038,6 +1047,7 @@ public sealed class V2ActionExecutor(IV2PrivateFeedStore? feed = null)
         internal object BindingState { get; }
         public V2ActionSubmission Submission { get; }
         internal bool HoldsLinearization { get; set; }
+        internal bool IsReplay { get; set; }
         internal int Completed;
     }
 

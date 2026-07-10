@@ -145,8 +145,18 @@ if (UseHttpTransport())
         if (!V2McpInoCommandHandler.TryGetPrompt(body, out _)) return Results.BadRequest(new V2McpError("invalid_ino_command", "INO commands accept only a prompt.", principal.CorrelationId));
         var commandId = context.Request.Headers["Idempotency-Key"].ToString();
         if (string.IsNullOrWhiteSpace(commandId) || commandId.Length > 256) return Results.BadRequest(new V2McpError("invalid_idempotency", "Idempotency-Key is required.", principal.CorrelationId));
-        var operation = await service.SubmitAsync(principal, new V2CommandEnvelope(V2McpInoCommandHandler.CommandType, 2, commandId, principal, body.Clone()), context.RequestAborted);
-        return Results.Accepted($"/v2/operations/{operation.OperationId}", operation);
+        try
+        {
+            var operation = await service.SubmitAsync(principal,
+                new V2CommandEnvelope(V2McpInoCommandHandler.CommandType, 2, commandId, principal, body.Clone()),
+                context.RequestAborted);
+            return Results.Accepted($"/v2/operations/{operation.OperationId}", operation);
+        }
+        catch (V2IdempotencyConflictException)
+        {
+            return Results.Conflict(new V2McpError("idempotency_conflict",
+                "The idempotency key was already used for different input.", principal.CorrelationId));
+        }
     });
     app.MapGet("/v2/workflows", async (HttpContext context, IV2ProjectionQueryPort store) =>
     {
@@ -165,8 +175,16 @@ if (UseHttpTransport())
         var commandId = body.TryGetProperty("commandId", out var idValue) ? idValue.GetString() : null;
         if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(commandId)) return Results.BadRequest(new V2McpError("invalid_command", "type and commandId are required", principal.CorrelationId));
         var envelope = new V2CommandEnvelope(type!, 2, commandId!, principal, body.Clone());
-        var operation = await service.SubmitAsync(principal, envelope, context.RequestAborted);
-        return Results.Accepted($"/v2/operations/{operation.OperationId}", operation);
+        try
+        {
+            var operation = await service.SubmitAsync(principal, envelope, context.RequestAborted);
+            return Results.Accepted($"/v2/operations/{operation.OperationId}", operation);
+        }
+        catch (V2IdempotencyConflictException)
+        {
+            return Results.Conflict(new V2McpError("idempotency_conflict",
+                "The idempotency key was already used for different input.", principal.CorrelationId));
+        }
     });
     app.MapPost("/v2/session/refresh", (IV2SessionManager sessions, V2SessionRefreshRequest request) =>
     {

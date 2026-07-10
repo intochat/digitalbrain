@@ -316,11 +316,19 @@ class V2FeedController {
 
   SurfaceEnvelope? surface(String surfaceId) => _surfaces[surfaceId];
 
-  void bindIdentity(V2SessionIdentity identity) {
-    if (_identity case final current? when !_sameScope(current, identity)) {
+  bool bindIdentity(V2SessionIdentity identity) {
+    final current = _identity;
+    final scopeChanged = current != null && !_sameScope(current, identity);
+    if (scopeChanged) {
       reset();
     }
     _identity = identity;
+    return scopeChanged;
+  }
+
+  void clearIdentity() {
+    _identity = null;
+    reset();
   }
 
   V2FeedMessage accept(SurfaceEnvelope envelope) {
@@ -416,6 +424,7 @@ class V2FeedController {
   }
 
   static bool _sameScope(V2SessionIdentity left, V2SessionIdentity right) =>
+      left.sessionId == right.sessionId &&
       left.tenantId == right.tenantId &&
       left.workspaceId == right.workspaceId &&
       left.principalId == right.principalId;
@@ -499,8 +508,10 @@ class V2RuntimeController extends ChangeNotifier {
   bool _forceSnapshot = false;
   bool _disposed = false;
   int _generation = 0;
+  int _scopeEpoch = 0;
 
   bool get hasSurface => latestSurface != null;
+  int get scopeEpoch => _scopeEpoch;
 
   Future<void> start({String? bootstrapSecret}) async {
     if (_loop != null || status == V2RuntimeStatus.authenticating) return;
@@ -515,7 +526,7 @@ class V2RuntimeController extends ChangeNotifier {
       await authenticateWithBootstrap(bootstrapSecret);
       return;
     }
-    feed.bindIdentity(session.identity!);
+    _bindIdentity(session.identity!);
     _launchLoop();
   }
 
@@ -528,10 +539,11 @@ class V2RuntimeController extends ChangeNotifier {
     try {
       await session.bootstrap(transport, secret);
       final identity = session.identity!;
-      feed.bindIdentity(identity);
+      _bindIdentity(identity);
       _launchLoop();
     } catch (error) {
       transientError = error;
+      _clearProtectedState(clearFeedIdentity: true);
       _setStatus(V2RuntimeStatus.awaitingSignIn);
       rethrow;
     }
@@ -648,6 +660,12 @@ class V2RuntimeController extends ChangeNotifier {
       }
 
       if (_stopRequested || generation != _generation) return;
+      if (!session.isAuthenticated) {
+        terminalError ??= connectionError;
+        _clearProtectedState(clearFeedIdentity: true);
+        _setStatus(V2RuntimeStatus.awaitingSignIn);
+        return;
+      }
       if (connectionError is V2TransportException &&
           connectionError.isTerminal) {
         terminalError ??= connectionError;
@@ -661,6 +679,7 @@ class V2RuntimeController extends ChangeNotifier {
           reconnectImmediately = true;
         } catch (_) {
           terminalError ??= connectionError;
+          _clearProtectedState(clearFeedIdentity: true);
           _setStatus(V2RuntimeStatus.awaitingSignIn);
           return;
         }
@@ -704,12 +723,38 @@ class V2RuntimeController extends ChangeNotifier {
     if (action.isExpired(timestamp) || surface.isExpired(timestamp)) {
       throw StateError('V2 action expired.');
     }
+    final submissionEpoch = _scopeEpoch;
     final accessToken = await session.accessToken(transport);
-    return transport.submitAction(
+    if (submissionEpoch != _scopeEpoch) {
+      throw StateError('V2 action scope changed before acceptance.');
+    }
+    final result = await transport.submitAction(
       accessToken: accessToken,
       action: action,
       input: Map<String, Object?>.unmodifiable(input),
     );
+    if (submissionEpoch != _scopeEpoch) {
+      throw StateError('V2 action result belongs to a prior scope.');
+    }
+    return result;
+  }
+
+  void _bindIdentity(V2SessionIdentity identity) {
+    if (!feed.bindIdentity(identity)) return;
+    _clearProtectedState(clearFeedIdentity: false);
+  }
+
+  void _clearProtectedState({required bool clearFeedIdentity}) {
+    if (clearFeedIdentity) {
+      feed.clearIdentity();
+    } else {
+      feed.reset();
+    }
+    latestSurface = null;
+    lastReset = null;
+    _forceSnapshot = false;
+    _scopeEpoch++;
+    _notifyListeners();
   }
 
   Future<void> stop({bool closeTransport = true}) async {

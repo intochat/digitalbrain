@@ -10,8 +10,7 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
 {
     private readonly CapabilityIsolationGate _gate = new();
     private readonly ConcurrentDictionary<string, V2OperationStatus> _operations = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, (TenantId Tenant, WorkspaceId Workspace)> _operationOwners = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<IdempotencyScope, string> _idempotency = new();
+    private readonly ConcurrentDictionary<IdempotencyScope, SubmissionReceipt> _idempotency = new();
     private readonly ConcurrentDictionary<string, string> _operationIdempotency = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, V2CommandEnvelope> _commands = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _claimed = new(StringComparer.Ordinal);
@@ -53,7 +52,10 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
     public Task<V2Page<V2OperationStatus>> GetOperationsAsync(RequestContext context, string? cursor, int limit, CancellationToken cancellationToken = default)
     {
         _gate.Demand(context, context.TenantId, context.WorkspaceId, "brain.read");
-        var owned = _operations.Values.Where(x => _operationOwners.TryGetValue(x.OperationId, out var owner) && owner.Tenant == context.TenantId && owner.Workspace == context.WorkspaceId).OrderBy(x => x.OperationId, StringComparer.Ordinal).ToArray();
+        var owned = _operations.Values
+            .Where(operation => _commands.TryGetValue(operation.OperationId, out var command) && SameOwner(context, command.Context))
+            .OrderBy(operation => operation.OperationId, StringComparer.Ordinal)
+            .ToArray();
         var offset = DecodeCursor(cursor);
         var take = Math.Clamp(limit, 1, 100);
         var items = owned.Skip(offset).Take(take).ToArray();
@@ -63,13 +65,17 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
     public Task<V2OperationStatus?> GetOperationAsync(RequestContext context, string operationId, CancellationToken cancellationToken = default)
     {
         _gate.Demand(context, context.TenantId, context.WorkspaceId, "brain.read");
-        if (_operations.TryGetValue(operationId, out var operation) && _operationOwners.TryGetValue(operationId, out var owner) && owner.Tenant == context.TenantId && owner.Workspace == context.WorkspaceId)
+        if (_operations.TryGetValue(operationId, out var operation) && _commands.TryGetValue(operationId, out var command) &&
+            SameOwner(context, command.Context))
             return Task.FromResult<V2OperationStatus?>(operation);
         return Task.FromResult<V2OperationStatus?>(null);
     }
 
     public Task<V2OperationStatus> SubmitAsync(RequestContext context, V2CommandEnvelope command, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(command.Context);
         var requiredCapability = command.Type.Contains("admin", StringComparison.OrdinalIgnoreCase)
             ? "brain.admin"
             : command.Type.Contains("approv", StringComparison.OrdinalIgnoreCase)
@@ -77,26 +83,34 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
                 : "brain.act";
         _gate.Demand(context, context.TenantId, context.WorkspaceId, requiredCapability);
         cancellationToken.ThrowIfCancellationRequested();
+        DemandAuthenticatedAuthority(context, command);
+        if (string.IsNullOrWhiteSpace(command.Type) || command.Type.Length > 256 || command.Version <= 0 ||
+            string.IsNullOrWhiteSpace(command.CommandId) || command.CommandId.Length > 1024 ||
+            command.Payload.ValueKind == JsonValueKind.Undefined)
+            throw new ArgumentException("The V2 command envelope is invalid.", nameof(command));
         var idempotency = context.IdempotencyKey ?? command.CommandId;
-        var key = new IdempotencyScope(context.TenantId, context.WorkspaceId, idempotency);
+        if (string.IsNullOrWhiteSpace(idempotency) || idempotency.Length > 1024)
+            throw new ArgumentException("The V2 idempotency key is invalid.", nameof(context));
+        var key = new IdempotencyScope(context.TenantId, context.WorkspaceId, context.Principal, idempotency);
+        var inputFingerprint = InputFingerprint(command.Payload);
         lock (_stateLock)
         {
-            if (_idempotency.TryGetValue(key, out var existing))
+            if (_idempotency.TryGetValue(key, out var receipt))
             {
-                if (_operations.TryGetValue(existing, out var prior) && _operationOwners.TryGetValue(existing, out var owner) &&
-                    owner.Tenant == context.TenantId && owner.Workspace == context.WorkspaceId)
-                    return Task.FromResult(prior);
-                throw new InvalidOperationException("The V2 idempotency journal is internally inconsistent.");
+                if (!_operations.TryGetValue(receipt.OperationId, out var prior) ||
+                    !_commands.TryGetValue(receipt.OperationId, out var priorCommand) || !SameOwner(context, priorCommand.Context))
+                    throw new InvalidOperationException("The V2 idempotency journal is internally inconsistent.");
+                if (!receipt.Matches(command, inputFingerprint)) throw new V2IdempotencyConflictException();
+                return Task.FromResult(prior);
             }
             var operationId = "v2-op-" + Guid.NewGuid().ToString("N");
             var operation = new V2OperationStatus(operationId, WorkflowState.ApplyQueued, null, DateTimeOffset.UtcNow);
             // The operation and command envelope are appended together before any in-memory
             // observer can see them. This is the durable handoff and idempotency linearization point.
-            Persist(idempotency, context.TenantId, context.WorkspaceId, command, operation);
+            Persist(idempotency, command, operation);
             _operations[operationId] = operation;
-            _operationOwners[operationId] = (context.TenantId, context.WorkspaceId);
             _commands[operationId] = command;
-            _idempotency[key] = operationId;
+            _idempotency[key] = new SubmissionReceipt(operationId, command.Type, command.Version, inputFingerprint);
             _operationIdempotency[operationId] = idempotency;
             return Task.FromResult(operation);
         }
@@ -127,25 +141,39 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
                 string.IsNullOrWhiteSpace(item.Tenant) || item.Tenant.Length > 256 ||
                 string.IsNullOrWhiteSpace(item.Workspace) || item.Workspace.Length > 256 ||
                 item.Operation is null || string.IsNullOrWhiteSpace(item.Operation.OperationId) || item.Operation.OperationId.Length > 256 ||
-                item.Command is null || item.Command.Context.TenantId.Value != item.Tenant ||
-                item.Command.Context.WorkspaceId.Value != item.Workspace)
+                item.Command is null || item.Command.Context is null || item.Command.Context.TenantId.Value != item.Tenant ||
+                item.Command.Context.WorkspaceId.Value != item.Workspace ||
+                string.IsNullOrWhiteSpace(item.Command.Context.Principal.Value) || item.Command.Context.Principal.Value.Length > 256 ||
+                !Enum.IsDefined(item.Command.Context.Principal.Kind) || !Enum.IsDefined(item.Command.Context.Assurance) ||
+                string.IsNullOrWhiteSpace(item.Command.Context.SessionId) || item.Command.Context.SessionId.Length > 256 ||
+                item.Command.Context.Grants is null || string.IsNullOrWhiteSpace(item.Command.Type) || item.Command.Type.Length > 256 ||
+                item.Command.Version <= 0 || string.IsNullOrWhiteSpace(item.Command.CommandId) || item.Command.CommandId.Length > 1024 ||
+                item.Command.Payload.ValueKind == JsonValueKind.Undefined)
             {
                 Quarantine(lineNumber, line);
                 throw new InvalidDataException($"The V2 operation journal contains an invalid record at line {lineNumber}.");
             }
-            var idempotencyScope = new IdempotencyScope(new(item.Tenant), new(item.Workspace), item.Idempotency);
-            if (_idempotency.TryGetValue(idempotencyScope, out var mappedOperation) &&
-                !string.Equals(mappedOperation, item.Operation.OperationId, StringComparison.Ordinal))
+            var inputFingerprint = InputFingerprint(item.Command.Payload);
+            var idempotencyScope = new IdempotencyScope(new(item.Tenant), new(item.Workspace), item.Command.Context.Principal, item.Idempotency);
+            var receipt = new SubmissionReceipt(item.Operation.OperationId, item.Command.Type, item.Command.Version, inputFingerprint);
+            if ((_idempotency.TryGetValue(idempotencyScope, out var mappedReceipt) && mappedReceipt != receipt) ||
+                (_operationIdempotency.TryGetValue(item.Operation.OperationId, out var mappedIdempotency) &&
+                 !string.Equals(mappedIdempotency, item.Idempotency, StringComparison.Ordinal)) ||
+                (_commands.TryGetValue(item.Operation.OperationId, out var mappedCommand) &&
+                 (!SameOwner(mappedCommand.Context, item.Command.Context) ||
+                  !string.Equals(mappedCommand.Type, item.Command.Type, StringComparison.Ordinal) ||
+                  mappedCommand.Version != item.Command.Version ||
+                  !FixedTimeEquals(InputFingerprint(mappedCommand.Payload), inputFingerprint))))
             {
                 Quarantine(lineNumber, line);
                 throw new InvalidDataException($"The V2 operation journal contains an idempotency conflict at line {lineNumber}.");
             }
             _operations[item.Operation.OperationId] = item.Operation;
-            _operationOwners[item.Operation.OperationId] = (new(item.Tenant), new(item.Workspace));
-            _idempotency[idempotencyScope] = item.Operation.OperationId;
+            _idempotency[idempotencyScope] = receipt;
             _operationIdempotency[item.Operation.OperationId] = item.Idempotency;
-            if (item.Command is not null) _commands[item.Operation.OperationId] = item.Command;
+            _commands[item.Operation.OperationId] = item.Command;
         }
+        RecoverInterruptedApplications();
     }
 
     private void Quarantine(int lineNumber, string raw)
@@ -169,15 +197,22 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
         }
     }
 
-    private void Persist(string idempotency, TenantId tenant, WorkspaceId workspace, V2CommandEnvelope command, V2OperationStatus operation)
+    private void Persist(string idempotency, V2CommandEnvelope command, V2OperationStatus operation)
     {
         if (_appendLine is null) return;
         lock (_storageLock)
-            _appendLine(JsonSerializer.Serialize(new PersistedOperation(idempotency, tenant.Value, workspace.Value, operation, command)));
+            _appendLine(JsonSerializer.Serialize(new PersistedOperation(
+                idempotency, command.Context.TenantId.Value, command.Context.WorkspaceId.Value, operation, command)));
     }
 
     private sealed record PersistedOperation(string Idempotency, string Tenant, string Workspace, V2OperationStatus Operation, V2CommandEnvelope? Command = null);
-    private readonly record struct IdempotencyScope(TenantId Tenant, WorkspaceId Workspace, string Idempotency);
+    private readonly record struct IdempotencyScope(TenantId Tenant, WorkspaceId Workspace, PrincipalRef Principal, string Idempotency);
+    private sealed record SubmissionReceipt(string OperationId, string CommandType, int CommandVersion, string InputFingerprint)
+    {
+        public bool Matches(V2CommandEnvelope command, string inputFingerprint) =>
+            string.Equals(CommandType, command.Type, StringComparison.Ordinal) && CommandVersion == command.Version &&
+            FixedTimeEquals(InputFingerprint, inputFingerprint);
+    }
 
     /// <summary>Claims one durable command for execution. Claiming is idempotent and never trusts transport state.</summary>
     public bool TryClaimPending(string operationId, out V2CommandEnvelope? command)
@@ -219,11 +254,91 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
 
     private void PersistStatus(string operationId, V2OperationStatus status)
     {
-        if (_appendLine is null || !_operationOwners.TryGetValue(operationId, out var owner) ||
-            !_commands.TryGetValue(operationId, out var command) || !_operationIdempotency.TryGetValue(operationId, out var idempotency)) return;
+        if (_appendLine is null || !_commands.TryGetValue(operationId, out var command) ||
+            !_operationIdempotency.TryGetValue(operationId, out var idempotency)) return;
         lock (_storageLock)
-            _appendLine(JsonSerializer.Serialize(new PersistedOperation(idempotency, owner.Tenant.Value, owner.Workspace.Value, status, command)));
+            _appendLine(JsonSerializer.Serialize(new PersistedOperation(
+                idempotency, command.Context.TenantId.Value, command.Context.WorkspaceId.Value, status, command)));
     }
+
+    private void RecoverInterruptedApplications()
+    {
+        foreach (var pair in _operations.Where(static pair => pair.Value.State == WorkflowState.Applying)
+                     .OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        {
+            var recovered = pair.Value with
+            {
+                State = WorkflowState.OutcomeUnknown,
+                SafeReason = "The previous attempt ended before its outcome was confirmed.",
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            PersistStatus(pair.Key, recovered);
+            _operations[pair.Key] = recovered;
+        }
+    }
+
+    private static void DemandAuthenticatedAuthority(RequestContext context, V2CommandEnvelope command)
+    {
+        if (!SameOwner(context, command.Context) || context.Assurance != command.Context.Assurance ||
+            !string.Equals(context.SessionId, command.Context.SessionId, StringComparison.Ordinal) ||
+            !context.Grants.SetEquals(command.Context.Grants))
+            throw new UnauthorizedAccessException("V2 command authority must match the authenticated context.");
+    }
+
+    private static bool SameOwner(RequestContext left, RequestContext right) =>
+        left.TenantId == right.TenantId && left.WorkspaceId == right.WorkspaceId && left.Principal == right.Principal;
+
+    private static string InputFingerprint(JsonElement input)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            WriteCanonical(writer, input);
+            writer.Flush();
+        }
+        return Convert.ToHexString(SHA256.HashData(stream.ToArray()));
+    }
+
+    private static void WriteCanonical(Utf8JsonWriter writer, JsonElement value)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (var property in value.EnumerateObject().OrderBy(static property => property.Name, StringComparer.Ordinal))
+                {
+                    writer.WritePropertyName(property.Name);
+                    WriteCanonical(writer, property.Value);
+                }
+                writer.WriteEndObject();
+                break;
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (var item in value.EnumerateArray()) WriteCanonical(writer, item);
+                writer.WriteEndArray();
+                break;
+            case JsonValueKind.String:
+                writer.WriteStringValue(value.GetString());
+                break;
+            case JsonValueKind.Number:
+                writer.WriteRawValue(value.GetRawText(), skipInputValidation: true);
+                break;
+            case JsonValueKind.True:
+                writer.WriteBooleanValue(true);
+                break;
+            case JsonValueKind.False:
+                writer.WriteBooleanValue(false);
+                break;
+            case JsonValueKind.Null:
+                writer.WriteNullValue();
+                break;
+            default:
+                throw new ArgumentException("The V2 command input contains an unsupported JSON value.", nameof(value));
+        }
+    }
+
+    private static bool FixedTimeEquals(string first, string second) =>
+        CryptographicOperations.FixedTimeEquals(Convert.FromHexString(first), Convert.FromHexString(second));
 
     private string EncodeCursor(int offset)
     {
