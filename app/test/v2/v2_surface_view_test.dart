@@ -168,6 +168,56 @@ void main() {
     );
   });
 
+  testWidgets('uses a readable foreground for user turns in dark mode', (
+    tester,
+  ) async {
+    const prompt = 'A restored user turn must remain readable.';
+    final theme = ThemeData.dark(useMaterial3: true);
+
+    await tester.pumpWidget(
+      _host(
+        V2SurfaceView(
+          surface: _inoSurface(
+            messages: [
+              inoMessage(
+                turnKey: 'turn-contrast-user',
+                role: 'user',
+                text: prompt,
+                state: 'succeeded',
+              ),
+            ],
+          ),
+          onSubmitAction: _unexpectedAction,
+        ),
+        theme: theme,
+      ),
+    );
+
+    final expectedForeground = theme.colorScheme.onPrimaryContainer;
+    expect(
+      tester.widget<SelectableText>(find.byType(SelectableText)).style?.color,
+      expectedForeground,
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(const ValueKey('v2-ino-turn-turn-contrast-user-author')),
+          )
+          .style
+          ?.color,
+      expectedForeground,
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(const ValueKey('v2-ino-turn-turn-contrast-user-status')),
+          )
+          .style
+          ?.color,
+      expectedForeground,
+    );
+  });
+
   testWidgets('enforces the production prompt bound before submission', (
     tester,
   ) async {
@@ -589,6 +639,38 @@ void main() {
     );
   });
 
+  testWidgets('shows the principal-scoped Google connection action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        V2SurfaceView(
+          surface: _inoSurface(
+            messages: [
+              inoMessage(
+                role: 'assistant',
+                text: 'Connect your Google account to let INO read your Gmail.',
+                state: 'succeeded',
+              ),
+            ],
+            operation: inoOperation(
+              state: 'succeeded',
+              action: googleConnectionAction(),
+            ),
+          ),
+          onSubmitAction: (_, _, _) async => const V2ActionResult(
+            operationId: 'unused',
+            idempotencyKey: 'unused',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(v2InoConnectButtonKey), findsOneWidget);
+    expect(find.text('Connect Google'), findsOneWidget);
+    expect(find.textContaining('Connect your Google account'), findsOneWidget);
+  });
+
   testWidgets('terminal state is announced as a live status', (tester) async {
     await tester.pumpWidget(
       _host(
@@ -816,7 +898,8 @@ Future<void> _pumpInoRevision(
   await tester.pump();
 }
 
-Widget _host(Widget child) => MaterialApp(
+Widget _host(Widget child, {ThemeData? theme}) => MaterialApp(
+  theme: theme,
   home: FTheme(
     data: FThemes.neutral.light.touch,
     child: Scaffold(body: SizedBox.expand(child: child)),

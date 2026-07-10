@@ -190,6 +190,15 @@ public sealed class V2WorkspaceSurfaceProducer(
             };
         if (operation is not null && !string.IsNullOrWhiteSpace(current!.SafeReason))
             operation["safeReason"] = current.SafeReason;
+        if (operation is not null && current!.Action is { } action)
+        {
+            operation["action"] = new Dictionary<string, object?>
+            {
+                ["kind"] = action.Kind,
+                ["label"] = action.Label,
+                ["target"] = action.Target
+            };
+        }
 
         return JsonSerializer.SerializeToElement(new
         {

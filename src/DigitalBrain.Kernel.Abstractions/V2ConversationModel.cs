@@ -5,7 +5,14 @@ namespace DigitalBrain.Kernel.V2;
 [GenerateSerializer, Alias("digitalbrain.v2.conversation-model-request")]
 public sealed record V2ConversationModelCompletionRequest(
     [property: Id(0)] string Prompt,
-    [property: Id(1)] IReadOnlyList<string> ConversationHistory);
+    [property: Id(1)] IReadOnlyList<string> ConversationHistory,
+    [property: Id(2)] IReadOnlyList<V2ConversationModelToolOutcome>? ToolOutcomes = null);
+
+[GenerateSerializer, Alias("digitalbrain.v2.conversation-model-tool-outcome")]
+public sealed record V2ConversationModelToolOutcome(
+    [property: Id(0)] string Kind,
+    [property: Id(1)] string? Content,
+    [property: Id(2)] string? SafeReason);
 
 [GenerateSerializer, Alias("digitalbrain.v2.conversation-model-response")]
 public sealed record V2ConversationModelCompletionResponse(

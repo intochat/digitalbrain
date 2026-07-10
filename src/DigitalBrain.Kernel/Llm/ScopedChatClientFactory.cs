@@ -52,12 +52,12 @@ internal static class DigitalBrainChatClients
 {
     public static IChatClient BuildOllama(string endpoint, string model) =>
         new ChatClientBuilder(new OllamaSharp.OllamaApiClient(new Uri(endpoint), model))
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
             .Build();
 
     public static IChatClient BuildOpenAi(string model, string apiKey) =>
         new ChatClientBuilder(new OpenAI.Chat.ChatClient(model, apiKey).AsIChatClient())
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
             .Build();
 
     public static IChatClient BuildOpenAiCompatible(string endpoint, string model, string apiKey) =>
@@ -67,7 +67,7 @@ internal static class DigitalBrainChatClients
                         new OpenAI.OpenAIClientOptions { Endpoint = new Uri(endpoint) })
                     .GetChatClient(model)
                     .AsIChatClient())
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
             .Build();
 
     public static IChatClient BuildGitHubModels(string endpoint, string model, string token) =>

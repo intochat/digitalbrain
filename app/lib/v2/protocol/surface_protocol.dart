@@ -365,11 +365,13 @@ class InoConversationOperation {
     required this.state,
     required this.retryable,
     this.safeReason,
+    this.action,
   });
 
   final InoConversationOperationState state;
   final bool retryable;
   final String? safeReason;
+  final InoConversationAction? action;
 
   factory InoConversationOperation.fromJson(Object? value) {
     final json = _safeObject(value, 'payload.data.operation');
@@ -377,6 +379,7 @@ class InoConversationOperation {
       'state',
       'safeReason',
       'retryable',
+      'action',
     }, 'payload.data.operation');
     final retryable = json['retryable'];
     if (retryable is! bool) {
@@ -407,6 +410,9 @@ class InoConversationOperation {
       ),
       retryable: retryable,
       safeReason: normalizedReason,
+      action: json['action'] == null
+          ? null
+          : InoConversationAction.fromJson(json['action']),
     );
   }
 
@@ -414,6 +420,47 @@ class InoConversationOperation {
     'state': state.name,
     'retryable': retryable,
     'safeReason': ?safeReason,
+    'action': action?.toJson(),
+  };
+}
+
+class InoConversationAction {
+  const InoConversationAction({
+    required this.kind,
+    required this.label,
+    required this.target,
+  });
+
+  final String kind;
+  final String label;
+  final Uri target;
+
+  factory InoConversationAction.fromJson(Object? value) {
+    final json = _safeObject(value, 'payload.data.operation.action');
+    _demandOnlyKeys(json, const {
+      'kind',
+      'label',
+      'target',
+    }, 'payload.data.operation.action');
+    final kind = _boundedString(json, 'kind', maxLength: 32);
+    final label = _boundedString(json, 'label', maxLength: 64);
+    final targetText = _boundedString(json, 'target', maxLength: 4096);
+    final target = Uri.tryParse(targetText);
+    if (kind != 'openUrl' ||
+        target == null ||
+        target.scheme != 'https' ||
+        target.host.toLowerCase() != 'accounts.google.com') {
+      throw const FormatException(
+        'payload.data.operation.action is not an allowed connection action.',
+      );
+    }
+    return InoConversationAction(kind: kind, label: label, target: target);
+  }
+
+  Map<String, Object?> toJson() => {
+    'kind': kind,
+    'label': label,
+    'target': target.toString(),
   };
 }
 

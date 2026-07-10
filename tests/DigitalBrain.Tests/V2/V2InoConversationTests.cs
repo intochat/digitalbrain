@@ -192,6 +192,18 @@ public sealed class V2InoConversationTests
             []));
     }
 
+    [Theory]
+    [InlineData("Open docs.example.ai before continuing.")]
+    [InlineData("Connect to 2001:db8::1 before continuing.")]
+    [InlineData(@"Read from \\fileserver\share before continuing.")]
+    public async Task Presentation_policy_rejects_additional_endpoint_forms(string answer)
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new V2McpResponseComposer().ComposeAsync(
+            Context(),
+            new V2ModelResponse(answer, "test-model", false),
+            []));
+    }
+
     [Fact]
     public async Task Presentation_policy_rejects_exact_authenticated_grant_values()
     {
@@ -222,6 +234,22 @@ public sealed class V2InoConversationTests
             []));
     }
 
+    [Theory]
+    [InlineData("The workspace named local is ready.")]
+    [InlineData("The workspace 'local' is ready.")]
+    public async Task Presentation_policy_rejects_named_or_quoted_short_scope_values(string answer)
+    {
+        var context = Context() with
+        {
+            WorkspaceId = new WorkspaceId("local")
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new V2McpResponseComposer().ComposeAsync(
+            context,
+            new V2ModelResponse(answer, "test-model", false),
+            []));
+    }
+
     [Fact]
     public async Task Presentation_policy_does_not_reject_ordinary_local_or_default_language()
     {
@@ -231,7 +259,7 @@ public sealed class V2InoConversationTests
             WorkspaceId = new WorkspaceId("default"),
             Principal = new PrincipalRef("flutter-ui", PrincipalKind.User)
         };
-        const string answer = "I can help with local files and sensible defaults. We can check back at 12:30.";
+        const string answer = "I can help with this workspace, local files, and sensible defaults. We can check back at 12:30.";
 
         var composed = await new V2McpResponseComposer().ComposeAsync(
             context,

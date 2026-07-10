@@ -28,7 +28,7 @@ public sealed record V2UiBootstrapOptions(
             tenant.Length > 256 || workspace.Length > 256 || principal.Length > 256)
             throw new InvalidOperationException("V2 UI bootstrap identity configuration must be complete.");
         return new(secret, new(tenant), new(workspace), new(principal, PrincipalKind.User), TimeSpan.FromMinutes(15),
-            new HashSet<string>(StringComparer.Ordinal) { "brain.read", "ui.action" });
+            new HashSet<string>(StringComparer.Ordinal) { "brain.read", "ui.action", "gmail.read" });
     }
 }
 

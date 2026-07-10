@@ -37,7 +37,9 @@ public static class DigitalBrainChat
                     : new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(options.AzureOpenAIKey)))
                 .GetChatClient(options.Model)
                 .AsIChatClient();
-            var chatClient = new ChatClientBuilder(azureClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+            var chatClient = new ChatClientBuilder(azureClient)
+                .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
+                .Build();
             services.AddChatClient(chatClient);
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase))
@@ -52,7 +54,7 @@ public static class DigitalBrainChat
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:AnthropicApiKey is required for anthropic provider.");
             var client = new Anthropic.AnthropicClient { ApiKey = apiKey };
             services.AddChatClient(new ChatClientBuilder(client.AsIChatClient(options.Model))
-                .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+                .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
                 .Build());
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase))

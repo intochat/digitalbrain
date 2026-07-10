@@ -12,7 +12,7 @@ namespace DigitalBrain.Mcp;
 /// <summary>Durable, principal-scoped conversation journal used only by the V2 INO path.</summary>
 public sealed class V2InoEffectStore : IV2InoConversationStore
 {
-    private const int JournalVersion = 2;
+    private const int JournalVersion = 3;
     private const int MaximumAssistantCharacters = 16_000;
     private const string InterruptedReason = "I couldn’t confirm the previous response. You can continue from here.";
     private readonly ConcurrentDictionary<ConversationScope, V2InoConversationSnapshot> _conversations = new();
@@ -95,7 +95,11 @@ public sealed class V2InoEffectStore : IV2InoConversationStore
         }
     }
 
-    public V2InoConversationSnapshot Complete(V2RequestContext context, string commandId, string response)
+    public V2InoConversationSnapshot Complete(
+        V2RequestContext context,
+        string commandId,
+        string response,
+        V2ToolAction? action = null)
     {
         if (string.IsNullOrWhiteSpace(response))
             throw new ArgumentException("A non-empty assistant response is required.", nameof(response));
@@ -138,6 +142,7 @@ public sealed class V2InoEffectStore : IV2InoConversationStore
                 State = V2InoConversationStates.Succeeded,
                 SafeReason = null,
                 Retryable = false,
+                Action = action,
                 UpdatedAt = DateTimeOffset.UtcNow
             }, V2InoConversationStates.Succeeded);
             next = next with
@@ -176,6 +181,7 @@ public sealed class V2InoEffectStore : IV2InoConversationStore
                 State = V2InoConversationStates.Failed,
                 SafeReason = reason,
                 Retryable = retryable,
+                Action = null,
                 UpdatedAt = DateTimeOffset.UtcNow
             }, "failed");
             return Persist(scope, next);
@@ -473,12 +479,12 @@ public sealed class V2McpInoCommandHandler(
             snapshot = conversations.Transition(command.Context, command.CommandId, V2InoConversationStates.Responding);
             surfaces.PublishInoConversation(command.Context, snapshot);
 
-            var response = await owner.ExecuteAsync(new V2ConversationRequest(
+            var response = await owner.ExecuteDetailedAsync(new V2ConversationRequest(
                 command.Context,
                 snapshot.ConversationId,
                 prompt,
-                AllowTools: false), cancellationToken).ConfigureAwait(false);
-            snapshot = conversations.Complete(command.Context, command.CommandId, response);
+                AllowTools: true), cancellationToken).ConfigureAwait(false);
+            snapshot = conversations.Complete(command.Context, command.CommandId, response.Text, response.Action);
             surfaces.PublishInoConversation(command.Context, snapshot);
             return V2CommandExecutionResult.Success();
         }
@@ -543,7 +549,13 @@ public sealed class V2McpConversationModelRouter(IClusterClient cluster) : IV2Mo
             request.Context.ConversationId);
         var model = cluster.GetGrain<IV2ConversationModelGrain>(grainId);
         var response = await model.CompleteAsync(
-            new V2ConversationModelCompletionRequest(request.Text, request.Context.MemoryEvidence),
+            new V2ConversationModelCompletionRequest(
+                request.Text,
+                request.Context.MemoryEvidence,
+                request.ToolOutcomes?.Select(static outcome => new V2ConversationModelToolOutcome(
+                    outcome.Kind.ToString(),
+                    outcome.Content?.GetRawText(),
+                    outcome.SafeReason)).ToArray()),
             cancellationToken).ConfigureAwait(false);
         return new V2ModelResponse(response.Text, response.Model, IsStructured: false);
     }
@@ -566,13 +578,102 @@ public sealed class V2McpNoToolCatalog : IV2AuthorizedToolCatalog
         Task.FromResult(new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "Tools are unavailable in this conversation."));
 }
 
+public sealed class V2McpGmailPlanner : IV2IntentCapabilityPlanner
+{
+    public Task<IReadOnlyList<V2ToolInvocation>> PlanAsync(
+        V2ConversationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var text = request.Text.ToLowerInvariant();
+        var mentionsMail = text.Contains("gmail", StringComparison.Ordinal) ||
+                           text.Contains("email", StringComparison.Ordinal) ||
+                           text.Contains("mail", StringComparison.Ordinal);
+        var explicitlyIncoming = text.Contains("incoming", StringComparison.Ordinal) ||
+                                 text.Contains("inbox", StringComparison.Ordinal);
+        var requestsLatest = text.Contains("latest", StringComparison.Ordinal) ||
+                             text.Contains("last", StringComparison.Ordinal) ||
+                             text.Contains("newest", StringComparison.Ordinal) ||
+                             text.Contains("recent", StringComparison.Ordinal);
+        var explicitlyOutgoing = text.Contains("send", StringComparison.Ordinal) ||
+                                 text.Contains("sent", StringComparison.Ordinal) ||
+                                 text.Contains("outgoing", StringComparison.Ordinal) ||
+                                 text.Contains("draft", StringComparison.Ordinal) ||
+                                 text.Contains("compose", StringComparison.Ordinal);
+        var requestsLatestIncoming = explicitlyIncoming || (requestsLatest && !explicitlyOutgoing);
+        if (!mentionsMail || !requestsLatestIncoming)
+            return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([]);
+
+        return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
+            new V2ToolInvocation(V2GmailTools.ReadLatest, JsonSerializer.SerializeToElement(new { }))
+        ]);
+    }
+}
+
+public interface IV2McpGmailToolGateway
+{
+    Task<V2GmailReadResult> ReadLatestIncomingAsync(string ownerScope, CancellationToken cancellationToken = default);
+}
+
+public sealed class V2McpGmailToolGateway(IClusterClient cluster) : IV2McpGmailToolGateway
+{
+    public Task<V2GmailReadResult> ReadLatestIncomingAsync(
+        string ownerScope,
+        CancellationToken cancellationToken = default) =>
+        cluster.GetGrain<IV2GmailReadToolGrain>(ownerScope).ReadLatestIncomingAsync(cancellationToken);
+}
+
+public sealed class V2McpAuthorizedToolCatalog(IV2McpGmailToolGateway gmail) : IV2AuthorizedToolCatalog
+{
+    public async Task<V2ToolOutcome> InvokeAsync(
+        V2RequestContext context,
+        V2ToolInvocation invocation,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!string.Equals(invocation.ToolId, V2GmailTools.ReadLatest, StringComparison.Ordinal) ||
+            invocation.Input.ValueKind != JsonValueKind.Object ||
+            invocation.Input.EnumerateObject().Any())
+            return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That tool request is not allowed.");
+        if (context.Principal.Kind != PrincipalKind.User || !context.Grants.Contains("gmail.read"))
+            return new V2ToolOutcome(
+                V2ToolOutcomeKind.Denied,
+                SafeReason: "You don’t have permission to read Gmail in this workspace.");
+
+        var result = await gmail.ReadLatestIncomingAsync(V2RequestScope.Id(context), cancellationToken);
+        return result.Status switch
+        {
+            V2GmailReadStatus.Success => new V2ToolOutcome(
+                V2ToolOutcomeKind.Success,
+                JsonSerializer.SerializeToElement(new { latestMessage = result.Content ?? string.Empty })),
+            V2GmailReadStatus.NeedsAuth when IsAllowedGoogleAuthorizationUrl(result.ConnectionUrl) => new V2ToolOutcome(
+                V2ToolOutcomeKind.NeedsAuth,
+                SafeReason: result.SafeReason ?? "Connect your Google account to let INO read your Gmail.",
+                Action: new V2ToolAction("openUrl", "Connect Google", result.ConnectionUrl!)),
+            V2GmailReadStatus.NeedsAuth => new V2ToolOutcome(
+                V2ToolOutcomeKind.PermanentFailure,
+                SafeReason: "Gmail connection is unavailable right now."),
+            _ => new V2ToolOutcome(
+                V2ToolOutcomeKind.RetryableFailure,
+                SafeReason: result.SafeReason ?? "I couldn’t read Gmail right now. Please try again later.")
+        };
+    }
+
+    private static bool IsAllowedGoogleAuthorizationUrl(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        string.Equals(uri.Host, "accounts.google.com", StringComparison.OrdinalIgnoreCase);
+}
+
 public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
 {
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(250);
     private static readonly Regex UnsafeAddress = new(
-        @"\b[a-z][a-z0-9+.-]*://|\bwww\.|\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|dev|app|cloud|internal|invalid|local)(?::\d{2,5})?\b|" +
+        @"\b[a-z][a-z0-9+.-]*://|\bwww\.|(?<![\p{L}\p{N}_/@.-])(?:[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?::\d{2,5})?(?![\p{L}\p{N}_-])|" +
         @"(?<![\p{L}\p{N}.-])(?=[a-z0-9.-]*[a-z])(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):\d{2,5}(?!\d)|" +
-        @"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b",
+        @"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b|" +
+        @"(?<![\p{L}\p{N}:])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?![\p{L}\p{N}:])|" +
+        @"(?<!\\)\\\\[a-z0-9._$-]+(?:\\[^\s\\/:*?""<>|]+)?",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         RegexTimeout);
     private static readonly Regex UnsafeTerm = new(
@@ -589,6 +690,9 @@ public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var blockingOutcome = toolOutcomes.FirstOrDefault(static outcome => outcome.Kind != V2ToolOutcomeKind.Success);
+        if (blockingOutcome is not null)
+            return Task.FromResult(blockingOutcome.SafeReason ?? "I couldn’t complete that request safely.");
         if (string.IsNullOrWhiteSpace(response.Text))
             throw new InvalidOperationException("The configured model returned no answer.");
         var text = response.Text.Trim();
@@ -609,7 +713,9 @@ public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
         if (value.Length >= 8 && ContainsDistinctIdentifier(text, value)) return true;
         return Regex.IsMatch(
             text,
-            $@"(?<![\p{{L}}\p{{N}}]){label}(?:[\s_-]+(?:id|identifier))?(?:\s*[:=#]\s*|\s+(?:is|equals?)\s+){DistinctIdentifierPattern(value)}",
+            $@"(?<![\p{{L}}\p{{N}}]){label}(?:[\s_-]+(?:id|identifier))?" +
+            $@"(?:(?:\s*[:=#]\s*|\s+(?:is|equals?|named)\s+)(?:['""`\(\[]\s*)?|\s+['""`\(\[]\s*)" +
+            DistinctIdentifierPattern(value),
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
             RegexTimeout);
     }

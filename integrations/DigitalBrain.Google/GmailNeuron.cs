@@ -2,6 +2,8 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Kernel.V2;
 using DigitalBrain.Ui.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,7 +13,7 @@ namespace DigitalBrain.Google;
 
 [GrainType("digitalbrain.google.gmail.v1")]
 public class GmailNeuron(ILogger<GmailNeuron> logger, NeuronJournals journals, IGmailApiClientFactory? gmailApiClientFactory = null)
-    : Neuron(logger, journals), IGmailNeuron
+    : Neuron(logger, journals), IGmailNeuron, IV2GmailReadToolGrain
 {
     private const int DefaultMessageLimit = 10;
 
@@ -101,6 +103,80 @@ public class GmailNeuron(ILogger<GmailNeuron> logger, NeuronJournals journals, I
         var client = await factory.CreateAsync(Self.AsScope(), ct);
         await client.SendMessageAsync(to, subject, body, ct);
     }
+
+    public async Task<V2GmailReadResult> ReadLatestIncomingAsync(CancellationToken cancellationToken = default)
+    {
+        var scope = Self.AsScope();
+        if (!await HasCredentialAsync(scope, cancellationToken))
+            return await BuildConnectionResultAsync(scope.UserId, cancellationToken);
+
+        try
+        {
+            var factory = gmailApiClientFactory ?? throw new InvalidOperationException("Gmail is not configured in this host.");
+            var client = await factory.CreateAsync(scope, cancellationToken);
+            var messages = await client.ListMessagesAsync("in:inbox", 1, cancellationToken);
+            if (messages.Length == 0)
+                return new V2GmailReadResult(V2GmailReadStatus.Success, "No incoming Gmail messages were found.");
+
+            var content = await client.ReadMessageAsync(messages[0], cancellationToken);
+            return new V2GmailReadResult(
+                V2GmailReadStatus.Success,
+                string.IsNullOrWhiteSpace(content) ? "The latest incoming Gmail message has no preview text." : content.Trim());
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (IsAuthOrConfigFailure(ex))
+        {
+            return await BuildConnectionResultAsync(scope.UserId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Principal-scoped Gmail read failed.");
+            return new V2GmailReadResult(
+                V2GmailReadStatus.Unavailable,
+                SafeReason: "I couldn’t read Gmail right now. Please try again later.");
+        }
+    }
+
+    private async Task<V2GmailReadResult> BuildConnectionResultAsync(
+        UserId userId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var connector = ServiceProvider.GetRequiredKeyedService<IConnector>("google");
+            var challenge = await connector.BeginAuthAsync(new NeuronId(userId.Value), cancellationToken: cancellationToken);
+            if (challenge.IsForm || !IsAllowedGoogleAuthorizationUrl(challenge.UrlOrForm))
+            {
+                return new V2GmailReadResult(
+                    V2GmailReadStatus.Unavailable,
+                    SafeReason: "Gmail needs to be configured before you can connect an account.");
+            }
+
+            return new V2GmailReadResult(
+                V2GmailReadStatus.NeedsAuth,
+                SafeReason: "Connect your Google account to let INO read your Gmail.",
+                ConnectionUrl: challenge.UrlOrForm);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Principal-scoped Google connection challenge failed.");
+            return new V2GmailReadResult(
+                V2GmailReadStatus.Unavailable,
+                SafeReason: "Gmail connection is unavailable right now. Please try again later.");
+        }
+    }
+
+    private static bool IsAllowedGoogleAuthorizationUrl(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        string.Equals(uri.Host, "accounts.google.com", StringComparison.OrdinalIgnoreCase);
 
     private async Task<NeuronScope?> TryGetConnectedScopeAsync(string? clientId, CancellationToken cancellationToken)
     {

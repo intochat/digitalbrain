@@ -58,7 +58,9 @@ public static class DigitalBrainChatClientRegistration
             .GetChatClient(deploymentId)
             .AsIChatClient();
 
-        return new ChatClientBuilder(azureClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+        return new ChatClientBuilder(azureClient)
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
+            .Build();
     }
 
     private static IChatClient BuildOpenAi(DigitalBrainLlmRuntimeOptions options, string modelId)
@@ -84,7 +86,7 @@ public static class DigitalBrainChatClientRegistration
 
         var client = new Anthropic.AnthropicClient { ApiKey = options.AnthropicApiKey };
         return new ChatClientBuilder(client.AsIChatClient(modelId))
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
+            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron", configure: static options => options.EnableSensitiveData = false)
             .Build();
     }
 

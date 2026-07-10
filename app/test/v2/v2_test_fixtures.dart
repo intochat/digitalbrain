@@ -128,10 +128,20 @@ Map<String, Object?> inoOperation({
   required String state,
   bool retryable = false,
   String? safeReason,
+  Map<String, Object?>? action,
 }) => <String, Object?>{
   'state': state,
   'retryable': retryable,
   'safeReason': ?safeReason,
+  'action': ?action,
+};
+
+Map<String, Object?> googleConnectionAction({
+  String target = 'https://accounts.google.com/o/oauth2/v2/auth?state=test',
+}) => <String, Object?>{
+  'kind': 'openUrl',
+  'label': 'Connect Google',
+  'target': target,
 };
 
 String surfaceJsonString({

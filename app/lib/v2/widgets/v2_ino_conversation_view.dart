@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../protocol/surface_protocol.dart';
 import '../v2_runtime.dart';
@@ -12,6 +13,7 @@ const Key v2InoTranscriptKey = Key('v2-ino-transcript');
 const Key v2InoEmptyTranscriptKey = Key('v2-ino-empty-transcript');
 const Key v2InoOperationStatusKey = Key('v2-ino-operation-status');
 const Key v2InoRetryButtonKey = Key('v2-ino-retry-button');
+const Key v2InoConnectButtonKey = Key('v2-ino-connect-button');
 const Key v2InoReconnectBannerKey = Key('v2-ino-reconnect-banner');
 const Key v2InoConnectionUnavailableBannerKey = Key(
   'v2-ino-connection-unavailable-banner',
@@ -63,6 +65,7 @@ class _V2InoConversationViewState extends State<V2InoConversationView> {
   bool _awaitingServerConfirmation = false;
   bool _submissionUncertain = false;
   String? _submissionNotice;
+  bool _openingConnection = false;
   V2ActionResult? _lastAcceptedReceipt;
 
   @override
@@ -179,6 +182,39 @@ class _V2InoConversationViewState extends State<V2InoConversationView> {
     }
     if (lastUserTurn == null) return;
     await _submit(lastUserTurn.text, showOptimisticTurn: false);
+  }
+
+  Future<void> _openConnection(InoConversationAction action) async {
+    if (_openingConnection ||
+        widget.reconnecting ||
+        widget.connectionUnavailable) {
+      return;
+    }
+    setState(() {
+      _openingConnection = true;
+      _submissionNotice = null;
+    });
+    try {
+      final opened = await launchUrl(
+        action.target,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!mounted) return;
+      setState(() {
+        _openingConnection = false;
+        if (!opened) {
+          _submissionNotice =
+              'Google sign-in couldn\'t be opened. Please try again.';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _openingConnection = false;
+        _submissionNotice =
+            'Google sign-in couldn\'t be opened. Please try again.';
+      });
+    }
   }
 
   Future<void> _submit(
@@ -411,6 +447,11 @@ class _V2InoConversationViewState extends State<V2InoConversationView> {
                           !_submissionUncertain &&
                           _sendAction != null,
                       onRetry: _retry,
+                      connectionEnabled:
+                          !_openingConnection &&
+                          !widget.reconnecting &&
+                          !widget.connectionUnavailable,
+                      onConnect: _openConnection,
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -466,7 +507,12 @@ class _ConversationTurn extends StatelessWidget {
     final status = message.uncertain
         ? 'Checking delivery'
         : _turnStatus(message.state);
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final background = isUser
+        ? colors.primaryContainer
+        : colors.surfaceContainerHigh;
+    final foreground = isUser ? colors.onPrimaryContainer : colors.onSurface;
     return Semantics(
       container: true,
       label: '$author, $status',
@@ -475,9 +521,7 @@ class _ConversationTurn extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 680),
           child: Material(
-            color: isUser
-                ? colors.primaryContainer
-                : colors.surfaceContainerHigh,
+            color: background,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -487,15 +531,24 @@ class _ConversationTurn extends StatelessWidget {
                   Text(
                     author,
                     key: ValueKey('v2-ino-turn-${message.turnKey}-author'),
-                    style: Theme.of(context).textTheme.labelLarge,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: foreground,
+                    ),
                   ),
                   const SizedBox(height: 5),
-                  SelectableText(message.text),
+                  SelectableText(
+                    message.text,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: foreground,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     status,
                     key: ValueKey('v2-ino-turn-${message.turnKey}-status'),
-                    style: Theme.of(context).textTheme.labelSmall,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: foreground,
+                    ),
                   ),
                 ],
               ),
@@ -512,11 +565,15 @@ class _OperationStatus extends StatelessWidget {
     required this.operation,
     required this.retryEnabled,
     required this.onRetry,
+    required this.connectionEnabled,
+    required this.onConnect,
   });
 
   final InoConversationOperation operation;
   final bool retryEnabled;
   final VoidCallback onRetry;
+  final bool connectionEnabled;
+  final Future<void> Function(InoConversationAction action) onConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -556,6 +613,16 @@ class _OperationStatus extends StatelessWidget {
                   key: v2InoRetryButtonKey,
                   onPressed: retryEnabled ? onRetry : null,
                   child: const Text('Retry'),
+                ),
+              ],
+              if (operation.action case final action?) ...[
+                const SizedBox(width: 10),
+                FilledButton(
+                  key: v2InoConnectButtonKey,
+                  onPressed: connectionEnabled
+                      ? () => unawaited(onConnect(action))
+                      : null,
+                  child: Text(action.label),
                 ),
               ],
             ],

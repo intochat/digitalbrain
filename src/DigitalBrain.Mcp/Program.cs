@@ -63,9 +63,10 @@ if (UseHttpTransport())
     builder.Services.AddSingleton(new V2InoEffectStore(inoEffectStorePath));
     builder.Services.AddSingleton<IV2InoConversationStore>(serviceProvider => serviceProvider.GetRequiredService<V2InoEffectStore>());
     builder.Services.AddSingleton<IV2ContextAssembler, V2McpConversationContextAssembler>();
-    builder.Services.AddSingleton<IV2IntentCapabilityPlanner, V2McpNoToolPlanner>();
+    builder.Services.AddSingleton<IV2IntentCapabilityPlanner, V2McpGmailPlanner>();
     builder.Services.AddSingleton<IV2ModelRouter, V2McpConversationModelRouter>();
-    builder.Services.AddSingleton<IV2AuthorizedToolCatalog, V2McpNoToolCatalog>();
+    builder.Services.AddSingleton<IV2McpGmailToolGateway, V2McpGmailToolGateway>();
+    builder.Services.AddSingleton<IV2AuthorizedToolCatalog, V2McpAuthorizedToolCatalog>();
     builder.Services.AddSingleton<IV2ResponseSurfaceComposer, V2McpResponseComposer>();
     builder.Services.AddSingleton<V2ConversationOwner>();
     builder.Services.AddSingleton<IV2CommandHandler, V2McpInoCommandHandler>();

@@ -90,6 +90,12 @@ void main() {
           'operationId': 'must-not-reach-renderer',
         },
       ),
+      inoConversationPayload(
+        operation: inoOperation(
+          state: 'succeeded',
+          action: googleConnectionAction(target: 'https://example.com/auth'),
+        ),
+      ),
     ];
 
     for (final payload in invalidPayloads) {
@@ -100,6 +106,25 @@ void main() {
         throwsFormatException,
       );
     }
+  });
+
+  test('decodes only the bounded Google connection action', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            action: googleConnectionAction(),
+          ),
+        ),
+      ),
+    );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.action?.kind, 'openUrl');
+    expect(operation.action?.label, 'Connect Google');
+    expect(operation.action?.target.host, 'accounts.google.com');
   });
 
   test('rejects unsupported protocol and capability requirements', () {
