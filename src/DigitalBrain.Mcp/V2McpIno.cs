@@ -612,6 +612,17 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
         var mentionsAccount = text.Contains("account", StringComparison.Ordinal) ||
                               text.Contains("customer", StringComparison.Ordinal) ||
                               text.Contains("organization", StringComparison.Ordinal);
+        var mentionsContact = text.Contains("contact", StringComparison.Ordinal) ||
+                              text.Contains("people", StringComparison.Ordinal) ||
+                              text.Contains("person", StringComparison.Ordinal);
+        var mentionsProfile = text.Contains("profile", StringComparison.Ordinal) ||
+                              text.Contains("current user", StringComparison.Ordinal) ||
+                              text.Contains("who am i", StringComparison.Ordinal) ||
+                              text.Contains("my identity", StringComparison.Ordinal);
+        var mentionsSchema = text.Contains("schema", StringComparison.Ordinal) ||
+                             text.Contains("metadata", StringComparison.Ordinal) ||
+                             text.Contains("field access", StringComparison.Ordinal) ||
+                             text.Contains("available fields", StringComparison.Ordinal);
         var requestsRead = text.Contains("get", StringComparison.Ordinal) ||
                            text.Contains("show", StringComparison.Ordinal) ||
                            text.Contains("read", StringComparison.Ordinal) ||
@@ -621,12 +632,31 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
         var requestsMutation = text.Contains("create", StringComparison.Ordinal) ||
                                text.Contains("update", StringComparison.Ordinal) ||
                                text.Contains("delete", StringComparison.Ordinal) ||
+                               text.Contains("write", StringComparison.Ordinal) ||
+                               text.Contains("edit", StringComparison.Ordinal) ||
+                               text.Contains("insert", StringComparison.Ordinal) ||
+                               text.Contains("upsert", StringComparison.Ordinal) ||
+                               text.Contains("merge", StringComparison.Ordinal) ||
                                text.Contains("modify", StringComparison.Ordinal) ||
                                text.Contains("change", StringComparison.Ordinal);
-        if (mentionsSalesforce && mentionsAccount && requestsRead && !requestsMutation)
-            return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
-                new V2ToolInvocation(V2SalesforceTools.ReadLatestAccount, emptyInput)
-            ]);
+        if (mentionsSalesforce && requestsRead && !requestsMutation)
+        {
+            var toolId = mentionsProfile
+                ? V2SalesforceTools.ReadCurrentProfile
+                : mentionsSchema
+                    ? V2SalesforceTools.ReadCrmSchema
+                    : mentionsContact
+                        ? V2SalesforceTools.ReadRecentContacts
+                        : mentionsAccount && requestsLatest
+                            ? V2SalesforceTools.ReadLatestAccount
+                            : mentionsAccount
+                                ? V2SalesforceTools.ReadRecentAccounts
+                                : null;
+            if (toolId is not null)
+                return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
+                    new V2ToolInvocation(toolId, emptyInput)
+                ]);
+        }
 
         return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([]);
     }
@@ -636,7 +666,10 @@ public interface IV2McpIntegrationToolGateway
 {
     Task<V2GmailReadResult> ReadLatestIncomingAsync(string ownerScope, CancellationToken cancellationToken = default);
 
-    Task<V2SalesforceReadResult> ReadLatestSalesforceAccountAsync(string ownerScope, CancellationToken cancellationToken = default);
+    Task<V2SalesforceReadResult> ReadSalesforceAsync(
+        string ownerScope,
+        string toolId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class V2McpIntegrationToolGateway(IClusterClient cluster) : IV2McpIntegrationToolGateway
@@ -646,10 +679,22 @@ public sealed class V2McpIntegrationToolGateway(IClusterClient cluster) : IV2Mcp
         CancellationToken cancellationToken = default) =>
         cluster.GetGrain<IV2GmailReadToolGrain>(ownerScope).ReadLatestIncomingAsync(cancellationToken);
 
-    public Task<V2SalesforceReadResult> ReadLatestSalesforceAccountAsync(
+    public Task<V2SalesforceReadResult> ReadSalesforceAsync(
         string ownerScope,
-        CancellationToken cancellationToken = default) =>
-        cluster.GetGrain<IV2SalesforceReadToolGrain>(ownerScope).ReadLatestAccountAsync(cancellationToken);
+        string toolId,
+        CancellationToken cancellationToken = default)
+    {
+        var grain = cluster.GetGrain<IV2SalesforceReadToolGrain>(ownerScope);
+        return toolId switch
+        {
+            V2SalesforceTools.ReadLatestAccount => grain.ReadLatestAccountAsync(cancellationToken),
+            V2SalesforceTools.ReadCurrentProfile => grain.ReadCurrentProfileAsync(cancellationToken),
+            V2SalesforceTools.ReadRecentAccounts => grain.ReadRecentAccountsAsync(cancellationToken),
+            V2SalesforceTools.ReadRecentContacts => grain.ReadRecentContactsAsync(cancellationToken),
+            V2SalesforceTools.ReadCrmSchema => grain.ReadCrmSchemaAsync(cancellationToken),
+            _ => Task.FromResult(new V2SalesforceReadResult(V2SalesforceReadStatus.Unavailable))
+        };
+    }
 }
 
 public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway integrations) : IV2AuthorizedToolCatalog
@@ -665,8 +710,8 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
             return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That tool request is not allowed.");
         if (string.Equals(invocation.ToolId, V2GmailTools.ReadLatest, StringComparison.Ordinal))
             return await InvokeGmailAsync(context, cancellationToken);
-        if (string.Equals(invocation.ToolId, V2SalesforceTools.ReadLatestAccount, StringComparison.Ordinal))
-            return await InvokeSalesforceAsync(context, cancellationToken);
+        if (IsSalesforceReadTool(invocation.ToolId))
+            return await InvokeSalesforceAsync(context, invocation.ToolId, cancellationToken);
         return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That tool request is not allowed.");
     }
 
@@ -703,6 +748,7 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
 
     private async Task<V2ToolOutcome> InvokeSalesforceAsync(
         V2RequestContext context,
+        string toolId,
         CancellationToken cancellationToken)
     {
         if (context.Principal.Kind != PrincipalKind.User || !context.Grants.Contains("salesforce.read"))
@@ -710,12 +756,15 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
                 V2ToolOutcomeKind.Denied,
                 SafeReason: "You don’t have permission to read Salesforce in this workspace.");
 
-        var result = await integrations.ReadLatestSalesforceAccountAsync(V2RequestScope.Id(context), cancellationToken);
+        var result = await integrations.ReadSalesforceAsync(V2RequestScope.Id(context), toolId, cancellationToken);
         return result.Status switch
         {
             V2SalesforceReadStatus.Success => new V2ToolOutcome(
                 V2ToolOutcomeKind.Success,
-                JsonSerializer.SerializeToElement(new { latestAccount = result.Content ?? string.Empty })),
+                JsonSerializer.SerializeToElement(new Dictionary<string, string>
+                {
+                    [SalesforceResultField(toolId)] = result.Content ?? string.Empty
+                })),
             V2SalesforceReadStatus.NeedsAuth when IsAllowedSalesforceAuthorizationUrl(result.ConnectionUrl) => new V2ToolOutcome(
                 V2ToolOutcomeKind.NeedsAuth,
                 SafeReason: result.SafeReason ?? "Connect your Salesforce account to let INO read Salesforce.",
@@ -731,6 +780,22 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
                 SafeReason: result.SafeReason ?? "I couldn’t read Salesforce right now. Please try again later.")
         };
     }
+
+    private static bool IsSalesforceReadTool(string toolId) => toolId is
+        V2SalesforceTools.ReadLatestAccount or
+        V2SalesforceTools.ReadCurrentProfile or
+        V2SalesforceTools.ReadRecentAccounts or
+        V2SalesforceTools.ReadRecentContacts or
+        V2SalesforceTools.ReadCrmSchema;
+
+    private static string SalesforceResultField(string toolId) => toolId switch
+    {
+        V2SalesforceTools.ReadCurrentProfile => "currentProfile",
+        V2SalesforceTools.ReadRecentAccounts => "recentAccounts",
+        V2SalesforceTools.ReadRecentContacts => "recentContacts",
+        V2SalesforceTools.ReadCrmSchema => "crmSchema",
+        _ => "latestAccount"
+    };
 
     private static bool IsAllowedGoogleAuthorizationUrl(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri) &&

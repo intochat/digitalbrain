@@ -8,6 +8,7 @@ public sealed class SalesforceApiClientFactory(IPackConfigStore store) : ISalesf
     public async Task<ISalesforceApiClient> CreateAsync(NeuronScope scope, CancellationToken cancellationToken = default)
     {
         var merged = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken).ConfigureAwait(false);
-        return new SalesforceApiClient(await SalesforceClientFactory.CreateForceClientAsync(merged, cancellationToken).ConfigureAwait(false));
+        var session = await SalesforceClientFactory.CreateSessionAsync(merged, cancellationToken).ConfigureAwait(false);
+        return new SalesforceApiClient(session.Client, session.IdentityUrl);
     }
 }

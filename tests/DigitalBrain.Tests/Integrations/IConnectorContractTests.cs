@@ -134,8 +134,10 @@ internal sealed class FakeOAuthStateProtector : IOAuthStateProtector
 
 internal sealed class FakeSalesforceApiClient : ISalesforceApiClient
 {
-    public Task<string[]> QueryAsync(string soql, CancellationToken ct = default) => throw new NotImplementedException("Auth path does not call; TestConnection does.");
+    public Task<string> GetCurrentUserProfileAsync(CancellationToken ct = default) => Task.FromResult("{}");
     public Task<string[]> ListAccountsAsync(int maxResults, CancellationToken ct = default) => Task.FromResult(Array.Empty<string>());
+    public Task<string[]> ListContactsAsync(int maxResults, CancellationToken ct = default) => Task.FromResult(Array.Empty<string>());
+    public Task<string> DescribeCrmAccessAsync(CancellationToken ct = default) => Task.FromResult("{}");
 }
 
 internal sealed class FakeGoogleApiClientFactory // placeholder if needed for future Google TestConnection extension

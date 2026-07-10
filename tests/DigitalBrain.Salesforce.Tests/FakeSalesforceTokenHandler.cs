@@ -4,7 +4,11 @@ using System.Text.Json;
 
 namespace DigitalBrain.Salesforce.Tests;
 
-public sealed class FakeSalesforceTokenHandler(string accessToken, string instanceUrl, string? refreshToken = null)
+public sealed class FakeSalesforceTokenHandler(
+    string accessToken,
+    string instanceUrl,
+    string? refreshToken = null,
+    string? identityUrl = null)
     : HttpMessageHandler
 {
     public int RequestCount { get; private set; }
@@ -21,6 +25,10 @@ public sealed class FakeSalesforceTokenHandler(string accessToken, string instan
         if (refreshToken is not null)
         {
             payload["refresh_token"] = refreshToken;
+        }
+        if (identityUrl is not null)
+        {
+            payload["id"] = identityUrl;
         }
 
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)

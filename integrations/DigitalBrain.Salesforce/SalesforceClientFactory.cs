@@ -25,6 +25,7 @@ public static class SalesforceClientFactory
     public const string AccessTokenKey = "access_token";
     public const string RefreshTokenKey = "refresh_token";
     public const string InstanceUrlKey = "instance_url";
+    public const string IdentityUrlKey = "identity_url";
     public const string RedirectUriKey = "redirect_uri";
     public const string OAuthStateKey = "oauth_state";
     public const string OAuthScopeKey = "oauth_scope";
@@ -52,12 +53,17 @@ public static class SalesforceClientFactory
     }
 
     public static async Task<ForceClient> CreateForceClientAsync(IReadOnlyDictionary<string, string> values, CancellationToken cancellationToken = default)
+        => (await CreateSessionAsync(values, cancellationToken).ConfigureAwait(false)).Client;
+
+    public static async Task<SalesforceClientSession> CreateSessionAsync(
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken = default)
     {
         var apiVersion = NormalizeApiVersion(Optional(values, ApiVersionKey, DefaultApiVersion));
 
         if (HasOAuthCredential(values))
         {
-            return await CreateOAuthForceClientAsync(values, apiVersion, cancellationToken).ConfigureAwait(false);
+            return await CreateOAuthSessionAsync(values, apiVersion, cancellationToken).ConfigureAwait(false);
         }
 
         throw new InvalidOperationException("Salesforce is not connected for this principal.");
@@ -149,6 +155,10 @@ public static class SalesforceClientFactory
             [InstanceUrlKey] = token.InstanceUrl,
             [RedirectUriKey] = effectiveRedirectUri
         };
+        if (!string.IsNullOrWhiteSpace(token.IdentityUrl))
+        {
+            result[IdentityUrlKey] = token.IdentityUrl;
+        }
         if (!string.IsNullOrWhiteSpace(token.RefreshToken))
         {
             result[RefreshTokenKey] = token.RefreshToken;
@@ -257,7 +267,7 @@ public static class SalesforceClientFactory
             ? value.Trim()
             : fallback;
 
-    private static async Task<ForceClient> CreateOAuthForceClientAsync(
+    private static async Task<SalesforceClientSession> CreateOAuthSessionAsync(
         IReadOnlyDictionary<string, string> values,
         string apiVersion,
         CancellationToken cancellationToken = default)
@@ -285,12 +295,18 @@ public static class SalesforceClientFactory
                     "Salesforce refresh-token response did not include access_token and instance_url.");
             }
 
-            return new ForceClient(instanceUrl, token.AccessToken, apiVersion);
+            return new SalesforceClientSession(
+                new ForceClient(instanceUrl, token.AccessToken, apiVersion),
+                string.IsNullOrWhiteSpace(token.IdentityUrl)
+                    ? Optional(values, IdentityUrlKey)
+                    : token.IdentityUrl);
         }
 
         if (HasValue(values, AccessTokenKey) && HasValue(values, InstanceUrlKey))
         {
-            return new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion);
+            return new SalesforceClientSession(
+                new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion),
+                Optional(values, IdentityUrlKey));
         }
 
         if (HasValue(values, RefreshTokenKey))
@@ -298,7 +314,9 @@ public static class SalesforceClientFactory
             RequireConnectedAppConfig(values);
         }
 
-        return new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion);
+        return new SalesforceClientSession(
+            new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion),
+            Optional(values, IdentityUrlKey));
     }
 
     private static void RequireConnectedAppConfig(IReadOnlyDictionary<string, string> values)
@@ -357,6 +375,7 @@ public static class SalesforceClientFactory
         return new SalesforceTokenResponse(
             GetString(root, "access_token"),
             GetString(root, "instance_url"),
+            GetString(root, "id"),
             GetString(root, "refresh_token"),
             GetString(root, "issued_at"),
             GetString(root, "scope"));
@@ -417,7 +436,10 @@ public static class SalesforceClientFactory
     private sealed record SalesforceTokenResponse(
         string AccessToken,
         string InstanceUrl,
+        string IdentityUrl,
         string RefreshToken,
         string IssuedAt,
         string Scope);
 }
+
+public sealed record SalesforceClientSession(ForceClient Client, string? IdentityUrl);

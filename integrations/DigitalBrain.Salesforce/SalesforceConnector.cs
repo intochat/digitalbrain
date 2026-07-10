@@ -198,9 +198,8 @@ public class SalesforceConnector : IConnector
         {
             // Use existing factory to create client (exercises merged scope/credentials).
             var client = await _factory.CreateAsync(new NeuronScope(new UserId(user.Value), null), cancellationToken);  // per-user scope for credential merge
-            // Cheap probe: SELECT Id FROM User LIMIT 1
-            await client.QueryAsync("SELECT Id FROM User LIMIT 1", cancellationToken);
-            return new ConnectionHealth(Healthy: true, Detail: "Salesforce connection healthy (query succeeded)", Checked: DateTimeOffset.UtcNow);
+            await client.ListAccountsAsync(1, cancellationToken);
+            return new ConnectionHealth(Healthy: true, Detail: "Salesforce connection healthy (account read succeeded)", Checked: DateTimeOffset.UtcNow);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

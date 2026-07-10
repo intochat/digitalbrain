@@ -14,7 +14,42 @@ public sealed class SalesforceReadNeuron(
     IPackConfigStore store,
     [FromKeyedServices("salesforce")] IConnector connector) : Grain, IV2SalesforceReadToolGrain
 {
-    public async Task<V2SalesforceReadResult> ReadLatestAccountAsync(CancellationToken cancellationToken = default)
+    public Task<V2SalesforceReadResult> ReadLatestAccountAsync(CancellationToken cancellationToken = default) =>
+        ReadAsync(
+            async (client, ct) =>
+            {
+                var accounts = await client.ListAccountsAsync(1, ct);
+                return accounts.Length == 0 ? "No Salesforce accounts were found." : accounts[0];
+            },
+            cancellationToken);
+
+    public Task<V2SalesforceReadResult> ReadCurrentProfileAsync(CancellationToken cancellationToken = default) =>
+        ReadAsync((client, ct) => client.GetCurrentUserProfileAsync(ct), cancellationToken);
+
+    public Task<V2SalesforceReadResult> ReadRecentAccountsAsync(CancellationToken cancellationToken = default) =>
+        ReadAsync(
+            async (client, ct) =>
+            {
+                var accounts = await client.ListAccountsAsync(10, ct);
+                return accounts.Length == 0 ? "No Salesforce accounts were found." : "[" + string.Join(',', accounts) + "]";
+            },
+            cancellationToken);
+
+    public Task<V2SalesforceReadResult> ReadRecentContactsAsync(CancellationToken cancellationToken = default) =>
+        ReadAsync(
+            async (client, ct) =>
+            {
+                var contacts = await client.ListContactsAsync(10, ct);
+                return contacts.Length == 0 ? "No Salesforce contacts were found." : "[" + string.Join(',', contacts) + "]";
+            },
+            cancellationToken);
+
+    public Task<V2SalesforceReadResult> ReadCrmSchemaAsync(CancellationToken cancellationToken = default) =>
+        ReadAsync((client, ct) => client.DescribeCrmAccessAsync(ct), cancellationToken);
+
+    private async Task<V2SalesforceReadResult> ReadAsync(
+        Func<ISalesforceApiClient, CancellationToken, Task<string>> read,
+        CancellationToken cancellationToken)
     {
         var owner = new NeuronId(this.GetPrimaryKeyString());
         var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
@@ -31,12 +66,10 @@ public sealed class SalesforceReadNeuron(
         try
         {
             var client = await salesforceApiClientFactory.CreateAsync(scope, cancellationToken);
-            var accounts = await client.QueryAsync(
-                "SELECT Name FROM Account ORDER BY LastModifiedDate DESC LIMIT 1",
-                cancellationToken);
+            var content = await read(client, cancellationToken);
             return new V2SalesforceReadResult(
                 V2SalesforceReadStatus.Success,
-                accounts.Length == 0 ? "No Salesforce accounts were found." : accounts[0]);
+                content);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -102,6 +135,7 @@ public sealed class SalesforceReadNeuron(
         var message = exception.GetBaseException().Message;
         return message.Contains("authentication", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("credential", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("reconnect", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("invalid session", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("revoked", StringComparison.OrdinalIgnoreCase) ||

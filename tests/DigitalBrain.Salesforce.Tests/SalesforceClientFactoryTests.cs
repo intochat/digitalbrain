@@ -122,7 +122,11 @@ public class SalesforceClientFactoryTests
     [Fact]
     public async Task ExchangeAuthorizationCodeAsync_Uses_Provided_Handler_Instead_Of_Real_Network_Call()
     {
-        var handler = new FakeSalesforceTokenHandler("fake-access-token", "https://fake.my.salesforce.com", "fake-refresh-token");
+        var handler = new FakeSalesforceTokenHandler(
+            "fake-access-token",
+            "https://fake.my.salesforce.com",
+            "fake-refresh-token",
+            "https://login.salesforce.com/id/org/user");
 
         var result = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(
             new Dictionary<string, string>
@@ -139,6 +143,21 @@ public class SalesforceClientFactoryTests
         Assert.Equal("fake-access-token", result[SalesforceClientFactory.AccessTokenKey]);
         Assert.Equal("https://fake.my.salesforce.com", result[SalesforceClientFactory.InstanceUrlKey]);
         Assert.Equal("fake-refresh-token", result[SalesforceClientFactory.RefreshTokenKey]);
+        Assert.Equal("https://login.salesforce.com/id/org/user", result[SalesforceClientFactory.IdentityUrlKey]);
         Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task CreateSessionAsync_Preserves_Stored_Identity_Url()
+    {
+        var session = await SalesforceClientFactory.CreateSessionAsync(new Dictionary<string, string>
+        {
+            [SalesforceClientFactory.AccessTokenKey] = "access-token",
+            [SalesforceClientFactory.InstanceUrlKey] = "https://example.my.salesforce.com",
+            [SalesforceClientFactory.IdentityUrlKey] = "https://login.salesforce.com/id/org/user"
+        });
+
+        Assert.NotNull(session.Client);
+        Assert.Equal("https://login.salesforce.com/id/org/user", session.IdentityUrl);
     }
 }

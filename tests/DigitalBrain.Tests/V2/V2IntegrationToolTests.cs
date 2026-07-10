@@ -22,14 +22,24 @@ public sealed class V2IntegrationToolTests
         var planner = new V2McpIntegrationPlanner();
 
         var gmail = await planner.PlanAsync(Request("Can you get my last incoming gmail?"));
-        var salesforce = await planner.PlanAsync(Request("Show my latest Salesforce account"));
+        var latestAccount = await planner.PlanAsync(Request("Show my latest Salesforce account"));
+        var accounts = await planner.PlanAsync(Request("Show my Salesforce customer accounts"));
+        var contacts = await planner.PlanAsync(Request("Get recent Salesforce contacts"));
+        var profile = await planner.PlanAsync(Request("Show my Salesforce profile"));
+        var schema = await planner.PlanAsync(Request("Get Salesforce CRM field access metadata"));
         var send = await planner.PlanAsync(Request("Send an email to the team"));
         var update = await planner.PlanAsync(Request("Update my Salesforce account"));
+        var query = await planner.PlanAsync(Request("Run this Salesforce SOQL query"));
 
         Assert.Equal(V2GmailTools.ReadLatest, Assert.Single(gmail).ToolId);
-        Assert.Equal(V2SalesforceTools.ReadLatestAccount, Assert.Single(salesforce).ToolId);
+        Assert.Equal(V2SalesforceTools.ReadLatestAccount, Assert.Single(latestAccount).ToolId);
+        Assert.Equal(V2SalesforceTools.ReadRecentAccounts, Assert.Single(accounts).ToolId);
+        Assert.Equal(V2SalesforceTools.ReadRecentContacts, Assert.Single(contacts).ToolId);
+        Assert.Equal(V2SalesforceTools.ReadCurrentProfile, Assert.Single(profile).ToolId);
+        Assert.Equal(V2SalesforceTools.ReadCrmSchema, Assert.Single(schema).ToolId);
         Assert.Empty(send);
         Assert.Empty(update);
+        Assert.Empty(query);
     }
 
     [Fact]
@@ -60,9 +70,9 @@ public sealed class V2IntegrationToolTests
         var first = Context("user-a", "workspace-a", "salesforce.read");
         var second = Context("user-b", "workspace-a", "salesforce.read");
 
-        var firstResult = await catalog.InvokeAsync(first, SalesforceInvocation());
-        var secondResult = await catalog.InvokeAsync(second, SalesforceInvocation());
-        var denied = await catalog.InvokeAsync(Context("user-a", "workspace-a"), SalesforceInvocation());
+        var firstResult = await catalog.InvokeAsync(first, SalesforceInvocation(V2SalesforceTools.ReadLatestAccount));
+        var secondResult = await catalog.InvokeAsync(second, SalesforceInvocation(V2SalesforceTools.ReadLatestAccount));
+        var denied = await catalog.InvokeAsync(Context("user-a", "workspace-a"), SalesforceInvocation(V2SalesforceTools.ReadLatestAccount));
 
         Assert.Equal(V2ToolOutcomeKind.Success, firstResult.Kind);
         Assert.Equal("{\"Name\":\"Grounded account\"}", firstResult.Content!.Value.GetProperty("latestAccount").GetString());
@@ -70,6 +80,33 @@ public sealed class V2IntegrationToolTests
         Assert.Equal([V2RequestScope.Id(first), V2RequestScope.Id(second)], gateway.SalesforceOwnerScopes);
         Assert.NotEqual(gateway.SalesforceOwnerScopes[0], gateway.SalesforceOwnerScopes[1]);
         Assert.Equal(V2ToolOutcomeKind.Denied, denied.Kind);
+    }
+
+    [Theory]
+    [InlineData(V2SalesforceTools.ReadCurrentProfile, "currentProfile")]
+    [InlineData(V2SalesforceTools.ReadRecentAccounts, "recentAccounts")]
+    [InlineData(V2SalesforceTools.ReadRecentContacts, "recentContacts")]
+    [InlineData(V2SalesforceTools.ReadCrmSchema, "crmSchema")]
+    public async Task Salesforce_catalog_exposes_only_bounded_read_operations(string toolId, string resultField)
+    {
+        var gateway = new RecordingGateway(salesforce: new(V2SalesforceReadStatus.Success, "grounded"));
+        var catalog = new V2McpAuthorizedToolCatalog(gateway);
+
+        var result = await catalog.InvokeAsync(
+            Context("user", "workspace", "salesforce.read"),
+            SalesforceInvocation(toolId));
+        var deniedInput = await catalog.InvokeAsync(
+            Context("user", "workspace", "salesforce.read"),
+            new V2ToolInvocation(toolId, JsonSerializer.SerializeToElement(new { soql = "DELETE FROM Account" })));
+        var deniedTool = await catalog.InvokeAsync(
+            Context("user", "workspace", "salesforce.read"),
+            SalesforceInvocation("salesforce.query.execute"));
+
+        Assert.Equal(V2ToolOutcomeKind.Success, result.Kind);
+        Assert.Equal("grounded", result.Content!.Value.GetProperty(resultField).GetString());
+        Assert.Equal(toolId, Assert.Single(gateway.SalesforceToolIds));
+        Assert.Equal(V2ToolOutcomeKind.Denied, deniedInput.Kind);
+        Assert.Equal(V2ToolOutcomeKind.Denied, deniedTool.Kind);
     }
 
     [Fact]
@@ -87,7 +124,7 @@ public sealed class V2IntegrationToolTests
         var catalog = new V2McpAuthorizedToolCatalog(gateway);
 
         var gmail = await catalog.InvokeAsync(Context("user", "workspace", "gmail.read"), GmailInvocation());
-        var salesforce = await catalog.InvokeAsync(Context("user", "workspace", "salesforce.read"), SalesforceInvocation());
+        var salesforce = await catalog.InvokeAsync(Context("user", "workspace", "salesforce.read"), SalesforceInvocation(V2SalesforceTools.ReadLatestAccount));
 
         Assert.Equal(V2ToolOutcomeKind.NeedsAuth, gmail.Kind);
         Assert.Equal("Connect Google", gmail.Action?.Label);
@@ -106,7 +143,7 @@ public sealed class V2IntegrationToolTests
         var catalog = new V2McpAuthorizedToolCatalog(gateway);
 
         var gmail = await catalog.InvokeAsync(Context("user", "workspace", "gmail.read"), GmailInvocation());
-        var salesforce = await catalog.InvokeAsync(Context("user", "workspace", "salesforce.read"), SalesforceInvocation());
+        var salesforce = await catalog.InvokeAsync(Context("user", "workspace", "salesforce.read"), SalesforceInvocation(V2SalesforceTools.ReadLatestAccount));
 
         Assert.Equal(V2ToolOutcomeKind.PermanentFailure, gmail.Kind);
         Assert.Contains("configuration is missing", gmail.SafeReason, StringComparison.Ordinal);
@@ -169,8 +206,8 @@ public sealed class V2IntegrationToolTests
     private static V2ToolInvocation GmailInvocation() =>
         new(V2GmailTools.ReadLatest, JsonSerializer.SerializeToElement(new { }));
 
-    private static V2ToolInvocation SalesforceInvocation() =>
-        new(V2SalesforceTools.ReadLatestAccount, JsonSerializer.SerializeToElement(new { }));
+    private static V2ToolInvocation SalesforceInvocation(string toolId) =>
+        new(toolId, JsonSerializer.SerializeToElement(new { }));
 
     private static V2RequestContext Context(string principal, string workspace, params string[] grants) => new(
         new TenantId("tenant"),
@@ -188,6 +225,7 @@ public sealed class V2IntegrationToolTests
     {
         public List<string> GmailOwnerScopes { get; } = [];
         public List<string> SalesforceOwnerScopes { get; } = [];
+        public List<string> SalesforceToolIds { get; } = [];
 
         public Task<V2GmailReadResult> ReadLatestIncomingAsync(
             string ownerScope,
@@ -197,11 +235,13 @@ public sealed class V2IntegrationToolTests
             return Task.FromResult(gmail ?? new V2GmailReadResult(V2GmailReadStatus.Unavailable));
         }
 
-        public Task<V2SalesforceReadResult> ReadLatestSalesforceAccountAsync(
+        public Task<V2SalesforceReadResult> ReadSalesforceAsync(
             string ownerScope,
+            string toolId,
             CancellationToken cancellationToken = default)
         {
             SalesforceOwnerScopes.Add(ownerScope);
+            SalesforceToolIds.Add(toolId);
             return Task.FromResult(salesforce ?? new V2SalesforceReadResult(V2SalesforceReadStatus.Unavailable));
         }
     }
