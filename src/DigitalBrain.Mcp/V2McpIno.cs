@@ -586,6 +586,9 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
     {
         cancellationToken.ThrowIfCancellationRequested();
         var text = request.Text.ToLowerInvariant();
+        var words = Regex.Split(text, @"[^\p{L}\p{N}]+")
+            .Where(static word => word.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
         var emptyInput = JsonSerializer.SerializeToElement(new { });
         var mentionsMail = text.Contains("gmail", StringComparison.Ordinal) ||
                            text.Contains("email", StringComparison.Ordinal) ||
@@ -596,13 +599,25 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
                              text.Contains("last", StringComparison.Ordinal) ||
                              text.Contains("newest", StringComparison.Ordinal) ||
                              text.Contains("recent", StringComparison.Ordinal);
-        var explicitlyOutgoing = text.Contains("send", StringComparison.Ordinal) ||
-                                 text.Contains("sent", StringComparison.Ordinal) ||
-                                 text.Contains("outgoing", StringComparison.Ordinal) ||
-                                 text.Contains("draft", StringComparison.Ordinal) ||
-                                 text.Contains("compose", StringComparison.Ordinal);
+        var requestsSender = words.Contains("sender") || words.Contains("from") ||
+                             text.Contains("who sent", StringComparison.Ordinal) ||
+                             text.Contains("sent me", StringComparison.Ordinal) ||
+                             text.Contains("sent my", StringComparison.Ordinal);
+        var explicitlyOutgoing = words.Contains("send") ||
+                                 words.Contains("outgoing") ||
+                                 words.Contains("draft") ||
+                                 words.Contains("compose") ||
+                                 words.Contains("reply") ||
+                                 words.Contains("forward") ||
+                                 (words.Contains("sent") && !requestsSender);
+        var requestsMailMutation = explicitlyOutgoing ||
+                                   words.Contains("delete") ||
+                                   words.Contains("trash") ||
+                                   words.Contains("archive") ||
+                                   words.Contains("move") ||
+                                   words.Contains("mark");
         var requestsLatestIncoming = explicitlyIncoming || (requestsLatest && !explicitlyOutgoing);
-        if (mentionsMail && requestsLatestIncoming)
+        if (mentionsMail && requestsLatestIncoming && !requestsMailMutation)
             return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
                 new V2ToolInvocation(V2GmailTools.ReadLatest, emptyInput)
             ]);
@@ -729,7 +744,15 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
         {
             V2GmailReadStatus.Success => new V2ToolOutcome(
                 V2ToolOutcomeKind.Success,
-                JsonSerializer.SerializeToElement(new { latestMessage = result.Content ?? string.Empty })),
+                JsonSerializer.SerializeToElement(new
+                {
+                    latestIncomingMessage = new
+                    {
+                        status = GmailMailboxStatus(result.MailboxState),
+                        sender = result.Sender,
+                        senderAddress = result.SenderAddress
+                    }
+                })),
             V2GmailReadStatus.NeedsAuth when IsAllowedGoogleAuthorizationUrl(result.ConnectionUrl) => new V2ToolOutcome(
                 V2ToolOutcomeKind.NeedsAuth,
                 SafeReason: result.SafeReason ?? "Connect your Google account to let INO read your Gmail.",
@@ -788,6 +811,13 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway inte
         V2SalesforceTools.ReadRecentContacts or
         V2SalesforceTools.ReadCrmSchema;
 
+    private static string GmailMailboxStatus(V2GmailMailboxState state) => state switch
+    {
+        V2GmailMailboxState.SenderAvailable => "senderAvailable",
+        V2GmailMailboxState.EmptyInbox => "emptyInbox",
+        _ => "senderUnavailable"
+    };
+
     private static string SalesforceResultField(string toolId) => toolId switch
     {
         V2SalesforceTools.ReadCurrentProfile => "currentProfile",
@@ -838,12 +868,52 @@ public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer
         var blockingOutcome = toolOutcomes.FirstOrDefault(static outcome => outcome.Kind != V2ToolOutcomeKind.Success);
         if (blockingOutcome is not null)
             return Task.FromResult(blockingOutcome.SafeReason ?? "I couldn’t complete that request safely.");
+        var groundedGmailResponse = toolOutcomes
+            .Select(static outcome => ComposeLatestIncomingGmail(outcome.Content))
+            .FirstOrDefault(static text => text is not null);
+        if (groundedGmailResponse is not null)
+            return Task.FromResult(groundedGmailResponse);
         if (string.IsNullOrWhiteSpace(response.Text))
             throw new InvalidOperationException("The configured model returned no answer.");
         var text = response.Text.Trim();
         if (UnsafeAddress.IsMatch(text) || UnsafeTerm.IsMatch(text) || ContainsSensitiveContextValue(text, context))
             throw new InvalidOperationException("The configured model returned an answer that is unsafe to display.");
         return Task.FromResult(text);
+    }
+
+    private static string? ComposeLatestIncomingGmail(JsonElement? content)
+    {
+        if (content is not { ValueKind: JsonValueKind.Object } root ||
+            !root.TryGetProperty("latestIncomingMessage", out var message) ||
+            message.ValueKind != JsonValueKind.Object ||
+            !message.TryGetProperty("status", out var statusElement) ||
+            statusElement.ValueKind != JsonValueKind.String)
+            return null;
+
+        return statusElement.GetString() switch
+        {
+            "emptyInbox" => "No incoming Gmail messages were found.",
+            "senderUnavailable" => "The latest incoming Gmail message’s sender metadata was unavailable.",
+            "senderAvailable" => ComposeAvailableSender(message),
+            _ => throw new InvalidOperationException("The Gmail tool returned an unknown mailbox state.")
+        };
+    }
+
+    private static string ComposeAvailableSender(JsonElement message)
+    {
+        var sender = message.TryGetProperty("sender", out var senderElement) && senderElement.ValueKind == JsonValueKind.String
+            ? senderElement.GetString()
+            : null;
+        var address = message.TryGetProperty("senderAddress", out var addressElement) && addressElement.ValueKind == JsonValueKind.String
+            ? addressElement.GetString()
+            : null;
+        if (string.IsNullOrWhiteSpace(sender) || string.IsNullOrWhiteSpace(address) ||
+            !sender.Contains(address, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The Gmail tool returned incomplete sender metadata.");
+        var response = $"The latest incoming email was sent by {sender}.";
+        if (UnsafeAddress.IsMatch(response))
+            throw new InvalidOperationException("The Gmail tool returned unsafe sender metadata.");
+        return response;
     }
 
     private static bool ContainsSensitiveContextValue(string text, V2RequestContext context) =>

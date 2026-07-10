@@ -639,6 +639,33 @@ void main() {
     );
   });
 
+  testWidgets('renders a grounded sender email address verbatim', (
+    tester,
+  ) async {
+    const response =
+        'The latest incoming email was sent by Ada Lovelace <ada@example.com>.';
+    await tester.pumpWidget(
+      _host(
+        V2SurfaceView(
+          surface: _inoSurface(
+            messages: [
+              inoMessage(
+                role: 'assistant',
+                text: response,
+                state: 'succeeded',
+              ),
+            ],
+            operation: inoOperation(state: 'succeeded'),
+          ),
+          onSubmitAction: _unexpectedAction,
+        ),
+      ),
+    );
+
+    expect(find.text(response), findsOneWidget);
+    expect(find.byType(SelectableText), findsOneWidget);
+  });
+
   testWidgets('shows the principal-scoped Google connection action', (
     tester,
   ) async {

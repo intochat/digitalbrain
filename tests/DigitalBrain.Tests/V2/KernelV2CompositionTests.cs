@@ -32,6 +32,25 @@ public sealed class KernelV2CompositionTests
     }
 
     [Fact]
+    public async Task Conversation_model_receives_authorized_sender_metadata_without_a_blanket_identifier_refusal()
+    {
+        var chat = new RecordingPromptDependentChatClient();
+        var grain = new V2ConversationModelGrain(chat);
+        const string grounded = "{\"latestIncomingMessage\":{\"status\":\"senderAvailable\",\"sender\":\"Ada Lovelace <ada@example.com>\",\"senderAddress\":\"ada@example.com\"}}";
+
+        await grain.CompleteAsync(new V2ConversationModelCompletionRequest(
+            "Who sent my last email to me? Give me the sender’s email address.",
+            [],
+            [new V2ConversationModelToolOutcome("Success", grounded, null)]));
+
+        Assert.Contains("ada@example.com", chat.LastRequest, StringComparison.Ordinal);
+        Assert.Contains("internal identifiers", chat.LastRequest, StringComparison.Ordinal);
+        Assert.DoesNotContain("Never expose identifiers", chat.LastRequest, StringComparison.Ordinal);
+        Assert.Equal(2, Count(chat.LastRequest, "ada@example.com"));
+        Assert.DoesNotContain("\\\"latestIncomingMessage\\\"", chat.LastRequest, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Production_kernel_graph_has_one_runtime_and_shared_connector_composition()
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -106,5 +125,13 @@ public sealed class KernelV2CompositionTests
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
         public void Dispose() { }
+    }
+
+    private static int Count(string value, string expected)
+    {
+        var count = 0;
+        for (var index = 0; (index = value.IndexOf(expected, index, StringComparison.Ordinal)) >= 0; index += expected.Length)
+            count++;
+        return count;
     }
 }

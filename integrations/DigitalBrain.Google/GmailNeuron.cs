@@ -33,14 +33,21 @@ public sealed class GmailReadNeuron(
         try
         {
             var client = await gmailApiClientFactory.CreateAsync(scope, cancellationToken);
-            var messages = await client.ListMessagesAsync("in:inbox", 1, cancellationToken);
-            if (messages.Length == 0)
-                return new V2GmailReadResult(V2GmailReadStatus.Success, "No incoming Gmail messages were found.");
-
-            var content = await client.ReadMessageAsync(messages[0], cancellationToken);
-            return new V2GmailReadResult(
-                V2GmailReadStatus.Success,
-                string.IsNullOrWhiteSpace(content) ? "The latest incoming Gmail message has no preview text." : content.Trim());
+            var latest = await client.ReadLatestIncomingAsync(cancellationToken);
+            return latest.State switch
+            {
+                GmailLatestIncomingState.SenderAvailable => new V2GmailReadResult(
+                    V2GmailReadStatus.Success,
+                    Sender: latest.Sender,
+                    SenderAddress: latest.SenderAddress,
+                    MailboxState: V2GmailMailboxState.SenderAvailable),
+                GmailLatestIncomingState.EmptyInbox => new V2GmailReadResult(
+                    V2GmailReadStatus.Success,
+                    MailboxState: V2GmailMailboxState.EmptyInbox),
+                _ => new V2GmailReadResult(
+                    V2GmailReadStatus.Success,
+                    MailboxState: V2GmailMailboxState.SenderUnavailable)
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -1,8 +1,18 @@
 namespace DigitalBrain.Google;
 
+public enum GmailLatestIncomingState
+{
+    SenderAvailable,
+    EmptyInbox,
+    SenderUnavailable
+}
+
+public sealed record GmailLatestIncomingMessage(
+    GmailLatestIncomingState State,
+    string? Sender = null,
+    string? SenderAddress = null);
+
 public interface IGmailApiClient
 {
-    Task<string[]> ListMessagesAsync(string query, int maxResults, CancellationToken ct);
-    Task<string> ReadMessageAsync(string messageId, CancellationToken ct);
-    Task SendMessageAsync(string to, string subject, string body, CancellationToken ct);
+    Task<GmailLatestIncomingMessage> ReadLatestIncomingAsync(CancellationToken cancellationToken = default);
 }
