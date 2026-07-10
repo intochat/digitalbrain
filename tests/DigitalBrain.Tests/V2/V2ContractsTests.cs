@@ -1,13 +1,35 @@
+extern alias McpProject;
 using System.Text.Json;
 using DigitalBrain.Core.V2;
 using V2RequestContext = DigitalBrain.Core.V2.RequestContext;
 using DigitalBrain.Kernel.V2;
 using Orleans;
+using V2McpEffectCommandHandler = McpProject::DigitalBrain.Mcp.V2McpEffectCommandHandler;
 
 namespace DigitalBrain.Tests.V2;
 
 public sealed class V2ContractsTests
 {
+    [Fact]
+    public async Task Mcp_effect_handler_rejects_cross_workspace_aggregate()
+    {
+        var context = new V2RequestContext(new("tenant-a"), new("workspace-a"), new("user-a", PrincipalKind.User), "session", AuthAssurance.Password, "corr", null, new HashSet<string> { "brain.act" });
+        var command = new V2CommandEnvelope("effect.execute", 2, "cmd-1", context,
+            JsonSerializer.SerializeToElement(new { aggregateId = "v2:tenant-a:workspace-b:workflow:w1", effectId = "effect-1" }));
+        var handler = new V2McpEffectCommandHandler(new NoopEffectPort());
+
+        var result = await handler.ExecuteAsync(command);
+
+        Assert.Equal(WorkflowState.Failed, result.State);
+        Assert.Equal("effect-scope-invalid", result.SafeReason);
+    }
+
+    private sealed class NoopEffectPort : IV2EffectWorkerPort
+    {
+        public Task<EffectTransitionRecord> ExecuteAsync(string aggregateId, string effectId, string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken = default)
+            => throw new Xunit.Sdk.XunitException("The port must not be called for a cross-workspace aggregate.");
+    }
+
     [Fact]
     public void Grain_ids_are_canonical_and_scoped()
     {
@@ -46,6 +68,79 @@ public sealed class V2ContractsTests
         workflow.BeginApply();
         workflow.Succeed();
         Assert.Equal(WorkflowState.Succeeded, workflow.State);
+        Assert.Equal(new[] { WorkflowState.AwaitingApproval, WorkflowState.Approved, WorkflowState.ApplyQueued, WorkflowState.Applying, WorkflowState.Succeeded }, workflow.Transitions.Select(x => x.To));
+        Assert.Equal("operator", workflow.Approval!.Approver.Value);
+    }
+
+    [Fact]
+    public void Workflow_reject_expire_cancel_and_approval_guards_are_fail_closed()
+    {
+        var notAwaiting = new V2Workflow();
+        Assert.Throws<InvalidOperationException>(() => notAwaiting.Approve(new ApprovalRecord(new("operator", PrincipalKind.Operator), DateTimeOffset.UtcNow, "d", null)));
+
+        var rejected = new V2Workflow();
+        rejected.SubmitForApproval();
+        rejected.Reject("policy denied");
+        Assert.Equal(WorkflowState.Rejected, rejected.State);
+
+        var expired = new V2Workflow();
+        expired.SubmitForApproval();
+        expired.Expire();
+        Assert.Equal(WorkflowState.Expired, expired.State);
+
+        var cancelled = new V2Workflow();
+        cancelled.Cancel();
+        Assert.Equal(WorkflowState.Cancelled, cancelled.State);
+    }
+
+    [Fact]
+    public async Task Durable_workflow_approval_persists_authenticated_audit_and_apply_queue()
+    {
+        var store = new InMemoryV2AggregateStore();
+        var aggregate = new V2WorkflowAggregate(store);
+        var context = new V2RequestContext(new("t"), new("w"), new("operator", PrincipalKind.Operator), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.approve" });
+        await aggregate.SubmitForApprovalAsync("proposal-1", "submit-1", context);
+        var approval = new ApprovalRecord(context.Principal, DateTimeOffset.UtcNow, "decision-1", "safe");
+        var effect = new OutboxRecord("effect-1", "operation-1", 0, "fake", System.Text.Json.JsonDocument.Parse("{}").RootElement, DateTimeOffset.UtcNow.AddMinutes(5));
+        var snapshot = await aggregate.ApproveAsync("proposal-1", "approve-1", context, approval, effect);
+        Assert.Contains(snapshot.Commits.SelectMany(x => x.Events), x => x.Type == "v2.workflow.ApplyQueued");
+        Assert.Contains(snapshot.Outbox, x => x.EffectId == "effect-1");
+        var persisted = System.Text.Json.JsonSerializer.Deserialize<V2WorkflowPersistedState>(snapshot.State.GetRawText(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        Assert.Equal(WorkflowState.ApplyQueued, persisted.State);
+        Assert.Equal("operator", persisted.Approval!.Approver.Value);
+        Assert.Equal(new[] { WorkflowState.AwaitingApproval, WorkflowState.Approved, WorkflowState.ApplyQueued }, persisted.Transitions.Select(x => x.To));
+        snapshot = await aggregate.AdvanceAsync("proposal-1", "apply-1", context, WorkflowState.Applying);
+        snapshot = await aggregate.AdvanceAsync("proposal-1", "unknown-1", context, WorkflowState.OutcomeUnknown, "provider-timeout");
+        snapshot = await aggregate.AdvanceAsync("proposal-1", "manual-1", context, WorkflowState.ManualIntervention, "operator-review");
+        var finalState = System.Text.Json.JsonSerializer.Deserialize<V2WorkflowPersistedState>(snapshot.State.GetRawText(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        Assert.Equal(WorkflowState.ManualIntervention, finalState.State);
+    }
+
+    [Fact]
+    public async Task Durable_workflow_survives_file_store_reopen()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "db-v2-workflow-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var context = new V2RequestContext(new("t"), new("w"), new("operator", PrincipalKind.Operator), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.approve" });
+            var first = new V2WorkflowAggregate(new FileV2AggregateStore(root));
+            await first.SubmitForApprovalAsync("proposal", "submit", context);
+            await first.ApproveAsync("proposal", "approve", context, new ApprovalRecord(context.Principal, DateTimeOffset.UtcNow, "decision", null), new OutboxRecord("effect", "operation", 0, "fake", System.Text.Json.JsonDocument.Parse("{}").RootElement, DateTimeOffset.UtcNow.AddMinutes(1)));
+            var reopened = await new FileV2AggregateStore(root).ReadAsync("proposal");
+            Assert.Equal(2, reopened.CommitSequence);
+            Assert.Single(reopened.Outbox);
+            Assert.Contains(reopened.Commits.SelectMany(x => x.Events), x => x.Type == "v2.workflow.ApplyQueued");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void V2_schema_registry_is_stable_and_fail_closed()
+    {
+        var registry = new V2SchemaRegistry([new V2SchemaDescriptor("v2.workflow.ApplyQueued", 2, "Operational", true)]);
+        Assert.True(registry.TryResolve("v2.workflow.ApplyQueued", 2, out _));
+        Assert.Throws<InvalidOperationException>(() => registry.Require("v2.unknown", 1));
+        Assert.Throws<InvalidOperationException>(() => registry.Register(new V2SchemaDescriptor("v2.workflow.ApplyQueued", 2, "Secret", false)));
     }
 
     [Fact]
@@ -285,6 +380,9 @@ public sealed class V2ContractsTests
         Assert.Equal("success", point.Labels["outcome"]);
         await telemetry.EmitTraceAsync(new V2TraceContext("trace", "span", new("t"), new("w"), "command", "operation"), "effect", "safe detail");
         Assert.Single(telemetry.Traces);
+        await telemetry.EmitTraceAsync(new V2TraceContext("trace-2", "span-2", new("t"), new("w")), "overflow", "discarded");
+        Assert.Equal(2, telemetry.Dropped);
+        Assert.Single(telemetry.Traces);
     }
 
     [Fact]
@@ -391,6 +489,9 @@ public sealed class V2ContractsTests
             var service = new V2ApplicationService(storagePath: path);
             var page = await service.GetOperationsAsync(new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.read" }), null, 10);
             Assert.Empty(page.Items);
+            var quarantine = File.ReadAllText(path + ".quarantine");
+            Assert.Contains("invalid-json", quarantine);
+            Assert.DoesNotContain("not-json", quarantine);
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -443,6 +544,38 @@ public sealed class V2ContractsTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SubmitAsync(context, approval));
         var action = new V2CommandEnvelope("connector.send", 2, "cmd-action", context, System.Text.Json.JsonDocument.Parse("{}").RootElement);
         Assert.NotNull(await service.SubmitAsync(context, action));
+    }
+
+    [Fact]
+    public async Task Durable_command_can_be_claimed_once_and_outcome_replayed()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-commands-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.act", "brain.read" });
+            var service = new V2ApplicationService(storagePath: Path.Combine(root, "operations.jsonl"));
+            var submitted = await service.SubmitAsync(context, new V2CommandEnvelope("connector.send", 2, "cmd-durable", context, System.Text.Json.JsonDocument.Parse("{}").RootElement));
+            Assert.True(service.TryClaimPending(submitted.OperationId, out var command));
+            Assert.Equal("cmd-durable", command!.CommandId);
+            Assert.False(service.TryClaimPending(submitted.OperationId, out _));
+            Assert.True(service.RecordOutcome(submitted.OperationId, WorkflowState.OutcomeUnknown, "provider outcome unavailable"));
+            var reopened = new V2ApplicationService(storagePath: Path.Combine(root, "operations.jsonl"));
+            var status = await reopened.GetOperationAsync(context, submitted.OperationId);
+            Assert.Equal(WorkflowState.OutcomeUnknown, status!.State);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task Command_dispatcher_routes_once_and_marks_unknown_without_retry()
+    {
+        var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.act", "brain.read" });
+        var service = new V2ApplicationService();
+        var submitted = await service.SubmitAsync(context, new V2CommandEnvelope("test.command", 2, "cmd-dispatch", context, System.Text.Json.JsonDocument.Parse("{}").RootElement));
+        var dispatcher = new V2CommandDispatcher(service, Array.Empty<IV2CommandHandler>());
+        Assert.True(await dispatcher.DispatchAsync(submitted.OperationId));
+        Assert.False(await dispatcher.DispatchAsync(submitted.OperationId));
+        Assert.Equal(WorkflowState.ManualIntervention, (await service.GetOperationAsync(context, submitted.OperationId))!.State);
     }
 
     [Fact]

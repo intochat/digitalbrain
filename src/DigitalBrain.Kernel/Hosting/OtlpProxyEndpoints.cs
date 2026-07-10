@@ -11,11 +11,9 @@ internal static class OtlpProxyEndpoints
 
     public static IServiceCollection AddDigitalBrainOtlpForwardClient(this IServiceCollection services)
     {
-        services.AddHttpClient(OtlpForwardClientName)
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
-            });
+        // Keep the platform certificate chain; telemetry must not be forwarded to
+        // an endpoint with an untrusted certificate.
+        services.AddHttpClient(OtlpForwardClientName);
         return services;
     }
 

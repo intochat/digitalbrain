@@ -227,6 +227,8 @@ public sealed record V2CommandEnvelope([property: Id(0)] string Type, [property:
 public sealed record V2EventEnvelope([property: Id(0)] string Type, [property: Id(1)] int Version, [property: Id(2)] string EventId, [property: Id(3)] string CorrelationId, [property: Id(4)] string? CausationId, [property: Id(5)] JsonElement Payload);
 
 public enum WorkflowState { Proposed, AwaitingApproval, Approved, Rejected, Expired, Cancelled, ApplyQueued, Applying, RetryScheduled, Succeeded, Failed, OutcomeUnknown, CompensationQueued, Compensated, ManualIntervention }
+[GenerateSerializer, Alias("digitalbrain.v2.workflow-transition")]
+public sealed record WorkflowTransition([property: Id(0)] WorkflowState From, [property: Id(1)] WorkflowState To, [property: Id(2)] DateTimeOffset At, [property: Id(3)] string? Reason = null);
 [GenerateSerializer, Alias("digitalbrain.v2.approval-record")]
 public sealed record ApprovalRecord([property: Id(0)] PrincipalRef Approver, [property: Id(1)] DateTimeOffset ApprovedAt, [property: Id(2)] string DecisionId, [property: Id(3)] string? Reason);
 [GenerateSerializer, Alias("digitalbrain.v2.aggregate-commit")]
@@ -245,13 +247,32 @@ public sealed class V2Workflow
 {
     public WorkflowState State { get; private set; } = WorkflowState.Proposed;
     public ApprovalRecord? Approval { get; private set; }
+    public IReadOnlyList<WorkflowTransition> Transitions => _transitions;
+    private readonly List<WorkflowTransition> _transitions = [];
     public void SubmitForApproval() => Transition(WorkflowState.AwaitingApproval);
     public void Approve(ApprovalRecord approval)
     {
-        if (approval.Approver.Kind == PrincipalKind.User && string.IsNullOrWhiteSpace(approval.Approver.Value)) throw new UnauthorizedAccessException();
+        if (State != WorkflowState.AwaitingApproval) throw new InvalidOperationException($"Approval is only legal while awaiting approval; current state is {State}.");
+        if (approval.Approver.Kind != PrincipalKind.Operator || string.IsNullOrWhiteSpace(approval.Approver.Value)) throw new UnauthorizedAccessException();
         Approval = approval;
         Transition(WorkflowState.Approved);
         Transition(WorkflowState.ApplyQueued);
+    }
+    public void Reject(string reason)
+    {
+        if (State != WorkflowState.AwaitingApproval) throw new InvalidOperationException($"Rejection is only legal while awaiting approval; current state is {State}.");
+        if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("A safe rejection reason is required.", nameof(reason));
+        Transition(WorkflowState.Rejected);
+    }
+    public void Expire()
+    {
+        if (State != WorkflowState.AwaitingApproval) throw new InvalidOperationException($"Expiry is only legal while awaiting approval; current state is {State}.");
+        Transition(WorkflowState.Expired);
+    }
+    public void Cancel()
+    {
+        if (State is not (WorkflowState.Proposed or WorkflowState.AwaitingApproval or WorkflowState.ApplyQueued)) throw new InvalidOperationException($"Cancellation is not legal from {State}.");
+        Transition(WorkflowState.Cancelled);
     }
     public void BeginApply() => Transition(WorkflowState.Applying);
     public void Succeed() => Transition(WorkflowState.Succeeded);
@@ -260,7 +281,9 @@ public sealed class V2Workflow
     private void Transition(WorkflowState next)
     {
         if (State is WorkflowState.Succeeded or WorkflowState.Compensated or WorkflowState.Rejected or WorkflowState.Cancelled) throw new InvalidOperationException($"Workflow is terminal: {State}");
+        var prior = State;
         State = next;
+        _transitions.Add(new WorkflowTransition(prior, next, DateTimeOffset.UtcNow));
     }
 }
 

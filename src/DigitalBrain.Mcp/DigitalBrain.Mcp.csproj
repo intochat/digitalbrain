@@ -5,6 +5,7 @@
     <TargetFramework>net11.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerRepository>digitalbrain-mcp</ContainerRepository>
     <!-- noble-chiseled not yet published for .NET 11 preview; use standard preview base -->
@@ -15,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
 
     <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />

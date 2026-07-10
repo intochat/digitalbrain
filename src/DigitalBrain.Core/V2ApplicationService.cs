@@ -12,6 +12,8 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
     private readonly ConcurrentDictionary<string, V2OperationStatus> _operations = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (TenantId Tenant, WorkspaceId Workspace)> _operationOwners = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _idempotency = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, V2CommandEnvelope> _commands = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _claimed = new(StringComparer.Ordinal);
     private readonly byte[] _cursorKey;
     private readonly IReadOnlyList<V2Capability> _capabilities;
     private readonly string? _storagePath;
@@ -69,6 +71,7 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
         var operation = new V2OperationStatus(operationId, WorkflowState.ApplyQueued, null, DateTimeOffset.UtcNow);
         _operations[operationId] = operation;
         _operationOwners[operationId] = (context.TenantId, context.WorkspaceId);
+        _commands[operationId] = command;
         _idempotency[key] = operationId;
         // The operation and command envelope are appended together as the durable
         // handoff boundary. A worker can rebuild pending commands from this record;
@@ -80,8 +83,11 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
     private void Load()
     {
         if (string.IsNullOrWhiteSpace(_storagePath) || !File.Exists(_storagePath)) return;
-        foreach (var line in File.ReadLines(_storagePath).Where(x => !string.IsNullOrWhiteSpace(x)))
+        var lineNumber = 0;
+        foreach (var line in File.ReadLines(_storagePath))
         {
+            lineNumber++;
+            if (string.IsNullOrWhiteSpace(line)) continue;
             PersistedOperation? item;
             try
             {
@@ -89,14 +95,38 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
             }
             catch (JsonException)
             {
-                // A torn final append must not prevent the V2 host from recovering
-                // earlier operations; quarantine is represented by the skipped line.
+                // A torn/poison record must not prevent recovery of earlier operations.
+                // Quarantine only a digest and location: the raw record may contain a
+                // caller payload and must never be copied to another durable surface.
+                Quarantine(lineNumber, line);
                 continue;
             }
             if (item is null) continue;
             _operations[item.Operation.OperationId] = item.Operation;
             _operationOwners[item.Operation.OperationId] = (new(item.Tenant), new(item.Workspace));
             _idempotency[item.Idempotency] = item.Operation.OperationId;
+            if (item.Command is not null) _commands[item.Operation.OperationId] = item.Command;
+        }
+    }
+
+    private void Quarantine(int lineNumber, string raw)
+    {
+        if (string.IsNullOrWhiteSpace(_storagePath)) return;
+        try
+        {
+            var quarantinePath = _storagePath + ".quarantine";
+            var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)));
+            lock (_storageLock)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(quarantinePath))!);
+                var entry = JsonSerializer.Serialize(new { line = lineNumber, sha256 = digest, reason = "invalid-json" });
+                File.AppendAllText(quarantinePath, entry + Environment.NewLine);
+            }
+        }
+        catch
+        {
+            // Recovery remains fail-closed for the poisoned record while preserving
+            // availability of valid records; telemetry can report quarantine failure.
         }
     }
 
@@ -111,6 +141,43 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
     }
 
     private sealed record PersistedOperation(string Idempotency, string Tenant, string Workspace, V2OperationStatus Operation, V2CommandEnvelope? Command = null);
+
+    /// <summary>Claims one durable command for execution. Claiming is idempotent and never trusts transport state.</summary>
+    public bool TryClaimPending(string operationId, out V2CommandEnvelope? command)
+    {
+        command = null;
+        if (!_operations.TryGetValue(operationId, out var current) || current.State != WorkflowState.ApplyQueued || !_commands.TryGetValue(operationId, out command)) return false;
+        if (!_claimed.TryAdd(operationId, 0)) return false;
+        var applying = current with { State = WorkflowState.Applying, UpdatedAt = DateTimeOffset.UtcNow };
+        _operations[operationId] = applying;
+        PersistStatus(operationId, applying);
+        return true;
+    }
+
+    public IReadOnlyList<string> GetPendingOperationIds()
+        => _operations.Values.Where(x => x.State == WorkflowState.ApplyQueued)
+            .Select(x => x.OperationId).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+
+    /// <summary>Records a worker outcome durably; ambiguous outcomes must be reported explicitly.</summary>
+    public bool RecordOutcome(string operationId, WorkflowState state, string? safeReason = null)
+    {
+        if (state is not (WorkflowState.Succeeded or WorkflowState.Failed or WorkflowState.OutcomeUnknown or WorkflowState.Compensated or WorkflowState.ManualIntervention)) throw new ArgumentOutOfRangeException(nameof(state));
+        if (!_operations.TryGetValue(operationId, out var current) || current.State != WorkflowState.Applying) return false;
+        var updated = current with { State = state, SafeReason = safeReason, UpdatedAt = DateTimeOffset.UtcNow };
+        _operations[operationId] = updated;
+        PersistStatus(operationId, updated);
+        return true;
+    }
+
+    private void PersistStatus(string operationId, V2OperationStatus status)
+    {
+        if (!_operationOwners.TryGetValue(operationId, out var owner) || !_commands.TryGetValue(operationId, out var command) || string.IsNullOrWhiteSpace(_storagePath)) return;
+        lock (_storageLock)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_storagePath))!);
+            File.AppendAllText(_storagePath, JsonSerializer.Serialize(new PersistedOperation(owner.Tenant.Value + ":" + owner.Workspace.Value + ":" + command.CommandId, owner.Tenant.Value, owner.Workspace.Value, status, command)) + Environment.NewLine);
+        }
+    }
 
     private string EncodeCursor(int offset)
     {

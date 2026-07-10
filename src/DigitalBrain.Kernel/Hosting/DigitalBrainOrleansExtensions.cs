@@ -2,6 +2,7 @@ using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using DigitalBrain.Ino.Context;
+using DigitalBrain.Core.V2;
 using DigitalBrain.Infrastructure.Connectors.V2;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
@@ -12,6 +13,7 @@ using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Kernel.Voice;
+using DigitalBrain.Kernel.V2;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -128,8 +130,11 @@ public static class DigitalBrainOrleansExtensions
     public static IHostApplicationBuilder AddDigitalBrainClients(this IHostApplicationBuilder builder)
     {
         var isV2Runtime = string.Equals(builder.Configuration["DigitalBrain:Runtime"], "V2", StringComparison.OrdinalIgnoreCase);
-        builder.Services.AddSingleton<HomeFeedBus>();
-        builder.Services.AddSingleton<SignalEgressBus>();
+        if (!isV2Runtime)
+        {
+            builder.Services.AddSingleton<HomeFeedBus>();
+            builder.Services.AddSingleton<SignalEgressBus>();
+        }
         builder.Services.AddSingleton<SqliteSchemaInspector>();
 
         builder.Services.AddGrpc();
@@ -165,6 +170,17 @@ public static class DigitalBrainOrleansExtensions
             builder.Configuration["DigitalBrain:V2:Salesforce:RedirectUri"] ?? string.Empty));
         builder.Services.AddSingleton<IProviderOAuthAdapterRegistry, V2ProviderOAuthAdapterRegistry>();
         builder.Services.AddSingleton<IConnectorAuthorizationPolicy, V2ConnectorAuthorizationPolicy>();
+        if (isV2Runtime)
+        {
+            builder.Services.AddSingleton<IV2TelemetrySink, V2TelemetryBuffer>();
+            builder.Services.AddSingleton(new V2SchemaRegistry([
+                new V2SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
+                new V2SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true),
+                new V2SchemaDescriptor("digitalbrain.v2.workflow-persisted-state", 2, "Operational", true)]));
+            builder.Services.AddScoped<IV2AggregateStore, OrleansV2AggregateStore>();
+            builder.Services.AddScoped<V2WorkflowAggregate>();
+            builder.Services.AddSingleton<IV2CommandHandler, V2EffectCommandHandler>();
+        }
 
         builder.Services.AddHostedService<KernelStartupWarmupService>();
 

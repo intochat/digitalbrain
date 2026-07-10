@@ -22,6 +22,23 @@ public interface IV2EffectWorkerGrain : IGrainWithStringKey
     Task<EffectTransitionRecord> ExecuteAsync(string aggregateId, string effectId, string leaseOwner, TimeSpan leaseDuration);
 }
 
+/// <summary>Application-facing effect execution port; transport adapters never resolve grains directly.</summary>
+public interface IV2EffectWorkerPort
+{
+    Task<EffectTransitionRecord> ExecuteAsync(string aggregateId, string effectId, string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Orleans client adapter for the application-facing effect port.</summary>
+public sealed class OrleansClientV2EffectWorkerPort(IClusterClient cluster) : IV2EffectWorkerPort
+{
+    public Task<EffectTransitionRecord> ExecuteAsync(string aggregateId, string effectId, string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return cluster.GetGrain<IV2EffectWorkerGrain>(aggregateId)
+            .ExecuteAsync(aggregateId, effectId, leaseOwner, leaseDuration);
+    }
+}
+
 [GenerateSerializer, Alias("digitalbrain.v2.aggregate-grain-state")]
 public sealed class V2AggregateGrainState
 {

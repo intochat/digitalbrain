@@ -31,6 +31,14 @@ public sealed class V2TelemetryBuffer(int capacity = 2048) : IV2TelemetrySink
     public ValueTask EmitTraceAsync(V2TraceContext context, string eventName, string? safeDetail = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        // Traces are telemetry too: keep the queue bounded so a collector outage cannot
+        // turn an unbounded diagnostic stream into process-wide memory pressure.
+        if (_traces.Count >= capacity)
+        {
+            Interlocked.Increment(ref _dropped);
+            return ValueTask.CompletedTask;
+        }
+
         _traces.Enqueue((context, eventName, V2Redaction.SafeSummary(safeDetail)));
         return ValueTask.CompletedTask;
     }

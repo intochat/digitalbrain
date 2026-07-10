@@ -11,6 +11,8 @@ using V2RequestContext = DigitalBrain.Core.V2.RequestContext;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using DigitalBrain.Kernel.V2;
+using Orleans;
 
 
 if (UseHttpTransport())
@@ -24,10 +26,21 @@ if (UseHttpTransport())
     var mcp = builder.Services.AddMcpServer().WithHttpTransport();
     mcp.WithTools<V2McpTools>();
     builder.Services.AddHttpContextAccessor();
+    builder.Services.AddSingleton<IV2TelemetrySink, V2TelemetryBuffer>();
     var profileText = builder.Configuration["DigitalBrain:Profile"] ?? "Development";
     if (!Enum.TryParse<V2RuntimeProfile>(profileText, true, out var profile))
         throw new InvalidOperationException($"Unknown V2 runtime profile '{profileText}'.");
     var manifest = V2CapabilityManifests.For(profile);
+    builder.Services.AddSingleton(new V2SchemaRegistry([
+        new V2SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
+        new V2SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true),
+        new V2SchemaDescriptor("digitalbrain.v2.workflow-persisted-state", 2, "Operational", true)]));
+    var operationStorePath = builder.Configuration["DigitalBrain:V2:OperationStorePath"];
+    var sessionStorePath = builder.Configuration["DigitalBrain:V2:SessionStorePath"];
+    var projectionPath = builder.Configuration["DigitalBrain:V2:ProjectionStorePath"];
+    if (profile == V2RuntimeProfile.Production &&
+        (string.IsNullOrWhiteSpace(operationStorePath) || string.IsNullOrWhiteSpace(sessionStorePath) || string.IsNullOrWhiteSpace(projectionPath)))
+        throw new InvalidOperationException("Production V2 requires durable operation, session, and projection stores; in-memory fallbacks are disabled.");
     var v2Capabilities = manifest.Enabled
         .Where(x => x is "brain.read" or "brain.act" or "brain.approve" or "brain.admin")
         .Select(x => new V2Capability(x, 2, true, x is not "brain.read"))
@@ -36,16 +49,20 @@ if (UseHttpTransport())
         v2Capabilities.RemoveAll(x => x.Id == "brain.admin");
     builder.Services.AddSingleton(new V2ApplicationService(
         capabilities: v2Capabilities,
-        storagePath: builder.Configuration["DigitalBrain:V2:OperationStorePath"]));
+        storagePath: operationStorePath));
+    // The dispatcher is application-owned; handlers are intentionally supplied by the
+    // V2 composition and an empty handler set fails closed to ManualIntervention.
+    builder.Services.AddSingleton<IV2CommandHandler, V2McpEffectCommandHandler>();
+    builder.Services.AddSingleton<IV2EffectWorkerPort, OrleansClientV2EffectWorkerPort>();
+    builder.Services.AddSingleton<V2CommandDispatcher>();
+    builder.Services.AddHostedService<V2CommandExecutionWorker>();
     var sessionKeyText = builder.Configuration["DigitalBrain:Auth:SessionSigningKey"] ?? Environment.GetEnvironmentVariable("DigitalBrain__Auth__SessionSigningKey");
     if (string.IsNullOrWhiteSpace(sessionKeyText)) throw new InvalidOperationException("V2 session signing key is required for HTTP MCP.");
     builder.Services.AddSingleton(new V2SessionTokenService(Convert.FromBase64String(sessionKeyText)));
-    var sessionStorePath = builder.Configuration["DigitalBrain:V2:SessionStorePath"];
     if (!string.IsNullOrWhiteSpace(sessionStorePath))
         builder.Services.AddSingleton<IV2SessionManager>(_ => new FileV2SessionManager(new V2SessionTokenService(Convert.FromBase64String(sessionKeyText)), sessionStorePath));
     else
         builder.Services.AddSingleton<IV2SessionManager, V2SessionManager>();
-    var projectionPath = builder.Configuration["DigitalBrain:V2:ProjectionStorePath"];
     if (!string.IsNullOrWhiteSpace(projectionPath))
     {
         builder.Services.AddSingleton<FileV2ProjectionQueryStore>(_ => new FileV2ProjectionQueryStore(projectionPath));
