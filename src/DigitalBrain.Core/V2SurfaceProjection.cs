@@ -51,6 +51,24 @@ public sealed class V2WorkspaceSurfaceProducer(IV2PrivateFeedStore feed, V2Actio
         }
     }
 
+    /// <summary>Publishes a workspace-visible, V2-native INO result without traversing any legacy gateway or feed.</summary>
+    public V2StoredSurfaceRecord PublishInoResult(RequestContext context, string operationId, string summary)
+    {
+        lock (Gate(context, V2SurfaceAudienceKind.Workspace))
+        {
+            using var mutation = actions.EnterSurfaceMutation();
+            var audienceKind = V2SurfaceAudienceKind.Workspace;
+            var revision = checked((feed.LatestRevision(context, audienceKind, HomeSurfaceId) ?? 0) + 1);
+            var now = DateTimeOffset.UtcNow;
+            var payload = BuildPayload(revision, audienceKind, summary);
+            var record = feed.Append(context, audienceKind, HomeSurfaceId, revision, V2SurfaceContentHash.Compute(payload, []), now,
+                now.Add(V2UiProtocol.SurfaceLifetime), context.CorrelationId, "ino-operation", operationId, RequiredCapabilities, payload, []);
+            feed.RetainFrom(context, audienceKind, record.Sequence);
+            actions.NoteCurrentRevision(context, record.Audience, record.SurfaceId, record.Revision);
+            return record;
+        }
+    }
+
     private V2StoredSurfaceRecord PublishRefreshCore(
         RequestContext context,
         string causeId,
@@ -117,7 +135,7 @@ public sealed class V2WorkspaceSurfaceProducer(IV2PrivateFeedStore feed, V2Actio
             AudiencePrincipalKind: audienceKind == V2SurfaceAudienceKind.Principal ? context.Principal.Kind : null);
     }
 
-    private static JsonElement BuildPayload(int revision, V2SurfaceAudienceKind audienceKind)
+    private static JsonElement BuildPayload(int revision, V2SurfaceAudienceKind audienceKind, string? inoSummary = null)
     {
         var children = new List<object>
         {
@@ -144,6 +162,8 @@ public sealed class V2WorkspaceSurfaceProducer(IV2PrivateFeedStore feed, V2Actio
                 }
             });
         }
+        if (!string.IsNullOrWhiteSpace(inoSummary))
+            children.Add(new Dictionary<string, object?> { ["Type"] = "text", ["Props"] = new Dictionary<string, object?> { ["text"] = inoSummary } });
 
         return JsonSerializer.SerializeToElement(new
         {

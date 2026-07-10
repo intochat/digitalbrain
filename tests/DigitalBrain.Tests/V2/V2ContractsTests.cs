@@ -6,11 +6,28 @@ using V2RequestContext = DigitalBrain.Core.V2.RequestContext;
 using DigitalBrain.Kernel.V2;
 using Orleans;
 using V2McpEffectCommandHandler = McpProject::DigitalBrain.Mcp.V2McpEffectCommandHandler;
+using V2McpInoCommandHandler = McpProject::DigitalBrain.Mcp.V2McpInoCommandHandler;
+using V2InoEffectStore = McpProject::DigitalBrain.Mcp.V2InoEffectStore;
 
 namespace DigitalBrain.Tests.V2;
 
 public sealed class V2ContractsTests
 {
+    [Fact]
+    public async Task V2_ino_command_is_identity_free_durable_and_projects_a_workspace_surface()
+    {
+        var context = new V2RequestContext(new("tenant-a"), new("workspace-a"), new("user-a", PrincipalKind.User), "session", AuthAssurance.Password, "corr", "same-retry", new HashSet<string> { "brain.act" });
+        var other = context with { WorkspaceId = new("workspace-b"), Principal = new("user-b", PrincipalKind.User) };
+        var feed = new V2PrivateFeedStore(); var effects = new V2InoEffectStore();
+        var handler = new V2McpInoCommandHandler(effects, new V2WorkspaceSurfaceProducer(feed, new V2ActionExecutor(feed)));
+        var result = await handler.ExecuteAsync(new V2CommandEnvelope("ino.interact", 2, "ino-command", context, JsonSerializer.SerializeToElement(new { prompt = "Summarize my workspace" })));
+        Assert.Equal(WorkflowState.Succeeded, result.State);
+        Assert.Single(effects.Read(context));
+        Assert.Single(feed.CatchUp(context, V2SurfaceAudienceKind.Workspace, 0).Items);
+        Assert.Empty(feed.CatchUp(other, V2SurfaceAudienceKind.Workspace, 0).Items);
+        Assert.False(V2McpInoCommandHandler.TryGetPrompt(JsonSerializer.SerializeToElement(new { prompt = "x", workspaceId = "forged" }), out _));
+    }
+
     [Fact]
     public async Task Mcp_effect_handler_rejects_cross_workspace_aggregate()
     {

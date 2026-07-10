@@ -57,6 +57,11 @@ if (UseHttpTransport())
     // V2 composition and an empty handler set fails closed to ManualIntervention.
     builder.Services.AddSingleton<IV2CommandHandler, V2McpEffectCommandHandler>();
     builder.Services.AddSingleton<IV2EffectWorkerPort, OrleansClientV2EffectWorkerPort>();
+    var inoEffectStorePath = builder.Configuration["DigitalBrain:V2:InoEffectStorePath"];
+    if (string.IsNullOrWhiteSpace(inoEffectStorePath) && !string.IsNullOrWhiteSpace(operationStorePath)) inoEffectStorePath = operationStorePath + ".ino-effects";
+    if (profile == V2RuntimeProfile.Production && string.IsNullOrWhiteSpace(inoEffectStorePath)) throw new InvalidOperationException("Production V2 requires a durable INO effect store.");
+    builder.Services.AddSingleton(new V2InoEffectStore(inoEffectStorePath));
+    builder.Services.AddSingleton<IV2CommandHandler, V2McpInoCommandHandler>();
     builder.Services.AddSingleton<V2CommandDispatcher>();
     builder.Services.AddHostedService<V2CommandExecutionWorker>();
     var sessionKeyText = builder.Configuration["DigitalBrain:Auth:SessionSigningKey"] ?? Environment.GetEnvironmentVariable("DigitalBrain__Auth__SessionSigningKey");
@@ -128,6 +133,20 @@ if (UseHttpTransport())
     {
         if (!TryGetV2Context(context, out var principal)) return Results.Unauthorized();
         return Results.Ok(await store.TimelineAsync(principal, context.Request.Query["cursor"], ParseLimit(context), context.RequestAborted));
+    });
+    app.MapGet("/v2/ino/effects", (HttpContext context, V2InoEffectStore effects) =>
+    {
+        if (!TryGetV2Context(context, out var principal)) return Results.Unauthorized();
+        return Results.Ok(effects.Read(principal));
+    });
+    app.MapPost("/v2/ino/commands", async (HttpContext context, V2ApplicationService service, JsonElement body) =>
+    {
+        if (!TryGetV2Context(context, out var principal)) return Results.Unauthorized();
+        if (!V2McpInoCommandHandler.TryGetPrompt(body, out _)) return Results.BadRequest(new V2McpError("invalid_ino_command", "INO commands accept only a prompt.", principal.CorrelationId));
+        var commandId = context.Request.Headers["Idempotency-Key"].ToString();
+        if (string.IsNullOrWhiteSpace(commandId) || commandId.Length > 256) return Results.BadRequest(new V2McpError("invalid_idempotency", "Idempotency-Key is required.", principal.CorrelationId));
+        var operation = await service.SubmitAsync(principal, new V2CommandEnvelope(V2McpInoCommandHandler.CommandType, 2, commandId, principal, body.Clone()), context.RequestAborted);
+        return Results.Accepted($"/v2/operations/{operation.OperationId}", operation);
     });
     app.MapGet("/v2/workflows", async (HttpContext context, IV2ProjectionQueryPort store) =>
     {
