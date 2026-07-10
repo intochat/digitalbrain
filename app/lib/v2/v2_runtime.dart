@@ -513,6 +513,10 @@ class V2RuntimeController extends ChangeNotifier {
   bool get hasSurface => latestSurface != null;
   int get scopeEpoch => _scopeEpoch;
 
+  bool canSubmitActionsFrom(SurfaceEnvelope surface) =>
+      status == V2RuntimeStatus.streaming &&
+      identical(feed.surface(surface.surfaceId), surface);
+
   Future<void> start({String? bootstrapSecret}) async {
     if (_loop != null || status == V2RuntimeStatus.authenticating) return;
     _stopRequested = false;
@@ -617,10 +621,10 @@ class V2RuntimeController extends ChangeNotifier {
             lastReset = result;
             // after_sequence=0 can legitimately replay ordinary 1..N events
             // when the server still retains the complete history. Clear both
-            // sequence and rendered state so that replay converges and no
-            // stale action remains clickable.
+            // sequence/action state so replay converges. Keep the last
+            // rendered surface in the same authenticated scope so a chat
+            // draft, focus, and scroll position survive the snapshot repair.
             feed.reset();
-            latestSurface = null;
             _forceSnapshot = true;
             reconnectImmediately = true;
             _notifyListeners();

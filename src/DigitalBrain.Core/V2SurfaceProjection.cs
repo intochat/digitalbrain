@@ -14,32 +14,43 @@ public static class V2UiProtocol
     public static readonly TimeSpan SurfaceLifetime = TimeSpan.FromHours(24);
 }
 
-/// <summary>Creates the real initial workspace surface and projects refresh actions into new revisions.</summary>
-public sealed class V2WorkspaceSurfaceProducer(IV2PrivateFeedStore feed, V2ActionExecutor actions)
+/// <summary>Projects the principal-private INO conversation into the stable authenticated surface slot.</summary>
+public sealed class V2WorkspaceSurfaceProducer(
+    IV2PrivateFeedStore feed,
+    V2ActionExecutor actions,
+    IV2InoConversationStore? conversations = null)
 {
+    public const int InoPayloadBudgetBytes = V2PrivateFeedStore.MaximumSurfacePayloadBytes - (2 * 1024);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<SurfaceScopeKey, object> _scopeGates = new();
     public const string HomeSurfaceId = "workspace-home";
-    public const string RefreshBindingId = "workspace.refresh";
-    public const string RefreshActionType = "ui.surface.refresh";
+    public const string InoBindingId = "ino.send";
+    public const string InoActionType = "ino.interact";
+    public const string InoInputSchema = "digitalbrain.ino.prompt-input.v1";
 
     public V2StoredSurfaceRecord EnsureInitial(RequestContext context, V2SurfaceAudienceKind audienceKind = V2SurfaceAudienceKind.Principal)
     {
         lock (Gate(context, audienceKind))
         {
             using var mutation = actions.EnterSurfaceMutation();
+            var conversation = Conversation(context);
             var record = feed.EnsureInitial(context, audienceKind, HomeSurfaceId,
-                sequence => CreateRecord(context, audienceKind, sequence, revision: 1, "surface", "workspace-bootstrap"));
+                sequence => CreateRecord(context, audienceKind, sequence, revision: 1, "surface", "workspace-bootstrap", conversation));
             if ((record.ExpiresAt is { } surfaceExpiry && surfaceExpiry <= DateTimeOffset.UtcNow) ||
-                (record.Actions.Count > 0 && record.Actions.All(static action => action.ExpiresAt <= DateTimeOffset.UtcNow)))
+                (record.Actions.Count > 0 && record.Actions.All(static action => action.ExpiresAt <= DateTimeOffset.UtcNow)) ||
+                (audienceKind == V2SurfaceAudienceKind.Principal &&
+                 !string.Equals(record.Payload.GetRawText(), BuildInoPayload(conversation).GetRawText(), StringComparison.Ordinal)))
             {
-                record = PublishRefreshCore(context, "surface-policy-renewal", audienceKind);
+                record = audienceKind == V2SurfaceAudienceKind.Principal
+                    ? PublishInoConversationCore(context, conversation, "conversation-restore")
+                    : PublishWorkspaceOverviewCore(context, "surface-policy-renewal", audienceKind);
+                feed.RetainFrom(context, audienceKind, record.Sequence);
             }
             actions.NoteCurrentRevision(context, record.Audience, record.SurfaceId, record.Revision);
             return record;
         }
     }
 
-    public V2StoredSurfaceRecord PublishRefresh(
+    public V2StoredSurfaceRecord Republish(
         RequestContext context,
         string causeId,
         V2SurfaceAudienceKind audienceKind = V2SurfaceAudienceKind.Principal)
@@ -47,37 +58,34 @@ public sealed class V2WorkspaceSurfaceProducer(IV2PrivateFeedStore feed, V2Actio
         lock (Gate(context, audienceKind))
         {
             using var mutation = actions.EnterSurfaceMutation();
-            return PublishRefreshCore(context, causeId, audienceKind);
+            return PublishWorkspaceOverviewCore(context, causeId, audienceKind);
         }
     }
 
-    /// <summary>Publishes a workspace-visible, V2-native INO result without traversing any legacy gateway or feed.</summary>
-    public V2StoredSurfaceRecord PublishInoResult(RequestContext context, string operationId, string summary)
+    public V2StoredSurfaceRecord PublishInoConversation(
+        RequestContext context,
+        V2InoConversationSnapshot conversation)
     {
-        lock (Gate(context, V2SurfaceAudienceKind.Workspace))
+        if (!string.Equals(conversation.ConversationId, V2InoConversationIdentity.From(context), StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("The conversation projection is outside the authenticated scope.");
+        lock (Gate(context, V2SurfaceAudienceKind.Principal))
         {
             using var mutation = actions.EnterSurfaceMutation();
-            var audienceKind = V2SurfaceAudienceKind.Workspace;
-            var revision = checked((feed.LatestRevision(context, audienceKind, HomeSurfaceId) ?? 0) + 1);
-            var now = DateTimeOffset.UtcNow;
-            var payload = BuildPayload(revision, audienceKind, summary);
-            var record = feed.Append(context, audienceKind, HomeSurfaceId, revision, V2SurfaceContentHash.Compute(payload, []), now,
-                now.Add(V2UiProtocol.SurfaceLifetime), context.CorrelationId, "ino-operation", operationId, RequiredCapabilities, payload, []);
-            feed.RetainFrom(context, audienceKind, record.Sequence);
-            actions.NoteCurrentRevision(context, record.Audience, record.SurfaceId, record.Revision);
-            return record;
+            return PublishInoConversationCore(context, conversation, "ino-conversation");
         }
     }
 
-    private V2StoredSurfaceRecord PublishRefreshCore(
+    private V2StoredSurfaceRecord PublishWorkspaceOverviewCore(
         RequestContext context,
         string causeId,
         V2SurfaceAudienceKind audienceKind)
     {
+        if (audienceKind == V2SurfaceAudienceKind.Principal)
+            return PublishInoConversationCore(context, Conversation(context), causeId);
         var revision = checked((feed.LatestRevision(context, audienceKind, HomeSurfaceId) ?? 0) + 1);
         var now = DateTimeOffset.UtcNow;
-        var payload = BuildPayload(revision, audienceKind);
-        var descriptors = BuildActions(now, audienceKind);
+        var payload = BuildWorkspacePayload();
+        IReadOnlyList<V2StoredActionBinding> descriptors = [];
         var contentHash = V2SurfaceContentHash.Compute(payload, descriptors);
         var record = feed.Append(
             context,
@@ -90,10 +98,40 @@ public sealed class V2WorkspaceSurfaceProducer(IV2PrivateFeedStore feed, V2Actio
             context.CorrelationId,
             "command",
             causeId,
-            RequiredCapabilities,
+            WorkspaceRequiredCapabilities,
             payload,
             descriptors);
         feed.RetainFrom(context, audienceKind, record.Sequence);
+        actions.NoteCurrentRevision(context, record.Audience, record.SurfaceId, record.Revision);
+        return record;
+    }
+
+    private V2StoredSurfaceRecord PublishInoConversationCore(
+        RequestContext context,
+        V2InoConversationSnapshot conversation,
+        string causeId)
+    {
+        var audienceKind = V2SurfaceAudienceKind.Principal;
+        var revision = checked((feed.LatestRevision(context, audienceKind, HomeSurfaceId) ?? 0) + 1);
+        var now = DateTimeOffset.UtcNow;
+        var payload = BuildInoPayload(conversation);
+        var descriptors = BuildInoActions(now, conversation);
+        var record = feed.Append(
+            context,
+            audienceKind,
+            HomeSurfaceId,
+            revision,
+            V2SurfaceContentHash.Compute(payload, descriptors),
+            now,
+            now.Add(V2UiProtocol.SurfaceLifetime),
+            context.CorrelationId,
+            "command",
+            causeId,
+            InoRequiredCapabilities,
+            payload,
+            descriptors);
+        // Keep the complete ordered lifecycle even when model execution finishes before the client pulls.
+        feed.RetainFrom(context, audienceKind, Math.Max(1, record.Sequence - 3));
         actions.NoteCurrentRevision(context, record.Audience, record.SurfaceId, record.Revision);
         return record;
     }
@@ -111,11 +149,16 @@ public sealed class V2WorkspaceSurfaceProducer(IV2PrivateFeedStore feed, V2Actio
         long sequence,
         int revision,
         string causeKind,
-        string causeId)
+        string causeId,
+        V2InoConversationSnapshot conversation)
     {
         var now = DateTimeOffset.UtcNow;
-        var payload = BuildPayload(revision, audienceKind);
-        var descriptors = BuildActions(now, audienceKind);
+        var payload = audienceKind == V2SurfaceAudienceKind.Principal
+            ? BuildInoPayload(conversation)
+            : BuildWorkspacePayload();
+        var descriptors = audienceKind == V2SurfaceAudienceKind.Principal
+            ? BuildInoActions(now, conversation)
+            : [];
         return new(
             sequence,
             context.TenantId,
@@ -129,71 +172,71 @@ public sealed class V2WorkspaceSurfaceProducer(IV2PrivateFeedStore feed, V2Actio
             context.CorrelationId,
             causeKind,
             causeId,
-            RequiredCapabilities,
+            audienceKind == V2SurfaceAudienceKind.Principal ? InoRequiredCapabilities : WorkspaceRequiredCapabilities,
             payload,
             descriptors,
             AudiencePrincipalKind: audienceKind == V2SurfaceAudienceKind.Principal ? context.Principal.Kind : null);
     }
 
-    private static JsonElement BuildPayload(int revision, V2SurfaceAudienceKind audienceKind, string? inoSummary = null)
+    public static JsonElement BuildInoPayload(V2InoConversationSnapshot conversation)
     {
-        var children = new List<object>
-        {
-            new Dictionary<string, object?>
+        var current = conversation.CurrentOperation;
+        Dictionary<string, object?>? operation = current is null
+            ? null
+            : new Dictionary<string, object?>
             {
-                ["Type"] = "text",
-                ["Props"] = new Dictionary<string, object?>
-                {
-                    ["text"] = revision == 1
-                        ? "Your private V2 workspace feed is connected."
-                        : "Workspace surface refreshed successfully."
-                }
-            }
-        };
-        if (audienceKind == V2SurfaceAudienceKind.Principal)
-        {
-            children.Add(new Dictionary<string, object?>
-            {
-                ["Type"] = "forui:fbutton",
-                ["Props"] = new Dictionary<string, object?>
-                {
-                    ["label"] = "Refresh workspace",
-                    ["actionBindingId"] = RefreshBindingId
-                }
-            });
-        }
-        if (!string.IsNullOrWhiteSpace(inoSummary))
-            children.Add(new Dictionary<string, object?> { ["Type"] = "text", ["Props"] = new Dictionary<string, object?> { ["text"] = inoSummary } });
+                ["state"] = current.State,
+                ["retryable"] = current.Retryable
+            };
+        if (operation is not null && !string.IsNullOrWhiteSpace(current!.SafeReason))
+            operation["safeReason"] = current.SafeReason;
 
         return JsonSerializer.SerializeToElement(new
         {
-            kind = "widgetTree",
-            tree = new Dictionary<string, object?>
+            kind = "native",
+            nativeKind = "inoConversation",
+            data = new
             {
-                ["Type"] = "forui:fcard",
-                ["Props"] = new Dictionary<string, object?>
+                intro = "Ask INO about this workspace. I can help you understand what’s here and decide what to do next.",
+                messages = conversation.Turns.Select(static turn => new
                 {
-                    ["title"] = "DigitalBrain Runtime V2",
-                    ["subtitle"] = "Authenticated workspace surface"
-                },
-                ["Children"] = children
-            },
-            data = new Dictionary<string, object?>
-            {
-                ["kind"] = "v2-workspace-home",
-                ["status"] = "ready",
-                ["revision"] = revision
+                    turnKey = BuildTurnKey(turn),
+                    role = turn.Role,
+                    text = turn.Text,
+                    state = turn.State
+                }).ToArray(),
+                operation
             }
         });
     }
 
-    private static IReadOnlyList<V2StoredActionBinding> BuildActions(DateTimeOffset now, V2SurfaceAudienceKind audienceKind) =>
-        audienceKind == V2SurfaceAudienceKind.Principal
-            ? [new(RefreshBindingId, RefreshActionType, "digitalbrain.ui.refresh-input.v1", "ui.action", 1, now.Add(V2UiProtocol.SurfaceLifetime))]
-            : [];
+    private static string BuildTurnKey(V2InoConversationTurn turn)
+    {
+        var source = Encoding.UTF8.GetBytes(turn.CommandId + "\0" + turn.Role);
+        var hash = Convert.ToHexString(SHA256.HashData(source)).ToLowerInvariant();
+        return "turn-" + hash[..24];
+    }
 
-    private static readonly string[] RequiredCapabilities =
-        ["ui.protocol.v2", "ui.payload.widgetTree", "ui.widget-vocabulary.v2", "ui.native.typed-actions"];
+    private static JsonElement BuildWorkspacePayload() => JsonSerializer.SerializeToElement(new
+    {
+        kind = "native",
+        nativeKind = "workspaceOverview",
+        data = new { intro = "Your workspace is ready." }
+    });
+
+    private static IReadOnlyList<V2StoredActionBinding> BuildInoActions(
+        DateTimeOffset now,
+        V2InoConversationSnapshot conversation) =>
+        conversation.CurrentOperation is { } operation && V2InoConversationStates.IsActive(operation.State)
+            ? []
+            : [new(InoBindingId, InoActionType, InoInputSchema, "ui.action", 1, now.Add(V2UiProtocol.SurfaceLifetime))];
+
+    private V2InoConversationSnapshot Conversation(RequestContext context) =>
+        conversations?.Read(context) ?? V2InoConversationSnapshot.Empty(context);
+
+    private static readonly string[] InoRequiredCapabilities =
+        ["ui.protocol.v2", "ui.payload.native", "ui.native.ino-conversation", "ui.native.typed-actions"];
+    private static readonly string[] WorkspaceRequiredCapabilities = ["ui.protocol.v2", "ui.payload.native"];
 
     private readonly record struct SurfaceScopeKey(
         TenantId Tenant,
@@ -313,17 +356,4 @@ public sealed class V2SurfaceCapabilityException(IReadOnlyList<string> missing)
     : InvalidOperationException("The V2 client does not support required surface capabilities.")
 {
     public IReadOnlyList<string> Missing { get; } = missing;
-}
-
-/// <summary>The only live UI command: a narrowly-bound refresh projection, not arbitrary brain.act admission.</summary>
-public sealed class V2SurfaceRefreshCommandHandler(V2WorkspaceSurfaceProducer producer) : IV2CommandHandler
-{
-    public bool CanHandle(string commandType) => string.Equals(commandType, V2WorkspaceSurfaceProducer.RefreshActionType, StringComparison.Ordinal);
-
-    public Task<V2CommandExecutionResult> ExecuteAsync(V2CommandEnvelope command, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        producer.PublishRefresh(command.Context, command.CommandId);
-        return Task.FromResult(V2CommandExecutionResult.Success());
-    }
 }

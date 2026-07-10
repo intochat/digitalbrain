@@ -35,8 +35,9 @@ namespace DigitalBrain.Tests.V2;
 
 public sealed class V2UiTransportTests
 {
+    private const string PromptInputJson = "{\"prompt\":\"What can you help me with in this workspace?\"}";
     private static readonly string[] Capabilities =
-        ["ui.protocol.v2", "ui.payload.widgetTree", "ui.widget-vocabulary.v2", "ui.native.typed-actions"];
+        ["ui.protocol.v2", "ui.payload.widgetTree", "ui.widget-vocabulary.v2", "ui.payload.native", "ui.native.ino-conversation", "ui.native.typed-actions"];
 
     [Fact]
     public void Signed_sessions_preserve_grants_and_require_the_exact_transport_audience()
@@ -94,10 +95,10 @@ public sealed class V2UiTransportTests
         Assert.Empty(workspaceEnvelope.RootElement.GetProperty("actions").EnumerateArray());
         Assert.DoesNotContain("actionBindingId", workspaceEnvelope.RootElement.GetProperty("payload").GetRawText(), StringComparison.Ordinal);
         var principalToken = ActionToken(writer.Write(first, principal, Capabilities.ToHashSet(StringComparer.Ordinal)));
-        producer.PublishRefresh(first, "workspace-only", V2SurfaceAudienceKind.Workspace);
-        Assert.Equal(V2WorkspaceSurfaceProducer.RefreshActionType,
-            actions.Use(first, V2WorkspaceSurfaceProducer.RefreshBindingId, principalToken,
-                principal.SurfaceId, principal.Revision, JsonSerializer.SerializeToElement(new { })).ActionType);
+        producer.Republish(first, "workspace-only", V2SurfaceAudienceKind.Workspace);
+        Assert.Equal(V2WorkspaceSurfaceProducer.InoActionType,
+            actions.Use(first, V2WorkspaceSurfaceProducer.InoBindingId, principalToken,
+                principal.SurfaceId, principal.Revision, PromptInput()).ActionType);
     }
 
     [Fact]
@@ -123,8 +124,8 @@ public sealed class V2UiTransportTests
             user, userRecord, Capabilities.ToHashSet(StringComparer.Ordinal)));
         Assert.Equal(V2ActionRejection.WrongOwner,
             Assert.Throws<V2ActionRejectedException>(() => actions.Use(service,
-                V2WorkspaceSurfaceProducer.RefreshBindingId, token, userRecord.SurfaceId, userRecord.Revision,
-                JsonSerializer.SerializeToElement(new { }))).Reason);
+                V2WorkspaceSurfaceProducer.InoBindingId, token, userRecord.SurfaceId, userRecord.Revision,
+                PromptInput())).Reason);
         feed.MarkDelivered(user, V2SurfaceAudienceKind.Principal, 1);
         Assert.Throws<InvalidOperationException>(() => feed.Acknowledge(service, V2SurfaceAudienceKind.Principal, 1));
     }
@@ -150,10 +151,13 @@ public sealed class V2UiTransportTests
             Assert.Equal("digitalbrain.surface", envelope.GetProperty("surfaceSchema").GetString());
             Assert.Equal(V2UiProtocol.SurfaceSchemaVersion, envelope.GetProperty("surfaceSchemaVersion").GetInt32());
             Assert.True(envelope.GetProperty("expiresAt").GetDateTimeOffset() > DateTimeOffset.UtcNow);
-            Assert.Equal("widgetTree", envelope.GetProperty("payload").GetProperty("kind").GetString());
+            Assert.Equal("native", envelope.GetProperty("payload").GetProperty("kind").GetString());
+            Assert.Equal("inoConversation", envelope.GetProperty("payload").GetProperty("nativeKind").GetString());
             Assert.Matches("^[a-f0-9]{64}$", envelope.GetProperty("contentHash").GetString()!);
             var actionToken = envelope.GetProperty("actions")[0].GetProperty("actionToken").GetString()!;
             Assert.NotEmpty(actionToken);
+            Assert.Equal(V2WorkspaceSurfaceProducer.InoBindingId,
+                envelope.GetProperty("actions")[0].GetProperty("bindingId").GetString());
             var payloadText = envelope.GetProperty("payload").GetRawText();
             Assert.DoesNotContain("actionToken", payloadText, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("accessToken", payloadText, StringComparison.OrdinalIgnoreCase);
@@ -410,8 +414,8 @@ public sealed class V2UiTransportTests
         var context = Context("tenant", "workspace", "principal");
         var payload = JsonSerializer.SerializeToElement(new { kind = "widgetTree", tree = new { Type = "text" }, data = new { } });
         V2StoredActionBinding[] expiredActions =
-            [new(V2WorkspaceSurfaceProducer.RefreshBindingId, V2WorkspaceSurfaceProducer.RefreshActionType,
-                "digitalbrain.ui.refresh-input.v1", "ui.action", 1, DateTimeOffset.UtcNow.AddDays(-1))];
+            [new(V2WorkspaceSurfaceProducer.InoBindingId, V2WorkspaceSurfaceProducer.InoActionType,
+                V2WorkspaceSurfaceProducer.InoInputSchema, "ui.action", 1, DateTimeOffset.UtcNow.AddDays(-1))];
         store.Append(context, V2SurfaceAudienceKind.Principal, V2WorkspaceSurfaceProducer.HomeSurfaceId, 1,
             V2SurfaceContentHash.Compute(payload, expiredActions), DateTimeOffset.UtcNow.AddDays(-2), DateTimeOffset.UtcNow.AddDays(-1),
             "correlation", "surface", "bootstrap", [], payload, expiredActions);
@@ -436,32 +440,32 @@ public sealed class V2UiTransportTests
         var record = producer.EnsureInitial(context);
         var writer = new V2SurfaceEnvelopeWriter(actions);
         var token = ActionToken(writer.Write(context, record, Capabilities.ToHashSet(StringComparer.Ordinal)));
-        var input = JsonSerializer.SerializeToElement(new { });
+        var input = PromptInput();
 
         Assert.Equal(V2ActionRejection.Forged,
-            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.RefreshBindingId, "forged", record.SurfaceId, record.Revision, input)).Reason);
+            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.InoBindingId, "forged", record.SurfaceId, record.Revision, input)).Reason);
         Assert.Equal(V2ActionRejection.WrongWorkspace,
-            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context with { WorkspaceId = new("other") }, V2WorkspaceSurfaceProducer.RefreshBindingId, token, record.SurfaceId, record.Revision, input)).Reason);
+            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context with { WorkspaceId = new("other") }, V2WorkspaceSurfaceProducer.InoBindingId, token, record.SurfaceId, record.Revision, input)).Reason);
         Assert.Equal(V2ActionRejection.WrongOwner,
-            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context with { Principal = new("other", PrincipalKind.User) }, V2WorkspaceSurfaceProducer.RefreshBindingId, token, record.SurfaceId, record.Revision, input)).Reason);
+            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context with { Principal = new("other", PrincipalKind.User) }, V2WorkspaceSurfaceProducer.InoBindingId, token, record.SurfaceId, record.Revision, input)).Reason);
         Assert.Equal(V2ActionRejection.WrongRevision,
-            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.RefreshBindingId, token, record.SurfaceId, record.Revision + 1, input)).Reason);
+            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.InoBindingId, token, record.SurfaceId, record.Revision + 1, input)).Reason);
         Assert.Equal(V2ActionRejection.PolicyDenied,
-            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context with { Grants = new HashSet<string> { "brain.read" } }, V2WorkspaceSurfaceProducer.RefreshBindingId, token, record.SurfaceId, record.Revision, input)).Reason);
+            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context with { Grants = new HashSet<string> { "brain.read" } }, V2WorkspaceSurfaceProducer.InoBindingId, token, record.SurfaceId, record.Revision, input)).Reason);
         Assert.Equal(V2ActionRejection.PolicyDenied,
-            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.RefreshBindingId, token,
+            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.InoBindingId, token,
                 record.SurfaceId, record.Revision, JsonSerializer.SerializeToElement(new { unexpected = true }))).Reason);
 
-        Assert.Equal(V2WorkspaceSurfaceProducer.RefreshActionType,
-            actions.Use(context, V2WorkspaceSurfaceProducer.RefreshBindingId, token, record.SurfaceId, record.Revision, input).ActionType);
+        Assert.Equal(V2WorkspaceSurfaceProducer.InoActionType,
+            actions.Use(context, V2WorkspaceSurfaceProducer.InoBindingId, token, record.SurfaceId, record.Revision, input).ActionType);
         Assert.Equal(V2ActionRejection.Replay,
-            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.RefreshBindingId, token, record.SurfaceId, record.Revision, input)).Reason);
+            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.InoBindingId, token, record.SurfaceId, record.Revision, input)).Reason);
 
-        var second = producer.PublishRefresh(context, "command");
+        var second = producer.Republish(context, "command");
         var secondToken = ActionToken(writer.Write(context, second, Capabilities.ToHashSet(StringComparer.Ordinal)));
-        producer.PublishRefresh(context, "newer-command");
+        producer.Republish(context, "newer-command");
         Assert.Equal(V2ActionRejection.WrongRevision,
-            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.RefreshBindingId, secondToken, second.SurfaceId, second.Revision, input)).Reason);
+            Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, V2WorkspaceSurfaceProducer.InoBindingId, secondToken, second.SurfaceId, second.Revision, input)).Reason);
 
         var expiredBinding = record.Actions[0] with { ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(-1) };
         Assert.Equal(V2ActionRejection.Expired,
@@ -478,8 +482,8 @@ public sealed class V2UiTransportTests
         var record = producer.EnsureInitial(context);
         var firstToken = ActionToken(new V2SurfaceEnvelopeWriter(firstActions).Write(
             context, record, Capabilities.ToHashSet(StringComparer.Ordinal)));
-        var firstUse = firstActions.Use(context, V2WorkspaceSurfaceProducer.RefreshBindingId, firstToken,
-            record.SurfaceId, record.Revision, JsonSerializer.SerializeToElement(new { }));
+        var firstUse = firstActions.Use(context, V2WorkspaceSurfaceProducer.InoBindingId, firstToken,
+            record.SurfaceId, record.Revision, PromptInput());
         var commandContext = context with
         {
             IdempotencyKey = firstUse.IdempotencyKey,
@@ -492,15 +496,15 @@ public sealed class V2UiTransportTests
         var restartedActions = new V2ActionExecutor(feed);
         var restartedToken = ActionToken(new V2SurfaceEnvelopeWriter(restartedActions).Write(
             context, record, Capabilities.ToHashSet(StringComparer.Ordinal)));
-        var restartedUse = restartedActions.Use(context, V2WorkspaceSurfaceProducer.RefreshBindingId, restartedToken,
-            record.SurfaceId, record.Revision, JsonSerializer.SerializeToElement(new { }));
+        var restartedUse = restartedActions.Use(context, V2WorkspaceSurfaceProducer.InoBindingId, restartedToken,
+            record.SurfaceId, record.Revision, PromptInput());
         var restartedContext = commandContext with { IdempotencyKey = restartedUse.IdempotencyKey };
         var duplicateOperation = await application.SubmitAsync(restartedContext,
             new V2CommandEnvelope(restartedUse.ActionType, 2, "after-restart", restartedContext, restartedUse.Input));
 
         Assert.Equal(firstUse.IdempotencyKey, restartedUse.IdempotencyKey);
         Assert.Equal(firstOperation.OperationId, duplicateOperation.OperationId);
-        var dispatcher = new V2CommandDispatcher(application, [new V2SurfaceRefreshCommandHandler(producer)]);
+        var dispatcher = new V2CommandDispatcher(application, [new ProjectingInoTestHandler(producer)]);
         Assert.True(await dispatcher.DispatchAsync(firstOperation.OperationId));
         Assert.False(await dispatcher.DispatchAsync(duplicateOperation.OperationId));
         Assert.Equal(2, feed.LatestRevision(context, V2SurfaceAudienceKind.Principal, record.SurfaceId));
@@ -520,7 +524,7 @@ public sealed class V2UiTransportTests
 
         Assert.Equal(V2ActionRejection.Expired,
             Assert.Throws<V2ActionRejectedException>(() => actions.Use(context, issued.BindingId, issued.Token,
-                record.SurfaceId, record.Revision, JsonSerializer.SerializeToElement(new { }))).Reason);
+                record.SurfaceId, record.Revision, PromptInput())).Reason);
     }
 
     [Fact]
@@ -582,7 +586,7 @@ public sealed class V2UiTransportTests
             ActionToken = action.GetProperty("actionToken").GetString()!,
             SurfaceId = action.GetProperty("surfaceId").GetString()!,
             SurfaceRevision = action.GetProperty("surfaceRevision").GetInt32(),
-            InputJson = "{}"
+            InputJson = PromptInputJson
         };
         var authContext = TestServerCallContext.WithHeaders(
             ("x-v2-audience", V2SessionAudiences.Ui), ("x-v2-session", session.AccessToken));
@@ -594,12 +598,12 @@ public sealed class V2UiTransportTests
         Assert.StartsWith("v2-op-", accepted.OperationId);
 
         var dispatcher = new V2CommandDispatcher(fixture.Application,
-            [new V2SurfaceRefreshCommandHandler(fixture.Producer)]);
+            [new ProjectingInoTestHandler(fixture.Producer)]);
         Assert.True(await dispatcher.DispatchAsync(accepted.OperationId));
         Assert.True(fixture.Tokens.TryValidate(session.AccessToken, V2SessionAudiences.Ui, out var authenticated));
         var projected = fixture.Feed.CatchUp(authenticated, V2SurfaceAudienceKind.Principal, 0);
-        Assert.True(projected.ResetRequired);
-        Assert.Equal(2, Assert.Single(projected.Items).Revision);
+        Assert.False(projected.ResetRequired);
+        Assert.Equal(2, projected.Items[^1].Revision);
 
         var replay = await fixture.Service.SubmitAction(actionRequest, authContext);
         Assert.Equal(accepted.OperationId, replay.OperationId);
@@ -632,7 +636,7 @@ public sealed class V2UiTransportTests
             ActionToken = action.GetProperty("actionToken").GetString()!,
             SurfaceId = record.SurfaceId,
             SurfaceRevision = record.Revision,
-            InputJson = "{}"
+            InputJson = PromptInputJson
         };
 
         await Assert.ThrowsAsync<IOException>(() => fixture.Service.SubmitAction(request, AuthContext(session.AccessToken)));
@@ -670,12 +674,12 @@ public sealed class V2UiTransportTests
             ActionToken = action.GetProperty("actionToken").GetString()!,
             SurfaceId = record.SurfaceId,
             SurfaceRevision = record.Revision,
-            InputJson = "{}"
+            InputJson = PromptInputJson
         };
 
         var submit = Task.Run(() => fixture.Service.SubmitAction(request, AuthContext(session.AccessToken)));
         Assert.True(appendEntered.Wait(TimeSpan.FromSeconds(3)));
-        var publish = Task.Run(() => fixture.Producer.PublishRefresh(authenticated, "concurrent-revision"));
+        var publish = Task.Run(() => fixture.Producer.Republish(authenticated, "concurrent-revision"));
         Assert.NotSame(publish, await Task.WhenAny(publish, Task.Delay(100)));
         allowAppend.Set();
 
@@ -701,7 +705,7 @@ public sealed class V2UiTransportTests
         await WaitForMessages(leaseWriter, 1);
         var leaseError = await Assert.ThrowsAsync<RpcException>(async () => await leaseTask.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(StatusCode.Unauthenticated, leaseError.StatusCode);
-        leaseFixture.Producer.PublishRefresh(leaseContext, "after-expiry");
+        leaseFixture.Producer.Republish(leaseContext, "after-expiry");
         Assert.Single(leaseWriter.Messages);
 
         var revokedFixture = CreateService(new UiDeliveryOptions(TimeSpan.FromMinutes(4), TimeSpan.FromMilliseconds(25)));
@@ -712,7 +716,7 @@ public sealed class V2UiTransportTests
         var revokedTask = revokedFixture.Service.WatchSurfaceFeed(FeedRequest(), revokedWriter, AuthContext(revokedSession.AccessToken));
         await WaitForMessages(revokedWriter, 1);
         Assert.True(revokedFixture.Sessions.Revoke(revokedSession.RefreshToken, V2SessionAudiences.Ui));
-        revokedFixture.Producer.PublishRefresh(revokedContext, "after-logout");
+        revokedFixture.Producer.Republish(revokedContext, "after-logout");
         var revokedError = await Assert.ThrowsAsync<RpcException>(async () => await revokedTask.WaitAsync(TimeSpan.FromSeconds(2)));
         Assert.Equal(StatusCode.Unauthenticated, revokedError.StatusCode);
         Assert.Single(revokedWriter.Messages);
@@ -739,13 +743,13 @@ public sealed class V2UiTransportTests
         Assert.Equal(record.Sequence, reset.ResumeSequence);
         var freshToken = ActionToken(Assert.Single(reset.SnapshotJson));
         Assert.NotEqual(oldToken, freshToken);
-        Assert.Equal(V2WorkspaceSurfaceProducer.RefreshActionType,
-            restarted.Actions.Use(authenticated, V2WorkspaceSurfaceProducer.RefreshBindingId, freshToken,
-                record.SurfaceId, record.Revision, JsonSerializer.SerializeToElement(new { })).ActionType);
+        Assert.Equal(V2WorkspaceSurfaceProducer.InoActionType,
+            restarted.Actions.Use(authenticated, V2WorkspaceSurfaceProducer.InoBindingId, freshToken,
+                record.SurfaceId, record.Revision, PromptInput()).ActionType);
         Assert.Equal(V2ActionRejection.Forged,
             Assert.Throws<V2ActionRejectedException>(() => restarted.Actions.Use(authenticated,
-                V2WorkspaceSurfaceProducer.RefreshBindingId, oldToken, record.SurfaceId, record.Revision,
-                JsonSerializer.SerializeToElement(new { }))).Reason);
+                V2WorkspaceSurfaceProducer.InoBindingId, oldToken, record.SurfaceId, record.Revision,
+                PromptInput())).Reason);
     }
 
     [Fact]
@@ -780,8 +784,8 @@ public sealed class V2UiTransportTests
         {
             try
             {
-                fixture.Actions.Use(authenticated, V2WorkspaceSurfaceProducer.RefreshBindingId, token,
-                    V2WorkspaceSurfaceProducer.HomeSurfaceId, 1, JsonSerializer.SerializeToElement(new { }));
+                fixture.Actions.Use(authenticated, V2WorkspaceSurfaceProducer.InoBindingId, token,
+                    V2WorkspaceSurfaceProducer.HomeSurfaceId, 1, PromptInput());
                 return (V2ActionRejection?)null;
             }
             catch (V2ActionRejectedException exception)
@@ -802,8 +806,8 @@ public sealed class V2UiTransportTests
             new BootstrapSessionRequest { Secret = "bootstrap-secret" }, BootstrapContext());
         Assert.True(fixture.Tokens.TryValidate(session.AccessToken, V2SessionAudiences.Ui, out var authenticated));
         fixture.Producer.EnsureInitial(authenticated);
-        fixture.Producer.PublishRefresh(authenticated, "command-1");
-        fixture.Producer.PublishRefresh(authenticated, "command-2");
+        fixture.Producer.Republish(authenticated, "command-1");
+        fixture.Producer.Republish(authenticated, "command-2");
         fixture.Feed.RetainFrom(authenticated, V2SurfaceAudienceKind.Principal, 2);
 
         using var cancellation = new CancellationTokenSource();
@@ -986,29 +990,6 @@ public sealed class V2UiTransportTests
             string.Equals(reference.Name, "DigitalBrain.Kernel", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task Bound_refresh_command_projects_a_new_surface_revision_and_completes()
-    {
-        var feed = new V2PrivateFeedStore();
-        var producer = new V2WorkspaceSurfaceProducer(feed, new V2ActionExecutor(feed));
-        var context = Context("tenant", "workspace", "principal") with
-        {
-            Grants = new HashSet<string> { "brain.read", "brain.act" }
-        };
-        producer.EnsureInitial(context);
-        var application = new V2ApplicationService();
-        var command = new V2CommandEnvelope(V2WorkspaceSurfaceProducer.RefreshActionType, 2, "command", context,
-            JsonSerializer.SerializeToElement(new { }));
-        var operation = await application.SubmitAsync(context, command);
-        var dispatcher = new V2CommandDispatcher(application, [new V2SurfaceRefreshCommandHandler(producer)]);
-
-        Assert.True(await dispatcher.DispatchAsync(operation.OperationId));
-        Assert.Equal(WorkflowState.Succeeded, (await application.GetOperationAsync(context, operation.OperationId))!.State);
-        var page = feed.CatchUp(context, V2SurfaceAudienceKind.Principal, 0, 10);
-        Assert.True(page.ResetRequired);
-        Assert.Equal(2, Assert.Single(page.Items).Revision);
-    }
-
     private static async Task AssertUnauthenticated(UiGrpcService service, TestServerCallContext context)
     {
         var exception = await Assert.ThrowsAsync<RpcException>(() => service.AcknowledgeSurfaceFeed(
@@ -1111,6 +1092,23 @@ public sealed class V2UiTransportTests
         public WriteOptions? WriteOptions { get; set; }
         public Task WriteAsync(T message) => Task.FromException(new IOException("injected stream write failure"));
     }
+
+    private sealed class ProjectingInoTestHandler(V2WorkspaceSurfaceProducer producer) : IV2CommandHandler
+    {
+        public bool CanHandle(string commandType) =>
+            string.Equals(commandType, V2WorkspaceSurfaceProducer.InoActionType, StringComparison.Ordinal);
+
+        public Task<V2CommandExecutionResult> ExecuteAsync(
+            V2CommandEnvelope command,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            producer.Republish(command.Context, "transport-test");
+            return Task.FromResult(V2CommandExecutionResult.Success());
+        }
+    }
+
+    private static JsonElement PromptInput() => JsonDocument.Parse(PromptInputJson).RootElement.Clone();
 
     private static V2RequestContext Context(string tenant, string workspace, string principal) => new(
         new(tenant),

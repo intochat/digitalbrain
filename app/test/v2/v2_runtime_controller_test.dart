@@ -48,7 +48,7 @@ void main() {
     });
 
     test(
-      'client gap clears state and converges from an ordinary full replay',
+      'client gap preserves the visible surface and converges from a full replay',
       () async {
         final first = _FakeFeedCall.fromEvents([
           V2FeedSurfaceJson(
@@ -66,7 +66,8 @@ void main() {
         expect(transport.watchAfter, [0, 0]);
         expect(runtime.lastReset?.reason, 'sequence-gap');
         expect(runtime.feed.surfaces, isEmpty);
-        expect(runtime.latestSurface, isNull);
+        expect(runtime.latestSurface?.feedSequence, 1);
+        expect(runtime.canSubmitActionsFrom(runtime.latestSurface!), isFalse);
         second.add(V2FeedSurfaceJson(surfaceJsonString(sequence: 1)));
         second.add(
           V2FeedSurfaceJson(surfaceJsonString(sequence: 2, revision: 2)),
@@ -223,7 +224,8 @@ void main() {
         final runtime = _runtime(transport);
         final json = surfaceJsonString(
           sequence: 1,
-          actions: [testActionJson()],
+          payload: inoConversationPayload(),
+          actions: [testInoActionJson()],
         );
 
         await runtime.authenticateWithBootstrap('bootstrap-once');
@@ -231,16 +233,18 @@ void main() {
         call.add(V2FeedSurfaceJson(json));
         await _eventually(() => runtime.latestSurface != null);
         final surface = runtime.latestSurface!;
-        final result = await runtime.submitAction(
-          surface,
-          'refresh-binding',
-          const {'confirmed': true},
-          now: v2TestNow,
-        );
+        final result = await runtime.submitAction(surface, 'ino.send', const {
+          'prompt': 'What can you help me with?',
+        }, now: v2TestNow);
 
         expect(result.operationId, 'operation-a');
-        expect(transport.submittedAction?.actionToken, 'signed-action-token');
-        expect(transport.submittedInput, {'confirmed': true});
+        expect(
+          transport.submittedAction?.actionToken,
+          'signed-ino-action-token',
+        );
+        expect(transport.submittedInput, {
+          'prompt': 'What can you help me with?',
+        });
         expect(
           () => runtime.submitAction(
             surface,
@@ -253,7 +257,7 @@ void main() {
         expect(
           () => runtime.submitAction(
             surface,
-            'refresh-binding',
+            'ino.send',
             const {},
             now: DateTime.utc(2040),
           ),
@@ -273,11 +277,7 @@ void main() {
           [first, second],
           bootstrapResults: [
             testSession(),
-            testSession(
-              identity: testIdentity(
-                session: 'session-b',
-              ),
-            ),
+            testSession(identity: testIdentity(session: 'session-b')),
           ],
         );
         final runtime = _runtime(transport);
@@ -341,7 +341,15 @@ void main() {
 
         await runtime.authenticateWithBootstrap('bootstrap-once');
         await _eventually(() => runtime.status == V2RuntimeStatus.streaming);
-        first.add(V2FeedSurfaceJson(surfaceJsonString(sequence: 1)));
+        first.add(
+          V2FeedSurfaceJson(
+            surfaceJsonString(
+              sequence: 1,
+              payload: inoConversationPayload(),
+              actions: [testInoActionJson()],
+            ),
+          ),
+        );
         await _eventually(() => runtime.latestSurface != null);
         final surface = runtime.latestSurface;
         final epoch = runtime.scopeEpoch;
@@ -357,6 +365,10 @@ void main() {
         expect(runtime.scopeEpoch, epoch);
         expect(runtime.feed.lastSequence, 1);
         expect(runtime.latestSurface, same(surface));
+        expect(
+          runtime.latestSurface?.payload,
+          isA<InoConversationSurfacePayload>(),
+        );
         expect(runtime.status, V2RuntimeStatus.streaming);
 
         await runtime.stop();

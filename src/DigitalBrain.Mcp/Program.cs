@@ -61,6 +61,13 @@ if (UseHttpTransport())
     if (string.IsNullOrWhiteSpace(inoEffectStorePath) && !string.IsNullOrWhiteSpace(operationStorePath)) inoEffectStorePath = operationStorePath + ".ino-effects";
     if (profile == V2RuntimeProfile.Production && string.IsNullOrWhiteSpace(inoEffectStorePath)) throw new InvalidOperationException("Production V2 requires a durable INO effect store.");
     builder.Services.AddSingleton(new V2InoEffectStore(inoEffectStorePath));
+    builder.Services.AddSingleton<IV2InoConversationStore>(serviceProvider => serviceProvider.GetRequiredService<V2InoEffectStore>());
+    builder.Services.AddSingleton<IV2ContextAssembler, V2McpConversationContextAssembler>();
+    builder.Services.AddSingleton<IV2IntentCapabilityPlanner, V2McpNoToolPlanner>();
+    builder.Services.AddSingleton<IV2ModelRouter, V2McpConversationModelRouter>();
+    builder.Services.AddSingleton<IV2AuthorizedToolCatalog, V2McpNoToolCatalog>();
+    builder.Services.AddSingleton<IV2ResponseSurfaceComposer, V2McpResponseComposer>();
+    builder.Services.AddSingleton<V2ConversationOwner>();
     builder.Services.AddSingleton<IV2CommandHandler, V2McpInoCommandHandler>();
     builder.Services.AddSingleton<V2CommandDispatcher>();
     builder.Services.AddHostedService<V2CommandExecutionWorker>();
@@ -133,11 +140,6 @@ if (UseHttpTransport())
     {
         if (!TryGetV2Context(context, out var principal)) return Results.Unauthorized();
         return Results.Ok(await store.TimelineAsync(principal, context.Request.Query["cursor"], ParseLimit(context), context.RequestAborted));
-    });
-    app.MapGet("/v2/ino/effects", (HttpContext context, V2InoEffectStore effects) =>
-    {
-        if (!TryGetV2Context(context, out var principal)) return Results.Unauthorized();
-        return Results.Ok(effects.Read(principal));
     });
     app.MapPost("/v2/ino/commands", async (HttpContext context, V2ApplicationService service, JsonElement body) =>
     {

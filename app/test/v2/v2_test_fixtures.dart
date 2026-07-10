@@ -89,6 +89,51 @@ Map<String, Object?> testActionJson({
   'expiresAt': v2TestNow.add(const Duration(minutes: 5)).toIso8601String(),
 };
 
+Map<String, Object?> testInoActionJson({
+  String actionToken = 'signed-ino-action-token',
+  String surfaceId = 'surface-main',
+  int surfaceRevision = 1,
+}) => testActionJson(
+  bindingId: 'ino.send',
+  actionType: 'ino.interact',
+  actionToken: actionToken,
+  surfaceId: surfaceId,
+  surfaceRevision: surfaceRevision,
+);
+
+Map<String, Object?> inoConversationPayload({
+  String intro = 'Ask INO about this workspace.',
+  List<Map<String, Object?>> messages = const [],
+  Map<String, Object?>? operation,
+}) => <String, Object?>{
+  'kind': 'native',
+  'nativeKind': 'inoConversation',
+  'data': {'intro': intro, 'messages': messages, 'operation': operation},
+};
+
+Map<String, Object?> inoMessage({
+  required String role,
+  required String text,
+  required String state,
+  String? turnKey,
+}) => <String, Object?>{
+  'turnKey':
+      turnKey ?? 'turn-$role-${text.hashCode.toUnsigned(32).toRadixString(16)}',
+  'role': role,
+  'text': text,
+  'state': state,
+};
+
+Map<String, Object?> inoOperation({
+  required String state,
+  bool retryable = false,
+  String? safeReason,
+}) => <String, Object?>{
+  'state': state,
+  'retryable': retryable,
+  'safeReason': ?safeReason,
+};
+
 String surfaceJsonString({
   int sequence = 1,
   int revision = 1,

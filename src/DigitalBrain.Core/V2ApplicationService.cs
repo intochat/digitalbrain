@@ -8,6 +8,7 @@ namespace DigitalBrain.Core.V2;
 /// <summary>Application-owned V2 command/query boundary. It deliberately has no Orleans, transport, or provider dependency.</summary>
 public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
 {
+    private const string ReplaySafeInoCommandType = "ino.interact";
     private readonly CapabilityIsolationGate _gate = new();
     private readonly ConcurrentDictionary<string, V2OperationStatus> _operations = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<IdempotencyScope, SubmissionReceipt> _idempotency = new();
@@ -266,10 +267,12 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
         foreach (var pair in _operations.Where(static pair => pair.Value.State == WorkflowState.Applying)
                      .OrderBy(static pair => pair.Key, StringComparer.Ordinal))
         {
+            var replaySafe = _commands.TryGetValue(pair.Key, out var command) &&
+                             string.Equals(command.Type, ReplaySafeInoCommandType, StringComparison.Ordinal);
             var recovered = pair.Value with
             {
-                State = WorkflowState.OutcomeUnknown,
-                SafeReason = "The previous attempt ended before its outcome was confirmed.",
+                State = replaySafe ? WorkflowState.ApplyQueued : WorkflowState.OutcomeUnknown,
+                SafeReason = replaySafe ? null : "The previous attempt ended before its outcome was confirmed.",
                 UpdatedAt = DateTimeOffset.UtcNow
             };
             PersistStatus(pair.Key, recovered);

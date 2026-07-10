@@ -93,9 +93,7 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
         _firstSurfaceFrameScheduled = false;
         if (!mounted || _firstSurfaceFrameReported) return;
         _firstSurfaceFrameReported = true;
-        debugPrint(
-          'DigitalBrain Runtime V2 rendered first authenticated surface',
-        );
+        debugPrint('DigitalBrain rendered the first authenticated view');
       });
     }
   }
@@ -119,7 +117,7 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
     final initializationError = _initializationError;
     if (initializationError != null) {
       return _errorScaffold(
-        'Runtime V2 could not start.',
+        'DigitalBrain could not start. Please try again.',
         key: v2RuntimeTerminalErrorKey,
       );
     }
@@ -138,7 +136,7 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
     final surface = _renderableSurface(controller);
     if (controller.status == V2RuntimeStatus.terminalError && surface == null) {
       return _errorScaffold(
-        controller.terminalError?.toString() ?? 'V2 UI feed failed.',
+        'DigitalBrain is unavailable right now. Please try again.',
         key: v2RuntimeTerminalErrorKey,
       );
     }
@@ -156,13 +154,11 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
                 key: v2RuntimeSurfaceKey,
                 surface: surface,
                 onSubmitAction: controller.submitAction,
+                actionEnabled: controller.canSubmitActionsFrom(surface),
+                reconnecting: controller.status == V2RuntimeStatus.reconnecting,
+                connectionUnavailable:
+                    controller.status == V2RuntimeStatus.terminalError,
               ),
-            ),
-          if (surface != null &&
-              controller.status == V2RuntimeStatus.reconnecting)
-            const Align(
-              alignment: Alignment.topCenter,
-              child: LinearProgressIndicator(),
             ),
         ],
       ),
@@ -190,10 +186,10 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
 
   Widget _buildWaiting(V2RuntimeController controller) {
     final message = switch (controller.status) {
-      V2RuntimeStatus.authenticating => 'Establishing a signed V2 session…',
-      V2RuntimeStatus.connecting => 'Connecting to the private V2 UI feed…',
-      V2RuntimeStatus.reconnecting => 'Reconnecting to the private V2 UI feed…',
-      _ => 'Waiting for the first V2 surface…',
+      V2RuntimeStatus.authenticating => 'Signing you in…',
+      V2RuntimeStatus.connecting => 'Opening your workspace…',
+      V2RuntimeStatus.reconnecting => 'Reconnecting…',
+      _ => 'Preparing your workspace…',
     };
     return Center(
       child: Column(
@@ -204,8 +200,8 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
           Text(message),
           if (controller.transientError != null) ...[
             const SizedBox(height: 8),
-            Text(
-              controller.transientError.toString(),
+            const Text(
+              'DigitalBrain is taking longer than expected. We\'ll keep trying.',
               textAlign: TextAlign.center,
             ),
           ],
@@ -228,13 +224,13 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Sign in to DigitalBrain V2',
+                    'Sign in to DigitalBrain',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'Enter the local, scope-limited bootstrap credential '
-                    'supplied by your DigitalBrain administrator.',
+                    'Enter the sign-in code supplied by your '
+                    'DigitalBrain administrator.',
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -245,7 +241,7 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
                     autocorrect: false,
                     onSubmitted: (_) => _authenticate(controller),
                     decoration: const InputDecoration(
-                      labelText: 'Bootstrap credential',
+                      labelText: 'Sign-in code',
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -255,12 +251,12 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
                         controller.status == V2RuntimeStatus.authenticating
                         ? null
                         : () => _authenticate(controller),
-                    child: const Text('Establish session'),
+                    child: const Text('Sign in'),
                   ),
                   if (controller.transientError != null) ...[
                     const SizedBox(height: 12),
                     Text(
-                      controller.transientError.toString(),
+                      'That sign-in code wasn\'t accepted. Please try again.',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),

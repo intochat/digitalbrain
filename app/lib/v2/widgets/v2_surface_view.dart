@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../rfw_host/rfw_runtime_host.dart';
 import '../protocol/surface_protocol.dart';
 import '../v2_runtime.dart';
+import 'v2_ino_conversation_view.dart';
 
 typedef V2SurfaceActionSubmit =
     Future<V2ActionResult> Function(
@@ -21,11 +22,17 @@ class V2SurfaceView extends StatefulWidget {
     super.key,
     required this.surface,
     required this.onSubmitAction,
+    this.actionEnabled = true,
+    this.reconnecting = false,
+    this.connectionUnavailable = false,
     this.rfwHost,
   });
 
   final SurfaceEnvelope surface;
   final V2SurfaceActionSubmit onSubmitAction;
+  final bool actionEnabled;
+  final bool reconnecting;
+  final bool connectionUnavailable;
   final RfwRuntimeHost? rfwHost;
 
   @override
@@ -48,17 +55,25 @@ class _V2SurfaceViewState extends State<V2SurfaceView> {
           rfwHost: _rfwHost,
         ),
         RfwSurfacePayload payload => _buildRfw(payload),
+        InoConversationSurfacePayload payload => V2InoConversationView(
+          surface: widget.surface,
+          payload: payload,
+          onSubmitAction: widget.onSubmitAction,
+          actionEnabled: widget.actionEnabled,
+          reconnecting: widget.reconnecting,
+          connectionUnavailable: widget.connectionUnavailable,
+        ),
         NativeSurfacePayload payload => _buildNative(payload),
       };
     } catch (_) {
-      body = const Center(
-        child: Text('This V2 surface could not be rendered.'),
-      );
+      body = const Center(child: Text('This view could not be displayed.'));
     }
 
     return Semantics(
       container: true,
-      label: 'DigitalBrain V2 surface',
+      label: widget.surface.payload is InoConversationSurfacePayload
+          ? 'INO conversation'
+          : 'DigitalBrain workspace',
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -89,15 +104,13 @@ class _V2SurfaceViewState extends State<V2SurfaceView> {
     final source = payload.libraryText;
     if (source == null) {
       return const Center(
-        child: Text('This client does not support binary RFW surfaces.'),
+        child: Text('This view is not available in this app.'),
       );
     }
     final key = 'v2-${widget.surface.contentHash}-${widget.surface.revision}';
     _rfwHost.ensureLoaded(key, source);
     if (_rfwHost.parseError(key) != null) {
-      return const Center(
-        child: Text('This RFW surface could not be rendered.'),
-      );
+      return const Center(child: Text('This view could not be displayed.'));
     }
     return _rfwHost.render(
       key,
@@ -105,7 +118,7 @@ class _V2SurfaceViewState extends State<V2SurfaceView> {
       onEvent: _onRemoteEvent,
       rootWidget: payload.rootWidget,
       semanticsId: 'digitalbrain-v2-surface',
-      semanticsLabel: 'DigitalBrain V2 RFW surface',
+      semanticsLabel: 'Interactive workspace view',
     );
   }
 
@@ -145,7 +158,7 @@ class _V2SurfaceViewState extends State<V2SurfaceView> {
                       )
                         FilledButton(
                           key: ValueKey('v2-native-action-$index'),
-                          onPressed: _submitting
+                          onPressed: _submitting || !widget.actionEnabled
                               ? null
                               : () => _submit(
                                   widget.surface.actions[index],
@@ -185,7 +198,7 @@ class _V2SurfaceViewState extends State<V2SurfaceView> {
       }
     }
     if (action == null) {
-      setState(() => _actionError = 'This surface action is unavailable.');
+      setState(() => _actionError = 'That option is no longer available.');
       return;
     }
 
@@ -204,16 +217,19 @@ class _V2SurfaceViewState extends State<V2SurfaceView> {
     });
     try {
       await widget.onSubmitAction(widget.surface, action.bindingId, input);
-    } catch (error) {
-      if (mounted) setState(() => _actionError = error.toString());
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _actionError =
+              'That action couldn\'t be completed. Please try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
   static String _actionLabel(String actionType) {
-    final words = actionType.replaceAll(RegExp(r'[^A-Za-z0-9]+'), ' ').trim();
-    if (words.isEmpty) return 'Continue';
-    return words[0].toUpperCase() + words.substring(1);
+    return 'Continue';
   }
 }

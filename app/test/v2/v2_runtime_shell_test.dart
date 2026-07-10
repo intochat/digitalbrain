@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:digitalbrain_flutter/v2/protocol/surface_protocol.dart';
 import 'package:digitalbrain_flutter/v2/v2_config.dart';
 import 'package:digitalbrain_flutter/v2/v2_runtime.dart';
+import 'package:digitalbrain_flutter/v2/widgets/v2_ino_composer.dart';
+import 'package:digitalbrain_flutter/v2/widgets/v2_ino_conversation_view.dart';
 import 'package:digitalbrain_flutter/v2/widgets/v2_runtime_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,12 +28,20 @@ void main() {
       ),
     );
     await _pumpUntil(tester, () => transport.watchStarted);
-    feed.add(V2FeedSurfaceJson(surfaceJsonString(sequence: 1)));
+    feed.add(
+      V2FeedSurfaceJson(
+        surfaceJsonString(
+          sequence: 1,
+          payload: inoConversationPayload(),
+          actions: [testInoActionJson()],
+        ),
+      ),
+    );
     await _pumpUntil(tester, () => runtime.latestSurface != null);
 
     expect(find.byKey(v2RuntimeSurfaceKey), findsOneWidget);
-    expect(find.text('V2 ready'), findsOneWidget);
-    expect(find.text('Authenticated surface'), findsOneWidget);
+    expect(find.text('Ask INO about this workspace.'), findsOneWidget);
+    expect(find.byKey(v2InoComposerFieldKey), findsOneWidget);
     expect(transport.bootstrapSecret, 'bootstrap-once');
 
     await runtime.stop();
@@ -88,8 +98,11 @@ void main() {
       () => find.byKey(v2RuntimeTerminalErrorKey).evaluate().isNotEmpty,
     );
 
-    expect(find.text('Signed V2 feed was denied.'), findsOneWidget);
-    expect(find.textContaining('closed before'), findsNothing);
+    expect(
+      find.text('DigitalBrain is unavailable right now. Please try again.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('feed'), findsNothing);
 
     await runtime.stop();
   });
@@ -121,6 +134,108 @@ void main() {
 
     expect(find.byKey(v2RuntimeSurfaceKey), findsNothing);
     expect(find.byKey(v2RuntimeLoadingKey), findsOneWidget);
+    await runtime.stop();
+  });
+
+  testWidgets('shell retains the INO draft while reconnecting', (tester) async {
+    final first = _ShellFeedCall.open();
+    final transport = _ShellTransport(first);
+    final runtime = _runtime(transport);
+    Widget shell() => _host(
+      V2RuntimeShell(
+        configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+        controller: runtime,
+      ),
+    );
+
+    await tester.pumpWidget(shell());
+    await _pumpUntil(tester, () => transport.watchStarted);
+    first.add(
+      V2FeedSurfaceJson(
+        surfaceJsonString(
+          sequence: 1,
+          payload: inoConversationPayload(),
+          actions: [testInoActionJson()],
+        ),
+      ),
+    );
+    await _pumpUntil(tester, () => runtime.latestSurface != null);
+    await tester.enterText(
+      find.byKey(v2InoComposerFieldKey),
+      'A draft that stays private',
+    );
+
+    runtime.status = V2RuntimeStatus.reconnecting;
+    await tester.pumpWidget(shell());
+    await tester.pump();
+
+    expect(find.byKey(v2InoReconnectBannerKey), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(v2InoComposerFieldKey))
+          .controller
+          ?.text,
+      'A draft that stays private',
+    );
+    expect(
+      tester.widget<FilledButton>(find.byKey(v2InoSendButtonKey)).onPressed,
+      isNull,
+    );
+
+    runtime.status = V2RuntimeStatus.streaming;
+    await tester.pumpWidget(shell());
+    await tester.pump();
+    expect(find.byKey(v2InoReconnectBannerKey), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(v2InoComposerFieldKey))
+          .controller
+          ?.text,
+      'A draft that stays private',
+    );
+    await runtime.stop();
+  });
+
+  testWidgets('retained chat explains a terminal connection failure', (
+    tester,
+  ) async {
+    final feed = _ShellFeedCall.open();
+    final transport = _ShellTransport(feed);
+    final runtime = _runtime(transport);
+    Widget shell() => _host(
+      V2RuntimeShell(
+        configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+        controller: runtime,
+      ),
+    );
+
+    await tester.pumpWidget(shell());
+    await _pumpUntil(tester, () => transport.watchStarted);
+    feed.add(
+      V2FeedSurfaceJson(
+        surfaceJsonString(
+          sequence: 1,
+          payload: inoConversationPayload(),
+          actions: [testInoActionJson()],
+        ),
+      ),
+    );
+    await _pumpUntil(tester, () => runtime.latestSurface != null);
+    await tester.enterText(
+      find.byKey(v2InoComposerFieldKey),
+      'A draft that remains local',
+    );
+
+    runtime.status = V2RuntimeStatus.terminalError;
+    await tester.pumpWidget(shell());
+    await tester.pump();
+
+    expect(find.byKey(v2InoConnectionUnavailableBannerKey), findsOneWidget);
+    expect(find.text('A draft that remains local'), findsOneWidget);
+    expect(
+      tester.widget<FilledButton>(find.byKey(v2InoSendButtonKey)).onPressed,
+      isNull,
+    );
     await runtime.stop();
   });
 }

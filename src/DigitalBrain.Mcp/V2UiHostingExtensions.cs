@@ -58,7 +58,6 @@ public static class V2UiHostingExtensions
         services.AddSingleton<V2ActionExecutor>();
         services.AddSingleton<V2WorkspaceSurfaceProducer>();
         services.AddSingleton<V2SurfaceEnvelopeWriter>();
-        services.AddSingleton<IV2CommandHandler, V2SurfaceRefreshCommandHandler>();
         services.AddSingleton<V2UiGrpcService>();
         services.AddHealthChecks().AddCheck<V2UiTransportHealthCheck>("v2-ui-transport", tags: ["ready"]);
         return services;

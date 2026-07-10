@@ -19,7 +19,12 @@ class V2ClientCapabilities {
     this.widgetVocabularyVersion = 2,
     this.maximumPayloadBytes = defaultMaximumSurfaceBytes,
     this.supportsBinaryRfw = false,
-    this.nativeFeatures = const {'typed-actions', 'feed-reset', 'feed-ack'},
+    this.nativeFeatures = const {
+      'typed-actions',
+      'feed-reset',
+      'feed-ack',
+      'ino-conversation',
+    },
   });
 
   final Set<int> protocolVersions;
@@ -127,7 +132,7 @@ sealed class SurfacePayload {
         json,
         supportsBinary: capabilities.supportsBinaryRfw,
       ),
-      'native' => NativeSurfacePayload.fromJson(json),
+      'native' => _nativeSurfacePayloadFromJson(json),
       _ => throw FormatException('Unsupported V2 surface payload "$kind".'),
     };
   }
@@ -252,6 +257,230 @@ class NativeSurfacePayload extends SurfacePayload {
     'nativeKind': nativeKind,
     'data': data,
   };
+}
+
+enum InoConversationRole {
+  user,
+  assistant;
+
+  static InoConversationRole fromWire(String value) => switch (value) {
+    'user' => user,
+    'assistant' => assistant,
+    _ => throw FormatException('Unsupported INO conversation role "$value".'),
+  };
+}
+
+enum InoConversationTurnState {
+  sending,
+  queued,
+  running,
+  responding,
+  succeeded,
+  failed;
+
+  static InoConversationTurnState fromWire(String value) => switch (value) {
+    'sending' => sending,
+    'queued' => queued,
+    'running' => running,
+    'responding' => responding,
+    'succeeded' => succeeded,
+    'failed' => failed,
+    _ => throw FormatException(
+      'Unsupported INO conversation turn state "$value".',
+    ),
+  };
+}
+
+enum InoConversationOperationState {
+  queued,
+  running,
+  responding,
+  succeeded,
+  failed;
+
+  bool get isTerminal => this == succeeded || this == failed;
+
+  static InoConversationOperationState fromWire(String value) =>
+      switch (value) {
+        'queued' => queued,
+        'running' => running,
+        'responding' => responding,
+        'succeeded' => succeeded,
+        'failed' => failed,
+        _ => throw FormatException(
+          'Unsupported INO conversation operation state "$value".',
+        ),
+      };
+}
+
+class InoConversationMessage {
+  const InoConversationMessage({
+    required this.turnKey,
+    required this.role,
+    required this.text,
+    required this.state,
+  });
+
+  final String turnKey;
+  final InoConversationRole role;
+  final String text;
+  final InoConversationTurnState state;
+
+  factory InoConversationMessage.fromJson(Object? value) {
+    final json = _safeObject(value, 'payload.data.messages[]');
+    _demandOnlyKeys(json, const {
+      'turnKey',
+      'role',
+      'text',
+      'state',
+    }, 'payload.data.messages[]');
+    final turnKey = _boundedString(json, 'turnKey', maxLength: 64);
+    if (!RegExp(r'^turn-[a-z0-9-]{1,48}$').hasMatch(turnKey)) {
+      throw const FormatException(
+        'payload.data.messages[].turnKey has an invalid format.',
+      );
+    }
+    return InoConversationMessage(
+      turnKey: turnKey,
+      role: InoConversationRole.fromWire(
+        _boundedString(json, 'role', maxLength: 16),
+      ),
+      text: _boundedString(json, 'text', maxLength: 32 * 1024),
+      state: InoConversationTurnState.fromWire(
+        _boundedString(json, 'state', maxLength: 16),
+      ),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'turnKey': turnKey,
+    'role': role.name,
+    'text': text,
+    'state': state.name,
+  };
+}
+
+class InoConversationOperation {
+  const InoConversationOperation({
+    required this.state,
+    required this.retryable,
+    this.safeReason,
+  });
+
+  final InoConversationOperationState state;
+  final bool retryable;
+  final String? safeReason;
+
+  factory InoConversationOperation.fromJson(Object? value) {
+    final json = _safeObject(value, 'payload.data.operation');
+    _demandOnlyKeys(json, const {
+      'state',
+      'safeReason',
+      'retryable',
+    }, 'payload.data.operation');
+    final retryable = json['retryable'];
+    if (retryable is! bool) {
+      throw const FormatException(
+        'payload.data.operation.retryable must be a boolean.',
+      );
+    }
+    final safeReason = json['safeReason'];
+    final String? normalizedReason;
+    if (safeReason == null) {
+      normalizedReason = null;
+    } else if (safeReason is String) {
+      normalizedReason = safeReason.trim();
+    } else {
+      throw const FormatException(
+        'payload.data.operation.safeReason must be a string.',
+      );
+    }
+    if (normalizedReason != null &&
+        (normalizedReason.isEmpty || normalizedReason.length > 512)) {
+      throw const FormatException(
+        'payload.data.operation.safeReason has an invalid length.',
+      );
+    }
+    return InoConversationOperation(
+      state: InoConversationOperationState.fromWire(
+        _boundedString(json, 'state', maxLength: 16),
+      ),
+      retryable: retryable,
+      safeReason: normalizedReason,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'state': state.name,
+    'retryable': retryable,
+    'safeReason': ?safeReason,
+  };
+}
+
+class InoConversationSurfacePayload extends SurfacePayload {
+  const InoConversationSurfacePayload({
+    required this.intro,
+    required this.messages,
+    this.operation,
+  });
+
+  static const String nativeKindName = 'inoConversation';
+
+  @override
+  String get kind => 'native';
+
+  String get nativeKind => nativeKindName;
+
+  final String intro;
+  final List<InoConversationMessage> messages;
+  final InoConversationOperation? operation;
+
+  factory InoConversationSurfacePayload.fromJson(Map<String, Object?> json) {
+    final nativeKind = _boundedString(json, 'nativeKind', maxLength: 64);
+    if (nativeKind != nativeKindName) {
+      throw FormatException('Unsupported INO native surface "$nativeKind".');
+    }
+    final data = _safeObject(json['data'], 'payload.data');
+    _demandOnlyKeys(data, const {
+      'intro',
+      'messages',
+      'operation',
+    }, 'payload.data');
+    final messages = data['messages'];
+    if (messages is! List || messages.length > 200) {
+      throw const FormatException(
+        'payload.data.messages must be a bounded JSON array.',
+      );
+    }
+    return InoConversationSurfacePayload(
+      intro: _boundedString(data, 'intro', maxLength: 512),
+      messages: List.unmodifiable(
+        messages.map(InoConversationMessage.fromJson),
+      ),
+      operation: data['operation'] == null
+          ? null
+          : InoConversationOperation.fromJson(data['operation']),
+    );
+  }
+
+  @override
+  Map<String, Object?> toJson() => {
+    'kind': kind,
+    'nativeKind': nativeKind,
+    'data': {
+      'intro': intro,
+      'messages': messages.map((message) => message.toJson()).toList(),
+      'operation': operation?.toJson(),
+    },
+  };
+}
+
+SurfacePayload _nativeSurfacePayloadFromJson(Map<String, Object?> json) {
+  final nativeKind = _boundedString(json, 'nativeKind', maxLength: 64);
+  if (nativeKind == InoConversationSurfacePayload.nativeKindName) {
+    return InoConversationSurfacePayload.fromJson(json);
+  }
+  return NativeSurfacePayload.fromJson(json);
 }
 
 class UiActionRef {
@@ -529,6 +758,18 @@ const Set<String> _forbiddenPayloadKeys = {
   'userid',
   'workspaceid',
 };
+
+void _demandOnlyKeys(
+  Map<String, Object?> value,
+  Set<String> allowed,
+  String path,
+) {
+  for (final key in value.keys) {
+    if (!allowed.contains(key)) {
+      throw FormatException('$path contains unsupported field "$key".');
+    }
+  }
+}
 
 Map<String, Object?> _safeObject(
   Object? value,

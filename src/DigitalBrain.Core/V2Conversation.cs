@@ -18,6 +18,59 @@ public sealed record V2ConversationContext(
 public sealed record V2ModelRequest(string Text, V2ConversationContext Context, bool StructuredOutput);
 public sealed record V2ModelResponse(string Text, string Model, bool IsStructured);
 
+public static class V2InoConversationIdentity
+{
+    public static string From(RequestContext context) => "ino-" + V2RequestScope.Id(context);
+}
+
+public static class V2InoConversationStates
+{
+    public const string Idle = "idle";
+    public const string Queued = "queued";
+    public const string Running = "running";
+    public const string Responding = "responding";
+    public const string Succeeded = "succeeded";
+    public const string Failed = "failed";
+
+    public static bool IsActive(string state) =>
+        state is Queued or Running or Responding;
+}
+
+public sealed record V2InoConversationTurn(
+    string CommandId,
+    string Role,
+    string Text,
+    string State);
+
+public sealed record V2InoConversationOperation(
+    string CommandId,
+    string Prompt,
+    string State,
+    string? SafeReason,
+    bool Retryable,
+    DateTimeOffset UpdatedAt);
+
+public sealed record V2InoConversationSnapshot(
+    string ConversationId,
+    int Revision,
+    IReadOnlyList<V2InoConversationTurn> Turns,
+    IReadOnlyList<V2InoConversationOperation> Operations)
+{
+    public V2InoConversationOperation? CurrentOperation => Operations.LastOrDefault();
+
+    public static V2InoConversationSnapshot Empty(RequestContext context) =>
+        new(V2InoConversationIdentity.From(context), 0, [], []);
+}
+
+public interface IV2InoConversationStore
+{
+    V2InoConversationSnapshot Read(RequestContext context);
+    V2InoConversationSnapshot Begin(RequestContext context, string commandId, string prompt);
+    V2InoConversationSnapshot Transition(RequestContext context, string commandId, string state);
+    V2InoConversationSnapshot Complete(RequestContext context, string commandId, string response);
+    V2InoConversationSnapshot Fail(RequestContext context, string commandId, string safeReason, bool retryable);
+}
+
 public enum V2ToolOutcomeKind { Success, NeedsAuth, Denied, RetryableFailure, PermanentFailure, OutcomeUnknown, Cancelled }
 public sealed record V2ToolOutcome(V2ToolOutcomeKind Kind, JsonElement? Content = null, string? SafeReason = null);
 public sealed record V2ToolInvocation(string ToolId, JsonElement Input);

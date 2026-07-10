@@ -8,23 +8,31 @@ using Orleans;
 using V2McpEffectCommandHandler = McpProject::DigitalBrain.Mcp.V2McpEffectCommandHandler;
 using V2McpInoCommandHandler = McpProject::DigitalBrain.Mcp.V2McpInoCommandHandler;
 using V2InoEffectStore = McpProject::DigitalBrain.Mcp.V2InoEffectStore;
+using V2McpConversationContextAssembler = McpProject::DigitalBrain.Mcp.V2McpConversationContextAssembler;
+using V2McpNoToolCatalog = McpProject::DigitalBrain.Mcp.V2McpNoToolCatalog;
+using V2McpNoToolPlanner = McpProject::DigitalBrain.Mcp.V2McpNoToolPlanner;
+using V2McpResponseComposer = McpProject::DigitalBrain.Mcp.V2McpResponseComposer;
 
 namespace DigitalBrain.Tests.V2;
 
 public sealed class V2ContractsTests
 {
     [Fact]
-    public async Task V2_ino_command_is_identity_free_durable_and_projects_a_workspace_surface()
+    public async Task V2_ino_command_is_identity_free_durable_and_projects_a_principal_conversation()
     {
         var context = new V2RequestContext(new("tenant-a"), new("workspace-a"), new("user-a", PrincipalKind.User), "session", AuthAssurance.Password, "corr", "same-retry", new HashSet<string> { "brain.act" });
         var other = context with { WorkspaceId = new("workspace-b"), Principal = new("user-b", PrincipalKind.User) };
         var feed = new V2PrivateFeedStore(); var effects = new V2InoEffectStore();
-        var handler = new V2McpInoCommandHandler(effects, new V2WorkspaceSurfaceProducer(feed, new V2ActionExecutor(feed)));
+        var surfaces = new V2WorkspaceSurfaceProducer(feed, new V2ActionExecutor(feed), effects);
+        var owner = new V2ConversationOwner(new V2McpConversationContextAssembler(effects), new V2McpNoToolPlanner(),
+            new FakeModelRouter(), new V2McpNoToolCatalog(), new V2McpResponseComposer());
+        var handler = new V2McpInoCommandHandler(effects, surfaces, owner);
         var result = await handler.ExecuteAsync(new V2CommandEnvelope("ino.interact", 2, "ino-command", context, JsonSerializer.SerializeToElement(new { prompt = "Summarize my workspace" })));
         Assert.Equal(WorkflowState.Succeeded, result.State);
-        Assert.Single(effects.Read(context));
-        Assert.Single(feed.CatchUp(context, V2SurfaceAudienceKind.Workspace, 0).Items);
-        Assert.Empty(feed.CatchUp(other, V2SurfaceAudienceKind.Workspace, 0).Items);
+        Assert.Equal(2, effects.Read(context).Turns.Count);
+        Assert.Equal(4, feed.CatchUp(context, V2SurfaceAudienceKind.Principal, 0).Items.Count);
+        Assert.Empty(feed.CatchUp(context, V2SurfaceAudienceKind.Workspace, 0).Items);
+        Assert.Empty(feed.CatchUp(other, V2SurfaceAudienceKind.Principal, 0).Items);
         Assert.False(V2McpInoCommandHandler.TryGetPrompt(JsonSerializer.SerializeToElement(new { prompt = "x", workspaceId = "forged" }), out _));
     }
 
@@ -366,6 +374,9 @@ public sealed class V2ContractsTests
         Assert.Equal("digitalbrain.v2.aggregate-grain", alias.Alias);
         var workerAlias = typeof(IV2EffectWorkerGrain).GetCustomAttributes(typeof(AliasAttribute), false).Cast<AliasAttribute>().Single();
         Assert.Equal("digitalbrain.v2.effect-worker-grain", workerAlias.Alias);
+        var conversationModelAlias = typeof(IV2ConversationModelGrain)
+            .GetCustomAttributes(typeof(AliasAttribute), false).Cast<AliasAttribute>().Single();
+        Assert.Equal("digitalbrain.v2.conversation-model-grain", conversationModelAlias.Alias);
     }
 
     [Fact]
@@ -787,6 +798,57 @@ public sealed class V2ContractsTests
             Assert.Equal(WorkflowState.OutcomeUnknown,
                 (await reopenedAgain.GetOperationAsync(context, submitted.OperationId))!.State);
             Assert.Equal(lineCount, File.ReadLines(path).Count());
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task Claimed_ino_command_reopens_queued_and_completes_exactly_one_conversation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-ino-claimed-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var operationsPath = Path.Combine(root, "operations.jsonl");
+            var conversationPath = Path.Combine(root, "conversation.jsonl");
+            var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s",
+                AuthAssurance.Password, "c", "ino-idem", new HashSet<string> { "brain.act", "brain.read" });
+            var command = new V2CommandEnvelope(V2McpInoCommandHandler.CommandType, 2, "ino-command", context,
+                JsonSerializer.SerializeToElement(new { prompt = "What can you help me with in this workspace?" }));
+            var beforeCrash = new V2ApplicationService(storagePath: operationsPath);
+            var submitted = await beforeCrash.SubmitAsync(context, command);
+
+            Assert.True(beforeCrash.TryClaimPending(submitted.OperationId, out _));
+
+            var firstRecovery = new V2ApplicationService(storagePath: operationsPath);
+            var recoveredStatus = await firstRecovery.GetOperationAsync(context, submitted.OperationId);
+            Assert.Equal(WorkflowState.ApplyQueued, recoveredStatus!.State);
+            Assert.Null(recoveredStatus.SafeReason);
+            Assert.Equal(new[] { submitted.OperationId }, firstRecovery.GetPendingOperationIds());
+
+            var recovered = new V2ApplicationService(storagePath: operationsPath);
+            Assert.Equal(new[] { submitted.OperationId }, recovered.GetPendingOperationIds());
+            Assert.Equal(submitted.OperationId, (await recovered.SubmitAsync(context, command)).OperationId);
+
+            var effects = new V2InoEffectStore(conversationPath);
+            var feed = new V2PrivateFeedStore(Path.Combine(root, "feed.jsonl"));
+            var surfaces = new V2WorkspaceSurfaceProducer(feed, new V2ActionExecutor(feed), effects);
+            var owner = new V2ConversationOwner(
+                new V2McpConversationContextAssembler(effects),
+                new V2McpNoToolPlanner(),
+                new FakeModelRouter(),
+                new V2McpNoToolCatalog(),
+                new V2McpResponseComposer());
+            var handler = new V2McpInoCommandHandler(effects, surfaces, owner);
+            var dispatcher = new V2CommandDispatcher(recovered, [handler]);
+
+            Assert.True(await dispatcher.DispatchAsync(submitted.OperationId));
+            Assert.False(await dispatcher.DispatchAsync(submitted.OperationId));
+            Assert.Equal(WorkflowState.Succeeded,
+                (await recovered.GetOperationAsync(context, submitted.OperationId))!.State);
+            Assert.Collection(effects.Read(context).Turns,
+                user => Assert.Equal("user", user.Role),
+                assistant => Assert.Equal("assistant", assistant.Role));
+            Assert.Equal(2, new V2InoEffectStore(conversationPath).Read(context).Turns.Count);
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }

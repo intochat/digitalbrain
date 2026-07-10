@@ -1089,9 +1089,15 @@ public sealed class V2ActionExecutor(IV2PrivateFeedStore? feed = null)
     }
     private static void DemandInputSchema(string schemaRef, JsonElement input)
     {
-        if (!string.Equals(schemaRef, "digitalbrain.ui.refresh-input.v1", StringComparison.Ordinal) ||
-            input.ValueKind != JsonValueKind.Object || input.EnumerateObject().Any())
-            throw new V2ActionRejectedException(V2ActionRejection.PolicyDenied);
+        if (string.Equals(schemaRef, "digitalbrain.ui.refresh-input.v1", StringComparison.Ordinal) &&
+            input.ValueKind == JsonValueKind.Object && !input.EnumerateObject().Any())
+            return;
+        if (string.Equals(schemaRef, V2WorkspaceSurfaceProducer.InoInputSchema, StringComparison.Ordinal) &&
+            input.ValueKind == JsonValueKind.Object && input.EnumerateObject().Count() == 1 &&
+            input.TryGetProperty("prompt", out var prompt) && prompt.ValueKind == JsonValueKind.String &&
+            prompt.GetString() is { } value && !string.IsNullOrWhiteSpace(value) && value.Length <= 4096)
+            return;
+        throw new V2ActionRejectedException(V2ActionRejection.PolicyDenied);
     }
 
     private sealed record IssuedBinding(

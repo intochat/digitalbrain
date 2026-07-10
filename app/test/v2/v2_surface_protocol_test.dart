@@ -11,6 +11,10 @@ void main() {
 
     expect(capabilities.names, contains('ui.protocol.v3'));
     expect(capabilities.names, isNot(contains('ui.protocol.v2')));
+    expect(
+      const V2ClientCapabilities().names,
+      contains('ui.native.ino-conversation'),
+    );
   });
 
   test('decodes a complete V2 SurfaceEnvelope and typed action binding', () {
@@ -24,6 +28,78 @@ void main() {
     expect(envelope.payload, isA<NativeSurfacePayload>());
     expect(envelope.actions.single.bindingId, 'refresh-binding');
     expect(envelope.actions.single.actionToken, 'signed-action-token');
+  });
+
+  test('decodes a typed INO conversation without opaque identifiers', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          messages: [
+            inoMessage(role: 'user', text: 'Hello', state: 'queued'),
+            inoMessage(
+              role: 'assistant',
+              text: 'How can I help?',
+              state: 'succeeded',
+            ),
+          ],
+          operation: inoOperation(state: 'succeeded'),
+        ),
+        actions: [testInoActionJson()],
+      ),
+    );
+
+    final payload = envelope.payload as InoConversationSurfacePayload;
+    expect(payload.intro, 'Ask INO about this workspace.');
+    expect(payload.messages, hasLength(2));
+    expect(payload.messages.first.turnKey, startsWith('turn-user-'));
+    expect(payload.messages.first.role, InoConversationRole.user);
+    expect(payload.messages.last.role, InoConversationRole.assistant);
+    expect(payload.operation?.state, InoConversationOperationState.succeeded);
+    expect(payload.operation?.retryable, isFalse);
+    expect(envelope.actions.single.bindingId, 'ino.send');
+    expect(envelope.actions.single.actionType, 'ino.interact');
+  });
+
+  test('rejects malformed or sensitive INO conversation data', () {
+    final invalidPayloads = <Map<String, Object?>>[
+      inoConversationPayload(
+        messages: [inoMessage(role: 'system', text: 'Hidden', state: 'queued')],
+      ),
+      inoConversationPayload(operation: inoOperation(state: 'unknown')),
+      inoConversationPayload(
+        messages: [
+          {
+            ...inoMessage(role: 'user', text: 'Hello', state: 'queued'),
+            'principalId': 'must-not-reach-renderer',
+          },
+        ],
+      ),
+      inoConversationPayload(
+        messages: [
+          inoMessage(
+            role: 'user',
+            text: 'Hello',
+            state: 'queued',
+            turnKey: 'not a safe key',
+          ),
+        ],
+      ),
+      inoConversationPayload(
+        operation: {
+          ...inoOperation(state: 'failed', retryable: true),
+          'operationId': 'must-not-reach-renderer',
+        },
+      ),
+    ];
+
+    for (final payload in invalidPayloads) {
+      expect(
+        () => const SurfaceEnvelopeDecoder().decode(
+          surfaceJsonString(payload: payload),
+        ),
+        throwsFormatException,
+      );
+    }
   });
 
   test('rejects unsupported protocol and capability requirements', () {

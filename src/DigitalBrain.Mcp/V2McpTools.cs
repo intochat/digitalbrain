@@ -13,8 +13,7 @@ public sealed class V2McpTools(
     V2SessionTokenService tokens,
     IConfiguration configuration,
     V2ApplicationService application,
-    IV2ProjectionQueryPort projections,
-    V2InoEffectStore inoEffects)
+    IV2ProjectionQueryPort projections)
 {
     [McpServerTool(Name = "brain_read"), Description("Read the authenticated workspace-scoped V2 timeline.")]
     public async Task<object> ReadAsync(CancellationToken cancellationToken = default)
@@ -46,9 +45,6 @@ public sealed class V2McpTools(
         var command = new V2CommandEnvelope("admin", 2, commandId, context, payload.Clone());
         return await application.SubmitAsync(context, command, cancellationToken);
     }
-
-    [McpServerTool(Name = "ino_read"), Description("Read durable INO effects for the authenticated V2 workspace and principal.")]
-    public object InoRead() => inoEffects.Read(RequireContext());
 
     [McpServerTool(Name = "ino_interact"), Description("Queue an authenticated, idempotent V2 INO interaction for the current workspace.")]
     public async Task<object> InoInteractAsync(string commandId, string prompt, CancellationToken cancellationToken = default)

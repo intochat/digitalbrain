@@ -207,9 +207,10 @@ public static class DigitalBrainOrleansExtensions
             });
         }
 
+        builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
+
         if (!isV2Runtime)
         {
-            builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
             builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
             builder.Services.AddSingleton<DigitalBrain.Kernel.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
             builder.Services.AddDigitalBrainChatClients(builder.Configuration);
