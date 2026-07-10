@@ -96,7 +96,9 @@ if (ctx.EnableMcp)
 {
 #pragma warning disable ASPIREMCP001
     // Dedicated single-replica HTTP MCP resource; avoids stateful MCP sessions going through the replicated kernel proxy.
-    var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp")
+    // The local launch profile pins ports that collide with the AppHost's proxy model.
+    // Exclude it so Aspire owns randomized proxy and target ports in every isolated session.
+    var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp", launchProfileName: null)
         .WithReference(ctx.OrleansClient)
         .WithReference(ctx.Llm)
         .WithEnvironment("DIGITALBRAIN_MCP_TRANSPORT", "http")
