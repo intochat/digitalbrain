@@ -2,6 +2,7 @@ using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using DigitalBrain.Ino.Context;
+using DigitalBrain.Infrastructure.Connectors.V2;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Db;
@@ -27,6 +28,7 @@ public static class DigitalBrainOrleansExtensions
     public static IHostApplicationBuilder UseDigitalBrainOrleans(this IHostApplicationBuilder builder)
     {
         var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted();
+        var isV2Runtime = string.Equals(builder.Configuration["DigitalBrain:Runtime"], "V2", StringComparison.OrdinalIgnoreCase);
 
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
         var useManagedIdentity = !string.IsNullOrWhiteSpace(storageAccountName);
@@ -108,10 +110,16 @@ public static class DigitalBrainOrleansExtensions
                 siloBuilder.UseJsonJournalFormat(JournalJson.Configure);
             }
 
-            siloBuilder.AddMemoryStreams("HomeFeed");
-            siloBuilder.AddMemoryStreams(SynapseStream.ProviderName);
-            siloBuilder.AddMemoryGrainStorage("PubSubStore");
-            siloBuilder.ConfigureServices(services => services.AddSignalEgressStreamSubscriber());
+            // V2 has its own durable, workspace-private feed and does not activate the
+            // V1 shared HomeFeed/Synapse stream graph. Keep the providers available only
+            // to the legacy composition so V1 data and behavior remain untouched.
+            if (!isV2Runtime)
+            {
+                siloBuilder.AddMemoryStreams("HomeFeed");
+                siloBuilder.AddMemoryStreams(SynapseStream.ProviderName);
+                siloBuilder.AddMemoryGrainStorage("PubSubStore");
+                siloBuilder.ConfigureServices(services => services.AddSignalEgressStreamSubscriber());
+            }
         });
 
         return builder;
@@ -119,6 +127,7 @@ public static class DigitalBrainOrleansExtensions
 
     public static IHostApplicationBuilder AddDigitalBrainClients(this IHostApplicationBuilder builder)
     {
+        var isV2Runtime = string.Equals(builder.Configuration["DigitalBrain:Runtime"], "V2", StringComparison.OrdinalIgnoreCase);
         builder.Services.AddSingleton<HomeFeedBus>();
         builder.Services.AddSingleton<SignalEgressBus>();
         builder.Services.AddSingleton<SqliteSchemaInspector>();
@@ -135,11 +144,27 @@ public static class DigitalBrainOrleansExtensions
             .AllowAnyHeader()
             .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding")));
 
-        builder.Services
-            .AddMcpServer()
-            .WithHttpTransport()
-            .WithTools<DigitalBrain.Mcp.DigitalBrainReadTools>();
-        builder.Services.AddSingleton<DigitalBrain.Mcp.DigitalBrainReadTools>();
+        if (!string.Equals(builder.Configuration["DigitalBrain:Runtime"], "V2", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services
+                .AddMcpServer()
+                .WithHttpTransport()
+                .WithTools<DigitalBrain.Mcp.DigitalBrainReadTools>();
+            builder.Services.AddSingleton<DigitalBrain.Mcp.DigitalBrainReadTools>();
+        }
+
+        // V2 connector policy/registry is authoritative for new application ports. It never imports V1 PackConfig credentials.
+        builder.Services.AddSingleton<IProviderOAuthAdapter>(_ => new GoogleV2OAuthAdapter(
+            builder.Configuration["DigitalBrain:V2:Google:ClientId"] ?? string.Empty,
+            builder.Configuration["DigitalBrain:V2:Google:ClientSecret"] ?? string.Empty,
+            builder.Configuration["DigitalBrain:V2:Google:RedirectUri"] ?? string.Empty));
+        builder.Services.AddSingleton<IProviderOAuthAdapter>(_ => new SalesforceV2OAuthAdapter(
+            builder.Configuration["DigitalBrain:V2:Salesforce:ClientId"] ?? string.Empty,
+            builder.Configuration["DigitalBrain:V2:Salesforce:ClientSecret"] ?? string.Empty,
+            builder.Configuration["DigitalBrain:V2:Salesforce:LoginUrl"] ?? "https://login.salesforce.com",
+            builder.Configuration["DigitalBrain:V2:Salesforce:RedirectUri"] ?? string.Empty));
+        builder.Services.AddSingleton<IProviderOAuthAdapterRegistry, V2ProviderOAuthAdapterRegistry>();
+        builder.Services.AddSingleton<IConnectorAuthorizationPolicy, V2ConnectorAuthorizationPolicy>();
 
         builder.Services.AddHostedService<KernelStartupWarmupService>();
 
@@ -166,89 +191,92 @@ public static class DigitalBrainOrleansExtensions
             });
         }
 
-        builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
-        builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
-        builder.Services.AddSingleton<DigitalBrain.Kernel.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
-        builder.Services.AddDigitalBrainChatClients(builder.Configuration);
-
-        // One IAttributeToFactoryMapper<LlmAttribute<TModel>> registration per declared model type, so grain
-        // constructors can declare [Llm<SomeModel>] IChatClient chatClient — Orleans' GrainConstructorArgumentFactory
-        // resolves the mapper keyed by the parameter attribute's closed generic type, so this can't be a single
-        // open-generic registration; it must be done reflectively, once per concrete DigitalBrainModel type.
-        foreach (var modelType in typeof(DigitalBrain.Core.Models.LlmModel).Assembly.GetTypes()
-            .Where(t => typeof(DigitalBrain.Core.Models.LlmModel).IsAssignableFrom(t) && !t.IsAbstract))
+        if (!isV2Runtime)
         {
-            var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
-                typeof(DigitalBrain.Kernel.Llm.LlmAttribute<>).MakeGenericType(modelType));
-            var mapperImpl = typeof(DigitalBrain.Kernel.Llm.LlmAttributeMapper<>).MakeGenericType(modelType);
-            builder.Services.AddSingleton(mapperInterface, mapperImpl);
-        }
+            builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
+            builder.Services.AddDigitalBrainVoiceTranscription(builder.Configuration);
+            builder.Services.AddSingleton<DigitalBrain.Kernel.IScopedChatClientFactory, DigitalBrain.Kernel.Llm.ScopedChatClientFactory>();
+            builder.Services.AddDigitalBrainChatClients(builder.Configuration);
 
-        // Same as above, for [Voice2Text<TModel>] IVoiceTranscriber over VoiceToTextModel-derived types.
-        foreach (var modelType in typeof(DigitalBrain.Core.Models.VoiceToTextModel).Assembly.GetTypes()
-            .Where(t => typeof(DigitalBrain.Core.Models.VoiceToTextModel).IsAssignableFrom(t) && !t.IsAbstract))
-        {
-            var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
-                typeof(DigitalBrain.Kernel.Voice.Voice2TextAttribute<>).MakeGenericType(modelType));
-            var mapperImpl = typeof(DigitalBrain.Kernel.Voice.Voice2TextAttributeMapper<>).MakeGenericType(modelType);
-            builder.Services.AddSingleton(mapperInterface, mapperImpl);
-        }
-
-        builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
-        builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
-        builder.Services.AddContextStore(builder.Configuration);
-
-        BlobServiceClient? packConfigBlobs = null;
-        if (isAspireHosted)
-        {
-            var blobOptions = new BlobClientOptions();
-            blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
-
-            if (useManagedIdentity)
+            // One IAttributeToFactoryMapper<LlmAttribute<TModel>> registration per declared model type, so grain
+            // constructors can declare [Llm<SomeModel>] IChatClient chatClient — Orleans' GrainConstructorArgumentFactory
+            // resolves the mapper keyed by the parameter attribute's closed generic type, so this can't be a single
+            // open-generic registration; it must be done reflectively, once per concrete DigitalBrainModel type.
+            foreach (var modelType in typeof(DigitalBrain.Core.Models.LlmModel).Assembly.GetTypes()
+                .Where(t => typeof(DigitalBrain.Core.Models.LlmModel).IsAssignableFrom(t) && !t.IsAbstract))
             {
-                packConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions);
+                var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
+                    typeof(DigitalBrain.Kernel.Llm.LlmAttribute<>).MakeGenericType(modelType));
+                var mapperImpl = typeof(DigitalBrain.Kernel.Llm.LlmAttributeMapper<>).MakeGenericType(modelType);
+                builder.Services.AddSingleton(mapperInterface, mapperImpl);
             }
-            else
+
+            // Same as above, for [Voice2Text<TModel>] IVoiceTranscriber over VoiceToTextModel-derived types.
+            foreach (var modelType in typeof(DigitalBrain.Core.Models.VoiceToTextModel).Assembly.GetTypes()
+                .Where(t => typeof(DigitalBrain.Core.Models.VoiceToTextModel).IsAssignableFrom(t) && !t.IsAbstract))
             {
-                var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
-                if (!string.IsNullOrEmpty(grainStateConnStr))
+                var mapperInterface = typeof(IAttributeToFactoryMapper<>).MakeGenericType(
+                    typeof(DigitalBrain.Kernel.Voice.Voice2TextAttribute<>).MakeGenericType(modelType));
+                var mapperImpl = typeof(DigitalBrain.Kernel.Voice.Voice2TextAttributeMapper<>).MakeGenericType(modelType);
+                builder.Services.AddSingleton(mapperInterface, mapperImpl);
+            }
+
+            builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
+            builder.Services.AddCheckpointSync(builder.Configuration, useManagedIdentity, storageCredential, storageBlobServiceUri);
+            builder.Services.AddContextStore(builder.Configuration);
+
+            BlobServiceClient? packConfigBlobs = null;
+            if (isAspireHosted)
+            {
+                var blobOptions = new BlobClientOptions();
+                blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
+
+                if (useManagedIdentity)
                 {
-                    packConfigBlobs = new BlobServiceClient(grainStateConnStr, blobOptions);
+                    packConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions);
+                }
+                else
+                {
+                    var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
+                    if (!string.IsNullOrEmpty(grainStateConnStr))
+                    {
+                        packConfigBlobs = new BlobServiceClient(grainStateConnStr, blobOptions);
+                    }
                 }
             }
+            builder.Services.AddPackConfigStore(packConfigBlobs);
+            builder.Services.AddHostedService<DigitalBrain.Salesforce.SalesforceAppConfigSeeder>();
+            builder.Services.AddHostedService<DigitalBrain.Google.GoogleAppConfigSeeder>();
+
+            builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
+            builder.Services.AddSingleton<DigitalBrain.Google.IGmailApiClientFactory, DigitalBrain.Google.GmailApiClientFactory>();
+            builder.Services.AddSingleton<DigitalBrain.Kernel.IInoToolProvider, DigitalBrain.Google.GmailInoToolProvider>();
+            builder.Services.AddSingleton<DigitalBrain.Kernel.IInoToolProvider, DigitalBrain.Salesforce.SalesforceInoToolProvider>();
+
+            builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("salesforce", (sp, _) => new DigitalBrain.Salesforce.SalesforceConnector(
+                sp.GetRequiredService<DigitalBrain.Salesforce.ISalesforceApiClientFactory>(),
+                sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
+                sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
+            builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("google", (sp, _) => new DigitalBrain.Google.GoogleConnector(
+                sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
+                sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>(),
+                sp.GetService<IGrainFactory>()));
+
+            builder.Services.AddHealthChecks()
+                .AddAsyncCheck("google-connector", async (ct) =>
+                {
+                    return HealthCheckResult.Healthy("Google connector TestConnection (labels probe) registered");
+                })
+                .AddAsyncCheck("salesforce-connector", async (ct) =>
+                {
+                    return HealthCheckResult.Healthy("Salesforce connector TestConnection (query probe) registered");
+                });
+
+            builder.Services.AddDigitalBrainOtlpForwardClient();
+
+            DigitalBrain.Ino.InoServiceRegistration.AddInoAi(builder.Services, builder.Configuration.GetSection("Ino:AI"));
+            builder.Services.AddSingleton<DigitalBrain.Ino.IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
         }
-        builder.Services.AddPackConfigStore(packConfigBlobs);
-        builder.Services.AddHostedService<DigitalBrain.Salesforce.SalesforceAppConfigSeeder>();
-        builder.Services.AddHostedService<DigitalBrain.Google.GoogleAppConfigSeeder>();
-
-        builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
-        builder.Services.AddSingleton<DigitalBrain.Google.IGmailApiClientFactory, DigitalBrain.Google.GmailApiClientFactory>();
-        builder.Services.AddSingleton<DigitalBrain.Kernel.IInoToolProvider, DigitalBrain.Google.GmailInoToolProvider>();
-        builder.Services.AddSingleton<DigitalBrain.Kernel.IInoToolProvider, DigitalBrain.Salesforce.SalesforceInoToolProvider>();
-
-        builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("salesforce", (sp, _) => new DigitalBrain.Salesforce.SalesforceConnector(
-            sp.GetRequiredService<DigitalBrain.Salesforce.ISalesforceApiClientFactory>(),
-            sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
-            sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
-        builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("google", (sp, _) => new DigitalBrain.Google.GoogleConnector(
-            sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
-            sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>(),
-            sp.GetService<IGrainFactory>()));
-
-        builder.Services.AddHealthChecks()
-            .AddAsyncCheck("google-connector", async (ct) =>
-            {
-                return HealthCheckResult.Healthy("Google connector TestConnection (labels probe) registered");
-            })
-            .AddAsyncCheck("salesforce-connector", async (ct) =>
-            {
-                return HealthCheckResult.Healthy("Salesforce connector TestConnection (query probe) registered");
-            });
-
-        builder.Services.AddDigitalBrainOtlpForwardClient();
-
-        DigitalBrain.Ino.InoServiceRegistration.AddInoAi(builder.Services, builder.Configuration.GetSection("Ino:AI"));
-        builder.Services.AddSingleton<DigitalBrain.Ino.IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
 
         return builder;
     }
@@ -269,12 +297,18 @@ public static class DigitalBrainOrleansExtensions
             app.UseStaticFiles(new StaticFileOptions { FileProvider = fileProvider });
         }
 
-        app.MapGrpcService<DigitalBrain.Kernel.Gateway.GatewayService>();
-        app.MapGrpcService<DigitalBrain.Kernel.Gateway.UiGatewayService>();
+        var isV2Runtime = string.Equals(app.Configuration["DigitalBrain:Runtime"], "V2", StringComparison.OrdinalIgnoreCase);
+        if (!isV2Runtime)
+        {
+            // V1 gateway services resolve global grains and caller-supplied client IDs.
+            // They are intentionally absent from the V2 composition.
+            app.MapGrpcService<DigitalBrain.Kernel.Gateway.GatewayService>();
+            app.MapGrpcService<DigitalBrain.Kernel.Gateway.UiGatewayService>();
+        }
 
         app.MapDigitalBrainOtlpProxy();
 
-        if (!DigitalBrainHostEnvironment.IsAspireHosted())
+        if (!isV2Runtime && !DigitalBrainHostEnvironment.IsAspireHosted())
         {
             app.MapMcp().RequireHost("*:8081");
         }

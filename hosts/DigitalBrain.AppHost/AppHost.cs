@@ -8,6 +8,13 @@ using VoiceModels = DigitalBrain.Core.Models.Voice;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// V2 is the authoritative local/test composition. Production mutation capabilities remain explicitly gated.
+var v2Profile = builder.Configuration["DigitalBrain:Profile"] ?? "Development";
+var v2SessionSigningKey = builder.AddParameter(
+    "v2-session-signing-key",
+    () => builder.Configuration["Parameters:v2-session-signing-key"] ?? Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
+    secret: true);
+
 // Integrations stay thin here: INO, Gmail, Salesforce, Flutter, and optional transports
 // are wired through the kernel rather than distributed through a marketplace.
 
@@ -57,6 +64,9 @@ var googleAppConfig = builder.AddGoogleAppConfig();
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);  // Provides surfaces, journals, 3 replicas HA, and LLM wiring via the Aspire package.
 kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
+kernel.WithEnvironment("DigitalBrain__Runtime", "V2");
+kernel.WithEnvironment("DigitalBrain__Profile", v2Profile);
+kernel.WithEnvironment("DigitalBrain__Auth__SessionSigningKey", v2SessionSigningKey);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
 kernel.WithGoogleAppConfig(googleAppConfig);
 
@@ -74,6 +84,14 @@ if (ctx.EnableMcp)
         .WithReference(ctx.OrleansClient)
         .WithReference(ctx.Llm)
         .WithEnvironment("DIGITALBRAIN_MCP_TRANSPORT", "http")
+        .WithEnvironment("DigitalBrain__Runtime", "V2")
+        .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", v2SessionSigningKey)
+        .WithEnvironment("DigitalBrain__Profile", v2Profile)
+        .WithEnvironment("DigitalBrain__V2__OperationStorePath", ".digitalbrain/v2/operations.jsonl")
+        .WithEnvironment("DigitalBrain__V2__ProjectionStorePath", ".digitalbrain/v2/projections.jsonl")
+        .WithEnvironment("DigitalBrain__V2__SessionStorePath", ".digitalbrain/v2/sessions.jsonl")
+        .WithEnvironment("DigitalBrain__Mcp__EnableAdmin", "false")
+        .WithEnvironment("DigitalBrain__Mcp__EnableMutations", v2Profile.Equals("Development", StringComparison.OrdinalIgnoreCase) ? "true" : "false")
         .WithEndpoint(name: "http", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
         .WithMcpServer(endpointName: "http");
 #pragma warning restore ASPIREMCP001

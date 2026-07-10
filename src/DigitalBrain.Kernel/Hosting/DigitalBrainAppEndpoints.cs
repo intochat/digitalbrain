@@ -13,6 +13,14 @@ public static class DigitalBrainAppEndpoints
 {
     public static WebApplication MapDigitalBrainHandlers(this WebApplication app)
     {
+        // These handlers are legacy upload/OAuth bridges which dispatch directly to V1
+        // grains and PackConfig. V2 has separate application ports and must fail closed
+        // rather than accidentally exposing a V1 path under the V2 composition.
+        if (string.Equals(app.Configuration["DigitalBrain:Runtime"], "V2", StringComparison.OrdinalIgnoreCase))
+        {
+            return app;
+        }
+
         app.MapPost("/upload", async (HttpRequest request, IGrainFactory grains, ILogger<DigitalBrainAppEndpointLogs> logger) =>
         {
             if (!request.HasFormContentType)

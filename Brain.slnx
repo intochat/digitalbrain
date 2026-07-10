@@ -9,6 +9,8 @@
     <Project Path="src/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/DigitalBrain.Core/DigitalBrain.Core.csproj" />
 
+    <Project Path="src/DigitalBrain.Infrastructure.Connectors.V2/DigitalBrain.Infrastructure.Connectors.V2.csproj" />
+
     <Project Path="src/DigitalBrain.Kernel.Abstractions/DigitalBrain.Kernel.Abstractions.csproj" />
     <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
@@ -29,6 +31,7 @@
     <Project Path="hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DigitalBrain.Connectors.V2.Tests/DigitalBrain.Connectors.V2.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Ino.Tests/DigitalBrain.Ino.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />

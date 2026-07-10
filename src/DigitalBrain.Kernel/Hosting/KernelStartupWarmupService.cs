@@ -12,7 +12,7 @@ public sealed class KernelStartupWarmupService(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (IsTestMode(environment))
+        if (IsTestMode(environment) || IsV2Runtime())
         {
             return;
         }
@@ -69,4 +69,7 @@ public sealed class KernelStartupWarmupService(
     private static bool IsTestMode(IHostEnvironment environment) =>
         string.Equals(Environment.GetEnvironmentVariable("DIGITALBRAIN_TEST_MODE"), "true", StringComparison.OrdinalIgnoreCase)
         || string.Equals(environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsV2Runtime() =>
+        string.Equals(Environment.GetEnvironmentVariable("DigitalBrain__Runtime"), "V2", StringComparison.OrdinalIgnoreCase);
 }
