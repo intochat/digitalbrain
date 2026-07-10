@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+option csharp_namespace = "DigitalBrain.V2.Ui.Grpc";
+
+package digitalbrain.v2.ui;
+
+service DigitalBrainV2Ui {
+  rpc BootstrapSession(BootstrapSessionRequest) returns (SessionReply);
+  rpc RefreshSession(RefreshSessionRequest) returns (SessionReply);
+  rpc WatchSurfaceFeed(WatchSurfaceFeedRequest) returns (stream SurfaceFeedEvent);
+  rpc AcknowledgeSurfaceFeed(AcknowledgeSurfaceFeedRequest) returns (AcknowledgeSurfaceFeedReply);
+  rpc SubmitAction(SubmitActionRequest) returns (SubmitActionReply);
+}
+
+message BootstrapSessionRequest {
+  string secret = 1;
+}
+
+message RefreshSessionRequest {
+  string refresh_token = 1;
+}
+
+message SessionReply {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 access_expires_at_unix_ms = 3;
+  int64 refresh_expires_at_unix_ms = 4;
+  string session_id = 5;
+  string tenant_id = 6;
+  string workspace_id = 7;
+  string principal_id = 8;
+}
+
+enum FeedAudienceKind {
+  FEED_AUDIENCE_KIND_PRINCIPAL = 0;
+  FEED_AUDIENCE_KIND_WORKSPACE = 1;
+  FEED_AUDIENCE_KIND_PUBLIC = 2;
+}
+
+message WatchSurfaceFeedRequest {
+  int64 after_sequence = 1;
+  FeedAudienceKind audience = 2;
+  repeated string client_capabilities = 3;
+  int32 max_batch_size = 4;
+}
+
+message SurfaceFeedEvent {
+  oneof event {
+    string surface_json = 1;
+    SurfaceFeedReset reset = 2;
+  }
+}
+
+message SurfaceFeedReset {
+  string reason = 1;
+  int64 resume_sequence = 2;
+  repeated string snapshot_json = 3;
+}
+
+message AcknowledgeSurfaceFeedRequest {
+  FeedAudienceKind audience = 1;
+  int64 sequence = 2;
+}
+
+message AcknowledgeSurfaceFeedReply {
+  int64 acknowledged_sequence = 1;
+}
+
+message SubmitActionRequest {
+  string binding_id = 1;
+  string action_token = 2;
+  string surface_id = 3;
+  int32 surface_revision = 4;
+  string input_json = 5;
+}
+
+message SubmitActionReply {
+  string operation_id = 1;
+  string idempotency_key = 2;
+}

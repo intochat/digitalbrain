@@ -1,5 +1,6 @@
 extern alias McpProject;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using DigitalBrain.Core.V2;
 using V2RequestContext = DigitalBrain.Core.V2.RequestContext;
 using DigitalBrain.Kernel.V2;
@@ -36,7 +37,10 @@ public sealed class V2ContractsTests
         var a = V2GrainIds.Conversation(new("t1"), new("w1"), "c1");
         var b = V2GrainIds.Conversation(new("t1"), new("w2"), "c1");
         Assert.NotEqual(a, b);
-        Assert.StartsWith("v2:t1:w1:", a);
+        Assert.StartsWith(V2GrainIds.ScopePrefix(new("t1"), new("w1")), a, StringComparison.Ordinal);
+        Assert.NotEqual(
+            V2GrainIds.Aggregate(new("a:b"), new("c"), "same"),
+            V2GrainIds.Aggregate(new("a"), new("b:c"), "same"));
     }
 
     [Fact]
@@ -333,6 +337,95 @@ public sealed class V2ContractsTests
     }
 
     [Fact]
+    public void File_session_rotation_and_logout_failures_do_not_consume_unpersisted_state()
+    {
+        var fail = false;
+        var tokens = new V2SessionTokenService(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var path = Path.Combine(Path.GetTempPath(), "v2-session-seam-" + Guid.NewGuid().ToString("N"), "sessions.jsonl");
+        var manager = new FileV2SessionManager(tokens, path, appendLine: _ =>
+        {
+            if (fail) throw new IOException("injected session journal failure");
+        });
+        var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "session",
+            AuthAssurance.Password, "c", null, new HashSet<string> { "brain.read" });
+        var createFails = true;
+        var createManager = new FileV2SessionManager(tokens, path + ".create", appendLine: _ =>
+        {
+            if (createFails) throw new IOException("injected create journal failure");
+        });
+        Assert.Throws<IOException>(() => createManager.Create(context with { SessionId = "create-session" },
+            TimeSpan.FromMinutes(5), V2SessionAudiences.Ui));
+        createFails = false;
+        _ = createManager.Create(context with { SessionId = "create-session" }, TimeSpan.FromMinutes(5), V2SessionAudiences.Ui);
+        var pair = manager.Create(context, TimeSpan.FromMinutes(5), V2SessionAudiences.Ui);
+
+        fail = true;
+        Assert.Throws<IOException>(() => manager.TryRefresh(pair.RefreshToken, TimeSpan.FromMinutes(5), V2SessionAudiences.Ui, out _));
+        fail = false;
+        Assert.True(manager.TryRefresh(pair.RefreshToken, TimeSpan.FromMinutes(5), V2SessionAudiences.Ui, out var rotated));
+        fail = true;
+        Assert.Throws<IOException>(() => manager.Revoke(rotated.RefreshToken, V2SessionAudiences.Ui));
+        Assert.True(tokens.TryValidate(rotated.AccessToken, V2SessionAudiences.Ui, out _));
+        fail = false;
+        Assert.True(manager.Revoke(rotated.RefreshToken, V2SessionAudiences.Ui));
+        Assert.False(tokens.TryValidate(rotated.AccessToken, V2SessionAudiences.Ui, out _));
+    }
+
+    [Fact]
+    public void File_session_journal_fails_closed_on_a_malformed_interior_rotation_record()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-session-malformed-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var path = Path.Combine(root, "sessions.jsonl");
+            var key = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+            var manager = new FileV2SessionManager(new V2SessionTokenService(key), path);
+            var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "session",
+                AuthAssurance.Password, "c", null, new HashSet<string> { "brain.read" });
+            var pair = manager.Create(context, TimeSpan.FromMinutes(5), V2SessionAudiences.Ui);
+            Assert.True(manager.TryRefresh(pair.RefreshToken, TimeSpan.FromMinutes(5), V2SessionAudiences.Ui, out _));
+            var lines = File.ReadAllLines(path).ToList();
+            lines.Insert(1, "{private-refresh-token-marker");
+            File.WriteAllLines(path, lines);
+
+            Assert.Throws<InvalidDataException>(() => new FileV2SessionManager(new V2SessionTokenService(key), path));
+            var quarantine = File.ReadAllText(path + ".quarantine");
+            Assert.DoesNotContain("private-refresh-token-marker", quarantine, StringComparison.Ordinal);
+            Assert.Contains("sha256", quarantine, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void File_session_journal_rejects_valid_json_with_an_incomplete_context()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-session-incomplete-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var path = Path.Combine(root, "sessions.jsonl");
+            var key = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+            var manager = new FileV2SessionManager(new V2SessionTokenService(key), path);
+            var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "session",
+                AuthAssurance.Password, "c", null, new HashSet<string> { "brain.read" });
+            manager.Create(context, TimeSpan.FromMinutes(5), V2SessionAudiences.Ui);
+            var node = JsonNode.Parse(File.ReadAllText(path).Trim())!.AsObject();
+            node["Entry"]!["Context"] = null;
+            File.WriteAllText(path, node.ToJsonString());
+
+            Assert.Throws<InvalidDataException>(() => new FileV2SessionManager(new V2SessionTokenService(key), path));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void Private_feed_is_workspace_scoped_and_action_binding_is_single_use()
     {
         var feed = new V2PrivateFeedStore();
@@ -433,7 +526,7 @@ public sealed class V2ContractsTests
     {
         var tokens = new V2SessionTokenService(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.read" });
-        var token = tokens.Issue(context, TimeSpan.FromMinutes(5));
+        var token = tokens.Issue(context, TimeSpan.FromMinutes(5), "gateway");
         var metadata = new Dictionary<string, string> { ["x-v2-audience"] = "gateway", ["x-v2-session"] = token };
         Assert.True(V2GrpcAuthentication.TryAuthenticate(metadata, tokens, "gateway", out var authenticated));
         Assert.Equal(context.TenantId, authenticated.TenantId);
@@ -478,7 +571,50 @@ public sealed class V2ContractsTests
     }
 
     [Fact]
-    public async Task V2_operations_ignore_torn_trailing_record_during_recovery()
+    public async Task V2_operation_submission_is_concurrent_idempotent_and_not_visible_before_durable_append()
+    {
+        var fail = true;
+        var writes = 0;
+        var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s",
+            AuthAssurance.Password, "c", "same-idempotency", new HashSet<string> { "brain.act", "brain.read" });
+        var command = new V2CommandEnvelope("test", 2, "command", context, JsonSerializer.SerializeToElement(new { }));
+        var service = new V2ApplicationService(appendLine: _ =>
+        {
+            if (fail) throw new IOException("injected operation journal failure");
+            Interlocked.Increment(ref writes);
+        });
+
+        await Assert.ThrowsAsync<IOException>(() => service.SubmitAsync(context, command));
+        Assert.Empty(service.GetPendingOperationIds());
+        fail = false;
+        var submissions = await Task.WhenAll(Enumerable.Range(0, 32)
+            .Select(_ => Task.Run(() => service.SubmitAsync(context, command))).ToArray());
+        Assert.Single(submissions.Select(static operation => operation.OperationId).Distinct(StringComparer.Ordinal));
+        Assert.Single(service.GetPendingOperationIds());
+        Assert.Equal(1, writes);
+    }
+
+    [Fact]
+    public async Task V2_operation_idempotency_scope_is_unambiguous_for_delimiter_bearing_identifiers()
+    {
+        var service = new V2ApplicationService();
+        var first = new V2RequestContext(new("a:b"), new("c"), new("same", PrincipalKind.User), "s1",
+            AuthAssurance.Password, "c1", "idem", new HashSet<string> { "brain.act", "brain.read" });
+        var second = new V2RequestContext(new("a"), new("b:c"), new("same", PrincipalKind.User), "s2",
+            AuthAssurance.Password, "c2", "idem", new HashSet<string> { "brain.act", "brain.read" });
+        var firstOperation = await service.SubmitAsync(first,
+            new V2CommandEnvelope("test", 2, "command", first, JsonSerializer.SerializeToElement(new { })));
+        var secondOperation = await service.SubmitAsync(second,
+            new V2CommandEnvelope("test", 2, "command", second, JsonSerializer.SerializeToElement(new { })));
+
+        Assert.NotEqual(firstOperation.OperationId, secondOperation.OperationId);
+        Assert.NotNull(await service.GetOperationAsync(first, firstOperation.OperationId));
+        Assert.Null(await service.GetOperationAsync(first, secondOperation.OperationId));
+        Assert.NotEqual(V2RequestScope.Id(first), V2RequestScope.Id(second));
+    }
+
+    [Fact]
+    public void V2_operations_fail_closed_on_a_torn_journal_record()
     {
         var root = Path.Combine(Path.GetTempPath(), "v2-torn-" + Guid.NewGuid().ToString("N"));
         try
@@ -486,9 +622,7 @@ public sealed class V2ContractsTests
             Directory.CreateDirectory(root);
             var path = Path.Combine(root, "operations.jsonl");
             File.WriteAllText(path, "{not-json}\n");
-            var service = new V2ApplicationService(storagePath: path);
-            var page = await service.GetOperationsAsync(new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.read" }), null, 10);
-            Assert.Empty(page.Items);
+            Assert.Throws<InvalidDataException>(() => new V2ApplicationService(storagePath: path));
             var quarantine = File.ReadAllText(path + ".quarantine");
             Assert.Contains("invalid-json", quarantine);
             Assert.DoesNotContain("not-json", quarantine);
@@ -585,7 +719,8 @@ public sealed class V2ContractsTests
         try
         {
             var path = Path.Combine(root, "sessions.jsonl");
-            var tokens = new V2SessionTokenService(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+            var key = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+            var tokens = new V2SessionTokenService(key);
             var context = new V2RequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.read" });
             var first = new FileV2SessionManager(tokens, path, TimeSpan.FromHours(1));
             var pair = first.Create(context, TimeSpan.FromMinutes(5));
@@ -594,8 +729,10 @@ public sealed class V2ContractsTests
             var third = new FileV2SessionManager(tokens, path, TimeSpan.FromHours(1));
             Assert.False(third.TryRefresh(pair.RefreshToken, TimeSpan.FromMinutes(5), out _));
             Assert.True(third.Revoke(rotated.RefreshToken));
-            var final = new FileV2SessionManager(tokens, path, TimeSpan.FromHours(1));
+            var restartedTokens = new V2SessionTokenService(key);
+            var final = new FileV2SessionManager(restartedTokens, path, TimeSpan.FromHours(1));
             Assert.False(final.Revoke(rotated.RefreshToken));
+            Assert.False(restartedTokens.TryValidate(rotated.AccessToken, V2SessionAudiences.Mcp, out _));
             Assert.DoesNotContain(pair.RefreshToken, File.ReadAllText(path));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }

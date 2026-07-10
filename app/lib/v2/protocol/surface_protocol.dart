@@ -18,7 +18,7 @@ class V2ClientCapabilities {
     this.payloadKinds = const {'widgetTree', 'rfw', 'native'},
     this.widgetVocabularyVersion = 2,
     this.maximumPayloadBytes = defaultMaximumSurfaceBytes,
-    this.supportsBinaryRfw = true,
+    this.supportsBinaryRfw = false,
     this.nativeFeatures = const {'typed-actions', 'feed-reset', 'feed-ack'},
   });
 
@@ -30,7 +30,7 @@ class V2ClientCapabilities {
   final Set<String> nativeFeatures;
 
   Set<String> get names => {
-    'ui.protocol.v$digitalBrainUiProtocolVersion',
+    for (final version in protocolVersions) 'ui.protocol.v$version',
     'ui.widget-vocabulary.v$widgetVocabularyVersion',
     for (final kind in payloadKinds) 'ui.payload.$kind',
     if (supportsBinaryRfw) 'ui.rfw.binary',
@@ -512,12 +512,22 @@ class UnsupportedSurfaceCapability implements Exception {
 const Set<String> _forbiddenPayloadKeys = {
   'accesstoken',
   'actiontoken',
+  'authorization',
   'authorizationcode',
+  'clientid',
   'clientsecret',
   'codeverifier',
+  'grants',
   'password',
+  'principal',
+  'principalid',
   'refreshtoken',
+  'secret',
   'secretvalue',
+  'sessionid',
+  'tenantid',
+  'userid',
+  'workspaceid',
 };
 
 Map<String, Object?> _safeObject(

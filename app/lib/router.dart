@@ -4,14 +4,19 @@ import 'package:go_router/go_router.dart';
 import 'features/canvas/living_canvas_screen.dart';
 import 'features/experience/experience_host_screen.dart';
 import 'features/spike/globe_lottie_spike.dart';
-import 'shell/forui_app_shell.dart';
+import 'shell/runtime_app_shell.dart';
+import 'v2/v2_config.dart';
 
 final digitalbrainRouter = GoRouter(
   initialLocation: '/chat',
+  redirect: (context, state) {
+    if (isV2Runtime() && state.uri.path != '/chat') return '/chat';
+    return null;
+  },
   routes: [
     GoRoute(path: '/', redirect: (context, state) => '/chat'),
     ShellRoute(
-      builder: (context, state, child) => ForuiAppShell(child: child),
+      builder: (context, state, child) => RuntimeAppShell(child: child),
       routes: [
         GoRoute(
           path: '/chat',

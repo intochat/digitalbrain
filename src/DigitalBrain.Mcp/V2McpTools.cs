@@ -11,6 +11,7 @@ namespace DigitalBrain.Mcp;
 public sealed class V2McpTools(
     IHttpContextAccessor http,
     V2SessionTokenService tokens,
+    IConfiguration configuration,
     V2ApplicationService application,
     IV2ProjectionQueryPort projections)
 {
@@ -49,7 +50,10 @@ public sealed class V2McpTools(
     {
         var request = http.HttpContext?.Request;
         var value = request?.Headers.Authorization.ToString();
-        if (value is null || !value.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) || !tokens.TryValidate(value[7..].Trim(), out var context))
+        _ = V2SessionAudiences.RequireFixedMcp(configuration["DigitalBrain:V2:Mcp:Audience"]);
+        var audience = V2SessionAudiences.Mcp;
+        if (value is null || !value.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ||
+            !tokens.TryValidate(value[7..].Trim(), audience, out var context))
             throw new UnauthorizedAccessException("Authenticated V2 session required.");
         return context;
     }

@@ -17,6 +17,9 @@ public sealed class TestServerCallContext : ServerCallContext
     public static TestServerCallContext Create(CancellationToken cancellationToken = default) => new(cancellationToken);
 
     public static TestServerCallContext WithHeaders(params (string Key, string Value)[] headers)
+        => WithHeaders(default, headers);
+
+    public static TestServerCallContext WithHeaders(CancellationToken cancellationToken, params (string Key, string Value)[] headers)
     {
         var metadata = new Metadata();
         foreach (var (key, value) in headers)
@@ -24,7 +27,7 @@ public sealed class TestServerCallContext : ServerCallContext
             metadata.Add(key, value);
         }
 
-        return new TestServerCallContext(requestHeaders: metadata);
+        return new TestServerCallContext(cancellationToken, metadata);
     }
 
     protected override string MethodCore => "test";

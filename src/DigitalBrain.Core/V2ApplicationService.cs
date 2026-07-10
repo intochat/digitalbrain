@@ -11,19 +11,33 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
     private readonly CapabilityIsolationGate _gate = new();
     private readonly ConcurrentDictionary<string, V2OperationStatus> _operations = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (TenantId Tenant, WorkspaceId Workspace)> _operationOwners = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, string> _idempotency = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<IdempotencyScope, string> _idempotency = new();
+    private readonly ConcurrentDictionary<string, string> _operationIdempotency = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, V2CommandEnvelope> _commands = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _claimed = new(StringComparer.Ordinal);
     private readonly byte[] _cursorKey;
     private readonly IReadOnlyList<V2Capability> _capabilities;
     private readonly string? _storagePath;
     private readonly object _storageLock = new();
+    private readonly object _stateLock = new();
+    private readonly Action<string>? _appendLine;
 
-    public V2ApplicationService(byte[]? cursorKey = null, IEnumerable<V2Capability>? capabilities = null, string? storagePath = null)
+    public V2ApplicationService(
+        byte[]? cursorKey = null,
+        IEnumerable<V2Capability>? capabilities = null,
+        string? storagePath = null,
+        Action<string>? appendLine = null)
     {
         _cursorKey = cursorKey is { Length: >= 32 } ? cursorKey.ToArray() : SHA256.HashData(Encoding.UTF8.GetBytes("digitalbrain-v2-test-cursor-key"));
         _capabilities = (capabilities ?? [new("brain.read", 2, true, false), new("brain.act", 2, true, true), new("brain.approve", 2, true, true)]).ToArray();
-        _storagePath = storagePath;
+        _storagePath = string.IsNullOrWhiteSpace(storagePath) ? null : Path.GetFullPath(storagePath);
+        _appendLine = appendLine ?? (_storagePath is null
+            ? null
+            : line =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
+                File.AppendAllText(_storagePath, line + Environment.NewLine);
+            });
         Load();
     }
 
@@ -63,21 +77,29 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
                 : "brain.act";
         _gate.Demand(context, context.TenantId, context.WorkspaceId, requiredCapability);
         cancellationToken.ThrowIfCancellationRequested();
-        var scope = $"{context.TenantId.Value}:{context.WorkspaceId.Value}";
         var idempotency = context.IdempotencyKey ?? command.CommandId;
-        var key = scope + ":" + idempotency;
-        if (_idempotency.TryGetValue(key, out var existing) && _operations.TryGetValue(existing, out var prior)) return Task.FromResult(prior);
-        var operationId = "v2-op-" + Guid.NewGuid().ToString("N");
-        var operation = new V2OperationStatus(operationId, WorkflowState.ApplyQueued, null, DateTimeOffset.UtcNow);
-        _operations[operationId] = operation;
-        _operationOwners[operationId] = (context.TenantId, context.WorkspaceId);
-        _commands[operationId] = command;
-        _idempotency[key] = operationId;
-        // The operation and command envelope are appended together as the durable
-        // handoff boundary. A worker can rebuild pending commands from this record;
-        // an HTTP acknowledgement is never the only copy of the command.
-        Persist(key, command, operation);
-        return Task.FromResult(operation);
+        var key = new IdempotencyScope(context.TenantId, context.WorkspaceId, idempotency);
+        lock (_stateLock)
+        {
+            if (_idempotency.TryGetValue(key, out var existing))
+            {
+                if (_operations.TryGetValue(existing, out var prior) && _operationOwners.TryGetValue(existing, out var owner) &&
+                    owner.Tenant == context.TenantId && owner.Workspace == context.WorkspaceId)
+                    return Task.FromResult(prior);
+                throw new InvalidOperationException("The V2 idempotency journal is internally inconsistent.");
+            }
+            var operationId = "v2-op-" + Guid.NewGuid().ToString("N");
+            var operation = new V2OperationStatus(operationId, WorkflowState.ApplyQueued, null, DateTimeOffset.UtcNow);
+            // The operation and command envelope are appended together before any in-memory
+            // observer can see them. This is the durable handoff and idempotency linearization point.
+            Persist(idempotency, context.TenantId, context.WorkspaceId, command, operation);
+            _operations[operationId] = operation;
+            _operationOwners[operationId] = (context.TenantId, context.WorkspaceId);
+            _commands[operationId] = command;
+            _idempotency[key] = operationId;
+            _operationIdempotency[operationId] = idempotency;
+            return Task.FromResult(operation);
+        }
     }
 
     private void Load()
@@ -99,12 +121,29 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
                 // Quarantine only a digest and location: the raw record may contain a
                 // caller payload and must never be copied to another durable surface.
                 Quarantine(lineNumber, line);
-                continue;
+                throw new InvalidDataException($"The V2 operation journal contains invalid JSON at line {lineNumber}.");
             }
-            if (item is null) continue;
+            if (item is null || string.IsNullOrWhiteSpace(item.Idempotency) || item.Idempotency.Length > 1024 ||
+                string.IsNullOrWhiteSpace(item.Tenant) || item.Tenant.Length > 256 ||
+                string.IsNullOrWhiteSpace(item.Workspace) || item.Workspace.Length > 256 ||
+                item.Operation is null || string.IsNullOrWhiteSpace(item.Operation.OperationId) || item.Operation.OperationId.Length > 256 ||
+                item.Command is null || item.Command.Context.TenantId.Value != item.Tenant ||
+                item.Command.Context.WorkspaceId.Value != item.Workspace)
+            {
+                Quarantine(lineNumber, line);
+                throw new InvalidDataException($"The V2 operation journal contains an invalid record at line {lineNumber}.");
+            }
+            var idempotencyScope = new IdempotencyScope(new(item.Tenant), new(item.Workspace), item.Idempotency);
+            if (_idempotency.TryGetValue(idempotencyScope, out var mappedOperation) &&
+                !string.Equals(mappedOperation, item.Operation.OperationId, StringComparison.Ordinal))
+            {
+                Quarantine(lineNumber, line);
+                throw new InvalidDataException($"The V2 operation journal contains an idempotency conflict at line {lineNumber}.");
+            }
             _operations[item.Operation.OperationId] = item.Operation;
             _operationOwners[item.Operation.OperationId] = (new(item.Tenant), new(item.Workspace));
-            _idempotency[item.Idempotency] = item.Operation.OperationId;
+            _idempotency[idempotencyScope] = item.Operation.OperationId;
+            _operationIdempotency[item.Operation.OperationId] = item.Idempotency;
             if (item.Command is not null) _commands[item.Operation.OperationId] = item.Command;
         }
     }
@@ -130,28 +169,34 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
         }
     }
 
-    private void Persist(string idempotency, V2CommandEnvelope command, V2OperationStatus operation)
+    private void Persist(string idempotency, TenantId tenant, WorkspaceId workspace, V2CommandEnvelope command, V2OperationStatus operation)
     {
-        if (string.IsNullOrWhiteSpace(_storagePath) || !_operationOwners.TryGetValue(operation.OperationId, out var owner)) return;
+        if (_appendLine is null) return;
         lock (_storageLock)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_storagePath))!);
-            File.AppendAllText(_storagePath, JsonSerializer.Serialize(new PersistedOperation(idempotency, owner.Tenant.Value, owner.Workspace.Value, operation, command)) + Environment.NewLine);
-        }
+            _appendLine(JsonSerializer.Serialize(new PersistedOperation(idempotency, tenant.Value, workspace.Value, operation, command)));
     }
 
     private sealed record PersistedOperation(string Idempotency, string Tenant, string Workspace, V2OperationStatus Operation, V2CommandEnvelope? Command = null);
+    private readonly record struct IdempotencyScope(TenantId Tenant, WorkspaceId Workspace, string Idempotency);
 
     /// <summary>Claims one durable command for execution. Claiming is idempotent and never trusts transport state.</summary>
     public bool TryClaimPending(string operationId, out V2CommandEnvelope? command)
     {
-        command = null;
-        if (!_operations.TryGetValue(operationId, out var current) || current.State != WorkflowState.ApplyQueued || !_commands.TryGetValue(operationId, out command)) return false;
-        if (!_claimed.TryAdd(operationId, 0)) return false;
-        var applying = current with { State = WorkflowState.Applying, UpdatedAt = DateTimeOffset.UtcNow };
-        _operations[operationId] = applying;
-        PersistStatus(operationId, applying);
-        return true;
+        lock (_stateLock)
+        {
+            command = null;
+            if (!_operations.TryGetValue(operationId, out var current) || current.State != WorkflowState.ApplyQueued || !_commands.TryGetValue(operationId, out command)) return false;
+            if (!_claimed.TryAdd(operationId, 0)) return false;
+            var applying = current with { State = WorkflowState.Applying, UpdatedAt = DateTimeOffset.UtcNow };
+            try { PersistStatus(operationId, applying); }
+            catch
+            {
+                _claimed.TryRemove(operationId, out _);
+                throw;
+            }
+            _operations[operationId] = applying;
+            return true;
+        }
     }
 
     public IReadOnlyList<string> GetPendingOperationIds()
@@ -162,21 +207,22 @@ public sealed class V2ApplicationService : IV2QueryPort, IV2CommandPort
     public bool RecordOutcome(string operationId, WorkflowState state, string? safeReason = null)
     {
         if (state is not (WorkflowState.Succeeded or WorkflowState.Failed or WorkflowState.OutcomeUnknown or WorkflowState.Compensated or WorkflowState.ManualIntervention)) throw new ArgumentOutOfRangeException(nameof(state));
-        if (!_operations.TryGetValue(operationId, out var current) || current.State != WorkflowState.Applying) return false;
-        var updated = current with { State = state, SafeReason = safeReason, UpdatedAt = DateTimeOffset.UtcNow };
-        _operations[operationId] = updated;
-        PersistStatus(operationId, updated);
-        return true;
+        lock (_stateLock)
+        {
+            if (!_operations.TryGetValue(operationId, out var current) || current.State != WorkflowState.Applying) return false;
+            var updated = current with { State = state, SafeReason = safeReason, UpdatedAt = DateTimeOffset.UtcNow };
+            PersistStatus(operationId, updated);
+            _operations[operationId] = updated;
+            return true;
+        }
     }
 
     private void PersistStatus(string operationId, V2OperationStatus status)
     {
-        if (!_operationOwners.TryGetValue(operationId, out var owner) || !_commands.TryGetValue(operationId, out var command) || string.IsNullOrWhiteSpace(_storagePath)) return;
+        if (_appendLine is null || !_operationOwners.TryGetValue(operationId, out var owner) ||
+            !_commands.TryGetValue(operationId, out var command) || !_operationIdempotency.TryGetValue(operationId, out var idempotency)) return;
         lock (_storageLock)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_storagePath))!);
-            File.AppendAllText(_storagePath, JsonSerializer.Serialize(new PersistedOperation(owner.Tenant.Value + ":" + owner.Workspace.Value + ":" + command.CommandId, owner.Tenant.Value, owner.Workspace.Value, status, command)) + Environment.NewLine);
-        }
+            _appendLine(JsonSerializer.Serialize(new PersistedOperation(idempotency, owner.Tenant.Value, owner.Workspace.Value, status, command)));
     }
 
     private string EncodeCursor(int offset)

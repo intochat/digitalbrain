@@ -243,7 +243,7 @@ class UiSurfaceTreeRenderer {
       return const SizedBox.shrink(); // legacy navItems removed - use children
     }
 
-    if (type == 'fcard' || type == 'card' || type == 'panel') {
+    if (type == 'fcard' || type == 'forui:fcard' || type == 'card' || type == 'panel') {
       final title = props['title']?.toString() ?? '';
       final sub =
           props['subtitle']?.toString() ?? props['summary']?.toString() ?? '';

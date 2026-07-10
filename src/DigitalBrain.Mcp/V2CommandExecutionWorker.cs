@@ -18,7 +18,7 @@ public sealed class V2CommandExecutionWorker(
             {
                 try { await dispatcher.DispatchAsync(operationId, stoppingToken).ConfigureAwait(false); }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
-                catch (Exception ex) { logger.LogError(ex, "V2 command dispatch failed for operation {OperationId}", operationId); }
+                catch (Exception ex) { logger.LogError(ex, "V2 command dispatch failed."); }
             }
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken).ConfigureAwait(false);
         }

@@ -1,5 +1,7 @@
 using System.Reflection;
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+using DigitalBrain.Aspire;
 
 namespace DigitalBrain.Tests.Aspire;
 
@@ -50,6 +52,106 @@ public sealed class AddDigitalBrainExecutionModeTests
         // Sync blob container (checkpoint backup/restore, M11 Task 20) — unconditional like grainstate/journal,
         // not gated by isRunMode, but still present here as a regression guard for the resource wiring itself.
         Assert.Contains(builder.Resources, r => r.Name == "sync" && r.GetType().Name == "AzureBlobStorageResource");
+
+        // Development run mode automatically starts the Runtime V2 Flutter shell.
+        Assert.Contains(builder.Resources, r => r.Name == "flutter-ui");
+    }
+
+    [Fact]
+    public async Task V2TestProfile_DeclaresFlutterClientWiredOnlyToV2Transport()
+    {
+        var builder = await CreateAppHostBuilderAsync("--DigitalBrain:Profile=Test");
+
+        Assert.Equal("Test", builder.Configuration["DigitalBrain:Profile"]);
+        Assert.Contains(builder.Resources, r => r.Name == "kernel");
+
+        var mcp = Assert.Single(builder.Resources, r => r.Name == "mcp");
+        var flutter = Assert.Single(builder.Resources, r => r.Name == "flutter-ui");
+        var bootstrapSecret = Assert.IsType<ParameterResource>(
+            Assert.Single(builder.Resources, r => r.Name == "v2-ui-bootstrap-secret"));
+        Assert.True(bootstrapSecret.Secret);
+        var feedIntegrityKey = Assert.IsType<ParameterResource>(
+            Assert.Single(builder.Resources, r => r.Name == "v2-ui-feed-integrity-key"));
+        Assert.True(feedIntegrityKey.Secret);
+
+        var httpsEndpoint = Assert.Single(
+            mcp.Annotations.OfType<EndpointAnnotation>(),
+            endpoint => endpoint.Name == "https");
+        Assert.Equal("https", httpsEndpoint.UriScheme);
+        Assert.Equal("http2", httpsEndpoint.Transport);
+        Assert.True(httpsEndpoint.IsProxied);
+        Assert.Contains(
+            mcp.Annotations.OfType<HealthCheckAnnotation>(),
+            annotation => annotation.Key == "mcp_https_/health_200_check");
+
+        var wait = Assert.Single(
+            flutter.Annotations.OfType<WaitAnnotation>(),
+            annotation => ReferenceEquals(annotation.Resource, mcp));
+        Assert.Equal(WaitType.WaitUntilHealthy, wait.WaitType);
+
+        var transportReference = Assert.Single(flutter.Annotations.OfType<EndpointReferenceAnnotation>());
+        Assert.Same(mcp, transportReference.Resource);
+        Assert.False(transportReference.UseAllEndpoints);
+        Assert.Equal(["https"], transportReference.EndpointNames);
+
+        var flutterEnvironment = await EvaluateEnvironmentAsync(builder, flutter);
+        Assert.Equal("V2", flutterEnvironment[FlutterAspireExtensions.V2RuntimeEnvironmentVariable]);
+        var endpointReference = Assert.IsType<EndpointReference>(
+            flutterEnvironment[FlutterAspireExtensions.V2TransportEndpointEnvironmentVariable]);
+        Assert.Same(mcp, endpointReference.Resource);
+        Assert.Equal("https", endpointReference.EndpointName);
+        Assert.Same(
+            bootstrapSecret,
+            flutterEnvironment[FlutterAspireExtensions.V2BootstrapSecretEnvironmentVariable]);
+
+        var mcpEnvironment = await EvaluateEnvironmentAsync(builder, mcp);
+        Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__V2__Ui__BootstrapSecret"]);
+        Assert.Same(feedIntegrityKey, mcpEnvironment["DigitalBrain__V2__Ui__FeedIntegrityKey"]);
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var operationPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__OperationStorePath"]);
+        var projectionPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__ProjectionStorePath"]);
+        var sessionPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__SessionStorePath"]);
+        var feedPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__Ui__FeedStorePath"]);
+        Assert.All([operationPath, projectionPath, sessionPath, feedPath], path =>
+        {
+            Assert.StartsWith(localAppData, path, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(Path.Combine("hosts", "DigitalBrain.AppHost", ".digitalbrain"), path, StringComparison.OrdinalIgnoreCase);
+        });
+        Assert.Equal("operations.jsonl", Path.GetFileName(operationPath));
+        Assert.Equal("projections.jsonl", Path.GetFileName(projectionPath));
+        Assert.Equal("sessions.jsonl", Path.GetFileName(sessionPath));
+        Assert.Equal("ui-feed.jsonl", Path.GetFileName(feedPath));
+        Assert.Single(new[] { operationPath, projectionPath, sessionPath, feedPath }
+            .Select(Path.GetDirectoryName)
+            .Distinct(StringComparer.OrdinalIgnoreCase));
+
+        var relationships = flutter.Annotations.OfType<ResourceRelationshipAnnotation>().ToArray();
+        Assert.Contains(relationships, relationship => ReferenceEquals(relationship.Resource, mcp));
+        Assert.Contains(relationships, relationship => ReferenceEquals(relationship.Resource, bootstrapSecret));
+        Assert.All(
+            relationships,
+            relationship => Assert.True(
+                ReferenceEquals(relationship.Resource, mcp)
+                || ReferenceEquals(relationship.Resource, bootstrapSecret),
+                $"flutter-ui unexpectedly references '{relationship.Resource.Name}'."));
+        Assert.DoesNotContain(builder.Resources, resource => resource.Name.Contains("gateway", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            flutterEnvironment,
+            pair => pair.Key.Contains("WatchHomeFeed", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.Contains("DigitalBrainGateway", StringComparison.OrdinalIgnoreCase)
+                || pair.Value?.ToString()?.Contains("WatchHomeFeed", StringComparison.OrdinalIgnoreCase) == true
+                || pair.Value?.ToString()?.Contains("DigitalBrainGateway", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    [Fact]
+    public async Task V2ProductionProfile_DoesNotDeclareLocalFlutterOrBootstrapCredential()
+    {
+        var builder = await CreateAppHostBuilderAsync("--DigitalBrain:Profile=Production");
+
+        Assert.True(builder.ExecutionContext.IsRunMode);
+        Assert.Contains(builder.Resources, resource => resource.Name == "mcp");
+        Assert.DoesNotContain(builder.Resources, resource => resource.Name == "flutter-ui");
+        Assert.DoesNotContain(builder.Resources, resource => resource.Name == "v2-ui-bootstrap-secret");
     }
 
     [Fact]
@@ -78,5 +180,20 @@ public sealed class AddDigitalBrainExecutionModeTests
         // Sync blob container still present in publish mode (AddAzureStorage produces a valid real-Azure
         // resource on its own — same reasoning as grainstate/journal, see Task 20).
         Assert.Contains(builder.Resources, r => r.Name == "sync" && r.GetType().Name == "AzureBlobStorageResource");
+        Assert.DoesNotContain(builder.Resources, r => r.Name == "flutter-ui");
+    }
+
+    private static async Task<Dictionary<string, object>> EvaluateEnvironmentAsync(
+        IDistributedApplicationTestingBuilder builder,
+        IResource resource)
+    {
+        var environment = new Dictionary<string, object>(StringComparer.Ordinal);
+        var context = new EnvironmentCallbackContext(builder.ExecutionContext, resource, environment);
+        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
+        {
+            await annotation.Callback(context);
+        }
+
+        return environment;
     }
 }

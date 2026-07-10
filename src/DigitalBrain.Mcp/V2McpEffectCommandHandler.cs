@@ -16,8 +16,7 @@ public sealed class V2McpEffectCommandHandler(IV2EffectWorkerPort workerPort) : 
             return new(WorkflowState.Failed, "effect-reference-invalid");
 
         var aggregateId = aggregate.GetString();
-        var scopePrefix = $"v2:{command.Context.TenantId.Value}:{command.Context.WorkspaceId.Value}:";
-        if (string.IsNullOrWhiteSpace(aggregateId) || !aggregateId.StartsWith(scopePrefix, StringComparison.Ordinal))
+        if (!V2GrainIds.IsInScope(aggregateId, command.Context.TenantId, command.Context.WorkspaceId))
             return new(WorkflowState.Failed, "effect-scope-invalid");
 
         cancellationToken.ThrowIfCancellationRequested();

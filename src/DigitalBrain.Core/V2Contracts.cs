@@ -33,6 +33,35 @@ public sealed record RequestContext(
     [property: Id(6)] string? IdempotencyKey,
     [property: Id(7)] IReadOnlySet<string> Grants);
 
+public static class V2SessionAudiences
+{
+    public const string Mcp = "digitalbrain-v2";
+    public const string Ui = "digitalbrain-v2-ui";
+
+    public static string RequireFixedMcp(string? configuredAudience)
+    {
+        if (configuredAudience is null) return Mcp;
+        if (!string.Equals(configuredAudience, Mcp, StringComparison.Ordinal))
+            throw new InvalidOperationException("The V2 MCP transport audience is fixed and cannot be empty, aliased, or shared with the V2 UI transport.");
+        return Mcp;
+    }
+}
+
+public static class V2RequestScope
+{
+    public static string Id(RequestContext context)
+    {
+        var canonical = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            tenant = context.TenantId.Value,
+            workspace = context.WorkspaceId.Value,
+            principalKind = (int)context.Principal.Kind,
+            principal = context.Principal.Value
+        });
+        return Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant();
+    }
+}
+
 [GenerateSerializer, Alias("digitalbrain.v2.persisted-actor-snapshot")]
 public sealed record PersistedActorSnapshot(
     [property: Id(0)] TenantId TenantId,
@@ -44,15 +73,28 @@ public sealed record PersistedActorSnapshot(
 public static class V2GrainIds
 {
     public static string Aggregate(TenantId tenant, WorkspaceId workspace, string aggregate) =>
-        $"v2:{tenant.Value}:{workspace.Value}:aggregate:{aggregate}";
+        ScopePrefix(tenant, workspace) + "aggregate/" + Segment(aggregate);
     public static string Conversation(TenantId tenant, WorkspaceId workspace, string conversation) =>
-        $"v2:{tenant.Value}:{workspace.Value}:conversation:{conversation}";
+        ScopePrefix(tenant, workspace) + "conversation/" + Segment(conversation);
     public static string Workflow(TenantId tenant, WorkspaceId workspace, string workflow) =>
-        $"v2:{tenant.Value}:{workspace.Value}:workflow:{workflow}";
+        ScopePrefix(tenant, workspace) + "workflow/" + Segment(workflow);
+
+    public static string ScopePrefix(TenantId tenant, WorkspaceId workspace) =>
+        $"v2/{Segment(tenant.Value)}/{Segment(workspace.Value)}/";
+
+    public static bool IsInScope(string? grainId, TenantId tenant, WorkspaceId workspace) =>
+        !string.IsNullOrWhiteSpace(grainId) && grainId.StartsWith(ScopePrefix(tenant, workspace), StringComparison.Ordinal);
+
+    private static string Segment(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("A non-empty V2 grain id component is required.", nameof(value));
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
 }
 
 public sealed class V2SessionTokenService
 {
+    private const string StructuredPrefix = "v2s";
     private readonly byte[] _key;
     private readonly ConcurrentDictionary<string, DateTimeOffset> _revoked = new(StringComparer.Ordinal);
     public V2SessionTokenService(byte[] key)
@@ -60,38 +102,141 @@ public sealed class V2SessionTokenService
         if (key.Length < 32) throw new ArgumentException("V2 session signing key must be at least 256 bits.", nameof(key));
         _key = key.ToArray();
     }
-    public string Issue(RequestContext context, TimeSpan lifetime)
+    public string Issue(RequestContext context, TimeSpan lifetime, string audience = V2SessionAudiences.Mcp)
     {
-        var expires = DateTimeOffset.UtcNow.Add(lifetime);
-        var body = string.Join(".", "v2", context.SessionId, context.TenantId.Value, context.WorkspaceId.Value, context.Principal.Value, (int)context.Principal.Kind, (int)context.Assurance, expires.ToUnixTimeSeconds());
-        var sig = Convert.ToHexString(HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(body)));
-        return body + "." + sig;
+        if (lifetime <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(lifetime));
+        if (string.IsNullOrWhiteSpace(audience)) throw new ArgumentException("A non-empty V2 session audience is required.", nameof(audience));
+        if (string.IsNullOrWhiteSpace(context.SessionId) || string.IsNullOrWhiteSpace(context.TenantId.Value) ||
+            string.IsNullOrWhiteSpace(context.WorkspaceId.Value) || string.IsNullOrWhiteSpace(context.Principal.Value))
+            throw new ArgumentException("A complete V2 request context is required.", nameof(context));
+        if (context.SessionId.Length > 256 || context.TenantId.Value.Length > 256 || context.WorkspaceId.Value.Length > 256 ||
+            context.Principal.Value.Length > 256 || audience.Length > 128 || context.Grants.Count > 64 ||
+            context.Grants.Any(static grant => string.IsNullOrWhiteSpace(grant) || grant.Length > 128))
+            throw new ArgumentException("V2 session claims exceed the signed transport bound.", nameof(context));
+
+        var now = DateTimeOffset.UtcNow;
+        var claims = new SessionClaims(
+            2,
+            context.SessionId,
+            context.TenantId.Value,
+            context.WorkspaceId.Value,
+            context.Principal.Value,
+            context.Principal.Kind,
+            context.Assurance,
+            audience,
+            context.Grants.Order(StringComparer.Ordinal).ToArray(),
+            now.ToUnixTimeSeconds(),
+            now.Add(lifetime).ToUnixTimeSeconds());
+        var encoded = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(claims));
+        var body = StructuredPrefix + "." + encoded;
+        var signature = Convert.ToHexString(HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(body)));
+        return body + "." + signature;
     }
+
     public bool TryValidate(string token, out RequestContext context)
+        => TryValidateCore(token, expectedAudience: null, out context, out _);
+
+    public bool TryValidate(string token, string expectedAudience, out RequestContext context)
     {
         context = default!;
+        return !string.IsNullOrWhiteSpace(expectedAudience) && TryValidateCore(token, expectedAudience, out context, out _);
+    }
+
+    public bool TryValidate(string token, string expectedAudience, out RequestContext context, out DateTimeOffset expiresAt)
+    {
+        context = default!;
+        expiresAt = default;
+        return !string.IsNullOrWhiteSpace(expectedAudience) && TryValidateCore(token, expectedAudience, out context, out expiresAt);
+    }
+
+    private bool TryValidateCore(string token, string? expectedAudience, out RequestContext context, out DateTimeOffset expiresAt)
+    {
+        context = default!;
+        expiresAt = default;
+        if (string.IsNullOrWhiteSpace(token) || token.Length > 16_384) return false;
         var parts = token.Split('.');
-        if (parts.Length != 9 || parts[0] != "v2" || !int.TryParse(parts[5], out var kind) || !Enum.IsDefined(typeof(PrincipalKind), kind) || !int.TryParse(parts[6], out var assurance) || !Enum.IsDefined(typeof(AuthAssurance), assurance) || !long.TryParse(parts[7], out var seconds)) return false;
-        var body = string.Join('.', parts.Take(8));
+        if (parts.Length != 3 || parts[0] != StructuredPrefix) return false;
+        var body = string.Join('.', parts.Take(2));
         var expected = HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(body));
         byte[] actual;
-        try { actual = Convert.FromHexString(parts[8]); } catch (FormatException) { return false; }
+        try { actual = Convert.FromHexString(parts[2]); } catch (FormatException) { return false; }
+        if (actual.Length != expected.Length || !CryptographicOperations.FixedTimeEquals(actual, expected)) return false;
+
+        SessionClaims? claims;
+        try { claims = JsonSerializer.Deserialize<SessionClaims>(Base64UrlDecode(parts[1])); }
+        catch (Exception ex) when (ex is FormatException or JsonException or ArgumentException) { return false; }
+        if (claims is null || claims.Version != 2 || string.IsNullOrWhiteSpace(claims.SessionId) ||
+            string.IsNullOrWhiteSpace(claims.TenantId) || string.IsNullOrWhiteSpace(claims.WorkspaceId) ||
+            string.IsNullOrWhiteSpace(claims.PrincipalId) || string.IsNullOrWhiteSpace(claims.Audience) ||
+            claims.SessionId.Length > 256 || claims.TenantId.Length > 256 || claims.WorkspaceId.Length > 256 ||
+            claims.PrincipalId.Length > 256 || claims.Audience.Length > 128 || claims.Grants is null || claims.Grants.Length > 64 ||
+            claims.Grants.Any(static grant => string.IsNullOrWhiteSpace(grant) || grant.Length > 128) ||
+            !Enum.IsDefined(claims.PrincipalKind) || !Enum.IsDefined(claims.Assurance) ||
+            (expectedAudience is not null && !string.Equals(claims.Audience, expectedAudience, StringComparison.Ordinal))) return false;
+        DateTimeOffset issuedAt;
         DateTimeOffset expiry;
-        try { expiry = DateTimeOffset.FromUnixTimeSeconds(seconds); }
+        try
+        {
+            issuedAt = DateTimeOffset.FromUnixTimeSeconds(claims.IssuedAtUnixSeconds);
+            expiry = DateTimeOffset.FromUnixTimeSeconds(claims.ExpiresAtUnixSeconds);
+        }
         catch (ArgumentOutOfRangeException) { return false; }
-        if (actual.Length != expected.Length || !CryptographicOperations.FixedTimeEquals(actual, expected) || expiry <= DateTimeOffset.UtcNow || _revoked.ContainsKey(parts[1])) return false;
-        context = new RequestContext(new(parts[2]), new(parts[3]), new(parts[4], (PrincipalKind)kind), parts[1], (AuthAssurance)assurance, Guid.NewGuid().ToString("N"), null, new HashSet<string>(StringComparer.Ordinal) { "brain.read" });
+        var now = DateTimeOffset.UtcNow;
+        if (expiry <= now || issuedAt > now.AddMinutes(5) || expiry <= issuedAt || _revoked.ContainsKey(claims.SessionId)) return false;
+        var grants = (claims.Grants ?? [])
+            .Where(static grant => !string.IsNullOrWhiteSpace(grant))
+            .ToHashSet(StringComparer.Ordinal);
+        context = new RequestContext(
+            new(claims.TenantId),
+            new(claims.WorkspaceId),
+            new(claims.PrincipalId, claims.PrincipalKind),
+            claims.SessionId,
+            claims.Assurance,
+            Guid.NewGuid().ToString("N"),
+            null,
+            grants);
+        expiresAt = expiry;
         return true;
     }
     public void Revoke(string sessionId) => _revoked[sessionId] = DateTimeOffset.UtcNow;
+
+    private static string Base64UrlEncode(ReadOnlySpan<byte> value) =>
+        Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static byte[] Base64UrlDecode(string value)
+    {
+        var padded = value.Replace('-', '+').Replace('_', '/');
+        padded += (padded.Length % 4) switch { 2 => "==", 3 => "=", 0 => string.Empty, _ => throw new FormatException() };
+        return Convert.FromBase64String(padded);
+    }
+
+    private sealed record SessionClaims(
+        int Version,
+        string SessionId,
+        string TenantId,
+        string WorkspaceId,
+        string PrincipalId,
+        PrincipalKind PrincipalKind,
+        AuthAssurance Assurance,
+        string Audience,
+        string[] Grants,
+        long IssuedAtUnixSeconds,
+        long ExpiresAtUnixSeconds);
 }
 
-public sealed record V2SessionPair(string AccessToken, string RefreshToken, DateTimeOffset RefreshExpiresAt);
+public sealed record V2SessionPair(
+    string AccessToken,
+    string RefreshToken,
+    DateTimeOffset RefreshExpiresAt,
+    DateTimeOffset AccessExpiresAt = default,
+    string Audience = V2SessionAudiences.Mcp);
 public interface IV2SessionManager
 {
-    V2SessionPair Create(RequestContext context, TimeSpan accessLifetime);
+    V2SessionPair Create(RequestContext context, TimeSpan accessLifetime, string audience = V2SessionAudiences.Mcp);
     bool TryRefresh(string refreshToken, TimeSpan accessLifetime, out V2SessionPair pair);
+    bool TryRefresh(string refreshToken, TimeSpan accessLifetime, string expectedAudience, out V2SessionPair pair);
     bool Revoke(string refreshToken);
+    bool Revoke(string refreshToken, string expectedAudience);
 }
 
 /// <summary>One-use refresh rotation and revocation for V2 sessions. Store this behind a durable repository in production.</summary>
@@ -107,32 +252,50 @@ public sealed class V2SessionManager : IV2SessionManager
         _refreshLifetime = refreshLifetime ?? TimeSpan.FromDays(30);
     }
 
-    public V2SessionPair Create(RequestContext context, TimeSpan accessLifetime)
+    public V2SessionPair Create(RequestContext context, TimeSpan accessLifetime, string audience = V2SessionAudiences.Mcp)
     {
         var refresh = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var expires = DateTimeOffset.UtcNow.Add(_refreshLifetime);
-        _refresh[Hash(refresh)] = new RefreshEntry(context, expires);
-        return new V2SessionPair(_tokens.Issue(context, accessLifetime), refresh, expires);
+        var accessExpires = DateTimeOffset.UtcNow.Add(accessLifetime);
+        _refresh[Hash(refresh)] = new RefreshEntry(context, expires, audience);
+        return new V2SessionPair(_tokens.Issue(context, accessLifetime, audience), refresh, expires, accessExpires, audience);
     }
 
     public bool TryRefresh(string refreshToken, TimeSpan accessLifetime, out V2SessionPair pair)
+        => TryRefreshCore(refreshToken, accessLifetime, expectedAudience: null, out pair);
+
+    public bool TryRefresh(string refreshToken, TimeSpan accessLifetime, string expectedAudience, out V2SessionPair pair)
+        => TryRefreshCore(refreshToken, accessLifetime, expectedAudience, out pair);
+
+    private bool TryRefreshCore(string refreshToken, TimeSpan accessLifetime, string? expectedAudience, out V2SessionPair pair)
     {
         pair = default!;
         var key = Hash(refreshToken);
-        if (!_refresh.TryRemove(key, out var entry) || entry.ExpiresAt <= DateTimeOffset.UtcNow) return false;
-        pair = Create(entry.Context with { CorrelationId = Guid.NewGuid().ToString("N") }, accessLifetime);
+        if (!_refresh.TryGetValue(key, out var entry) || entry.ExpiresAt <= DateTimeOffset.UtcNow ||
+            (expectedAudience is not null && !string.Equals(entry.Audience, expectedAudience, StringComparison.Ordinal)) ||
+            !_refresh.TryRemove(key, out entry)) return false;
+        pair = Create(entry.Context with { CorrelationId = Guid.NewGuid().ToString("N") }, accessLifetime, entry.Audience);
         return true;
     }
 
     public bool Revoke(string refreshToken)
+        => RevokeCore(refreshToken, expectedAudience: null);
+
+    public bool Revoke(string refreshToken, string expectedAudience)
+        => RevokeCore(refreshToken, expectedAudience);
+
+    private bool RevokeCore(string refreshToken, string? expectedAudience)
     {
-        if (!_refresh.TryRemove(Hash(refreshToken), out var entry)) return false;
+        var hash = Hash(refreshToken);
+        if (!_refresh.TryGetValue(hash, out var entry) ||
+            (expectedAudience is not null && !string.Equals(entry.Audience, expectedAudience, StringComparison.Ordinal)) ||
+            !_refresh.TryRemove(hash, out entry)) return false;
         _tokens.Revoke(entry.Context.SessionId);
         return true;
     }
 
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value ?? string.Empty)));
-    private sealed record RefreshEntry(RequestContext Context, DateTimeOffset ExpiresAt);
+    private sealed record RefreshEntry(RequestContext Context, DateTimeOffset ExpiresAt, string Audience);
 }
 
 public sealed class FileV2SessionManager : IV2SessionManager
@@ -140,49 +303,86 @@ public sealed class FileV2SessionManager : IV2SessionManager
     private readonly V2SessionTokenService _tokens;
     private readonly TimeSpan _lifetime;
     private readonly string _path;
+    private readonly Action<string> _appendLine;
     private readonly Dictionary<string, RefreshEntry> _entries = new(StringComparer.Ordinal);
     private readonly object _gate = new();
 
-    public FileV2SessionManager(V2SessionTokenService tokens, string path, TimeSpan? refreshLifetime = null)
+    public FileV2SessionManager(
+        V2SessionTokenService tokens,
+        string path,
+        TimeSpan? refreshLifetime = null,
+        Action<string>? appendLine = null)
     {
         _tokens = tokens;
         _lifetime = refreshLifetime ?? TimeSpan.FromDays(30);
-        _path = path;
+        _path = Path.GetFullPath(path);
+        _appendLine = appendLine ?? (line =>
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            File.AppendAllText(_path, line + Environment.NewLine);
+        });
         Load();
     }
 
-    public V2SessionPair Create(RequestContext context, TimeSpan accessLifetime)
+    public V2SessionPair Create(RequestContext context, TimeSpan accessLifetime, string audience = V2SessionAudiences.Mcp)
     {
         lock (_gate)
         {
             var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            var entry = new RefreshEntry(context, DateTimeOffset.UtcNow.Add(_lifetime));
-            _entries[Hash(token)] = entry;
-            Append(new("create", Hash(token), entry));
-            return new(_tokens.Issue(context, accessLifetime), token, entry.ExpiresAt);
+            var entry = new RefreshEntry(context, DateTimeOffset.UtcNow.Add(_lifetime), audience);
+            var hash = Hash(token);
+            var accessExpires = DateTimeOffset.UtcNow.Add(accessLifetime);
+            var accessToken = _tokens.Issue(context, accessLifetime, audience);
+            Append(new("create", hash, entry));
+            _entries[hash] = entry;
+            return new(accessToken, token, entry.ExpiresAt, accessExpires, audience);
         }
     }
 
     public bool TryRefresh(string refreshToken, TimeSpan accessLifetime, out V2SessionPair pair)
+        => TryRefreshCore(refreshToken, accessLifetime, expectedAudience: null, out pair);
+
+    public bool TryRefresh(string refreshToken, TimeSpan accessLifetime, string expectedAudience, out V2SessionPair pair)
+        => TryRefreshCore(refreshToken, accessLifetime, expectedAudience, out pair);
+
+    private bool TryRefreshCore(string refreshToken, TimeSpan accessLifetime, string? expectedAudience, out V2SessionPair pair)
     {
         lock (_gate)
         {
             pair = default!;
             var hash = Hash(refreshToken);
-            if (!_entries.Remove(hash, out var entry) || entry.ExpiresAt <= DateTimeOffset.UtcNow) return false;
-            Append(new("revoke", hash, null));
-            pair = Create(entry.Context with { CorrelationId = Guid.NewGuid().ToString("N") }, accessLifetime);
+            if (!_entries.TryGetValue(hash, out var entry) || entry.ExpiresAt <= DateTimeOffset.UtcNow ||
+                (expectedAudience is not null && !string.Equals(entry.Audience, expectedAudience, StringComparison.Ordinal))) return false;
+
+            var nextToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            var nextHash = Hash(nextToken);
+            var nextContext = entry.Context with { CorrelationId = Guid.NewGuid().ToString("N") };
+            var nextEntry = new RefreshEntry(nextContext, DateTimeOffset.UtcNow.Add(_lifetime), entry.Audience);
+            var accessExpires = DateTimeOffset.UtcNow.Add(accessLifetime);
+            var accessToken = _tokens.Issue(nextContext, accessLifetime, entry.Audience);
+            Append(new("rotate", nextHash, nextEntry, null, hash));
+            _entries.Remove(hash);
+            _entries[nextHash] = nextEntry;
+            pair = new(accessToken, nextToken, nextEntry.ExpiresAt, accessExpires, entry.Audience);
             return true;
         }
     }
 
     public bool Revoke(string refreshToken)
+        => RevokeCore(refreshToken, expectedAudience: null);
+
+    public bool Revoke(string refreshToken, string expectedAudience)
+        => RevokeCore(refreshToken, expectedAudience);
+
+    private bool RevokeCore(string refreshToken, string? expectedAudience)
     {
         lock (_gate)
         {
             var hash = Hash(refreshToken);
-            if (!_entries.Remove(hash, out var entry)) return false;
-            Append(new("revoke", hash, null));
+            if (!_entries.TryGetValue(hash, out var entry) ||
+                (expectedAudience is not null && !string.Equals(entry.Audience, expectedAudience, StringComparison.Ordinal))) return false;
+            Append(new("logout", hash, null, entry.Context.SessionId));
+            _entries.Remove(hash);
             _tokens.Revoke(entry.Context.SessionId);
             return true;
         }
@@ -191,24 +391,84 @@ public sealed class FileV2SessionManager : IV2SessionManager
     private void Load()
     {
         if (!File.Exists(_path)) return;
+        var lineNumber = 0;
         foreach (var line in File.ReadLines(_path))
         {
-            var item = JsonSerializer.Deserialize<PersistedSession>(line);
-            if (item is null) continue;
-            if (item.Kind == "create" && item.Entry is not null) _entries[item.Hash] = item.Entry;
-            else if (item.Kind == "revoke") _entries.Remove(item.Hash);
+            lineNumber++;
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            PersistedSession? item;
+            try { item = JsonSerializer.Deserialize<PersistedSession>(line); }
+            catch (JsonException)
+            {
+                Quarantine(lineNumber, line, "invalid-json");
+                throw new InvalidDataException($"The V2 session journal contains invalid JSON at line {lineNumber}.");
+            }
+            if (item is null || !IsHash(item.Hash)) Invalid(lineNumber, line, "invalid-record");
+            if (item!.Kind == "create" && ValidEntry(item.Entry) && !_entries.ContainsKey(item.Hash))
+                _entries[item.Hash] = item.Entry!;
+            else if (item.Kind == "rotate" && ValidEntry(item.Entry) && IsHash(item.PreviousHash) &&
+                     _entries.ContainsKey(item.PreviousHash!) && !_entries.ContainsKey(item.Hash))
+            {
+                _entries.Remove(item.PreviousHash!);
+                _entries[item.Hash] = item.Entry!;
+            }
+            else if (item.Kind == "revoke" && _entries.ContainsKey(item.Hash))
+                _entries.Remove(item.Hash);
+            else if (item.Kind == "logout" && _entries.TryGetValue(item.Hash, out var logoutEntry) &&
+                     !string.IsNullOrWhiteSpace(item.SessionId) && item.SessionId.Length <= 256 &&
+                     string.Equals(logoutEntry.Context.SessionId, item.SessionId, StringComparison.Ordinal))
+            {
+                _entries.Remove(item.Hash);
+                _tokens.Revoke(item.SessionId);
+            }
+            else
+                Invalid(lineNumber, line, "invalid-transition");
         }
+        foreach (var expired in _entries.Where(static pair => pair.Value.ExpiresAt <= DateTimeOffset.UtcNow).Select(static pair => pair.Key).ToArray())
+            _entries.Remove(expired);
+    }
+
+    private void Invalid(int lineNumber, string raw, string reason)
+    {
+        Quarantine(lineNumber, raw, reason);
+        throw new InvalidDataException($"The V2 session journal contains an invalid transition at line {lineNumber}.");
+    }
+
+    private void Quarantine(int lineNumber, string raw, string reason)
+    {
+        try
+        {
+            var quarantinePath = _path + ".quarantine";
+            var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+            Directory.CreateDirectory(Path.GetDirectoryName(quarantinePath)!);
+            File.AppendAllText(quarantinePath, JsonSerializer.Serialize(new { line = lineNumber, sha256 = digest, reason }) + Environment.NewLine);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     private void Append(PersistedSession item)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_path))!);
-        File.AppendAllText(_path, JsonSerializer.Serialize(item) + Environment.NewLine);
+        _appendLine(JsonSerializer.Serialize(item));
     }
 
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value ?? string.Empty)));
-    private sealed record RefreshEntry(RequestContext Context, DateTimeOffset ExpiresAt);
-    private sealed record PersistedSession(string Kind, string Hash, RefreshEntry? Entry);
+    private static bool IsHash(string? value) => value is { Length: 64 } && value.All(static character => Uri.IsHexDigit(character));
+    private static bool ValidEntry(RefreshEntry? entry) => entry is not null && entry.Context is not null && entry.ExpiresAt != default &&
+        !string.IsNullOrWhiteSpace(entry.Audience) && entry.Audience.Length <= 128 &&
+        !string.IsNullOrWhiteSpace(entry.Context.SessionId) && entry.Context.SessionId.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(entry.Context.TenantId.Value) && entry.Context.TenantId.Value.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(entry.Context.WorkspaceId.Value) && entry.Context.WorkspaceId.Value.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(entry.Context.Principal.Value) && entry.Context.Principal.Value.Length <= 256 &&
+        Enum.IsDefined(entry.Context.Principal.Kind) && Enum.IsDefined(entry.Context.Assurance) && entry.Context.Grants is not null &&
+        entry.Context.Grants.Count <= 64 && entry.Context.Grants.All(static grant => !string.IsNullOrWhiteSpace(grant) && grant.Length <= 128);
+    private sealed record RefreshEntry(RequestContext Context, DateTimeOffset ExpiresAt, string Audience = V2SessionAudiences.Mcp);
+    private sealed record PersistedSession(
+        string Kind,
+        string Hash,
+        RefreshEntry? Entry,
+        string? SessionId = null,
+        string? PreviousHash = null);
 }
 
 public enum Sensitivity { Public, Internal, Confidential, Secret }

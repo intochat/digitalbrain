@@ -12,12 +12,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using DigitalBrain.Kernel.V2;
+using DigitalBrain.ServiceDefaults;
 using Orleans;
 
 
 if (UseHttpTransport())
 {
     var builder = WebApplication.CreateBuilder(args);
+    builder.AddServiceDefaults();
     ConfigureOrleansClient(builder);
 
     // HTTP is the authoritative V2 MCP surface. Legacy V1 tool registrations are intentionally
@@ -30,6 +32,7 @@ if (UseHttpTransport())
     var profileText = builder.Configuration["DigitalBrain:Profile"] ?? "Development";
     if (!Enum.TryParse<V2RuntimeProfile>(profileText, true, out var profile))
         throw new InvalidOperationException($"Unknown V2 runtime profile '{profileText}'.");
+    var mcpAudience = V2SessionAudiences.RequireFixedMcp(builder.Configuration["DigitalBrain:V2:Mcp:Audience"]);
     var manifest = V2CapabilityManifests.For(profile);
     builder.Services.AddSingleton(new V2SchemaRegistry([
         new V2SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
@@ -60,7 +63,7 @@ if (UseHttpTransport())
     if (string.IsNullOrWhiteSpace(sessionKeyText)) throw new InvalidOperationException("V2 session signing key is required for HTTP MCP.");
     builder.Services.AddSingleton(new V2SessionTokenService(Convert.FromBase64String(sessionKeyText)));
     if (!string.IsNullOrWhiteSpace(sessionStorePath))
-        builder.Services.AddSingleton<IV2SessionManager>(_ => new FileV2SessionManager(new V2SessionTokenService(Convert.FromBase64String(sessionKeyText)), sessionStorePath));
+        builder.Services.AddSingleton<IV2SessionManager>(sp => new FileV2SessionManager(sp.GetRequiredService<V2SessionTokenService>(), sessionStorePath));
     else
         builder.Services.AddSingleton<IV2SessionManager, V2SessionManager>();
     if (!string.IsNullOrWhiteSpace(projectionPath))
@@ -74,16 +77,18 @@ if (UseHttpTransport())
         builder.Services.AddSingleton<IV2ProjectionQueryPort>(sp => sp.GetRequiredService<InMemoryV2ProjectionQueryStore>());
     }
     builder.Services.AddSingleton(sp => new V2McpRequestGuard(new V2McpTransportPolicy(
-        builder.Configuration["DigitalBrain:V2:Mcp:Audience"] ?? "digitalbrain-v2",
+        mcpAudience,
         new HashSet<string>((builder.Configuration["DigitalBrain:V2:Mcp:AllowedOrigins"] ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.Ordinal),
         int.TryParse(builder.Configuration["DigitalBrain:V2:Mcp:MaxBodyBytes"], out var body) ? body : 1_048_576,
         int.TryParse(builder.Configuration["DigitalBrain:V2:Mcp:MaxConcurrentRequests"], out var concurrent) ? concurrent : 8,
         int.TryParse(builder.Configuration["DigitalBrain:V2:Mcp:RequestsPerMinute"], out var rate) ? rate : 120)));
+    builder.Services.AddV2UiTransport(builder.Configuration, builder.Environment, profile);
 
     var app = builder.Build();
+    app.MapV2UiTransport();
     app.Use(async (context, next) =>
     {
-        if (context.Request.Path.StartsWithSegments("/mcp") && !IsAuthenticated(context))
+        if (context.Request.Path.StartsWithSegments("/mcp") && !TryGetV2Context(context, out _))
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsync("V2 MCP authentication required.");
@@ -92,7 +97,7 @@ if (UseHttpTransport())
         if (context.Request.Path.StartsWithSegments("/mcp") && TryGetV2Context(context, out var principal))
         {
             var guard = context.RequestServices.GetRequiredService<V2McpRequestGuard>();
-            if (!guard.TryBegin(principal.Principal.Value, context.Request.Headers.Origin, context.Request.Headers["X-V2-Audience"].ToString(), (int)(context.Request.ContentLength ?? 0), out var lease))
+            if (!guard.TryBegin(V2RequestScope.Id(principal), context.Request.Headers.Origin, context.Request.Headers["X-V2-Audience"].ToString(), (int)(context.Request.ContentLength ?? 0), out var lease))
             {
                 context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 return;
@@ -146,13 +151,13 @@ if (UseHttpTransport())
     });
     app.MapPost("/v2/session/refresh", (IV2SessionManager sessions, V2SessionRefreshRequest request) =>
     {
-        return sessions.TryRefresh(request.RefreshToken, TimeSpan.FromMinutes(15), out var pair)
+        return sessions.TryRefresh(request.RefreshToken, TimeSpan.FromMinutes(15), V2SessionAudiences.Mcp, out var pair)
             ? Results.Ok(pair)
             : Results.Unauthorized();
     });
     app.MapPost("/v2/session/logout", (IV2SessionManager sessions, V2SessionRefreshRequest request) =>
-        sessions.Revoke(request.RefreshToken) ? Results.NoContent() : Results.NotFound());
-    app.MapGet("/health", () => Results.Ok("DigitalBrain MCP server ready."));
+        sessions.Revoke(request.RefreshToken, V2SessionAudiences.Mcp) ? Results.NoContent() : Results.NotFound());
+    app.MapDefaultEndpoints();
     await app.RunAsync();
 }
 else
@@ -191,32 +196,12 @@ static bool UseHttpTransport() =>
         "http",
         StringComparison.OrdinalIgnoreCase);
 
-static bool IsAuthenticated(HttpContext context) =>
-    context.User?.Identity?.IsAuthenticated == true ||
-    context.Request.Headers.TryGetValue("Authorization", out var auth) && auth.Count == 1 &&
-    TryValidateV2Token(auth[0]!);
-
-
-static bool TryValidateV2Token(string header)
-{
-    if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return false;
-    var token = header[7..].Trim();
-    var configured = Environment.GetEnvironmentVariable("DigitalBrain__Auth__SessionSigningKey");
-    if (string.IsNullOrWhiteSpace(configured)) return false;
-    byte[] key;
-    try { key = Convert.FromBase64String(configured); } catch (FormatException) { return false; }
-    return new V2SessionTokenService(key).TryValidate(token, out _);
-}
-
 static bool TryGetV2Context(HttpContext context, out V2RequestContext requestContext)
 {
     requestContext = default!;
-    if (context.User?.Identity?.IsAuthenticated == true) return false;
     if (!context.Request.Headers.TryGetValue("Authorization", out var auth) || auth.Count != 1 || !auth[0]!.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return false;
-    var configured = Environment.GetEnvironmentVariable("DigitalBrain__Auth__SessionSigningKey");
-    if (string.IsNullOrWhiteSpace(configured)) return false;
-    try { return new V2SessionTokenService(Convert.FromBase64String(configured)).TryValidate(auth[0]![7..].Trim(), out requestContext); }
-    catch (FormatException) { return false; }
+    var tokens = context.RequestServices.GetRequiredService<V2SessionTokenService>();
+    return tokens.TryValidate(auth[0]![7..].Trim(), V2SessionAudiences.Mcp, out requestContext);
 }
 
 static int ParseLimit(HttpContext context) => int.TryParse(context.Request.Query["limit"], out var value) ? Math.Clamp(value, 1, 100) : 50;

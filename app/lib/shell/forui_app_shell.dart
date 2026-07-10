@@ -59,6 +59,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   StreamSubscription<gw.RfwCardEnvelope>? _homeFeedSub;
   StreamSubscription<gw.SynapseEnvelope>? _authSignalSub;
   StreamSubscription<dynamic>? _channelStateSub;
+  Object? _feedTerminalError;
   final String _clientId = digitalBrainAppClientId;
 
   // Live data from neurons (minimal state for composition; all chrome/content from neuron trees)
@@ -111,6 +112,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
       );
 
       _homeFeedSub?.cancel();
+      _feedTerminalError = null;
       final sub = client
           .watchHomeFeed(gw.WatchHomeFeedRequest(clientId: _clientId))
           .listen(_onCard, onError: _onFeedError, onDone: _onFeedDone);
@@ -155,6 +157,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
     debugPrint('DigitalBrain WatchHomeFeed error: $error');
     debugPrintStack(stackTrace: stackTrace);
     if (!mounted) return;
+    _feedTerminalError = error;
     setState(() {
       _feedStatus = 'Kernel UI feed stream failed: $error';
     });
@@ -163,6 +166,7 @@ class _ForuiAppShellState extends State<ForuiAppShell> {
   void _onFeedDone() {
     debugPrint('DigitalBrain WatchHomeFeed stream closed.');
     if (!mounted) return;
+    if (_feedTerminalError != null) return;
     setState(() {
       _feedStatus = 'Kernel UI feed stream closed before any surface arrived.';
     });
