@@ -38,7 +38,7 @@ IResourceBuilder<ParameterResource>? v2UiBootstrapSecret = enableV2DevFlutter
     : null;
 
 // Integrations stay thin here: INO, Gmail, Salesforce, and optional transports are wired
-// through the kernel; Runtime V2 Flutter is wired only to MCP's authenticated UI boundary.
+// through the kernel; Flutter is wired only to MCP's authenticated UI boundary.
 
 // Experiences emit UiSurface (AuthButtonSurface etc) for sdk/flutter_demo + Telegram skeleton.
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
@@ -86,7 +86,6 @@ var googleAppConfig = builder.AddGoogleAppConfig();
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);  // Provides surfaces, journals, 3 replicas HA, and LLM wiring via the Aspire package.
 kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
-kernel.WithEnvironment("DigitalBrain__Runtime", "V2");
 kernel.WithEnvironment("DigitalBrain__Profile", v2Profile);
 kernel.WithEnvironment("DigitalBrain__Auth__SessionSigningKey", v2SessionSigningKey);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
@@ -101,8 +100,6 @@ if (ctx.EnableMcp)
     var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp", launchProfileName: null)
         .WithReference(ctx.OrleansClient)
         .WithReference(ctx.Llm)
-        .WithEnvironment("DIGITALBRAIN_MCP_TRANSPORT", "http")
-        .WithEnvironment("DigitalBrain__Runtime", "V2")
         .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", v2SessionSigningKey)
         .WithEnvironment("DigitalBrain__Profile", v2Profile)
         .WithEnvironment("DigitalBrain__V2__Ui__FeedIntegrityKey", v2UiFeedIntegrityKey)
@@ -126,11 +123,11 @@ if (ctx.EnableMcp)
         // transport exchanges it for a short-lived session signed for the exact V2 UI audience.
         mcp.WithEnvironment("DigitalBrain__V2__Ui__BootstrapSecret", v2UiBootstrapSecret);
 
-        // The Runtime V2 shell references only MCP's authenticated UI transport. It never receives
+        // The Flutter shell references only MCP's authenticated UI transport. It never receives
         // a kernel, Orleans, LLM, legacy Gateway, or WatchHomeFeed reference.
         _ = ctx.AddDefaultDevV2FlutterClient(mcp, v2UiBootstrapSecret, endpointName: "https")
             ?? throw new InvalidOperationException(
-                "Flutter app path not resolved for the Runtime V2 client. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+                "Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
     }
 #pragma warning restore ASPIREMCP001
 }

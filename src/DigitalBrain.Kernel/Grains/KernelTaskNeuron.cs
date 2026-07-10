@@ -7,7 +7,7 @@ namespace DigitalBrain.Kernel;
 using DigitalBrain.Ui.Contracts.Ui;
 using DigitalBrain.Ui.Runtime;
 
-[GrainType("kernel.task.v1")]
+[GrainType("kernel.task")]
 public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IKernelTask
 {
     public async Task HandleAsync(RunTask cmd, CancellationToken cancellationToken = default)

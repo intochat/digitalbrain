@@ -4,12 +4,6 @@ import '../telemetry/platform_env.dart';
 
 const String digitalBrainV2UiAudience = 'digitalbrain-v2-ui';
 
-bool isV2Runtime({String? runtime}) {
-  const compiled = String.fromEnvironment('DIGITALBRAIN_RUNTIME');
-  final value = runtime ?? getEnv('DIGITALBRAIN_RUNTIME') ?? compiled;
-  return value.trim().toUpperCase() == 'V2';
-}
-
 class V2RuntimeConfiguration {
   const V2RuntimeConfiguration({required this.endpoint, this.bootstrapSecret});
 
@@ -29,7 +23,7 @@ class V2RuntimeConfiguration {
         ? configured!.trim()
         : compiledEndpoint.trim();
     if (source.isEmpty) {
-      throw StateError('Runtime V2 requires DIGITALBRAIN_V2_UI_ENDPOINT.');
+      throw StateError('DigitalBrain requires DIGITALBRAIN_V2_UI_ENDPOINT.');
     }
     return V2RuntimeConfiguration(
       endpoint: parseV2UiEndpoint(source),

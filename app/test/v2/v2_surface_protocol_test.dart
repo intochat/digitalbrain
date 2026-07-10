@@ -127,6 +127,25 @@ void main() {
     expect(operation.action?.target.host, 'accounts.google.com');
   });
 
+  test('decodes the bounded Salesforce connection action', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            action: salesforceConnectionAction(),
+          ),
+        ),
+      ),
+    );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.action?.kind, 'openUrl');
+    expect(operation.action?.label, 'Connect Salesforce');
+    expect(operation.action?.target.host, 'login.salesforce.com');
+  });
+
   test('rejects unsupported protocol and capability requirements', () {
     final wrongVersion = surfaceJsonMap()..['protocolVersion'] = 3;
     final unsupported = surfaceJsonMap()

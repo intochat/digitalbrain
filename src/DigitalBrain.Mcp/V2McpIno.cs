@@ -578,7 +578,7 @@ public sealed class V2McpNoToolCatalog : IV2AuthorizedToolCatalog
         Task.FromResult(new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "Tools are unavailable in this conversation."));
 }
 
-public sealed class V2McpGmailPlanner : IV2IntentCapabilityPlanner
+public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
 {
     public Task<IReadOnlyList<V2ToolInvocation>> PlanAsync(
         V2ConversationRequest request,
@@ -586,6 +586,7 @@ public sealed class V2McpGmailPlanner : IV2IntentCapabilityPlanner
     {
         cancellationToken.ThrowIfCancellationRequested();
         var text = request.Text.ToLowerInvariant();
+        var emptyInput = JsonSerializer.SerializeToElement(new { });
         var mentionsMail = text.Contains("gmail", StringComparison.Ordinal) ||
                            text.Contains("email", StringComparison.Ordinal) ||
                            text.Contains("mail", StringComparison.Ordinal);
@@ -601,29 +602,57 @@ public sealed class V2McpGmailPlanner : IV2IntentCapabilityPlanner
                                  text.Contains("draft", StringComparison.Ordinal) ||
                                  text.Contains("compose", StringComparison.Ordinal);
         var requestsLatestIncoming = explicitlyIncoming || (requestsLatest && !explicitlyOutgoing);
-        if (!mentionsMail || !requestsLatestIncoming)
-            return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([]);
+        if (mentionsMail && requestsLatestIncoming)
+            return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
+                new V2ToolInvocation(V2GmailTools.ReadLatest, emptyInput)
+            ]);
 
-        return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
-            new V2ToolInvocation(V2GmailTools.ReadLatest, JsonSerializer.SerializeToElement(new { }))
-        ]);
+        var mentionsSalesforce = text.Contains("salesforce", StringComparison.Ordinal) ||
+                                 text.Contains("crm", StringComparison.Ordinal);
+        var mentionsAccount = text.Contains("account", StringComparison.Ordinal) ||
+                              text.Contains("customer", StringComparison.Ordinal) ||
+                              text.Contains("organization", StringComparison.Ordinal);
+        var requestsRead = text.Contains("get", StringComparison.Ordinal) ||
+                           text.Contains("show", StringComparison.Ordinal) ||
+                           text.Contains("read", StringComparison.Ordinal) ||
+                           text.Contains("latest", StringComparison.Ordinal) ||
+                           text.Contains("last", StringComparison.Ordinal) ||
+                           text.Contains("recent", StringComparison.Ordinal);
+        var requestsMutation = text.Contains("create", StringComparison.Ordinal) ||
+                               text.Contains("update", StringComparison.Ordinal) ||
+                               text.Contains("delete", StringComparison.Ordinal) ||
+                               text.Contains("modify", StringComparison.Ordinal) ||
+                               text.Contains("change", StringComparison.Ordinal);
+        if (mentionsSalesforce && mentionsAccount && requestsRead && !requestsMutation)
+            return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([
+                new V2ToolInvocation(V2SalesforceTools.ReadLatestAccount, emptyInput)
+            ]);
+
+        return Task.FromResult<IReadOnlyList<V2ToolInvocation>>([]);
     }
 }
 
-public interface IV2McpGmailToolGateway
+public interface IV2McpIntegrationToolGateway
 {
     Task<V2GmailReadResult> ReadLatestIncomingAsync(string ownerScope, CancellationToken cancellationToken = default);
+
+    Task<V2SalesforceReadResult> ReadLatestSalesforceAccountAsync(string ownerScope, CancellationToken cancellationToken = default);
 }
 
-public sealed class V2McpGmailToolGateway(IClusterClient cluster) : IV2McpGmailToolGateway
+public sealed class V2McpIntegrationToolGateway(IClusterClient cluster) : IV2McpIntegrationToolGateway
 {
     public Task<V2GmailReadResult> ReadLatestIncomingAsync(
         string ownerScope,
         CancellationToken cancellationToken = default) =>
         cluster.GetGrain<IV2GmailReadToolGrain>(ownerScope).ReadLatestIncomingAsync(cancellationToken);
+
+    public Task<V2SalesforceReadResult> ReadLatestSalesforceAccountAsync(
+        string ownerScope,
+        CancellationToken cancellationToken = default) =>
+        cluster.GetGrain<IV2SalesforceReadToolGrain>(ownerScope).ReadLatestAccountAsync(cancellationToken);
 }
 
-public sealed class V2McpAuthorizedToolCatalog(IV2McpGmailToolGateway gmail) : IV2AuthorizedToolCatalog
+public sealed class V2McpAuthorizedToolCatalog(IV2McpIntegrationToolGateway integrations) : IV2AuthorizedToolCatalog
 {
     public async Task<V2ToolOutcome> InvokeAsync(
         V2RequestContext context,
@@ -631,16 +660,26 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpGmailToolGateway gmail) : I
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!string.Equals(invocation.ToolId, V2GmailTools.ReadLatest, StringComparison.Ordinal) ||
-            invocation.Input.ValueKind != JsonValueKind.Object ||
+        if (invocation.Input.ValueKind != JsonValueKind.Object ||
             invocation.Input.EnumerateObject().Any())
             return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That tool request is not allowed.");
+        if (string.Equals(invocation.ToolId, V2GmailTools.ReadLatest, StringComparison.Ordinal))
+            return await InvokeGmailAsync(context, cancellationToken);
+        if (string.Equals(invocation.ToolId, V2SalesforceTools.ReadLatestAccount, StringComparison.Ordinal))
+            return await InvokeSalesforceAsync(context, cancellationToken);
+        return new V2ToolOutcome(V2ToolOutcomeKind.Denied, SafeReason: "That tool request is not allowed.");
+    }
+
+    private async Task<V2ToolOutcome> InvokeGmailAsync(
+        V2RequestContext context,
+        CancellationToken cancellationToken)
+    {
         if (context.Principal.Kind != PrincipalKind.User || !context.Grants.Contains("gmail.read"))
             return new V2ToolOutcome(
                 V2ToolOutcomeKind.Denied,
                 SafeReason: "You don’t have permission to read Gmail in this workspace.");
 
-        var result = await gmail.ReadLatestIncomingAsync(V2RequestScope.Id(context), cancellationToken);
+        var result = await integrations.ReadLatestIncomingAsync(V2RequestScope.Id(context), cancellationToken);
         return result.Status switch
         {
             V2GmailReadStatus.Success => new V2ToolOutcome(
@@ -653,9 +692,43 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpGmailToolGateway gmail) : I
             V2GmailReadStatus.NeedsAuth => new V2ToolOutcome(
                 V2ToolOutcomeKind.PermanentFailure,
                 SafeReason: "Gmail connection is unavailable right now."),
+            V2GmailReadStatus.ConfigurationMissing => new V2ToolOutcome(
+                V2ToolOutcomeKind.PermanentFailure,
+                SafeReason: result.SafeReason ?? "Gmail application configuration is missing."),
             _ => new V2ToolOutcome(
                 V2ToolOutcomeKind.RetryableFailure,
                 SafeReason: result.SafeReason ?? "I couldn’t read Gmail right now. Please try again later.")
+        };
+    }
+
+    private async Task<V2ToolOutcome> InvokeSalesforceAsync(
+        V2RequestContext context,
+        CancellationToken cancellationToken)
+    {
+        if (context.Principal.Kind != PrincipalKind.User || !context.Grants.Contains("salesforce.read"))
+            return new V2ToolOutcome(
+                V2ToolOutcomeKind.Denied,
+                SafeReason: "You don’t have permission to read Salesforce in this workspace.");
+
+        var result = await integrations.ReadLatestSalesforceAccountAsync(V2RequestScope.Id(context), cancellationToken);
+        return result.Status switch
+        {
+            V2SalesforceReadStatus.Success => new V2ToolOutcome(
+                V2ToolOutcomeKind.Success,
+                JsonSerializer.SerializeToElement(new { latestAccount = result.Content ?? string.Empty })),
+            V2SalesforceReadStatus.NeedsAuth when IsAllowedSalesforceAuthorizationUrl(result.ConnectionUrl) => new V2ToolOutcome(
+                V2ToolOutcomeKind.NeedsAuth,
+                SafeReason: result.SafeReason ?? "Connect your Salesforce account to let INO read Salesforce.",
+                Action: new V2ToolAction("openUrl", "Connect Salesforce", result.ConnectionUrl!)),
+            V2SalesforceReadStatus.NeedsAuth => new V2ToolOutcome(
+                V2ToolOutcomeKind.PermanentFailure,
+                SafeReason: "Salesforce connection is unavailable right now."),
+            V2SalesforceReadStatus.ConfigurationMissing => new V2ToolOutcome(
+                V2ToolOutcomeKind.PermanentFailure,
+                SafeReason: result.SafeReason ?? "Salesforce application configuration is missing."),
+            _ => new V2ToolOutcome(
+                V2ToolOutcomeKind.RetryableFailure,
+                SafeReason: result.SafeReason ?? "I couldn’t read Salesforce right now. Please try again later.")
         };
     }
 
@@ -663,6 +736,13 @@ public sealed class V2McpAuthorizedToolCatalog(IV2McpGmailToolGateway gmail) : I
         Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
         uri.Scheme == Uri.UriSchemeHttps &&
         string.Equals(uri.Host, "accounts.google.com", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsAllowedSalesforceAuthorizationUrl(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        (string.Equals(uri.Host, "login.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(uri.Host, "test.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
+         uri.Host.EndsWith(".my.salesforce.com", StringComparison.OrdinalIgnoreCase));
 }
 
 public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer

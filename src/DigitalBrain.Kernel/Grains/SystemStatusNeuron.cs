@@ -6,7 +6,7 @@ using ModelContextProtocol.Protocol;
 
 namespace DigitalBrain.Kernel;
 
-[GrainType("digitalbrain.systemstatus.v1")]
+[GrainType("digitalbrain.systemstatus")]
 public class SystemStatusNeuron(ILogger<SystemStatusNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ISystemStatus
 {
     private McpClient? _mcp;

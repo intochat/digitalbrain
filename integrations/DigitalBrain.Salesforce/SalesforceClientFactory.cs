@@ -20,9 +20,6 @@ public static class SalesforceClientFactory
 
     public const string ClientIdKey = "client_id";
     public const string ClientSecretKey = "client_secret";
-    public const string UsernameKey = "username";
-    public const string PasswordKey = "password";
-    public const string SecurityTokenKey = "security_token";
     public const string LoginUrlKey = "login_url";
     public const string ApiVersionKey = "api_version";
     public const string AccessTokenKey = "access_token";
@@ -33,7 +30,7 @@ public static class SalesforceClientFactory
     public const string OAuthScopeKey = "oauth_scope";
     public const string OAuthCodeVerifierKey = "oauth_code_verifier";
     public const string AuthenticationFailureMessage =
-        "Salesforce authentication failed. Check the connected app client ID/secret, username, password, security token, and login URL, then save the credentials again.";
+        "Salesforce authentication failed. Reconnect Salesforce and try again.";
     public const string MissingConnectedAppConfigMessage =
         "Salesforce OAuth is not configured. Configure the Connected App Client ID and Client Secret in Aspire parameters (salesforce-client-id and salesforce-client-secret) or save them in the Salesforce credentials form, then try Login via Salesforce again.";
 
@@ -63,40 +60,11 @@ public static class SalesforceClientFactory
             return await CreateOAuthForceClientAsync(values, apiVersion, cancellationToken).ConfigureAwait(false);
         }
 
-        var clientId = Required(values, ClientIdKey);
-        var clientSecret = Required(values, ClientSecretKey);
-        var username = Required(values, UsernameKey);
-        var password = Required(values, PasswordKey);
-        var passwordWithToken = password + Optional(values, SecurityTokenKey);
-        var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
-        var tokenEndpoint = TokenEndpoint(loginUrl);
-
-        var token = await RequestTokenAsync(tokenEndpoint, new Dictionary<string, string>
-        {
-            ["grant_type"] = "password",
-            ["client_id"] = clientId,
-            ["client_secret"] = clientSecret,
-            ["username"] = username,
-            ["password"] = passwordWithToken
-        }, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.InstanceUrl))
-        {
-            throw new InvalidOperationException(
-                "Salesforce authentication response did not include access_token and instance_url.");
-        }
-
-        return new ForceClient(token.InstanceUrl, token.AccessToken, apiVersion);
+        throw new InvalidOperationException("Salesforce is not connected for this principal.");
     }
 
     public static bool HasUsableCredential(IReadOnlyDictionary<string, string> values) =>
-        HasOAuthCredential(values) || HasPasswordCredential(values);
-
-    public static bool HasPasswordCredential(IReadOnlyDictionary<string, string> values) =>
-        HasValue(values, ClientIdKey) &&
-        HasValue(values, ClientSecretKey) &&
-        HasValue(values, UsernameKey) &&
-        HasValue(values, PasswordKey);
+        HasOAuthCredential(values);
 
     public static bool HasOAuthCredential(IReadOnlyDictionary<string, string> values) =>
         (HasValue(values, AccessTokenKey) && HasValue(values, InstanceUrlKey)) ||

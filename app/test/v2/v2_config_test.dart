@@ -2,13 +2,6 @@ import 'package:digitalbrain_flutter/v2/v2_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Runtime V2 selection is explicit', () {
-    expect(isV2Runtime(runtime: 'V2'), isTrue);
-    expect(isV2Runtime(runtime: 'v2'), isTrue);
-    expect(isV2Runtime(runtime: 'V1'), isFalse);
-    expect(isV2Runtime(runtime: ''), isFalse);
-  });
-
   test('V2 endpoint accepts an absolute HTTPS origin', () {
     expect(
       parseV2UiEndpoint('https://localhost:7443/'),

@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace DigitalBrain.TestKit;
 
-[GrainType("digitalbrain.testkit.probe.v1")]
+[GrainType("digitalbrain.testkit.probe")]
 public class ProbeNeuron(ILogger<ProbeNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IProbeNeuron, IHandle<ProbeMessageSynapse>
 {

@@ -11,17 +11,23 @@ public class SalesforceConnector : IConnector
 {
     private readonly ISalesforceApiClientFactory _factory;
     private readonly IPackConfigStore _store;
+    private readonly IOAuthStateProtector _stateProtector;
     private readonly IConfiguration? _config;
+    private readonly HttpMessageHandler? _tokenEndpointHandler;
 
-    public SalesforceConnector(ISalesforceApiClientFactory factory, IPackConfigStore store, IConfiguration? config = null)
+    public SalesforceConnector(
+        ISalesforceApiClientFactory factory,
+        IPackConfigStore store,
+        IOAuthStateProtector stateProtector,
+        IConfiguration? config = null,
+        HttpMessageHandler? tokenEndpointHandler = null)
     {
         _factory = factory;
         _store = store;
+        _stateProtector = stateProtector;
         _config = config;
+        _tokenEndpointHandler = tokenEndpointHandler;
     }
-
-    // Convenience for DI with fewer params
-    public SalesforceConnector(ISalesforceApiClientFactory factory, IPackConfigStore store) : this(factory, store, null) { }
 
     public ConnectorDescriptor Descriptor => new(
         Id: "salesforce",
@@ -75,7 +81,7 @@ public class SalesforceConnector : IConnector
             return new AuthChallenge(UrlOrForm: "credential-form-needed", IsForm: true);
         }
 
-        var state = $"{user.Value}:{Guid.NewGuid():N}";
+        var state = _stateProtector.Protect(user);
         var codeVerifier = SalesforceClientFactory.CreatePkceCodeVerifier();
         var codeChallenge = SalesforceClientFactory.CreatePkceCodeChallenge(codeVerifier);
 
@@ -104,7 +110,10 @@ public class SalesforceConnector : IConnector
     {
         if (!string.IsNullOrWhiteSpace(callback.Error))
         {
-            return new AuthResult(false, callback.Error, callback.ErrorDescription);
+            return string.Equals(callback.Error, "access_denied", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(callback.Error, "user_denied_authorization", StringComparison.OrdinalIgnoreCase)
+                ? new AuthResult(false, "consent-denied", "Salesforce consent was denied.")
+                : new AuthResult(false, "provider-error", "Salesforce authorization failed.");
         }
 
         if (string.IsNullOrWhiteSpace(callback.Code))
@@ -113,8 +122,9 @@ public class SalesforceConnector : IConnector
         }
 
         var state = callback.State;
-        var userId = state?.Split(':')[0] ?? "default";
-        var user = new NeuronId(userId);
+        if (!_stateProtector.TryUnprotect(state, out var user))
+            return new AuthResult(false, "invalid-state", "The authorization state is invalid or expired.");
+
         var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
 
         var appValues = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
@@ -138,7 +148,19 @@ public class SalesforceConnector : IConnector
 
         try
         {
-            var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(appValues, callback.Code, redirectUri, cancellationToken: cancellationToken);
+            var exchangeValues = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
+            if (pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var codeVerifier) &&
+                !string.IsNullOrWhiteSpace(codeVerifier))
+            {
+                exchangeValues[SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier;
+            }
+
+            var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(
+                exchangeValues,
+                callback.Code,
+                redirectUri,
+                _tokenEndpointHandler,
+                cancellationToken);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in tokenValues)
             {
@@ -164,9 +186,9 @@ public class SalesforceConnector : IConnector
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return new AuthResult(false, "exchange-failed", ex.Message);
+            return new AuthResult(false, "exchange-failed", "The authorization code exchange failed.");
         }
     }
 

@@ -431,6 +431,28 @@ public sealed class V2UiTransportTests
     }
 
     [Fact]
+    public void Reconnect_migrates_an_obsolete_stored_action_grant_without_losing_the_conversation()
+    {
+        var store = new V2PrivateFeedStore();
+        var actions = new V2ActionExecutor(store);
+        var context = Context("tenant", "workspace", "principal");
+        var conversation = V2InoConversationSnapshot.Empty(context);
+        var payload = V2WorkspaceSurfaceProducer.BuildInoPayload(conversation);
+        V2StoredActionBinding[] obsoleteActions =
+            [new(V2WorkspaceSurfaceProducer.InoBindingId, V2WorkspaceSurfaceProducer.InoActionType,
+                V2WorkspaceSurfaceProducer.InoInputSchema, "brain.act", 1, DateTimeOffset.UtcNow.AddHours(1))];
+        store.Append(context, V2SurfaceAudienceKind.Principal, V2WorkspaceSurfaceProducer.HomeSurfaceId, 1,
+            V2SurfaceContentHash.Compute(payload, obsoleteActions), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1),
+            "correlation", "surface", "bootstrap", [], payload, obsoleteActions);
+
+        var migrated = new V2WorkspaceSurfaceProducer(store, actions).EnsureInitial(context);
+
+        Assert.Equal(2, migrated.Revision);
+        Assert.Equal("ui.action", Assert.Single(migrated.Actions).RequiredGrant);
+        Assert.Equal(payload.GetRawText(), migrated.Payload.GetRawText());
+    }
+
+    [Fact]
     public void Action_tokens_reauthorize_owner_workspace_revision_policy_expiry_and_replay()
     {
         var store = new V2PrivateFeedStore();

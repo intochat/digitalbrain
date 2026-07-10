@@ -3,7 +3,7 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Kernel.Foundry;
 
-[GrainType("digitalbrain.codegen.v1")]
+[GrainType("digitalbrain.codegen")]
 public class CodeGenNeuron(ILogger<CodeGenNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ICodeGenNeuron
 {
     public async Task HandleAsync(GenerateCode cmd, CancellationToken cancellationToken = default)

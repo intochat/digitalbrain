@@ -12,19 +12,19 @@ namespace DigitalBrain.Google;
 public class GoogleConnector : IConnector
 {
     private readonly IPackConfigStore _store;
+    private readonly IOAuthStateProtector _stateProtector;
     private readonly IConfiguration? _config;
-    private readonly IGrainFactory? _grainFactory;
     private readonly HttpMessageHandler? _tokenEndpointHandler;
 
     public GoogleConnector(
         IPackConfigStore store,
+        IOAuthStateProtector stateProtector,
         IConfiguration? config = null,
-        IGrainFactory? grainFactory = null,
         HttpMessageHandler? tokenEndpointHandler = null)
     {
         _store = store;
+        _stateProtector = stateProtector;
         _config = config;
-        _grainFactory = grainFactory;
         _tokenEndpointHandler = tokenEndpointHandler;
     }
 
@@ -95,7 +95,7 @@ public class GoogleConnector : IConnector
             return new AuthChallenge(UrlOrForm: "credential-form-needed", IsForm: true);
         }
 
-        var state = $"{user.Value}:{Guid.NewGuid():N}";
+        var state = _stateProtector.Protect(user);
 
         string authUrl;
         try
@@ -122,7 +122,9 @@ public class GoogleConnector : IConnector
     {
         if (!string.IsNullOrWhiteSpace(callback.Error))
         {
-            return new AuthResult(false, callback.Error, callback.ErrorDescription);
+            return string.Equals(callback.Error, "access_denied", StringComparison.OrdinalIgnoreCase)
+                ? new AuthResult(false, "consent-denied", "Google consent was denied.")
+                : new AuthResult(false, "provider-error", "Google authorization failed.");
         }
 
         if (string.IsNullOrWhiteSpace(callback.Code))
@@ -131,8 +133,10 @@ public class GoogleConnector : IConnector
         }
 
         var store = _store;
-        var userId = callback.State?.Split(':')[0] ?? "default";
-        var user = new NeuronId(userId);
+        if (!_stateProtector.TryUnprotect(callback.State, out var user))
+            return new AuthResult(false, "invalid-state", "The authorization state is invalid or expired.");
+
+        var userId = user.Value;
         var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
         var appValues = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, cancellationToken);
         var pending = await store.GetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, cancellationToken);
@@ -187,26 +191,11 @@ public class GoogleConnector : IConnector
             await store.SetAsync(userScope, GoogleClientFactory.PackName, userTokenValues, cancellationToken);
             await store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, new Dictionary<string, string>(), cancellationToken);
 
-            if (_grainFactory is not null)
-            {
-                var notifyKey = "google-auth-completed";
-                var ingress = _grainFactory.GetGrain<IIngressNeuron>(notifyKey);
-                var props = new Dictionary<string, object?>
-                {
-                    ["provider"] = "google",
-                    ["pack"] = GoogleClientFactory.PackName,
-                    ["userId"] = userId,
-                    ["scope"] = userScope
-                };
-                await ingress.IngestAsync("PackConfigured", props, cancellationToken);
-                await ingress.IngestAsync(GoogleSignals.AuthCompleted, props, cancellationToken);
-            }
-
             return new AuthResult(true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new AuthResult(false, "exchange-failed", ex.Message);
+            return new AuthResult(false, "exchange-failed", "The authorization code exchange failed.");
         }
     }
 

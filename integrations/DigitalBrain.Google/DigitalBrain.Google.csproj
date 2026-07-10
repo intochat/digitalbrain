@@ -9,14 +9,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Google.Apis.Gmail.v1" />
-    <PackageReference Include="Google.Apis.Drive.v3" />
-    <PackageReference Include="Google.Apis.Calendar.v3" />
     <PackageReference Include="Google.Apis.Auth" />
   </ItemGroup>
 

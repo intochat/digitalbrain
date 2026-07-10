@@ -28,7 +28,7 @@ public sealed record V2UiBootstrapOptions(
             tenant.Length > 256 || workspace.Length > 256 || principal.Length > 256)
             throw new InvalidOperationException("V2 UI bootstrap identity configuration must be complete.");
         return new(secret, new(tenant), new(workspace), new(principal, PrincipalKind.User), TimeSpan.FromMinutes(15),
-            new HashSet<string>(StringComparer.Ordinal) { "brain.read", "ui.action", "gmail.read" });
+            new HashSet<string>(StringComparer.Ordinal) { "brain.read", "ui.action", "gmail.read", "salesforce.read" });
     }
 }
 
@@ -298,6 +298,10 @@ public sealed class V2UiGrpcService(
         }
         catch (V2ActionRejectedException exception)
         {
+            logger.LogWarning(
+                "V2 UI action authorization was rejected with {RejectionReason}; UI action grant present={HasUiActionGrant}.",
+                exception.Reason,
+                authenticated.Grants.Contains("ui.action"));
             var status = exception.Reason == V2ActionRejection.Replay ? StatusCode.AlreadyExists : StatusCode.PermissionDenied;
             throw new RpcException(new Status(status, "V2 action authorization failed."));
         }

@@ -144,6 +144,15 @@ Map<String, Object?> googleConnectionAction({
   'target': target,
 };
 
+Map<String, Object?> salesforceConnectionAction({
+  String target =
+      'https://login.salesforce.com/services/oauth2/authorize?state=test',
+}) => <String, Object?>{
+  'kind': 'openUrl',
+  'label': 'Connect Salesforce',
+  'target': target,
+};
+
 String surfaceJsonString({
   int sequence = 1,
   int revision = 1,

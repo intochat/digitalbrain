@@ -56,7 +56,7 @@ class V2GrpcUiTransport implements V2UiTransport {
       throw ArgumentError.value(
         endpoint,
         'endpoint',
-        'Runtime V2 transport requires an HTTPS endpoint.',
+        'DigitalBrain transport requires an HTTPS endpoint.',
       );
     }
     // grpc-dart's optional timeline profiler includes call metadata. V2 call

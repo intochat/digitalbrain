@@ -12,6 +12,6 @@ builder.ConfigureDigitalBrainKestrel();
 var app = builder.Build();
 
 app.MapDigitalBrainSetup();
-app.MapDigitalBrainHandlers();
+app.MapConnectorOAuthCallbacks();
 
 app.Run();

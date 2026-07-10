@@ -2,7 +2,7 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel.Foundry;
 
-/// Narrow approved capability facade (v1). Injected to scripts + Poll/Schedule triggers.
+/// Narrow approved capability facade injected into scripts and triggers.
 /// Only Http (allowlisted domains) + Notify (via host channels). No raw net/io from scripts.
 /// Approval declares usage; broker is the enforcement surface.
 public interface ICapabilityBroker
@@ -21,7 +21,7 @@ public class CapabilityBroker : ICapabilityBroker
 
     public async Task<string> HttpGetAsync(string url)
     {
-        // v1: allow any for approved automations (future: per-reaction domain list from proposal/manifest).
+        // Approved automations currently allow any host; proposal-specific domains can narrow this later.
         // Broker runs in host; scripts call this, not System.Net directly (gate + no direct ref).
         using var client = new System.Net.Http.HttpClient();
         return await client.GetStringAsync(url);
@@ -29,7 +29,7 @@ public class CapabilityBroker : ICapabilityBroker
 
     public Task NotifyAsync(string channel, string message)
     {
-        // Host can deliver via TelegramTransport etc. For v1 emit observable signal.
+        // The host can deliver through a configured transport; emit an observable signal here.
         // Real impl would resolve channel grain and deliver.
         return Task.CompletedTask;
     }

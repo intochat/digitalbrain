@@ -95,7 +95,7 @@ public static class UiSurfaceSamples
                     },
                     ["required"] = new[] { "prompt" }
                 },
-                ["submitAction"] = SynapseAction("ask-ino", "Ask INO", nameof(InoRequest), new Dictionary<string, object?>
+                ["submitAction"] = SynapseAction("ask-ino", "Ask INO", "ino.interact", new Dictionary<string, object?>
                 {
                     ["sessionId"] = "workbench"
                 }),
@@ -198,14 +198,14 @@ public static class UiSurfaceSamples
                 {
                     new Dictionary<string, object?>
                     {
-                        ["type"] = nameof(InoResponse),
+                        ["type"] = "ino.interact.completed",
                         ["title"] = "Assistant response",
                         ["at"] = DateTimeOffset.UtcNow
                     }
                 },
                 ["filters"] = new Dictionary<string, object?>
                 {
-                    ["types"] = new[] { nameof(InoResponse), nameof(TaskCompleted) }
+                    ["types"] = new[] { "ino.interact.completed", nameof(TaskCompleted) }
                 }
             }));
 
@@ -821,7 +821,6 @@ public static class UiSurfaceLiveData
             ThreeDGraphUpdate update => "Graph update: " + update.GraphId,
             DataChartGenerated generated => "Chart generated: " + generated.RequestId,
             DataChartFailed failed => "Chart failed: " + failed.Reason,
-            InoResponse response => response.Response,
             _ => synapse.Type
         };
 

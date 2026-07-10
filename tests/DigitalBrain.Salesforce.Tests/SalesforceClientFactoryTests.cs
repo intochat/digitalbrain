@@ -116,8 +116,7 @@ public class SalesforceClientFactoryTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             SalesforceClientFactory.CreateForceClientAsync(new Dictionary<string, string>()));
 
-        Assert.Contains("missing client_id", ex.Message);
-        Assert.Contains("Salesforce", ex.Message);
+        Assert.Equal("Salesforce is not connected for this principal.", ex.Message);
     }
 
     [Fact]

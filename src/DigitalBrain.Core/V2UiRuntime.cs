@@ -1089,9 +1089,6 @@ public sealed class V2ActionExecutor(IV2PrivateFeedStore? feed = null)
     }
     private static void DemandInputSchema(string schemaRef, JsonElement input)
     {
-        if (string.Equals(schemaRef, "digitalbrain.ui.refresh-input.v1", StringComparison.Ordinal) &&
-            input.ValueKind == JsonValueKind.Object && !input.EnumerateObject().Any())
-            return;
         if (string.Equals(schemaRef, V2WorkspaceSurfaceProducer.InoInputSchema, StringComparison.Ordinal) &&
             input.ValueKind == JsonValueKind.Object && input.EnumerateObject().Count() == 1 &&
             input.TryGetProperty("prompt", out var prompt) && prompt.ValueKind == JsonValueKind.String &&

@@ -25,7 +25,7 @@ public sealed class V2WorkspaceSurfaceProducer(
     public const string HomeSurfaceId = "workspace-home";
     public const string InoBindingId = "ino.send";
     public const string InoActionType = "ino.interact";
-    public const string InoInputSchema = "digitalbrain.ino.prompt-input.v1";
+    public const string InoInputSchema = "digitalbrain.ino.prompt-input.v2";
 
     public V2StoredSurfaceRecord EnsureInitial(RequestContext context, V2SurfaceAudienceKind audienceKind = V2SurfaceAudienceKind.Principal)
     {
@@ -38,7 +38,8 @@ public sealed class V2WorkspaceSurfaceProducer(
             if ((record.ExpiresAt is { } surfaceExpiry && surfaceExpiry <= DateTimeOffset.UtcNow) ||
                 (record.Actions.Count > 0 && record.Actions.All(static action => action.ExpiresAt <= DateTimeOffset.UtcNow)) ||
                 (audienceKind == V2SurfaceAudienceKind.Principal &&
-                 !string.Equals(record.Payload.GetRawText(), BuildInoPayload(conversation).GetRawText(), StringComparison.Ordinal)))
+                 (!string.Equals(record.Payload.GetRawText(), BuildInoPayload(conversation).GetRawText(), StringComparison.Ordinal) ||
+                  !HasCurrentInoActionPolicy(record, conversation))))
             {
                 record = audienceKind == V2SurfaceAudienceKind.Principal
                     ? PublishInoConversationCore(context, conversation, "conversation-restore")
@@ -239,6 +240,23 @@ public sealed class V2WorkspaceSurfaceProducer(
         conversation.CurrentOperation is { } operation && V2InoConversationStates.IsActive(operation.State)
             ? []
             : [new(InoBindingId, InoActionType, InoInputSchema, "ui.action", 1, now.Add(V2UiProtocol.SurfaceLifetime))];
+
+    private static bool HasCurrentInoActionPolicy(
+        V2StoredSurfaceRecord record,
+        V2InoConversationSnapshot conversation)
+    {
+        if (conversation.CurrentOperation is { } operation && V2InoConversationStates.IsActive(operation.State))
+            return record.Actions.Count == 0;
+        if (record.Actions.Count != 1) return false;
+        var action = record.Actions[0];
+        return string.Equals(action.BindingId, InoBindingId, StringComparison.Ordinal) &&
+               string.Equals(action.ActionType, InoActionType, StringComparison.Ordinal) &&
+               string.Equals(action.InputSchemaRef, InoInputSchema, StringComparison.Ordinal) &&
+               string.Equals(action.RequiredGrant, "ui.action", StringComparison.Ordinal) &&
+               action.MaxUses == 1 &&
+               action.ActionSchemaVersion == V2UiProtocol.ActionSchemaVersion &&
+               action.ExpiresAt > DateTimeOffset.UtcNow;
+    }
 
     private V2InoConversationSnapshot Conversation(RequestContext context) =>
         conversations?.Read(context) ?? V2InoConversationSnapshot.Empty(context);

@@ -11,6 +11,7 @@ public enum V2GmailReadStatus
 {
     Success,
     NeedsAuth,
+    ConfigurationMissing,
     Unavailable
 }
 

@@ -1,8 +1,10 @@
 using DigitalBrain.Kernel;
-using DigitalBrain.Kernel.Gateway;
+using DigitalBrain.Core.Config;
+using DigitalBrain.Google;
 using DigitalBrain.Kernel.Hosting;
-using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.V2;
+using DigitalBrain.Salesforce;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -30,7 +32,7 @@ public sealed class KernelV2CompositionTests
     }
 
     [Fact]
-    public async Task Actual_v2_kernel_graph_has_no_legacy_gateway_bus_or_stream_provider()
+    public async Task Production_kernel_graph_has_one_runtime_and_shared_connector_composition()
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -39,7 +41,6 @@ public sealed class KernelV2CompositionTests
         });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["DigitalBrain:Runtime"] = "V2",
             ["DigitalBrain:TestMode"] = "true",
             ["DigitalBrain:Llm:Provider"] = "ollama",
             ["DigitalBrain:Llm:OllamaEndpoint"] = "http://localhost:11434",
@@ -50,13 +51,14 @@ public sealed class KernelV2CompositionTests
         builder.AddDigitalBrainClients();
 
         var descriptors = builder.Services.ToArray();
-        Assert.DoesNotContain(descriptors, descriptor => descriptor.ServiceType == typeof(GatewayService));
-        Assert.DoesNotContain(descriptors, descriptor => descriptor.ServiceType == typeof(UiGatewayService));
-        Assert.DoesNotContain(descriptors, descriptor => descriptor.ServiceType == typeof(HomeFeedBus));
-        Assert.DoesNotContain(descriptors, descriptor => descriptor.ServiceType == typeof(SignalEgressBus));
         Assert.DoesNotContain(descriptors, descriptor =>
             string.Equals(descriptor.ServiceType.FullName, "DigitalBrain.Kernel.Ui.SignalEgressStreamSubscriber", StringComparison.Ordinal) ||
             string.Equals(descriptor.ImplementationType?.FullName, "DigitalBrain.Kernel.Ui.SignalEgressStreamSubscriber", StringComparison.Ordinal));
+        Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IPackConfigStore));
+        Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IGmailApiClientFactory));
+        Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(ISalesforceApiClientFactory));
+        Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IConnector) && Equals(descriptor.ServiceKey, "google"));
+        Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IConnector) && Equals(descriptor.ServiceKey, "salesforce"));
 
         var graph = string.Join('\n', descriptors.Select(static descriptor =>
             $"{descriptor.ServiceType.FullName}|{descriptor.ServiceKey}|{descriptor.ImplementationType?.FullName}"));
@@ -66,6 +68,11 @@ public sealed class KernelV2CompositionTests
 
         await using var app = builder.Build();
         Assert.NotNull(app.Services.GetService<IChatClient>());
+        Assert.NotNull(app.Services.GetRequiredService<IPackConfigStore>());
+        Assert.NotNull(app.Services.GetRequiredService<IGmailApiClientFactory>());
+        Assert.NotNull(app.Services.GetRequiredService<ISalesforceApiClientFactory>());
+        Assert.NotNull(app.Services.GetRequiredKeyedService<IConnector>("google"));
+        Assert.NotNull(app.Services.GetRequiredKeyedService<IConnector>("salesforce"));
         app.MapDigitalBrainSetup();
         var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(static source => source.Endpoints).ToArray();
         var endpointGraph = string.Join('\n', endpoints.Select(static endpoint =>

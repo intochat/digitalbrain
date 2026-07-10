@@ -449,7 +449,7 @@ class InoConversationAction {
     if (kind != 'openUrl' ||
         target == null ||
         target.scheme != 'https' ||
-        target.host.toLowerCase() != 'accounts.google.com') {
+        !_isAllowedConnectionHost(target.host)) {
       throw const FormatException(
         'payload.data.operation.action is not an allowed connection action.',
       );
@@ -462,6 +462,14 @@ class InoConversationAction {
     'label': label,
     'target': target.toString(),
   };
+}
+
+bool _isAllowedConnectionHost(String host) {
+  final normalized = host.toLowerCase();
+  return normalized == 'accounts.google.com' ||
+      normalized == 'login.salesforce.com' ||
+      normalized == 'test.salesforce.com' ||
+      normalized.endsWith('.my.salesforce.com');
 }
 
 class InoConversationSurfacePayload extends SurfacePayload {

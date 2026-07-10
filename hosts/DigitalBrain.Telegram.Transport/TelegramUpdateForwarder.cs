@@ -16,9 +16,7 @@ public sealed class TelegramUpdateForwarder(
 {
     public const string MessageReceivedType = TelegramSignals.MessageReceived;
 
-    // Must match GatewayService.InternalKeyHeader on the kernel side. The inbound generic Send is internal-only,
-    // so the transport presents the shared service-to-service key the same way the reply dispatcher does for the
-    // secret pull. Empty in local "clone + run" dev, where the kernel admits the call unauthenticated in Development.
+    // Shared service-to-service key for the internal transport channel.
     private const string InternalKeyHeader = "x-internal-key";
 
     public async Task ForwardAsync(Update update, CancellationToken ct = default)

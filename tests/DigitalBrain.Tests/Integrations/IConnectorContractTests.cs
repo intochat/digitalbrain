@@ -118,6 +118,20 @@ internal sealed class FakeSalesforceApiClientFactory : ISalesforceApiClientFacto
         Task.FromResult<ISalesforceApiClient>(new FakeSalesforceApiClient());
 }
 
+internal sealed class FakeOAuthStateProtector : IOAuthStateProtector
+{
+    private readonly Dictionary<string, NeuronId> _owners = new(StringComparer.Ordinal);
+
+    public string Protect(NeuronId owner)
+    {
+        var state = "opaque-" + Guid.NewGuid().ToString("N");
+        _owners[state] = owner;
+        return state;
+    }
+
+    public bool TryUnprotect(string state, out NeuronId owner) => _owners.TryGetValue(state, out owner!);
+}
+
 internal sealed class FakeSalesforceApiClient : ISalesforceApiClient
 {
     public Task<string[]> QueryAsync(string soql, CancellationToken ct = default) => throw new NotImplementedException("Auth path does not call; TestConnection does.");
@@ -135,7 +149,7 @@ public class SalesforceConnectorContractTests : IConnectorContractTests<Salesfor
     {
         var store = new FakePackConfigStore();
         var factory = new FakeSalesforceApiClientFactory();
-        return new SalesforceConnector(factory, store);
+        return new SalesforceConnector(factory, store, new FakeOAuthStateProtector());
     }
 
     [Fact]
@@ -154,7 +168,7 @@ public class GoogleConnectorContractTests : IConnectorContractTests<GoogleConnec
     protected override GoogleConnector CreateConnector(NeuronId? user = null)
     {
         var store = new FakePackConfigStore();
-        return new GoogleConnector(store);
+        return new GoogleConnector(store, new FakeOAuthStateProtector());
     }
 
     [Fact]

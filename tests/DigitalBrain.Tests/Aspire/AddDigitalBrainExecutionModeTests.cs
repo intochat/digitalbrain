@@ -53,7 +53,7 @@ public sealed class AddDigitalBrainExecutionModeTests
         // not gated by isRunMode, but still present here as a regression guard for the resource wiring itself.
         Assert.Contains(builder.Resources, r => r.Name == "sync" && r.GetType().Name == "AzureBlobStorageResource");
 
-        // Development run mode automatically starts the Runtime V2 Flutter shell.
+        // Development run mode automatically starts the authenticated Flutter shell.
         Assert.Contains(builder.Resources, r => r.Name == "flutter-ui");
     }
 
@@ -95,7 +95,7 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.Equal(["https"], transportReference.EndpointNames);
 
         var flutterEnvironment = await EvaluateEnvironmentAsync(builder, flutter);
-        Assert.Equal("V2", flutterEnvironment[FlutterAspireExtensions.V2RuntimeEnvironmentVariable]);
+        Assert.DoesNotContain("DIGITALBRAIN_RUNTIME", flutterEnvironment.Keys);
         var endpointReference = Assert.IsType<EndpointReference>(
             flutterEnvironment[FlutterAspireExtensions.V2TransportEndpointEnvironmentVariable]);
         Assert.Same(mcp, endpointReference.Resource);

@@ -22,7 +22,7 @@ public sealed class TelegramReplyDispatcher(
     public const string ReplyRequestedType = TelegramSignals.ReplyRequested;
     public const string PackConfiguredType = "PackConfigured";
 
-    // Must match GatewayService.InternalKeyHeader on the kernel side.
+    // Shared service-to-service key for the internal transport channel.
     private const string InternalKeyHeader = "x-internal-key";
 
     public IReadOnlyList<string> WatchedTypes => new[] { ReplyRequestedType, PackConfiguredType };
