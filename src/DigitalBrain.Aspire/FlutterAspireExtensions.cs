@@ -5,19 +5,19 @@ namespace DigitalBrain.Aspire;
 
 public static class FlutterAspireExtensions
 {
-    public const string V2TransportEndpointEnvironmentVariable = "DIGITALBRAIN_V2_UI_ENDPOINT";
-    public const string V2BootstrapSecretEnvironmentVariable = "DIGITALBRAIN_V2_UI_BOOTSTRAP_SECRET";
+    public const string TransportEndpointEnvironmentVariable = "DIGITALBRAIN_V2_UI_ENDPOINT";
+    public const string BootstrapSecretEnvironmentVariable = "DIGITALBRAIN_V2_UI_BOOTSTRAP_SECRET";
 
     /// <summary>
     /// Starts Flutter against the authenticated UI transport. The bootstrap secret is
     /// a local, scope-limited exchange credential; the client exchanges it for an audience-bound
-    /// V2 session and never uses it as a bearer token.
+    /// UI session and never uses it as a bearer token.
     /// </summary>
-    public static IResourceBuilder<ExecutableResource> AddV2FlutterClient(
+    public static IResourceBuilder<ExecutableResource> AddFlutterClient(
         this DigitalBrainContext ctx,
         string name,
         string flutterAppPath,
-        IResourceBuilder<ProjectResource> v2Transport,
+        IResourceBuilder<ProjectResource> transport,
         IResourceBuilder<ParameterResource> bootstrapSecret,
         string endpointName = "https",
         string target = "windows")
@@ -25,7 +25,7 @@ public static class FlutterAspireExtensions
         ArgumentNullException.ThrowIfNull(ctx);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(flutterAppPath);
-        ArgumentNullException.ThrowIfNull(v2Transport);
+        ArgumentNullException.ThrowIfNull(transport);
         ArgumentNullException.ThrowIfNull(bootstrapSecret);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
         ArgumentException.ThrowIfNullOrWhiteSpace(target);
@@ -41,19 +41,19 @@ public static class FlutterAspireExtensions
                 "run",
                 "-d",
                 target)
-            .WithEnvironment(V2TransportEndpointEnvironmentVariable, v2Transport.GetEndpoint(endpointName))
-            .WithEnvironment(V2BootstrapSecretEnvironmentVariable, bootstrapSecret)
-            .WithReference(v2Transport.GetEndpoint(endpointName))
-            .WaitFor(v2Transport);
+            .WithEnvironment(TransportEndpointEnvironmentVariable, transport.GetEndpoint(endpointName))
+            .WithEnvironment(BootstrapSecretEnvironmentVariable, bootstrapSecret)
+            .WithReference(transport.GetEndpoint(endpointName))
+            .WaitFor(transport);
     }
 
     /// <summary>
     /// Resolves the repository Flutter app and starts the authenticated shell against the supplied
     /// authenticated transport. Returns <see langword="null"/> when the app is not present.
     /// </summary>
-    public static IResourceBuilder<ExecutableResource>? AddDefaultDevV2FlutterClient(
+    public static IResourceBuilder<ExecutableResource>? AddDefaultDevFlutterClient(
         this DigitalBrainContext ctx,
-        IResourceBuilder<ProjectResource> v2Transport,
+        IResourceBuilder<ProjectResource> transport,
         IResourceBuilder<ParameterResource> bootstrapSecret,
         string endpointName = "https")
     {
@@ -63,10 +63,10 @@ public static class FlutterAspireExtensions
             return null;
         }
 
-        return ctx.AddV2FlutterClient(
+        return ctx.AddFlutterClient(
             "flutter-ui",
             flutterPath,
-            v2Transport,
+            transport,
             bootstrapSecret,
             endpointName,
             "windows");

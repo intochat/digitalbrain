@@ -1,7 +1,7 @@
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using DigitalBrain.Core.V2;
+using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Db;
@@ -10,7 +10,7 @@ using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Kernel.Ui;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -128,14 +128,14 @@ public static class DigitalBrainOrleansExtensions
             .AllowAnyHeader()
             .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding")));
 
-        builder.Services.AddSingleton<IV2TelemetrySink, V2TelemetryBuffer>();
-        builder.Services.AddSingleton(new V2SchemaRegistry([
-            new V2SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
-            new V2SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true),
-            new V2SchemaDescriptor("digitalbrain.v2.workflow-persisted-state", 2, "Operational", true)]));
-        builder.Services.AddScoped<IV2AggregateStore, OrleansV2AggregateStore>();
-        builder.Services.AddScoped<V2WorkflowAggregate>();
-        builder.Services.AddSingleton<IV2CommandHandler, V2EffectCommandHandler>();
+        builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
+        builder.Services.AddSingleton(new SchemaRegistry([
+            new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
+            new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true),
+            new SchemaDescriptor("digitalbrain.v2.workflow-persisted-state", 2, "Operational", true)]));
+        builder.Services.AddScoped<IAggregateStore, OrleansAggregateStore>();
+        builder.Services.AddScoped<WorkflowAggregate>();
+        builder.Services.AddSingleton<ICommandHandler, EffectCommandHandler>();
 
         var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted();
 

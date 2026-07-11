@@ -5,7 +5,7 @@ using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Config;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Ui.Contracts;
 
@@ -21,8 +21,8 @@ public sealed class AsyncContractArchitectureTests
         typeof(IAutomationNeuron),
         typeof(IUserSessionNeuron),
         typeof(IFlutterUiNeuron),
-        typeof(IV2GmailReadToolGrain),
-        typeof(IV2SalesforceReadToolGrain),
+        typeof(IGmailReadToolGrain),
+        typeof(ISalesforceReadToolGrain),
         typeof(IConnector),
         typeof(IPackConfigStore),
         typeof(IPackConfigBackingStore),

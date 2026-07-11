@@ -1,13 +1,15 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Abstractions;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ProviderSalesforceContinuation = DigitalBrain.Salesforce.SalesforceContinuation;
+using RuntimeSalesforceContinuation = DigitalBrain.Kernel.Runtime.SalesforceContinuation;
 
 namespace DigitalBrain.Salesforce;
 
@@ -19,12 +21,12 @@ public sealed class SalesforceReadNeuron(
     [FromKeyedServices("salesforce")] IConnector connector,
     IOAuthStateProtector oauthStateProtector,
     [PersistentState("salesforce-read", "Default")] IPersistentState<SalesforceReadNeuronState> continuationState)
-    : Grain, IV2SalesforceReadToolGrain
+    : Grain, ISalesforceReadToolGrain
 {
     private const int MaximumContinuations = 32;
     private static readonly TimeSpan OAuthStartLifetime = TimeSpan.FromMinutes(5);
 
-    public async Task<V2SalesforceReadResult> BeginAuthorizationAsync(
+    public async Task<SalesforceReadResult> BeginAuthorizationAsync(
         string startToken,
         CancellationToken cancellationToken = default)
     {
@@ -34,8 +36,8 @@ public sealed class SalesforceReadNeuron(
             !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal) ||
             !IsCurrentOAuthStartToken(startToken))
         {
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.Unavailable,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.Unavailable,
                 SafeReason: "This Salesforce connection request is invalid or expired. Start again from DigitalBrain.");
         }
 
@@ -45,13 +47,13 @@ public sealed class SalesforceReadNeuron(
             var challenge = await connector.BeginAuthAsync(owner, cancellationToken: cancellationToken);
             if (challenge.IsForm || !SalesforceClientFactory.IsAllowedAuthorizationUrl(challenge.UrlOrForm))
             {
-                return new V2SalesforceReadResult(
-                    V2SalesforceReadStatus.ConfigurationMissing,
+                return new SalesforceReadResult(
+                    SalesforceReadStatus.ConfigurationMissing,
                     SafeReason: "Salesforce application configuration is missing.");
             }
 
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.NeedsAuth,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.NeedsAuth,
                 ConnectionUrl: challenge.UrlOrForm);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -61,8 +63,8 @@ public sealed class SalesforceReadNeuron(
         catch (Exception ex)
         {
             logger.LogWarning("Principal-scoped Salesforce authorization start failed with {ExceptionType}.", ex.GetType().Name);
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.Unavailable,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.Unavailable,
                 SafeReason: "Salesforce connection is unavailable right now.");
         }
     }
@@ -81,7 +83,7 @@ public sealed class SalesforceReadNeuron(
         return connector.CompleteAuthAsync(callback, cancellationToken);
     }
 
-    public Task<V2SalesforceReadResult> ReadLatestAccountAsync(CancellationToken cancellationToken = default) =>
+    public Task<SalesforceReadResult> ReadLatestAccountAsync(CancellationToken cancellationToken = default) =>
         ReadAsync(
             async (client, ct) =>
             {
@@ -90,10 +92,10 @@ public sealed class SalesforceReadNeuron(
             },
             cancellationToken);
 
-    public Task<V2SalesforceReadResult> ReadCurrentProfileAsync(CancellationToken cancellationToken = default) =>
+    public Task<SalesforceReadResult> ReadCurrentProfileAsync(CancellationToken cancellationToken = default) =>
         ReadAsync((client, ct) => client.GetCurrentUserProfileAsync(ct), cancellationToken);
 
-    public Task<V2SalesforceReadResult> ReadRecentAccountsAsync(CancellationToken cancellationToken = default) =>
+    public Task<SalesforceReadResult> ReadRecentAccountsAsync(CancellationToken cancellationToken = default) =>
         ReadAsync(
             async (client, ct) =>
             {
@@ -102,7 +104,7 @@ public sealed class SalesforceReadNeuron(
             },
             cancellationToken);
 
-    public Task<V2SalesforceReadResult> ReadRecentContactsAsync(CancellationToken cancellationToken = default) =>
+    public Task<SalesforceReadResult> ReadRecentContactsAsync(CancellationToken cancellationToken = default) =>
         ReadAsync(
             async (client, ct) =>
             {
@@ -111,31 +113,31 @@ public sealed class SalesforceReadNeuron(
             },
             cancellationToken);
 
-    public Task<V2SalesforceReadResult> ReadCrmSchemaAsync(CancellationToken cancellationToken = default) =>
+    public Task<SalesforceReadResult> ReadCrmSchemaAsync(CancellationToken cancellationToken = default) =>
         ReadAsync((client, ct) => client.DescribeCrmAccessAsync(ct), cancellationToken);
 
-    public Task<V2SalesforceReadResult> DiscoverObjectsAsync(
-        V2SalesforceDiscoveryRequest request,
+    public Task<SalesforceReadResult> DiscoverObjectsAsync(
+        SalesforceDiscoveryRequest request,
         CancellationToken cancellationToken = default) =>
         ReadPageAsync((client, ct) => client.DiscoverObjectsAsync(request, ct), cancellationToken);
 
-    public Task<V2SalesforceReadResult> ReadRecordsAsync(
-        V2SalesforceRecordReadRequest request,
+    public Task<SalesforceReadResult> ReadRecordsAsync(
+        SalesforceRecordReadRequest request,
         CancellationToken cancellationToken = default) =>
         ReadPageAsync((client, ct) => client.ReadRecordsAsync(request, ct), cancellationToken);
 
-    public Task<V2SalesforceReadResult> SearchRecordsAsync(
-        V2SalesforceSearchRequest request,
+    public Task<SalesforceReadResult> SearchRecordsAsync(
+        SalesforceSearchRequest request,
         CancellationToken cancellationToken = default) =>
         ReadPageAsync((client, ct) => client.SearchRecordsAsync(request, ct), cancellationToken);
 
-    public Task<V2SalesforceReadResult> AggregateRecordsAsync(
-        V2SalesforceAggregateRequest request,
+    public Task<SalesforceReadResult> AggregateRecordsAsync(
+        SalesforceAggregateRequest request,
         CancellationToken cancellationToken = default) =>
         ReadPageAsync((client, ct) => client.AggregateRecordsAsync(request, ct), cancellationToken);
 
-    public Task<V2SalesforceReadResult> ContinueRecordsAsync(
-        V2SalesforceContinuationRequest request,
+    public Task<SalesforceReadResult> ContinueRecordsAsync(
+        SalesforceContinuationRequest request,
         CancellationToken cancellationToken = default) =>
         ReadPageAsync(
             async (client, ct) =>
@@ -153,7 +155,7 @@ public sealed class SalesforceReadNeuron(
             cancellationToken,
             request.Value);
 
-    private async Task<V2SalesforceReadResult> ReadPageAsync(
+    private async Task<SalesforceReadResult> ReadPageAsync(
         Func<ISalesforceApiClient, CancellationToken, Task<SalesforceReadPage>> read,
         CancellationToken cancellationToken,
         string? continuationToConsume = null)
@@ -164,8 +166,8 @@ public sealed class SalesforceReadNeuron(
             PackConfigScopes.ForUser(scope.UserId),
             cancellationToken);
         if (!config.IsValid)
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.ConfigurationMissing,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.ConfigurationMissing,
                 SafeReason: "Salesforce application configuration is missing.");
 
         var values = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
@@ -181,10 +183,10 @@ public sealed class SalesforceReadNeuron(
                 page.Continuation,
                 owner);
 
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.Success,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.Success,
                 page.Content,
-                Scope: new V2SalesforceReadScope(
+                Scope: new SalesforceReadScope(
                     owner.Value,
                     page.Scope.OrganizationId,
                     page.Scope.SalesforceUserId),
@@ -198,21 +200,21 @@ public sealed class SalesforceReadNeuron(
         }
         catch (SalesforceReadException ex)
         {
-            return new V2SalesforceReadResult(
+            return new SalesforceReadResult(
                 ex.Failure switch
                 {
-                    SalesforceReadFailure.InvalidRequest => V2SalesforceReadStatus.InvalidRequest,
-                    SalesforceReadFailure.AccessDenied => V2SalesforceReadStatus.AccessDenied,
-                    SalesforceReadFailure.LimitReached => V2SalesforceReadStatus.LimitReached,
-                    SalesforceReadFailure.ContinuationExpired => V2SalesforceReadStatus.ContinuationExpired,
-                    _ => V2SalesforceReadStatus.Unavailable
+                    SalesforceReadFailure.InvalidRequest => SalesforceReadStatus.InvalidRequest,
+                    SalesforceReadFailure.AccessDenied => SalesforceReadStatus.AccessDenied,
+                    SalesforceReadFailure.LimitReached => SalesforceReadStatus.LimitReached,
+                    SalesforceReadFailure.ContinuationExpired => SalesforceReadStatus.ContinuationExpired,
+                    _ => SalesforceReadStatus.Unavailable
                 },
                 SafeReason: ex.Message);
         }
         catch (Exception ex) when (IsPermissionFailure(ex))
         {
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.AccessDenied,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.AccessDenied,
                 SafeReason: "Salesforce authorization does not include the required read permission.");
         }
         catch (Exception ex) when (IsAuthorizationFailure(ex))
@@ -226,15 +228,15 @@ public sealed class SalesforceReadNeuron(
         catch (Exception ex)
         {
             logger.LogWarning("Principal-scoped Salesforce semantic read failed with {ExceptionType}.", ex.GetType().Name);
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.Unavailable,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.Unavailable,
                 SafeReason: "I couldn’t read Salesforce right now. Please try again later.");
         }
     }
 
-    private async Task<V2SalesforceContinuation?> PersistContinuationUpdateAsync(
+    private async Task<RuntimeSalesforceContinuation?> PersistContinuationUpdateAsync(
         string? continuationToConsume,
-        SalesforceContinuation? providerContinuation,
+        ProviderSalesforceContinuation? providerContinuation,
         NeuronId owner)
     {
         if (string.IsNullOrWhiteSpace(continuationToConsume) && providerContinuation is null)
@@ -243,14 +245,14 @@ public sealed class SalesforceReadNeuron(
         var continuations = ReadStoredContinuations()
             .Where(item => !string.Equals(item.Token, continuationToConsume, StringComparison.Ordinal))
             .ToList();
-        V2SalesforceContinuation? publicContinuation = null;
+        RuntimeSalesforceContinuation? publicContinuation = null;
         if (providerContinuation is not null)
         {
             if (continuations.Count >= MaximumContinuations)
                 continuations.RemoveAt(0);
             var token = Guid.NewGuid().ToString("N");
             continuations.Add(SalesforceStoredContinuation.From(token, providerContinuation));
-            publicContinuation = new V2SalesforceContinuation(
+            publicContinuation = new RuntimeSalesforceContinuation(
                 token,
                 owner.Value,
                 providerContinuation.Scope.OrganizationId);
@@ -285,7 +287,7 @@ public sealed class SalesforceReadNeuron(
         return [];
     }
 
-    private async Task<V2SalesforceReadResult> ReadAsync(
+    private async Task<SalesforceReadResult> ReadAsync(
         Func<ISalesforceApiClient, CancellationToken, Task<string>> read,
         CancellationToken cancellationToken)
     {
@@ -295,8 +297,8 @@ public sealed class SalesforceReadNeuron(
             PackConfigScopes.ForUser(scope.UserId),
             cancellationToken);
         if (!config.IsValid)
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.ConfigurationMissing,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.ConfigurationMissing,
                 SafeReason: "Salesforce application configuration is missing.");
 
         var values = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
@@ -307,8 +309,8 @@ public sealed class SalesforceReadNeuron(
         {
             var client = await salesforceApiClientFactory.CreateAsync(scope, cancellationToken);
             var content = await read(client, cancellationToken);
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.Success,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.Success,
                 content);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -334,13 +336,13 @@ public sealed class SalesforceReadNeuron(
         catch (Exception ex)
         {
             logger.LogWarning("Principal-scoped Salesforce read failed with {ExceptionType}.", ex.GetType().Name);
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.Unavailable,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.Unavailable,
                 SafeReason: "I couldn’t read Salesforce right now. Please try again later.");
         }
     }
 
-    private async Task<V2SalesforceReadResult> BuildConnectionResultAsync(
+    private async Task<SalesforceReadResult> BuildConnectionResultAsync(
         NeuronId owner,
         IReadOnlyDictionary<string, string> values,
         CancellationToken cancellationToken,
@@ -368,8 +370,8 @@ public sealed class SalesforceReadNeuron(
                 throw;
             }
 
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.NeedsAuth,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.NeedsAuth,
                 SafeReason: reason,
                 ConnectionUrl: startUrl);
         }
@@ -380,8 +382,8 @@ public sealed class SalesforceReadNeuron(
         catch (Exception ex)
         {
             logger.LogWarning("Principal-scoped Salesforce connection link creation failed with {ExceptionType}.", ex.GetType().Name);
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.Unavailable,
+            return new SalesforceReadResult(
+                SalesforceReadStatus.Unavailable,
                 SafeReason: "Salesforce connection is unavailable right now.");
         }
     }

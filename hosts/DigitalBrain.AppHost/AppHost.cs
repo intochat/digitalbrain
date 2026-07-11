@@ -10,27 +10,37 @@ using VoiceModels = DigitalBrain.Core.Models.Voice;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// V2 is the authoritative local/test composition. Production mutation capabilities remain explicitly gated.
-var v2Profile = builder.Configuration["DigitalBrain:Profile"] ?? "Development";
-var v2SessionSigningKey = builder.AddParameter(
+// This is the authoritative local/test composition. Publish and deploy must choose an explicit profile.
+var configuredProfile = builder.Configuration["DigitalBrain:Profile"];
+var profile = configuredProfile ?? (builder.ExecutionContext.IsRunMode
+    ? "Development"
+    : throw new InvalidOperationException("DigitalBrain:Profile must be configured for publish and deploy."));
+if (!IsKnownRuntimeProfile(profile))
+    throw new InvalidOperationException($"Unknown runtime profile '{profile}'.");
+var sessionSigningKey = builder.AddParameter(
     "v2-session-signing-key",
-    CreateV2KeyDefault(),
+    CreateKeyDefault(),
     secret: true,
     persist: true);
-var v2UiFeedIntegrityKey = builder.AddParameter(
+var uiFeedIntegrityKey = builder.AddParameter(
     "v2-ui-feed-integrity-key",
-    CreateV2KeyDefault(),
+    CreateKeyDefault(),
     secret: true,
     persist: true);
-var enableV2DevFlutter = builder.ExecutionContext.IsRunMode && IsLocalV2UiProfile(v2Profile);
-var localV2DataRoot = IsLocalV2UiProfile(v2Profile)
-    ? ResolveLocalV2DataRoot(builder.AppHostDirectory, v2Profile)
+var journalIntegrityKey = builder.AddParameter(
+    "v2-journal-integrity-key",
+    CreateKeyDefault(),
+    secret: true,
+    persist: true);
+var enableDevFlutter = builder.ExecutionContext.IsRunMode && IsLocalUiProfile(profile);
+var localDataRoot = IsLocalUiProfile(profile)
+    ? ResolveLocalDataRoot(builder.AppHostDirectory, profile)
     : null;
-var v2OperationStorePath = ResolveV2StorePath(builder.Configuration, "DigitalBrain:V2:OperationStorePath", localV2DataRoot, "operations.jsonl");
-var v2ProjectionStorePath = ResolveV2StorePath(builder.Configuration, "DigitalBrain:V2:ProjectionStorePath", localV2DataRoot, "projections.jsonl");
-var v2SessionStorePath = ResolveV2StorePath(builder.Configuration, "DigitalBrain:V2:SessionStorePath", localV2DataRoot, "sessions.jsonl");
-var v2UiFeedStorePath = ResolveV2StorePath(builder.Configuration, "DigitalBrain:V2:Ui:FeedStorePath", localV2DataRoot, "ui-feed.jsonl");
-IResourceBuilder<ParameterResource>? v2UiBootstrapSecret = enableV2DevFlutter
+var operationStorePath = ResolveStorePath(builder.Configuration, "DigitalBrain:V2:OperationStorePath", localDataRoot, "operations.jsonl");
+var projectionStorePath = ResolveStorePath(builder.Configuration, "DigitalBrain:V2:ProjectionStorePath", localDataRoot, "projections.jsonl");
+var sessionStorePath = ResolveStorePath(builder.Configuration, "DigitalBrain:V2:SessionStorePath", localDataRoot, "sessions.jsonl");
+var uiFeedStorePath = ResolveStorePath(builder.Configuration, "DigitalBrain:V2:Ui:FeedStorePath", localDataRoot, "ui-feed.jsonl");
+IResourceBuilder<ParameterResource>? uiBootstrapSecret = enableDevFlutter
     ? builder.AddParameter(
         "v2-ui-bootstrap-secret",
         () => builder.Configuration["Parameters:v2-ui-bootstrap-secret"] ?? Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
@@ -86,8 +96,8 @@ var googleAppConfig = builder.AddGoogleAppConfig();
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);  // Provides surfaces, journals, 3 replicas HA, and LLM wiring via the Aspire package.
 kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
-kernel.WithEnvironment("DigitalBrain__Profile", v2Profile);
-kernel.WithEnvironment("DigitalBrain__Auth__SessionSigningKey", v2SessionSigningKey);
+kernel.WithEnvironment("DigitalBrain__Profile", profile);
+kernel.WithEnvironment("DigitalBrain__Auth__SessionSigningKey", sessionSigningKey);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
 kernel.WithGoogleAppConfig(googleAppConfig);
 
@@ -100,12 +110,13 @@ if (ctx.EnableMcp)
     var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp", launchProfileName: null)
         .WithReference(ctx.OrleansClient)
         .WithReference(ctx.Llm)
-        .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", v2SessionSigningKey)
-        .WithEnvironment("DigitalBrain__Profile", v2Profile)
+        .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", sessionSigningKey)
+        .WithEnvironment("DigitalBrain__Profile", profile)
         .WithEnvironment("DigitalBrain__Salesforce__RedirectUri", salesforceAppConfig.RedirectUri)
-        .WithEnvironment("DigitalBrain__V2__Ui__FeedIntegrityKey", v2UiFeedIntegrityKey)
+        .WithEnvironment("DigitalBrain__V2__JournalIntegrityKey", journalIntegrityKey)
+        .WithEnvironment("DigitalBrain__V2__Ui__FeedIntegrityKey", uiFeedIntegrityKey)
         .WithEnvironment("DigitalBrain__Mcp__EnableAdmin", "false")
-        .WithEnvironment("DigitalBrain__Mcp__EnableMutations", v2Profile.Equals("Development", StringComparison.OrdinalIgnoreCase) ? "true" : "false")
+        .WithEnvironment("DigitalBrain__Mcp__EnableMutations", profile.Equals("Development", StringComparison.OrdinalIgnoreCase) ? "true" : "false")
         .WithEndpoint(name: "http", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
         .WithHttpsEndpoint(name: "https", env: "ASPNETCORE_HTTPS_PORTS", isProxied: true)
         .AsHttp2Service()
@@ -113,20 +124,20 @@ if (ctx.EnableMcp)
         .WithHttpHealthCheck(path: "/health", endpointName: "https")
         .WithMcpServer(endpointName: "http");
 
-    SetEnvironmentWhenConfigured(mcp, "DigitalBrain__V2__OperationStorePath", v2OperationStorePath);
-    SetEnvironmentWhenConfigured(mcp, "DigitalBrain__V2__ProjectionStorePath", v2ProjectionStorePath);
-    SetEnvironmentWhenConfigured(mcp, "DigitalBrain__V2__SessionStorePath", v2SessionStorePath);
-    SetEnvironmentWhenConfigured(mcp, "DigitalBrain__V2__Ui__FeedStorePath", v2UiFeedStorePath);
+    SetEnvironmentWhenConfigured(mcp, "DigitalBrain__V2__OperationStorePath", operationStorePath);
+    SetEnvironmentWhenConfigured(mcp, "DigitalBrain__V2__ProjectionStorePath", projectionStorePath);
+    SetEnvironmentWhenConfigured(mcp, "DigitalBrain__V2__SessionStorePath", sessionStorePath);
+    SetEnvironmentWhenConfigured(mcp, "DigitalBrain__V2__Ui__FeedStorePath", uiFeedStorePath);
 
-    if (v2UiBootstrapSecret is not null)
+    if (uiBootstrapSecret is not null)
     {
         // This is a local, scope-limited exchange credential, not an access token. The MCP
-        // transport exchanges it for a short-lived session signed for the exact V2 UI audience.
-        mcp.WithEnvironment("DigitalBrain__V2__Ui__BootstrapSecret", v2UiBootstrapSecret);
+        // transport exchanges it for a short-lived session signed for the exact UI transport audience.
+        mcp.WithEnvironment("DigitalBrain__V2__Ui__BootstrapSecret", uiBootstrapSecret);
 
         // The Flutter shell references only MCP's authenticated UI transport. It never receives
         // a kernel, Orleans, LLM, legacy Gateway, or WatchHomeFeed reference.
-        var flutter = ctx.AddDefaultDevV2FlutterClient(mcp, v2UiBootstrapSecret, endpointName: "https")
+        var flutter = ctx.AddDefaultDevFlutterClient(mcp, uiBootstrapSecret, endpointName: "https")
             ?? throw new InvalidOperationException(
                 "Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
         flutter.WithEnvironment("DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK", salesforceAppConfig.RedirectUriValue);
@@ -160,11 +171,15 @@ static bool IsEnabled(string name) =>
     string.Equals(Environment.GetEnvironmentVariable(name), "true", StringComparison.OrdinalIgnoreCase)
     || string.Equals(Environment.GetEnvironmentVariable(name), "1", StringComparison.OrdinalIgnoreCase);
 
-static bool IsLocalV2UiProfile(string profile) =>
+static bool IsLocalUiProfile(string profile) =>
     profile.Equals("Development", StringComparison.OrdinalIgnoreCase)
     || profile.Equals("Test", StringComparison.OrdinalIgnoreCase);
 
-static GenerateParameterDefault CreateV2KeyDefault() => new()
+static bool IsKnownRuntimeProfile(string profile) =>
+    IsLocalUiProfile(profile)
+    || profile.Equals("Production", StringComparison.OrdinalIgnoreCase);
+
+static GenerateParameterDefault CreateKeyDefault() => new()
 {
     // Forty-four base64-alphabet characters decode to 33 bytes. Aspire persists the generated
     // secret in Run mode so signed sessions and durable feed integrity survive AppHost restarts.
@@ -178,11 +193,11 @@ static GenerateParameterDefault CreateV2KeyDefault() => new()
     MinNumeric = 1
 };
 
-static string ResolveLocalV2DataRoot(string appHostDirectory, string profile)
+static string ResolveLocalDataRoot(string appHostDirectory, string profile)
 {
     var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
     if (string.IsNullOrWhiteSpace(localAppData))
-        throw new InvalidOperationException("A private per-user local application-data directory is required for local V2 durability.");
+        throw new InvalidOperationException("A private per-user local application-data directory is required for local runtime durability.");
     var fullAppHostPath = Path.GetFullPath(appHostDirectory);
     var canonicalPath = OperatingSystem.IsWindows() ? fullAppHostPath.ToUpperInvariant() : fullAppHostPath;
     var scope = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
@@ -190,7 +205,7 @@ static string ResolveLocalV2DataRoot(string appHostDirectory, string profile)
     return Path.Combine(localAppData, "DigitalBrain", "V2", scope, profile.ToLowerInvariant());
 }
 
-static string? ResolveV2StorePath(
+static string? ResolveStorePath(
     IConfiguration configuration,
     string configurationKey,
     string? localDataRoot,

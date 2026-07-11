@@ -1,4 +1,4 @@
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 
 namespace DigitalBrain.Salesforce;
 
@@ -9,16 +9,16 @@ public interface ISalesforceApiClient
     Task<string[]> ListContactsAsync(int maxResults, CancellationToken ct);
     Task<string> DescribeCrmAccessAsync(CancellationToken ct);
 
-    Task<SalesforceReadPage> DiscoverObjectsAsync(V2SalesforceDiscoveryRequest request, CancellationToken ct) =>
+    Task<SalesforceReadPage> DiscoverObjectsAsync(SalesforceDiscoveryRequest request, CancellationToken ct) =>
         Task.FromException<SalesforceReadPage>(SalesforceReadException.Unsupported());
 
-    Task<SalesforceReadPage> ReadRecordsAsync(V2SalesforceRecordReadRequest request, CancellationToken ct) =>
+    Task<SalesforceReadPage> ReadRecordsAsync(SalesforceRecordReadRequest request, CancellationToken ct) =>
         Task.FromException<SalesforceReadPage>(SalesforceReadException.Unsupported());
 
-    Task<SalesforceReadPage> SearchRecordsAsync(V2SalesforceSearchRequest request, CancellationToken ct) =>
+    Task<SalesforceReadPage> SearchRecordsAsync(SalesforceSearchRequest request, CancellationToken ct) =>
         Task.FromException<SalesforceReadPage>(SalesforceReadException.Unsupported());
 
-    Task<SalesforceReadPage> AggregateRecordsAsync(V2SalesforceAggregateRequest request, CancellationToken ct) =>
+    Task<SalesforceReadPage> AggregateRecordsAsync(SalesforceAggregateRequest request, CancellationToken ct) =>
         Task.FromException<SalesforceReadPage>(SalesforceReadException.Unsupported());
 
     Task<SalesforceReadPage> ContinueRecordsAsync(SalesforceContinuation continuation, CancellationToken ct) =>

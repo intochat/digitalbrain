@@ -239,7 +239,9 @@ class _VisualConstructorCanvasState extends State<VisualConstructorCanvas>
             ...widget.state.connections.map((conn) {
               final fromNode = widget.state.nodes[conn.fromNodeId];
               final toNode = widget.state.nodes[conn.toNodeId];
-              if (fromNode == null || toNode == null) return const SizedBox.shrink();
+              if (fromNode == null || toNode == null) {
+                return const SizedBox.shrink();
+              }
 
               final fromPort = fromNode.ports.firstWhere((p) => p.id == conn.fromPortId);
               final toPort = toNode.ports.firstWhere((p) => p.id == conn.toPortId);
@@ -576,7 +578,7 @@ class _SynapseAnimationPainter extends CustomPainter {
       final pos = getBezierPoint(p.start, p.end, p.progress);
 
       final outerGlow = Paint()
-        ..color = const Color(0xFF00FFD2).withOpacity(0.6)
+        ..color = const Color(0xFF00FFD2).withValues(alpha: 0.6)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12.0);
       canvas.drawCircle(pos, 12.0, outerGlow);
 
@@ -596,13 +598,13 @@ class _SynapseAnimationPainter extends CustomPainter {
       canvas.save();
       // Tilt tilted back in Z-axis space for 3D depth perspective!
       final matrix = Matrix4.identity()
-        ..translate(r.center.dx, r.center.dy)
+        ..translateByDouble(r.center.dx, r.center.dy, 0, 1)
         ..rotateX(0.9)
-        ..translate(-r.center.dx, -r.center.dy);
+        ..translateByDouble(-r.center.dx, -r.center.dy, 0, 1);
       canvas.transform(matrix.storage);
 
       final ripplePaint = Paint()
-        ..color = const Color(0xFFFF2D55).withOpacity(r.opacity * 0.7)
+        ..color = const Color(0xFFFF2D55).withValues(alpha: r.opacity * 0.7)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.0
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
@@ -611,7 +613,7 @@ class _SynapseAnimationPainter extends CustomPainter {
 
       // Inner faint atmospheric expand ring
       final innerAtm = Paint()
-        ..color = const Color(0xFFFF2D55).withOpacity(r.opacity * 0.15)
+        ..color = const Color(0xFFFF2D55).withValues(alpha: r.opacity * 0.15)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(r.center, r.radius, innerAtm);
 

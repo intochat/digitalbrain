@@ -58,7 +58,7 @@ public sealed class AddDigitalBrainExecutionModeTests
     }
 
     [Fact]
-    public async Task V2TestProfile_DeclaresFlutterClientWiredOnlyToV2Transport()
+    public async Task TestProfile_DeclaresFlutterClientWiredOnlyToTransport()
     {
         const string salesforceCallback = "https://brain.example/oauth/callback/salesforce";
         var builder = await CreateAppHostBuilderAsync(
@@ -76,6 +76,9 @@ public sealed class AddDigitalBrainExecutionModeTests
         var feedIntegrityKey = Assert.IsType<ParameterResource>(
             Assert.Single(builder.Resources, r => r.Name == "v2-ui-feed-integrity-key"));
         Assert.True(feedIntegrityKey.Secret);
+        var journalIntegrityKey = Assert.IsType<ParameterResource>(
+            Assert.Single(builder.Resources, r => r.Name == "v2-journal-integrity-key"));
+        Assert.True(journalIntegrityKey.Secret);
 
         var httpsEndpoint = Assert.Single(
             mcp.Annotations.OfType<EndpointAnnotation>(),
@@ -100,17 +103,18 @@ public sealed class AddDigitalBrainExecutionModeTests
         var flutterEnvironment = await EvaluateEnvironmentAsync(builder, flutter);
         Assert.DoesNotContain("DIGITALBRAIN_RUNTIME", flutterEnvironment.Keys);
         var endpointReference = Assert.IsType<EndpointReference>(
-            flutterEnvironment[FlutterAspireExtensions.V2TransportEndpointEnvironmentVariable]);
+            flutterEnvironment[FlutterAspireExtensions.TransportEndpointEnvironmentVariable]);
         Assert.Same(mcp, endpointReference.Resource);
         Assert.Equal("https", endpointReference.EndpointName);
         Assert.Same(
             bootstrapSecret,
-            flutterEnvironment[FlutterAspireExtensions.V2BootstrapSecretEnvironmentVariable]);
+            flutterEnvironment[FlutterAspireExtensions.BootstrapSecretEnvironmentVariable]);
         Assert.Equal(salesforceCallback, flutterEnvironment["DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK"]);
 
         var mcpEnvironment = await EvaluateEnvironmentAsync(builder, mcp);
         Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__V2__Ui__BootstrapSecret"]);
         Assert.Same(feedIntegrityKey, mcpEnvironment["DigitalBrain__V2__Ui__FeedIntegrityKey"]);
+        Assert.Same(journalIntegrityKey, mcpEnvironment["DigitalBrain__V2__JournalIntegrityKey"]);
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var operationPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__OperationStorePath"]);
         var projectionPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__ProjectionStorePath"]);
@@ -148,7 +152,7 @@ public sealed class AddDigitalBrainExecutionModeTests
     }
 
     [Fact]
-    public async Task V2ProductionProfile_DoesNotDeclareLocalFlutterOrBootstrapCredential()
+    public async Task ProductionProfile_DoesNotDeclareLocalFlutterOrBootstrapCredential()
     {
         var builder = await CreateAppHostBuilderAsync("--DigitalBrain:Profile=Production");
 
@@ -159,10 +163,20 @@ public sealed class AddDigitalBrainExecutionModeTests
     }
 
     [Fact]
+    public async Task PublishMode_RequiresAnExplicitRuntimeProfile()
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            CreateAppHostBuilderAsync("--publisher", "manifest"));
+    }
+
+    [Fact]
     public async Task PublishMode_SkipsEmulatorAndOllamaContainer_UsesConnectionStringPlaceholder()
     {
         // `aspire publish`'s equivalent: no containers should ever be started for this.
-        var builder = await CreateAppHostBuilderAsync("--publisher", "manifest");
+        var builder = await CreateAppHostBuilderAsync(
+            "--publisher",
+            "manifest",
+            "--DigitalBrain:Profile=Production");
 
         Assert.True(builder.ExecutionContext.IsPublishMode);
         Assert.False(builder.ExecutionContext.IsRunMode);

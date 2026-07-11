@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Salesforce.Common.Models.Json;
@@ -73,7 +73,7 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
     }
 
     public async Task<SalesforceReadPage> DiscoverObjectsAsync(
-        V2SalesforceDiscoveryRequest request,
+        SalesforceDiscoveryRequest request,
         CancellationToken ct)
     {
         var scope = ProviderScope();
@@ -108,7 +108,7 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
     }
 
     public async Task<SalesforceReadPage> ReadRecordsAsync(
-        V2SalesforceRecordReadRequest request,
+        SalesforceRecordReadRequest request,
         CancellationToken ct)
     {
         var scope = ProviderScope();
@@ -118,14 +118,14 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
             var selected = ResolveSelectedFields(schema, request.Fields);
             var where = new List<string>(CompileFilters(schema, request.Filters));
 
-            if (request.Kind == V2SalesforceRecordReadKind.Details)
+            if (request.Kind == SalesforceRecordReadKind.Details)
             {
                 if (request.Record is null || !SameLabel(request.Record.Entity.Label, request.Entity.Label))
                     throw Invalid("A server-resolved record for the requested Salesforce entity is required.");
                 ValidateRecordId(request.Record.RecordId, schema.KeyPrefix);
                 where.Add($"{schema.IdField.ApiName} = '{request.Record.RecordId}'");
             }
-            else if (request.Kind == V2SalesforceRecordReadKind.Related)
+            else if (request.Kind == SalesforceRecordReadKind.Related)
             {
                 if (request.RelatedTo is null)
                     throw Invalid("A server-resolved parent record is required for a related-record read.");
@@ -156,7 +156,7 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
     }
 
     public async Task<SalesforceReadPage> SearchRecordsAsync(
-        V2SalesforceSearchRequest request,
+        SalesforceSearchRequest request,
         CancellationToken ct)
     {
         var scope = ProviderScope();
@@ -200,7 +200,7 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
     }
 
     public async Task<SalesforceReadPage> AggregateRecordsAsync(
-        V2SalesforceAggregateRequest request,
+        SalesforceAggregateRequest request,
         CancellationToken ct)
     {
         var scope = ProviderScope();
@@ -208,7 +208,7 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
         {
             var schema = await ResolveObjectAsync(request.Entity, true, false, ct).ConfigureAwait(false);
             var field = request.Field is null ? null : ResolveField(schema, request.Field, "aggregate");
-            if (request.Function != V2SemanticAggregateFunction.Count && field is null)
+            if (request.Function != SemanticAggregateFunction.Count && field is null)
                 throw Invalid("The requested Salesforce aggregate requires a semantic field.");
             var group = request.GroupBy is null ? null : ResolveField(schema, request.GroupBy, "group");
             if (group is not null && !group.Groupable)
@@ -216,12 +216,12 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
 
             var expression = request.Function switch
             {
-                V2SemanticAggregateFunction.Count => "COUNT()",
-                V2SemanticAggregateFunction.CountDistinct => $"COUNT_DISTINCT({field!.ApiName})",
-                V2SemanticAggregateFunction.Sum => $"SUM({field!.ApiName})",
-                V2SemanticAggregateFunction.Average => $"AVG({field!.ApiName})",
-                V2SemanticAggregateFunction.Minimum => $"MIN({field!.ApiName})",
-                V2SemanticAggregateFunction.Maximum => $"MAX({field!.ApiName})",
+                SemanticAggregateFunction.Count => "COUNT()",
+                SemanticAggregateFunction.CountDistinct => $"COUNT_DISTINCT({field!.ApiName})",
+                SemanticAggregateFunction.Sum => $"SUM({field!.ApiName})",
+                SemanticAggregateFunction.Average => $"AVG({field!.ApiName})",
+                SemanticAggregateFunction.Minimum => $"MIN({field!.ApiName})",
+                SemanticAggregateFunction.Maximum => $"MAX({field!.ApiName})",
                 _ => throw Invalid("The requested Salesforce aggregate is unsupported.")
             };
             var filters = CompileFilters(schema, request.Filters).ToArray();
@@ -283,7 +283,7 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
     }
 
     private async Task<ObjectSchema> ResolveObjectAsync(
-        V2SalesforceSemanticEntity entity,
+        SalesforceSemanticEntity entity,
         bool requireQueryable,
         bool requireSearchable,
         CancellationToken ct)
@@ -337,7 +337,7 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
 
     private static IReadOnlyList<FieldSchema> ResolveSelectedFields(
         ObjectSchema schema,
-        IReadOnlyList<V2SalesforceSemanticField>? requested)
+        IReadOnlyList<SalesforceSemanticField>? requested)
     {
         var result = new List<FieldSchema> { schema.IdField };
         if (requested is { Count: > 0 })
@@ -360,7 +360,7 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
 
     private static FieldSchema ResolveField(
         ObjectSchema schema,
-        V2SalesforceSemanticField semantic,
+        SalesforceSemanticField semantic,
         string purpose)
     {
         if (semantic is null || string.IsNullOrWhiteSpace(semantic.Label) || semantic.Label.Length > 120)
@@ -373,16 +373,16 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
 
     private static IEnumerable<string> CompileFilters(
         ObjectSchema schema,
-        IReadOnlyList<V2SalesforceFilter>? filters)
+        IReadOnlyList<SalesforceFilter>? filters)
     {
         foreach (var filter in filters?.Take(12) ?? [])
         {
             var field = ResolveField(schema, filter.Field, "filtering");
             if (!field.Filterable)
                 throw Invalid($"Salesforce field '{field.Label}' cannot be filtered.");
-            if (filter.Operator is V2SemanticFilterOperator.IsNull or V2SemanticFilterOperator.IsNotNull)
+            if (filter.Operator is SemanticFilterOperator.IsNull or SemanticFilterOperator.IsNotNull)
             {
-                yield return $"{field.ApiName} {(filter.Operator == V2SemanticFilterOperator.IsNull ? "=" : "!=")} null";
+                yield return $"{field.ApiName} {(filter.Operator == SemanticFilterOperator.IsNull ? "=" : "!=")} null";
                 continue;
             }
             if (string.IsNullOrWhiteSpace(filter.Value))
@@ -390,22 +390,22 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
             var literal = Literal(field, filter.Value);
             yield return filter.Operator switch
             {
-                V2SemanticFilterOperator.Equals => $"{field.ApiName} = {literal}",
-                V2SemanticFilterOperator.NotEquals => $"{field.ApiName} != {literal}",
-                V2SemanticFilterOperator.GreaterThan => $"{field.ApiName} > {literal}",
-                V2SemanticFilterOperator.GreaterThanOrEqual => $"{field.ApiName} >= {literal}",
-                V2SemanticFilterOperator.LessThan => $"{field.ApiName} < {literal}",
-                V2SemanticFilterOperator.LessThanOrEqual => $"{field.ApiName} <= {literal}",
-                V2SemanticFilterOperator.Contains => $"{field.ApiName} LIKE '%{EscapeLike(filter.Value)}%'",
-                V2SemanticFilterOperator.StartsWith => $"{field.ApiName} LIKE '{EscapeLike(filter.Value)}%'",
+                SemanticFilterOperator.Equals => $"{field.ApiName} = {literal}",
+                SemanticFilterOperator.NotEquals => $"{field.ApiName} != {literal}",
+                SemanticFilterOperator.GreaterThan => $"{field.ApiName} > {literal}",
+                SemanticFilterOperator.GreaterThanOrEqual => $"{field.ApiName} >= {literal}",
+                SemanticFilterOperator.LessThan => $"{field.ApiName} < {literal}",
+                SemanticFilterOperator.LessThanOrEqual => $"{field.ApiName} <= {literal}",
+                SemanticFilterOperator.Contains => $"{field.ApiName} LIKE '%{EscapeLike(filter.Value)}%'",
+                SemanticFilterOperator.StartsWith => $"{field.ApiName} LIKE '{EscapeLike(filter.Value)}%'",
                 _ => throw Invalid($"The requested filter operation is unsupported for Salesforce field '{field.Label}'.")
             };
         }
     }
 
-    private static string CompileSorts(ObjectSchema schema, IReadOnlyList<V2SalesforceSort>? sorts)
+    private static string CompileSorts(ObjectSchema schema, IReadOnlyList<SalesforceSort>? sorts)
     {
-        var resolved = new List<(FieldSchema Field, V2SemanticSortDirection Direction)>();
+        var resolved = new List<(FieldSchema Field, SemanticSortDirection Direction)>();
         foreach (var sort in sorts?.Take(5) ?? [])
         {
             var field = ResolveField(schema, sort.Field, "sorting");
@@ -415,15 +415,15 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
                 resolved.Add((field, sort.Direction));
         }
         if (resolved.All(item => item.Field.ApiName != schema.IdField.ApiName))
-            resolved.Add((schema.IdField, V2SemanticSortDirection.Ascending));
+            resolved.Add((schema.IdField, SemanticSortDirection.Ascending));
         return string.Join(", ", resolved.Select(item =>
-            $"{item.Field.ApiName} {(item.Direction == V2SemanticSortDirection.Descending ? "DESC" : "ASC")}"));
+            $"{item.Field.ApiName} {(item.Direction == SemanticSortDirection.Descending ? "DESC" : "ASC")}"));
     }
 
     private static FieldSchema ResolveRelationship(
         ObjectSchema child,
         ObjectSchema parent,
-        V2SalesforceSemanticField? semantic)
+        SalesforceSemanticField? semantic)
     {
         var candidates = child.Fields.Where(field =>
             field.ReferenceTo.Contains(parent.ApiName, StringComparer.Ordinal)).ToArray();

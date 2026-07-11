@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using Salesforce.Force;
 using Xunit;
 
@@ -13,21 +13,21 @@ public sealed class SalesforceSemanticReadTests
     public async Task Semantic_read_resolves_described_labels_and_adds_record_id_tie_breaker()
     {
         var (client, handler) = CreateClient();
-        var request = new V2SalesforceRecordReadRequest(
-            new V2SalesforceSemanticEntity("Accounts"),
-            Fields: [new V2SalesforceSemanticField("Account Name")],
+        var request = new SalesforceRecordReadRequest(
+            new SalesforceSemanticEntity("Accounts"),
+            Fields: [new SalesforceSemanticField("Account Name")],
             Filters:
             [
-                new V2SalesforceFilter(
-                    new V2SalesforceSemanticField("Industry"),
-                    V2SemanticFilterOperator.Equals,
+                new SalesforceFilter(
+                    new SalesforceSemanticField("Industry"),
+                    SemanticFilterOperator.Equals,
                     "Technology' OR Name != 'Acme")
             ],
             Sorts:
             [
-                new V2SalesforceSort(
-                    new V2SalesforceSemanticField("Account Name"),
-                    V2SemanticSortDirection.Descending)
+                new SalesforceSort(
+                    new SalesforceSemanticField("Account Name"),
+                    SemanticSortDirection.Descending)
             ],
             Limit: 500);
 
@@ -50,8 +50,8 @@ public sealed class SalesforceSemanticReadTests
     public async Task Semantic_labels_fail_closed_before_unresolved_names_reach_the_sdk()
     {
         var (client, handler) = CreateClient();
-        var request = new V2SalesforceRecordReadRequest(
-            new V2SalesforceSemanticEntity("Account WHERE Name != null"));
+        var request = new SalesforceRecordReadRequest(
+            new SalesforceSemanticEntity("Account WHERE Name != null"));
 
         var error = await Assert.ThrowsAsync<SalesforceReadException>(
             () => client.ReadRecordsAsync(request, CancellationToken.None));
@@ -65,26 +65,26 @@ public sealed class SalesforceSemanticReadTests
     public async Task Related_aggregate_search_and_query_more_use_only_schema_resolved_provider_values()
     {
         var (client, handler) = CreateClient();
-        var parent = new V2SalesforceResolvedRecord(
-            new V2SalesforceSemanticEntity("Accounts"),
+        var parent = new SalesforceResolvedRecord(
+            new SalesforceSemanticEntity("Accounts"),
             "001000000000001");
         var related = await client.ReadRecordsAsync(
-            new V2SalesforceRecordReadRequest(
-                new V2SalesforceSemanticEntity("Contacts"),
-                V2SalesforceRecordReadKind.Related,
+            new SalesforceRecordReadRequest(
+                new SalesforceSemanticEntity("Contacts"),
+                SalesforceRecordReadKind.Related,
                 RelatedTo: parent),
             CancellationToken.None);
         var aggregate = await client.AggregateRecordsAsync(
-            new V2SalesforceAggregateRequest(
-                new V2SalesforceSemanticEntity("Accounts"),
-                V2SemanticAggregateFunction.Sum,
-                new V2SalesforceSemanticField("Annual Revenue"),
-                new V2SalesforceSemanticField("Industry")),
+            new SalesforceAggregateRequest(
+                new SalesforceSemanticEntity("Accounts"),
+                SemanticAggregateFunction.Sum,
+                new SalesforceSemanticField("Annual Revenue"),
+                new SalesforceSemanticField("Industry")),
             CancellationToken.None);
         await client.SearchRecordsAsync(
-            new V2SalesforceSearchRequest(
+            new SalesforceSearchRequest(
                 "Acme} OR FIND {*",
-                [new V2SalesforceSemanticEntity("Accounts")],
+                [new SalesforceSemanticEntity("Accounts")],
                 5),
             CancellationToken.None);
         var continued = await client.ContinueRecordsAsync(related.Continuation!, CancellationToken.None);
@@ -107,7 +107,7 @@ public sealed class SalesforceSemanticReadTests
     {
         var (client, _) = CreateClient();
 
-        var page = await client.DiscoverObjectsAsync(new V2SalesforceDiscoveryRequest(1), CancellationToken.None);
+        var page = await client.DiscoverObjectsAsync(new SalesforceDiscoveryRequest(1), CancellationToken.None);
         using var json = JsonDocument.Parse(page.Content);
 
         var discovered = Assert.Single(json.RootElement.GetProperty("Objects").EnumerateArray());

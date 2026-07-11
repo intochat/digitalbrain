@@ -291,7 +291,9 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
         final cPaint = Paint()
           ..color = adaptedColor.withValues(alpha: finalOpacity)
           ..style = PaintingStyle.fill;
-        if (cinematicBlur > 1.0) cPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, cinematicBlur);
+        if (cinematicBlur > 1.0) {
+          cPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, cinematicBlur);
+        }
         canvas.drawCircle(p.screen, radius * finalScale * pulseFactor, cPaint);
         continue;
       }
@@ -631,23 +633,44 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
 
   Color _adaptColor(Color c) {
     if (!isMonochrome) return c;
-    final double l = (0.299 * c.red + 0.587 * c.green + 0.114 * c.blue) / 255.0;
+    final double l = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
     final int gray = (l * 255.0).round();
-    return Color.fromARGB(c.alpha, gray, gray, (gray * 1.06).clamp(0, 255).round());
+    final alpha = (c.a * 255.0).round().clamp(0, 255);
+    return Color.fromARGB(alpha, gray, gray, (gray * 1.06).clamp(0, 255).round());
   }
 
   IconData _getBrainIcon(String id) {
     final lower = id.toLowerCase();
-    if (lower.contains('gmail') || lower.contains('mail')) return Icons.mail;
-    if (lower.contains('ai') || lower.contains('creator')) return Icons.psychology;
-    if (lower.contains('travel')) return Icons.flight;
-    if (lower.contains('sqlite') || lower.contains('postgres') || lower.contains('db')) return Icons.dns;
-    if (lower.contains('taskmanager')) return Icons.task_alt;
-    if (lower.contains('identity') || lower.contains('license')) return Icons.admin_panel_settings;
-    if (lower.contains('word')) return Icons.description;
-    if (lower.contains('diagram')) return Icons.schema;
-    if (lower.contains('onboarding')) return Icons.handshake;
-    if (lower.contains('innolang') || lower.contains('interpreter')) return Icons.translate;
+    if (lower.contains('gmail') || lower.contains('mail')) {
+      return Icons.mail;
+    }
+    if (lower.contains('ai') || lower.contains('creator')) {
+      return Icons.psychology;
+    }
+    if (lower.contains('travel')) {
+      return Icons.flight;
+    }
+    if (lower.contains('sqlite') || lower.contains('postgres') || lower.contains('db')) {
+      return Icons.dns;
+    }
+    if (lower.contains('taskmanager')) {
+      return Icons.task_alt;
+    }
+    if (lower.contains('identity') || lower.contains('license')) {
+      return Icons.admin_panel_settings;
+    }
+    if (lower.contains('word')) {
+      return Icons.description;
+    }
+    if (lower.contains('diagram')) {
+      return Icons.schema;
+    }
+    if (lower.contains('onboarding')) {
+      return Icons.handshake;
+    }
+    if (lower.contains('innolang') || lower.contains('interpreter')) {
+      return Icons.translate;
+    }
     return Icons.cloud_outlined;
   }
 

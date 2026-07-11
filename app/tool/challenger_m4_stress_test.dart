@@ -65,7 +65,7 @@ bool checkWildcard(String word) {
 }
 
 void main() {
-  print('=== CHALLENGER MILESTONE 4 STRESS TESTS ===\n');
+  stdout.writeln('=== CHALLENGER MILESTONE 4 STRESS TESTS ===\n');
 
   int totalTests = 0;
   int passedTests = 0;
@@ -74,20 +74,20 @@ void main() {
     totalTests++;
     if (condition) {
       passedTests++;
-      print('[PASS] $name');
+      stdout.writeln('[PASS] $name');
     } else {
-      print('[FAIL] $name');
+      stdout.writeln('[FAIL] $name');
     }
   }
 
   // -------------------------------------------------------------
   // Test 1: JSON Catalog Parsing
   // -------------------------------------------------------------
-  print('--- Testing Catalog Contract Schema & Deserialization ---');
+  stdout.writeln('--- Testing Catalog Contract Schema & Deserialization ---');
   try {
     final file = File('assets/ino-catalog.json');
     if (!file.existsSync()) {
-      print('[WARN] assets/ino-catalog.json not found in current directory. Trying relative UI/flutter/assets/...');
+      stdout.writeln('[WARN] assets/ino-catalog.json not found in current directory. Trying relative UI/flutter/assets/...');
     }
     final jsonPath = file.existsSync() ? 'assets/ino-catalog.json' : 'UI/flutter/assets/ino-catalog.json';
     final jsonStr = File(jsonPath).readAsStringSync();
@@ -107,7 +107,7 @@ void main() {
   // -------------------------------------------------------------
   // Test 2: Wildcard Parsing Boundaries in PromptInput
   // -------------------------------------------------------------
-  print('\n--- Testing Wildcard Parsing Boundaries in Creator Prompt ---');
+  stdout.writeln('\n--- Testing Wildcard Parsing Boundaries in Creator Prompt ---');
   assertTest('DigitalBrain.SDK.* matches wildcard boundary', checkWildcard('DigitalBrain.SDK.*'));
   assertTest('digitalbrain.sdk.* is case-insensitive and matches', checkWildcard('digitalbrain.sdk.*'));
   assertTest('DigitalBrain.SDK.Storage.* matches deeper wildcard nested path', checkWildcard('DigitalBrain.SDK.Storage.*'));
@@ -121,7 +121,7 @@ void main() {
   // -------------------------------------------------------------
   // Test 3: Outbound Signals Regex Extraction under Stress Scenarios
   // -------------------------------------------------------------
-  print('\n--- Testing Outbound Signals Extraction Regex ---');
+  stdout.writeln('\n--- Testing Outbound Signals Extraction Regex ---');
   
   // Base cases
   assertTest('Matches standard on synapse', parseSynapses('on synapse(DB.Google.Auth)').contains('DB.Google.Auth'));
@@ -157,16 +157,16 @@ void main() {
       !multiParse.contains('DB.Google.Auth'));
 
   // Summary
-  print('\n=== SUMMARY ===');
-  print('Total tests executed: $totalTests');
-  print('Passed: $passedTests');
-  print('Failed: ${totalTests - passedTests}');
+  stdout.writeln('\n=== SUMMARY ===');
+  stdout.writeln('Total tests executed: $totalTests');
+  stdout.writeln('Passed: $passedTests');
+  stdout.writeln('Failed: ${totalTests - passedTests}');
   
   if (passedTests == totalTests) {
-    print('\nALL STRESS TESTS PASSED SUCCESSFULLY!');
+    stdout.writeln('\nALL STRESS TESTS PASSED SUCCESSFULLY!');
     exit(0);
   } else {
-    print('\nSOME STRESS TESTS FAILED!');
+    stdout.writeln('\nSOME STRESS TESTS FAILED!');
     exit(1);
   }
 }

@@ -1,6 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel.Abstractions;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.Salesforce;
 using Orleans;
 
@@ -28,9 +28,9 @@ public static class DigitalBrainAppEndpoints
 
             var cluster = services.GetRequiredService<IClusterClient>();
             var result = await cluster
-                .GetGrain<IV2SalesforceReadToolGrain>(owner.Value)
+                .GetGrain<ISalesforceReadToolGrain>(owner.Value)
                 .BeginAuthorizationAsync(startToken, request.HttpContext.RequestAborted);
-            return result.Status == V2SalesforceReadStatus.NeedsAuth &&
+            return result.Status == SalesforceReadStatus.NeedsAuth &&
                    SalesforceClientFactory.IsAllowedAuthorizationUrl(result.ConnectionUrl)
                 ? Results.Redirect(result.ConnectionUrl!, permanent: false, preserveMethod: false)
                 : Results.StatusCode(StatusCodes.Status400BadRequest);
@@ -61,7 +61,7 @@ public static class DigitalBrainAppEndpoints
                 {
                     var cluster = services.GetRequiredService<IClusterClient>();
                     result = await cluster
-                        .GetGrain<IV2SalesforceReadToolGrain>(owner.Value)
+                        .GetGrain<ISalesforceReadToolGrain>(owner.Value)
                         .CompleteAuthorizationAsync(callback, request.HttpContext.RequestAborted);
                 }
             }

@@ -2,10 +2,18 @@ using System.Net;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Abstractions;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using Google;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using RuntimeGmailMessageListRequest = DigitalBrain.Kernel.Runtime.GmailMessageListRequest;
+using RuntimeGmailMessageListResult = DigitalBrain.Kernel.Runtime.GmailMessageListResult;
+using RuntimeGmailMessageMetadata = DigitalBrain.Kernel.Runtime.GmailMessageMetadata;
+using RuntimeGmailMessageSelection = DigitalBrain.Kernel.Runtime.GmailMessageSelection;
+using RuntimeGmailResultCoverage = DigitalBrain.Kernel.Runtime.GmailResultCoverage;
+using RuntimeGmailThreadListRequest = DigitalBrain.Kernel.Runtime.GmailThreadListRequest;
+using RuntimeGmailThreadListResult = DigitalBrain.Kernel.Runtime.GmailThreadListResult;
+using RuntimeGmailThreadMetadata = DigitalBrain.Kernel.Runtime.GmailThreadMetadata;
 
 namespace DigitalBrain.Google;
 
@@ -14,18 +22,18 @@ public sealed class GmailReadNeuron(
     ILogger<GmailReadNeuron> logger,
     IGmailApiClientFactory gmailApiClientFactory,
     IPackConfigStore store,
-    [FromKeyedServices("google")] IConnector connector) : Grain, IV2GmailReadToolGrain, IV2GmailMetadataToolGrain
+    [FromKeyedServices("google")] IConnector connector) : Grain, IGmailReadToolGrain, IGmailMetadataToolGrain
 {
-    public async Task<V2GmailReadResult> ReadIncomingAtOffsetAsync(
-        V2GmailReadRequest request,
+    public async Task<GmailReadResult> ReadIncomingAtOffsetAsync(
+        GmailReadRequest request,
         CancellationToken cancellationToken = default)
     {
         var owner = new NeuronId(this.GetPrimaryKeyString());
         var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
         var config = await connector.ValidateConfigAsync(cancellationToken: cancellationToken);
         if (!config.IsValid)
-            return new V2GmailReadResult(
-                V2GmailReadStatus.ConfigurationMissing,
+            return new GmailReadResult(
+                GmailReadStatus.ConfigurationMissing,
                 SafeReason: "Gmail application configuration is missing.");
 
         var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
@@ -36,34 +44,34 @@ public sealed class GmailReadNeuron(
         {
             var client = await gmailApiClientFactory.CreateAsync(scope, cancellationToken);
             if (!Valid(request))
-                return new V2GmailReadResult(
-                    V2GmailReadStatus.Unavailable,
+                return new GmailReadResult(
+                    GmailReadStatus.Unavailable,
                     SafeReason: "That Gmail position cannot be read safely.");
             var latest = await client.ReadIncomingAtOffsetAsync(
                 new GmailIncomingReadRequest(request.Offset, request.AnchorMessageId, request.AnchorInternalDate),
                 cancellationToken);
             return latest.State switch
             {
-                GmailLatestIncomingState.SenderAvailable => new V2GmailReadResult(
-                    V2GmailReadStatus.Success,
+                GmailLatestIncomingState.SenderAvailable => new GmailReadResult(
+                    GmailReadStatus.Success,
                     Sender: latest.Sender,
                     SenderAddress: latest.SenderAddress,
-                    MailboxState: V2GmailMailboxState.SenderAvailable,
+                    MailboxState: GmailMailboxState.SenderAvailable,
                     MessageId: latest.MessageId,
                     InternalDate: latest.InternalDate,
                     TraversalDepth: request.TraversalDepth,
                     AnchoredPrevious: request.RequiresAnchor),
-                GmailLatestIncomingState.EmptyInbox => new V2GmailReadResult(
-                    V2GmailReadStatus.Success,
-                    MailboxState: V2GmailMailboxState.EmptyInbox),
-                GmailLatestIncomingState.PositionUnavailable => new V2GmailReadResult(
-                    V2GmailReadStatus.Success,
-                    MailboxState: V2GmailMailboxState.PositionUnavailable,
+                GmailLatestIncomingState.EmptyInbox => new GmailReadResult(
+                    GmailReadStatus.Success,
+                    MailboxState: GmailMailboxState.EmptyInbox),
+                GmailLatestIncomingState.PositionUnavailable => new GmailReadResult(
+                    GmailReadStatus.Success,
+                    MailboxState: GmailMailboxState.PositionUnavailable,
                     TraversalDepth: request.TraversalDepth,
                     AnchoredPrevious: request.RequiresAnchor),
-                _ => new V2GmailReadResult(
-                    V2GmailReadStatus.Success,
-                    MailboxState: V2GmailMailboxState.SenderUnavailable,
+                _ => new GmailReadResult(
+                    GmailReadStatus.Success,
+                    MailboxState: GmailMailboxState.SenderUnavailable,
                     MessageId: latest.MessageId,
                     InternalDate: latest.InternalDate,
                     TraversalDepth: request.TraversalDepth,
@@ -91,19 +99,19 @@ public sealed class GmailReadNeuron(
         catch (Exception ex)
         {
             logger.LogWarning("Principal-scoped Gmail read failed with {ExceptionType}.", ex.GetType().Name);
-            return new V2GmailReadResult(
-                V2GmailReadStatus.Unavailable,
+            return new GmailReadResult(
+                GmailReadStatus.Unavailable,
                 SafeReason: "I couldn’t read Gmail right now. Please try again later.");
         }
     }
 
-    public Task<V2GmailMessageListResult> ReadMessagesAsync(
-        V2GmailMessageListRequest request,
+    public Task<RuntimeGmailMessageListResult> ReadMessagesAsync(
+        RuntimeGmailMessageListRequest request,
         CancellationToken cancellationToken = default)
     {
         if (!Valid(request))
-            return Task.FromResult(new V2GmailMessageListResult(
-                V2GmailReadStatus.Unavailable,
+            return Task.FromResult(new RuntimeGmailMessageListResult(
+                GmailReadStatus.Unavailable,
                 [],
                 EmptyCoverage(),
                 "That Gmail message selection cannot be read safely."));
@@ -113,44 +121,44 @@ public sealed class GmailReadNeuron(
             {
                 var result = await client.ListMessagesAsync(new GmailMessageListRequest(
                     Map(request.Selection), request.Offset, request.Limit), token);
-                return new V2GmailMessageListResult(
+                return new RuntimeGmailMessageListResult(
                     result.State == GmailMetadataReadState.Success
-                        ? V2GmailReadStatus.Success
-                        : V2GmailReadStatus.CapabilityUnavailable,
+                        ? GmailReadStatus.Success
+                        : GmailReadStatus.CapabilityUnavailable,
                     result.Messages.Select(Map).ToArray(),
                     Map(result.Coverage),
                     result.SafeReason,
                     StableCandidateMessageIds: result.StableCandidateMessageIds);
             },
-            static (status, reason, url) => new V2GmailMessageListResult(
+            static (status, reason, url) => new RuntimeGmailMessageListResult(
                 status, [], EmptyCoverage(), reason, url),
             cancellationToken);
     }
 
-    public Task<V2GmailMailboxOverviewResult> ReadMailboxOverviewAsync(
+    public Task<GmailMailboxOverviewResult> ReadMailboxOverviewAsync(
         CancellationToken cancellationToken = default) =>
         ExecuteMetadataReadAsync(
             async (client, token) =>
             {
                 var result = await client.ReadMailboxOverviewAsync(token);
-                return new V2GmailMailboxOverviewResult(
-                    V2GmailReadStatus.Success,
+                return new GmailMailboxOverviewResult(
+                    GmailReadStatus.Success,
                     result.InboxMessages,
                     result.UnreadInboxMessages,
                     result.InboxThreads,
                     result.UnreadInboxThreads);
             },
-            static (status, reason, url) => new V2GmailMailboxOverviewResult(
+            static (status, reason, url) => new GmailMailboxOverviewResult(
                 status, SafeReason: reason, ConnectionUrl: url),
             cancellationToken);
 
-    public Task<V2GmailThreadListResult> ReadThreadsAsync(
-        V2GmailThreadListRequest request,
+    public Task<RuntimeGmailThreadListResult> ReadThreadsAsync(
+        RuntimeGmailThreadListRequest request,
         CancellationToken cancellationToken = default)
     {
         if (!Valid(request))
-            return Task.FromResult(new V2GmailThreadListResult(
-                V2GmailReadStatus.Unavailable,
+            return Task.FromResult(new RuntimeGmailThreadListResult(
+                GmailReadStatus.Unavailable,
                 [],
                 EmptyCoverage(),
                 "That Gmail thread selection cannot be read safely."));
@@ -160,11 +168,11 @@ public sealed class GmailReadNeuron(
             {
                 var result = await client.ListThreadsAsync(new GmailThreadListRequest(
                     Map(request.Selection), request.Offset, request.Limit, request.MaxMessagesPerThread), token);
-                return new V2GmailThreadListResult(
+                return new RuntimeGmailThreadListResult(
                     result.State == GmailMetadataReadState.Success
-                        ? V2GmailReadStatus.Success
-                        : V2GmailReadStatus.CapabilityUnavailable,
-                    result.Threads.Select(thread => new V2GmailThreadMetadata(
+                        ? GmailReadStatus.Success
+                        : GmailReadStatus.CapabilityUnavailable,
+                    result.Threads.Select(thread => new RuntimeGmailThreadMetadata(
                         thread.ThreadId,
                         thread.LatestInternalDate,
                         thread.Subject,
@@ -177,21 +185,21 @@ public sealed class GmailReadNeuron(
                     StableCandidateMessageIds: result.StableCandidateMessageIds,
                     StableCandidateThreadIds: result.StableCandidateThreadIds);
             },
-            static (status, reason, url) => new V2GmailThreadListResult(
+            static (status, reason, url) => new RuntimeGmailThreadListResult(
                 status, [], EmptyCoverage(), reason, url),
             cancellationToken);
     }
 
     private async Task<T> ExecuteMetadataReadAsync<T>(
         Func<IGmailApiClient, CancellationToken, Task<T>> operation,
-        Func<V2GmailReadStatus, string?, string?, T> failure,
+        Func<GmailReadStatus, string?, string?, T> failure,
         CancellationToken cancellationToken)
     {
         var owner = new NeuronId(this.GetPrimaryKeyString());
         var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
         var config = await connector.ValidateConfigAsync(cancellationToken: cancellationToken);
         if (!config.IsValid)
-            return failure(V2GmailReadStatus.ConfigurationMissing, "Gmail application configuration is missing.", null);
+            return failure(GmailReadStatus.ConfigurationMissing, "Gmail application configuration is missing.", null);
 
         var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
         if (!GoogleClientFactory.HasUsableCredential(values))
@@ -224,11 +232,11 @@ public sealed class GmailReadNeuron(
         catch (Exception ex)
         {
             logger.LogWarning("Principal-scoped Gmail metadata read failed with {ExceptionType}.", ex.GetType().Name);
-            return failure(V2GmailReadStatus.Unavailable, "I couldn’t read Gmail right now. Please try again later.", null);
+            return failure(GmailReadStatus.Unavailable, "I couldn’t read Gmail right now. Please try again later.", null);
         }
     }
 
-    private static GmailMessageSelection Map(V2GmailMessageSelection selection) => new(
+    private static GmailMessageSelection Map(RuntimeGmailMessageSelection selection) => new(
         (GmailMailboxScope)selection.Mailbox,
         (GmailMessageReadState)selection.ReadState,
         selection.SenderAddress,
@@ -241,7 +249,7 @@ public sealed class GmailReadNeuron(
         selection.MaxPages,
         selection.MaxCandidates);
 
-    private static V2GmailMessageMetadata Map(GmailMessageMetadata message) => new(
+    private static RuntimeGmailMessageMetadata Map(GmailMessageMetadata message) => new(
         message.MessageId,
         message.ThreadId,
         message.InternalDate,
@@ -253,7 +261,7 @@ public sealed class GmailReadNeuron(
         message.LabelIds,
         message.IsRead);
 
-    private static V2GmailResultCoverage Map(GmailResultCoverage coverage) => new(
+    private static RuntimeGmailResultCoverage Map(GmailResultCoverage coverage) => new(
         coverage.PagesRead,
         coverage.CandidatesDiscovered,
         coverage.MetadataRead,
@@ -262,21 +270,21 @@ public sealed class GmailReadNeuron(
         coverage.ProviderExhausted,
         coverage.CandidateLimitReached);
 
-    private static V2GmailResultCoverage EmptyCoverage() => new(0, 0, 0, 0, 0, true, false);
+    private static RuntimeGmailResultCoverage EmptyCoverage() => new(0, 0, 0, 0, 0, true, false);
 
-    private async Task<V2GmailReadResult> BuildConnectionResultAsync(
+    private async Task<GmailReadResult> BuildConnectionResultAsync(
         NeuronId owner,
         CancellationToken cancellationToken,
         string reason = "Connect your Google account to let INO read your Gmail.")
     {
         var challenge = await connector.BeginAuthAsync(owner, cancellationToken: cancellationToken);
         if (challenge.IsForm || !IsAllowedGoogleAuthorizationUrl(challenge.UrlOrForm))
-            return new V2GmailReadResult(
-                V2GmailReadStatus.ConfigurationMissing,
+            return new GmailReadResult(
+                GmailReadStatus.ConfigurationMissing,
                 SafeReason: "Gmail application configuration is missing.");
 
-        return new V2GmailReadResult(
-            V2GmailReadStatus.NeedsAuth,
+        return new GmailReadResult(
+            GmailReadStatus.NeedsAuth,
             SafeReason: reason,
             ConnectionUrl: challenge.UrlOrForm);
     }
@@ -286,28 +294,28 @@ public sealed class GmailReadNeuron(
         uri.Scheme == Uri.UriSchemeHttps &&
         string.Equals(uri.Host, "accounts.google.com", StringComparison.OrdinalIgnoreCase);
 
-    private static bool Valid(V2GmailReadRequest request) =>
-        request.Offset is >= 0 and <= V2GmailTools.MaximumOffset &&
-        request.TraversalDepth is >= 0 and <= V2GmailTools.MaximumOffset &&
+    private static bool Valid(GmailReadRequest request) =>
+        request.Offset is >= 0 and <= GmailTools.MaximumOffset &&
+        request.TraversalDepth is >= 0 and <= GmailTools.MaximumOffset &&
         (request.AnchorMessageId is null
             ? !request.RequiresAnchor && request.AnchorInternalDate is null && request.TraversalDepth == request.Offset
             : request.RequiresAnchor && request.Offset == 1 && request.AnchorInternalDate is not null &&
               request.AnchorMessageId.Length is > 0 and <= 256);
 
-    private static bool Valid(V2GmailMessageListRequest request) =>
+    private static bool Valid(RuntimeGmailMessageListRequest request) =>
         request.Selection is not null && Valid(request.Selection) &&
-        request.Offset is >= 0 and < V2GmailTools.MaximumCandidateCount &&
-        request.Limit is >= 1 and <= V2GmailTools.MaximumResultCount;
+        request.Offset is >= 0 and < GmailTools.MaximumCandidateCount &&
+        request.Limit is >= 1 and <= GmailTools.MaximumResultCount;
 
-    private static bool Valid(V2GmailThreadListRequest request) =>
+    private static bool Valid(RuntimeGmailThreadListRequest request) =>
         request.Selection is not null && Valid(request.Selection) &&
-        request.Offset is >= 0 and < V2GmailTools.MaximumCandidateCount &&
-        request.Limit is >= 1 and <= V2GmailTools.MaximumResultCount &&
-        request.MaxMessagesPerThread is >= 1 and <= V2GmailTools.MaximumResultCount;
+        request.Offset is >= 0 and < GmailTools.MaximumCandidateCount &&
+        request.Limit is >= 1 and <= GmailTools.MaximumResultCount &&
+        request.MaxMessagesPerThread is >= 1 and <= GmailTools.MaximumResultCount;
 
-    private static bool Valid(V2GmailMessageSelection selection) =>
-        selection.MaxPages is >= 1 and <= V2GmailTools.MaximumPageCount &&
-        selection.MaxCandidates is >= 1 and <= V2GmailTools.MaximumCandidateCount &&
+    private static bool Valid(RuntimeGmailMessageSelection selection) =>
+        selection.MaxPages is >= 1 and <= GmailTools.MaximumPageCount &&
+        selection.MaxCandidates is >= 1 and <= GmailTools.MaximumCandidateCount &&
         selection.SenderAddress is not { Length: > 320 } &&
         selection.RecipientAddress is not { Length: > 320 } &&
         selection.SubjectContains is not { Length: > 256 } &&

@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Text;
 using System.Text.RegularExpressions;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using Google;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Gmail.v1;
@@ -42,7 +42,7 @@ public sealed class GoogleGmailApiClient : IGmailApiClient
         GmailIncomingReadRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (request.Offset is < 0 or > V2GmailTools.MaximumOffset)
+        if (request.Offset is < 0 or > GmailTools.MaximumOffset)
             throw new ArgumentOutOfRangeException(nameof(request));
         if ((request.AnchorMessageId is null) != (request.AnchorInternalDate is null))
             throw new ArgumentException("A complete Gmail anchor is required.", nameof(request));
@@ -150,7 +150,7 @@ public sealed class GoogleGmailApiClient : IGmailApiClient
         CancellationToken cancellationToken = default)
     {
         Validate(request.Selection, request.Offset, request.Limit);
-        if (request.MaxMessagesPerThread is < 1 or > V2GmailTools.MaximumResultCount)
+        if (request.MaxMessagesPerThread is < 1 or > GmailTools.MaximumResultCount)
             throw new ArgumentOutOfRangeException(nameof(request));
         if (request.Selection.AttachmentFilter != GmailAttachmentFilter.Any)
             return new GmailThreadListResult(
@@ -336,10 +336,10 @@ public sealed class GoogleGmailApiClient : IGmailApiClient
     private static void Validate(GmailMessageSelection selection, int offset, int limit)
     {
         ArgumentNullException.ThrowIfNull(selection);
-        if (offset is < 0 or >= V2GmailTools.MaximumCandidateCount) throw new ArgumentOutOfRangeException(nameof(offset));
-        if (limit is < 1 or > V2GmailTools.MaximumResultCount) throw new ArgumentOutOfRangeException(nameof(limit));
-        if (selection.MaxPages is < 1 or > V2GmailTools.MaximumPageCount) throw new ArgumentOutOfRangeException(nameof(selection));
-        if (selection.MaxCandidates is < 1 or > V2GmailTools.MaximumCandidateCount) throw new ArgumentOutOfRangeException(nameof(selection));
+        if (offset is < 0 or >= GmailTools.MaximumCandidateCount) throw new ArgumentOutOfRangeException(nameof(offset));
+        if (limit is < 1 or > GmailTools.MaximumResultCount) throw new ArgumentOutOfRangeException(nameof(limit));
+        if (selection.MaxPages is < 1 or > GmailTools.MaximumPageCount) throw new ArgumentOutOfRangeException(nameof(selection));
+        if (selection.MaxCandidates is < 1 or > GmailTools.MaximumCandidateCount) throw new ArgumentOutOfRangeException(nameof(selection));
         if (selection.PinnedMessageIds is { Length: > 0 } pinned &&
             (pinned.Length > selection.MaxCandidates || pinned.Any(static id =>
                 string.IsNullOrWhiteSpace(id) || id.Length > 256 || id.Any(char.IsControl))))

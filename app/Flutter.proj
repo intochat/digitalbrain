@@ -4,7 +4,7 @@
     - Source kept under app/ (pubspec, lib/, windows/ embedder for desktop).
     - Referenced from brain/Brain.slnx as first-class entry under /Clients/ (Type="C#").
     - Participates in `dotnet build` for pub get + incremental web bundle (used by gateway static or E2E).
-    - The live Windows client is launched by Aspire AddV2FlutterClient (AddExecutable "flutter run -d windows")
+    - The live Windows client is launched by Aspire AddFlutterClient (AddExecutable "flutter run -d windows")
       from the app/ working dir, with service discovery env injected for kernel gRPC + Orleans.
     - When embodied as NeuroPack (DigitalBrain.UI.AspireFlutter or custom shell pack), the pack can
       supply upgraded RFW definitions / ForUI chrome / nav surfaces; this host remains thin renderer.

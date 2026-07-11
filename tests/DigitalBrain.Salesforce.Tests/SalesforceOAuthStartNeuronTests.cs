@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Abstractions;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
@@ -26,12 +26,12 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
     [Fact]
     public async Task OAuth_start_is_local_persistent_and_single_use()
     {
-        var grain = Grain<IV2SalesforceReadToolGrain>("principal-oauth-start");
+        var grain = Grain<ISalesforceReadToolGrain>("principal-oauth-start");
 
         var disconnected = await grain.ReadRecordsAsync(
-            new V2SalesforceRecordReadRequest(new V2SalesforceSemanticEntity("Accounts")));
+            new SalesforceRecordReadRequest(new SalesforceSemanticEntity("Accounts")));
 
-        Assert.Equal(V2SalesforceReadStatus.NeedsAuth, disconnected.Status);
+        Assert.Equal(SalesforceReadStatus.NeedsAuth, disconnected.Status);
         var localStartUrl = Assert.IsType<string>(disconnected.ConnectionUrl);
         var localStart = new Uri(localStartUrl, UriKind.Absolute);
         Assert.True(localStart.IsLoopback);
@@ -52,7 +52,7 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
 
         var authorization = await grain.BeginAuthorizationAsync(token);
 
-        Assert.Equal(V2SalesforceReadStatus.NeedsAuth, authorization.Status);
+        Assert.Equal(SalesforceReadStatus.NeedsAuth, authorization.Status);
         var providerUrl = Assert.IsType<string>(authorization.ConnectionUrl);
         Assert.True(SalesforceClientFactory.IsAllowedAuthorizationUrl(providerUrl));
         Assert.Contains("/services/oauth2/authorize", providerUrl, StringComparison.Ordinal);
@@ -61,7 +61,7 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
         await Cluster.DeactivateAsync(grain);
         var replay = await grain.BeginAuthorizationAsync(token);
 
-        Assert.Equal(V2SalesforceReadStatus.Unavailable, replay.Status);
+        Assert.Equal(SalesforceReadStatus.Unavailable, replay.Status);
         Assert.Null(replay.ConnectionUrl);
         Assert.Equal(1, _connector.BeginAuthCallCount);
     }

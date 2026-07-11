@@ -363,7 +363,7 @@ public sealed class GoogleGmailApiClientTests
         payload = new
         {
             headers = new object[] { new { name = "From", value = message.From } },
-            body = new { data = "TmV2ZXIgZXhwb3NlIG1lLg==" }
+            body = new { data = "TmZXIgZXhwb3NlIG1lLg==" }
         }
     });
 
@@ -382,7 +382,7 @@ public sealed class GoogleGmailApiClientTests
                 new { name = "To", value = message.To },
                 new { name = "Subject", value = message.Subject }
             },
-            body = new { data = "TmV2ZXIgZXhwb3NlIG1lLg==" }
+            body = new { data = "TmZXIgZXhwb3NlIG1lLg==" }
         }
     });
 

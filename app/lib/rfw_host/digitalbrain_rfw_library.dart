@@ -824,9 +824,6 @@ Widget _graphicChart(BuildContext c, DataSource s) {
     ]);
   }
 
-  final rawSpec = s.v<Object>(['graphicSpec']) ?? s.v<Object>(['spec']);
-  final specMap = rawSpec is Map ? rawSpec : <String, dynamic>{};
-
   return SizedBox(
     height: 180,
     child: graphic.Chart(
@@ -3605,12 +3602,13 @@ class _SynapseRowWidgetState extends State<_SynapseRowWidget> {
       dynamic val = textVal;
       if (textVal.toLowerCase() == 'true') {
         val = true;
-      } else if (textVal.toLowerCase() == 'false')
+      } else if (textVal.toLowerCase() == 'false') {
         val = false;
-      else if (int.tryParse(textVal) != null)
+      } else if (int.tryParse(textVal) != null) {
         val = int.parse(textVal);
-      else if (double.tryParse(textVal) != null)
+      } else if (double.tryParse(textVal) != null) {
         val = double.parse(textVal);
+      }
       customFields[entry.key] = val;
     }
 
@@ -3649,6 +3647,7 @@ class _SynapseRowWidgetState extends State<_SynapseRowWidget> {
       widget.onFire?.call();
 
       await client.send(envelope);
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -3672,6 +3671,7 @@ class _SynapseRowWidgetState extends State<_SynapseRowWidget> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to fire synapse: $e'),

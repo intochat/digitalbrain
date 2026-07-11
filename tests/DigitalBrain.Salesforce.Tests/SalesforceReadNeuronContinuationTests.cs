@@ -2,11 +2,13 @@ using System.Reflection;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Abstractions;
-using DigitalBrain.Kernel.V2;
+using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Xunit;
+using ProviderSalesforceContinuation = DigitalBrain.Salesforce.SalesforceContinuation;
+using RuntimeSalesforceContinuation = DigitalBrain.Kernel.Runtime.SalesforceContinuation;
 
 namespace DigitalBrain.Salesforce.Tests;
 
@@ -27,7 +29,7 @@ public sealed class SalesforceReadNeuronContinuationTests : NeuronTestBase
     [Fact]
     public async Task Cancellation_preserves_the_continuation_for_retry()
     {
-        var grain = Grain<IV2SalesforceReadToolGrain>("principal-cancel");
+        var grain = Grain<ISalesforceReadToolGrain>("principal-cancel");
         var continuation = await SeedContinuationAsync(grain);
         var providerStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _client.Continue = async (_, cancellationToken) =>
@@ -46,14 +48,14 @@ public sealed class SalesforceReadNeuronContinuationTests : NeuronTestBase
         _client.Continue = (_, _) => Task.FromResult(CompletedPage());
         var retry = await grain.ContinueRecordsAsync(continuation);
 
-        Assert.Equal(V2SalesforceReadStatus.Success, retry.Status);
+        Assert.Equal(SalesforceReadStatus.Success, retry.Status);
         Assert.Equal(2, _client.ContinuationCallCount);
     }
 
     [Fact]
     public async Task Transient_failure_preserves_the_continuation_for_retry()
     {
-        var grain = Grain<IV2SalesforceReadToolGrain>("principal-transient");
+        var grain = Grain<ISalesforceReadToolGrain>("principal-transient");
         var continuation = await SeedContinuationAsync(grain);
         _client.Continue = (_, _) => _client.ContinuationCallCount == 1
             ? Task.FromException<SalesforceReadPage>(new TimeoutException("transient provider failure"))
@@ -62,15 +64,15 @@ public sealed class SalesforceReadNeuronContinuationTests : NeuronTestBase
         var failed = await grain.ContinueRecordsAsync(continuation);
         var retry = await grain.ContinueRecordsAsync(continuation);
 
-        Assert.Equal(V2SalesforceReadStatus.Unavailable, failed.Status);
-        Assert.Equal(V2SalesforceReadStatus.Success, retry.Status);
+        Assert.Equal(SalesforceReadStatus.Unavailable, failed.Status);
+        Assert.Equal(SalesforceReadStatus.Success, retry.Status);
         Assert.Equal(2, _client.ContinuationCallCount);
     }
 
     [Fact]
     public async Task Success_consumes_the_continuation()
     {
-        var grain = Grain<IV2SalesforceReadToolGrain>("principal-success");
+        var grain = Grain<ISalesforceReadToolGrain>("principal-success");
         var continuation = await SeedContinuationAsync(grain);
         _client.Continue = (_, _) => Task.FromResult(CompletedPage());
 
@@ -78,40 +80,40 @@ public sealed class SalesforceReadNeuronContinuationTests : NeuronTestBase
         await Cluster.DeactivateAsync(grain);
         var replay = await grain.ContinueRecordsAsync(continuation);
 
-        Assert.Equal(V2SalesforceReadStatus.Success, success.Status);
-        Assert.Equal(V2SalesforceReadStatus.ContinuationExpired, replay.Status);
+        Assert.Equal(SalesforceReadStatus.Success, success.Status);
+        Assert.Equal(SalesforceReadStatus.ContinuationExpired, replay.Status);
         Assert.Equal(1, _client.ContinuationCallCount);
     }
 
     [Fact]
     public async Task Continuation_survives_grain_reactivation()
     {
-        var grain = Grain<IV2SalesforceReadToolGrain>("principal-reactivation");
+        var grain = Grain<ISalesforceReadToolGrain>("principal-reactivation");
         var continuation = await SeedContinuationAsync(grain);
         await Cluster.DeactivateAsync(grain);
         _client.Continue = (_, _) => Task.FromResult(CompletedPage());
 
         var result = await grain.ContinueRecordsAsync(continuation);
 
-        Assert.Equal(V2SalesforceReadStatus.Success, result.Status);
+        Assert.Equal(SalesforceReadStatus.Success, result.Status);
         Assert.Equal(1, _client.ContinuationCallCount);
     }
 
-    private static async Task<V2SalesforceContinuationRequest> SeedContinuationAsync(
-        IV2SalesforceReadToolGrain grain)
+    private static async Task<SalesforceContinuationRequest> SeedContinuationAsync(
+        ISalesforceReadToolGrain grain)
     {
         var result = await grain.ReadRecordsAsync(
-            new V2SalesforceRecordReadRequest(new V2SalesforceSemanticEntity("Accounts")));
-        Assert.Equal(V2SalesforceReadStatus.Success, result.Status);
-        return new V2SalesforceContinuationRequest(Assert.IsType<V2SalesforceContinuation>(result.Continuation).Value);
+            new SalesforceRecordReadRequest(new SalesforceSemanticEntity("Accounts")));
+        Assert.Equal(SalesforceReadStatus.Success, result.Status);
+        return new SalesforceContinuationRequest(Assert.IsType<RuntimeSalesforceContinuation>(result.Continuation).Value);
     }
 
     private static SalesforceReadPage CompletedPage() =>
         new("{\"Entity\":\"Account\",\"Records\":[]}", 0, 0, ProviderScope);
 
-    private static SalesforceContinuation ProviderContinuation() =>
-        (SalesforceContinuation)Activator.CreateInstance(
-            typeof(SalesforceContinuation),
+    private static ProviderSalesforceContinuation ProviderContinuation() =>
+        (ProviderSalesforceContinuation)Activator.CreateInstance(
+            typeof(ProviderSalesforceContinuation),
             BindingFlags.Instance | BindingFlags.NonPublic,
             binder: null,
             ["/services/data/v60.0/query/next", ProviderScope, "Account", "Id", new Dictionary<string, string>()],
@@ -134,7 +136,7 @@ public sealed class SalesforceReadNeuronContinuationTests : NeuronTestBase
         public int ContinuationCallCount { get; private set; }
 
         public Task<SalesforceReadPage> ReadRecordsAsync(
-            V2SalesforceRecordReadRequest request,
+            SalesforceRecordReadRequest request,
             CancellationToken ct) =>
             Task.FromResult(new SalesforceReadPage(
                 "{\"Entity\":\"Account\",\"Records\":[]}",

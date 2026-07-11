@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:forui/forui.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class DigitalBrainColors {
@@ -242,4 +241,3 @@ class GlassBorderPainter extends CustomPainter {
         gradient != oldDelegate.gradient;
   }
 }
-

@@ -53,7 +53,7 @@ void main() {
     testWidgets('renders both text fields, the select, and the Save button', (
       tester,
     ) async {
-      await tester.pumpWidget(_configForm(onEvent: (_, __) {}));
+      await tester.pumpWidget(_configForm(onEvent: (_, _) {}));
       await tester.pumpAndSettle();
 
       expect(

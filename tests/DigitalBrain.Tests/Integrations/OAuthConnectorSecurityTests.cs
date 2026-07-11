@@ -126,7 +126,10 @@ public sealed class OAuthConnectorSecurityTests
 
         Assert.True(result.Success);
         Assert.Equal("test.salesforce.com", handler.RequestUri?.Host);
-        Assert.Contains("redirect_uri=http%3A%2F%2Flocalhost%3A8081%2Foauth%2Fcallback%2Fsalesforce", handler.RequestBody, StringComparison.Ordinal);
+        Assert.Contains(
+            "redirect_uri=" + Uri.EscapeDataString(SalesforceClientFactory.DefaultRedirectUri),
+            handler.RequestBody,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("9090", handler.RequestBody, StringComparison.Ordinal);
     }
 

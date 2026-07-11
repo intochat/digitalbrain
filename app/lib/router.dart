@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'v2/widgets/v2_runtime_shell.dart';
+import 'runtime/widgets/runtime_shell.dart';
 
 final digitalbrainRouter = GoRouter(
   initialLocation: '/chat',
@@ -10,7 +9,7 @@ final digitalbrainRouter = GoRouter(
     GoRoute(
       path: '/chat',
       name: 'chat',
-      builder: (context, state) => const V2RuntimeShell(),
+      builder: (context, state) => const RuntimeShell(),
     ),
   ],
 );

@@ -75,7 +75,7 @@ class _InspectorPanelState extends State<InspectorPanel> {
             backgroundColor: Colors.black87,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
-              side: BorderSide(color: const Color(0xFF00FFD2).withOpacity(0.3), width: 1),
+              side: BorderSide(color: const Color(0xFF00FFD2).withValues(alpha: 0.3), width: 1),
             ),
             title: Row(
               children: [
@@ -110,7 +110,7 @@ class _InspectorPanelState extends State<InspectorPanel> {
                   maxLines: 3,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
-                    fillColor: Colors.white.withOpacity(0.03),
+                    fillColor: Colors.white.withValues(alpha: 0.03),
                     filled: true,
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -132,7 +132,7 @@ class _InspectorPanelState extends State<InspectorPanel> {
                   controller: langCtrl,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
-                    fillColor: Colors.white.withOpacity(0.03),
+                    fillColor: Colors.white.withValues(alpha: 0.03),
                     filled: true,
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -218,6 +218,7 @@ class _InspectorPanelState extends State<InspectorPanel> {
       await client.send(envelope);
     } catch (e) {
       debugPrint("InspectorPanel gRPC dispatch error: $e");
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error dispatching synapse: $e')),
       );
@@ -317,7 +318,7 @@ class _InspectorPanelState extends State<InspectorPanel> {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         elevation: 10,
-                        shadowColor: const Color(0xFF00FFD2).withOpacity(0.5),
+                        shadowColor: const Color(0xFF00FFD2).withValues(alpha: 0.5),
                       ),
                       icon: const Icon(Icons.flash_on, size: 16),
                       label: const Text(

@@ -23,14 +23,16 @@ public sealed class OAuthCallbackPathTests
         Assert.Equal("/oauth/start/salesforce", OAuthCallbackPaths.SalesforceStart);
         Assert.Equal(OAuthCallbackPaths.Salesforce, SalesforceAspireExtensions.DefaultCallbackPath);
         Assert.Equal(OAuthCallbackPaths.Salesforce, SalesforceClientFactory.DefaultCallbackPath);
-        Assert.EndsWith(OAuthCallbackPaths.Salesforce, SalesforceClientFactory.DefaultRedirectUri);
+        Assert.Equal(
+            "http://localhost:51014/oauth/callback/salesforce",
+            SalesforceClientFactory.DefaultRedirectUri);
     }
 
     [Fact]
     public void SalesforceStartUrlAllowsOnlyBoundedLocalOrHttpsTokenLinks()
     {
         Assert.True(OAuthCallbackPaths.IsAllowedSalesforceStartUrl(
-            "http://localhost:8081/oauth/start/salesforce?t=opaque-token"));
+            "http://localhost:51014/oauth/start/salesforce?t=opaque-token"));
         Assert.False(OAuthCallbackPaths.IsAllowedSalesforceStartUrl(
             "https://brain.example/oauth/start/salesforce?t=opaque-token"));
         Assert.True(OAuthCallbackPaths.IsAllowedSalesforceStartUrl(
