@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Tests.Llm;
 
+[Collection("chat-telemetry-environment")]
 public class ChatClientRegistrationTests
 {
     [Fact]
@@ -157,43 +158,43 @@ public class ChatClientRegistrationTests
 
     [Theory]
     [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("not-a-boolean", false)]
     [InlineData("false", false)]
     [InlineData("true", true)]
-    public void SensitiveTelemetryRequiresExplicitConfiguration(string? configured, bool expected)
+    public async Task ChatTelemetryHonorsStandardMessageCaptureEnvironmentVariable(string? configured, bool expected)
     {
-        var values = new Dictionary<string, string?>();
-        if (configured is not null) values["DigitalBrain:Llm:EnableSensitiveTelemetry"] = configured;
-        var options = DigitalBrainLlmRuntimeOptions.FromConfiguration(
-            new ConfigurationBuilder().AddInMemoryCollection(values).Build());
-
-        Assert.Equal(expected, options.EnableSensitiveTelemetry);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ChatTelemetryIncludesMessagesOnlyWhenExplicitlyEnabled(bool enabled)
-    {
+        const string environmentVariable = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT";
         const string prompt = "telemetry-secret-prompt";
-        var stopped = new List<Activity>();
-        using var listener = new ActivityListener
+        var previous = Environment.GetEnvironmentVariable(environmentVariable);
+
+        try
         {
-            ShouldListenTo = static source => source.Name == "DigitalBrain.Neuron",
-            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-            SampleUsingParentId = static (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = stopped.Add
-        };
-        ActivitySource.AddActivityListener(listener);
-        using var client = DigitalBrainChatTelemetry.Wrap(new EchoChatClient(), enabled);
+            Environment.SetEnvironmentVariable(environmentVariable, configured);
+            var stopped = new List<Activity>();
+            using var listener = new ActivityListener
+            {
+                ShouldListenTo = static source => source.Name == "DigitalBrain.Neuron",
+                Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+                SampleUsingParentId = static (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
+                ActivityStopped = stopped.Add
+            };
+            ActivitySource.AddActivityListener(listener);
+            using var client = DigitalBrainChatTelemetry.Wrap(new EchoChatClient());
 
-        await client.GetResponseAsync(prompt);
+            await client.GetResponseAsync(prompt);
 
-        var telemetry = string.Join('\n', stopped.SelectMany(static activity =>
-            activity.Tags.Select(static tag => $"{tag.Key}={tag.Value}")
-                .Concat(activity.Events.SelectMany(static activityEvent => activityEvent.Tags.Select(tag =>
-                    $"{activityEvent.Name}:{tag.Key}={tag.Value}")))));
-        Assert.Equal(enabled, telemetry.Contains(prompt, StringComparison.Ordinal));
-        Assert.Equal(enabled, telemetry.Contains("telemetry-response", StringComparison.Ordinal));
+            var telemetry = string.Join('\n', stopped.SelectMany(static activity =>
+                activity.Tags.Select(static tag => $"{tag.Key}={tag.Value}")
+                    .Concat(activity.Events.SelectMany(static activityEvent => activityEvent.Tags.Select(tag =>
+                        $"{activityEvent.Name}:{tag.Key}={tag.Value}")))));
+            Assert.Equal(expected, telemetry.Contains(prompt, StringComparison.Ordinal));
+            Assert.Equal(expected, telemetry.Contains("telemetry-response", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(environmentVariable, previous);
+        }
     }
 
     private sealed class EchoChatClient : IChatClient
@@ -215,3 +216,6 @@ public class ChatClientRegistrationTests
         public void Dispose() { }
     }
 }
+
+[CollectionDefinition("chat-telemetry-environment", DisableParallelization = true)]
+public sealed class ChatTelemetryEnvironmentCollection;

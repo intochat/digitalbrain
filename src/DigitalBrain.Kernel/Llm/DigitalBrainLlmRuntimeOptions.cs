@@ -17,8 +17,7 @@ public sealed record DigitalBrainLlmRuntimeOptions(
     string? OpenAIApiKey,
     string? GitHubModelsToken,
     string GitHubModelsEndpoint,
-    string OpenAIModel,
-    bool EnableSensitiveTelemetry)
+    string OpenAIModel)
 {
     public const string DefaultOllamaModel = "llama3.1:8b";
     public const string DefaultOpenAIModel = "gpt-4o-mini";
@@ -50,9 +49,7 @@ public sealed record DigitalBrainLlmRuntimeOptions(
             config["DigitalBrain:Llm:GitHubModelsEndpoint"] ?? DefaultGitHubModelsEndpoint,
             FindRegisteredLlmModel(config, DigitalBrainProviderIds.OpenAI)
                 ?? config["DigitalBrain:Llm:OpenAIModel"]
-                ?? DefaultOpenAIModel,
-            bool.TryParse(config["DigitalBrain:Llm:EnableSensitiveTelemetry"], out var sensitiveTelemetry) &&
-            sensitiveTelemetry);
+                ?? DefaultOpenAIModel);
     }
 
     private static string? FindRegisteredLlmModel(IConfiguration config, string provider)

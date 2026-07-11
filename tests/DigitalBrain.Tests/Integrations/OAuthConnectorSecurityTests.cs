@@ -60,9 +60,11 @@ public sealed class OAuthConnectorSecurityTests
         var first = new NeuronId("principal-a");
         var second = new NeuronId("principal-b");
 
+        var validation = await connector.ValidateConfigAsync();
         var firstChallenge = await connector.BeginAuthAsync(first);
         var secondChallenge = await connector.BeginAuthAsync(second);
 
+        Assert.True(validation.IsValid, validation.Message);
         Assert.False(firstChallenge.IsForm);
         Assert.False(secondChallenge.IsForm);
         Assert.NotEqual(firstChallenge.State, secondChallenge.State);
@@ -100,8 +102,7 @@ public sealed class OAuthConnectorSecurityTests
         [SalesforceClientFactory.ClientSecretKey] = "client-secret",
         [SalesforceClientFactory.RedirectUriKey] = SalesforceClientFactory.DefaultRedirectUri,
         [SalesforceClientFactory.LoginUrlKey] = SalesforceClientFactory.DefaultLoginUrl,
-        [SalesforceClientFactory.ApiVersionKey] = SalesforceClientFactory.DefaultApiVersion,
-        [SalesforceClientFactory.OAuthScopeKey] = SalesforceClientFactory.DefaultOAuthScope
+        [SalesforceClientFactory.ApiVersionKey] = SalesforceClientFactory.DefaultApiVersion
     };
 
     private sealed class StubTokenEndpointHandler(string responseBody) : HttpMessageHandler

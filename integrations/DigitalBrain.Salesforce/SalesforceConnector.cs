@@ -32,7 +32,7 @@ public class SalesforceConnector : IConnector
     public ConnectorDescriptor Descriptor => new(
         Id: "salesforce",
         DisplayName: "Salesforce CRM",
-        RequiredConfigKeys: new[] { SalesforceClientFactory.ClientIdKey, SalesforceClientFactory.ClientSecretKey, SalesforceClientFactory.LoginUrlKey, SalesforceClientFactory.ApiVersionKey, SalesforceClientFactory.OAuthScopeKey, SalesforceClientFactory.RedirectUriKey },
+        RequiredConfigKeys: new[] { SalesforceClientFactory.ClientIdKey, SalesforceClientFactory.ClientSecretKey, SalesforceClientFactory.LoginUrlKey, SalesforceClientFactory.ApiVersionKey, SalesforceClientFactory.RedirectUriKey },
         Scopes: new[] { "api", "refresh_token" });
 
     public async Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null, CancellationToken cancellationToken = default)

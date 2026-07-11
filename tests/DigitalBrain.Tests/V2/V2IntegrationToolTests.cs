@@ -69,6 +69,22 @@ public sealed class V2IntegrationToolTests
     }
 
     [Fact]
+    public async Task Salesforce_answer_explains_bounded_reads_without_a_provider_call()
+    {
+        var resolver = new RecordingSemanticIntentResolver(new V2SemanticIntentProposal(
+            V2SemanticProvider.Salesforce,
+            V2SemanticOperation.Answer));
+
+        var invocation = Assert.Single(await new V2McpIntegrationPlanner(resolver)
+            .PlanAsync(Request("Tell me how my current Salesforce works.")));
+
+        Assert.Equal(V2AssistantTools.Clarify, invocation.ToolId);
+        var message = invocation.Input.GetProperty("message").GetString();
+        Assert.Contains("discover and search Salesforce objects", message, StringComparison.Ordinal);
+        Assert.Contains("connect Salesforce first when authorization is missing", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Gmail_catalog_uses_authenticated_principal_scope_and_requires_permission()
     {
         var gateway = new RecordingGateway(gmail: new(

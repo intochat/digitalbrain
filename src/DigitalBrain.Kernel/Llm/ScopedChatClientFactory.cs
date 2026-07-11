@@ -21,7 +21,7 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
                 return null;
             }
 
-            return DigitalBrainChatClients.BuildOpenAi(options.OpenAIModel, apiKey, options.EnableSensitiveTelemetry);
+            return DigitalBrainChatClients.BuildOpenAi(options.OpenAIModel, apiKey);
         }
 
         if (string.Equals(provider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase))
@@ -35,8 +35,7 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
             return DigitalBrainChatClients.BuildGitHubModels(
                 options.GitHubModelsEndpoint,
                 options.Model,
-                apiKey,
-                options.EnableSensitiveTelemetry);
+                apiKey);
         }
 
         if (string.IsNullOrWhiteSpace(provider) ||
@@ -44,8 +43,7 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
         {
             return DigitalBrainChatClients.BuildOllama(
                 options.OllamaEndpoint,
-                options.Model,
-                options.EnableSensitiveTelemetry);
+                options.Model);
         }
 
         logger.LogWarning("Unsupported scoped LLM provider '{Provider}' requested — falling back to global client.", provider);
@@ -57,43 +55,40 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
 // and the startup-time keyed registration in DigitalBrainChatClientRegistration.
 internal static class DigitalBrainChatClients
 {
-    public static IChatClient BuildOllama(string endpoint, string model, bool enableSensitiveTelemetry = false) =>
-        DigitalBrainChatTelemetry.Wrap(
-            new OllamaSharp.OllamaApiClient(new Uri(endpoint), model),
-            enableSensitiveTelemetry);
+    public static IChatClient BuildOllama(string endpoint, string model) =>
+        DigitalBrainChatTelemetry.Wrap(new OllamaSharp.OllamaApiClient(new Uri(endpoint), model));
 
-    public static IChatClient BuildOpenAi(string model, string apiKey, bool enableSensitiveTelemetry = false) =>
-        DigitalBrainChatTelemetry.Wrap(
-            new OpenAI.Chat.ChatClient(model, apiKey).AsIChatClient(),
-            enableSensitiveTelemetry);
+    public static IChatClient BuildOpenAi(string model, string apiKey) =>
+        DigitalBrainChatTelemetry.Wrap(new OpenAI.Chat.ChatClient(model, apiKey).AsIChatClient());
 
     public static IChatClient BuildOpenAiCompatible(
         string endpoint,
         string model,
-        string apiKey,
-        bool enableSensitiveTelemetry = false) =>
+        string apiKey) =>
         DigitalBrainChatTelemetry.Wrap(
             new OpenAI.OpenAIClient(
                     new System.ClientModel.ApiKeyCredential(apiKey),
                     new OpenAI.OpenAIClientOptions { Endpoint = new Uri(endpoint) })
                 .GetChatClient(model)
-                .AsIChatClient(),
-            enableSensitiveTelemetry);
+                .AsIChatClient());
 
     public static IChatClient BuildGitHubModels(
         string endpoint,
         string model,
-        string token,
-        bool enableSensitiveTelemetry = false) =>
-        BuildOpenAiCompatible(endpoint, model, token, enableSensitiveTelemetry);
+        string token) =>
+        BuildOpenAiCompatible(endpoint, model, token);
 }
 
 public static class DigitalBrainChatTelemetry
 {
-    public static IChatClient Wrap(IChatClient client, bool enableSensitiveTelemetry) =>
+    public static IChatClient Wrap(IChatClient client) =>
         new ChatClientBuilder(client)
             .UseOpenTelemetry(
                 sourceName: "DigitalBrain.Neuron",
-                configure: options => options.EnableSensitiveData = enableSensitiveTelemetry)
+                configure: options => options.EnableSensitiveData =
+                    bool.TryParse(
+                        Environment.GetEnvironmentVariable("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"),
+                        out var enabled) &&
+                    enabled)
             .Build();
 }

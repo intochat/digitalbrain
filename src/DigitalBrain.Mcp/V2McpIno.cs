@@ -715,7 +715,10 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
         activity?.SetTag("db.ino.tool_id", toolId ?? "assistant.clarify");
         activity?.SetTag("db.ino.outcome", toolId is null ? "unsupported" : "planned");
         return toolId is null
-            ? [Clarification("That connected-service operation isn’t available safely yet.")]
+            ? [Clarification(normalized.Provider == V2SemanticProvider.Salesforce &&
+                             normalized.Operation == V2SemanticOperation.Answer
+                ? "I can safely discover and search Salesforce objects, read details and related records, aggregate, sort, and page results. Ask for a specific account, opportunity, or object; I’ll ask this principal to connect Salesforce first when authorization is missing."
+                : "That connected-service operation isn’t available safely yet.")]
             : [new V2ToolInvocation(toolId, JsonSerializer.SerializeToElement(normalized, SemanticJson))];
     }
 

@@ -24,8 +24,7 @@ public static class DigitalBrainChat
         {
             services.AddChatClient(DigitalBrainChatClients.BuildOllama(
                 options.OllamaEndpoint,
-                options.Model,
-                options.EnableSensitiveTelemetry));
+                options.Model));
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase))
         {
@@ -40,7 +39,7 @@ public static class DigitalBrainChat
                     : new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(options.AzureOpenAIKey)))
                 .GetChatClient(options.Model)
                 .AsIChatClient();
-            var chatClient = DigitalBrainChatTelemetry.Wrap(azureClient, options.EnableSensitiveTelemetry);
+            var chatClient = DigitalBrainChatTelemetry.Wrap(azureClient);
             services.AddChatClient(chatClient);
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase))
@@ -49,17 +48,14 @@ public static class DigitalBrainChat
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:OpenAIApiKey is required for openai provider.");
             services.AddChatClient(DigitalBrainChatClients.BuildOpenAi(
                 options.Model,
-                apiKey,
-                options.EnableSensitiveTelemetry));
+                apiKey));
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase))
         {
             var apiKey = options.AnthropicApiKey
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:AnthropicApiKey is required for anthropic provider.");
             var client = new Anthropic.AnthropicClient { ApiKey = apiKey };
-            services.AddChatClient(DigitalBrainChatTelemetry.Wrap(
-                client.AsIChatClient(options.Model),
-                options.EnableSensitiveTelemetry));
+            services.AddChatClient(DigitalBrainChatTelemetry.Wrap(client.AsIChatClient(options.Model)));
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase))
         {
@@ -68,8 +64,7 @@ public static class DigitalBrainChat
             services.AddChatClient(DigitalBrainChatClients.BuildOpenAiCompatible(
                 "https://api.x.ai/v1",
                 options.Model,
-                apiKey,
-                options.EnableSensitiveTelemetry));
+                apiKey));
         }
         else if (string.Equals(options.Provider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase))
         {
@@ -78,8 +73,7 @@ public static class DigitalBrainChat
             services.AddChatClient(DigitalBrainChatClients.BuildGitHubModels(
                 options.GitHubModelsEndpoint,
                 options.Model,
-                token,
-                options.EnableSensitiveTelemetry));
+                token));
         }
         else if (!string.IsNullOrWhiteSpace(options.Provider))
         {
