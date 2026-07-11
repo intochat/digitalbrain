@@ -102,6 +102,7 @@ if (ctx.EnableMcp)
         .WithReference(ctx.Llm)
         .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", v2SessionSigningKey)
         .WithEnvironment("DigitalBrain__Profile", v2Profile)
+        .WithEnvironment("DigitalBrain__Salesforce__RedirectUri", salesforceAppConfig.RedirectUri)
         .WithEnvironment("DigitalBrain__V2__Ui__FeedIntegrityKey", v2UiFeedIntegrityKey)
         .WithEnvironment("DigitalBrain__Mcp__EnableAdmin", "false")
         .WithEnvironment("DigitalBrain__Mcp__EnableMutations", v2Profile.Equals("Development", StringComparison.OrdinalIgnoreCase) ? "true" : "false")
@@ -125,9 +126,10 @@ if (ctx.EnableMcp)
 
         // The Flutter shell references only MCP's authenticated UI transport. It never receives
         // a kernel, Orleans, LLM, legacy Gateway, or WatchHomeFeed reference.
-        _ = ctx.AddDefaultDevV2FlutterClient(mcp, v2UiBootstrapSecret, endpointName: "https")
+        var flutter = ctx.AddDefaultDevV2FlutterClient(mcp, v2UiBootstrapSecret, endpointName: "https")
             ?? throw new InvalidOperationException(
                 "Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+        flutter.WithEnvironment("DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK", salesforceAppConfig.RedirectUriValue);
     }
 #pragma warning restore ASPIREMCP001
 }

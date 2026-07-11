@@ -146,7 +146,7 @@ Map<String, Object?> googleConnectionAction({
 
 Map<String, Object?> salesforceConnectionAction({
   String target =
-      'https://login.salesforce.com/services/oauth2/authorize?state=test',
+      'http://localhost:51014/oauth/start/salesforce?t=opaque-token',
 }) => <String, Object?>{
   'kind': 'openUrl',
   'label': 'Connect Salesforce',

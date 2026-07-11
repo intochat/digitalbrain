@@ -24,4 +24,33 @@ void main() {
       }
     },
   );
+
+  test('Salesforce callback resolves to a trusted OAuth start origin', () {
+    expect(
+      parseSalesforceOAuthStartOrigin(
+        'http://localhost:51014/oauth/callback/salesforce',
+      ),
+      Uri.parse('http://localhost:51014'),
+    );
+    expect(
+      parseSalesforceOAuthStartOrigin(
+        'https://brain.example/oauth/callback/salesforce',
+      ),
+      Uri.parse('https://brain.example'),
+    );
+  });
+
+  test('Salesforce callback rejects untrusted or malformed origins', () {
+    for (final source in [
+      'http://brain.example/oauth/callback/salesforce',
+      'https://brain.example/oauth/start/salesforce',
+      'https://brain.example/oauth/callback/salesforce?state=unsafe',
+      'https://user@brain.example/oauth/callback/salesforce',
+    ]) {
+      expect(
+        () => parseSalesforceOAuthStartOrigin(source),
+        throwsFormatException,
+      );
+    }
+  });
 }

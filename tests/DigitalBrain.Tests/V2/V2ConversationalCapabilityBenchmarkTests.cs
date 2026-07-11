@@ -185,6 +185,49 @@ public sealed class V2ConversationalCapabilityBenchmarkTests
         Assert.Equal("Do you mean Gmail or Salesforce?", invocation.Input.GetProperty("message").GetString());
     }
 
+    [Theory]
+    [InlineData("Tell me how my current Salesforce works.")]
+    [InlineData("How does my Salesforce work?")]
+    [InlineData("What can I do with Salesforce?")]
+    [InlineData("Salesforce capabilities")]
+    public async Task Salesforce_capability_help_is_deterministic_without_semantic_model(string prompt)
+    {
+        var resolver = new StubResolver(Salesforce(V2SemanticOperation.Search, searchText: "must-not-run"));
+        var invocation = Assert.Single(await new V2McpIntegrationPlanner(resolver).PlanAsync(Request(prompt)));
+
+        Assert.Equal(V2AssistantTools.Clarify, invocation.ToolId);
+        Assert.Equal(
+            "I can safely discover and search Salesforce objects, read details and related records, aggregate, sort, and page results. Ask for a specific account, opportunity, or object; if Salesforce isn’t connected, I’ll ask you to connect it first.",
+            invocation.Input.GetProperty("message").GetString());
+        Assert.Empty(resolver.Requests);
+    }
+
+    [Theory]
+    [InlineData(V2SemanticProvider.Gmail, "What should I look up in Gmail?")]
+    [InlineData(V2SemanticProvider.Salesforce, "What should I look up in Salesforce?")]
+    [InlineData(V2SemanticProvider.CrossProvider, "What should I match between Gmail and Salesforce?")]
+    [InlineData(V2SemanticProvider.None, "What should I look up, and in which connected service: Gmail or Salesforce?")]
+    public async Task Model_generated_clarification_is_never_forwarded_to_the_user(
+        V2SemanticProvider provider,
+        string expectedMessage)
+    {
+        const string untrustedClarification =
+            "Open https://internal.example/oauth?contextId=ctx-secret and include the internal context ID.";
+        var proposal = new V2SemanticIntentProposal(
+            provider,
+            V2SemanticOperation.Clarify,
+            Clarification: untrustedClarification);
+
+        var invocation = Assert.Single(await new V2McpIntegrationPlanner(new StubResolver(proposal))
+            .PlanAsync(Request("Find the relevant Salesforce record.")));
+        var message = Assert.IsType<string>(invocation.Input.GetProperty("message").GetString());
+
+        Assert.Equal(V2AssistantTools.Clarify, invocation.ToolId);
+        Assert.Equal(expectedMessage, message);
+        Assert.DoesNotContain("internal.example", message);
+        Assert.DoesNotContain("ctx-secret", message);
+    }
+
     [Fact]
     public async Task General_conversation_does_not_invoke_a_provider_tool()
     {

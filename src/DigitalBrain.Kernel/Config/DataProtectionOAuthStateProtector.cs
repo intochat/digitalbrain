@@ -6,9 +6,22 @@ using Microsoft.AspNetCore.DataProtection;
 
 namespace DigitalBrain.Kernel.Config;
 
-public sealed class DataProtectionOAuthStateProtector(IDataProtectionProvider provider) : IOAuthStateProtector
+public sealed class DataProtectionOAuthStateProtector : IOAuthStateProtector
 {
-    private readonly IDataProtector _protector = provider.CreateProtector("DigitalBrain.OAuth.State.v2");
+    public static readonly TimeSpan DefaultLifetime = TimeSpan.FromMinutes(10);
+    private readonly ITimeLimitedDataProtector _protector;
+    private readonly TimeSpan _lifetime;
+
+    public DataProtectionOAuthStateProtector(IDataProtectionProvider provider)
+        : this(provider, DefaultLifetime) { }
+
+    public DataProtectionOAuthStateProtector(IDataProtectionProvider provider, TimeSpan lifetime)
+    {
+        if (lifetime <= TimeSpan.Zero || lifetime > TimeSpan.FromHours(1))
+            throw new ArgumentOutOfRangeException(nameof(lifetime));
+        _protector = provider.CreateProtector("DigitalBrain.OAuth.State.v3").ToTimeLimitedDataProtector();
+        _lifetime = lifetime;
+    }
 
     public string Protect(NeuronId owner)
     {
@@ -17,7 +30,7 @@ public sealed class DataProtectionOAuthStateProtector(IDataProtectionProvider pr
 
         return _protector.Protect(JsonSerializer.Serialize(new StatePayload(
             owner.Value,
-            Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))));
+            Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))), _lifetime);
     }
 
     public bool TryUnprotect(string state, out NeuronId owner)

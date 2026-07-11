@@ -57,7 +57,8 @@ public static class SalesforceAspireExtensions
             clientSecret,
             redirectUri,
             loginUrl,
-            apiVersion);
+            apiVersion,
+            defaultRedirectUri);
     }
 
     public static IResourceBuilder<T> WithSalesforceAppConfig<T>(
@@ -73,7 +74,8 @@ public static class SalesforceAspireExtensions
 
     private static string ResolveRedirectUri(IDistributedApplicationBuilder builder)
     {
-        var configured = builder.Configuration["DigitalBrain:Salesforce:RedirectUri"]
+        var configured = builder.Configuration[$"Parameters:{RedirectUriParameterName}"]
+            ?? builder.Configuration["DigitalBrain:Salesforce:RedirectUri"]
             ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_SALESFORCE_REDIRECT_URI");
 
         return string.IsNullOrWhiteSpace(configured)
@@ -97,4 +99,5 @@ public sealed record SalesforceAppConfigParameters(
     IResourceBuilder<ParameterResource> ClientSecret,
     IResourceBuilder<ParameterResource> RedirectUri,
     IResourceBuilder<ParameterResource> LoginUrl,
-    IResourceBuilder<ParameterResource> ApiVersion);
+    IResourceBuilder<ParameterResource> ApiVersion,
+    string RedirectUriValue);

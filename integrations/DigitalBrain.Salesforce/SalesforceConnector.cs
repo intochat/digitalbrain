@@ -1,7 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Abstractions;
-using Microsoft.Extensions.Configuration;
+using System.Globalization;
 
 namespace DigitalBrain.Salesforce;
 
@@ -12,41 +12,37 @@ public class SalesforceConnector : IConnector
     private readonly ISalesforceApiClientFactory _factory;
     private readonly IPackConfigStore _store;
     private readonly IOAuthStateProtector _stateProtector;
-    private readonly IConfiguration? _config;
     private readonly HttpMessageHandler? _tokenEndpointHandler;
 
     public SalesforceConnector(
         ISalesforceApiClientFactory factory,
         IPackConfigStore store,
         IOAuthStateProtector stateProtector,
-        IConfiguration? config = null,
         HttpMessageHandler? tokenEndpointHandler = null)
     {
         _factory = factory;
         _store = store;
         _stateProtector = stateProtector;
-        _config = config;
         _tokenEndpointHandler = tokenEndpointHandler;
     }
 
     public ConnectorDescriptor Descriptor => new(
         Id: "salesforce",
         DisplayName: "Salesforce CRM",
-        RequiredConfigKeys: new[] { SalesforceClientFactory.ClientIdKey, SalesforceClientFactory.ClientSecretKey, SalesforceClientFactory.LoginUrlKey, SalesforceClientFactory.ApiVersionKey, SalesforceClientFactory.RedirectUriKey },
+        RequiredConfigKeys: new[] { SalesforceClientFactory.ClientIdKey, SalesforceClientFactory.ClientSecretKey },
         Scopes: new[] { "api", "refresh_token" });
 
     public async Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null, CancellationToken cancellationToken = default)
     {
-        var scope = string.IsNullOrWhiteSpace(userScope) ? PackConfigScopes.App : userScope;
-        var values = await _store.GetAsync(scope, SalesforceClientFactory.PackName, cancellationToken);
-        foreach (var key in Descriptor.RequiredConfigKeys)
+        var values = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(userScope))
         {
-            if (!values.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
-            {
-                return new ConnectorConfigStatus(false, MissingKey: key, Message: $"Missing {key}");
-            }
+            await ClearExpiredPendingAsync(userScope, cancellationToken);
         }
-        return new ConnectorConfigStatus(true);
+
+        return SalesforceClientFactory.TryValidateAppConfig(values, out var invalidKey, out var message)
+            ? new ConnectorConfigStatus(true)
+            : new ConnectorConfigStatus(false, MissingKey: invalidKey, Message: message);
     }
 
     public async Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null, CancellationToken cancellationToken = default)
@@ -60,26 +56,14 @@ public class SalesforceConnector : IConnector
             values[SalesforceClientFactory.ClientIdKey] = clientIdHint;
         }
 
-        var configuredRedirectUri = _config?["DigitalBrain:Salesforce:RedirectUri"];
-        if (!string.IsNullOrWhiteSpace(configuredRedirectUri))
-        {
-            values[SalesforceClientFactory.RedirectUriKey] = configuredRedirectUri.Trim();
-        }
-        else if (!values.ContainsKey(SalesforceClientFactory.RedirectUriKey))
-        {
-            values[SalesforceClientFactory.RedirectUriKey] = SalesforceClientFactory.DefaultRedirectUri;
-        }
-
-        if (!values.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var redirectUri) || string.IsNullOrWhiteSpace(redirectUri))
-        {
-            redirectUri = SalesforceClientFactory.DefaultRedirectUri;
-            values[SalesforceClientFactory.RedirectUriKey] = redirectUri;
-        }
-
-        if (!SalesforceClientFactory.HasConnectedAppConfig(values))
+        if (!SalesforceClientFactory.TryValidateAppConfig(values, out _, out _))
         {
             return new AuthChallenge(UrlOrForm: "credential-form-needed", IsForm: true);
         }
+
+        var redirectUri = SalesforceClientFactory.ResolveRedirectUri(values);
+        var loginUrl = SalesforceClientFactory.ResolveLoginUrl(values);
+        var clientId = values[SalesforceClientFactory.ClientIdKey].Trim();
 
         var state = _stateProtector.Protect(user);
         var codeVerifier = SalesforceClientFactory.CreatePkceCodeVerifier();
@@ -95,12 +79,18 @@ public class SalesforceConnector : IConnector
             return new AuthChallenge(UrlOrForm: "error:" + ex.Message, IsForm: true);
         }
 
-        await _store.SetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, values, cancellationToken);
         var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
         await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>
         {
             [SalesforceClientFactory.OAuthStateKey] = state,
-            [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier
+            [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier,
+            [SalesforceClientFactory.OAuthPendingClientIdKey] = clientId,
+            [SalesforceClientFactory.OAuthPendingLoginUrlKey] = loginUrl,
+            [SalesforceClientFactory.OAuthPendingRedirectUriKey] = redirectUri,
+            [SalesforceClientFactory.OAuthPendingExpiresAtKey] = DateTimeOffset.UtcNow
+                .Add(SalesforceClientFactory.OAuthPendingLifetime)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture)
         }, cancellationToken);
 
         return new AuthChallenge(url, IsForm: false, State: state);
@@ -108,19 +98,6 @@ public class SalesforceConnector : IConnector
 
     public async Task<AuthResult> CompleteAuthAsync(OAuthCallback callback, CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrWhiteSpace(callback.Error))
-        {
-            return string.Equals(callback.Error, "access_denied", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(callback.Error, "user_denied_authorization", StringComparison.OrdinalIgnoreCase)
-                ? new AuthResult(false, "consent-denied", "Salesforce consent was denied.")
-                : new AuthResult(false, "provider-error", "Salesforce authorization failed.");
-        }
-
-        if (string.IsNullOrWhiteSpace(callback.Code))
-        {
-            return new AuthResult(false, "no-code", "The callback did not include an authorization code.");
-        }
-
         var state = callback.State;
         if (!_stateProtector.TryUnprotect(state, out var user))
             return new AuthResult(false, "invalid-state", "The authorization state is invalid or expired.");
@@ -129,6 +106,12 @@ public class SalesforceConnector : IConnector
 
         var appValues = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
         var pending = await _store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, cancellationToken);
+
+        if (IsPendingExpired(pending))
+        {
+            await ClearPendingAsync(userScope);
+            return new AuthResult(false, "no-pending", "No pending OAuth flow.");
+        }
 
         if (!pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) || string.IsNullOrWhiteSpace(expectedState))
         {
@@ -140,25 +123,51 @@ public class SalesforceConnector : IConnector
             return new AuthResult(false, "state-mismatch", "State did not match.");
         }
 
-        var redirectUri = appValues.TryGetValue(SalesforceClientFactory.RedirectUriKey, out var stored) ? stored : callback.FallbackRedirectUri;
-        if (string.IsNullOrWhiteSpace(redirectUri))
+        if (!string.IsNullOrWhiteSpace(callback.Error))
         {
-            redirectUri = SalesforceClientFactory.DefaultRedirectUri;
+            await ClearPendingAsync(userScope);
+            return string.Equals(callback.Error, "access_denied", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(callback.Error, "user_denied_authorization", StringComparison.OrdinalIgnoreCase)
+                ? new AuthResult(false, "consent-denied", "Salesforce consent was denied.")
+                : new AuthResult(false, "provider-error", "Salesforce authorization failed.");
         }
+
+        if (string.IsNullOrWhiteSpace(callback.Code))
+        {
+            await ClearPendingAsync(userScope);
+            return new AuthResult(false, "no-code", "The callback did not include an authorization code.");
+        }
+
+        if (!pending.TryGetValue(SalesforceClientFactory.OAuthPendingClientIdKey, out var pendingClientId) ||
+            string.IsNullOrWhiteSpace(pendingClientId) ||
+            !pending.TryGetValue(SalesforceClientFactory.OAuthPendingLoginUrlKey, out var pendingLoginUrl) ||
+            string.IsNullOrWhiteSpace(pendingLoginUrl) ||
+            !pending.TryGetValue(SalesforceClientFactory.OAuthPendingRedirectUriKey, out var pendingRedirectUri) ||
+            string.IsNullOrWhiteSpace(pendingRedirectUri) ||
+            !pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var codeVerifier) ||
+            string.IsNullOrWhiteSpace(codeVerifier) ||
+            !SalesforceClientFactory.HasConnectedAppConfig(appValues) ||
+            !appValues.TryGetValue(SalesforceClientFactory.ClientIdKey, out var currentClientId) ||
+            !string.Equals(pendingClientId, currentClientId?.Trim(), StringComparison.Ordinal))
+        {
+            await ClearPendingAsync(userScope);
+            return new AuthResult(false, "configuration-changed", "Salesforce configuration changed. Start authorization again.");
+        }
+
+        await ClearPendingAsync(userScope);
 
         try
         {
             var exchangeValues = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
-            if (pending.TryGetValue(SalesforceClientFactory.OAuthCodeVerifierKey, out var codeVerifier) &&
-                !string.IsNullOrWhiteSpace(codeVerifier))
-            {
-                exchangeValues[SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier;
-            }
+            exchangeValues[SalesforceClientFactory.ClientIdKey] = pendingClientId.Trim();
+            exchangeValues[SalesforceClientFactory.LoginUrlKey] = pendingLoginUrl.Trim();
+            exchangeValues[SalesforceClientFactory.RedirectUriKey] = pendingRedirectUri.Trim();
+            exchangeValues[SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier.Trim();
 
             var tokenValues = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(
                 exchangeValues,
                 callback.Code,
-                redirectUri,
+                pendingRedirectUri,
                 _tokenEndpointHandler,
                 cancellationToken);
             var userTokenValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -167,18 +176,7 @@ public class SalesforceConnector : IConnector
                 userTokenValues[kv.Key] = kv.Value;
             }
 
-            if (appValues.TryGetValue(SalesforceClientFactory.ClientIdKey, out var cid))
-            {
-                userTokenValues[SalesforceClientFactory.ClientIdKey] = cid;
-            }
-
-            if (appValues.TryGetValue(SalesforceClientFactory.ClientSecretKey, out var cs))
-            {
-                userTokenValues[SalesforceClientFactory.ClientSecretKey] = cs;
-            }
-
             await _store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues, cancellationToken);
-            await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>(), cancellationToken);
 
             return new AuthResult(true);
         }
@@ -192,10 +190,37 @@ public class SalesforceConnector : IConnector
         }
     }
 
+    private Task ClearPendingAsync(string userScope) =>
+        _store.SetAsync(
+            userScope,
+            SalesforceClientFactory.OAuthPendingPackName,
+            new Dictionary<string, string>(),
+            CancellationToken.None);
+
+    private async Task ClearExpiredPendingAsync(string userScope, CancellationToken cancellationToken)
+    {
+        var pending = await _store.GetAsync(
+            userScope,
+            SalesforceClientFactory.OAuthPendingPackName,
+            cancellationToken);
+        if (pending.Count > 0 && IsPendingExpired(pending))
+        {
+            await ClearPendingAsync(userScope);
+        }
+    }
+
+    private static bool IsPendingExpired(IReadOnlyDictionary<string, string> pending) =>
+        !pending.TryGetValue(SalesforceClientFactory.OAuthPendingExpiresAtKey, out var expiresAt) ||
+        !long.TryParse(expiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAtUnixSeconds) ||
+        expiresAtUnixSeconds <= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
     public async Task<ConnectionHealth> TestConnectionAsync(NeuronId user, CancellationToken cancellationToken = default)
     {
         try
         {
+            await ClearExpiredPendingAsync(
+                PackConfigScopes.ForUser(new UserId(user.Value)),
+                cancellationToken);
             // Use existing factory to create client (exercises merged scope/credentials).
             var client = await _factory.CreateAsync(new NeuronScope(new UserId(user.Value), null), cancellationToken);  // per-user scope for credential merge
             await client.ListAccountsAsync(1, cancellationToken);

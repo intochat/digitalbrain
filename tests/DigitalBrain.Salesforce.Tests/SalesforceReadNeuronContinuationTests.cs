@@ -20,6 +20,7 @@ public sealed class SalesforceReadNeuronContinuationTests : NeuronTestBase
         {
             services.AddSingleton<ISalesforceApiClientFactory>(new ScenarioSalesforceApiClientFactory(_client));
             services.AddSingleton<IPackConfigStore, CredentialPackConfigStore>();
+            services.AddSingleton<IOAuthStateProtector>(new SalesforceTestOAuthStateProtector());
             services.AddKeyedSingleton<IConnector>("salesforce", new ValidSalesforceConnector());
         });
 

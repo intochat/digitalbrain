@@ -63,6 +63,13 @@ class _V2RuntimeShellState extends State<V2RuntimeShell> {
           widget.controller ??
           V2RuntimeController(
             transport: widget.transportFactory(configuration.endpoint),
+            decoder: SurfaceEnvelopeDecoder(
+              capabilities: const V2ClientCapabilities(
+                supportsBinaryRfw: false,
+              ),
+              salesforceOAuthStartOrigin:
+                  configuration.salesforceOAuthStartOrigin,
+            ),
           );
       _controller = controller;
       _ownsController = widget.controller == null;

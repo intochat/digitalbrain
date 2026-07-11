@@ -204,7 +204,7 @@ class _V2InoConversationViewState extends State<V2InoConversationView> {
         _openingConnection = false;
         if (!opened) {
           _submissionNotice =
-              'Google sign-in couldn\'t be opened. Please try again.';
+              'Connection sign-in couldn\'t be opened. Please try again.';
         }
       });
     } catch (_) {
@@ -212,7 +212,7 @@ class _V2InoConversationViewState extends State<V2InoConversationView> {
       setState(() {
         _openingConnection = false;
         _submissionNotice =
-            'Google sign-in couldn\'t be opened. Please try again.';
+            'Connection sign-in couldn\'t be opened. Please try again.';
       });
     }
   }

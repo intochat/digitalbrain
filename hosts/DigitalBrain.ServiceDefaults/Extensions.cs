@@ -18,6 +18,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+    private const string OAuthEndpointPath = "/oauth";
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -72,6 +73,7 @@ public static class Extensions
                         options.Filter = context =>
                             !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                             && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                            && !context.Request.Path.StartsWithSegments(OAuthEndpointPath)
                             && !context.Request.Path.StartsWithSegments("/otlp")
                     )
                     .AddHttpClientInstrumentation();

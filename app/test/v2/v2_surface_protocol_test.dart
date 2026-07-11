@@ -96,6 +96,22 @@ void main() {
           action: googleConnectionAction(target: 'https://example.com/auth'),
         ),
       ),
+      for (final target in [
+        'http://brain.example/oauth/start/salesforce?t=opaque-token',
+        'https://evil.example/oauth/start/salesforce?t=opaque-token',
+        'https://login.salesforce.com/services/oauth2/authorize?response_type=code',
+        'http://localhost:51014/oauth/callback/salesforce?t=opaque-token',
+        'http://localhost:51014/oauth/start/salesforce?t=opaque-token&state=provider-state',
+        'http://localhost:51014/oauth/start/salesforce?t=',
+        'http://user@localhost:51014/oauth/start/salesforce?t=opaque-token',
+        'http://localhost:51014/oauth/start/salesforce?t=opaque-token#fragment',
+      ])
+        inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            action: salesforceConnectionAction(target: target),
+          ),
+        ),
     ];
 
     for (final payload in invalidPayloads) {
@@ -143,7 +159,51 @@ void main() {
         (envelope.payload as InoConversationSurfacePayload).operation!;
     expect(operation.action?.kind, 'openUrl');
     expect(operation.action?.label, 'Connect Salesforce');
-    expect(operation.action?.target.host, 'login.salesforce.com');
+    expect(operation.action?.target.host, 'localhost');
+    expect(operation.action?.target.path, '/oauth/start/salesforce');
+    expect(operation.action?.target.queryParameters.keys, ['t']);
+  });
+
+  test('binds an HTTPS Salesforce start action to the configured origin', () {
+    final decoder = SurfaceEnvelopeDecoder(
+      salesforceOAuthStartOrigin: Uri.parse('https://brain.example:7443'),
+    );
+    final accepted = decoder.decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            action: salesforceConnectionAction(
+              target:
+                  'https://brain.example:7443/oauth/start/salesforce?t=opaque-token',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final operation =
+        (accepted.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.action?.target.host, 'brain.example');
+    for (final target in [
+      'https://evil.example:7443/oauth/start/salesforce?t=opaque-token',
+      'https://brain.example:7444/oauth/start/salesforce?t=opaque-token',
+      'http://localhost:51014/oauth/start/salesforce?t=opaque-token',
+    ]) {
+      expect(
+        () => decoder.decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                action: salesforceConnectionAction(target: target),
+              ),
+            ),
+          ),
+        ),
+        throwsFormatException,
+      );
+    }
   });
 
   test('rejects unsupported protocol and capability requirements', () {

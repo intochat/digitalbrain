@@ -3,6 +3,7 @@ extern alias McpProject;
 using System.Text.Json;
 using DigitalBrain.Core.V2;
 using DigitalBrain.Kernel.V2;
+using Microsoft.Extensions.Configuration;
 using V2RequestContext = DigitalBrain.Core.V2.RequestContext;
 using IV2McpIntegrationToolGateway = McpProject::DigitalBrain.Mcp.IV2McpIntegrationToolGateway;
 using V2InoEffectStore = McpProject::DigitalBrain.Mcp.V2InoEffectStore;
@@ -81,7 +82,8 @@ public sealed class V2IntegrationToolTests
         Assert.Equal(V2AssistantTools.Clarify, invocation.ToolId);
         var message = invocation.Input.GetProperty("message").GetString();
         Assert.Contains("discover and search Salesforce objects", message, StringComparison.Ordinal);
-        Assert.Contains("connect Salesforce first when authorization is missing", message, StringComparison.Ordinal);
+        Assert.Contains("if Salesforce isn’t connected, I’ll ask you to connect it first", message, StringComparison.Ordinal);
+        Assert.Empty(resolver.Requests);
     }
 
     [Fact]
@@ -173,7 +175,7 @@ public sealed class V2IntegrationToolTests
             salesforce: new(
                 V2SalesforceReadStatus.NeedsAuth,
                 SafeReason: "Connect your Salesforce account to let INO read Salesforce.",
-                ConnectionUrl: "https://login.salesforce.com/services/oauth2/authorize?state=test"));
+                ConnectionUrl: "http://localhost:8081/oauth/start/salesforce?t=opaque-token"));
         var catalog = new V2McpAuthorizedToolCatalog(gateway);
 
         var gmail = await catalog.InvokeAsync(Context("user", "workspace", "gmail.read"), GmailInvocation());
@@ -184,7 +186,53 @@ public sealed class V2IntegrationToolTests
         Assert.StartsWith("https://accounts.google.com/", gmail.Action?.Target, StringComparison.Ordinal);
         Assert.Equal(V2ToolOutcomeKind.NeedsAuth, salesforce.Kind);
         Assert.Equal("Connect Salesforce", salesforce.Action?.Label);
-        Assert.StartsWith("https://login.salesforce.com/", salesforce.Action?.Target, StringComparison.Ordinal);
+        Assert.StartsWith("http://localhost:8081/oauth/start/salesforce?t=", salesforce.Action?.Target, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Untrusted_salesforce_authorization_urls_are_not_exposed_as_actions()
+    {
+        var providerCatalog = new V2McpAuthorizedToolCatalog(new RecordingGateway(
+            salesforce: new(
+                V2SalesforceReadStatus.NeedsAuth,
+                ConnectionUrl: "https://login.salesforce.com/services/oauth2/authorize?state=provider-state")));
+        var wrongOriginCatalog = new V2McpAuthorizedToolCatalog(new RecordingGateway(
+            salesforce: new(
+                V2SalesforceReadStatus.NeedsAuth,
+                ConnectionUrl: "https://evil.example/oauth/start/salesforce?t=opaque-token")));
+
+        var providerResult = await providerCatalog.InvokeAsync(
+            Context("user", "workspace", "salesforce.read"),
+            TypedSalesforceInvocation());
+        var wrongOriginResult = await wrongOriginCatalog.InvokeAsync(
+            Context("user", "workspace", "salesforce.read"),
+            TypedSalesforceInvocation());
+
+        Assert.Equal(V2ToolOutcomeKind.PermanentFailure, providerResult.Kind);
+        Assert.Null(providerResult.Action);
+        Assert.Equal(V2ToolOutcomeKind.PermanentFailure, wrongOriginResult.Kind);
+        Assert.Null(wrongOriginResult.Action);
+    }
+
+    [Fact]
+    public async Task Configured_salesforce_start_origin_is_the_only_https_origin_allowed()
+    {
+        var configuration = new ConfigurationManager
+        {
+            ["DigitalBrain:Salesforce:RedirectUri"] = "https://brain.example/oauth/callback/salesforce"
+        };
+        var catalog = new V2McpAuthorizedToolCatalog(
+            new RecordingGateway(salesforce: new(
+                V2SalesforceReadStatus.NeedsAuth,
+                ConnectionUrl: "https://brain.example/oauth/start/salesforce?t=opaque-token")),
+            configuration: configuration);
+
+        var result = await catalog.InvokeAsync(
+            Context("user", "workspace", "salesforce.read"),
+            TypedSalesforceInvocation());
+
+        Assert.Equal(V2ToolOutcomeKind.NeedsAuth, result.Kind);
+        Assert.Equal("https://brain.example/oauth/start/salesforce?t=opaque-token", result.Action?.Target);
     }
 
     [Fact]

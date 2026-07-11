@@ -60,7 +60,10 @@ public sealed class AddDigitalBrainExecutionModeTests
     [Fact]
     public async Task V2TestProfile_DeclaresFlutterClientWiredOnlyToV2Transport()
     {
-        var builder = await CreateAppHostBuilderAsync("--DigitalBrain:Profile=Test");
+        const string salesforceCallback = "https://brain.example/oauth/callback/salesforce";
+        var builder = await CreateAppHostBuilderAsync(
+            "--DigitalBrain:Profile=Test",
+            $"--Parameters:salesforce-redirect-uri={salesforceCallback}");
 
         Assert.Equal("Test", builder.Configuration["DigitalBrain:Profile"]);
         Assert.Contains(builder.Resources, r => r.Name == "kernel");
@@ -103,6 +106,7 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.Same(
             bootstrapSecret,
             flutterEnvironment[FlutterAspireExtensions.V2BootstrapSecretEnvironmentVariable]);
+        Assert.Equal(salesforceCallback, flutterEnvironment["DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK"]);
 
         var mcpEnvironment = await EvaluateEnvironmentAsync(builder, mcp);
         Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__V2__Ui__BootstrapSecret"]);

@@ -192,8 +192,7 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("salesforce", (sp, _) => new DigitalBrain.Salesforce.SalesforceConnector(
             sp.GetRequiredService<DigitalBrain.Salesforce.ISalesforceApiClientFactory>(),
             sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
-            sp.GetRequiredService<DigitalBrain.Kernel.Abstractions.IOAuthStateProtector>(),
-            sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
+            sp.GetRequiredService<DigitalBrain.Kernel.Abstractions.IOAuthStateProtector>()));
         builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("google", (sp, _) => new DigitalBrain.Google.GoogleConnector(
             sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
             sp.GetRequiredService<DigitalBrain.Kernel.Abstractions.IOAuthStateProtector>(),

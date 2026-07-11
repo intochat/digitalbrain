@@ -3,8 +3,10 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DigitalBrain.Core;
 using DigitalBrain.Core.V2;
 using DigitalBrain.Kernel.V2;
+using Microsoft.Extensions.Configuration;
 using Orleans;
 using V2RequestContext = DigitalBrain.Core.V2.RequestContext;
 
@@ -638,6 +640,8 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
 {
     private const int MaximumDescriptors = 12;
     private const int MaximumSemanticText = 256;
+    private const string SalesforceCapabilityMessage =
+        "I can safely discover and search Salesforce objects, read details and related records, aggregate, sort, and page results. Ask for a specific account, opportunity, or object; if Salesforce isn’t connected, I’ll ask you to connect it first.";
     private static readonly JsonSerializerOptions SemanticJson = CreateSemanticJson();
     private readonly IV2SemanticIntentResolver _semanticIntents;
     private readonly IV2InoConversationStore? _conversations;
@@ -661,6 +665,14 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
     {
         using var activity = V2InoTelemetry.Source.StartActivity("ino.intent.plan", ActivityKind.Internal);
         cancellationToken.ThrowIfCancellationRequested();
+        if (IsSalesforceCapabilityHelp(request.Text))
+        {
+            activity?.SetTag("db.ino.provider", V2SemanticProvider.Salesforce.ToString());
+            activity?.SetTag("db.ino.operation", V2SemanticOperation.Answer.ToString());
+            activity?.SetTag("db.ino.outcome", "capability-help");
+            return [Clarification(SalesforceCapabilityMessage)];
+        }
+
         var descriptors = GroundingDescriptors(request);
         activity?.SetTag("db.ino.grounding_descriptor_count", descriptors.Count);
         var semanticRequest = new V2SemanticIntentRequest(
@@ -706,9 +718,7 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
         if (normalized.Provider == V2SemanticProvider.Ambiguous || normalized.Operation == V2SemanticOperation.Clarify)
         {
             activity?.SetTag("db.ino.outcome", "clarify");
-            return [Clarification(normalized.Provider == V2SemanticProvider.Ambiguous
-                ? "Do you mean Gmail or Salesforce?"
-                : normalized.Clarification ?? "What should I look up, and in which connected service?")];
+            return [Clarification(SafeClarification(normalized.Provider))];
         }
 
         var toolId = ToolId(normalized);
@@ -717,7 +727,7 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
         return toolId is null
             ? [Clarification(normalized.Provider == V2SemanticProvider.Salesforce &&
                              normalized.Operation == V2SemanticOperation.Answer
-                ? "I can safely discover and search Salesforce objects, read details and related records, aggregate, sort, and page results. Ask for a specific account, opportunity, or object; I’ll ask this principal to connect Salesforce first when authorization is missing."
+                ? SalesforceCapabilityMessage
                 : "That connected-service operation isn’t available safely yet.")]
             : [new V2ToolInvocation(toolId, JsonSerializer.SerializeToElement(normalized, SemanticJson))];
     }
@@ -790,7 +800,6 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
             proposal.Filters is { Count: > 8 } || proposal.Sorts is { Count: > 8 } ||
             !ValidText(proposal.Entity, required: false) ||
             !ValidText(proposal.SearchText, required: false) ||
-            !ValidText(proposal.Clarification, required: false) ||
             proposal.Filters?.Any(static filter =>
                 !ValidText(filter.Field, required: true) || !ValidText(filter.Value, required: false)) == true ||
             proposal.Sorts?.Any(static sort => !ValidText(sort.Field, required: true)) == true ||
@@ -802,7 +811,7 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
         {
             Entity = NormalizeText(proposal.Entity),
             SearchText = NormalizeText(proposal.SearchText),
-            Clarification = NormalizeText(proposal.Clarification),
+            Clarification = null,
             Filters = proposal.Filters?.Select(static filter => filter with
             {
                 Field = filter.Field.Trim(),
@@ -824,6 +833,38 @@ public sealed class V2McpIntegrationPlanner : IV2IntentCapabilityPlanner
         value is null ? !required : value.Trim().Length is > 0 and <= MaximumSemanticText && !value.Any(char.IsControl);
 
     private static string? NormalizeText(string? value) => value?.Trim();
+
+    private static bool IsSalesforceCapabilityHelp(string prompt) => NormalizeCapabilityPrompt(prompt) is
+        "tell me how salesforce works" or
+        "tell me how my salesforce works" or
+        "tell me how current salesforce works" or
+        "tell me how my current salesforce works" or
+        "how does salesforce work" or
+        "how does my salesforce work" or
+        "how does current salesforce work" or
+        "how does my current salesforce work" or
+        "what can salesforce do" or
+        "what can my salesforce do" or
+        "what can i do with salesforce" or
+        "salesforce capabilities" or
+        "what are salesforce capabilities" or
+        "what are the salesforce capabilities";
+
+    private static string NormalizeCapabilityPrompt(string prompt)
+    {
+        var characters = prompt.Select(static character =>
+            char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : ' ').ToArray();
+        return string.Join(' ', new string(characters).Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static string SafeClarification(V2SemanticProvider provider) => provider switch
+    {
+        V2SemanticProvider.Ambiguous => "Do you mean Gmail or Salesforce?",
+        V2SemanticProvider.Gmail => "What should I look up in Gmail?",
+        V2SemanticProvider.Salesforce => "What should I look up in Salesforce?",
+        V2SemanticProvider.CrossProvider => "What should I match between Gmail and Salesforce?",
+        _ => "What should I look up, and in which connected service: Gmail or Salesforce?"
+    };
 
     private static V2ToolInvocation Clarification(string message) =>
         new(V2AssistantTools.Clarify, JsonSerializer.SerializeToElement(new { message }));
@@ -1074,13 +1115,16 @@ public sealed class V2McpAuthorizedToolCatalog : IV2AuthorizedToolCatalog
     private static readonly JsonSerializerOptions SemanticJson = CreateSemanticJson();
     private readonly IV2McpIntegrationToolGateway _integrations;
     private readonly IV2InoConversationStore? _conversations;
+    private readonly string? _salesforceRedirectUri;
 
     public V2McpAuthorizedToolCatalog(
         IV2McpIntegrationToolGateway integrations,
-        IV2InoConversationStore? conversations = null)
+        IV2InoConversationStore? conversations = null,
+        IConfiguration? configuration = null)
     {
         _integrations = integrations;
         _conversations = conversations;
+        _salesforceRedirectUri = configuration?["DigitalBrain:Salesforce:RedirectUri"];
     }
 
     public async Task<V2ToolOutcome> InvokeAsync(
@@ -1896,7 +1940,7 @@ public sealed class V2McpAuthorizedToolCatalog : IV2AuthorizedToolCatalog
         return true;
     }
 
-    private static V2ToolOutcome SalesforceOutcome(
+    private V2ToolOutcome SalesforceOutcome(
         V2SalesforceReadResult result,
         string resultField,
         string? entity,
@@ -1969,9 +2013,11 @@ public sealed class V2McpAuthorizedToolCatalog : IV2AuthorizedToolCatalog
         }
     }
 
-    private static V2ToolOutcome SalesforceFailure(V2SalesforceReadResult result) => result.Status switch
+    private V2ToolOutcome SalesforceFailure(V2SalesforceReadResult result) => result.Status switch
     {
-        V2SalesforceReadStatus.NeedsAuth when IsAllowedSalesforceAuthorizationUrl(result.ConnectionUrl) => new V2ToolOutcome(
+        V2SalesforceReadStatus.NeedsAuth when OAuthCallbackPaths.IsAllowedSalesforceStartUrl(
+            result.ConnectionUrl,
+            _salesforceRedirectUri) => new V2ToolOutcome(
             V2ToolOutcomeKind.NeedsAuth,
             SafeReason: SafeProviderReason(result.SafeReason, "Connect your Salesforce account to let INO read Salesforce."),
             Action: new V2ToolAction("openUrl", "Connect Salesforce", result.ConnectionUrl!)),
@@ -2213,12 +2259,6 @@ public sealed class V2McpAuthorizedToolCatalog : IV2AuthorizedToolCatalog
         uri.Scheme == Uri.UriSchemeHttps &&
         string.Equals(uri.Host, "accounts.google.com", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsAllowedSalesforceAuthorizationUrl(string? value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps &&
-        (string.Equals(uri.Host, "login.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
-         string.Equals(uri.Host, "test.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
-         uri.Host.EndsWith(".my.salesforce.com", StringComparison.OrdinalIgnoreCase));
 }
 
 public sealed class V2McpResponseComposer : IV2ResponseSurfaceComposer

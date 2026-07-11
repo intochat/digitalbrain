@@ -1,4 +1,5 @@
 using Orleans;
+using DigitalBrain.Kernel.Abstractions;
 
 namespace DigitalBrain.Kernel.V2;
 
@@ -121,6 +122,16 @@ public sealed record V2SalesforceReadResult(
 [Alias("digitalbrain.v2.salesforce-read-tool-grain")]
 public interface IV2SalesforceReadToolGrain : IGrainWithStringKey
 {
+    [Alias("BeginAuthorizationAsync")]
+    Task<V2SalesforceReadResult> BeginAuthorizationAsync(
+        string startToken,
+        CancellationToken cancellationToken = default);
+
+    [Alias("CompleteAuthorizationAsync")]
+    Task<AuthResult> CompleteAuthorizationAsync(
+        OAuthCallback callback,
+        CancellationToken cancellationToken = default);
+
     [Alias("ReadLatestAccountAsync")]
     Task<V2SalesforceReadResult> ReadLatestAccountAsync(CancellationToken cancellationToken = default);
 

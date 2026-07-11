@@ -70,6 +70,38 @@ public class SalesforceClientFactoryTests
     }
 
     [Fact]
+    public void CreateOAuthStartUrl_Uses_The_Application_Origin_Without_Provider_Parameters()
+    {
+        var url = SalesforceClientFactory.CreateOAuthStartUrl(new Dictionary<string, string>
+        {
+            [SalesforceClientFactory.RedirectUriKey] = "https://brain.example/oauth/callback/salesforce"
+        }, "opaque-token");
+
+        Assert.Equal("https://brain.example/oauth/start/salesforce?t=opaque-token", url);
+        Assert.DoesNotContain("services/oauth2/authorize", url, StringComparison.Ordinal);
+        Assert.DoesNotContain("state=", url, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void App_config_rejects_untrusted_login_and_non_loopback_callback_origins()
+    {
+        var insecureLogin = ValidAppConfig();
+        insecureLogin[SalesforceClientFactory.LoginUrlKey] = "http://login.salesforce.com";
+        var untrustedLogin = ValidAppConfig();
+        untrustedLogin[SalesforceClientFactory.LoginUrlKey] = "https://example.com";
+        var insecureCallback = ValidAppConfig();
+        insecureCallback[SalesforceClientFactory.RedirectUriKey] = "http://brain.example/oauth/callback/salesforce";
+
+        Assert.False(SalesforceClientFactory.TryValidateAppConfig(insecureLogin, out var loginKey, out _));
+        Assert.Equal(SalesforceClientFactory.LoginUrlKey, loginKey);
+        Assert.False(SalesforceClientFactory.TryValidateAppConfig(untrustedLogin, out var untrustedLoginKey, out _));
+        Assert.Equal(SalesforceClientFactory.LoginUrlKey, untrustedLoginKey);
+        Assert.False(SalesforceClientFactory.TryValidateAppConfig(insecureCallback, out var callbackKey, out _));
+        Assert.Equal(SalesforceClientFactory.RedirectUriKey, callbackKey);
+        Assert.True(SalesforceClientFactory.TryValidateAppConfig(ValidAppConfig(), out _, out _));
+    }
+
+    [Fact]
     public void CreatePkceCodeChallenge_Uses_Rfc7636_S256_Example()
     {
         var challenge = SalesforceClientFactory.CreatePkceCodeChallenge(
@@ -160,4 +192,13 @@ public class SalesforceClientFactoryTests
         Assert.NotNull(session.Client);
         Assert.Equal("https://login.salesforce.com/id/org/user", session.IdentityUrl);
     }
+
+    private static Dictionary<string, string> ValidAppConfig() => new()
+    {
+        [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
+        [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
+        [SalesforceClientFactory.LoginUrlKey] = SalesforceClientFactory.DefaultLoginUrl,
+        [SalesforceClientFactory.RedirectUriKey] = SalesforceClientFactory.DefaultRedirectUri,
+        [SalesforceClientFactory.ApiVersionKey] = SalesforceClientFactory.DefaultApiVersion
+    };
 }

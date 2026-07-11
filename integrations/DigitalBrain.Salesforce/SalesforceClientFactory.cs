@@ -30,6 +30,11 @@ public static class SalesforceClientFactory
     public const string OAuthStateKey = "oauth_state";
     public const string OAuthScopeKey = "oauth_scope";
     public const string OAuthCodeVerifierKey = "oauth_code_verifier";
+    public const string OAuthPendingClientIdKey = "oauth_client_id";
+    public const string OAuthPendingLoginUrlKey = "oauth_login_url";
+    public const string OAuthPendingRedirectUriKey = "oauth_redirect_uri";
+    public const string OAuthPendingExpiresAtKey = "oauth_expires_at";
+    public static readonly TimeSpan OAuthPendingLifetime = TimeSpan.FromMinutes(10);
     public const string AuthenticationFailureMessage =
         "Salesforce authentication failed. Reconnect Salesforce and try again.";
     public const string MissingConnectedAppConfigMessage =
@@ -46,7 +51,10 @@ public static class SalesforceClientFactory
         var merged = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in userValues)
         {
-            merged[key] = value;
+            if (!AppOwnedKeys.Contains(key))
+            {
+                merged[key] = value;
+            }
         }
 
         return merged;
@@ -79,6 +87,81 @@ public static class SalesforceClientFactory
     public static bool HasConnectedAppConfig(IReadOnlyDictionary<string, string> values) =>
         HasValue(values, ClientIdKey) && HasValue(values, ClientSecretKey);
 
+    public static bool TryValidateAppConfig(
+        IReadOnlyDictionary<string, string> values,
+        out string? invalidKey,
+        out string? message)
+    {
+        foreach (var key in new[] { ClientIdKey, ClientSecretKey })
+        {
+            if (!HasValue(values, key))
+            {
+                invalidKey = key;
+                message = $"Missing {key}";
+                return false;
+            }
+        }
+
+        if (!TryNormalizeLoginUrl(Optional(values, LoginUrlKey, DefaultLoginUrl), out _))
+        {
+            invalidKey = LoginUrlKey;
+            message = "Salesforce login_url must be an approved Salesforce HTTPS origin.";
+            return false;
+        }
+
+        if (!TryNormalizeRedirectUri(Optional(values, RedirectUriKey, DefaultRedirectUri), out _))
+        {
+            invalidKey = RedirectUriKey;
+            message = $"Salesforce redirect_uri must use {DefaultCallbackPath}; HTTP is allowed only for loopback development.";
+            return false;
+        }
+
+        if (!TryNormalizeApiVersion(Optional(values, ApiVersionKey, DefaultApiVersion), out _))
+        {
+            invalidKey = ApiVersionKey;
+            message = "Salesforce api_version must use the vNN.N format.";
+            return false;
+        }
+
+        invalidKey = null;
+        message = null;
+        return true;
+    }
+
+    public static string ResolveLoginUrl(IReadOnlyDictionary<string, string> values) =>
+        NormalizeLoginUrl(Optional(values, LoginUrlKey, DefaultLoginUrl));
+
+    public static string ResolveRedirectUri(IReadOnlyDictionary<string, string> values) =>
+        NormalizeRedirectUri(Optional(values, RedirectUriKey, DefaultRedirectUri));
+
+    public static string CreateOAuthStartUrl(IReadOnlyDictionary<string, string> values, string token)
+    {
+        if (string.IsNullOrWhiteSpace(token) || token.Length > 4096)
+        {
+            throw new ArgumentException("A bounded OAuth start token is required.", nameof(token));
+        }
+
+        var redirect = new Uri(ResolveRedirectUri(values), UriKind.Absolute);
+        var start = new UriBuilder(redirect)
+        {
+            Path = OAuthCallbackPaths.SalesforceStart,
+            Query = "t=" + Uri.EscapeDataString(token),
+            Fragment = string.Empty
+        }.Uri.AbsoluteUri;
+        if (!OAuthCallbackPaths.IsAllowedSalesforceStartUrl(start, redirect.AbsoluteUri))
+        {
+            throw new InvalidOperationException("Salesforce OAuth start URL could not be resolved safely.");
+        }
+
+        return start;
+    }
+
+    public static bool IsAllowedAuthorizationUrl(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        string.Equals(uri.AbsolutePath, "/services/oauth2/authorize", StringComparison.OrdinalIgnoreCase) &&
+        IsAllowedLoginHost(uri.Host);
+
     public static string CreateAuthorizationUrl(
         IReadOnlyDictionary<string, string> values,
         string redirectUri,
@@ -87,14 +170,16 @@ public static class SalesforceClientFactory
     {
         RequireConnectedAppConfig(values);
         var clientId = Required(values, ClientIdKey);
-        var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
+        var loginUrl = ResolveLoginUrl(values);
         var scope = Optional(values, OAuthScopeKey, DefaultOAuthScope);
 
         var query = new Dictionary<string, string>
         {
             ["response_type"] = "code",
             ["client_id"] = clientId,
-            ["redirect_uri"] = string.IsNullOrWhiteSpace(redirectUri) ? DefaultRedirectUri : redirectUri,
+            ["redirect_uri"] = string.IsNullOrWhiteSpace(redirectUri)
+                ? ResolveRedirectUri(values)
+                : NormalizeRedirectUri(redirectUri),
             ["scope"] = scope,
             ["state"] = state
         };
@@ -121,10 +206,10 @@ public static class SalesforceClientFactory
 
         var clientId = Required(values, ClientIdKey);
         var clientSecret = Required(values, ClientSecretKey);
-        var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
+        var loginUrl = ResolveLoginUrl(values);
         var effectiveRedirectUri = string.IsNullOrWhiteSpace(redirectUri)
-            ? Optional(values, RedirectUriKey, DefaultRedirectUri)
-            : redirectUri;
+            ? ResolveRedirectUri(values)
+            : NormalizeRedirectUri(redirectUri);
 
         var form = new Dictionary<string, string>
         {
@@ -152,8 +237,7 @@ public static class SalesforceClientFactory
         var result = new Dictionary<string, string>
         {
             [AccessTokenKey] = token.AccessToken,
-            [InstanceUrlKey] = token.InstanceUrl,
-            [RedirectUriKey] = effectiveRedirectUri
+            [InstanceUrlKey] = token.InstanceUrl
         };
         if (!string.IsNullOrWhiteSpace(token.IdentityUrl))
         {
@@ -179,26 +263,14 @@ public static class SalesforceClientFactory
 
     public static string AuthorizationEndpoint(string loginUrlOrEndpoint)
     {
-        var value = NormalizeLoginUrlOrEndpoint(loginUrlOrEndpoint);
-
-        if (value.EndsWith("/services/oauth2/authorize", StringComparison.OrdinalIgnoreCase))
-        {
-            return value;
-        }
-
-        return value.TrimEnd('/') + "/services/oauth2/authorize";
+        var value = NormalizeLoginUrl(loginUrlOrEndpoint);
+        return value + "/services/oauth2/authorize";
     }
 
     public static string TokenEndpoint(string loginUrlOrEndpoint)
     {
-        var value = NormalizeLoginUrlOrEndpoint(loginUrlOrEndpoint);
-
-        if (value.EndsWith("/services/oauth2/token", StringComparison.OrdinalIgnoreCase))
-        {
-            return value;
-        }
-
-        return value.TrimEnd('/') + "/services/oauth2/token";
+        var value = NormalizeLoginUrl(loginUrlOrEndpoint);
+        return value + "/services/oauth2/token";
     }
 
     public static string CreatePkceCodeVerifier() =>
@@ -216,35 +288,85 @@ public static class SalesforceClientFactory
 
     private static string NormalizeApiVersion(string value)
     {
-        var trimmed = value.Trim();
-        return trimmed.StartsWith('v') ? trimmed : "v" + trimmed;
+        if (TryNormalizeApiVersion(value, out var normalized)) return normalized;
+        throw new InvalidOperationException("Salesforce api_version must use the vNN.N format.");
     }
 
-    private static string NormalizeLoginUrlOrEndpoint(string loginUrlOrEndpoint)
+    private static bool TryNormalizeApiVersion(string value, out string normalized)
     {
-        if (string.IsNullOrWhiteSpace(loginUrlOrEndpoint))
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var version = value.Trim();
+        if (version.StartsWith('v') || version.StartsWith('V')) version = version[1..];
+        var parts = version.Split('.');
+        if (parts.Length != 2 ||
+            !int.TryParse(parts[0], out var major) || major <= 0 ||
+            !int.TryParse(parts[1], out var minor) || minor < 0)
         {
-            return DefaultLoginUrl;
+            return false;
         }
 
-        var value = loginUrlOrEndpoint.Trim();
-        if (value.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-            value.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        normalized = $"v{major}.{minor}";
+        return true;
+    }
+
+    private static string NormalizeLoginUrl(string value)
+    {
+        if (TryNormalizeLoginUrl(value, out var normalized)) return normalized;
+        throw new InvalidOperationException("Salesforce login_url must be an approved Salesforce HTTPS origin.");
+    }
+
+    private static bool TryNormalizeLoginUrl(string value, out string normalized)
+    {
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var candidate = value.Trim();
+        if (!candidate.Contains("://", StringComparison.Ordinal)) candidate = "https://" + candidate;
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) ||
+            uri.Scheme != Uri.UriSchemeHttps ||
+            string.IsNullOrWhiteSpace(uri.Host) ||
+            !IsAllowedLoginHost(uri.Host) ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment) ||
+            uri.AbsolutePath is not ("" or "/"))
         {
-            return value;
+            return false;
         }
 
-        if (value.StartsWith("//", StringComparison.Ordinal))
+        normalized = uri.GetLeftPart(UriPartial.Authority);
+        return true;
+    }
+
+    private static bool IsAllowedLoginHost(string host) =>
+        string.Equals(host, "login.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(host, "test.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
+        host.EndsWith(".salesforce.com", StringComparison.OrdinalIgnoreCase) ||
+        host.EndsWith(".site.com", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeRedirectUri(string value)
+    {
+        if (TryNormalizeRedirectUri(value, out var normalized)) return normalized;
+        throw new InvalidOperationException(
+            $"Salesforce redirect_uri must use {DefaultCallbackPath}; HTTP is allowed only for loopback development.");
+    }
+
+    private static bool TryNormalizeRedirectUri(string value, out string normalized)
+    {
+        normalized = string.Empty;
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri) ||
+            string.IsNullOrWhiteSpace(uri.Host) ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment) ||
+            !string.Equals(uri.AbsolutePath, DefaultCallbackPath, StringComparison.Ordinal) ||
+            (uri.Scheme != Uri.UriSchemeHttps && !(uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)))
         {
-            return "https:" + value;
+            return false;
         }
 
-        if (value.StartsWith("/", StringComparison.Ordinal))
-        {
-            return DefaultLoginUrl.TrimEnd('/') + value;
-        }
-
-        return "https://" + value;
+        normalized = uri.AbsoluteUri;
+        return true;
     }
 
     private static string Required(IReadOnlyDictionary<string, string> values, string key)
@@ -422,6 +544,15 @@ public static class SalesforceClientFactory
 
     private static bool HasValue(IReadOnlyDictionary<string, string> values, string key) =>
         values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
+
+    private static readonly HashSet<string> AppOwnedKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ClientIdKey,
+        ClientSecretKey,
+        LoginUrlKey,
+        ApiVersionKey,
+        RedirectUriKey
+    };
 
     private static string QueryString(IReadOnlyDictionary<string, string> values) =>
         string.Join("&", values.Select(kv =>

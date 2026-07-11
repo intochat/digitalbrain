@@ -5,7 +5,11 @@ import '../telemetry/platform_env.dart';
 const String digitalBrainV2UiAudience = 'digitalbrain-v2-ui';
 
 class V2RuntimeConfiguration {
-  const V2RuntimeConfiguration({required this.endpoint, this.bootstrapSecret});
+  const V2RuntimeConfiguration({
+    required this.endpoint,
+    this.bootstrapSecret,
+    this.salesforceOAuthStartOrigin,
+  });
 
   final Uri endpoint;
 
@@ -13,10 +17,14 @@ class V2RuntimeConfiguration {
   /// desktop process by Aspire. It is not an access token and is never accepted
   /// from a URL or compiled into the Flutter application.
   final String? bootstrapSecret;
+  final Uri? salesforceOAuthStartOrigin;
 
   factory V2RuntimeConfiguration.fromEnvironment() {
     const compiledEndpoint = String.fromEnvironment(
       'DIGITALBRAIN_V2_UI_ENDPOINT',
+    );
+    const compiledSalesforceCallback = String.fromEnvironment(
+      'DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK',
     );
     final configured = getEnv('DIGITALBRAIN_V2_UI_ENDPOINT');
     final source = configured?.trim().isNotEmpty == true
@@ -25,11 +33,19 @@ class V2RuntimeConfiguration {
     if (source.isEmpty) {
       throw StateError('DigitalBrain requires DIGITALBRAIN_V2_UI_ENDPOINT.');
     }
+    final configuredSalesforceCallback = _nonEmpty(
+      getEnv('DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK'),
+    );
+    final salesforceCallback =
+        configuredSalesforceCallback ?? _nonEmpty(compiledSalesforceCallback);
     return V2RuntimeConfiguration(
       endpoint: parseV2UiEndpoint(source),
       bootstrapSecret: kIsWeb
           ? null
           : _nonEmpty(getEnv('DIGITALBRAIN_V2_UI_BOOTSTRAP_SECRET')),
+      salesforceOAuthStartOrigin: salesforceCallback == null
+          ? null
+          : parseSalesforceOAuthStartOrigin(salesforceCallback),
     );
   }
 }
@@ -53,6 +69,31 @@ Uri parseV2UiEndpoint(String source) {
     );
   }
   return endpoint.replace(path: '', query: null, fragment: null);
+}
+
+Uri parseSalesforceOAuthStartOrigin(String source) {
+  final callback = Uri.tryParse(source);
+  if (callback == null ||
+      !callback.isAbsolute ||
+      callback.host.isEmpty ||
+      callback.userInfo.isNotEmpty ||
+      callback.hasQuery ||
+      callback.hasFragment ||
+      callback.path != '/oauth/callback/salesforce' ||
+      (callback.scheme != 'https' &&
+          !(callback.scheme == 'http' && _isLoopbackHost(callback.host)))) {
+    throw FormatException(
+      'DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK must be an HTTPS callback origin or an HTTP loopback callback.',
+    );
+  }
+  return callback.replace(path: '', query: null, fragment: null);
+}
+
+bool _isLoopbackHost(String host) {
+  final normalized = host.toLowerCase();
+  return normalized == 'localhost' ||
+      normalized == '127.0.0.1' ||
+      normalized == '::1';
 }
 
 String? _nonEmpty(String? value) {

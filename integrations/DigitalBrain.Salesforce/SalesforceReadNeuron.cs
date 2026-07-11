@@ -5,6 +5,8 @@ using DigitalBrain.Kernel.V2;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace DigitalBrain.Salesforce;
@@ -15,10 +17,69 @@ public sealed class SalesforceReadNeuron(
     ISalesforceApiClientFactory salesforceApiClientFactory,
     IPackConfigStore store,
     [FromKeyedServices("salesforce")] IConnector connector,
+    IOAuthStateProtector oauthStateProtector,
     [PersistentState("salesforce-read", "Default")] IPersistentState<SalesforceReadNeuronState> continuationState)
     : Grain, IV2SalesforceReadToolGrain
 {
     private const int MaximumContinuations = 32;
+    private static readonly TimeSpan OAuthStartLifetime = TimeSpan.FromMinutes(5);
+
+    public async Task<V2SalesforceReadResult> BeginAuthorizationAsync(
+        string startToken,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        if (!oauthStateProtector.TryUnprotect(startToken, out var protectedOwner) ||
+            !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal) ||
+            !IsCurrentOAuthStartToken(startToken))
+        {
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.Unavailable,
+                SafeReason: "This Salesforce connection request is invalid or expired. Start again from DigitalBrain.");
+        }
+
+        try
+        {
+            await ConsumeOAuthStartTokenAsync();
+            var challenge = await connector.BeginAuthAsync(owner, cancellationToken: cancellationToken);
+            if (challenge.IsForm || !SalesforceClientFactory.IsAllowedAuthorizationUrl(challenge.UrlOrForm))
+            {
+                return new V2SalesforceReadResult(
+                    V2SalesforceReadStatus.ConfigurationMissing,
+                    SafeReason: "Salesforce application configuration is missing.");
+            }
+
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.NeedsAuth,
+                ConnectionUrl: challenge.UrlOrForm);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Principal-scoped Salesforce authorization start failed with {ExceptionType}.", ex.GetType().Name);
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.Unavailable,
+                SafeReason: "Salesforce connection is unavailable right now.");
+        }
+    }
+
+    public Task<AuthResult> CompleteAuthorizationAsync(
+        OAuthCallback callback,
+        CancellationToken cancellationToken = default)
+    {
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        if (!oauthStateProtector.TryUnprotect(callback.State, out var protectedOwner) ||
+            !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal))
+        {
+            return Task.FromResult(new AuthResult(false, "invalid-state"));
+        }
+
+        return connector.CompleteAuthAsync(callback, cancellationToken);
+    }
 
     public Task<V2SalesforceReadResult> ReadLatestAccountAsync(CancellationToken cancellationToken = default) =>
         ReadAsync(
@@ -99,7 +160,9 @@ public sealed class SalesforceReadNeuron(
     {
         var owner = new NeuronId(this.GetPrimaryKeyString());
         var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
-        var config = await connector.ValidateConfigAsync(cancellationToken: cancellationToken);
+        var config = await connector.ValidateConfigAsync(
+            PackConfigScopes.ForUser(scope.UserId),
+            cancellationToken);
         if (!config.IsValid)
             return new V2SalesforceReadResult(
                 V2SalesforceReadStatus.ConfigurationMissing,
@@ -107,7 +170,7 @@ public sealed class SalesforceReadNeuron(
 
         var values = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
         if (!SalesforceClientFactory.HasUsableCredential(values))
-            return await BuildConnectionResultAsync(owner, cancellationToken);
+            return await BuildConnectionResultAsync(owner, values, cancellationToken);
 
         try
         {
@@ -156,6 +219,7 @@ public sealed class SalesforceReadNeuron(
         {
             return await BuildConnectionResultAsync(
                 owner,
+                values,
                 cancellationToken,
                 "Salesforce authorization expired or was revoked. Reconnect Salesforce to continue.");
         }
@@ -195,7 +259,9 @@ public sealed class SalesforceReadNeuron(
         var previousState = continuationState.State;
         continuationState.State = new SalesforceReadNeuronState
         {
-            SerializedContinuations = SalesforceContinuationStateCodec.Encode(continuations)
+            SerializedContinuations = SalesforceContinuationStateCodec.Encode(continuations),
+            OAuthStartTokenHash = previousState.OAuthStartTokenHash,
+            OAuthStartExpiresAtUnixSeconds = previousState.OAuthStartExpiresAtUnixSeconds
         };
         try
         {
@@ -225,7 +291,9 @@ public sealed class SalesforceReadNeuron(
     {
         var owner = new NeuronId(this.GetPrimaryKeyString());
         var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
-        var config = await connector.ValidateConfigAsync(cancellationToken: cancellationToken);
+        var config = await connector.ValidateConfigAsync(
+            PackConfigScopes.ForUser(scope.UserId),
+            cancellationToken);
         if (!config.IsValid)
             return new V2SalesforceReadResult(
                 V2SalesforceReadStatus.ConfigurationMissing,
@@ -233,7 +301,7 @@ public sealed class SalesforceReadNeuron(
 
         var values = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
         if (!SalesforceClientFactory.HasUsableCredential(values))
-            return await BuildConnectionResultAsync(owner, cancellationToken);
+            return await BuildConnectionResultAsync(owner, values, cancellationToken);
 
         try
         {
@@ -251,6 +319,7 @@ public sealed class SalesforceReadNeuron(
         {
             return await BuildConnectionResultAsync(
                 owner,
+                values,
                 cancellationToken,
                 "Salesforce authorization does not include the required read permission. Reconnect Salesforce and grant API access.");
         }
@@ -258,6 +327,7 @@ public sealed class SalesforceReadNeuron(
         {
             return await BuildConnectionResultAsync(
                 owner,
+                values,
                 cancellationToken,
                 "Salesforce authorization expired or was revoked. Reconnect Salesforce to continue.");
         }
@@ -272,27 +342,78 @@ public sealed class SalesforceReadNeuron(
 
     private async Task<V2SalesforceReadResult> BuildConnectionResultAsync(
         NeuronId owner,
+        IReadOnlyDictionary<string, string> values,
         CancellationToken cancellationToken,
         string reason = "Connect your Salesforce account to let INO read Salesforce.")
     {
-        var challenge = await connector.BeginAuthAsync(owner, cancellationToken: cancellationToken);
-        if (challenge.IsForm || !IsAllowedSalesforceAuthorizationUrl(challenge.UrlOrForm))
-            return new V2SalesforceReadResult(
-                V2SalesforceReadStatus.ConfigurationMissing,
-                SafeReason: "Salesforce application configuration is missing.");
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var startToken = oauthStateProtector.Protect(owner);
+            var startUrl = SalesforceClientFactory.CreateOAuthStartUrl(values, startToken);
+            var previousState = continuationState.State;
+            continuationState.State = new SalesforceReadNeuronState
+            {
+                SerializedContinuations = previousState.SerializedContinuations,
+                OAuthStartTokenHash = HashOAuthStartToken(startToken),
+                OAuthStartExpiresAtUnixSeconds = DateTimeOffset.UtcNow.Add(OAuthStartLifetime).ToUnixTimeSeconds()
+            };
+            try
+            {
+                await continuationState.WriteStateAsync(CancellationToken.None);
+            }
+            catch
+            {
+                continuationState.State = previousState;
+                throw;
+            }
 
-        return new V2SalesforceReadResult(
-            V2SalesforceReadStatus.NeedsAuth,
-            SafeReason: reason,
-            ConnectionUrl: challenge.UrlOrForm);
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.NeedsAuth,
+                SafeReason: reason,
+                ConnectionUrl: startUrl);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Principal-scoped Salesforce connection link creation failed with {ExceptionType}.", ex.GetType().Name);
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.Unavailable,
+                SafeReason: "Salesforce connection is unavailable right now.");
+        }
     }
 
-    private static bool IsAllowedSalesforceAuthorizationUrl(string value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps &&
-        (string.Equals(uri.Host, "login.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
-         string.Equals(uri.Host, "test.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
-         uri.Host.EndsWith(".my.salesforce.com", StringComparison.OrdinalIgnoreCase));
+    private bool IsCurrentOAuthStartToken(string startToken)
+    {
+        var expectedHash = continuationState.State.OAuthStartTokenHash;
+        return expectedHash is { Length: 32 } &&
+               continuationState.State.OAuthStartExpiresAtUnixSeconds >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() &&
+               CryptographicOperations.FixedTimeEquals(expectedHash, HashOAuthStartToken(startToken));
+    }
+
+    private async Task ConsumeOAuthStartTokenAsync()
+    {
+        var previousState = continuationState.State;
+        continuationState.State = new SalesforceReadNeuronState
+        {
+            SerializedContinuations = previousState.SerializedContinuations
+        };
+        try
+        {
+            await continuationState.WriteStateAsync(CancellationToken.None);
+        }
+        catch
+        {
+            continuationState.State = previousState;
+            throw;
+        }
+    }
+
+    private static byte[] HashOAuthStartToken(string token) =>
+        SHA256.HashData(Encoding.UTF8.GetBytes(token));
 
     private static bool IsPermissionFailure(Exception exception)
     {
@@ -319,6 +440,8 @@ public sealed class SalesforceReadNeuron(
 public sealed class SalesforceReadNeuronState
 {
     [Id(0)] public byte[] SerializedContinuations { get; set; } = [];
+    [Id(1)] public byte[] OAuthStartTokenHash { get; set; } = [];
+    [Id(2)] public long OAuthStartExpiresAtUnixSeconds { get; set; }
 }
 
 internal sealed record SalesforceStoredContinuation(
