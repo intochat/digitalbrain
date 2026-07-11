@@ -341,14 +341,18 @@ public sealed class V2InoConversationTests
                 .ToArray();
             try
             {
-                var assistantPersisted = journal[^2].RootElement.GetProperty("Snapshot");
+                Assert.Equal(4, journal.Length);
+                var respondingPersisted = journal[^2].RootElement.GetProperty("Snapshot");
                 Assert.Equal(V2InoConversationStates.Responding,
-                    assistantPersisted.GetProperty("Operations")[0].GetProperty("State").GetString());
-                Assert.Contains(assistantPersisted.GetProperty("Turns").EnumerateArray(), turn =>
+                    respondingPersisted.GetProperty("Operations")[0].GetProperty("State").GetString());
+                Assert.DoesNotContain(respondingPersisted.GetProperty("Turns").EnumerateArray(), turn =>
                     turn.GetProperty("Role").GetString() == "assistant");
+                var completed = journal[^1].RootElement.GetProperty("Snapshot");
                 Assert.Equal(V2InoConversationStates.Succeeded,
-                    journal[^1].RootElement.GetProperty("Snapshot")
-                        .GetProperty("Operations")[0].GetProperty("State").GetString());
+                    completed.GetProperty("Operations")[0].GetProperty("State").GetString());
+                Assert.Contains(completed.GetProperty("Turns").EnumerateArray(), turn =>
+                    turn.GetProperty("Role").GetString() == "assistant" &&
+                    turn.GetProperty("State").GetString() == V2InoConversationStates.Succeeded);
             }
             finally
             {
@@ -369,6 +373,136 @@ public sealed class V2InoConversationTests
             Assert.Equal(2, reopenedStore.Read(context).Turns.Count);
             Assert.Equal(2, MessageCount(reopenedFeed.CatchUp(
                 context, V2SurfaceAudienceKind.Principal, long.MaxValue).Items.Single()));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void Complete_journals_response_action_and_all_groundings_atomically_and_replay_is_exact()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-ino-atomic-complete-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var context = Context();
+            var path = Path.Combine(root, "conversation.jsonl");
+            var store = new V2InoEffectStore(path);
+            const string commandId = "atomic-command";
+            store.Begin(context, commandId, Prompt);
+            store.Transition(context, commandId, V2InoConversationStates.Running);
+            store.Transition(context, commandId, V2InoConversationStates.Responding);
+            var recordsBeforeComplete = File.ReadAllLines(path).Length;
+            var action = new V2ToolAction("openUrl", "Connect Google", "https://accounts.google.com/");
+            V2ToolGrounding[] groundings =
+            [
+                new("gmail.read.messages", JsonSerializer.SerializeToElement(new { messageId = "message-1" })),
+                new("salesforce.read.records", JsonSerializer.SerializeToElement(new { recordId = "record-1" }))
+            ];
+
+            var completed = store.Complete(
+                context,
+                commandId,
+                "Atomic grounded answer.",
+                action,
+                groundings[0],
+                groundings);
+
+            Assert.Equal(recordsBeforeComplete + 1, File.ReadAllLines(path).Length);
+            var operation = Assert.Single(completed.Operations);
+            Assert.Equal(V2InoConversationStates.Succeeded, operation.State);
+            Assert.Equal(action, operation.Action);
+            Assert.Equal(groundings[0].Content.GetRawText(), operation.Grounding!.Content.GetRawText());
+            Assert.Equal(2, operation.Groundings!.Count);
+            Assert.Equal("Atomic grounded answer.", Assert.Single(
+                completed.Turns, static turn => turn.Role == "assistant").Text);
+
+            var reopened = new V2InoEffectStore(path);
+            var recordsBeforeReplay = File.ReadAllLines(path).Length;
+            var replay = reopened.Complete(
+                context,
+                commandId,
+                "Atomic grounded answer.",
+                action,
+                groundings[0],
+                groundings);
+
+            Assert.Equal(recordsBeforeReplay, File.ReadAllLines(path).Length);
+            Assert.Equal(completed.Revision, replay.Revision);
+            var replayOperation = Assert.Single(replay.Operations);
+            Assert.Equal(action, replayOperation.Action);
+            Assert.Equal(2, replayOperation.Groundings!.Count);
+            Assert.Equal("Atomic grounded answer.", Assert.Single(
+                replay.Turns, static turn => turn.Role == "assistant").Text);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Interrupted_legacy_partial_answer_recovers_failed_and_replay_never_claims_success()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-ino-interrupted-answer-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var context = Context();
+            var path = Path.Combine(root, "conversation.jsonl");
+            var store = new V2InoEffectStore(path);
+            const string commandId = "interrupted-command";
+            store.Begin(context, commandId, Prompt);
+            store.Transition(context, commandId, V2InoConversationStates.Running);
+            store.Transition(context, commandId, V2InoConversationStates.Responding);
+            var responding = store.Read(context);
+            var legacyPartial = responding with
+            {
+                Revision = checked(responding.Revision + 1),
+                Turns = responding.Turns.Concat([
+                    new V2InoConversationTurn(
+                        commandId,
+                        "assistant",
+                        "This answer was never atomically committed.",
+                        V2InoConversationStates.Responding)
+                ]).ToArray()
+            };
+            File.AppendAllText(path, JsonSerializer.Serialize(new
+            {
+                Version = 3,
+                Tenant = context.TenantId,
+                Workspace = context.WorkspaceId,
+                Principal = context.Principal,
+                Snapshot = legacyPartial
+            }) + Environment.NewLine);
+
+            var recoveredStore = new V2InoEffectStore(path);
+            var recovered = recoveredStore.Read(context);
+            var recoveredOperation = Assert.Single(recovered.Operations);
+            Assert.Equal(V2InoConversationStates.Failed, recoveredOperation.State);
+            Assert.Contains("couldn’t confirm", recoveredOperation.SafeReason, StringComparison.Ordinal);
+            Assert.Null(recoveredOperation.Action);
+            Assert.Null(recoveredOperation.Grounding);
+            Assert.Null(recoveredOperation.Groundings);
+            var recoveredTurn = Assert.Single(recovered.Turns);
+            Assert.Equal("user", recoveredTurn.Role);
+            Assert.Equal(V2InoConversationStates.Failed, recoveredTurn.State);
+
+            var feed = new V2PrivateFeedStore();
+            var surfaces = new V2WorkspaceSurfaceProducer(feed, new V2ActionExecutor(feed), recoveredStore);
+            var replayRouter = new RecordingModelRouter(_ => throw new InvalidOperationException("Replay called the model."));
+            var command = new V2CommandEnvelope(
+                V2McpInoCommandHandler.CommandType,
+                2,
+                commandId,
+                context,
+                JsonSerializer.SerializeToElement(new { prompt = Prompt }));
+
+            var replay = await Handler(recoveredStore, surfaces, replayRouter).ExecuteAsync(command);
+
+            Assert.Equal(WorkflowState.Failed, replay.State);
+            Assert.Equal(0, replayRouter.Calls);
+            Assert.Equal(V2InoConversationStates.Failed, recoveredStore.Read(context).CurrentOperation!.State);
         }
         finally
         {

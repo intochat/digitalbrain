@@ -385,7 +385,7 @@ public sealed class V2ContractsTests
         var context = new V2RequestContext(new("tenant"), new("workspace"), new("user", PrincipalKind.User), "session", AuthAssurance.Password, "corr", null, new HashSet<string> { "brain.read" });
         var owner = new V2ConversationOwner(new FakeContextAssembler(), new FakePlanner(), new FakeModelRouter(), new FakeToolCatalog(), new FakeComposer());
         var result = await owner.ExecuteAsync(new V2ConversationRequest(context, "conversation", "hello"));
-        Assert.Equal("model:Success", result);
+        Assert.Equal(":Success", result);
     }
 
     [Fact]

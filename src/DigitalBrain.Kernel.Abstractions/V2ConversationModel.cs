@@ -22,6 +22,11 @@ public sealed record V2ConversationModelCompletionResponse(
 [Alias("digitalbrain.v2.conversation-model-grain")]
 public interface IV2ConversationModelGrain : IGrainWithStringKey
 {
+    [Alias("ResolveIntentAsync")]
+    Task<V2SemanticIntentProposal> ResolveIntentAsync(
+        V2SemanticIntentRequest request,
+        CancellationToken cancellationToken = default);
+
     [Alias("CompleteAsync")]
     Task<V2ConversationModelCompletionResponse> CompleteAsync(
         V2ConversationModelCompletionRequest request,

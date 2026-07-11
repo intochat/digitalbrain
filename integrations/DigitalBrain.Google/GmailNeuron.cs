@@ -14,7 +14,7 @@ public sealed class GmailReadNeuron(
     ILogger<GmailReadNeuron> logger,
     IGmailApiClientFactory gmailApiClientFactory,
     IPackConfigStore store,
-    [FromKeyedServices("google")] IConnector connector) : Grain, IV2GmailReadToolGrain
+    [FromKeyedServices("google")] IConnector connector) : Grain, IV2GmailReadToolGrain, IV2GmailMetadataToolGrain
 {
     public async Task<V2GmailReadResult> ReadIncomingAtOffsetAsync(
         V2GmailReadRequest request,
@@ -97,6 +97,173 @@ public sealed class GmailReadNeuron(
         }
     }
 
+    public Task<V2GmailMessageListResult> ReadMessagesAsync(
+        V2GmailMessageListRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Valid(request))
+            return Task.FromResult(new V2GmailMessageListResult(
+                V2GmailReadStatus.Unavailable,
+                [],
+                EmptyCoverage(),
+                "That Gmail message selection cannot be read safely."));
+
+        return ExecuteMetadataReadAsync(
+            async (client, token) =>
+            {
+                var result = await client.ListMessagesAsync(new GmailMessageListRequest(
+                    Map(request.Selection), request.Offset, request.Limit), token);
+                return new V2GmailMessageListResult(
+                    result.State == GmailMetadataReadState.Success
+                        ? V2GmailReadStatus.Success
+                        : V2GmailReadStatus.CapabilityUnavailable,
+                    result.Messages.Select(Map).ToArray(),
+                    Map(result.Coverage),
+                    result.SafeReason,
+                    StableCandidateMessageIds: result.StableCandidateMessageIds);
+            },
+            static (status, reason, url) => new V2GmailMessageListResult(
+                status, [], EmptyCoverage(), reason, url),
+            cancellationToken);
+    }
+
+    public Task<V2GmailMailboxOverviewResult> ReadMailboxOverviewAsync(
+        CancellationToken cancellationToken = default) =>
+        ExecuteMetadataReadAsync(
+            async (client, token) =>
+            {
+                var result = await client.ReadMailboxOverviewAsync(token);
+                return new V2GmailMailboxOverviewResult(
+                    V2GmailReadStatus.Success,
+                    result.InboxMessages,
+                    result.UnreadInboxMessages,
+                    result.InboxThreads,
+                    result.UnreadInboxThreads);
+            },
+            static (status, reason, url) => new V2GmailMailboxOverviewResult(
+                status, SafeReason: reason, ConnectionUrl: url),
+            cancellationToken);
+
+    public Task<V2GmailThreadListResult> ReadThreadsAsync(
+        V2GmailThreadListRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Valid(request))
+            return Task.FromResult(new V2GmailThreadListResult(
+                V2GmailReadStatus.Unavailable,
+                [],
+                EmptyCoverage(),
+                "That Gmail thread selection cannot be read safely."));
+
+        return ExecuteMetadataReadAsync(
+            async (client, token) =>
+            {
+                var result = await client.ListThreadsAsync(new GmailThreadListRequest(
+                    Map(request.Selection), request.Offset, request.Limit, request.MaxMessagesPerThread), token);
+                return new V2GmailThreadListResult(
+                    result.State == GmailMetadataReadState.Success
+                        ? V2GmailReadStatus.Success
+                        : V2GmailReadStatus.CapabilityUnavailable,
+                    result.Threads.Select(thread => new V2GmailThreadMetadata(
+                        thread.ThreadId,
+                        thread.LatestInternalDate,
+                        thread.Subject,
+                        thread.ParticipantAddresses,
+                        thread.HasUnread,
+                        thread.MatchingMessageCount,
+                        thread.Messages.Select(Map).ToArray())).ToArray(),
+                    Map(result.Coverage),
+                    result.SafeReason,
+                    StableCandidateMessageIds: result.StableCandidateMessageIds,
+                    StableCandidateThreadIds: result.StableCandidateThreadIds);
+            },
+            static (status, reason, url) => new V2GmailThreadListResult(
+                status, [], EmptyCoverage(), reason, url),
+            cancellationToken);
+    }
+
+    private async Task<T> ExecuteMetadataReadAsync<T>(
+        Func<IGmailApiClient, CancellationToken, Task<T>> operation,
+        Func<V2GmailReadStatus, string?, string?, T> failure,
+        CancellationToken cancellationToken)
+    {
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
+        var config = await connector.ValidateConfigAsync(cancellationToken: cancellationToken);
+        if (!config.IsValid)
+            return failure(V2GmailReadStatus.ConfigurationMissing, "Gmail application configuration is missing.", null);
+
+        var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
+        if (!GoogleClientFactory.HasUsableCredential(values))
+        {
+            var connection = await BuildConnectionResultAsync(owner, cancellationToken);
+            return failure(connection.Status, connection.SafeReason, connection.ConnectionUrl);
+        }
+
+        try
+        {
+            var client = await gmailApiClientFactory.CreateAsync(scope, cancellationToken);
+            return await operation(client, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (GoogleApiException ex) when (ex.HttpStatusCode == HttpStatusCode.Forbidden)
+        {
+            var connection = await BuildConnectionResultAsync(owner, cancellationToken,
+                "Google authorization does not include Gmail read permission. Reconnect Google and grant read access.");
+            return failure(connection.Status, connection.SafeReason, connection.ConnectionUrl);
+        }
+        catch (Exception ex) when (IsAuthorizationFailure(ex))
+        {
+            var connection = await BuildConnectionResultAsync(owner, cancellationToken,
+                "Google authorization expired or was revoked. Reconnect Google to continue.");
+            return failure(connection.Status, connection.SafeReason, connection.ConnectionUrl);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Principal-scoped Gmail metadata read failed with {ExceptionType}.", ex.GetType().Name);
+            return failure(V2GmailReadStatus.Unavailable, "I couldn’t read Gmail right now. Please try again later.", null);
+        }
+    }
+
+    private static GmailMessageSelection Map(V2GmailMessageSelection selection) => new(
+        (GmailMailboxScope)selection.Mailbox,
+        (GmailMessageReadState)selection.ReadState,
+        selection.SenderAddress,
+        selection.RecipientAddress,
+        selection.SubjectContains,
+        selection.ReceivedAfterInclusive,
+        selection.ReceivedBeforeExclusive,
+        (GmailAttachmentFilter)selection.AttachmentFilter,
+        selection.PinnedMessageIds,
+        selection.MaxPages,
+        selection.MaxCandidates);
+
+    private static V2GmailMessageMetadata Map(GmailMessageMetadata message) => new(
+        message.MessageId,
+        message.ThreadId,
+        message.InternalDate,
+        message.From,
+        message.FromAddress,
+        message.To,
+        message.ToAddresses,
+        message.Subject,
+        message.LabelIds,
+        message.IsRead);
+
+    private static V2GmailResultCoverage Map(GmailResultCoverage coverage) => new(
+        coverage.PagesRead,
+        coverage.CandidatesDiscovered,
+        coverage.MetadataRead,
+        coverage.MatchingMessages,
+        coverage.UnavailableMessages,
+        coverage.ProviderExhausted,
+        coverage.CandidateLimitReached);
+
+    private static V2GmailResultCoverage EmptyCoverage() => new(0, 0, 0, 0, 0, true, false);
+
     private async Task<V2GmailReadResult> BuildConnectionResultAsync(
         NeuronId owner,
         CancellationToken cancellationToken,
@@ -126,6 +293,28 @@ public sealed class GmailReadNeuron(
             ? !request.RequiresAnchor && request.AnchorInternalDate is null && request.TraversalDepth == request.Offset
             : request.RequiresAnchor && request.Offset == 1 && request.AnchorInternalDate is not null &&
               request.AnchorMessageId.Length is > 0 and <= 256);
+
+    private static bool Valid(V2GmailMessageListRequest request) =>
+        request.Selection is not null && Valid(request.Selection) &&
+        request.Offset is >= 0 and < V2GmailTools.MaximumCandidateCount &&
+        request.Limit is >= 1 and <= V2GmailTools.MaximumResultCount;
+
+    private static bool Valid(V2GmailThreadListRequest request) =>
+        request.Selection is not null && Valid(request.Selection) &&
+        request.Offset is >= 0 and < V2GmailTools.MaximumCandidateCount &&
+        request.Limit is >= 1 and <= V2GmailTools.MaximumResultCount &&
+        request.MaxMessagesPerThread is >= 1 and <= V2GmailTools.MaximumResultCount;
+
+    private static bool Valid(V2GmailMessageSelection selection) =>
+        selection.MaxPages is >= 1 and <= V2GmailTools.MaximumPageCount &&
+        selection.MaxCandidates is >= 1 and <= V2GmailTools.MaximumCandidateCount &&
+        selection.SenderAddress is not { Length: > 320 } &&
+        selection.RecipientAddress is not { Length: > 320 } &&
+        selection.SubjectContains is not { Length: > 256 } &&
+        selection.PinnedMessageIds is not { Length: 0 } &&
+        (selection.PinnedMessageIds is null || selection.PinnedMessageIds.Length <= selection.MaxCandidates) &&
+        selection.ReceivedAfterInclusive is not < 0 && selection.ReceivedBeforeExclusive is not < 0 &&
+        !(selection.ReceivedAfterInclusive >= selection.ReceivedBeforeExclusive);
 
     private static bool IsAuthorizationFailure(Exception exception)
     {

@@ -58,6 +58,7 @@ if (profile == V2RuntimeProfile.Production && string.IsNullOrWhiteSpace(inoEffec
 builder.Services.AddSingleton(new V2InoEffectStore(inoEffectStorePath));
 builder.Services.AddSingleton<IV2InoConversationStore>(serviceProvider => serviceProvider.GetRequiredService<V2InoEffectStore>());
 builder.Services.AddSingleton<IV2ContextAssembler, V2McpConversationContextAssembler>();
+builder.Services.AddSingleton<IV2SemanticIntentResolver, V2McpSemanticIntentResolver>();
 builder.Services.AddSingleton<IV2IntentCapabilityPlanner, V2McpIntegrationPlanner>();
 builder.Services.AddSingleton<IV2ModelRouter, V2McpConversationModelRouter>();
 builder.Services.AddSingleton<IV2McpIntegrationToolGateway, V2McpIntegrationToolGateway>();

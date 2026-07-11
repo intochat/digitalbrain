@@ -54,7 +54,8 @@ public sealed record V2InoConversationOperation(
     bool Retryable,
     DateTimeOffset UpdatedAt,
     V2ToolAction? Action = null,
-    V2ToolGrounding? Grounding = null);
+    V2ToolGrounding? Grounding = null,
+    IReadOnlyList<V2ToolGrounding>? Groundings = null);
 
 public sealed record V2InoConversationSnapshot(
     string ConversationId,
@@ -78,7 +79,8 @@ public interface IV2InoConversationStore
         string commandId,
         string response,
         V2ToolAction? action = null,
-        V2ToolGrounding? grounding = null);
+        V2ToolGrounding? grounding = null,
+        IReadOnlyList<V2ToolGrounding>? groundings = null);
     V2InoConversationSnapshot Fail(RequestContext context, string commandId, string safeReason, bool retryable);
 }
 
@@ -89,12 +91,14 @@ public sealed record V2ToolOutcome(
     V2ToolOutcomeKind Kind,
     JsonElement? Content = null,
     string? SafeReason = null,
-    V2ToolAction? Action = null);
+    V2ToolAction? Action = null,
+    JsonElement? GroundingContent = null);
 public sealed record V2ToolInvocation(string ToolId, JsonElement Input);
 public sealed record V2ConversationExecutionResult(
     string Text,
     V2ToolAction? Action = null,
-    V2ToolGrounding? Grounding = null);
+    V2ToolGrounding? Grounding = null,
+    IReadOnlyList<V2ToolGrounding>? Groundings = null);
 
 public interface IV2IntentCapabilityPlanner
 {
@@ -164,20 +168,28 @@ public sealed class V2ConversationOwner(
             }
         }
 
-        var model = await modelRouter.CompleteAsync(
-            new V2ModelRequest(request.Text, scoped, StructuredOutput: true, outcomes),
-            cancellationToken);
+        var model = outcomes.Count == 0
+            ? await modelRouter.CompleteAsync(
+                new V2ModelRequest(request.Text, scoped, StructuredOutput: true),
+                cancellationToken)
+            : new V2ModelResponse(string.Empty, "deterministic-tool-response", IsStructured: true);
         var text = await composer.ComposeAsync(request.Context, model, outcomes, cancellationToken);
-        var grounding = invocations
+        var groundings = invocations
             .Zip(outcomes)
             .Where(static pair => pair.Second.Kind == V2ToolOutcomeKind.Success &&
                                   pair.Second.Content is not null &&
-                                  pair.First.ToolId.StartsWith("gmail.read.", StringComparison.Ordinal))
-            .Select(static pair => new V2ToolGrounding(pair.First.ToolId, pair.Second.Content!.Value.Clone()))
-            .FirstOrDefault();
+                                  pair.Second.GroundingContent is not null &&
+                                  (pair.First.ToolId.StartsWith("gmail.", StringComparison.Ordinal) ||
+                                   pair.First.ToolId.StartsWith("salesforce.", StringComparison.Ordinal) ||
+                                   pair.First.ToolId.StartsWith("cross.", StringComparison.Ordinal)))
+            .Select(static pair => new V2ToolGrounding(
+                pair.First.ToolId,
+                pair.Second.GroundingContent!.Value.Clone()))
+            .ToArray();
         return new V2ConversationExecutionResult(
             text,
             outcomes.Select(static outcome => outcome.Action).FirstOrDefault(static action => action is not null),
-            grounding);
+            groundings.FirstOrDefault(),
+            groundings);
     }
 }

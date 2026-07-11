@@ -4,6 +4,8 @@ using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.V2;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans;
+using System.Text.Json;
 
 namespace DigitalBrain.Salesforce;
 
@@ -12,8 +14,12 @@ public sealed class SalesforceReadNeuron(
     ILogger<SalesforceReadNeuron> logger,
     ISalesforceApiClientFactory salesforceApiClientFactory,
     IPackConfigStore store,
-    [FromKeyedServices("salesforce")] IConnector connector) : Grain, IV2SalesforceReadToolGrain
+    [FromKeyedServices("salesforce")] IConnector connector,
+    [PersistentState("salesforce-read", "Default")] IPersistentState<SalesforceReadNeuronState> continuationState)
+    : Grain, IV2SalesforceReadToolGrain
 {
+    private const int MaximumContinuations = 32;
+
     public Task<V2SalesforceReadResult> ReadLatestAccountAsync(CancellationToken cancellationToken = default) =>
         ReadAsync(
             async (client, ct) =>
@@ -46,6 +52,172 @@ public sealed class SalesforceReadNeuron(
 
     public Task<V2SalesforceReadResult> ReadCrmSchemaAsync(CancellationToken cancellationToken = default) =>
         ReadAsync((client, ct) => client.DescribeCrmAccessAsync(ct), cancellationToken);
+
+    public Task<V2SalesforceReadResult> DiscoverObjectsAsync(
+        V2SalesforceDiscoveryRequest request,
+        CancellationToken cancellationToken = default) =>
+        ReadPageAsync((client, ct) => client.DiscoverObjectsAsync(request, ct), cancellationToken);
+
+    public Task<V2SalesforceReadResult> ReadRecordsAsync(
+        V2SalesforceRecordReadRequest request,
+        CancellationToken cancellationToken = default) =>
+        ReadPageAsync((client, ct) => client.ReadRecordsAsync(request, ct), cancellationToken);
+
+    public Task<V2SalesforceReadResult> SearchRecordsAsync(
+        V2SalesforceSearchRequest request,
+        CancellationToken cancellationToken = default) =>
+        ReadPageAsync((client, ct) => client.SearchRecordsAsync(request, ct), cancellationToken);
+
+    public Task<V2SalesforceReadResult> AggregateRecordsAsync(
+        V2SalesforceAggregateRequest request,
+        CancellationToken cancellationToken = default) =>
+        ReadPageAsync((client, ct) => client.AggregateRecordsAsync(request, ct), cancellationToken);
+
+    public Task<V2SalesforceReadResult> ContinueRecordsAsync(
+        V2SalesforceContinuationRequest request,
+        CancellationToken cancellationToken = default) =>
+        ReadPageAsync(
+            async (client, ct) =>
+            {
+                var stored = string.IsNullOrWhiteSpace(request.Value)
+                    ? null
+                    : ReadStoredContinuations().FirstOrDefault(item =>
+                        string.Equals(item.Token, request.Value, StringComparison.Ordinal));
+                if (stored is null)
+                    throw new SalesforceReadException(
+                        SalesforceReadFailure.ContinuationExpired,
+                        "That Salesforce continuation is no longer available.");
+                return await client.ContinueRecordsAsync(stored.ToProviderContinuation(), ct);
+            },
+            cancellationToken,
+            request.Value);
+
+    private async Task<V2SalesforceReadResult> ReadPageAsync(
+        Func<ISalesforceApiClient, CancellationToken, Task<SalesforceReadPage>> read,
+        CancellationToken cancellationToken,
+        string? continuationToConsume = null)
+    {
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
+        var config = await connector.ValidateConfigAsync(cancellationToken: cancellationToken);
+        if (!config.IsValid)
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.ConfigurationMissing,
+                SafeReason: "Salesforce application configuration is missing.");
+
+        var values = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
+        if (!SalesforceClientFactory.HasUsableCredential(values))
+            return await BuildConnectionResultAsync(owner, cancellationToken);
+
+        try
+        {
+            var client = await salesforceApiClientFactory.CreateAsync(scope, cancellationToken);
+            var page = await read(client, cancellationToken);
+            var publicContinuation = await PersistContinuationUpdateAsync(
+                continuationToConsume,
+                page.Continuation,
+                owner);
+
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.Success,
+                page.Content,
+                Scope: new V2SalesforceReadScope(
+                    owner.Value,
+                    page.Scope.OrganizationId,
+                    page.Scope.SalesforceUserId),
+                Continuation: publicContinuation,
+                ReturnedCount: page.ReturnedCount,
+                TotalSize: page.TotalSize);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (SalesforceReadException ex)
+        {
+            return new V2SalesforceReadResult(
+                ex.Failure switch
+                {
+                    SalesforceReadFailure.InvalidRequest => V2SalesforceReadStatus.InvalidRequest,
+                    SalesforceReadFailure.AccessDenied => V2SalesforceReadStatus.AccessDenied,
+                    SalesforceReadFailure.LimitReached => V2SalesforceReadStatus.LimitReached,
+                    SalesforceReadFailure.ContinuationExpired => V2SalesforceReadStatus.ContinuationExpired,
+                    _ => V2SalesforceReadStatus.Unavailable
+                },
+                SafeReason: ex.Message);
+        }
+        catch (Exception ex) when (IsPermissionFailure(ex))
+        {
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.AccessDenied,
+                SafeReason: "Salesforce authorization does not include the required read permission.");
+        }
+        catch (Exception ex) when (IsAuthorizationFailure(ex))
+        {
+            return await BuildConnectionResultAsync(
+                owner,
+                cancellationToken,
+                "Salesforce authorization expired or was revoked. Reconnect Salesforce to continue.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Principal-scoped Salesforce semantic read failed with {ExceptionType}.", ex.GetType().Name);
+            return new V2SalesforceReadResult(
+                V2SalesforceReadStatus.Unavailable,
+                SafeReason: "I couldn’t read Salesforce right now. Please try again later.");
+        }
+    }
+
+    private async Task<V2SalesforceContinuation?> PersistContinuationUpdateAsync(
+        string? continuationToConsume,
+        SalesforceContinuation? providerContinuation,
+        NeuronId owner)
+    {
+        if (string.IsNullOrWhiteSpace(continuationToConsume) && providerContinuation is null)
+            return null;
+
+        var continuations = ReadStoredContinuations()
+            .Where(item => !string.Equals(item.Token, continuationToConsume, StringComparison.Ordinal))
+            .ToList();
+        V2SalesforceContinuation? publicContinuation = null;
+        if (providerContinuation is not null)
+        {
+            if (continuations.Count >= MaximumContinuations)
+                continuations.RemoveAt(0);
+            var token = Guid.NewGuid().ToString("N");
+            continuations.Add(SalesforceStoredContinuation.From(token, providerContinuation));
+            publicContinuation = new V2SalesforceContinuation(
+                token,
+                owner.Value,
+                providerContinuation.Scope.OrganizationId);
+        }
+
+        var previousState = continuationState.State;
+        continuationState.State = new SalesforceReadNeuronState
+        {
+            SerializedContinuations = SalesforceContinuationStateCodec.Encode(continuations)
+        };
+        try
+        {
+            await continuationState.WriteStateAsync(CancellationToken.None);
+            return publicContinuation;
+        }
+        catch
+        {
+            continuationState.State = previousState;
+            throw;
+        }
+    }
+
+    private IReadOnlyList<SalesforceStoredContinuation> ReadStoredContinuations()
+    {
+        if (SalesforceContinuationStateCodec.TryDecode(
+                continuationState.State.SerializedContinuations,
+                out var continuations))
+            return continuations;
+        logger.LogWarning("Principal-scoped Salesforce continuation state was invalid and will be ignored.");
+        return [];
+    }
 
     private async Task<V2SalesforceReadResult> ReadAsync(
         Func<ISalesforceApiClient, CancellationToken, Task<string>> read,
@@ -141,4 +313,99 @@ public sealed class SalesforceReadNeuron(
                message.Contains("revoked", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase);
     }
+}
+
+[GenerateSerializer, Alias("digitalbrain.salesforce.read-neuron-state")]
+public sealed class SalesforceReadNeuronState
+{
+    [Id(0)] public byte[] SerializedContinuations { get; set; } = [];
+}
+
+internal sealed record SalesforceStoredContinuation(
+    string Token,
+    string NextRecordsUrl,
+    string OrganizationId,
+    string SalesforceUserId,
+    string EntityLabel,
+    string RecordIdField,
+    Dictionary<string, string> FieldLabels)
+{
+    internal static SalesforceStoredContinuation From(string token, SalesforceContinuation continuation) =>
+        new(
+            token,
+            continuation.NextRecordsUrl,
+            continuation.Scope.OrganizationId,
+            continuation.Scope.SalesforceUserId,
+            continuation.EntityLabel,
+            continuation.RecordIdField,
+            continuation.FieldLabels.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal));
+
+    internal SalesforceContinuation ToProviderContinuation() =>
+        new(
+            NextRecordsUrl,
+            new SalesforceProviderScope(OrganizationId, SalesforceUserId),
+            EntityLabel,
+            RecordIdField,
+            new Dictionary<string, string>(FieldLabels, StringComparer.Ordinal));
+}
+
+internal static class SalesforceContinuationStateCodec
+{
+    private const int CurrentVersion = 1;
+    private const int MaximumContinuations = 32;
+    private const int MaximumPayloadBytes = 64 * 1024;
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    internal static byte[] Encode(IReadOnlyList<SalesforceStoredContinuation> continuations)
+    {
+        var payload = JsonSerializer.SerializeToUtf8Bytes(
+            new SalesforceContinuationStateEnvelope(CurrentVersion, continuations),
+            Json);
+        if (payload.Length > MaximumPayloadBytes)
+            throw new SalesforceReadException(
+                SalesforceReadFailure.LimitReached,
+                "The Salesforce continuation state limit was reached. Start a new bounded read.");
+        return payload;
+    }
+
+    internal static bool TryDecode(
+        byte[]? payload,
+        out IReadOnlyList<SalesforceStoredContinuation> continuations)
+    {
+        continuations = [];
+        if (payload is null || payload.Length == 0)
+            return true;
+        if (payload.Length > MaximumPayloadBytes)
+            return false;
+        try
+        {
+            var envelope = JsonSerializer.Deserialize<SalesforceContinuationStateEnvelope>(payload, Json);
+            if (envelope is null || envelope.Version != CurrentVersion ||
+                envelope.Continuations is null || envelope.Continuations.Count > MaximumContinuations)
+                return false;
+            if (envelope.Continuations.Any(static continuation => continuation is null || !IsValid(continuation)))
+                return false;
+            continuations = envelope.Continuations;
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsValid(SalesforceStoredContinuation continuation) =>
+        Guid.TryParseExact(continuation.Token, "N", out _) &&
+        continuation.NextRecordsUrl is { Length: > 0 and <= 8192 } &&
+        continuation.OrganizationId is { Length: > 0 and <= 256 } &&
+        continuation.SalesforceUserId is { Length: > 0 and <= 256 } &&
+        continuation.EntityLabel is { Length: > 0 and <= 256 } &&
+        continuation.RecordIdField is { Length: > 0 and <= 256 } &&
+        continuation.FieldLabels is { Count: <= 64 } &&
+        continuation.FieldLabels.All(static item =>
+            item.Key is { Length: > 0 and <= 256 } && item.Value is { Length: > 0 and <= 256 });
+
+    private sealed record SalesforceContinuationStateEnvelope(
+        int Version,
+        IReadOnlyList<SalesforceStoredContinuation> Continuations);
 }
