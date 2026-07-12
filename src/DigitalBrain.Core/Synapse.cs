@@ -324,9 +324,6 @@ public record ChartCommand(string SurfaceId, string Instruction, string? Context
 [Alias("DigitalBrain.Core.ChartInteraction")]
 public record ChartInteraction(string SurfaceId, string Kind, IReadOnlyDictionary<string, object?> Payload) : Synapse(nameof(ChartInteraction), DateTimeOffset.UtcNow);
 
-[Alias("DigitalBrain.Core.IDataVisualizationNeuron")]
-public interface IDataVisualizationNeuron : INeuron, IHandle<VisualizeDataRequest> { }
-
 // Chart neuron supports agent metadata for routing + full conversational + selection driven updates.
 [Alias("DigitalBrain.Core.IChartNeuron")]
 public interface IChartNeuron : IAgent, IHandle<VisualizeDataRequest>, IHandle<ChartCommand>, IHandle<ChartInteraction> { }

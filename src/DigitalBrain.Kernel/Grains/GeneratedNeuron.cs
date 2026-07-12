@@ -222,15 +222,6 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         var surface = BuildGmailInsightsSurface(used, summary, emails.Count, chartRequestId);
         await FireAsync(surface, cancellationToken);
-
-        var chart = GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-" + chartRequestId);
-        await chart.FireAsync(new VisualizeDataRequest(
-            "Gmail last 100 emails by category",
-            System.Text.Json.JsonSerializer.Serialize(categoryRows),
-            "bar",
-            chartRequestId,
-            userId,
-            used.SessionId), cancellationToken);
     }
 
     private async Task<string> SummarizeGmailRowsAsync(IReadOnlyList<IReadOnlyDictionary<string, object?>> emails, CancellationToken cancellationToken)
