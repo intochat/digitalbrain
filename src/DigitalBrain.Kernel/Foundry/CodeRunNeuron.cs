@@ -2,7 +2,7 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel.Foundry;
 
-[GrainType("digitalbrain.coderun")]
+[GrainType("digitalbrain.coderun.v1")]
 public class CodeRunNeuron(ILogger<CodeRunNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ICodeRunNeuron
 {
     public async Task HandleAsync(RunGeneratedCode cmd, CancellationToken cancellationToken = default)

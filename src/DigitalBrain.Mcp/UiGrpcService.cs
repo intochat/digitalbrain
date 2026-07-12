@@ -306,9 +306,15 @@ public sealed class UiGrpcService(
             throw new RpcException(new Status(status, "Action authorization failed."));
         }
 
-        // The session itself never receives brain.act. Only a successfully reauthorized, server-bound UI action
-        // crosses into command admission, and its type comes from the stored binding rather than the request.
-        var internalGrants = authenticated.Grants.Append("brain.act").ToHashSet(StringComparer.Ordinal);
+        // The session itself receives neither command capability. Only a successfully reauthorized,
+        // server-bound action crosses command admission, and its type comes from the stored binding.
+        var internalCapability = string.Equals(
+            submission.ActionType,
+            McpInoCommandHandler.CommandType,
+            StringComparison.Ordinal)
+            ? "brain.interact"
+            : "brain.act";
+        var internalGrants = authenticated.Grants.Append(internalCapability).ToHashSet(StringComparer.Ordinal);
         var commandContext = authenticated with
         {
             IdempotencyKey = submission.IdempotencyKey,

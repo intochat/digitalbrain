@@ -22,10 +22,16 @@ public sealed class McpInoCommandHandler(
 
     public bool CanHandle(string commandType) => string.Equals(commandType, CommandType, StringComparison.Ordinal);
 
-    public async Task<CommandExecutionResult> ExecuteAsync(
+    public Task<CommandExecutionResult> ExecuteAsync(
         CommandEnvelope command,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(new CommandExecutionAttempt(command), cancellationToken);
+
+    public async Task<CommandExecutionResult> ExecuteAsync(
+        CommandExecutionAttempt attempt,
         CancellationToken cancellationToken = default)
     {
+        var command = attempt.Command;
         using var activity = InoTelemetry.Source.StartActivity("ino.conversation.execute", ActivityKind.Internal);
         activity?.SetTag("db.ino.command_type", command.Type);
         if (!TryGetPrompt(command.Payload, out var prompt))
@@ -51,6 +57,35 @@ public sealed class McpInoCommandHandler(
             surfaces.PublishInoConversation(command.Context, snapshot);
             return new CommandExecutionResult(WorkflowState.Failed, prior.SafeReason);
         }
+        if (string.Equals(prior.State, InoConversationStates.AwaitingAuthorization, StringComparison.Ordinal) &&
+            attempt.Authorization is null)
+        {
+            if (prior.Authorization?.IsValid() == true)
+            {
+                activity?.SetTag("db.ino.replay", true);
+                activity?.SetTag("db.ino.outcome", "authorization-continuation-recovered");
+                surfaces.PublishInoConversation(command.Context, snapshot);
+                return CommandExecutionResult.AwaitAuthorization(prior.Authorization);
+            }
+            activity?.SetTag("db.ino.replay", true);
+            activity?.SetTag("db.ino.outcome", "authorization-continuation-missing");
+            surfaces.PublishInoConversation(command.Context, snapshot);
+            return new CommandExecutionResult(
+                WorkflowState.ManualIntervention,
+                "external-authorization-continuation-missing");
+        }
+        if (string.Equals(prior.State, InoConversationStates.AwaitingAuthorization, StringComparison.Ordinal) &&
+            attempt.Authorization is { } applicationAuthorization &&
+            prior.Authorization is { } conversationAuthorization &&
+            !conversationAuthorization.Matches(applicationAuthorization))
+        {
+            activity?.SetTag("db.ino.replay", true);
+            activity?.SetTag("db.ino.outcome", "authorization-continuation-mismatch");
+            surfaces.PublishInoConversation(command.Context, snapshot);
+            return new CommandExecutionResult(
+                WorkflowState.ManualIntervention,
+                "external-authorization-continuation-mismatch");
+        }
 
         surfaces.PublishInoConversation(command.Context, snapshot);
         try
@@ -61,11 +96,63 @@ public sealed class McpInoCommandHandler(
             snapshot = conversations.Transition(command.Context, command.CommandId, InoConversationStates.Responding);
             surfaces.PublishInoConversation(command.Context, snapshot);
 
-            var response = await owner.ExecuteDetailedAsync(new ConversationRequest(
+            if (attempt.Authorization is { } expiredAuthorization &&
+                expiredAuthorization.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                const string expiredReason = "Authorization wasn’t completed in time. Send the request again when you’re ready.";
+                snapshot = conversations.Fail(command.Context, command.CommandId, expiredReason, retryable: true);
+                surfaces.PublishInoConversation(command.Context, snapshot);
+                activity?.SetTag("db.ino.outcome", "authorization-expired");
+                return new CommandExecutionResult(WorkflowState.Failed, "external-authorization-expired");
+            }
+            if (attempt.AuthorizationResolution is
+                { State: ExternalAuthorizationResolutionState.Failed } failedAuthorization)
+            {
+                const string failedReason = "Authorization wasn’t completed. Reconnect and send the request again.";
+                snapshot = conversations.Fail(command.Context, command.CommandId, failedReason, retryable: true);
+                surfaces.PublishInoConversation(command.Context, snapshot);
+                activity?.SetTag("db.ino.outcome", "authorization-failed");
+                return new CommandExecutionResult(
+                    WorkflowState.Failed,
+                    failedAuthorization.SafeReason ?? "external-authorization-failed");
+            }
+            if (attempt.AuthorizationResolution is
+                { State: ExternalAuthorizationResolutionState.Waiting })
+            {
+                activity?.SetTag("db.ino.outcome", "authorization-resolution-invalid");
+                return new CommandExecutionResult(
+                    WorkflowState.ManualIntervention,
+                    "external-authorization-resolution-invalid");
+            }
+
+            var request = new ConversationRequest(
                 command.Context,
                 snapshot.ConversationId,
                 prompt,
-                AllowTools: true), cancellationToken).ConfigureAwait(false);
+                AllowTools: true);
+            var response = attempt.Authorization is null
+                ? await owner.ExecuteDetailedAsync(request, cancellationToken).ConfigureAwait(false)
+                : await owner.ResumeAfterAuthorizationAsync(
+                    request,
+                    new ExternalAuthorizationRequest(
+                        attempt.Authorization.Provider,
+                        attempt.Authorization.Invocation),
+                    cancellationToken).ConfigureAwait(false);
+            if (response.Authorization is not null)
+            {
+                if (response.Action is null)
+                    throw new InvalidOperationException("An external authorization response requires a safe action.");
+                var continuation = ExternalAuthorizationContinuation.Create(response.Authorization);
+                snapshot = conversations.AwaitAuthorization(
+                    command.Context,
+                    command.CommandId,
+                    response.Text,
+                    response.Action,
+                    continuation);
+                activity?.SetTag("db.ino.outcome", "awaiting-authorization");
+                surfaces.PublishInoConversation(command.Context, snapshot);
+                return CommandExecutionResult.AwaitAuthorization(continuation);
+            }
             snapshot = conversations.Complete(
                 command.Context,
                 command.CommandId,
@@ -117,9 +204,16 @@ public sealed class McpConversationContextAssembler(IInoConversationStore conver
         var snapshot = conversations.Read(request.Context);
         if (!string.Equals(snapshot.ConversationId, request.ConversationId, StringComparison.Ordinal))
             throw new UnauthorizedAccessException("The conversation is outside the authenticated scope.");
+        var providerGroundedCommands = snapshot.Operations
+            .Where(static operation => HasProviderGrounding(operation.Groundings) ||
+                                       operation.Grounding is { } grounding && IsProviderGrounding(grounding))
+            .Select(static operation => operation.CommandId)
+            .ToHashSet(StringComparer.Ordinal);
         var history = snapshot.Turns
             .Where(turn => !(turn.Role == "user" && string.Equals(turn.Text, request.Text, StringComparison.Ordinal) &&
                              string.Equals(turn.CommandId, snapshot.CurrentOperation?.CommandId, StringComparison.Ordinal)))
+            .Where(turn => !string.Equals(turn.Role, "assistant", StringComparison.Ordinal) ||
+                           !providerGroundedCommands.Contains(turn.CommandId))
             .TakeLast(12)
             .Select(static turn => $"{turn.Role}: {turn.Text}")
             .ToArray();
@@ -129,6 +223,14 @@ public sealed class McpConversationContextAssembler(IInoConversationStore conver
             request.ConversationId,
             history));
     }
+
+    private static bool HasProviderGrounding(IReadOnlyList<ToolGrounding>? groundings) =>
+        groundings?.Any(IsProviderGrounding) == true;
+
+    private static bool IsProviderGrounding(ToolGrounding grounding) =>
+        grounding.ToolId.StartsWith("gmail.", StringComparison.Ordinal) ||
+        grounding.ToolId.StartsWith("salesforce.", StringComparison.Ordinal) ||
+        grounding.ToolId.StartsWith("cross.", StringComparison.Ordinal);
 }
 
 public sealed class McpConversationModelRouter(IClusterClient cluster) : IModelRouter

@@ -53,6 +53,66 @@ public sealed class EffectStateSafetyTests
     }
 
     [Fact]
+    public async Task Caller_cancellation_before_provider_dispatch_is_terminally_cancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var innerStore = new InMemoryAggregateStore();
+        var store = new CancelAfterClaimStore(innerStore, cancellation);
+        await SeedEffectAsync(store);
+        var handler = new CountingEffectHandler(new(EffectDisposition.Success));
+
+        var result = await new EffectCoordinator(store, [handler])
+            .ExecuteOnceAsync("aggregate", "effect", "worker", TimeSpan.FromMinutes(1), cancellation.Token);
+
+        Assert.Equal("Cancelled", result.State);
+        Assert.Equal("cancelled-before-dispatch", result.SafeResult);
+        Assert.Equal(0, handler.Calls);
+        Assert.Empty((await innerStore.ReadAsync("aggregate")).Outbox);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_after_provider_dispatch_is_outcome_unknown_and_is_not_retried()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var store = new InMemoryAggregateStore();
+        await SeedEffectAsync(store);
+        var handler = new CancellingEffectHandler(cancellation);
+        var coordinator = new EffectCoordinator(store, [handler]);
+
+        var result = await coordinator.ExecuteOnceAsync(
+            "aggregate", "effect", "worker-a", TimeSpan.FromMinutes(1), cancellation.Token);
+        var replay = await coordinator.ExecuteOnceAsync(
+            "aggregate", "effect", "worker-b", TimeSpan.FromMinutes(1));
+
+        Assert.Equal("OutcomeUnknown", result.State);
+        Assert.Equal("effect-execution-cancelled", result.SafeResult);
+        Assert.Equal(result.TransitionId, replay.TransitionId);
+        Assert.Equal(1, handler.Calls);
+        Assert.Empty((await store.ReadAsync("aggregate")).Outbox);
+    }
+
+    [Fact]
+    public async Task Handler_cancelled_result_after_dispatch_is_outcome_unknown_and_is_not_retried()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var store = new InMemoryAggregateStore();
+        await SeedEffectAsync(store);
+        var handler = new ReturningCancelledEffectHandler(cancellation);
+        var coordinator = new EffectCoordinator(store, [handler]);
+
+        var result = await coordinator.ExecuteOnceAsync(
+            "aggregate", "effect", "worker-a", TimeSpan.FromMinutes(1), cancellation.Token);
+        var replay = await coordinator.ExecuteOnceAsync(
+            "aggregate", "effect", "worker-b", TimeSpan.FromMinutes(1));
+
+        Assert.Equal("OutcomeUnknown", result.State);
+        Assert.Equal("effect-execution-cancelled", result.SafeResult);
+        Assert.Equal(result.TransitionId, replay.TransitionId);
+        Assert.Equal(1, handler.Calls);
+        Assert.Empty((await store.ReadAsync("aggregate")).Outbox);
+    }
+
+    [Fact]
     public async Task Expired_ambiguous_effect_is_verified_instead_of_executed_again()
     {
         var store = new InMemoryAggregateStore();
@@ -304,6 +364,74 @@ public sealed class EffectStateSafetyTests
             Started.TrySetResult();
             await Release.Task.WaitAsync(cancellationToken);
             return new(EffectDisposition.Success);
+        }
+    }
+
+    private sealed class CancellingEffectHandler(CancellationTokenSource cancellation) : IEffectHandler
+    {
+        public string EffectType => "fake";
+        public int Calls { get; private set; }
+
+        public Task<EffectExecutionResult> ExecuteAsync(OutboxRecord intent, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            cancellation.Cancel();
+            throw new OperationCanceledException(cancellationToken);
+        }
+    }
+
+    private sealed class ReturningCancelledEffectHandler(CancellationTokenSource cancellation) : IEffectHandler
+    {
+        public string EffectType => "fake";
+        public int Calls { get; private set; }
+
+        public Task<EffectExecutionResult> ExecuteAsync(
+            OutboxRecord intent,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            cancellation.Cancel();
+            return Task.FromResult(new EffectExecutionResult(
+                EffectDisposition.Cancelled,
+                "provider-cancelled"));
+        }
+    }
+
+    private sealed class CancelAfterClaimStore(
+        IAggregateStore inner,
+        CancellationTokenSource cancellation) : IAggregateStore
+    {
+        public Task<V2AggregateSnapshot> ReadAsync(string aggregateId, CancellationToken cancellationToken = default) =>
+            inner.ReadAsync(aggregateId, cancellationToken);
+
+        public Task<V2CommitResult> CommitAsync(
+            string aggregateId,
+            V2CommitRequest request,
+            CancellationToken cancellationToken = default) =>
+            inner.CommitAsync(aggregateId, request, cancellationToken);
+
+        public Task AppendEffectTransitionAsync(
+            string aggregateId,
+            EffectTransitionRecord transition,
+            CancellationToken cancellationToken = default) =>
+            inner.AppendEffectTransitionAsync(aggregateId, transition, cancellationToken);
+
+        public async Task<bool> TryAppendEffectTransitionAsync(
+            string aggregateId,
+            string effectId,
+            string? expectedTransitionId,
+            EffectTransitionRecord transition,
+            CancellationToken cancellationToken = default)
+        {
+            var appended = await inner.TryAppendEffectTransitionAsync(
+                aggregateId,
+                effectId,
+                expectedTransitionId,
+                transition,
+                cancellationToken);
+            if (appended && string.Equals(transition.State, "Applying", StringComparison.Ordinal))
+                cancellation.Cancel();
+            return appended;
         }
     }
 

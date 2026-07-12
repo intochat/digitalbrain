@@ -4,8 +4,8 @@ import 'dart:convert';
 import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:grpc/grpc_or_grpcweb.dart';
 
-import '../grpc/v2_ui.pb.dart' as wire;
-import '../grpc/v2_ui.pbgrpc.dart';
+import '../grpc/ui.pb.dart' as wire;
+import '../grpc/ui.pbgrpc.dart';
 import 'protocol/surface_protocol.dart';
 import 'runtime_configuration.dart';
 import 'runtime.dart';

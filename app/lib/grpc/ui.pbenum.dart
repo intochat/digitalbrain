@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from v2_ui.proto.
+// Generated from ui.proto.
 
 // @dart = 3.3
 

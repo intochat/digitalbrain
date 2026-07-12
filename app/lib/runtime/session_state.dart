@@ -71,6 +71,10 @@ class SessionController {
 
   final DateTime Function() _now;
   SessionBundle? _bundle;
+  int _bundleVersion = 0;
+  int _bootstrapGeneration = 0;
+  Future<String>? _refreshInFlight;
+  int? _refreshBundleVersion;
 
   SessionStatus status = SessionStatus.signedOut;
   Object? lastError;
@@ -90,12 +94,14 @@ class SessionController {
 
   void establish(SessionBundle bundle) {
     _validate(bundle);
+    _bootstrapGeneration++;
     _bundle = bundle;
+    _bundleVersion++;
     lastError = null;
     status = SessionStatus.authenticated;
   }
 
-  Future<void> bootstrap(
+  Future<bool> bootstrap(
     SessionTransport transport,
     String bootstrapSecret,
   ) async {
@@ -106,11 +112,19 @@ class SessionController {
         'A bootstrap secret is required.',
       );
     }
+    final generation = ++_bootstrapGeneration;
+    _bundle = null;
+    _bundleVersion++;
     begin();
     try {
-      establish(await transport.bootstrapSession(bootstrapSecret));
+      final established = await transport.bootstrapSession(bootstrapSecret);
+      if (generation != _bootstrapGeneration) return false;
+      establish(established);
+      return true;
     } catch (error) {
+      if (generation != _bootstrapGeneration) return false;
       _bundle = null;
+      _bundleVersion++;
       lastError = error;
       status = SessionStatus.signedOut;
       rethrow;
@@ -126,6 +140,8 @@ class SessionController {
   }) async {
     var bundle = _bundle;
     if (bundle == null) throw const AuthenticationException();
+    final refreshInFlight = _currentRefresh;
+    if (refreshInFlight != null) return refreshInFlight;
     final now = _now().toUtc();
     if (bundle.credentials.refreshExpiresAt.isBefore(now) ||
         bundle.credentials.refreshExpiresAt.isAtSameMomentAs(now)) {
@@ -142,7 +158,10 @@ class SessionController {
   /// Forces one-use refresh rotation after the server rejects an access
   /// session, even when the local expiry clock still considers it current.
   Future<String> refreshAccessToken(SessionTransport transport) async {
-    var bundle = _bundle;
+    final refreshInFlight = _currentRefresh;
+    if (refreshInFlight != null) return refreshInFlight;
+
+    final bundle = _bundle;
     if (bundle == null) throw const AuthenticationException();
     final now = _now().toUtc();
     if (!bundle.credentials.refreshExpiresAt.isAfter(now)) {
@@ -151,6 +170,25 @@ class SessionController {
     }
 
     status = SessionStatus.refreshing;
+    final bundleVersion = _bundleVersion;
+    late final Future<String> refresh;
+    refresh = _refreshAccessToken(transport, bundle, bundleVersion)
+        .whenComplete(() {
+          if (identical(_refreshInFlight, refresh)) {
+            _refreshInFlight = null;
+            _refreshBundleVersion = null;
+          }
+        });
+    _refreshInFlight = refresh;
+    _refreshBundleVersion = bundleVersion;
+    return refresh;
+  }
+
+  Future<String> _refreshAccessToken(
+    SessionTransport transport,
+    SessionBundle bundle,
+    int bundleVersion,
+  ) async {
     try {
       final refreshed = await transport.refreshSession(
         refreshToken: bundle.credentials.refreshToken,
@@ -160,23 +198,42 @@ class SessionController {
           'Session refresh changed the authenticated identity.',
         );
       }
+      if (!_isCurrent(bundle, bundleVersion)) {
+        final current = _bundle;
+        if (current == null ||
+            !_sameIdentity(bundle.identity, current.identity)) {
+          throw const AuthenticationException();
+        }
+        return current.credentials.accessToken;
+      }
       establish(refreshed);
-      bundle = refreshed;
-      return bundle.credentials.accessToken;
+      return refreshed.credentials.accessToken;
     } catch (error) {
-      lastError = error;
-      expire();
+      if (_isCurrent(bundle, bundleVersion)) {
+        lastError = error;
+        expire();
+      }
       rethrow;
     }
   }
 
+  Future<String>? get _currentRefresh =>
+      _refreshBundleVersion == _bundleVersion ? _refreshInFlight : null;
+
+  bool _isCurrent(SessionBundle bundle, int bundleVersion) =>
+      _bundleVersion == bundleVersion && identical(_bundle, bundle);
+
   void expire() {
+    _bootstrapGeneration++;
     _bundle = null;
+    _bundleVersion++;
     status = SessionStatus.expired;
   }
 
   void signOut() {
+    _bootstrapGeneration++;
     _bundle = null;
+    _bundleVersion++;
     lastError = null;
     status = SessionStatus.signedOut;
   }

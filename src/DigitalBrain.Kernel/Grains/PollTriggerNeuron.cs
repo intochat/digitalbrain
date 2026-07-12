@@ -8,7 +8,7 @@ namespace DigitalBrain.Kernel;
 
 /// Poll trigger (reminder-driven): projects reactions (When containing "poll" or "Poll"), uses ICapabilityBroker for
 /// sanctioned HTTP/RSS fetch, simple cursor/dedup via journals, emits per new item as trigger.poll.* signals.
-[GrainType("poll-trigger")]
+[GrainType("poll-trigger.v1")]
 public class PollTriggerNeuron(ILogger<PollTriggerNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IRemindable
 {

@@ -13,7 +13,7 @@ public interface IScheduleTriggerNeuron : INeuron
 {
 }
 
-[GrainType("schedule-trigger")]
+[GrainType("schedule-trigger.v1")]
 public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IScheduleTriggerNeuron, IRemindable
 {

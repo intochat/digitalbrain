@@ -27,9 +27,10 @@ public static class DigitalBrainAppEndpoints
                 return Results.StatusCode(StatusCodes.Status400BadRequest);
 
             var cluster = services.GetRequiredService<IClusterClient>();
+            using var startDeadline = CreateServerOperationDeadline(services);
             var result = await cluster
                 .GetGrain<ISalesforceReadToolGrain>(owner.Value)
-                .BeginAuthorizationAsync(startToken, request.HttpContext.RequestAborted);
+                .BeginAuthorizationAsync(startToken, startDeadline.Token);
             return result.Status == SalesforceReadStatus.NeedsAuth &&
                    SalesforceClientFactory.IsAllowedAuthorizationUrl(result.ConnectionUrl)
                 ? Results.Redirect(result.ConnectionUrl!, permanent: false, preserveMethod: false)
@@ -60,20 +61,32 @@ public static class DigitalBrainAppEndpoints
                 else
                 {
                     var cluster = services.GetRequiredService<IClusterClient>();
+                    using var completionDeadline = CreateServerOperationDeadline(services);
                     result = await cluster
                         .GetGrain<ISalesforceReadToolGrain>(owner.Value)
-                        .CompleteAuthorizationAsync(callback, request.HttpContext.RequestAborted);
+                        .CompleteAuthorizationAsync(callback, completionDeadline.Token);
                 }
             }
             else
             {
-                var connector = services.GetRequiredKeyedService<IConnector>(provider);
-                result = await connector.CompleteAuthAsync(callback, request.HttpContext.RequestAborted);
+                var protector = services.GetRequiredService<IOAuthStateProtector>();
+                if (!protector.TryUnprotect(callback.State, out var owner))
+                {
+                    result = new AuthResult(false, "invalid-state");
+                }
+                else
+                {
+                    var cluster = services.GetRequiredService<IClusterClient>();
+                    using var completionDeadline = CreateServerOperationDeadline(services);
+                    result = await cluster
+                        .GetGrain<IGmailReadToolGrain>(owner.Value)
+                        .CompleteAuthorizationAsync(callback, completionDeadline.Token);
+                }
             }
 
             var title = result.Success ? "Connection complete" : "Connection not completed";
             var message = result.Success
-                ? "You can return to DigitalBrain and retry your request."
+                ? "You can return to DigitalBrain. INO will resume your request automatically."
                 : result.Error switch
                 {
                     "consent-denied" => "Consent was denied. No connection was created.",
@@ -88,6 +101,14 @@ public static class DigitalBrainAppEndpoints
         });
 
         return app;
+    }
+
+    private static CancellationTokenSource CreateServerOperationDeadline(IServiceProvider services)
+    {
+        var lifetime = services.GetRequiredService<IHostApplicationLifetime>();
+        var deadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
+        deadline.CancelAfter(TimeSpan.FromMinutes(2));
+        return deadline;
     }
 
     private static void SetOAuthResponseHeaders(HttpResponse response)

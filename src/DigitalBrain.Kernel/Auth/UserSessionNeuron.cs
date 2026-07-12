@@ -8,7 +8,7 @@ using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Ui.Runtime;
 
 
-[GrainType("digitalbrain.user-session")]
+[GrainType("digitalbrain.user-session.v1")]
 public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IUserSessionNeuron
 {
     private const int PasswordHashIterations = 100_000;

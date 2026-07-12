@@ -148,7 +148,8 @@ public sealed class McpAuthorizedToolCatalog : IAuthorizedToolCatalog
             GmailReadStatus.NeedsAuth when _actionPolicy.IsAllowedOpenUrl("Connect Google", result.ConnectionUrl) => new ToolOutcome(
                 ToolOutcomeKind.NeedsAuth,
                 SafeReason: result.SafeReason ?? "Connect your Google account to let INO read your Gmail.",
-                Action: new ToolAction("openUrl", "Connect Google", result.ConnectionUrl!)),
+                Action: new ToolAction("openUrl", "Connect Google", result.ConnectionUrl!),
+                AuthorizationProvider: "google"),
             GmailReadStatus.NeedsAuth => new ToolOutcome(
                 ToolOutcomeKind.PermanentFailure,
                 SafeReason: "Gmail connection is unavailable right now."),
@@ -189,18 +190,20 @@ public sealed class McpAuthorizedToolCatalog : IAuthorizedToolCatalog
             var overview = await _integrations.ReadGmailMailboxOverviewAsync(ownerScope, cancellationToken);
             if (overview.Status != GmailReadStatus.Success)
                 return GmailFailure(overview.Status, overview.SafeReason, overview.ConnectionUrl);
+            var content = JsonSerializer.SerializeToElement(new
+            {
+                gmailMailboxOverview = new
+                {
+                    overview.InboxMessages,
+                    overview.UnreadInboxMessages,
+                    overview.InboxThreads,
+                    overview.UnreadInboxThreads
+                }
+            }, SemanticJson);
             return new ToolOutcome(
                 ToolOutcomeKind.Success,
-                JsonSerializer.SerializeToElement(new
-                {
-                    gmailMailboxOverview = new
-                    {
-                        overview.InboxMessages,
-                        overview.UnreadInboxMessages,
-                        overview.InboxThreads,
-                        overview.UnreadInboxThreads
-                    }
-                }, SemanticJson));
+                content,
+                GroundingContent: content.Clone());
         }
 
         if (!TryCompileGmailRequest(context, proposal, out var selection, out var offset, out var safeReason))
@@ -575,7 +578,8 @@ public sealed class McpAuthorizedToolCatalog : IAuthorizedToolCatalog
         GmailReadStatus.NeedsAuth when _actionPolicy.IsAllowedOpenUrl("Connect Google", connectionUrl) => new ToolOutcome(
             ToolOutcomeKind.NeedsAuth,
             SafeReason: SafeProviderReason(safeReason, "Connect your Google account to let INO read Gmail metadata."),
-            Action: new ToolAction("openUrl", "Connect Google", connectionUrl!)),
+            Action: new ToolAction("openUrl", "Connect Google", connectionUrl!),
+            AuthorizationProvider: "google"),
         GmailReadStatus.NeedsAuth => new ToolOutcome(
             ToolOutcomeKind.PermanentFailure,
             SafeReason: "Gmail connection is unavailable right now."),
@@ -925,7 +929,8 @@ public sealed class McpAuthorizedToolCatalog : IAuthorizedToolCatalog
             result.ConnectionUrl) => new ToolOutcome(
             ToolOutcomeKind.NeedsAuth,
             SafeReason: SafeProviderReason(result.SafeReason, "Connect your Salesforce account to let INO read Salesforce."),
-            Action: new ToolAction("openUrl", "Connect Salesforce", result.ConnectionUrl!)),
+            Action: new ToolAction("openUrl", "Connect Salesforce", result.ConnectionUrl!),
+            AuthorizationProvider: "salesforce"),
         SalesforceReadStatus.NeedsAuth => new ToolOutcome(
             ToolOutcomeKind.PermanentFailure,
             SafeReason: "Salesforce connection is unavailable right now."),

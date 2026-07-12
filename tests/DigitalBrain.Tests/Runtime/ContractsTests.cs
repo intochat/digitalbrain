@@ -301,7 +301,7 @@ public sealed class ContractsTests
     }
 
     [Fact]
-    public async Task File_store_reopens_without_touching_non_v2_namespace()
+    public async Task File_store_reopens_in_compatible_aggregate_namespace()
     {
         var root = Path.Combine(Path.GetTempPath(), "db-v2-" + Guid.NewGuid().ToString("N"));
         try
@@ -373,7 +373,7 @@ public sealed class ContractsTests
     }
 
     [Fact]
-    public void Orleans_v2_aggregate_contract_has_stable_aliases()
+    public void Orleans_aggregate_contract_has_stable_versioned_aliases()
     {
         var alias = typeof(IAggregateGrain).GetCustomAttributes(typeof(AliasAttribute), false).Cast<AliasAttribute>().Single();
         Assert.Equal("digitalbrain.v2.aggregate-grain", alias.Alias);
@@ -602,7 +602,7 @@ public sealed class ContractsTests
     }
 
     [Fact]
-    public void Grpc_v2_auth_requires_audience_and_signed_session_metadata()
+    public void Grpc_auth_requires_audience_and_signed_session_metadata()
     {
         var tokens = new SessionTokenService(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         var context = new RuntimeRequestContext(new("t"), new("w"), new("u", PrincipalKind.User), "s", AuthAssurance.Password, "c", null, new HashSet<string> { "brain.read" });
@@ -615,7 +615,7 @@ public sealed class ContractsTests
     }
 
     [Fact]
-    public void File_feed_reopens_with_v2_items_after_restart()
+    public void File_feed_reopens_with_persisted_items_after_restart()
     {
         var root = Path.Combine(Path.GetTempPath(), "v2-feed-" + Guid.NewGuid().ToString("N"));
         try
@@ -853,7 +853,7 @@ public sealed class ContractsTests
             Assert.Equal(new[] { submitted.OperationId }, recovered.GetPendingOperationIds());
             Assert.Equal(submitted.OperationId, (await recovered.SubmitAsync(context, command)).OperationId);
 
-            var effects = new InoEffectStore(conversationPath);
+            var effects = new InoEffectStore(conversationPath, journalIntegrityKey: journalKey);
             var feed = new PrivateFeedStore(Path.Combine(root, "feed.jsonl"));
             var surfaces = new WorkspaceSurfaceProducer(feed, new ActionExecutor(feed), effects);
             var owner = new ConversationOwner(
@@ -872,7 +872,9 @@ public sealed class ContractsTests
             Assert.Collection(effects.Read(context).Turns,
                 user => Assert.Equal("user", user.Role),
                 assistant => Assert.Equal("assistant", assistant.Role));
-            Assert.Equal(2, new InoEffectStore(conversationPath).Read(context).Turns.Count);
+            Assert.Equal(2, new InoEffectStore(
+                conversationPath,
+                journalIntegrityKey: journalKey).Read(context).Turns.Count);
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }

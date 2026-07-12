@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:digitalbrain_flutter/grpc/v2_ui.pb.dart' as wire;
+import 'package:digitalbrain_flutter/grpc/ui.pb.dart' as wire;
 import 'package:digitalbrain_flutter/runtime/runtime_configuration.dart';
 import 'package:digitalbrain_flutter/runtime/grpc_ui_transport.dart';
 import 'package:digitalbrain_flutter/runtime/runtime.dart';

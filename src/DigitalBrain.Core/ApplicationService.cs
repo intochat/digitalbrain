@@ -15,6 +15,8 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
     private readonly ConcurrentDictionary<string, string> _operationIdempotency = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CommandEnvelope> _commands = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _claimed = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ExternalAuthorizationContinuation> _externalAuthorizations = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ExternalAuthorizationResolution> _externalAuthorizationResolutions = new(StringComparer.Ordinal);
     private readonly byte[] _cursorKey;
     private readonly IReadOnlyList<Capability> _capabilities;
     private readonly object _stateLock = new();
@@ -47,7 +49,7 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
         AuthenticatedJournalFaultInjection? journalFaultInjection)
     {
         _cursorKey = cursorKey is { Length: >= 32 } ? cursorKey.ToArray() : SHA256.HashData(Encoding.UTF8.GetBytes("digitalbrain-v2-test-cursor-key"));
-        _capabilities = (capabilities ?? [new("brain.read", 2, true, false), new("brain.act", 2, true, true), new("brain.approve", 2, true, true)]).ToArray();
+        _capabilities = (capabilities ?? [new("brain.read", 2, true, false), new("brain.interact", 2, true, false), new("brain.act", 2, true, true), new("brain.approve", 2, true, true)]).ToArray();
         if (!string.IsNullOrWhiteSpace(storagePath) && journalIntegrityKey is not { Length: >= 32 })
             throw new ArgumentException("A stable journal integrity key of at least 256 bits is required for durable operations.", nameof(journalIntegrityKey));
         if (string.IsNullOrWhiteSpace(storagePath) && journalFaultInjection is not null)
@@ -93,7 +95,10 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(command.Context);
-        var requiredCapability = command.Type.Contains("admin", StringComparison.OrdinalIgnoreCase)
+        var requiredCapability = string.Equals(command.Type, ReplaySafeInoCommandType, StringComparison.Ordinal) &&
+                                 context.Grants.Contains("brain.interact")
+            ? "brain.interact"
+            : command.Type.Contains("admin", StringComparison.OrdinalIgnoreCase)
             ? "brain.admin"
             : command.Type.Contains("approv", StringComparison.OrdinalIgnoreCase)
                 ? "brain.approve"
@@ -158,7 +163,14 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
                 string.IsNullOrWhiteSpace(item.Command.Context.SessionId) || item.Command.Context.SessionId.Length > 256 ||
                 item.Command.Context.Grants is null || string.IsNullOrWhiteSpace(item.Command.Type) || item.Command.Type.Length > 256 ||
                 item.Command.Version <= 0 || string.IsNullOrWhiteSpace(item.Command.CommandId) || item.Command.CommandId.Length > 1024 ||
-                item.Command.Payload.ValueKind == JsonValueKind.Undefined)
+                item.Command.Payload.ValueKind == JsonValueKind.Undefined ||
+                item.Operation.State == WorkflowState.AwaitingExternalAuthorization && item.Authorization is null ||
+                item.Authorization is not null &&
+                (!ValidAuthorization(item.Authorization) ||
+                 item.Operation.State is not (WorkflowState.AwaitingExternalAuthorization or WorkflowState.ApplyQueued or WorkflowState.Applying)) ||
+                item.AuthorizationResolution is not null &&
+                (item.Authorization is null || !ValidAuthorizationResolution(item.AuthorizationResolution) ||
+                 item.Operation.State is not (WorkflowState.ApplyQueued or WorkflowState.Applying)))
             {
                 throw _journal.Invalid(record, "invalid-record", $"The operation journal contains an invalid record at line {record.LineNumber}.");
             }
@@ -182,6 +194,14 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
             _idempotency[idempotencyScope] = receipt;
             _operationIdempotency[item.Operation.OperationId] = item.Idempotency;
             _commands[item.Operation.OperationId] = item.Command;
+            if (item.Authorization is null)
+                _externalAuthorizations.TryRemove(item.Operation.OperationId, out _);
+            else
+                _externalAuthorizations[item.Operation.OperationId] = Clone(item.Authorization);
+            if (item.AuthorizationResolution is null)
+                _externalAuthorizationResolutions.TryRemove(item.Operation.OperationId, out _);
+            else
+                _externalAuthorizationResolutions[item.Operation.OperationId] = item.AuthorizationResolution;
         }
         _journal.SealLegacy();
         RecoverInterruptedApplications();
@@ -202,7 +222,14 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
             idempotency, command.Context.TenantId.Value, command.Context.WorkspaceId.Value, operation, command)));
     }
 
-    private sealed record PersistedOperation(string Idempotency, string Tenant, string Workspace, OperationStatus Operation, CommandEnvelope? Command = null);
+    private sealed record PersistedOperation(
+        string Idempotency,
+        string Tenant,
+        string Workspace,
+        OperationStatus Operation,
+        CommandEnvelope? Command = null,
+        ExternalAuthorizationContinuation? Authorization = null,
+        ExternalAuthorizationResolution? AuthorizationResolution = null);
     private readonly record struct IdempotencyScope(TenantId Tenant, WorkspaceId Workspace, PrincipalRef Principal, string Idempotency);
     private sealed record SubmissionReceipt(string OperationId, string CommandType, int CommandVersion, string InputFingerprint)
     {
@@ -213,16 +240,35 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
 
     /// <summary>Claims one durable command for execution. Claiming is idempotent and never trusts transport state.</summary>
     public bool TryClaimPending(string operationId, out CommandEnvelope? command)
+        => TryClaimPending(operationId, out command, out _);
+
+    public bool TryClaimPending(
+        string operationId,
+        out CommandEnvelope? command,
+        out ExternalAuthorizationContinuation? authorization) =>
+        TryClaimPending(operationId, out command, out authorization, out _);
+
+    public bool TryClaimPending(
+        string operationId,
+        out CommandEnvelope? command,
+        out ExternalAuthorizationContinuation? authorization,
+        out ExternalAuthorizationResolution? authorizationResolution)
     {
         lock (_stateLock)
         {
             command = null;
+            authorization = null;
+            authorizationResolution = null;
             if (!_operations.TryGetValue(operationId, out var current) ||
                 current.State is not (WorkflowState.ApplyQueued or WorkflowState.RetryScheduled) ||
                 !_commands.TryGetValue(operationId, out command)) return false;
             if (!_claimed.TryAdd(operationId, 0)) return false;
+            if (_externalAuthorizations.TryGetValue(operationId, out var pendingAuthorization))
+                authorization = Clone(pendingAuthorization);
+            if (_externalAuthorizationResolutions.TryGetValue(operationId, out var pendingResolution))
+                authorizationResolution = pendingResolution;
             var applying = current with { State = WorkflowState.Applying, UpdatedAt = DateTimeOffset.UtcNow };
-            try { PersistStatus(operationId, applying); }
+            try { PersistStatus(operationId, applying, authorization, authorizationResolution); }
             catch
             {
                 _claimed.TryRemove(operationId, out _);
@@ -237,29 +283,114 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
         => _operations.Values.Where(x => x.State is WorkflowState.ApplyQueued or WorkflowState.RetryScheduled)
             .Select(x => x.OperationId).OrderBy(x => x, StringComparer.Ordinal).ToArray();
 
+    public IReadOnlyList<ExternalAuthorizationWait> GetAwaitingExternalAuthorizations()
+    {
+        lock (_stateLock)
+        {
+            return _operations.Values
+                .Where(static operation => operation.State == WorkflowState.AwaitingExternalAuthorization)
+                .OrderBy(static operation => operation.OperationId, StringComparer.Ordinal)
+                .Select(operation =>
+                    _commands.TryGetValue(operation.OperationId, out var command) &&
+                    _externalAuthorizations.TryGetValue(operation.OperationId, out var authorization)
+                        ? new ExternalAuthorizationWait(operation.OperationId, command, Clone(authorization))
+                        : null)
+                .Where(static wait => wait is not null)
+                .Select(static wait => wait!)
+                .ToArray();
+        }
+    }
+
+    public bool TryRequeueExternalAuthorization(string operationId, string attemptId) =>
+        TryRequeueExternalAuthorization(
+            operationId,
+            attemptId,
+            new ExternalAuthorizationResolution(ExternalAuthorizationResolutionState.Ready));
+
+    public bool TryRequeueExternalAuthorization(
+        string operationId,
+        string attemptId,
+        ExternalAuthorizationResolution resolution)
+    {
+        if (!ValidAuthorizationResolution(resolution))
+            throw new ArgumentException("A terminal external authorization resolution is required.", nameof(resolution));
+        lock (_stateLock)
+        {
+            if (!_operations.TryGetValue(operationId, out var current) ||
+                current.State != WorkflowState.AwaitingExternalAuthorization ||
+                !_externalAuthorizations.TryGetValue(operationId, out var authorization) ||
+                !string.Equals(authorization.AttemptId, attemptId, StringComparison.Ordinal))
+                return false;
+            var queued = current with
+            {
+                State = WorkflowState.ApplyQueued,
+                SafeReason = null,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            PersistStatus(operationId, queued, authorization, resolution);
+            _operations[operationId] = queued;
+            _externalAuthorizationResolutions[operationId] = resolution;
+            return true;
+        }
+    }
+
     /// <summary>Records a worker outcome durably; ambiguous outcomes must be reported explicitly.</summary>
-    public bool RecordOutcome(string operationId, WorkflowState state, string? safeReason = null)
+    public bool RecordOutcome(
+        string operationId,
+        WorkflowState state,
+        string? safeReason = null,
+        ExternalAuthorizationContinuation? authorization = null)
     {
         if (state is not (WorkflowState.RetryScheduled or WorkflowState.Succeeded or WorkflowState.Failed or
             WorkflowState.Cancelled or WorkflowState.OutcomeUnknown or WorkflowState.Compensated or
-            WorkflowState.ManualIntervention)) throw new ArgumentOutOfRangeException(nameof(state));
+            WorkflowState.ManualIntervention or WorkflowState.AwaitingExternalAuthorization))
+            throw new ArgumentOutOfRangeException(nameof(state));
+        if (state == WorkflowState.AwaitingExternalAuthorization)
+        {
+            if (!ValidAuthorization(authorization))
+                throw new ArgumentException("A valid external authorization continuation is required.", nameof(authorization));
+        }
+        else if (authorization is not null)
+        {
+            throw new ArgumentException("Only an external authorization wait may persist a continuation.", nameof(authorization));
+        }
         lock (_stateLock)
         {
             if (!_operations.TryGetValue(operationId, out var current) || current.State != WorkflowState.Applying) return false;
             var updated = current with { State = state, SafeReason = safeReason, UpdatedAt = DateTimeOffset.UtcNow };
-            PersistStatus(operationId, updated);
+            PersistStatus(operationId, updated, authorization);
             _operations[operationId] = updated;
+            if (authorization is null)
+            {
+                _externalAuthorizations.TryRemove(operationId, out _);
+                _externalAuthorizationResolutions.TryRemove(operationId, out _);
+            }
+            else
+            {
+                _externalAuthorizations[operationId] = Clone(authorization);
+                _externalAuthorizationResolutions.TryRemove(operationId, out _);
+            }
             _claimed.TryRemove(operationId, out _);
             return true;
         }
     }
 
-    private void PersistStatus(string operationId, OperationStatus status)
+    private void PersistStatus(
+        string operationId,
+        OperationStatus status,
+        ExternalAuthorizationContinuation? authorization = null,
+        ExternalAuthorizationResolution? authorizationResolution = null)
     {
         if (_journal is null || !_commands.TryGetValue(operationId, out var command) ||
             !_operationIdempotency.TryGetValue(operationId, out var idempotency)) return;
         _journal.Append(OperationJournalKind(status), JsonSerializer.Serialize(new PersistedOperation(
-            idempotency, command.Context.TenantId.Value, command.Context.WorkspaceId.Value, status, command)));
+            idempotency,
+            command.Context.TenantId.Value,
+            command.Context.WorkspaceId.Value,
+            status,
+            command,
+            authorization is null ? null : Clone(authorization),
+            authorizationResolution)));
     }
 
     private static string OperationJournalKind(OperationStatus operation) => "operation." + operation.State;
@@ -277,10 +408,23 @@ public sealed class ApplicationService : IQueryPort, ICommandPort
                 SafeReason = replaySafe ? null : "The previous attempt ended before its outcome was confirmed.",
                 UpdatedAt = DateTimeOffset.UtcNow
             };
-            PersistStatus(pair.Key, recovered);
+            _externalAuthorizations.TryGetValue(pair.Key, out var authorization);
+            _externalAuthorizationResolutions.TryGetValue(pair.Key, out var authorizationResolution);
+            PersistStatus(pair.Key, recovered, authorization, authorizationResolution);
             _operations[pair.Key] = recovered;
         }
     }
+
+    private static bool ValidAuthorization(ExternalAuthorizationContinuation? authorization)
+        => authorization?.IsValid() == true;
+
+    private static bool ValidAuthorizationResolution(ExternalAuthorizationResolution? resolution) =>
+        resolution is not null &&
+        resolution.State is ExternalAuthorizationResolutionState.Ready or ExternalAuthorizationResolutionState.Failed &&
+        (resolution.SafeReason is null || resolution.SafeReason.Length <= 256);
+
+    private static ExternalAuthorizationContinuation Clone(ExternalAuthorizationContinuation authorization) =>
+        authorization.Copy();
 
     private static void DemandAuthenticatedAuthority(RequestContext context, CommandEnvelope command)
     {

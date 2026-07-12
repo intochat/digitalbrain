@@ -13,9 +13,9 @@ public static class CapabilityManifests
 {
     public static CapabilityManifest For(RuntimeProfile profile) => profile switch
     {
-        RuntimeProfile.Development => new(profile, new HashSet<string> { "brain.read", "brain.act", "brain.approve", "brain.admin", "local.ollama", "local.whisper" }, new HashSet<string>(), true, true),
-        RuntimeProfile.Test => new(profile, new HashSet<string> { "brain.read", "brain.act", "brain.approve", "fake.oauth", "fake.storage" }, new HashSet<string> { "brain.admin", "live.connectors" }, false, false),
-        _ => new(profile, new HashSet<string> { "brain.read", "fake-safe" }, new HashSet<string> { "brain.act", "brain.approve", "brain.admin", "trusted.stdio", "local.ollama", "local.whisper" }, false, false),
+        RuntimeProfile.Development => new(profile, new HashSet<string> { "brain.read", "brain.interact", "brain.act", "brain.approve", "brain.admin", "local.ollama", "local.whisper" }, new HashSet<string>(), true, true),
+        RuntimeProfile.Test => new(profile, new HashSet<string> { "brain.read", "brain.interact", "brain.act", "brain.approve", "fake.oauth", "fake.storage" }, new HashSet<string> { "brain.admin", "live.connectors" }, false, false),
+        _ => new(profile, new HashSet<string> { "brain.read", "brain.interact", "fake-safe" }, new HashSet<string> { "brain.act", "brain.approve", "brain.admin", "trusted.stdio", "local.ollama", "local.whisper" }, false, false),
     };
 }
 
@@ -34,14 +34,14 @@ public sealed record RuntimePolicy(
         var mutationsEnabled = mutationsRequested && manifest.HttpMcpMutations;
         var adminEnabled = mutationsEnabled && adminRequested && manifest.Enabled.Contains("brain.admin");
         var capabilities = manifest.Enabled
-            .Where(capability => capability == "brain.read" ||
+            .Where(capability => capability is "brain.read" or "brain.interact" ||
                                  mutationsEnabled && capability is "brain.act" or "brain.approve" ||
                                  adminEnabled && capability == "brain.admin")
             .Select(capability => new Capability(
                 capability,
                 2,
                 Enabled: true,
-                RequiresApproval: capability != "brain.read"))
+                RequiresApproval: capability is not ("brain.read" or "brain.interact")))
             .OrderBy(static capability => capability.Id, StringComparer.Ordinal)
             .ToArray();
         return new RuntimePolicy(manifest, mutationsEnabled, adminEnabled, capabilities);

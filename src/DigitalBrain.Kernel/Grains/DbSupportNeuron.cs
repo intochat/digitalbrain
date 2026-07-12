@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace DigitalBrain.Kernel;
 
-[GrainType("db.support")]
+[GrainType("db.support.v1")]
 public class DbSupportNeuron(
     ILogger<DbSupportNeuron> logger,
     NeuronJournals journals,

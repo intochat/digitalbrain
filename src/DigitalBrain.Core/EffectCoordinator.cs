@@ -158,6 +158,8 @@ public sealed class EffectCoordinator
             return await CompleteClaimAsync(aggregateId, intent, applying, "Failed", "effect-handler-unavailable", null, cancellationToken).ConfigureAwait(false);
         if (intent.Deadline <= _clock.UtcNow)
             return await CompleteClaimAsync(aggregateId, intent, applying, "Failed", "deadline-exceeded", null, cancellationToken).ConfigureAwait(false);
+        if (cancellationToken.IsCancellationRequested)
+            return await CompleteClaimAsync(aggregateId, intent, applying, "Cancelled", "cancelled-before-dispatch", null, CancellationToken.None).ConfigureAwait(false);
 
         EffectExecutionResult result;
         try
@@ -166,7 +168,7 @@ public sealed class EffectCoordinator
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return await CompleteClaimAsync(aggregateId, intent, applying, "Cancelled", "cancelled", null, CancellationToken.None).ConfigureAwait(false);
+            return await CompleteClaimAsync(aggregateId, intent, applying, "OutcomeUnknown", "effect-execution-cancelled", null, CancellationToken.None).ConfigureAwait(false);
         }
         catch
         {
@@ -178,17 +180,20 @@ public sealed class EffectCoordinator
             EffectDisposition.Success => "Succeeded",
             EffectDisposition.RetryableFailure when intent.Deadline > _clock.UtcNow => "RetryScheduled",
             EffectDisposition.OutcomeUnknown => "OutcomeUnknown",
-            EffectDisposition.Cancelled => "Cancelled",
+            EffectDisposition.Cancelled => "OutcomeUnknown",
             _ => "Failed"
         };
+        var safeResult = result.Disposition == EffectDisposition.Cancelled
+            ? "effect-execution-cancelled"
+            : result.SafeResult;
         return await CompleteClaimAsync(
             aggregateId,
             intent,
             applying,
             state,
-            result.SafeResult,
+            safeResult,
             result.ProviderOperationId,
-            cancellationToken).ConfigureAwait(false);
+            CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task<EffectTransitionRecord?> TryResolveAsync(

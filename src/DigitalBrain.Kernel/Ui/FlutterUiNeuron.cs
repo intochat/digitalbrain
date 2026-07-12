@@ -6,7 +6,7 @@ namespace DigitalBrain.Kernel.Ui;
 
 using DigitalBrain.Ui.Contracts;
 
-[GrainType("digitalbrain.flutter-ui")]
+[GrainType("digitalbrain.flutter-ui.v1")]
 public sealed class FlutterUiNeuron(ILogger<FlutterUiNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IFlutterUiNeuron
 {
     public async Task HandleAsync(UiSurface surface, CancellationToken cancellationToken = default)

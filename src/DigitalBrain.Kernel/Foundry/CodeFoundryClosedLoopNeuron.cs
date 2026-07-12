@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Kernel.Foundry;
 
-[GrainType("digitalbrain.foundry.loop")]
+[GrainType("digitalbrain.foundry.loop.v1")]
 public class CodeFoundryClosedLoopNeuron(ILogger<CodeFoundryClosedLoopNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ICodeFoundryLoopNeuron
 {
     public async Task HandleAsync(FoundryRequest request, CancellationToken cancellationToken = default)

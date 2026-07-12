@@ -2,7 +2,7 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel.SelfEvolution;
 
-[GrainType("self-evolution")]
+[GrainType("self-evolution.v1")]
 public sealed class SelfEvolutionNeuron(
     ILogger<SelfEvolutionNeuron> logger,
     NeuronJournals journals,

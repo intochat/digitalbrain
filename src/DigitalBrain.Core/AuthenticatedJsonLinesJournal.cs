@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 
 namespace DigitalBrain.Core.Runtime;
 
-internal sealed record AuthenticatedJournalRecord(
+public sealed record AuthenticatedJournalRecord(
     int LineNumber,
     string? Kind,
     string Payload,
@@ -18,7 +18,7 @@ internal sealed record AuthenticatedJournalFaultInjection(
     Action? BeforePhysicalAppend = null,
     Action? BeforeHeadWrite = null);
 
-internal sealed class AuthenticatedJsonLinesJournal
+public sealed class AuthenticatedJsonLinesJournal
 {
     private const int FormatVersion = 1;
     private const string FormatMarker = "digitalbrain.authenticated-jsonl.v1";
@@ -40,8 +40,16 @@ internal sealed class AuthenticatedJsonLinesJournal
     public AuthenticatedJsonLinesJournal(
         string domain,
         byte[] integrityKey,
+        string path)
+        : this(domain, integrityKey, path, null)
+    {
+    }
+
+    internal AuthenticatedJsonLinesJournal(
+        string domain,
+        byte[] integrityKey,
         string path,
-        AuthenticatedJournalFaultInjection? faultInjection = null)
+        AuthenticatedJournalFaultInjection? faultInjection)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(domain);
         ArgumentNullException.ThrowIfNull(integrityKey);

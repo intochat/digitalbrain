@@ -33,11 +33,12 @@ public static class InoConversationStates
     public const string Queued = "queued";
     public const string Running = "running";
     public const string Responding = "responding";
+    public const string AwaitingAuthorization = "awaiting-authorization";
     public const string Succeeded = "succeeded";
     public const string Failed = "failed";
 
     public static bool IsActive(string state) =>
-        state is Queued or Running or Responding;
+        state is Queued or Running or Responding or AwaitingAuthorization;
 }
 
 public sealed record InoConversationTurn(
@@ -55,7 +56,8 @@ public sealed record InoConversationOperation(
     DateTimeOffset UpdatedAt,
     ToolAction? Action = null,
     ToolGrounding? Grounding = null,
-    IReadOnlyList<ToolGrounding>? Groundings = null);
+    IReadOnlyList<ToolGrounding>? Groundings = null,
+    ExternalAuthorizationContinuation? Authorization = null);
 
 public sealed record InoConversationSnapshot(
     string ConversationId,
@@ -81,6 +83,12 @@ public interface IInoConversationStore
         ToolAction? action = null,
         ToolGrounding? grounding = null,
         IReadOnlyList<ToolGrounding>? groundings = null);
+    InoConversationSnapshot AwaitAuthorization(
+        RequestContext context,
+        string commandId,
+        string response,
+        ToolAction action,
+        ExternalAuthorizationContinuation authorization);
     InoConversationSnapshot Fail(RequestContext context, string commandId, string safeReason, bool retryable);
 }
 
@@ -92,13 +100,16 @@ public sealed record ToolOutcome(
     JsonElement? Content = null,
     string? SafeReason = null,
     ToolAction? Action = null,
-    JsonElement? GroundingContent = null);
+    JsonElement? GroundingContent = null,
+    string? AuthorizationProvider = null);
 public sealed record ToolInvocation(string ToolId, JsonElement Input);
+public sealed record ExternalAuthorizationRequest(string Provider, ToolInvocation Invocation);
 public sealed record ConversationExecutionResult(
     string Text,
     ToolAction? Action = null,
     ToolGrounding? Grounding = null,
-    IReadOnlyList<ToolGrounding>? Groundings = null);
+    IReadOnlyList<ToolGrounding>? Groundings = null,
+    ExternalAuthorizationRequest? Authorization = null);
 
 public interface IIntentCapabilityPlanner
 {
@@ -173,7 +184,46 @@ public sealed class ConversationOwner(
                 new ModelRequest(request.Text, scoped, StructuredOutput: true),
                 cancellationToken)
             : new ModelResponse(string.Empty, "deterministic-tool-response", IsStructured: true);
-        var text = await composer.ComposeAsync(request.Context, model, outcomes, cancellationToken);
+        return await ComposeResultAsync(request.Context, model, invocations, outcomes, cancellationToken);
+    }
+
+    public async Task<ConversationExecutionResult> ResumeAfterAuthorizationAsync(
+        ConversationRequest request,
+        ExternalAuthorizationRequest authorization,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(authorization);
+        if (authorization.Provider is not ("google" or "salesforce") ||
+            string.IsNullOrWhiteSpace(authorization.Invocation.ToolId) ||
+            authorization.Invocation.Input.ValueKind == JsonValueKind.Undefined)
+            throw new InvalidOperationException("The external authorization continuation is invalid.");
+
+        var scoped = await contextAssembler.AssembleAsync(request, cancellationToken);
+        if (scoped.TenantId != request.Context.TenantId || scoped.WorkspaceId != request.Context.WorkspaceId ||
+            scoped.ConversationId != request.ConversationId)
+            throw new UnauthorizedAccessException("The context assembler returned an out-of-scope context.");
+
+        var outcome = await toolCatalog.InvokeAsync(request.Context, authorization.Invocation, cancellationToken);
+        if (outcome.Kind == ToolOutcomeKind.NeedsAuth &&
+            !string.Equals(outcome.AuthorizationProvider, authorization.Provider, StringComparison.Ordinal))
+            throw new InvalidOperationException("The external authorization provider changed during continuation.");
+
+        return await ComposeResultAsync(
+            request.Context,
+            new ModelResponse(string.Empty, "deterministic-tool-response", IsStructured: true),
+            [authorization.Invocation],
+            [outcome],
+            cancellationToken);
+    }
+
+    private async Task<ConversationExecutionResult> ComposeResultAsync(
+        RequestContext context,
+        ModelResponse model,
+        IReadOnlyList<ToolInvocation> invocations,
+        IReadOnlyList<ToolOutcome> outcomes,
+        CancellationToken cancellationToken)
+    {
+        var text = await composer.ComposeAsync(context, model, outcomes, cancellationToken);
         var groundings = invocations
             .Zip(outcomes)
             .Where(static pair => pair.Second.Kind == ToolOutcomeKind.Success &&
@@ -186,10 +236,24 @@ public sealed class ConversationOwner(
                 pair.First.ToolId,
                 pair.Second.GroundingContent!.Value.Clone()))
             .ToArray();
+        var authorizationPairs = invocations.Zip(outcomes)
+            .Where(static pair => pair.Second.Kind == ToolOutcomeKind.NeedsAuth)
+            .ToArray();
+        if (authorizationPairs.Length > 1 ||
+            authorizationPairs.Any(static pair => string.IsNullOrWhiteSpace(pair.Second.AuthorizationProvider)))
+            throw new InvalidOperationException("A response may await exactly one typed external authorization.");
+        var authorization = authorizationPairs.Length == 0
+            ? null
+            : new ExternalAuthorizationRequest(
+                authorizationPairs[0].Second.AuthorizationProvider!,
+                new ToolInvocation(
+                    authorizationPairs[0].First.ToolId,
+                    authorizationPairs[0].First.Input.Clone()));
         return new ConversationExecutionResult(
             text,
             outcomes.Select(static outcome => outcome.Action).FirstOrDefault(static action => action is not null),
             groundings.FirstOrDefault(),
-            groundings);
+            groundings,
+            authorization);
     }
 }

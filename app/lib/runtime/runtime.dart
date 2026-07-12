@@ -90,6 +90,7 @@ class RuntimeController extends ChangeNotifier {
   bool _disposed = false;
   int _generation = 0;
   int _scopeEpoch = 0;
+  int _authenticationGeneration = 0;
 
   bool get hasSurface => latestSurface != null;
   int get scopeEpoch => _scopeEpoch;
@@ -116,19 +117,25 @@ class RuntimeController extends ChangeNotifier {
   }
 
   Future<void> authenticateWithBootstrap(String secret) async {
-    await stop(closeTransport: false);
+    final authenticationGeneration = ++_authenticationGeneration;
+    await stop(closeTransport: false, invalidateAuthentication: false);
+    if (authenticationGeneration != _authenticationGeneration) return;
     _stopRequested = false;
     terminalError = null;
     transientError = null;
+    _clearProtectedState(clearFeedIdentity: true);
     _setStatus(RuntimeStatus.authenticating);
     try {
-      await session.bootstrap(transport, secret);
+      final applied = await session.bootstrap(transport, secret);
+      if (!applied || authenticationGeneration != _authenticationGeneration) {
+        return;
+      }
       final identity = session.identity!;
-      _bindIdentity(identity);
+      feed.bindIdentity(identity);
       _launchLoop();
     } catch (error) {
+      if (authenticationGeneration != _authenticationGeneration) return;
       transientError = error;
-      _clearProtectedState(clearFeedIdentity: true);
       _setStatus(RuntimeStatus.awaitingSignIn);
       rethrow;
     }
@@ -351,11 +358,17 @@ class RuntimeController extends ChangeNotifier {
     _notifyListeners();
   }
 
-  Future<void> stop({bool closeTransport = true}) async {
+  Future<void> stop({
+    bool closeTransport = true,
+    bool invalidateAuthentication = true,
+  }) async {
+    if (invalidateAuthentication) _authenticationGeneration++;
     _stopRequested = true;
-    _generation++;
+    final stopGeneration = ++_generation;
     final call = _activeCall;
     _activeCall = null;
+    final loop = _loop;
+    _loop = null;
     Future<void>? cancellation;
     if (call != null) {
       try {
@@ -370,14 +383,13 @@ class RuntimeController extends ChangeNotifier {
         await cancellation;
       } catch (_) {}
     }
-    final loop = _loop;
-    _loop = null;
     if (loop != null) {
       try {
         await loop;
       } catch (_) {}
     }
-    if (status != RuntimeStatus.awaitingSignIn) {
+    if (_generation == stopGeneration &&
+        status != RuntimeStatus.awaitingSignIn) {
       _setStatus(RuntimeStatus.stopped);
     }
   }

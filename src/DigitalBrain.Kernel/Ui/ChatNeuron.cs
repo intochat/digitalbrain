@@ -8,7 +8,7 @@ using DigitalBrain.Ui.Contracts.Ui;
 
 // The Chat neuron (server-driven UI). On a data-visualization request it emits an RfwCard, journals it as
 // conversation history, and broadcasts it to the live Home feed (HomeFeedBus) for streaming to clients.
-[GrainType("digitalbrain.chat")]
+[GrainType("digitalbrain.chat.v1")]
 public class ChatNeuron(ILogger<ChatNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IChatNeuron
 {
     public async Task HandleAsync(VisualizeDataRequest request, CancellationToken cancellationToken = default)

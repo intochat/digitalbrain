@@ -1,4 +1,6 @@
 using Orleans;
+using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Core.Runtime;
 
 namespace DigitalBrain.Kernel.Runtime;
 
@@ -60,6 +62,15 @@ public interface IGmailReadToolGrain : IGrainWithStringKey
     [Alias("ReadIncomingAtOffsetAsync")]
     Task<GmailReadResult> ReadIncomingAtOffsetAsync(
         GmailReadRequest request,
+        CancellationToken cancellationToken = default);
+
+    [Alias("ResolveAuthorizationAsync")]
+    Task<ExternalAuthorizationResolution> ResolveAuthorizationAsync(
+        CancellationToken cancellationToken = default);
+
+    [Alias("CompleteAuthorizationAsync")]
+    Task<AuthResult> CompleteAuthorizationAsync(
+        OAuthCallback callback,
         CancellationToken cancellationToken = default);
 }
 

@@ -12,7 +12,7 @@ using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Ui.Runtime;
 
 
-[GrainType("digitalbrain.data-visualization")]
+[GrainType("digitalbrain.data-visualization.v1")]
 public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IChartNeuron, IDataVisualizationNeuron
 {
     private readonly ConcurrentDictionary<string, ChartSession> _sessions = new(StringComparer.Ordinal);

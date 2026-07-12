@@ -20,21 +20,35 @@ internal static class InoTelemetry
 /// <summary>Durable, principal-scoped conversation journal used only by the INO runtime path.</summary>
 public sealed class InoEffectStore : IInoConversationStore
 {
-    private const int JournalVersion = 3;
+    private const int JournalVersion = 4;
+    private const string JournalDomain = "digitalbrain.v2.ino-effects";
+    private const string SnapshotRecordKind = "conversation.snapshot";
     private const int MaximumAssistantCharacters = 16_000;
     private const string InterruptedReason = "I couldn’t confirm the previous response. You can continue from here.";
     private readonly ConcurrentDictionary<ConversationScope, InoConversationSnapshot> _conversations = new();
-    private readonly string? _path;
+    private readonly HashSet<ConversationScope> _migrationScopes = [];
+    private readonly AuthenticatedJsonLinesJournal? _journal;
     private readonly ToolActionPolicy _actionPolicy;
     private readonly object _gate = new();
 
-    public InoEffectStore(string? path = null, ToolActionPolicy? actionPolicy = null)
+    public InoEffectStore(
+        string? path = null,
+        ToolActionPolicy? actionPolicy = null,
+        byte[]? journalIntegrityKey = null)
     {
-        _path = string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path);
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            if (journalIntegrityKey is null || journalIntegrityKey.Length < 32)
+                throw new ArgumentException(
+                    "A stable journal integrity key of at least 256 bits is required for durable INO conversations.",
+                    nameof(journalIntegrityKey));
+            _journal = new AuthenticatedJsonLinesJournal(JournalDomain, journalIntegrityKey, path);
+        }
         _actionPolicy = actionPolicy ?? new ToolActionPolicy();
         Load();
         RecoverObsoleteConnectionActions();
         RecoverInterruptedConversations();
+        PersistMigrations();
     }
 
     public InoConversationSnapshot Read(RuntimeRequestContext context)
@@ -91,17 +105,87 @@ public sealed class InoEffectStore : IInoConversationStore
             var operation = current.Operations.Single(candidate =>
                 string.Equals(candidate.CommandId, commandId, StringComparison.Ordinal));
             if (string.Equals(operation.State, state, StringComparison.Ordinal)) return Clone(current);
-            var expected = state == InoConversationStates.Running
-                ? InoConversationStates.Queued
-                : InoConversationStates.Running;
-            if (!string.Equals(operation.State, expected, StringComparison.Ordinal))
+            var validPrior = state == InoConversationStates.Running
+                ? operation.State is InoConversationStates.Queued or InoConversationStates.AwaitingAuthorization
+                : string.Equals(operation.State, InoConversationStates.Running, StringComparison.Ordinal);
+            if (!validPrior)
                 throw new InvalidOperationException("The conversation state transition is out of order.");
 
-            var next = ReplaceOperationAndUserTurn(current, operation with
+            var transitionBase = current with
+            {
+                Turns = current.Turns.Select(turn =>
+                    string.Equals(turn.CommandId, commandId, StringComparison.Ordinal) &&
+                    string.Equals(turn.Role, "assistant", StringComparison.Ordinal)
+                        ? turn with { State = state }
+                        : turn).ToArray()
+            };
+            var next = ReplaceOperationAndUserTurn(transitionBase, operation with
             {
                 State = state,
+                SafeReason = null,
                 UpdatedAt = DateTimeOffset.UtcNow
             }, state);
+            return Persist(scope, next);
+        }
+    }
+
+    public InoConversationSnapshot AwaitAuthorization(
+        RuntimeRequestContext context,
+        string commandId,
+        string response,
+        ToolAction action,
+        ExternalAuthorizationContinuation authorization)
+    {
+        if (string.IsNullOrWhiteSpace(response))
+            throw new ArgumentException("A non-empty assistant response is required.", nameof(response));
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(authorization);
+        if (!_actionPolicy.IsAllowed(action))
+            throw new InvalidOperationException("The external authorization action is not allowed.");
+        if (!authorization.IsValid())
+            throw new InvalidOperationException("The external authorization continuation is invalid.");
+
+        lock (_gate)
+        {
+            var scope = Scope(context);
+            var current = Required(scope, commandId);
+            var operation = current.Operations.Single(candidate =>
+                string.Equals(candidate.CommandId, commandId, StringComparison.Ordinal));
+            if (!string.Equals(operation.State, InoConversationStates.Responding, StringComparison.Ordinal))
+                throw new InvalidOperationException("Authorization cannot be awaited before responding begins.");
+
+            var safeResponse = BoundCharacters(response.Trim(), MaximumAssistantCharacters);
+            var hasAssistant = current.Turns.Any(turn =>
+                string.Equals(turn.CommandId, commandId, StringComparison.Ordinal) &&
+                string.Equals(turn.Role, "assistant", StringComparison.Ordinal));
+            var candidate = current with
+            {
+                Turns = hasAssistant
+                    ? current.Turns.Select(turn =>
+                        string.Equals(turn.CommandId, commandId, StringComparison.Ordinal) &&
+                        string.Equals(turn.Role, "assistant", StringComparison.Ordinal)
+                            ? turn with { Text = safeResponse, State = InoConversationStates.AwaitingAuthorization }
+                            : turn).ToArray()
+                    : current.Turns.Concat([
+                        new InoConversationTurn(
+                            commandId,
+                            "assistant",
+                            safeResponse,
+                            InoConversationStates.AwaitingAuthorization)
+                    ]).ToArray()
+            };
+            var next = ReplaceOperationAndUserTurn(candidate, operation with
+            {
+                State = InoConversationStates.AwaitingAuthorization,
+                SafeReason = null,
+                Retryable = true,
+                Action = action,
+                Grounding = null,
+                Groundings = null,
+                Authorization = authorization.Copy(),
+                UpdatedAt = DateTimeOffset.UtcNow
+            }, InoConversationStates.AwaitingAuthorization);
+            next = FitAssistantResponse(next, commandId, safeResponse);
             return Persist(scope, next);
         }
     }
@@ -161,6 +245,7 @@ public sealed class InoEffectStore : IInoConversationStore
                     : new ToolGrounding(grounding.ToolId, grounding.Content.Clone()),
                 Groundings = groundings?.Select(static value =>
                     new ToolGrounding(value.ToolId, value.Content.Clone())).ToArray(),
+                Authorization = null,
                 UpdatedAt = DateTimeOffset.UtcNow
             }, InoConversationStates.Succeeded);
             next = FitAssistantResponse(next, commandId, safeResponse);
@@ -193,6 +278,7 @@ public sealed class InoEffectStore : IInoConversationStore
                 SafeReason = reason,
                 Retryable = retryable,
                 Action = null,
+                Authorization = null,
                 UpdatedAt = DateTimeOffset.UtcNow
             }, "failed");
             return Persist(scope, next);
@@ -223,24 +309,62 @@ public sealed class InoEffectStore : IInoConversationStore
 
     private void Append(PersistedConversation record)
     {
-        if (_path is null) return;
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        File.AppendAllText(_path, JsonSerializer.Serialize(record) + Environment.NewLine);
+        _journal?.Append(SnapshotRecordKind, JsonSerializer.Serialize(record));
+        if (record.Version == JournalVersion)
+            _migrationScopes.Remove(new ConversationScope(record.Tenant, record.Workspace, record.Principal));
     }
 
     private void Load()
     {
-        if (_path is null || !File.Exists(_path)) return;
-        foreach (var line in File.ReadLines(_path).Where(static value => !string.IsNullOrWhiteSpace(value)))
+        if (_journal is null) return;
+        foreach (var record in _journal.Read())
         {
             PersistedConversation? persisted;
-            try { persisted = JsonSerializer.Deserialize<PersistedConversation>(line); }
-            catch (JsonException) { continue; }
-            if (!Valid(persisted)) continue;
-            var scope = new ConversationScope(persisted!.Tenant, persisted.Workspace, persisted.Principal);
-            if (!_conversations.TryGetValue(scope, out var current) || persisted.Snapshot.Revision > current.Revision)
-                _conversations[scope] = Clone(persisted.Snapshot);
+            try { persisted = JsonSerializer.Deserialize<PersistedConversation>(record.Payload); }
+            catch (JsonException)
+            {
+                throw _journal.Invalid(
+                    record,
+                    "invalid-conversation-json",
+                    $"The INO conversation journal contains malformed JSON at line {record.LineNumber}.");
+            }
+            if (!record.IsLegacy && !string.Equals(record.Kind, SnapshotRecordKind, StringComparison.Ordinal))
+                throw _journal.Invalid(
+                    record,
+                    "invalid-conversation-kind",
+                    $"The INO conversation journal contains an unexpected record kind at line {record.LineNumber}.");
+            if (!TryNormalize(persisted, out var normalized))
+                throw _journal.Invalid(
+                    record,
+                    "invalid-conversation-record",
+                    $"The INO conversation journal contains an invalid record at line {record.LineNumber}.");
+            var scope = new ConversationScope(normalized.Tenant, normalized.Workspace, normalized.Principal);
+            var requiresMigration = persisted!.Version != JournalVersion;
+            if (!_conversations.TryGetValue(scope, out var current) || normalized.Snapshot.Revision > current.Revision)
+            {
+                _conversations[scope] = Clone(normalized.Snapshot);
+                if (requiresMigration) _migrationScopes.Add(scope);
+                else _migrationScopes.Remove(scope);
+            }
+            else if (normalized.Snapshot.Revision == current.Revision && !requiresMigration)
+            {
+                _migrationScopes.Remove(scope);
+            }
         }
+        _journal.SealLegacy();
+    }
+
+    private void PersistMigrations()
+    {
+        foreach (var scope in _migrationScopes.ToArray())
+            if (_conversations.TryGetValue(scope, out var snapshot))
+                Append(new PersistedConversation(
+                    JournalVersion,
+                    scope.Tenant,
+                    scope.Workspace,
+                    scope.Principal,
+                    snapshot));
+        _migrationScopes.Clear();
     }
 
     private void RecoverInterruptedConversations()
@@ -254,23 +378,42 @@ public sealed class InoEffectStore : IInoConversationStore
                     .Select(static operation => operation.CommandId)
                     .ToHashSet(StringComparer.Ordinal);
                 if (active.Count == 0) continue;
+                var resumableAuthorizations = pair.Value.Operations
+                    .Where(operation => active.Contains(operation.CommandId) &&
+                                        operation.Action is not null &&
+                                        operation.Authorization?.IsValid() == true &&
+                                        _actionPolicy.IsAllowed(operation.Action))
+                    .Select(static operation => operation.CommandId)
+                    .ToHashSet(StringComparer.Ordinal);
                 var now = DateTimeOffset.UtcNow;
                 var recovered = pair.Value with
                 {
                     Revision = checked(pair.Value.Revision + 1),
                     Turns = pair.Value.Turns
-                        .Where(turn => !active.Contains(turn.CommandId) || turn.Role != "assistant")
-                        .Select(turn => active.Contains(turn.CommandId)
-                            ? turn with { State = InoConversationStates.Failed }
+                        .Where(turn => resumableAuthorizations.Contains(turn.CommandId) ||
+                                       !active.Contains(turn.CommandId) || turn.Role != "assistant")
+                        .Select(turn => resumableAuthorizations.Contains(turn.CommandId)
+                            ? turn with { State = InoConversationStates.AwaitingAuthorization }
+                            : active.Contains(turn.CommandId)
+                                ? turn with { State = InoConversationStates.Failed }
                             : turn)
                         .ToArray(),
                     Operations = pair.Value.Operations.Select(operation => active.Contains(operation.CommandId)
                         ? operation with
                         {
-                            State = InoConversationStates.Failed,
-                            SafeReason = InterruptedReason,
-                            Retryable = false,
-                            Action = null,
+                            State = resumableAuthorizations.Contains(operation.CommandId)
+                                ? InoConversationStates.AwaitingAuthorization
+                                : InoConversationStates.Failed,
+                            SafeReason = resumableAuthorizations.Contains(operation.CommandId)
+                                ? null
+                                : InterruptedReason,
+                            Retryable = resumableAuthorizations.Contains(operation.CommandId),
+                            Action = resumableAuthorizations.Contains(operation.CommandId)
+                                ? operation.Action
+                                : null,
+                            Authorization = resumableAuthorizations.Contains(operation.CommandId)
+                                ? operation.Authorization?.Copy()
+                                : null,
                             Grounding = null,
                             Groundings = null,
                             UpdatedAt = now
@@ -298,7 +441,7 @@ public sealed class InoEffectStore : IInoConversationStore
                 {
                     Operations = pair.Value.Operations.Select(operation =>
                         operation.Action is not null && !_actionPolicy.IsAllowed(operation.Action)
-                            ? operation with { Action = null }
+                            ? operation with { Action = null, Authorization = null }
                             : operation).ToArray()
                 });
             }
@@ -322,7 +465,7 @@ public sealed class InoEffectStore : IInoConversationStore
                     : operation).ToArray()
         };
 
-    private static bool Valid(PersistedConversation? persisted)
+    private bool Valid(PersistedConversation? persisted)
     {
         if (persisted is null || persisted.Version != JournalVersion ||
             string.IsNullOrWhiteSpace(persisted.Tenant.Value) ||
@@ -331,15 +474,54 @@ public sealed class InoEffectStore : IInoConversationStore
             persisted.Snapshot is null ||
             string.IsNullOrWhiteSpace(persisted.Snapshot.ConversationId) ||
             persisted.Snapshot.Revision < 0 || persisted.Snapshot.Turns.Count > 200 ||
-            persisted.Snapshot.Operations.Count > 128)
+            persisted.Snapshot.Operations.Count > 128 ||
+            persisted.Snapshot.Operations.Any(operation => operation.Authorization is not null &&
+                (!operation.Authorization.IsValid() ||
+                 operation.State is not (InoConversationStates.AwaitingAuthorization or
+                     InoConversationStates.Running or InoConversationStates.Responding) ||
+                 operation.Action is null || !_actionPolicy.IsAllowed(operation.Action))))
             return false;
         var context = new RuntimeRequestContext(persisted.Tenant, persisted.Workspace, persisted.Principal,
             "journal-validation", AuthAssurance.Password, "journal-validation", null, new HashSet<string>());
         var payloadBytes = PayloadBytes(persisted.Snapshot);
         return string.Equals(persisted.Snapshot.ConversationId, InoConversationIdentity.From(context), StringComparison.Ordinal) &&
                payloadBytes <= PrivateFeedStore.MaximumSurfacePayloadBytes &&
+               JournalPayloadBytes(persisted.Snapshot) <= PrivateFeedStore.MaximumSurfacePayloadBytes &&
                (!persisted.Snapshot.Operations.Any(operation => InoConversationStates.IsActive(operation.State)) ||
                 payloadBytes <= WorkspaceSurfaceProducer.InoPayloadBudgetBytes);
+    }
+
+    private bool TryNormalize(
+        PersistedConversation? persisted,
+        out PersistedConversation normalized)
+    {
+        normalized = persisted!;
+        if (persisted is not { Version: 2 or 3 or JournalVersion } || persisted.Snapshot is null)
+            return false;
+        if (persisted.Version == JournalVersion)
+            return Valid(persisted);
+
+        var scrubbedActions = persisted.Snapshot.Operations.Any(operation =>
+            !InoConversationStates.IsActive(operation.State) &&
+            (operation.Action is not null || operation.Authorization is not null));
+        var migrated = persisted.Snapshot with
+        {
+            Operations = persisted.Snapshot.Operations.Select(operation =>
+                !InoConversationStates.IsActive(operation.State)
+                    ? operation with { Action = null, Authorization = null }
+                    : operation).ToArray()
+        };
+        var bounded = PruneCompletedEntries(migrated, string.Empty);
+        var changed = scrubbedActions ||
+                      bounded.Operations.Count != persisted.Snapshot.Operations.Count ||
+                      bounded.Turns.Count != persisted.Snapshot.Turns.Count;
+        if (changed)
+        {
+            if (bounded.Revision == int.MaxValue) return false;
+            bounded = bounded with { Revision = bounded.Revision + 1 };
+        }
+        normalized = persisted with { Version = JournalVersion, Snapshot = bounded };
+        return Valid(normalized);
     }
 
     private static InoConversationSnapshot PruneCompletedEntries(
@@ -428,24 +610,30 @@ public sealed class InoEffectStore : IInoConversationStore
 
     private static bool WithinRetentionAndPayloadBudget(InoConversationSnapshot snapshot) =>
         snapshot.Turns.Count <= 200 && snapshot.Operations.Count <= 128 &&
-        PayloadBytes(snapshot) <= WorkspaceSurfaceProducer.InoPayloadBudgetBytes;
+        PayloadBytes(snapshot) <= WorkspaceSurfaceProducer.InoPayloadBudgetBytes &&
+        JournalPayloadBytes(snapshot) <= PrivateFeedStore.MaximumSurfacePayloadBytes;
 
     private static void DemandWithinPayloadBudget(InoConversationSnapshot snapshot)
     {
         if (snapshot.Turns.Count > 200 || snapshot.Operations.Count > 128 ||
-            PayloadBytes(snapshot) > WorkspaceSurfaceProducer.InoPayloadBudgetBytes)
+            PayloadBytes(snapshot) > WorkspaceSurfaceProducer.InoPayloadBudgetBytes ||
+            JournalPayloadBytes(snapshot) > PrivateFeedStore.MaximumSurfacePayloadBytes)
             throw new InvalidOperationException("The conversation exceeds its durable presentation bound.");
     }
 
     private static void DemandWithinDeliveryBound(InoConversationSnapshot snapshot)
     {
         if (snapshot.Turns.Count > 200 || snapshot.Operations.Count > 128 ||
-            PayloadBytes(snapshot) > PrivateFeedStore.MaximumSurfacePayloadBytes)
+            PayloadBytes(snapshot) > PrivateFeedStore.MaximumSurfacePayloadBytes ||
+            JournalPayloadBytes(snapshot) > PrivateFeedStore.MaximumSurfacePayloadBytes)
             throw new InvalidOperationException("The conversation exceeds its durable delivery bound.");
     }
 
     private static int PayloadBytes(InoConversationSnapshot snapshot) =>
         Encoding.UTF8.GetByteCount(WorkspaceSurfaceProducer.BuildInoPayload(snapshot).GetRawText());
+
+    private static int JournalPayloadBytes(InoConversationSnapshot snapshot) =>
+        Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(snapshot));
 
     private static InoConversationSnapshot Clone(InoConversationSnapshot snapshot) => snapshot with
     {
@@ -456,7 +644,8 @@ public sealed class InoEffectStore : IInoConversationStore
                 ? null
                 : new ToolGrounding(operation.Grounding.ToolId, operation.Grounding.Content.Clone()),
             Groundings = operation.Groundings?.Select(static grounding =>
-                new ToolGrounding(grounding.ToolId, grounding.Content.Clone())).ToArray()
+                new ToolGrounding(grounding.ToolId, grounding.Content.Clone())).ToArray(),
+            Authorization = operation.Authorization?.Copy()
         }).ToArray()
     };
 

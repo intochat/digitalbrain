@@ -163,6 +163,30 @@ public class SalesforceConnectorContractTests : IConnectorContractTests<Salesfor
         Assert.False(status.IsValid);
         Assert.NotNull(status.MissingKey);
     }
+
+    [Fact]
+    public async Task Failed_health_probe_does_not_expose_provider_exception_details()
+    {
+        const string providerDetail = "provider response contained sensitive detail";
+        var connector = new SalesforceConnector(
+            new FailingSalesforceApiClientFactory(providerDetail),
+            new FakePackConfigStore(),
+            new FakeOAuthStateProtector());
+
+        var health = await connector.TestConnectionAsync(new NeuronId("user:test"));
+
+        Assert.False(health.Healthy);
+        Assert.Equal("Salesforce connection probe failed.", health.Detail);
+        Assert.DoesNotContain(providerDetail, health.Detail, StringComparison.Ordinal);
+    }
+
+    private sealed class FailingSalesforceApiClientFactory(string detail) : ISalesforceApiClientFactory
+    {
+        public Task<ISalesforceApiClient> CreateAsync(
+            NeuronScope scope,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<ISalesforceApiClient>(new InvalidOperationException(detail));
+    }
 }
 
 public class GoogleConnectorContractTests : IConnectorContractTests<GoogleConnector>

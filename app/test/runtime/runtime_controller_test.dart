@@ -487,6 +487,84 @@ void main() {
     });
 
     test(
+      'an older bootstrap failure cannot sign out a newer runtime',
+      () async {
+        final older = Completer<SessionBundle>();
+        final newer = Completer<SessionBundle>();
+        final call = _FakeFeedCall.open();
+        final transport = _FakeUiTransport(
+          [call],
+          bootstrapResults: [older.future, newer.future],
+        );
+        final runtime = _runtime(transport);
+
+        final olderAuthentication = runtime.authenticateWithBootstrap('older');
+        await _eventually(() => transport.bootstrapSecrets.length == 1);
+        final newerAuthentication = runtime.authenticateWithBootstrap('newer');
+        await _eventually(() => transport.bootstrapSecrets.length == 2);
+        newer.complete(
+          testSession(
+            identity: testIdentity(session: 'session-newer'),
+            accessToken: 'access-newer',
+            refreshToken: 'refresh-newer',
+          ),
+        );
+        await newerAuthentication;
+        await _eventually(() => runtime.status == RuntimeStatus.streaming);
+
+        older.completeError(
+          const AuthenticationException('Older bootstrap was rejected.'),
+        );
+        await olderAuthentication;
+
+        expect(runtime.status, RuntimeStatus.streaming);
+        expect(runtime.session.sessionId, 'session-newer');
+        expect(runtime.transientError, isNull);
+        expect(transport.watchAccessTokens, ['access-newer']);
+        await runtime.stop();
+      },
+    );
+
+    test(
+      'a later authentication intent wins while an older stop is blocked',
+      () async {
+        final cancelGate = Completer<void>();
+        final firstCall = _FakeFeedCall.open(cancelCompletionGate: cancelGate);
+        final laterCall = _FakeFeedCall.open();
+        final laterBootstrap = Completer<SessionBundle>();
+        final transport = _FakeUiTransport(
+          [firstCall, laterCall],
+          bootstrapResults: [testSession(), laterBootstrap.future],
+        );
+        final runtime = _runtime(transport);
+        await runtime.authenticateWithBootstrap('initial');
+        await _eventually(() => runtime.status == RuntimeStatus.streaming);
+
+        final olderAuthentication = runtime.authenticateWithBootstrap('older');
+        await _eventually(() => firstCall.cancelled);
+        final laterAuthentication = runtime.authenticateWithBootstrap('later');
+        await _eventually(() => transport.bootstrapSecrets.length == 2);
+        laterBootstrap.complete(
+          testSession(
+            identity: testIdentity(session: 'session-later'),
+            accessToken: 'access-later',
+            refreshToken: 'refresh-later',
+          ),
+        );
+        await laterAuthentication;
+        await _eventually(() => runtime.status == RuntimeStatus.streaming);
+
+        cancelGate.complete();
+        await olderAuthentication;
+
+        expect(transport.bootstrapSecrets, ['initial', 'later']);
+        expect(runtime.session.sessionId, 'session-later');
+        expect(transport.watchAccessTokens, ['access-token', 'access-later']);
+        await runtime.stop();
+      },
+    );
+
+    test(
       'authentication expiry clears protected in-memory scope state',
       () async {
         final call = _FakeFeedCall.open();
@@ -612,6 +690,7 @@ class _FakeUiTransport implements UiTransport {
   final List<int> watchAfter = [];
   final List<String> watchAccessTokens = [];
   final List<int> acknowledged = [];
+  final List<String> bootstrapSecrets = [];
   String? bootstrapSecret;
   UiActionRef? submittedAction;
   Map<String, Object?>? submittedInput;
@@ -621,11 +700,13 @@ class _FakeUiTransport implements UiTransport {
   @override
   Future<SessionBundle> bootstrapSession(String bootstrapSecret) async {
     this.bootstrapSecret = bootstrapSecret;
+    bootstrapSecrets.add(bootstrapSecret);
     if (_bootstrapResults.isEmpty) {
       throw StateError('No fake bootstrap result is available.');
     }
     final result = _bootstrapResults.removeFirst();
     if (result is SessionBundle) return result;
+    if (result is Future<SessionBundle>) return await result;
     throw result;
   }
 
@@ -695,10 +776,10 @@ class _FakeUiTransport implements UiTransport {
 }
 
 class _FakeFeedCall implements FeedCall {
-  _FakeFeedCall._(this._controller);
+  _FakeFeedCall._(this._controller, [this._cancelCompletionGate]);
 
-  factory _FakeFeedCall.open() =>
-      _FakeFeedCall._(StreamController<FeedEvent>());
+  factory _FakeFeedCall.open({Completer<void>? cancelCompletionGate}) =>
+      _FakeFeedCall._(StreamController<FeedEvent>(), cancelCompletionGate);
 
   factory _FakeFeedCall.fromEvents(Iterable<FeedEvent> events) {
     final controller = StreamController<FeedEvent>();
@@ -721,6 +802,7 @@ class _FakeFeedCall implements FeedCall {
   }
 
   final StreamController<FeedEvent> _controller;
+  final Completer<void>? _cancelCompletionGate;
   bool cancelled = false;
 
   void add(FeedEvent event) => _controller.add(event);
@@ -734,5 +816,7 @@ class _FakeFeedCall implements FeedCall {
   Future<void> cancel() async {
     cancelled = true;
     if (!_controller.isClosed) await _controller.close();
+    final gate = _cancelCompletionGate;
+    if (gate != null) await gate.future;
   }
 }

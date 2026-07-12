@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from v2_ui.proto.
+// Generated from ui.proto.
 
 // @dart = 3.3
 
@@ -15,11 +15,11 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'v2_ui.pbenum.dart';
+import 'ui.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
-export 'v2_ui.pbenum.dart';
+export 'ui.pbenum.dart';
 
 class BootstrapSessionRequest extends $pb.GeneratedMessage {
   factory BootstrapSessionRequest({

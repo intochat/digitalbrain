@@ -182,6 +182,10 @@ public sealed class AuthenticatedJournalHardeningTests
     [Fact]
     public void Public_durable_store_constructors_expose_no_arbitrary_append_sink()
     {
+        var journalConstructor = Assert.Single(typeof(AuthenticatedJsonLinesJournal).GetConstructors());
+        Assert.Equal(
+            [typeof(string), typeof(byte[]), typeof(string)],
+            journalConstructor.GetParameters().Select(static parameter => parameter.ParameterType));
         Assert.DoesNotContain(typeof(ApplicationService).GetConstructors(), constructor =>
             constructor.GetParameters().Any(static parameter => parameter.ParameterType == typeof(Action<string>)));
         Assert.DoesNotContain(typeof(FileSessionManager).GetConstructors(), constructor =>

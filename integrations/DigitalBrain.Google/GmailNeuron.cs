@@ -1,6 +1,7 @@
 using System.Net;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Runtime;
 using Google;
@@ -22,8 +23,51 @@ public sealed class GmailReadNeuron(
     ILogger<GmailReadNeuron> logger,
     IGmailApiClientFactory gmailApiClientFactory,
     IPackConfigStore store,
-    [FromKeyedServices("google")] IConnector connector) : Grain, IGmailReadToolGrain, IGmailMetadataToolGrain
+    [FromKeyedServices("google")] IConnector connector,
+    IOAuthStateProtector oauthStateProtector) : Grain, IGmailReadToolGrain, IGmailMetadataToolGrain
 {
+    public async Task<ExternalAuthorizationResolution> ResolveAuthorizationAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
+        var userScope = PackConfigScopes.ForUser(scope.UserId);
+        var pending = await store.GetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, cancellationToken);
+        if (GoogleClientFactory.IsKnownPendingExpired(pending))
+        {
+            var compact = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [GoogleClientFactory.OAuthPhaseKey] = GoogleClientFactory.OAuthPhaseFailed,
+                [GoogleClientFactory.OAuthResultKey] = "expired"
+            };
+            if (pending.TryGetValue(GoogleClientFactory.OAuthFlowIdKey, out var flowId) &&
+                GoogleClientFactory.IsAuthorizationFlowId(flowId))
+                compact[GoogleClientFactory.OAuthFlowIdKey] = flowId;
+            if (pending.TryGetValue(GoogleClientFactory.OAuthAttemptFingerprintKey, out var attempt) &&
+                GoogleClientFactory.IsAuthorizationAttemptFingerprint(attempt))
+                compact[GoogleClientFactory.OAuthAttemptFingerprintKey] = attempt;
+            await store.SetAsync(
+                userScope,
+                GoogleClientFactory.OAuthPendingPackName,
+                compact,
+                cancellationToken);
+            pending = compact;
+        }
+        var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
+        return GoogleClientFactory.ResolveAuthorization(values, pending);
+    }
+
+    public Task<AuthResult> CompleteAuthorizationAsync(
+        OAuthCallback callback,
+        CancellationToken cancellationToken = default)
+    {
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        if (!oauthStateProtector.TryUnprotect(callback.State, out var protectedOwner) ||
+            !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal))
+            return Task.FromResult(new AuthResult(false, "invalid-state"));
+        return connector.CompleteAuthAsync(callback, cancellationToken);
+    }
+
     public async Task<GmailReadResult> ReadIncomingAtOffsetAsync(
         GmailReadRequest request,
         CancellationToken cancellationToken = default)

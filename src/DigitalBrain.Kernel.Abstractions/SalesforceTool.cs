@@ -1,5 +1,6 @@
 using Orleans;
 using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Core.Runtime;
 
 namespace DigitalBrain.Kernel.Runtime;
 
@@ -122,6 +123,10 @@ public sealed record SalesforceReadResult(
 [Alias("digitalbrain.v2.salesforce-read-tool-grain")]
 public interface ISalesforceReadToolGrain : IGrainWithStringKey
 {
+    [Alias("ResolveAuthorizationAsync")]
+    Task<ExternalAuthorizationResolution> ResolveAuthorizationAsync(
+        CancellationToken cancellationToken = default);
+
     [Alias("BeginAuthorizationAsync")]
     Task<SalesforceReadResult> BeginAuthorizationAsync(
         string startToken,

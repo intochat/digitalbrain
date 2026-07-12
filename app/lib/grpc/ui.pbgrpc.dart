@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from v2_ui.proto.
+// Generated from ui.proto.
 
 // @dart = 3.3
 
@@ -16,9 +16,9 @@ import 'dart:core' as $core;
 import 'package:grpc/service_api.dart' as $grpc;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'v2_ui.pb.dart' as $0;
+import 'ui.pb.dart' as $0;
 
-export 'v2_ui.pb.dart';
+export 'ui.pb.dart';
 
 @$pb.GrpcServiceName('digitalbrain.v2.ui.DigitalBrainV2Ui')
 class DigitalBrainV2UiClient extends $grpc.Client {

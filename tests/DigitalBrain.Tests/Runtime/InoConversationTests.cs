@@ -1,5 +1,6 @@
 extern alias McpProject;
 
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core.Runtime;
@@ -16,6 +17,7 @@ namespace DigitalBrain.Tests.Runtime;
 
 public sealed class InoConversationTests
 {
+    private const string InoJournalDomain = "digitalbrain.v2.ino-effects";
     private const string Prompt = "What can you help me with in this workspace?";
 
     [Fact]
@@ -271,6 +273,70 @@ public sealed class InoConversationTests
     }
 
     [Fact]
+    public async Task Context_excludes_provider_results_but_preserves_safe_prompts_and_ordinary_history()
+    {
+        var context = Context();
+        var store = new InoEffectStore();
+
+        Complete("ordinary", "Explain the release plan.", "The release is planned for Tuesday.");
+        Complete(
+            "local-tool",
+            "Show my workspace reminders.",
+            "You have one workspace reminder.",
+            grounding: Grounding("reminders.read.items"));
+        Complete(
+            "gmail",
+            "Show my last incoming email.",
+            "Private Gmail presentation text.",
+            grounding: Grounding("gmail.read.messages"));
+        Complete(
+            "salesforce",
+            "Find the matching Salesforce account.",
+            "Private Salesforce presentation text.",
+            groundings: [Grounding("salesforce.read.records")]);
+        Complete(
+            "cross-provider",
+            "Match the latest sender to an account.",
+            "Private cross-provider presentation text.",
+            groundings: [Grounding("cross.match.salesforce-account-to-gmail-sender")]);
+
+        const string currentPrompt = "What should I do next?";
+        store.Begin(context, "current", currentPrompt);
+
+        var assembled = await new McpConversationContextAssembler(store).AssembleAsync(
+            new ConversationRequest(
+                context,
+                InoConversationIdentity.From(context),
+                currentPrompt));
+
+        Assert.Equal([
+            "user: Explain the release plan.",
+            "assistant: The release is planned for Tuesday.",
+            "user: Show my workspace reminders.",
+            "assistant: You have one workspace reminder.",
+            "user: Show my last incoming email.",
+            "user: Find the matching Salesforce account.",
+            "user: Match the latest sender to an account."
+        ], assembled.MemoryEvidence);
+
+        void Complete(
+            string commandId,
+            string prompt,
+            string response,
+            ToolGrounding? grounding = null,
+            IReadOnlyList<ToolGrounding>? groundings = null)
+        {
+            store.Begin(context, commandId, prompt);
+            store.Transition(context, commandId, InoConversationStates.Running);
+            store.Transition(context, commandId, InoConversationStates.Responding);
+            store.Complete(context, commandId, response, grounding: grounding, groundings: groundings);
+        }
+
+        static ToolGrounding Grounding(string toolId) =>
+            new(toolId, JsonSerializer.SerializeToElement(new { resultCount = 1 }));
+    }
+
+    [Fact]
     public async Task Long_unicode_answers_are_fitted_and_old_completed_turns_are_pruned_before_publication()
     {
         var context = Context();
@@ -318,6 +384,34 @@ public sealed class InoConversationTests
     }
 
     [Fact]
+    public void Durable_conversation_journal_requires_a_stable_key_and_rejects_tampering()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-ino-integrity-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var path = Path.Combine(root, "conversation.jsonl");
+            var missingKey = Assert.Throws<ArgumentException>(() => new InoEffectStore(path));
+            Assert.Equal("journalIntegrityKey", missingKey.ParamName);
+
+            var journalKey = RandomNumberGenerator.GetBytes(32);
+            var store = new InoEffectStore(path, journalIntegrityKey: journalKey);
+            store.Begin(Context(), "tamper-command", Prompt);
+            var lines = File.ReadAllLines(path);
+            Assert.Single(lines);
+            Assert.Contains(Prompt, lines[0], StringComparison.Ordinal);
+            lines[0] = lines[0].Replace(Prompt, "Tampered prompt", StringComparison.Ordinal);
+            File.WriteAllLines(path, lines);
+
+            Assert.Throws<InvalidDataException>(() =>
+                new InoEffectStore(path, journalIntegrityKey: journalKey));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public async Task Restart_restores_the_transcript_and_direct_replay_cannot_duplicate_turns()
     {
         var root = Path.Combine(Path.GetTempPath(), "v2-ino-conversation-" + Guid.NewGuid().ToString("N"));
@@ -326,7 +420,8 @@ public sealed class InoConversationTests
             var context = Context();
             var conversationPath = Path.Combine(root, "conversation.jsonl");
             var feedPath = Path.Combine(root, "feed.jsonl");
-            var firstStore = new InoEffectStore(conversationPath);
+            var journalKey = RandomNumberGenerator.GetBytes(32);
+            var firstStore = new InoEffectStore(conversationPath, journalIntegrityKey: journalKey);
             var firstFeed = new PrivateFeedStore(feedPath);
             var firstSurfaces = new WorkspaceSurfaceProducer(firstFeed, new ActionExecutor(firstFeed), firstStore);
             var firstRouter = new RecordingModelRouter(request => Task.FromResult(
@@ -337,12 +432,14 @@ public sealed class InoConversationTests
             Assert.Equal(WorkflowState.Succeeded,
                 (await Handler(firstStore, firstSurfaces, firstRouter).ExecuteAsync(command)).State);
 
-            var journal = File.ReadAllLines(conversationPath)
-                .Select(static line => JsonDocument.Parse(line))
+            var journal = new AuthenticatedJsonLinesJournal(InoJournalDomain, journalKey, conversationPath)
+                .Read()
+                .Select(static record => JsonDocument.Parse(record.Payload))
                 .ToArray();
             try
             {
                 Assert.Equal(4, journal.Length);
+                Assert.True(File.Exists(conversationPath + ".head"));
                 var respondingPersisted = journal[^2].RootElement.GetProperty("Snapshot");
                 Assert.Equal(InoConversationStates.Responding,
                     respondingPersisted.GetProperty("Operations")[0].GetProperty("State").GetString());
@@ -360,7 +457,7 @@ public sealed class InoConversationTests
                 foreach (var document in journal) document.Dispose();
             }
 
-            var reopenedStore = new InoEffectStore(conversationPath);
+            var reopenedStore = new InoEffectStore(conversationPath, journalIntegrityKey: journalKey);
             var reopenedFeed = new PrivateFeedStore(feedPath);
             var reopenedSurfaces = new WorkspaceSurfaceProducer(
                 reopenedFeed, new ActionExecutor(reopenedFeed), reopenedStore);
@@ -389,7 +486,8 @@ public sealed class InoConversationTests
         {
             var context = Context();
             var path = Path.Combine(root, "conversation.jsonl");
-            var store = new InoEffectStore(path);
+            var journalKey = RandomNumberGenerator.GetBytes(32);
+            var store = new InoEffectStore(path, journalIntegrityKey: journalKey);
             const string commandId = "atomic-command";
             store.Begin(context, commandId, Prompt);
             store.Transition(context, commandId, InoConversationStates.Running);
@@ -422,7 +520,7 @@ public sealed class InoConversationTests
             Assert.Equal("Atomic grounded answer.", Assert.Single(
                 completed.Turns, static turn => turn.Role == "assistant").Text);
 
-            var reopened = new InoEffectStore(path);
+            var reopened = new InoEffectStore(path, journalIntegrityKey: journalKey);
             var recordsBeforeReplay = File.ReadAllLines(path).Length;
             var replay = reopened.Complete(
                 context,
@@ -455,6 +553,7 @@ public sealed class InoConversationTests
             Directory.CreateDirectory(root);
             var context = Context();
             var path = Path.Combine(root, "conversation.jsonl");
+            var journalKey = RandomNumberGenerator.GetBytes(32);
             const string commandId = "legacy-connection-action";
             var legacySnapshot = new InoConversationSnapshot(
                 InoConversationIdentity.From(context),
@@ -478,7 +577,7 @@ public sealed class InoConversationTests
                 ]);
             var legacyLine = JsonSerializer.Serialize(new
             {
-                Version = 3,
+                Version = 2,
                 Tenant = context.TenantId,
                 Workspace = context.WorkspaceId,
                 Principal = context.Principal,
@@ -487,19 +586,94 @@ public sealed class InoConversationTests
             File.WriteAllText(path, legacyLine + Environment.NewLine);
             var policy = new ToolActionPolicy("https://brain.example/oauth/callback/salesforce");
 
-            var recoveredStore = new InoEffectStore(path, policy);
+            var recoveredStore = new InoEffectStore(path, policy, journalKey);
             var recovered = recoveredStore.Read(context);
             var recoveredLines = File.ReadAllLines(path);
 
             Assert.Equal(8, recovered.Revision);
             Assert.Null(Assert.Single(recovered.Operations).Action);
-            Assert.Equal(2, recoveredLines.Length);
+            Assert.Equal(3, recoveredLines.Length);
             Assert.Equal(legacyLine, recoveredLines[0]);
             Assert.DoesNotContain("login.salesforce.com", recoveredLines[1], StringComparison.Ordinal);
+            Assert.DoesNotContain("login.salesforce.com", recoveredLines[2], StringComparison.Ordinal);
+            Assert.True(File.Exists(path + ".head"));
 
-            var reopenedStore = new InoEffectStore(path, policy);
+            var reopenedStore = new InoEffectStore(path, policy, journalKey);
 
             Assert.Equal(recovered.Revision, reopenedStore.Read(context).Revision);
+            Assert.Equal(recoveredLines, File.ReadAllLines(path));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void Reopening_prunes_oversized_version_three_history_without_discarding_the_journal()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-ino-bounded-migration-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var context = Context();
+            var path = Path.Combine(root, "conversation.jsonl");
+            var journalKey = RandomNumberGenerator.GetBytes(32);
+            var turns = new List<InoConversationTurn>();
+            var operations = new List<InoConversationOperation>();
+            for (var index = 0; index < 80; index++)
+            {
+                var commandId = "completed-" + index;
+                turns.Add(new InoConversationTurn(
+                    commandId,
+                    "user",
+                    "Request " + index,
+                    InoConversationStates.Succeeded));
+                turns.Add(new InoConversationTurn(
+                    commandId,
+                    "assistant",
+                    new string((char)('a' + index % 26), 1024),
+                    InoConversationStates.Succeeded));
+                operations.Add(new InoConversationOperation(
+                    commandId,
+                    "Request " + index,
+                    InoConversationStates.Succeeded,
+                    null,
+                    false,
+                    DateTimeOffset.UtcNow,
+                    index == 0
+                        ? new ToolAction(
+                            "openUrl",
+                            "Connect account",
+                            "https://accounts.google.com/o/oauth2/v2/auth?state=historical")
+                        : null));
+            }
+            var legacySnapshot = new InoConversationSnapshot(
+                InoConversationIdentity.From(context),
+                80,
+                turns,
+                operations);
+            File.WriteAllText(path, JsonSerializer.Serialize(new
+            {
+                Version = 3,
+                Tenant = context.TenantId,
+                Workspace = context.WorkspaceId,
+                Principal = context.Principal,
+                Snapshot = legacySnapshot
+            }) + Environment.NewLine);
+
+            var recovered = new InoEffectStore(path, journalIntegrityKey: journalKey).Read(context);
+            var recoveredLines = File.ReadAllLines(path);
+
+            Assert.True(recovered.Operations.Count < operations.Count);
+            Assert.All(recovered.Operations, operation => Assert.Null(operation.Action));
+            Assert.Equal(81, recovered.Revision);
+            Assert.Equal(3, recoveredLines.Length);
+            var reopened = new InoEffectStore(path, journalIntegrityKey: journalKey).Read(context);
+            Assert.Equal(recovered.Revision, reopened.Revision);
+            Assert.Equal(
+                recovered.Operations.Select(static operation => operation.CommandId),
+                reopened.Operations.Select(static operation => operation.CommandId));
             Assert.Equal(recoveredLines, File.ReadAllLines(path));
         }
         finally
@@ -540,7 +714,8 @@ public sealed class InoConversationTests
         {
             var context = Context();
             var path = Path.Combine(root, "conversation.jsonl");
-            var store = new InoEffectStore(path);
+            var journalKey = RandomNumberGenerator.GetBytes(32);
+            var store = new InoEffectStore();
             const string commandId = "interrupted-command";
             store.Begin(context, commandId, Prompt);
             store.Transition(context, commandId, InoConversationStates.Running);
@@ -557,7 +732,8 @@ public sealed class InoConversationTests
                         InoConversationStates.Responding)
                 ]).ToArray()
             };
-            File.AppendAllText(path, JsonSerializer.Serialize(new
+            Directory.CreateDirectory(root);
+            File.WriteAllText(path, JsonSerializer.Serialize(new
             {
                 Version = 3,
                 Tenant = context.TenantId,
@@ -566,7 +742,7 @@ public sealed class InoConversationTests
                 Snapshot = legacyPartial
             }) + Environment.NewLine);
 
-            var recoveredStore = new InoEffectStore(path);
+            var recoveredStore = new InoEffectStore(path, journalIntegrityKey: journalKey);
             var recovered = recoveredStore.Read(context);
             var recoveredOperation = Assert.Single(recovered.Operations);
             Assert.Equal(InoConversationStates.Failed, recoveredOperation.State);
@@ -644,6 +820,154 @@ public sealed class InoConversationTests
         actions.Release(changedAuthorization);
     }
 
+    [Fact]
+    public async Task Authorization_wait_is_durable_attempt_idempotent_and_resumes_exact_typed_invocation_once()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "v2-ino-authorization-resume-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var context = Context() with { IdempotencyKey = "authorization-resume" };
+            var operationsPath = Path.Combine(root, "operations.jsonl");
+            var conversationPath = Path.Combine(root, "conversation.jsonl");
+            var journalKey = RandomNumberGenerator.GetBytes(32);
+            var invocationInput = JsonSerializer.SerializeToElement(new
+            {
+                provider = "gmail",
+                operation = "list",
+                limit = 2,
+                filters = new[] { new { field = "direction", value = "incoming" } }
+            });
+            var invocation = new ToolInvocation("gmail.read.messages", invocationInput);
+            var planner = new FixedInvocationPlanner(invocation);
+            var catalog = new AuthorizationSequenceCatalog(invocation);
+            var firstStore = new InoEffectStore(conversationPath, journalIntegrityKey: journalKey);
+            var firstFeed = new PrivateFeedStore();
+            var firstHandler = AuthorizationHandler(firstStore, firstFeed, planner, catalog);
+            var firstApplication = new ApplicationService(
+                storagePath: operationsPath,
+                journalIntegrityKey: journalKey);
+            var command = new CommandEnvelope(
+                McpInoCommandHandler.CommandType,
+                2,
+                "authorization-resume-command",
+                context,
+                JsonSerializer.SerializeToElement(new { prompt = "Get my last 2 incoming emails" }));
+
+            var submitted = await firstApplication.SubmitAsync(context, command);
+            Assert.True(firstApplication.TryClaimPending(
+                submitted.OperationId,
+                out var claimedCommand,
+                out var claimedAuthorization));
+            Assert.Null(claimedAuthorization);
+            var interruptedResult = await firstHandler.ExecuteAsync(
+                new CommandExecutionAttempt(claimedCommand!, claimedAuthorization));
+            Assert.Equal(WorkflowState.AwaitingExternalAuthorization, interruptedResult.State);
+            var interruptedConversation = firstStore.Read(context);
+            Assert.Equal(InoConversationStates.AwaitingAuthorization,
+                interruptedConversation.CurrentOperation!.State);
+            Assert.True(interruptedConversation.CurrentOperation.Authorization!.Matches(
+                interruptedResult.Authorization!));
+            Assert.Equal(1, catalog.Calls);
+            Assert.Equal(1, planner.Calls);
+
+            // Simulate a crash after the INO snapshot committed but before the application journal
+            // recorded the continuation. Recovery must repair the second journal without replanning.
+            var reopenedApplication = new ApplicationService(
+                storagePath: operationsPath,
+                journalIntegrityKey: journalKey);
+            Assert.Empty(reopenedApplication.GetAwaitingExternalAuthorizations());
+            var reopenedStore = new InoEffectStore(conversationPath, journalIntegrityKey: journalKey);
+            var resumedFeed = new PrivateFeedStore();
+            var resumedHandler = AuthorizationHandler(reopenedStore, resumedFeed, planner, catalog);
+            var resumedDispatcher = new CommandDispatcher(reopenedApplication, [resumedHandler]);
+
+            Assert.True(await resumedDispatcher.DispatchAsync(submitted.OperationId));
+
+            var durableWait = Assert.Single(reopenedApplication.GetAwaitingExternalAuthorizations());
+            Assert.Equal(submitted.OperationId, durableWait.OperationId);
+            Assert.Equal("google", durableWait.Continuation.Provider);
+            Assert.Equal(invocation.ToolId, durableWait.Continuation.Invocation.ToolId);
+            Assert.Equal(invocation.Input.GetRawText(), durableWait.Continuation.Invocation.Input.GetRawText());
+            Assert.True(Guid.TryParseExact(durableWait.Continuation.AttemptId, "N", out _));
+
+            Assert.False(reopenedApplication.TryRequeueExternalAuthorization(
+                submitted.OperationId,
+                Guid.NewGuid().ToString("N")));
+            Assert.True(reopenedApplication.TryRequeueExternalAuthorization(
+                submitted.OperationId,
+                durableWait.Continuation.AttemptId));
+            Assert.False(reopenedApplication.TryRequeueExternalAuthorization(
+                submitted.OperationId,
+                durableWait.Continuation.AttemptId));
+
+            var callsBeforeResume = catalog.Calls;
+
+            Assert.True(await resumedDispatcher.DispatchAsync(submitted.OperationId));
+
+            var completed = await reopenedApplication.GetOperationAsync(context, submitted.OperationId);
+            Assert.Equal(WorkflowState.Succeeded, completed!.State);
+            Assert.Empty(reopenedApplication.GetAwaitingExternalAuthorizations());
+            Assert.Equal(callsBeforeResume + 1, catalog.Calls);
+            Assert.Equal(2, catalog.Calls);
+            Assert.Equal(1, planner.Calls);
+            Assert.All(catalog.Invocations, actual =>
+            {
+                Assert.Equal(invocation.ToolId, actual.ToolId);
+                Assert.Equal(invocation.Input.GetRawText(), actual.Input.GetRawText());
+            });
+            var conversation = reopenedStore.Read(context);
+            Assert.Equal(InoConversationStates.Succeeded, conversation.CurrentOperation!.State);
+            Assert.Null(conversation.CurrentOperation.Action);
+            Assert.Equal("Here are your last 2 incoming emails.",
+                Assert.Single(conversation.Turns, static turn => turn.Role == "assistant").Text);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Failed_authorization_is_journaled_without_invoking_the_provider_again()
+    {
+        var context = Context() with { IdempotencyKey = "authorization-failed" };
+        var invocation = new ToolInvocation(
+            "gmail.read.messages",
+            JsonSerializer.SerializeToElement(new { limit = 2 }));
+        var planner = new FixedInvocationPlanner(invocation);
+        var catalog = new AuthorizationSequenceCatalog(invocation);
+        var store = new InoEffectStore();
+        var handler = AuthorizationHandler(store, new PrivateFeedStore(), planner, catalog);
+        var application = new ApplicationService();
+        var dispatcher = new CommandDispatcher(application, [handler]);
+        var command = new CommandEnvelope(
+            McpInoCommandHandler.CommandType,
+            2,
+            "authorization-failed-command",
+            context,
+            JsonSerializer.SerializeToElement(new { prompt = "Get my last 2 incoming emails" }));
+        var submitted = await application.SubmitAsync(context, command);
+
+        Assert.True(await dispatcher.DispatchAsync(submitted.OperationId));
+        var wait = Assert.Single(application.GetAwaitingExternalAuthorizations());
+        Assert.True(application.TryRequeueExternalAuthorization(
+            submitted.OperationId,
+            wait.Continuation.AttemptId,
+            new ExternalAuthorizationResolution(
+                ExternalAuthorizationResolutionState.Failed,
+                "authorization-failed")));
+
+        Assert.True(await dispatcher.DispatchAsync(submitted.OperationId));
+
+        var completed = await application.GetOperationAsync(context, submitted.OperationId);
+        Assert.Equal(WorkflowState.Failed, completed!.State);
+        Assert.Equal("authorization-failed", completed.SafeReason);
+        Assert.Equal(1, catalog.Calls);
+        Assert.Equal(1, planner.Calls);
+        Assert.Equal(InoConversationStates.Failed, store.Read(context).CurrentOperation!.State);
+    }
+
     private static McpInoCommandHandler Handler(
         IInoConversationStore store,
         WorkspaceSurfaceProducer surfaces,
@@ -654,6 +978,21 @@ public sealed class InoConversationTests
             router,
             new McpNoToolCatalog(),
             new McpResponseComposer()));
+
+    private static McpInoCommandHandler AuthorizationHandler(
+        IInoConversationStore store,
+        PrivateFeedStore feed,
+        IIntentCapabilityPlanner planner,
+        IAuthorizedToolCatalog catalog) =>
+        new(
+            store,
+            new WorkspaceSurfaceProducer(feed, new ActionExecutor(feed), store),
+            new ConversationOwner(
+                new McpConversationContextAssembler(store),
+                planner,
+                new RecordingModelRouter(_ => throw new InvalidOperationException("Authorization flow called the model.")),
+                catalog,
+                new AuthorizationResponseComposer()));
 
     private static RuntimeRequestContext Context() => new(
         new TenantId("private-tenant"),
@@ -670,6 +1009,76 @@ public sealed class InoConversationTests
 
     private static int MessageCount(StoredSurfaceRecord record) =>
         record.Payload.GetProperty("data").GetProperty("messages").GetArrayLength();
+
+    private sealed class FixedInvocationPlanner(ToolInvocation invocation) : IIntentCapabilityPlanner
+    {
+        public int Calls { get; private set; }
+
+        public Task<IReadOnlyList<ToolInvocation>> PlanAsync(
+            ConversationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult<IReadOnlyList<ToolInvocation>>([
+                new ToolInvocation(invocation.ToolId, invocation.Input.Clone())
+            ]);
+        }
+    }
+
+    private sealed class AuthorizationSequenceCatalog(ToolInvocation expected) : IAuthorizedToolCatalog
+    {
+        private readonly List<ToolInvocation> _invocations = [];
+        public int Calls => _invocations.Count;
+        public IReadOnlyList<ToolInvocation> Invocations => _invocations;
+
+        public Task<ToolOutcome> InvokeAsync(
+            RuntimeRequestContext context,
+            ToolInvocation invocation,
+            CancellationToken cancellationToken = default)
+        {
+            Assert.Equal(expected.ToolId, invocation.ToolId);
+            Assert.Equal(expected.Input.GetRawText(), invocation.Input.GetRawText());
+            _invocations.Add(new ToolInvocation(invocation.ToolId, invocation.Input.Clone()));
+            if (_invocations.Count == 1)
+            {
+                return Task.FromResult(new ToolOutcome(
+                    ToolOutcomeKind.NeedsAuth,
+                    SafeReason: "Google authorization is required.",
+                    Action: new ToolAction(
+                        "openUrl",
+                        "Connect Google",
+                        "https://accounts.google.com/o/oauth2/v2/auth?state=current"),
+                    AuthorizationProvider: "google"));
+            }
+
+            if (_invocations.Count == 2)
+            {
+                var content = JsonSerializer.SerializeToElement(new
+                {
+                    resultCount = 2,
+                    messageIds = new[] { "message-1", "message-2" }
+                });
+                return Task.FromResult(new ToolOutcome(
+                    ToolOutcomeKind.Success,
+                    Content: content,
+                    GroundingContent: content));
+            }
+
+            throw new InvalidOperationException("The stored tool invocation was replayed more than once.");
+        }
+    }
+
+    private sealed class AuthorizationResponseComposer : IResponseSurfaceComposer
+    {
+        public Task<string> ComposeAsync(
+            RuntimeRequestContext context,
+            ModelResponse response,
+            IReadOnlyList<ToolOutcome> toolOutcomes,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Assert.Single(toolOutcomes).Kind == ToolOutcomeKind.NeedsAuth
+                ? "Connect your Google account to continue."
+                : "Here are your last 2 incoming emails.");
+    }
 
     private sealed class RecordingModelRouter(
         Func<ModelRequest, Task<ModelResponse>> complete) : IModelRouter

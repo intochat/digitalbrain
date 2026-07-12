@@ -8,8 +8,8 @@
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerRepository>digitalbrain-mcp</ContainerRepository>
-    <!-- noble-chiseled not yet published for .NET 11 preview; use standard preview base -->
-    <ContainerBaseImage>mcr.microsoft.com/dotnet/runtime:11.0-preview</ContainerBaseImage>
+    <!-- noble-chiseled not yet published for .NET 11 preview; use the ASP.NET preview base -->
+    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
     <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
     <ContainerRuntimeIdentifier>linux-x64</ContainerRuntimeIdentifier>
   </PropertyGroup>
@@ -43,7 +43,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="Protos\v2_ui.proto" GrpcServices="Both" />
+    <Protobuf Include="Protos\ui.proto" GrpcServices="Both" />
   </ItemGroup>
 
 </Project>

@@ -7,7 +7,7 @@ namespace DigitalBrain.Kernel;
 // The chat's bound bundle is derived from the durable incoming journal (the most recent "/start <bundleId>"),
 // so binding needs no separate state store. A bound chat routes normal messages point-to-point to the bound
 // bundle's generated neuron; an unbound chat broadcasts (today's behaviour → the seeded Responder handles it).
-[GrainType("digitalbrain.telegram-chat")]
+[GrainType("digitalbrain.telegram-chat.v1")]
 public sealed class TelegramChatNeuron(ILogger<TelegramChatNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ITelegramChatNeuron, IHandle<Signal>
 {
     private const string InboundName = TelegramSignals.MessageReceived;

@@ -49,16 +49,21 @@ builder.Services.AddSingleton(new SchemaRegistry([
 var operationStorePath = builder.Configuration["DigitalBrain:V2:OperationStorePath"];
 var sessionStorePath = builder.Configuration["DigitalBrain:V2:SessionStorePath"];
 var projectionPath = builder.Configuration["DigitalBrain:V2:ProjectionStorePath"];
+var inoEffectStorePath = builder.Configuration["DigitalBrain:V2:InoEffectStorePath"];
+if (string.IsNullOrWhiteSpace(inoEffectStorePath) && !string.IsNullOrWhiteSpace(operationStorePath))
+    inoEffectStorePath = operationStorePath + ".ino-effects";
 if (profile == RuntimeProfile.Production &&
-    (string.IsNullOrWhiteSpace(operationStorePath) || string.IsNullOrWhiteSpace(sessionStorePath) || string.IsNullOrWhiteSpace(projectionPath)))
-    throw new InvalidOperationException("Production runtime requires durable operation, session, and projection stores; in-memory fallbacks are disabled.");
+    (string.IsNullOrWhiteSpace(operationStorePath) || string.IsNullOrWhiteSpace(sessionStorePath) ||
+     string.IsNullOrWhiteSpace(projectionPath) || string.IsNullOrWhiteSpace(inoEffectStorePath)))
+    throw new InvalidOperationException("Production runtime requires durable operation, session, projection, and INO stores; in-memory fallbacks are disabled.");
 byte[]? journalIntegrityKey = null;
-if (!string.IsNullOrWhiteSpace(operationStorePath) || !string.IsNullOrWhiteSpace(sessionStorePath))
+if (!string.IsNullOrWhiteSpace(operationStorePath) || !string.IsNullOrWhiteSpace(sessionStorePath) ||
+    !string.IsNullOrWhiteSpace(inoEffectStorePath))
 {
     var journalKeyText = builder.Configuration["DigitalBrain:V2:JournalIntegrityKey"] ??
                          Environment.GetEnvironmentVariable("DigitalBrain__V2__JournalIntegrityKey");
     if (string.IsNullOrWhiteSpace(journalKeyText))
-        throw new InvalidOperationException("A stable journal integrity key is required for durable operation and session stores.");
+        throw new InvalidOperationException("A stable journal integrity key is required for durable operation, session, and INO stores.");
     try { journalIntegrityKey = Convert.FromBase64String(journalKeyText); }
     catch (FormatException exception) { throw new InvalidOperationException("The journal integrity key must be valid base64.", exception); }
     if (journalIntegrityKey.Length < 32)
@@ -72,12 +77,9 @@ builder.Services.AddSingleton(new ApplicationService(
 // Runtime composition and an empty handler set fail closed to ManualIntervention.
 builder.Services.AddSingleton<ICommandHandler, McpEffectCommandHandler>();
 builder.Services.AddSingleton<IEffectWorkerPort, OrleansClientEffectWorkerPort>();
-var inoEffectStorePath = builder.Configuration["DigitalBrain:V2:InoEffectStorePath"];
-if (string.IsNullOrWhiteSpace(inoEffectStorePath) && !string.IsNullOrWhiteSpace(operationStorePath)) inoEffectStorePath = operationStorePath + ".ino-effects";
-if (profile == RuntimeProfile.Production && string.IsNullOrWhiteSpace(inoEffectStorePath)) throw new InvalidOperationException("Production runtime requires a durable INO effect store.");
 var toolActionPolicy = new ToolActionPolicy(builder.Configuration["DigitalBrain:Salesforce:RedirectUri"]);
 builder.Services.AddSingleton(toolActionPolicy);
-builder.Services.AddSingleton(new InoEffectStore(inoEffectStorePath, toolActionPolicy));
+builder.Services.AddSingleton(new InoEffectStore(inoEffectStorePath, toolActionPolicy, journalIntegrityKey));
 builder.Services.AddSingleton<IInoConversationStore>(serviceProvider => serviceProvider.GetRequiredService<InoEffectStore>());
 builder.Services.AddSingleton<IContextAssembler, McpConversationContextAssembler>();
 builder.Services.AddSingleton<ISemanticIntentResolver, McpSemanticIntentResolver>();
@@ -89,6 +91,8 @@ builder.Services.AddSingleton<IResponseSurfaceComposer, McpResponseComposer>();
 builder.Services.AddSingleton<ConversationOwner>();
 builder.Services.AddSingleton<ICommandHandler, McpInoCommandHandler>();
 builder.Services.AddSingleton<CommandDispatcher>();
+builder.Services.AddSingleton<IExternalAuthorizationProbe, OrleansExternalAuthorizationProbe>();
+builder.Services.AddHostedService<ExternalAuthorizationWorker>();
 builder.Services.AddHostedService<CommandExecutionWorker>();
 var sessionKeyText = builder.Configuration["DigitalBrain:Auth:SessionSigningKey"] ?? Environment.GetEnvironmentVariable("DigitalBrain__Auth__SessionSigningKey");
 if (string.IsNullOrWhiteSpace(sessionKeyText)) throw new InvalidOperationException("A session signing key is required for HTTP MCP.");

@@ -1,6 +1,10 @@
 using System.Collections.Concurrent;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.TestKit;
@@ -12,19 +16,30 @@ namespace DigitalBrain.Salesforce.Tests;
 
 public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
 {
-    private readonly RecordingSalesforceConnector _connector = new();
+    private readonly StatefulSalesforceConfigStore _store = new();
+    private readonly SalesforceTestOAuthStateProtector _protector = new();
+    private readonly RecordingSalesforceConnector _connector;
+
+    public SalesforceOAuthStartNeuronTests()
+    {
+        _connector = new RecordingSalesforceConnector(new SalesforceConnector(
+            new UnusedSalesforceApiClientFactory(),
+            _store,
+            _protector,
+            new SuccessfulTokenEndpointHandler()));
+    }
 
     protected override void ConfigureSilo(ISiloBuilder builder) =>
         builder.ConfigureServices(services =>
         {
             services.AddSingleton<ISalesforceApiClientFactory>(new UnusedSalesforceApiClientFactory());
-            services.AddSingleton<IPackConfigStore, DisconnectedSalesforceConfigStore>();
-            services.AddSingleton<IOAuthStateProtector>(new SalesforceTestOAuthStateProtector());
+            services.AddSingleton<IPackConfigStore>(_store);
+            services.AddSingleton<IOAuthStateProtector>(_protector);
             services.AddKeyedSingleton<IConnector>("salesforce", _connector);
         });
 
     [Fact]
-    public async Task OAuth_start_is_local_persistent_and_single_use()
+    public async Task OAuth_start_is_persistent_and_provider_redirect_is_idempotent()
     {
         var grain = Grain<ISalesforceReadToolGrain>("principal-oauth-start");
 
@@ -37,16 +52,19 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
         Assert.True(localStart.IsLoopback);
         Assert.Equal(Uri.UriSchemeHttp, localStart.Scheme);
         Assert.Equal(OAuthCallbackPaths.SalesforceStart, localStart.AbsolutePath);
-        Assert.StartsWith("?t=", localStart.Query, StringComparison.Ordinal);
-        Assert.DoesNotContain("&", localStart.Query, StringComparison.Ordinal);
-        Assert.DoesNotContain("services/oauth2/authorize", localStartUrl, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("state=", localStartUrl, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("client_id=", localStartUrl, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("code_challenge=", localStartUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.True(HasPrefix(localStart.Query, "?t="));
+        Assert.False(localStart.Query.Contains('&'));
+        Assert.False(localStartUrl.Contains("services/oauth2/authorize", StringComparison.OrdinalIgnoreCase));
+        Assert.False(localStartUrl.Contains("state=", StringComparison.OrdinalIgnoreCase));
+        Assert.False(localStartUrl.Contains("client_id=", StringComparison.OrdinalIgnoreCase));
+        Assert.False(localStartUrl.Contains("code_challenge=", StringComparison.OrdinalIgnoreCase));
 
         var token = Uri.UnescapeDataString(localStart.Query["?t=".Length..]);
-        Assert.StartsWith("opaque-", token, StringComparison.Ordinal);
-        Assert.DoesNotContain("principal-oauth-start", token, StringComparison.Ordinal);
+        Assert.True(HasPrefix(token, "opaque-"));
+        Assert.False(token.Contains("principal-oauth-start", StringComparison.Ordinal));
+
+        var beforeClick = await grain.ResolveAuthorizationAsync();
+        Assert.Equal(ExternalAuthorizationResolutionState.Waiting, beforeClick.State);
 
         await Cluster.DeactivateAsync(grain);
 
@@ -55,56 +73,139 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
         Assert.Equal(SalesforceReadStatus.NeedsAuth, authorization.Status);
         var providerUrl = Assert.IsType<string>(authorization.ConnectionUrl);
         Assert.True(SalesforceClientFactory.IsAllowedAuthorizationUrl(providerUrl));
-        Assert.Contains("/services/oauth2/authorize", providerUrl, StringComparison.Ordinal);
+        Assert.True(providerUrl.Contains("/services/oauth2/authorize", StringComparison.Ordinal));
         Assert.Equal(1, _connector.BeginAuthCallCount);
+        var providerPending = _store.PendingSnapshot("principal-oauth-start");
 
         await Cluster.DeactivateAsync(grain);
         var replay = await grain.BeginAuthorizationAsync(token);
 
-        Assert.Equal(SalesforceReadStatus.Unavailable, replay.Status);
-        Assert.Null(replay.ConnectionUrl);
-        Assert.Equal(1, _connector.BeginAuthCallCount);
+        Assert.Equal(SalesforceReadStatus.NeedsAuth, replay.Status);
+        Assert.True(SameSecret(providerUrl, replay.ConnectionUrl), "The persisted provider challenge changed.");
+        Assert.Equal(2, _connector.BeginAuthCallCount);
+        Assert.True(
+            SameSecretDictionary(providerPending, _store.PendingSnapshot("principal-oauth-start")),
+            "The persisted provider attempt changed.");
     }
 
-    private sealed class RecordingSalesforceConnector : IConnector
+    [Fact]
+    public async Task Provider_pending_atomically_supersedes_local_start_and_callback_survives_reactivation()
+    {
+        var grain = Grain<ISalesforceReadToolGrain>("principal-oauth-crash-boundary");
+        var disconnected = await grain.ReadRecordsAsync(
+            new SalesforceRecordReadRequest(new SalesforceSemanticEntity("Accounts")));
+        var localStartUrl = Assert.IsType<string>(disconnected.ConnectionUrl);
+        var localStart = new Uri(localStartUrl, UriKind.Absolute);
+        var token = Uri.UnescapeDataString(localStart.Query["?t=".Length..]);
+
+        var authorization = await grain.BeginAuthorizationAsync(token);
+        Assert.Equal(SalesforceReadStatus.NeedsAuth, authorization.Status);
+        Assert.True(_store.HasLocalStart("principal-oauth-crash-boundary"));
+        Assert.True(_store.HasProviderPending("principal-oauth-crash-boundary"));
+        var providerState = _store.ProviderState("principal-oauth-crash-boundary");
+
+        await Cluster.DeactivateAsync(grain);
+
+        var completion = await grain.CompleteAuthorizationAsync(
+            new OAuthCallback("code", providerState));
+        Assert.True(completion.Success);
+
+        await Cluster.DeactivateAsync(grain);
+        var resolution = await grain.ResolveAuthorizationAsync();
+
+        Assert.Equal(ExternalAuthorizationResolutionState.Ready, resolution.State);
+    }
+
+    [Fact]
+    public async Task Second_read_coalesces_live_provider_attempt_without_replacing_pkce_state()
+    {
+        var grain = Grain<ISalesforceReadToolGrain>("principal-oauth-coalesce");
+        var firstRead = await grain.ReadRecordsAsync(
+            new SalesforceRecordReadRequest(new SalesforceSemanticEntity("Accounts")));
+        var firstStartUrl = Assert.IsType<string>(firstRead.ConnectionUrl);
+        var firstStart = new Uri(firstStartUrl, UriKind.Absolute);
+        var token = Uri.UnescapeDataString(firstStart.Query["?t=".Length..]);
+        var firstChallenge = await grain.BeginAuthorizationAsync(token);
+        var pendingBeforeSecondRead = _store.PendingSnapshot("principal-oauth-coalesce");
+
+        var secondRead = await grain.ReadRecordsAsync(
+            new SalesforceRecordReadRequest(new SalesforceSemanticEntity("Accounts")));
+
+        Assert.True(SameSecret(firstStartUrl, secondRead.ConnectionUrl), "The local OAuth action changed.");
+        Assert.True(
+            SameSecretDictionary(pendingBeforeSecondRead, _store.PendingSnapshot("principal-oauth-coalesce")),
+            "The provider attempt changed during a coalesced read.");
+        var completion = await grain.CompleteAuthorizationAsync(
+            new OAuthCallback("code", _store.ProviderState("principal-oauth-coalesce")));
+        Assert.True(completion.Success);
+        Assert.True(SalesforceClientFactory.IsAllowedAuthorizationUrl(firstChallenge.ConnectionUrl));
+
+        await Cluster.DeactivateAsync(grain);
+        Assert.Equal(
+            ExternalAuthorizationResolutionState.Ready,
+            (await grain.ResolveAuthorizationAsync()).State);
+    }
+
+    private static bool SameSecret(string? left, string? right)
+    {
+        if (left is null || right is null)
+            return left is null && right is null;
+        return CryptographicOperations.FixedTimeEquals(
+            SHA256.HashData(Encoding.UTF8.GetBytes(left)),
+            SHA256.HashData(Encoding.UTF8.GetBytes(right)));
+    }
+
+    private static bool HasPrefix(string value, string prefix) =>
+        value.StartsWith(prefix, StringComparison.Ordinal);
+
+    private static bool SameSecretDictionary(
+        IReadOnlyDictionary<string, string> left,
+        IReadOnlyDictionary<string, string> right)
+    {
+        if (left.Count != right.Count)
+            return false;
+        foreach (var (key, value) in left)
+        {
+            if (!right.TryGetValue(key, out var other) || !SameSecret(value, other))
+                return false;
+        }
+        return true;
+    }
+
+    private sealed class RecordingSalesforceConnector(SalesforceConnector inner) : IConnector
     {
         private int _beginAuthCallCount;
 
         public int BeginAuthCallCount => Volatile.Read(ref _beginAuthCallCount);
 
-        public ConnectorDescriptor Descriptor { get; } = new("salesforce", "Salesforce", [], []);
+        public ConnectorDescriptor Descriptor => inner.Descriptor;
 
         public Task<ConnectorConfigStatus> ValidateConfigAsync(
             string? userScope = null,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(new ConnectorConfigStatus(true));
-        }
+            CancellationToken cancellationToken = default) =>
+            inner.ValidateConfigAsync(userScope, cancellationToken);
 
-        public Task<AuthChallenge> BeginAuthAsync(
+        public async Task<AuthChallenge> BeginAuthAsync(
             NeuronId user,
             string? clientIdHint = null,
             CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _beginAuthCallCount);
-            return Task.FromResult(new AuthChallenge(
-                "https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=test-client&state=provider-state"));
+            return await inner.BeginAuthAsync(user, clientIdHint, cancellationToken);
         }
 
         public Task<AuthResult> CompleteAuthAsync(
             OAuthCallback callback,
             CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            inner.CompleteAuthAsync(callback, cancellationToken);
 
         public Task<ConnectionHealth> TestConnectionAsync(
             NeuronId user,
             CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            inner.TestConnectionAsync(user, cancellationToken);
     }
 
-    private sealed class DisconnectedSalesforceConfigStore : IPackConfigStore
+    private sealed class StatefulSalesforceConfigStore : IPackConfigStore
     {
         private static readonly IReadOnlyDictionary<string, string> AppConfig =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -115,13 +216,25 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
 
         private static readonly IReadOnlyDictionary<string, string> Empty =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly IReadOnlyDictionary<string, string> PriorTerminalAuthorization =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [SalesforceClientFactory.OAuthResultKey] = "denied",
+                [SalesforceClientFactory.OAuthAttemptFingerprintKey] =
+                    SalesforceClientFactory.AuthorizationAttemptFingerprint("prior-state")
+            };
+        private readonly ConcurrentDictionary<(string Scope, string Pack), IReadOnlyDictionary<string, string>> _values = new();
 
         public Task SetAsync(
             string scope,
             string pack,
             IReadOnlyDictionary<string, string> values,
-            CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _values[(scope, pack)] = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
+            return Task.CompletedTask;
+        }
 
         public Task<IReadOnlyDictionary<string, string>> GetAsync(
             string scope,
@@ -129,11 +242,50 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (_values.TryGetValue((scope, pack), out var persisted))
+                return Task.FromResult(persisted);
             return Task.FromResult(
                 string.Equals(scope, PackConfigScopes.App, StringComparison.Ordinal) &&
                 string.Equals(pack, SalesforceClientFactory.PackName, StringComparison.Ordinal)
                     ? AppConfig
+                    : string.Equals(pack, SalesforceClientFactory.OAuthPendingPackName, StringComparison.Ordinal)
+                        ? PriorTerminalAuthorization
                     : Empty);
+        }
+
+        public bool HasLocalStart(string principal) =>
+            ReadPending(principal).ContainsKey(SalesforceClientFactory.OAuthStartTokenFingerprintKey);
+
+        public bool HasProviderPending(string principal) =>
+            ReadPending(principal).ContainsKey(SalesforceClientFactory.OAuthStateKey);
+
+        public string ProviderState(string principal) =>
+            Assert.IsType<string>(ReadPending(principal).GetValueOrDefault(SalesforceClientFactory.OAuthStateKey));
+
+        public IReadOnlyDictionary<string, string> PendingSnapshot(string principal) =>
+            new Dictionary<string, string>(ReadPending(principal), StringComparer.OrdinalIgnoreCase);
+
+        private IReadOnlyDictionary<string, string> ReadPending(string principal) =>
+            _values.GetValueOrDefault((
+                PackConfigScopes.ForUser(new UserId(principal)),
+                SalesforceClientFactory.OAuthPendingPackName),
+                Empty);
+    }
+
+    private sealed class SuccessfulTokenEndpointHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    "{\"access_token\":\"access-a\",\"instance_url\":\"https://example.my.salesforce.com\",\"refresh_token\":\"refresh-a\"}",
+                    Encoding.UTF8,
+                    "application/json")
+            });
         }
     }
 

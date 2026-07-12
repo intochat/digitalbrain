@@ -128,7 +128,7 @@ internal static class Program
             AccountName = "digitalbrainstprod",
             ResourceGroupName = resourceGroup.Name,
             Location = Region,
-            Kind = Storage.Kind.Storage,
+            Kind = Storage.Kind.StorageV2,
             Sku = new StorageInputs.SkuArgs { Name = Storage.SkuName.Standard_LRS },
             AccessTier = Storage.AccessTier.Hot,
             AllowBlobPublicAccess = false,

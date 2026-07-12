@@ -110,6 +110,30 @@ public sealed class TypedAuthorizedToolCatalogTests
     }
 
     [Fact]
+    public async Task Gmail_mailbox_overview_is_grounded_so_provider_counts_never_enter_model_memory()
+    {
+        var gateway = new RecordingGateway
+        {
+            GmailOverviewResult = new GmailMailboxOverviewResult(
+                GmailReadStatus.Success,
+                InboxMessages: 12,
+                UnreadInboxMessages: 3,
+                InboxThreads: 9,
+                UnreadInboxThreads: 2)
+        };
+        var catalog = new McpAuthorizedToolCatalog(gateway);
+        var outcome = await catalog.InvokeAsync(
+            Context(PrincipalKind.User, "gmail.read"),
+            Invocation(
+                GmailTools.ReadMailboxOverview,
+                new SemanticIntentProposal(SemanticProvider.Gmail, SemanticOperation.Overview)));
+
+        Assert.Equal(ToolOutcomeKind.Success, outcome.Kind);
+        Assert.NotNull(outcome.GroundingContent);
+        Assert.Equal(outcome.Content!.Value.GetRawText(), outcome.GroundingContent!.Value.GetRawText());
+    }
+
+    [Fact]
     public async Task Gmail_summary_requires_the_separate_content_grant_without_calling_a_provider()
     {
         var gateway = new RecordingGateway();
@@ -521,6 +545,8 @@ public sealed class TypedAuthorizedToolCatalogTests
         public SalesforceContinuationRequest? LastSalesforceContinuationRequest { get; private set; }
         public GmailMessageListResult GmailMessagesResult { get; init; } =
             new(GmailReadStatus.Success, [], EmptyCoverage);
+        public GmailMailboxOverviewResult GmailOverviewResult { get; init; } =
+            new(GmailReadStatus.Success);
         public SalesforceReadResult SalesforceResult { get; init; } =
             new(SalesforceReadStatus.Success, "[]");
 
@@ -557,7 +583,7 @@ public sealed class TypedAuthorizedToolCatalogTests
             CancellationToken cancellationToken = default)
         {
             Record(ownerScope);
-            return Task.FromResult(new GmailMailboxOverviewResult(GmailReadStatus.Success));
+            return Task.FromResult(GmailOverviewResult);
         }
 
         public Task<GmailThreadListResult> ReadGmailThreadsAsync(
@@ -636,6 +662,12 @@ public sealed class TypedAuthorizedToolCatalogTests
             ToolAction? action = null,
             ToolGrounding? grounding = null,
             IReadOnlyList<ToolGrounding>? groundings = null) => throw new NotSupportedException();
+        public InoConversationSnapshot AwaitAuthorization(
+            RuntimeRequestContext context,
+            string commandId,
+            string response,
+            ToolAction action,
+            ExternalAuthorizationContinuation authorization) => throw new NotSupportedException();
         public InoConversationSnapshot Fail(
             RuntimeRequestContext context,
             string commandId,

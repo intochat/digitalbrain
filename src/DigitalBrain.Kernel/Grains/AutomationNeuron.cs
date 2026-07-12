@@ -12,7 +12,7 @@ using DigitalBrain.Ui.Contracts;
 /// Signals, and other synapses without requiring static IHandle<> declarations.
 /// Definitions are stored purely in the durable journals (source of truth).
 /// "Apps" and reactions are hot: register -> immediately active for future matches.
-[GrainType("digitalbrain.automation")]
+[GrainType("digitalbrain.automation.v1")]
 public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IAutomationNeuron
 {

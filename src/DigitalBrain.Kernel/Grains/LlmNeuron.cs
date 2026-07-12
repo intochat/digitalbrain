@@ -2,7 +2,7 @@ using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel;
 
-[GrainType("digitalbrain.llm")]
+[GrainType("digitalbrain.llm.v1")]
 public class LlmNeuron(ILogger<LlmNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ILlmNeuron
 {
     public async Task HandleAsync(LlmPrompt prompt, CancellationToken cancellationToken = default)

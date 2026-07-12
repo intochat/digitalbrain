@@ -486,7 +486,7 @@ public sealed record CommandEnvelope([property: Id(0)] string Type, [property: I
 [GenerateSerializer, Alias("digitalbrain.v2.event-envelope")]
 public sealed record EventEnvelope([property: Id(0)] string Type, [property: Id(1)] int Version, [property: Id(2)] string EventId, [property: Id(3)] string CorrelationId, [property: Id(4)] string? CausationId, [property: Id(5)] JsonElement Payload);
 
-public enum WorkflowState { Proposed, AwaitingApproval, Approved, Rejected, Expired, Cancelled, ApplyQueued, Applying, RetryScheduled, Succeeded, Failed, OutcomeUnknown, CompensationQueued, Compensated, ManualIntervention }
+public enum WorkflowState { Proposed, AwaitingApproval, Approved, Rejected, Expired, Cancelled, ApplyQueued, Applying, RetryScheduled, Succeeded, Failed, OutcomeUnknown, CompensationQueued, Compensated, ManualIntervention, AwaitingExternalAuthorization }
 [GenerateSerializer, Alias("digitalbrain.v2.workflow-transition")]
 public sealed record WorkflowTransition([property: Id(0)] WorkflowState From, [property: Id(1)] WorkflowState To, [property: Id(2)] DateTimeOffset At, [property: Id(3)] string? Reason = null);
 [GenerateSerializer, Alias("digitalbrain.v2.approval-record")]

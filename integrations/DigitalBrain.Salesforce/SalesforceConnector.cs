@@ -65,6 +65,24 @@ public class SalesforceConnector : IConnector
         var loginUrl = SalesforceClientFactory.ResolveLoginUrl(values);
         var clientId = values[SalesforceClientFactory.ClientIdKey].Trim();
 
+        var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
+        var priorPending = await _store.GetAsync(
+            userScope,
+            SalesforceClientFactory.OAuthPendingPackName,
+            cancellationToken);
+        if (SalesforceClientFactory.TryGetReplayableAuthorizationChallenge(
+                priorPending,
+                out var replayUrl,
+                out var replayState))
+        {
+            return new AuthChallenge(replayUrl, IsForm: false, State: replayState);
+        }
+
+        var flowId = priorPending.TryGetValue(SalesforceClientFactory.OAuthFlowIdKey, out var priorFlowId) &&
+                     SalesforceClientFactory.IsAuthorizationFlowId(priorFlowId)
+            ? priorFlowId
+            : SalesforceClientFactory.CreateAuthorizationFlowId();
+
         var state = _stateProtector.Protect(user);
         var codeVerifier = SalesforceClientFactory.CreatePkceCodeVerifier();
         var codeChallenge = SalesforceClientFactory.CreatePkceCodeChallenge(codeVerifier);
@@ -79,19 +97,41 @@ public class SalesforceConnector : IConnector
             return new AuthChallenge(UrlOrForm: "error:" + ex.Message, IsForm: true);
         }
 
-        var userScope = PackConfigScopes.ForUser(new UserId(user.Value));
-        await _store.SetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, new Dictionary<string, string>
+        var providerExpiresAt = DateTimeOffset.UtcNow
+            .Add(SalesforceClientFactory.OAuthPendingLifetime)
+            .ToUnixTimeSeconds()
+            .ToString(CultureInfo.InvariantCulture);
+        var pendingValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
+            [SalesforceClientFactory.OAuthPhaseKey] = SalesforceClientFactory.OAuthPhaseChallengeIssued,
+            [SalesforceClientFactory.OAuthFlowIdKey] = flowId,
             [SalesforceClientFactory.OAuthStateKey] = state,
+            [SalesforceClientFactory.OAuthAttemptFingerprintKey] =
+                SalesforceClientFactory.AuthorizationAttemptFingerprint(state),
+            [SalesforceClientFactory.OAuthAuthorizationUrlKey] = url,
             [SalesforceClientFactory.OAuthCodeVerifierKey] = codeVerifier,
             [SalesforceClientFactory.OAuthPendingClientIdKey] = clientId,
             [SalesforceClientFactory.OAuthPendingLoginUrlKey] = loginUrl,
             [SalesforceClientFactory.OAuthPendingRedirectUriKey] = redirectUri,
-            [SalesforceClientFactory.OAuthPendingExpiresAtKey] = DateTimeOffset.UtcNow
-                .Add(SalesforceClientFactory.OAuthPendingLifetime)
-                .ToUnixTimeSeconds()
-                .ToString(CultureInfo.InvariantCulture)
-        }, cancellationToken);
+            [SalesforceClientFactory.OAuthPendingExpiresAtKey] = providerExpiresAt
+        };
+        foreach (var key in new[]
+                 {
+                     SalesforceClientFactory.OAuthStartTokenKey,
+                     SalesforceClientFactory.OAuthStartTokenFingerprintKey,
+                     SalesforceClientFactory.OAuthStartExpiresAtKey
+                 })
+        {
+            if (priorPending.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+                pendingValues[key] = value;
+        }
+        if (pendingValues.ContainsKey(SalesforceClientFactory.OAuthStartTokenKey))
+            pendingValues[SalesforceClientFactory.OAuthStartExpiresAtKey] = providerExpiresAt;
+        await _store.SetAsync(
+            userScope,
+            SalesforceClientFactory.OAuthPendingPackName,
+            pendingValues,
+            cancellationToken);
 
         return new AuthChallenge(url, IsForm: false, State: state);
     }
@@ -106,14 +146,34 @@ public class SalesforceConnector : IConnector
 
         var appValues = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
         var pending = await _store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, cancellationToken);
+        var existingUser = await _store.GetAsync(userScope, SalesforceClientFactory.PackName, cancellationToken);
 
         if (IsPendingExpired(pending))
         {
-            await ClearPendingAsync(userScope);
+            await TerminalizePendingAsync(userScope, pending, "expired");
             return new AuthResult(false, "no-pending", "No pending OAuth flow.");
         }
 
         if (!pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) || string.IsNullOrWhiteSpace(expectedState))
+        {
+            var callbackFingerprint = SalesforceClientFactory.AuthorizationAttemptFingerprint(state);
+            var mergedCredentials = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
+            foreach (var item in existingUser)
+                mergedCredentials[item.Key] = item.Value;
+            if (existingUser.TryGetValue(SalesforceClientFactory.OAuthCompletedFingerprintKey, out var completedFingerprint) &&
+                SalesforceClientFactory.SameAuthorizationAttempt(callbackFingerprint, completedFingerprint) &&
+                SalesforceClientFactory.HasUsableCredential(mergedCredentials))
+            {
+                return new AuthResult(true);
+            }
+            return new AuthResult(false, "no-pending", "No pending OAuth flow.");
+        }
+
+        if (pending.TryGetValue(SalesforceClientFactory.OAuthPhaseKey, out var phase) &&
+            (!string.Equals(phase, SalesforceClientFactory.OAuthPhaseChallengeIssued, StringComparison.Ordinal) &&
+             !string.Equals(phase, SalesforceClientFactory.OAuthPhaseProcessing, StringComparison.Ordinal) ||
+             !pending.TryGetValue(SalesforceClientFactory.OAuthFlowIdKey, out var phaseFlowId) ||
+             !SalesforceClientFactory.IsAuthorizationFlowId(phaseFlowId)))
         {
             return new AuthResult(false, "no-pending", "No pending OAuth flow.");
         }
@@ -122,19 +182,49 @@ public class SalesforceConnector : IConnector
         {
             return new AuthResult(false, "state-mismatch", "State did not match.");
         }
+        var attemptFingerprint = SalesforceClientFactory.AuthorizationAttemptFingerprint(expectedState);
+        var flowId = pending.TryGetValue(SalesforceClientFactory.OAuthFlowIdKey, out var persistedFlowId) &&
+                     SalesforceClientFactory.IsAuthorizationFlowId(persistedFlowId)
+            ? persistedFlowId
+            : null;
+        if (!pending.TryGetValue(SalesforceClientFactory.OAuthAttemptFingerprintKey, out var persistedFingerprint) ||
+            !SalesforceClientFactory.SameAuthorizationAttempt(persistedFingerprint, attemptFingerprint))
+            return new AuthResult(false, "state-mismatch", "State did not match.");
+        var completedMatches = existingUser.TryGetValue(
+                                   SalesforceClientFactory.OAuthCompletedFingerprintKey,
+                                   out var completedFingerprintForReplay) &&
+                               SalesforceClientFactory.SameAuthorizationAttempt(
+                                   attemptFingerprint,
+                                   completedFingerprintForReplay);
+        var completedFlowMatches = flowId is null ||
+                                   existingUser.TryGetValue(
+                                       SalesforceClientFactory.OAuthCompletedFlowIdKey,
+                                       out var completedFlowForReplay) &&
+                                   string.Equals(flowId, completedFlowForReplay, StringComparison.Ordinal);
+        if (completedMatches && completedFlowMatches)
+        {
+            var mergedCredentials = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
+            foreach (var item in existingUser)
+                mergedCredentials[item.Key] = item.Value;
+            if (SalesforceClientFactory.HasUsableCredential(mergedCredentials))
+                return new AuthResult(true);
+        }
+
+        await SetPendingResultAsync(userScope, pending, "processing", attemptFingerprint, flowId);
 
         if (!string.IsNullOrWhiteSpace(callback.Error))
         {
-            await ClearPendingAsync(userScope);
-            return string.Equals(callback.Error, "access_denied", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(callback.Error, "user_denied_authorization", StringComparison.OrdinalIgnoreCase)
+            var denied = string.Equals(callback.Error, "access_denied", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(callback.Error, "user_denied_authorization", StringComparison.OrdinalIgnoreCase);
+            await SetPendingResultAsync(userScope, pending, denied ? "denied" : "provider-error", attemptFingerprint, flowId);
+            return denied
                 ? new AuthResult(false, "consent-denied", "Salesforce consent was denied.")
                 : new AuthResult(false, "provider-error", "Salesforce authorization failed.");
         }
 
         if (string.IsNullOrWhiteSpace(callback.Code))
         {
-            await ClearPendingAsync(userScope);
+            await SetPendingResultAsync(userScope, pending, "incomplete", attemptFingerprint, flowId);
             return new AuthResult(false, "no-code", "The callback did not include an authorization code.");
         }
 
@@ -150,11 +240,9 @@ public class SalesforceConnector : IConnector
             !appValues.TryGetValue(SalesforceClientFactory.ClientIdKey, out var currentClientId) ||
             !string.Equals(pendingClientId, currentClientId?.Trim(), StringComparison.Ordinal))
         {
-            await ClearPendingAsync(userScope);
+            await SetPendingResultAsync(userScope, pending, "configuration-changed", attemptFingerprint, flowId);
             return new AuthResult(false, "configuration-changed", "Salesforce configuration changed. Start authorization again.");
         }
-
-        await ClearPendingAsync(userScope);
 
         try
         {
@@ -175,18 +263,70 @@ public class SalesforceConnector : IConnector
             {
                 userTokenValues[kv.Key] = kv.Value;
             }
+            userTokenValues[SalesforceClientFactory.OAuthCompletedFingerprintKey] = attemptFingerprint;
+            if (flowId is not null)
+                userTokenValues[SalesforceClientFactory.OAuthCompletedFlowIdKey] = flowId;
 
             await _store.SetAsync(userScope, SalesforceClientFactory.PackName, userTokenValues, cancellationToken);
+            await BestEffortClearPendingAsync(userScope);
 
             return new AuthResult(true);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            await SetPendingResultAsync(userScope, pending, "cancelled", attemptFingerprint, flowId);
             throw;
         }
         catch (Exception)
         {
+            await SetPendingResultAsync(userScope, pending, "exchange-failed", attemptFingerprint, flowId);
             return new AuthResult(false, "exchange-failed", "The authorization code exchange failed.");
+        }
+    }
+
+    private Task SetPendingResultAsync(
+        string userScope,
+        IReadOnlyDictionary<string, string> pending,
+        string result,
+        string attemptFingerprint,
+        string? flowId)
+    {
+        var processing = string.Equals(result, "processing", StringComparison.Ordinal);
+        var values = processing
+            ? new Dictionary<string, string>(pending, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        values[SalesforceClientFactory.OAuthPhaseKey] = processing
+            ? SalesforceClientFactory.OAuthPhaseProcessing
+            : SalesforceClientFactory.OAuthPhaseFailed;
+        values[SalesforceClientFactory.OAuthResultKey] = result;
+        values[SalesforceClientFactory.OAuthAttemptFingerprintKey] = attemptFingerprint;
+        values[SalesforceClientFactory.OAuthPendingExpiresAtKey] = DateTimeOffset.UtcNow
+            .Add(SalesforceClientFactory.OAuthPendingLifetime)
+            .ToUnixTimeSeconds()
+            .ToString(CultureInfo.InvariantCulture);
+        if (flowId is not null)
+            values[SalesforceClientFactory.OAuthFlowIdKey] = flowId;
+        if (processing)
+            values[SalesforceClientFactory.OAuthProcessingExpiresAtKey] = DateTimeOffset.UtcNow
+                .Add(SalesforceClientFactory.OAuthProcessingLifetime)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture);
+        return _store.SetAsync(
+            userScope,
+            SalesforceClientFactory.OAuthPendingPackName,
+            values,
+            CancellationToken.None);
+    }
+
+    private async Task BestEffortClearPendingAsync(string userScope)
+    {
+        try
+        {
+            await ClearPendingAsync(userScope);
+        }
+        catch (Exception)
+        {
+            // The credential pack contains a matching completion witness for this exact flow.
         }
     }
 
@@ -205,14 +345,64 @@ public class SalesforceConnector : IConnector
             cancellationToken);
         if (pending.Count > 0 && IsPendingExpired(pending))
         {
-            await ClearPendingAsync(userScope);
+            if (pending.TryGetValue(SalesforceClientFactory.OAuthPhaseKey, out var phase) &&
+                string.Equals(phase, SalesforceClientFactory.OAuthPhaseFailed, StringComparison.Ordinal))
+            {
+                var compact = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [SalesforceClientFactory.OAuthPhaseKey] = SalesforceClientFactory.OAuthPhaseFailed,
+                    [SalesforceClientFactory.OAuthResultKey] = pending.GetValueOrDefault(
+                        SalesforceClientFactory.OAuthResultKey,
+                        "expired")
+                };
+                if (pending.TryGetValue(SalesforceClientFactory.OAuthFlowIdKey, out var flowId) &&
+                    SalesforceClientFactory.IsAuthorizationFlowId(flowId))
+                    compact[SalesforceClientFactory.OAuthFlowIdKey] = flowId;
+                if (pending.TryGetValue(SalesforceClientFactory.OAuthAttemptFingerprintKey, out var attempt) &&
+                    SalesforceClientFactory.IsAuthorizationAttemptFingerprint(attempt))
+                    compact[SalesforceClientFactory.OAuthAttemptFingerprintKey] = attempt;
+                await _store.SetAsync(
+                    userScope,
+                    SalesforceClientFactory.OAuthPendingPackName,
+                    compact,
+                    CancellationToken.None);
+            }
+            else
+            {
+                await TerminalizePendingAsync(userScope, pending, "expired");
+            }
         }
     }
 
+    private Task TerminalizePendingAsync(
+        string userScope,
+        IReadOnlyDictionary<string, string> pending,
+        string result)
+    {
+        var terminal = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [SalesforceClientFactory.OAuthPhaseKey] = SalesforceClientFactory.OAuthPhaseFailed,
+            [SalesforceClientFactory.OAuthResultKey] = result,
+            [SalesforceClientFactory.OAuthPendingExpiresAtKey] = DateTimeOffset.UtcNow
+                .Add(SalesforceClientFactory.OAuthPendingLifetime)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture)
+        };
+        if (pending.TryGetValue(SalesforceClientFactory.OAuthFlowIdKey, out var flowId) &&
+            SalesforceClientFactory.IsAuthorizationFlowId(flowId))
+            terminal[SalesforceClientFactory.OAuthFlowIdKey] = flowId;
+        if (pending.TryGetValue(SalesforceClientFactory.OAuthAttemptFingerprintKey, out var attempt) &&
+            SalesforceClientFactory.IsAuthorizationAttemptFingerprint(attempt))
+            terminal[SalesforceClientFactory.OAuthAttemptFingerprintKey] = attempt;
+        return _store.SetAsync(
+            userScope,
+            SalesforceClientFactory.OAuthPendingPackName,
+            terminal,
+            CancellationToken.None);
+    }
+
     private static bool IsPendingExpired(IReadOnlyDictionary<string, string> pending) =>
-        !pending.TryGetValue(SalesforceClientFactory.OAuthPendingExpiresAtKey, out var expiresAt) ||
-        !long.TryParse(expiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAtUnixSeconds) ||
-        expiresAtUnixSeconds <= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        SalesforceClientFactory.IsKnownPendingExpired(pending);
 
     public async Task<ConnectionHealth> TestConnectionAsync(NeuronId user, CancellationToken cancellationToken = default)
     {
@@ -230,9 +420,12 @@ public class SalesforceConnector : IConnector
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return new ConnectionHealth(Healthy: false, Detail: ex.Message, Checked: DateTimeOffset.UtcNow);
+            return new ConnectionHealth(
+                Healthy: false,
+                Detail: "Salesforce connection probe failed.",
+                Checked: DateTimeOffset.UtcNow);
         }
     }
 }

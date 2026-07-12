@@ -17,7 +17,7 @@ public static class KernelPack
     public const string Description = "Core kernel substrate with rolling replica support.";
 }
 
-[GrainType("digitalbrain.kernel.aspire")]
+[GrainType("digitalbrain.kernel.aspire.v1")]
 public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IAspireNeuron, IHandle<PerformKernelSelfUpdate>
 {
     public async Task HandleAsync(StartDistributedApp cmd, CancellationToken cancellationToken = default)
@@ -119,7 +119,7 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
     }
 }
 
-[GrainType("digitalbrain.observability")]
+[GrainType("digitalbrain.observability.v1")]
 public class ObservabilityNeuron(ILogger<ObservabilityNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IObservabilityNeuron
 {
     public async Task HandleAsync(UiSurface surface, CancellationToken cancellationToken = default)
@@ -162,7 +162,7 @@ public class ObservabilityNeuron(ILogger<ObservabilityNeuron> logger, NeuronJour
     }
 }
 
-[GrainType("digitalbrain.optimizer")]
+[GrainType("digitalbrain.optimizer.v1")]
 public class MetaOptimizerNeuron(ILogger<MetaOptimizerNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IMetaOptimizerNeuron
 {
     public async Task HandleAsync(NeuronTelemetry telemetry, CancellationToken cancellationToken = default)

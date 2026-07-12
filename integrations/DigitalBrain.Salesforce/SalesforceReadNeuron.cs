@@ -1,10 +1,12 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -26,6 +28,33 @@ public sealed class SalesforceReadNeuron(
     private const int MaximumContinuations = 32;
     private static readonly TimeSpan OAuthStartLifetime = TimeSpan.FromMinutes(5);
 
+    public async Task<ExternalAuthorizationResolution> ResolveAuthorizationAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
+        var userScope = PackConfigScopes.ForUser(scope.UserId);
+        var pending = await store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, cancellationToken);
+        var values = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
+        var providerResolution = SalesforceClientFactory.ResolveAuthorization(values, pending);
+        if (SalesforceClientFactory.IsProviderAuthorizationPhase(pending))
+            return providerResolution;
+        if (TryResolvePersistedOAuthStart(pending, out var persistedStart))
+            return persistedStart;
+
+        var startTokenHash = continuationState.State.OAuthStartTokenHash;
+        if (startTokenHash is { Length: 32 })
+        {
+            if (providerResolution.State == ExternalAuthorizationResolutionState.Ready)
+                return providerResolution;
+            if (continuationState.State.OAuthStartExpiresAtUnixSeconds >= DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                return new(ExternalAuthorizationResolutionState.Waiting);
+            if (pending.Count == 0)
+                return new(ExternalAuthorizationResolutionState.Failed, "authorization-start-expired");
+        }
+        return providerResolution;
+    }
+
     public async Task<SalesforceReadResult> BeginAuthorizationAsync(
         string startToken,
         CancellationToken cancellationToken = default)
@@ -33,8 +62,21 @@ public sealed class SalesforceReadNeuron(
         cancellationToken.ThrowIfCancellationRequested();
         var owner = new NeuronId(this.GetPrimaryKeyString());
         if (!oauthStateProtector.TryUnprotect(startToken, out var protectedOwner) ||
-            !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal) ||
-            !IsCurrentOAuthStartToken(startToken))
+            !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal))
+        {
+            return new SalesforceReadResult(
+                SalesforceReadStatus.Unavailable,
+                SafeReason: "This Salesforce connection request is invalid or expired. Start again from DigitalBrain.");
+        }
+
+        var userScope = PackConfigScopes.ForUser(new UserId(owner.Value));
+        var pending = await store.GetAsync(
+            userScope,
+            SalesforceClientFactory.OAuthPendingPackName,
+            cancellationToken);
+        var isPersistedStart = IsCurrentPersistedOAuthStartToken(pending, startToken);
+        var isLegacyStart = IsCurrentLegacyOAuthStartToken(startToken);
+        if (!isPersistedStart && !isLegacyStart)
         {
             return new SalesforceReadResult(
                 SalesforceReadStatus.Unavailable,
@@ -43,14 +85,17 @@ public sealed class SalesforceReadNeuron(
 
         try
         {
-            await ConsumeOAuthStartTokenAsync();
             var challenge = await connector.BeginAuthAsync(owner, cancellationToken: cancellationToken);
             if (challenge.IsForm || !SalesforceClientFactory.IsAllowedAuthorizationUrl(challenge.UrlOrForm))
             {
+                if (isPersistedStart)
+                    await TerminalizePersistedOAuthStartAsync(userScope, pending, "configuration-missing");
                 return new SalesforceReadResult(
                     SalesforceReadStatus.ConfigurationMissing,
                     SafeReason: "Salesforce application configuration is missing.");
             }
+            if (isLegacyStart)
+                await ConsumeLegacyOAuthStartTokenAsync();
 
             return new SalesforceReadResult(
                 SalesforceReadStatus.NeedsAuth,
@@ -351,24 +396,73 @@ public sealed class SalesforceReadNeuron(
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            var userScope = PackConfigScopes.ForUser(new UserId(owner.Value));
+            var pending = await store.GetAsync(
+                userScope,
+                SalesforceClientFactory.OAuthPendingPackName,
+                cancellationToken);
+            var providerResolution = SalesforceClientFactory.ResolveAuthorization(values, pending);
+
+            if (TryGetReusableLocalStartToken(pending, owner, out var reusableStartToken))
+            {
+                return new SalesforceReadResult(
+                    SalesforceReadStatus.NeedsAuth,
+                    SafeReason: reason,
+                    ConnectionUrl: SalesforceClientFactory.CreateOAuthStartUrl(values, reusableStartToken));
+            }
+
+            if (pending.TryGetValue(SalesforceClientFactory.OAuthPhaseKey, out var phase) &&
+                string.Equals(phase, SalesforceClientFactory.OAuthPhaseProcessing, StringComparison.Ordinal) &&
+                providerResolution.State == ExternalAuthorizationResolutionState.Waiting)
+            {
+                return new SalesforceReadResult(
+                    SalesforceReadStatus.Unavailable,
+                    SafeReason: "Salesforce authorization is being completed. Please wait a moment.");
+            }
+
             var startToken = oauthStateProtector.Protect(owner);
             var startUrl = SalesforceClientFactory.CreateOAuthStartUrl(values, startToken);
-            var previousState = continuationState.State;
-            continuationState.State = new SalesforceReadNeuronState
+            Dictionary<string, string> nextPending;
+            var startsNewFlow = false;
+            if (pending.TryGetValue(SalesforceClientFactory.OAuthPhaseKey, out phase) &&
+                string.Equals(phase, SalesforceClientFactory.OAuthPhaseChallengeIssued, StringComparison.Ordinal) &&
+                providerResolution.State == ExternalAuthorizationResolutionState.Waiting)
             {
-                SerializedContinuations = previousState.SerializedContinuations,
-                OAuthStartTokenHash = HashOAuthStartToken(startToken),
-                OAuthStartExpiresAtUnixSeconds = DateTimeOffset.UtcNow.Add(OAuthStartLifetime).ToUnixTimeSeconds()
-            };
-            try
-            {
-                await continuationState.WriteStateAsync(CancellationToken.None);
+                nextPending = new Dictionary<string, string>(pending, StringComparer.OrdinalIgnoreCase);
+                if (!nextPending.TryGetValue(SalesforceClientFactory.OAuthFlowIdKey, out var flowId) ||
+                    !SalesforceClientFactory.IsAuthorizationFlowId(flowId))
+                    nextPending[SalesforceClientFactory.OAuthFlowIdKey] = SalesforceClientFactory.CreateAuthorizationFlowId();
             }
-            catch
+            else
             {
-                continuationState.State = previousState;
-                throw;
+                startsNewFlow = true;
+                nextPending = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [SalesforceClientFactory.OAuthPhaseKey] = SalesforceClientFactory.OAuthPhaseLocalStart,
+                    [SalesforceClientFactory.OAuthFlowIdKey] = SalesforceClientFactory.CreateAuthorizationFlowId()
+                };
             }
+
+            nextPending[SalesforceClientFactory.OAuthStartTokenKey] = startToken;
+            nextPending[SalesforceClientFactory.OAuthStartTokenFingerprintKey] =
+                SalesforceClientFactory.AuthorizationAttemptFingerprint(startToken);
+            nextPending[SalesforceClientFactory.OAuthStartExpiresAtKey] = DateTimeOffset.UtcNow
+                .Add(OAuthStartLifetime)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture);
+            if (startsNewFlow)
+            {
+                await store.SetAsync(
+                    userScope,
+                    SalesforceClientFactory.PackName,
+                    new Dictionary<string, string>(),
+                    CancellationToken.None);
+            }
+            await store.SetAsync(
+                userScope,
+                SalesforceClientFactory.OAuthPendingPackName,
+                nextPending,
+                CancellationToken.None);
 
             return new SalesforceReadResult(
                 SalesforceReadStatus.NeedsAuth,
@@ -388,7 +482,74 @@ public sealed class SalesforceReadNeuron(
         }
     }
 
-    private bool IsCurrentOAuthStartToken(string startToken)
+    private static bool TryResolvePersistedOAuthStart(
+        IReadOnlyDictionary<string, string> pending,
+        out ExternalAuthorizationResolution resolution)
+    {
+        if (!pending.TryGetValue(SalesforceClientFactory.OAuthPhaseKey, out var phase) ||
+            !string.Equals(phase, SalesforceClientFactory.OAuthPhaseLocalStart, StringComparison.Ordinal))
+        {
+            resolution = default!;
+            return false;
+        }
+
+        if (!pending.TryGetValue(SalesforceClientFactory.OAuthStartTokenKey, out var startToken) ||
+            string.IsNullOrWhiteSpace(startToken) ||
+            !pending.TryGetValue(SalesforceClientFactory.OAuthStartTokenFingerprintKey, out var fingerprint) ||
+            !SalesforceClientFactory.SameAuthorizationAttempt(
+                fingerprint,
+                SalesforceClientFactory.AuthorizationAttemptFingerprint(startToken)) ||
+            !pending.TryGetValue(SalesforceClientFactory.OAuthStartExpiresAtKey, out var expiresAt) ||
+            !long.TryParse(expiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAtUnixSeconds))
+        {
+            resolution = new(ExternalAuthorizationResolutionState.Failed, "authorization-start-invalid");
+            return true;
+        }
+
+        resolution = expiresAtUnixSeconds >= DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            ? new(ExternalAuthorizationResolutionState.Waiting)
+            : new(ExternalAuthorizationResolutionState.Failed, "authorization-start-expired");
+        return true;
+    }
+
+    private static bool IsCurrentPersistedOAuthStartToken(
+        IReadOnlyDictionary<string, string> pending,
+        string startToken)
+    {
+        if (!pending.TryGetValue(SalesforceClientFactory.OAuthPhaseKey, out var phase) ||
+            (!string.Equals(phase, SalesforceClientFactory.OAuthPhaseLocalStart, StringComparison.Ordinal) &&
+             !string.Equals(phase, SalesforceClientFactory.OAuthPhaseChallengeIssued, StringComparison.Ordinal)) ||
+            !pending.TryGetValue(SalesforceClientFactory.OAuthStartTokenFingerprintKey, out var expectedFingerprint) ||
+            !pending.TryGetValue(SalesforceClientFactory.OAuthStartExpiresAtKey, out var expiresAt) ||
+            !long.TryParse(expiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAtUnixSeconds) ||
+            expiresAtUnixSeconds < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+        {
+            return false;
+        }
+
+        return SalesforceClientFactory.SameAuthorizationAttempt(
+            expectedFingerprint,
+            SalesforceClientFactory.AuthorizationAttemptFingerprint(startToken));
+    }
+
+    private bool TryGetReusableLocalStartToken(
+        IReadOnlyDictionary<string, string> pending,
+        NeuronId owner,
+        out string startToken)
+    {
+        startToken = string.Empty;
+        if (!pending.TryGetValue(SalesforceClientFactory.OAuthStartTokenKey, out var candidate) ||
+            string.IsNullOrWhiteSpace(candidate) ||
+            !IsCurrentPersistedOAuthStartToken(pending, candidate) ||
+            !oauthStateProtector.TryUnprotect(candidate, out var protectedOwner) ||
+            !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal))
+            return false;
+
+        startToken = candidate;
+        return true;
+    }
+
+    private bool IsCurrentLegacyOAuthStartToken(string startToken)
     {
         var expectedHash = continuationState.State.OAuthStartTokenHash;
         return expectedHash is { Length: 32 } &&
@@ -396,7 +557,7 @@ public sealed class SalesforceReadNeuron(
                CryptographicOperations.FixedTimeEquals(expectedHash, HashOAuthStartToken(startToken));
     }
 
-    private async Task ConsumeOAuthStartTokenAsync()
+    private async Task ConsumeLegacyOAuthStartTokenAsync()
     {
         var previousState = continuationState.State;
         continuationState.State = new SalesforceReadNeuronState
@@ -412,6 +573,30 @@ public sealed class SalesforceReadNeuron(
             continuationState.State = previousState;
             throw;
         }
+    }
+
+    private Task TerminalizePersistedOAuthStartAsync(
+        string userScope,
+        IReadOnlyDictionary<string, string> pending,
+        string result)
+    {
+        var terminal = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [SalesforceClientFactory.OAuthPhaseKey] = SalesforceClientFactory.OAuthPhaseFailed,
+            [SalesforceClientFactory.OAuthResultKey] = result,
+            [SalesforceClientFactory.OAuthPendingExpiresAtKey] = DateTimeOffset.UtcNow
+                .Add(SalesforceClientFactory.OAuthPendingLifetime)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture)
+        };
+        if (pending.TryGetValue(SalesforceClientFactory.OAuthFlowIdKey, out var flowId) &&
+            SalesforceClientFactory.IsAuthorizationFlowId(flowId))
+            terminal[SalesforceClientFactory.OAuthFlowIdKey] = flowId;
+        return store.SetAsync(
+            userScope,
+            SalesforceClientFactory.OAuthPendingPackName,
+            terminal,
+            CancellationToken.None);
     }
 
     private static byte[] HashOAuthStartToken(string token) =>
