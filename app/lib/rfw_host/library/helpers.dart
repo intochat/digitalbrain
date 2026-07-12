@@ -9,12 +9,8 @@ int _int(DataSource s, String k, int def) =>
     s.v<int>([k]) ?? s.v<double>([k])?.toInt() ?? def;
 bool _bool(DataSource s, String k, bool def) => s.v<bool>([k]) ?? def;
 
-double _dp(DataSource s, List<Object> p, [double def = 0]) =>
-    s.v<double>(p) ?? s.v<int>(p)?.toDouble() ?? def;
 String _sp(DataSource s, List<Object> p, [String def = '']) =>
     s.v<String>(p) ?? def;
-int _ip(DataSource s, List<Object> p, [int def = 0]) =>
-    s.v<int>(p) ?? s.v<double>(p)?.toInt() ?? def;
 
 Color _tone(String tone) {
   switch (tone) {
