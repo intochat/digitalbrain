@@ -35,9 +35,6 @@
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
   </Folder>
-  <Folder Name="/tools/">
-
-  </Folder>
 </Solution>
 
 
