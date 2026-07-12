@@ -1,3 +1,0 @@
-
-Passed!  - Failed:     0, Passed:   344, Skipped:     0, Total:   344, Duration: 45 s - DigitalBrain.Tests.dll (net11.0)
-
