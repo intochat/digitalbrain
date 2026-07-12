@@ -1,0 +1,148 @@
+using System.Security.Cryptography;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Hosting;
+using DigitalBrain.Kernel.Runtime;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+
+namespace DigitalBrain.Tests.Kernel;
+
+public sealed class RuntimeStateHostingTests
+{
+    [Fact]
+    public void Hosted_runtime_state_registers_a_purpose_derived_exact_aes256_kek()
+    {
+        var rawKek = Enumerable.Range(0, 33).Select(static value => (byte)value).ToArray();
+        var builder = HostedBuilder(managedIdentity: false, rawKek);
+
+        builder.UseDigitalBrainOrleans();
+
+        using var services = builder.Services.BuildServiceProvider();
+        var ring = services.GetRequiredService<IRuntimeStateKeyRing>();
+        Assert.Equal(1, ring.ActiveKekVersion);
+        Assert.True(ring.TryGetKek(1, out var derived));
+        Assert.Equal(32, derived.Length);
+        Assert.False(derived.Span.SequenceEqual(rawKek.AsSpan(0, 32)));
+        Assert.Same(ring, services.GetRequiredService<RuntimeStateKeyRing>());
+        Assert.NotNull(services.GetRequiredService<EncryptedRuntimeStateProtector>());
+    }
+
+    [Fact]
+    public void Hosted_and_production_configuration_fail_closed_instead_of_selecting_memory_storage()
+    {
+        var hosted = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+        {
+            EnvironmentName = Environments.Development
+        });
+        AddStorageConnections(hosted);
+        Assert.Throws<InvalidOperationException>(() => hosted.UseDigitalBrainOrleans());
+
+        var production = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+        {
+            EnvironmentName = Environments.Production
+        });
+        AddKeys(production, RandomNumberGenerator.GetBytes(32));
+        var exception = Assert.Throws<InvalidOperationException>(() => production.UseDigitalBrainOrleans());
+        Assert.Contains("ConnectionStrings:clustering", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Production_rejects_oversized_kek_instead_of_deriving_deployment_key_material()
+    {
+        var production = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+        {
+            EnvironmentName = Environments.Production
+        });
+        AddStorageConnections(production);
+        AddKeys(production, RandomNumberGenerator.GetBytes(33));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => production.UseDigitalBrainOrleans());
+
+        Assert.Contains("exactly 32 bytes in Production", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Runtime_storage_and_authenticated_marker_names_are_isolated_by_namespace()
+    {
+        var mainContainer = RuntimeStateStorageNames.Container("main", "conversations");
+        var isolatedContainer = RuntimeStateStorageNames.Container("test-run", "conversations");
+
+        Assert.Equal(mainContainer, RuntimeStateStorageNames.Container(" MAIN ", "conversations"));
+        Assert.NotEqual(mainContainer, isolatedContainer);
+        Assert.NotEqual(
+            RuntimeStateStorageNames.MigrationMarkerBlob("main"),
+            RuntimeStateStorageNames.MigrationMarkerBlob("test-run"));
+        Assert.DoesNotContain("main", RuntimeStateStorageNames.MigrationMarkerBlob("main"), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false, "azure-blob-connection-string")]
+    [InlineData(true, "azure-blob-managed-identity")]
+    public async Task Both_azure_paths_register_dedicated_containers_and_metadata_only_health(
+        bool managedIdentity,
+        string expectedBackend)
+    {
+        var builder = HostedBuilder(managedIdentity, RandomNumberGenerator.GetBytes(33));
+        builder.UseDigitalBrainOrleans();
+
+        using var services = builder.Services.BuildServiceProvider();
+        var storage = services.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>();
+        AssertProvider(RuntimeStateStorageProviders.Conversations, "conversations");
+        AssertProvider(RuntimeStateStorageProviders.SurfaceFeeds, "surface-feeds");
+        AssertProvider(RuntimeStateStorageProviders.Sessions, "sessions");
+
+        var healthOptions = services.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
+        var registration = Assert.Single(healthOptions.Registrations,
+            static candidate => candidate.Name == "digitalbrain-runtime-state");
+        var result = await registration.Factory(services).CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Healthy, result.Status);
+        Assert.Equal(["backendKind", "keyVersion", "migrationStatus", "namespace", "schemaVersion"],
+            result.Data.Keys.Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(expectedBackend, Assert.IsType<string>(result.Data["backendKind"]));
+        Assert.Equal("main", Assert.IsType<string>(result.Data["namespace"]));
+        Assert.Equal(RuntimeStateSchemas.Envelope, Assert.IsType<int>(result.Data["schemaVersion"]));
+        Assert.Equal(1, Assert.IsType<int>(result.Data["keyVersion"]));
+        Assert.Equal("not-required", Assert.IsType<string>(result.Data["migrationStatus"]));
+
+        void AssertProvider(string name, string kind)
+        {
+            var options = storage.Get(name);
+            Assert.Equal(RuntimeStateStorageNames.Container("main", kind), options.ContainerName);
+            Assert.NotNull(options.BlobServiceClient);
+        }
+    }
+
+    private static HostApplicationBuilder HostedBuilder(bool managedIdentity, byte[] rawKek)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+        {
+            EnvironmentName = Environments.Development
+        });
+        if (managedIdentity)
+            builder.Configuration["DigitalBrain:Storage:AccountName"] = "digitalbrainstate";
+        else
+            AddStorageConnections(builder);
+        AddKeys(builder, rawKek);
+        builder.Configuration["DigitalBrain:Runtime:MigrationStatusOverride"] = "not-required";
+        return builder;
+    }
+
+    private static void AddStorageConnections(HostApplicationBuilder builder)
+    {
+        builder.Configuration["ConnectionStrings:clustering"] = "UseDevelopmentStorage=true";
+        builder.Configuration["ConnectionStrings:grainstate"] = "UseDevelopmentStorage=true";
+        builder.Configuration["ConnectionStrings:journal"] = "UseDevelopmentStorage=true";
+    }
+
+    private static void AddKeys(HostApplicationBuilder builder, byte[] rawKek)
+    {
+        builder.Configuration["DigitalBrain:Runtime:State:ActiveKekVersion"] = "1";
+        builder.Configuration["DigitalBrain:Runtime:State:Keks:1"] = Convert.ToBase64String(rawKek);
+        builder.Configuration["DigitalBrain:Runtime:State:SigningKey"] =
+            Convert.ToBase64String(Enumerable.Repeat((byte)0xD7, 33).ToArray());
+    }
+}
