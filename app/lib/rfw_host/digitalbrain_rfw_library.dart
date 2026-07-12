@@ -19,11 +19,11 @@ import 'package:graphic/graphic.dart' as graphic;
 
 import 'package:digitalbrain_flutter/digital_brain_ui/digital_brain_ui.dart';
 import 'package:digitalbrain_flutter/features/live/graph/domain_palette.dart';
-import 'package:digitalbrain_flutter/features/ino_editor/prompt_input_bus.dart';
-import 'package:digitalbrain_flutter/features/ino_editor/typewriter_controller.dart';
-import 'package:digitalbrain_flutter/features/ino_editor/state_editor_bus.dart';
-import 'package:digitalbrain_flutter/features/ino_editor/llm_settings_bus.dart';
-import 'package:digitalbrain_flutter/features/ino_editor/ino_editor_bus.dart';
+import 'package:digitalbrain_flutter/runtime/buses/prompt_input_bus.dart';
+import 'package:digitalbrain_flutter/runtime/buses/typewriter_controller.dart';
+import 'package:digitalbrain_flutter/runtime/buses/state_editor_bus.dart';
+import 'package:digitalbrain_flutter/runtime/buses/llm_settings_bus.dart';
+import 'package:digitalbrain_flutter/runtime/buses/ino_editor_bus.dart';
 import 'package:digitalbrain_flutter/rfw_host/synapse_stream_scope.dart';
 import 'package:digitalbrain_flutter/theme/digitalbrain_theme.dart';
 import 'package:digitalbrain_flutter/shell/digitalbrain_client_scope.dart';
