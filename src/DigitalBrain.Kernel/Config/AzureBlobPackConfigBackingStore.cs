@@ -48,7 +48,11 @@ public sealed class AzureBlobPackConfigBackingStore : IPackConfigBackingStore
         var blob = EntryBlob(scope, pack);
         if (!(await blob.ExistsAsync(cancellationToken)).Value)
         {
-            return null;
+            // Opaque-named blob naming shipped after plaintext {scope}/{pack}.bin names were already in
+            // use; transparently migrate on first read so a pre-existing connection isn't silently stranded
+            // and the caller forced into re-authenticating.
+            if (await MigrateLegacyEntryAsync(scope, pack, cancellationToken) == PackConfigLegacyMigrationResult.SourceMissing)
+                return null;
         }
 
         return await DownloadAsync(blob, cancellationToken);

@@ -52,11 +52,6 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
         }
 
         await FireAsync(new DataChartGenerated(surfaceId, surface), cancellationToken);
-        await BroadcastRfwCard(surface, cancellationToken);
-
-        // P0-5: also deliver UiSurface to dedicated FlutterUiNeuron (point-to-point via I* contract) so it owns handling for thin client.
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
-        await flutter.DeliverAsync(surface.Stamp(Self, CurrentCause), cancellationToken);
     }
 
     public async Task HandleAsync(ChartCommand command, CancellationToken cancellationToken = default)
@@ -116,7 +111,6 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
 
         var s = UiSurfaceSamples.Chart(command.SurfaceId, Self.Value, newSpec);
         await FireAsync(new DataChartGenerated(command.SurfaceId, s), cancellationToken);
-        await BroadcastRfwCard(s, cancellationToken);
     }
 
     public async Task HandleAsync(ChartInteraction inter, CancellationToken cancellationToken = default)
@@ -128,7 +122,6 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
 
         var s = UiSurfaceSamples.Chart(inter.SurfaceId, Self.Value, session.Current);
         await FireAsync(new DataChartGenerated(inter.SurfaceId, s), cancellationToken);
-        await BroadcastRfwCard(s, cancellationToken);
     }
 
     private IReadOnlyList<IReadOnlyDictionary<string, object?>> Apply(ChartSession ses, string action, string? arg)
@@ -218,14 +211,6 @@ public class ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals) :
         };
 
         return surface with { Props = props };
-    }
-
-    private async Task BroadcastRfwCard(UiSurface surface, CancellationToken cancellationToken)
-    {
-        // Prefer routing through dedicated IFlutterUiNeuron (item 14) so it owns the UI channel, applies bridge, and broadcasts.
-        // Uses CorrelationId from surface for context sharing (per channel marker).
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
-        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
     private sealed class ChartSession

@@ -171,7 +171,7 @@ internal sealed class ToolResultComposer(SemanticIntentValidator validator)
             ["hasMore"] = continuationValue is not null
         };
         if (matchedSender is not null) envelope["matchedGmailSender"] = matchedSender;
-        var recordIds = SalesforceRecordIds(content).Distinct(StringComparer.Ordinal).Take(20).ToArray();
+        var recordIds = validator.SalesforceRecordIds(content).Distinct(StringComparer.Ordinal).Take(20).ToArray();
         var grounding = JsonSerializer.SerializeToElement(new
         {
             entity,
@@ -206,46 +206,6 @@ internal sealed class ToolResultComposer(SemanticIntentValidator validator)
             ToolOutcomeKind.PermanentFailure,
             SafeReason: validator.SafeProviderReason(safeReason, "That typed request is unavailable."));
 
-    private IEnumerable<string> SalesforceRecordIds(JsonElement value)
-    {
-        if (value.ValueKind == JsonValueKind.String)
-        {
-            if (validator.IsValidSalesforceRecordId(value.GetString()))
-            {
-                yield return value.GetString()!;
-                yield break;
-            }
-            JsonElement parsed;
-            try
-            {
-                parsed = JsonElement.Parse(value.GetString() ?? string.Empty);
-            }
-            catch (JsonException)
-            {
-                yield break;
-            }
-            foreach (var id in SalesforceRecordIds(parsed)) yield return id;
-            yield break;
-        }
-        if (value.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in value.EnumerateArray())
-            {
-                foreach (var id in SalesforceRecordIds(item))
-                    yield return id;
-            }
-            yield break;
-        }
-        if (value.ValueKind != JsonValueKind.Object) yield break;
-        if (value.TryGetProperty("RecordId", out var recordId) && recordId.ValueKind == JsonValueKind.String &&
-            validator.IsValidSalesforceRecordId(recordId.GetString()))
-            yield return recordId.GetString()!;
-        foreach (var property in value.EnumerateObject())
-        {
-            if (property.Name is "Fields" or "attributes" or "RecordId") continue;
-            foreach (var id in SalesforceRecordIds(property.Value)) yield return id;
-        }
-    }
 
     private static string GmailMailboxStatus(GmailMailboxState state) => state switch
     {

@@ -16,7 +16,11 @@ public sealed class OAuthCallbackPathTests
         Assert.Equal("/oauth/start/google", OAuthCallbackPaths.GoogleStart);
         Assert.Equal(OAuthCallbackPaths.Google, GoogleAspireExtensions.DefaultCallbackPath);
         Assert.Equal(OAuthCallbackPaths.Google, GoogleClientFactory.DefaultCallbackPath);
-        Assert.EndsWith(OAuthCallbackPaths.Google, GoogleClientFactory.DefaultRedirectUri);
+        // Full-URL check, matching the Salesforce assertion below -- a path-suffix-only check let the port
+        // silently drift from the kernel's actual default (8081 vs 51014) without any test catching it.
+        Assert.Equal(
+            "http://localhost:51014/oauth/callback/google",
+            GoogleClientFactory.DefaultRedirectUri);
     }
 
     [Fact]

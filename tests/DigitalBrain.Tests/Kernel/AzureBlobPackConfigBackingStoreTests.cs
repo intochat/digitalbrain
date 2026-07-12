@@ -54,7 +54,7 @@ public class AzureBlobPackConfigBackingStoreTests
     }
 
     [Fact]
-    public async Task LoadAsync_DoesNotReadLegacyName_AndMigrationCopiesIdempotently()
+    public async Task LoadAsync_transparently_migrates_a_legacy_entry_on_the_first_read()
     {
         const string scope = "tenant-secret-scope";
         const string pack = "google-private-config";
@@ -65,14 +65,14 @@ public class AzureBlobPackConfigBackingStoreTests
         var legacyName = $"{scope}/{pack}.bin";
         blobs.Container.Seed(legacyName, sourceBytes);
 
-        Assert.Null(await store.LoadAsync(scope, pack));
+        // A pre-existing connection (persisted under the plaintext legacy name before opaque naming
+        // shipped) must be visible on the very first read, not just after an explicit migration call --
+        // otherwise the caller silently looks "disconnected" and is forced to re-authenticate.
+        var first = await store.LoadAsync(scope, pack);
+        var second = await store.LoadAsync(scope, pack);
 
-        var first = await store.MigrateLegacyEntryAsync(scope, pack);
-        var second = await store.MigrateLegacyEntryAsync(scope, pack);
-
-        Assert.Equal(PackConfigLegacyMigrationResult.Copied, first);
-        Assert.Equal(PackConfigLegacyMigrationResult.AlreadyMigrated, second);
-        Assert.Equal(sourceBytes, await store.LoadAsync(scope, pack));
+        Assert.Equal(sourceBytes, first);
+        Assert.Equal(sourceBytes, second);
         Assert.Equal(sourceBytes, blobs.Container.Read(legacyName));
         Assert.Equal(sourceBytes, blobs.Container.Read(ExpectedName(signingKey, scope, pack)));
     }

@@ -447,7 +447,7 @@ public sealed class McpIntegrationPlanner : IIntentCapabilityPlanner
             return [Clarification(SafeClarification(normalized.Provider))];
         }
 
-        var toolId = ToolId(normalized);
+        var toolId = SemanticIntentValidator.ExpectedTool(normalized);
         activity?.SetTag("db.ino.tool_id", toolId ?? "assistant.clarify");
         activity?.SetTag("db.ino.outcome", toolId is null ? "unsupported" : "planned");
         return toolId is null
@@ -490,33 +490,6 @@ public sealed class McpIntegrationPlanner : IIntentCapabilityPlanner
         }
         return result;
     }
-
-    private static string? ToolId(SemanticIntentProposal proposal) => proposal.Provider switch
-    {
-        SemanticProvider.Gmail => proposal.Operation switch
-        {
-            SemanticOperation.List or SemanticOperation.Refine or SemanticOperation.Previous => GmailTools.ReadMessages,
-            SemanticOperation.Overview => GmailTools.ReadMailboxOverview,
-            SemanticOperation.Threads => GmailTools.ReadThreads,
-            SemanticOperation.Summarize => GmailTools.SummarizeThread,
-            _ => null
-        },
-        SemanticProvider.Salesforce => proposal.Operation switch
-        {
-            SemanticOperation.Discover => SalesforceTools.DiscoverObjects,
-            SemanticOperation.Search => SalesforceTools.SearchRecords,
-            SemanticOperation.Aggregate => SalesforceTools.AggregateRecords,
-            SemanticOperation.NextPage => SalesforceTools.ContinueRecords,
-            SemanticOperation.MutationPreview => SalesforceTools.PreviewMutation,
-            SemanticOperation.List or SemanticOperation.Refine or SemanticOperation.Related or
-                SemanticOperation.Details or SemanticOperation.Previous => SalesforceTools.ReadRecords,
-            _ => null
-        },
-        SemanticProvider.CrossProvider when proposal.Operation == SemanticOperation.Match &&
-                                                 proposal.Reference == SemanticReference.LatestGmailSender =>
-            CrossProviderTools.MatchSalesforceAccountToGmailSender,
-        _ => null
-    };
 
     private static bool TryNormalize(
         SemanticIntentProposal? proposal,

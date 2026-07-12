@@ -240,17 +240,12 @@ public sealed class IntegrationToolTests
     }
 
     [Fact]
-    public async Task Configured_salesforce_origin_cannot_expand_the_internal_action_policy()
+    public async Task A_provider_hosted_salesforce_start_origin_is_rejected_by_the_internal_action_policy()
     {
-        var configuration = new ConfigurationManager
-        {
-            ["DigitalBrain:Salesforce:RedirectUri"] = "https://brain.example/oauth/callback/salesforce"
-        };
         var catalog = new McpAuthorizedToolCatalog(
             new RecordingGateway(salesforce: new(
                 SalesforceReadStatus.NeedsAuth,
-                ConnectionUrl: $"https://brain.example{OAuthCallbackPaths.SalesforceStart}?f={OAuthFlowReference}")),
-            configuration: configuration);
+                ConnectionUrl: $"https://brain.example{OAuthCallbackPaths.SalesforceStart}?f={OAuthFlowReference}")));
 
         var result = await catalog.InvokeAsync(
             Context("user", "workspace", "salesforce.read"),

@@ -1,3 +1,5 @@
+using DigitalBrain.Core.Runtime;
+
 namespace DigitalBrain.Core;
 
 public static class OAuthCallbackPaths
@@ -10,6 +12,20 @@ public static class OAuthCallbackPaths
     public const string SalesforceStart = "/oauth/start/salesforce";
     public const int MinimumFlowReferenceLength = 32;
     public const int MaximumFlowReferenceLength = 1024;
+    public const int MaximumActionLabelLength = 64;
+    public const int MaximumActionTargetLength = 4096;
+
+    // Re-run on every read/projection, not only when an authorization is freshly issued, so a
+    // historically-poisoned record can never surface un-validated.
+    public static bool IsStructurallyValidAction(ToolAction? action) =>
+        action is not null &&
+        string.Equals(action.Kind, "openUrl", StringComparison.Ordinal) &&
+        !string.IsNullOrWhiteSpace(action.Label) &&
+        action.Label.Length <= MaximumActionLabelLength &&
+        !action.Label.Any(char.IsControl) &&
+        !string.IsNullOrWhiteSpace(action.Target) &&
+        action.Target.Length <= MaximumActionTargetLength &&
+        TryParseInternalStartPath(action.Target, out _, out _);
 
     public static bool IsSupportedProvider(string? provider) =>
         provider is GoogleProvider or SalesforceProvider;

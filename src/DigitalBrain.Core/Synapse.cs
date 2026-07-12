@@ -51,10 +51,9 @@ public record ExperienceUsed(
 [Alias("DigitalBrain.Core.IAspireNeuron")]
 public interface IAspireNeuron : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
 
-// Thin common marker for channel neurons (Flutter UI and similar) per item 13.
+// Thin common marker for channel neurons.
 // Allows discovery and shared patterns (e.g. CorrelationId/CausationId for reply context across channels).
-// No methods yet - keeps it thin; specific contracts live in feature contract assemblies
-// (IFlutterUiNeuron in DigitalBrain.Ui.Contracts and channel packs), not Core.
+// No methods yet - keeps it thin; specific contracts live in feature contract assemblies, not Core.
 [Alias("DigitalBrain.Core.IChannelNeuron")]
 public interface IChannelNeuron : INeuron
 {

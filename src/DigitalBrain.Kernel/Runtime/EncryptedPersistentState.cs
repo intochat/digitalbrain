@@ -443,38 +443,15 @@ public sealed class EncryptedPersistentState<TState>
 
     private async Task WriteWithRollbackAsync(EncryptedRuntimeStateEnvelope next)
     {
-        var previousState = _persistentState.State;
-        var previousEtag = _persistentState.Etag;
-        var previousExists = _persistentState.RecordExists;
-        _persistentState.State = next;
         try
         {
-            await _persistentState.WriteStateAsync().ConfigureAwait(false);
+            await PersistedStateReconciliation.WriteWithRollbackAsync(_persistentState, next, SameEnvelope)
+                .ConfigureAwait(false);
         }
-        catch (Exception writeFailure)
+        catch (PersistedStateWriteOutcomeUnknownException)
         {
-            try
-            {
-                await _persistentState.ReadStateAsync().ConfigureAwait(false);
-            }
-            catch (Exception recoveryFailure)
-            {
-                _poisoned = true;
-                throw new InvalidOperationException(
-                    "Runtime-state write outcome is unknown and this activation is no longer usable.",
-                    new AggregateException(writeFailure, recoveryFailure));
-            }
-            if (_persistentState.RecordExists && SameEnvelope(_persistentState.State, next))
-                return;
-            if (_persistentState.RecordExists == previousExists &&
-                string.Equals(_persistentState.Etag, previousEtag, StringComparison.Ordinal) &&
-                SameEnvelope(_persistentState.State, previousState))
-            {
-                throw;
-            }
-            throw new InvalidOperationException(
-                "Runtime-state write failed after the durable concurrency state advanced; the refreshed state was retained.",
-                writeFailure);
+            _poisoned = true;
+            throw;
         }
     }
 

@@ -18,11 +18,6 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
     public override async Task OnActivateAsync(CancellationToken ct)
     {
         await base.OnActivateAsync(ct);
-
-        if (!ActiveSessions().Any())
-        {
-            await BroadcastAsync(LoginSurface(), ct);
-        }
     }
 
     public async Task HandleAsync(LoginRequest request, CancellationToken cancellationToken = default)
@@ -88,8 +83,6 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         {
             await FireAsync(new UserSessionEnded(request.SessionId, clientId), cancellationToken);
         }
-
-        await BroadcastAsync(LoginSurface(clientId: clientId), cancellationToken);
     }
 
     public Task<UserSessionState?> GetSessionAsync(string sessionId)
@@ -142,7 +135,6 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
         foreach (var surface in surfaces)
         {
             await FireAsync(surface, cancellationToken);
-            await BroadcastAsync(surface, cancellationToken);
         }
     }
 
@@ -213,7 +205,6 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
     private async Task RejectAsync(string username, string reason, string clientId, CancellationToken cancellationToken)
     {
         await FireAsync(new LoginFailed(username, reason, clientId), cancellationToken);
-        await BroadcastAsync(LoginSurface(reason, clientId), cancellationToken);
     }
 
     private async Task BroadcastSignedInAsync(LocalUserRegistered user, string sessionId, string clientId, CancellationToken cancellationToken)
@@ -233,16 +224,7 @@ public sealed class UserSessionNeuron(ILogger<UserSessionNeuron> logger, NeuronJ
             ["body"] = $"Signed in as {user.DisplayName}"
         });
 
-        await BroadcastAsync(surface, cancellationToken);
-    }
-
-    private async Task BroadcastAsync(UiSurface surface, CancellationToken cancellationToken = default)
-    {
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus is not null)
-        {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value), cancellationToken);
-        }
+        await FireAsync(surface, cancellationToken);
     }
 
     private IReadOnlyList<Synapse> SessionJournal() =>

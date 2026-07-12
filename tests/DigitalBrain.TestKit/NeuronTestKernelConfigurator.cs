@@ -29,7 +29,6 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
         siloBuilder
             .AddMemoryGrainStorageAsDefault()
             .AddMemoryStreams("Default")
-            .AddMemoryStreams("HomeFeed")
             .AddMemoryStreams("DigitalBrainTimeline")
             .AddMemoryGrainStorage("PubSubStore")
             .ConfigureServices(services =>
@@ -47,7 +46,6 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
                 services.AddSingleton<SqliteSchemaInspector>();
-                services.AddSingleton<HomeFeedBus>();
                 services.AddSingleton<SignalEgressBus>();
                 services.AddSignalEgressStreamSubscriber();
                 services.AddSingleton<IConfiguration>(

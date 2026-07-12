@@ -41,7 +41,7 @@ public class DigitalBrainModelRegistrySnapshotTests
     {
         var entries = DigitalBrainModelRegistrySnapshot.Read(BuildConfig(new Dictionary<string, string?>()));
 
-        var result = DigitalBrainModelRegistrySnapshot.FirstOrDefault(entries, DigitalBrainCapabilityKind.VoiceToText);
+        var result = DigitalBrainModelRegistrySnapshot.FirstOrDefault(entries, DigitalBrainCapabilityKind.Embedding);
 
         Assert.Null(result);
     }

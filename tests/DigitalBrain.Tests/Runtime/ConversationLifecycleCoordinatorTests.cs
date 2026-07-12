@@ -1,6 +1,7 @@
 extern alias McpProject;
 
 using System.Text;
+using System.Text.Json;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using ConversationLifecycleCoordinator = McpProject::DigitalBrain.Mcp.ConversationLifecycleCoordinator;
@@ -132,6 +133,41 @@ public sealed class ConversationLifecycleCoordinatorTests
         Assert.Empty(tombstoned.Inbox);
         Assert.Empty(tombstoned.Outbox);
         Assert.NotNull(tombstoned.Tombstone);
+    }
+
+    [Fact]
+    public void ToSnapshot_scrubs_a_structurally_invalid_persisted_action()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 10, 0, 0, TimeSpan.Zero);
+        var identity = new ConversationIdentity(
+            new TenantId("tenant"), new WorkspaceId("workspace"), new PrincipalRef("principal", PrincipalKind.User), ConversationId('f'));
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, identity);
+        state = ConversationTransitions.BeginOperation(
+            state, state.Revision, "command-1", new string('a', 64), "operation-1", "connect salesforce", now);
+        var claim = ConversationTransitions.TryClaimOperation(state, state.Revision, "operation-1", "worker", now, TimeSpan.FromMinutes(1));
+        var projection = new ConversationStateClient.ConversationFeedProjection(
+            "operation-1",
+            "Connect Salesforce to continue.",
+            new ToolAction("openUrl", "Connect Salesforce", "https://login.salesforce.com/services/oauth2/authorize?raw=legacy"),
+            null,
+            null,
+            null);
+        var outbox = new ConversationOutboxEntry(
+            "feed-operation-1", "surface-feed", JsonSerializer.SerializeToUtf8Bytes(projection), now, null);
+        state = ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation-1",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "Connect Salesforce to continue.",
+            outbox,
+            now);
+
+        var snapshot = ConversationStateClient.ToSnapshot(Context(), state);
+
+        Assert.Null(snapshot.CurrentOperation!.Action);
     }
 
     [Fact]

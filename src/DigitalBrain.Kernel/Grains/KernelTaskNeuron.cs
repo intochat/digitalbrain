@@ -35,41 +35,11 @@ public class KernelTaskNeuron(ILogger<KernelTaskNeuron> logger, NeuronJournals j
         }
         await FireAsync(new TaskProgress(cmd.TaskId, "finalizing"), cancellationToken);
         await FireAsync(new TaskCompleted(cmd.TaskId, result), cancellationToken);
-
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus != null)
-        {
-            var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
-            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, clientId: cmd.SessionId);
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value), cancellationToken);
-
-            var directData = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                totals = tm.Props.GetValueOrDefault("totals"),
-                tasks = tm.Props.GetValueOrDefault("tasks")
-            });
-            await bus.BroadcastAsync(new RfwCard("digitalbrain", "TaskManagerCard", directData), cancellationToken);
-        }
     }
 
     public async Task HandleAsync(CancelTask cmd, CancellationToken cancellationToken = default)
     {
         await FireAsync(new TaskCancelled(cmd.TaskId), cancellationToken);
-
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus != null)
-        {
-            var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
-            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, clientId: cmd.SessionId);
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value), cancellationToken);
-
-            var directData = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                totals = tm.Props.GetValueOrDefault("totals"),
-                tasks = tm.Props.GetValueOrDefault("tasks")
-            });
-            await bus.BroadcastAsync(new RfwCard("digitalbrain", "TaskManagerCard", directData), cancellationToken);
-        }
     }
 
     public Task<TaskInfo> GetInfoAsync()

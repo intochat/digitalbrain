@@ -63,17 +63,6 @@ public sealed class DigitalBrainOptions
         return this;
     }
 
-    public DigitalBrainOptions WithVectorDatabase(string provider, string id = "default")
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
-        ArgumentException.ThrowIfNullOrWhiteSpace(id);
-
-        lastModelRegistration = ModelRegistry.Register(
-            new DigitalBrainModelDescriptor(DigitalBrainCapabilityKind.VectorDatabase, provider, id, id, DigitalBrainModelCapabilities.FullyCapable),
-            DigitalBrainModelRole.Default);
-        return this;
-    }
-
     public DigitalBrainOptions AsFast() => SetLastModelRole(DigitalBrainModelRole.Fast);
 
     public DigitalBrainOptions AsBalanced() => SetLastModelRole(DigitalBrainModelRole.Balanced);

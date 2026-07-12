@@ -70,12 +70,16 @@ public sealed class ConversationStateClient(
         var operation = RequiredOperation(state, commandId);
         if (stateName == InoConversationStates.Responding)
             return ToSnapshot(context, state);
-        var claim = await neuron.TryClaimOperationAsync(
-            state.Revision,
-            operation.OperationId,
-            _leaseOwner,
-            timeProvider.GetUtcNow(),
-            OperationLease).WaitAsync(cancellationToken).ConfigureAwait(false);
+        var claim = await RetryConflictAsync(
+            neuron,
+            state,
+            current => neuron.TryClaimOperationAsync(
+                current.Revision,
+                operation.OperationId,
+                _leaseOwner,
+                timeProvider.GetUtcNow(),
+                OperationLease),
+            cancellationToken).ConfigureAwait(false);
         if (!claim.Claimed)
             throw new ConversationOperationLeaseUnavailableException();
         return ToSnapshot(context, claim.State);
@@ -381,10 +385,10 @@ public sealed class ConversationStateClient(
         }
     }
 
-    private static async Task<ConversationState> RetryConflictAsync(
+    private static async Task<TResult> RetryConflictAsync<TResult>(
         IConversationNeuron neuron,
         ConversationState initial,
-        Func<ConversationState, Task<ConversationState>> update,
+        Func<ConversationState, Task<TResult>> update,
         CancellationToken cancellationToken)
     {
         var state = initial;
@@ -513,6 +517,11 @@ public sealed class ConversationStateClient(
                     throw new RuntimeStateIntegrityException("invalid suspended invocation JSON");
                 }
             }
+            // Re-check on every materialization, not only when an authorization is freshly issued -- a
+            // persisted action can predate this policy or a not-yet-expired authorization can carry a
+            // poisoned target with no other self-healing path.
+            if (action is not null && !OAuthCallbackPaths.IsStructurallyValidAction(action))
+                action = null;
             return new InoConversationOperation(
                 operation.CommandId,
                 userText,

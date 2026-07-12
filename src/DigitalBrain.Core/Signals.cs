@@ -4,15 +4,9 @@ namespace DigitalBrain.Core;
 // Name/props let pack code ride the wire as a named event bag without polluting Core with domain types.
 // Channel-specific names live here so they are first-class datatypes (usable from packs that compile against Core only).
 
-public static class TelegramSignals
-{
-    public const string MessageReceived = "TelegramMessageReceived";
-    public const string ReplyRequested = "TelegramReplyRequested";
-}
-
 public static class UiSignals
 {
-    // Central names for UiSurface kinds / events that cross channels (e.g. from Telegram viz to Flutter).
+    // Central names for UiSurface kinds / events that cross channels.
     // Prefer the UI contract constants for structured surfaces; keep these for Signal-level routing.
     public const string SurfaceEmitted = "UiSurfaceEmitted";
     public const string WidgetTreeUpdated = "UiWidgetTreeUpdated";
@@ -34,12 +28,6 @@ public static class SalesforceSignals
     public const string AuthCompleted = "SalesforceAuthCompleted";
     public const string QueryRequested = "SalesforceQueryRequested";
     public const string QueryResultsReady = "SalesforceQueryResultsReady";
-}
-
-public static class ContextSignals
-{
-    public const string RecallRequested = "ContextRecallRequested";
-    public const string RecallCompleted = "ContextRecallCompleted";
 }
 
 [GenerateSerializer]

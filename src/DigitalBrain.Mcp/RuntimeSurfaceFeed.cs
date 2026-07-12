@@ -127,8 +127,29 @@ public sealed class RuntimeSurfaceFeed(
             string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
         var presentation = ReadPresentation(current);
         var now = timeProvider.GetUtcNow();
+
+        // The persisted surface can go stale relative to its conversation (e.g. a recovery-neutralized
+        // revision was written to the conversation but never reprojected). Force a full rematerialization
+        // whenever the conversation has moved on, instead of only refreshing action-binding tokens over
+        // whatever content happens to already be persisted.
+        var conversation = await ReadConversationSnapshotAsync(
+            context, ActiveConversationId(context, state), cancellationToken).ConfigureAwait(false);
+        if (conversation.Revision != presentation.ConversationRevision)
+        {
+            await ProjectConversationAsync(
+                context,
+                conversation,
+                "reproject-" + Guid.NewGuid().ToString("N"),
+                now,
+                cancellationToken).ConfigureAwait(false);
+            state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            current = state.CurrentSurfaces.Single(surface =>
+                string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+            presentation = ReadPresentation(current);
+        }
+
         var descriptors = PresentationAllowsSend(presentation.Payload)
-            ? ConversationSurfacePayload.Actions(InoConversationSnapshot.Empty(context), now).ToArray()
+            ? ConversationSurfacePayload.Actions(conversation, now).ToArray()
             : ConversationSurfacePayload.LifecycleActions(now);
 
         var nextRevision = checked(current.SurfaceRevision + 1);
@@ -380,6 +401,20 @@ public sealed class RuntimeSurfaceFeed(
             context.WorkspaceId,
             context.Principal));
 
+    private async Task<InoConversationSnapshot> ReadConversationSnapshotAsync(
+        RuntimeRequestContext context,
+        string conversationId,
+        CancellationToken cancellationToken)
+    {
+        var neuron = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
+            context.TenantId,
+            context.WorkspaceId,
+            context.Principal,
+            conversationId));
+        var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        return ConversationStateClient.ToSnapshot(context with { ConversationId = conversationId }, state);
+    }
+
     private static SurfaceActionBinding[] CreateBindings(
         IReadOnlyList<StoredActionBinding> descriptors,
         int surfaceRevision,
@@ -464,7 +499,8 @@ public sealed class RuntimeSurfaceFeed(
             "conversation",
             conversation.ConversationId,
             ConversationSurfacePayload.RequiredCapabilities,
-            payload);
+            payload,
+            conversation.Revision);
         return new(
             projectionId,
             ConversationSurfacePayload.HomeSurfaceId,
@@ -617,5 +653,6 @@ public sealed class RuntimeSurfaceFeed(
         string CauseKind,
         string CauseId,
         string[] RequiredClientCapabilities,
-        JsonElement Payload);
+        JsonElement Payload,
+        int ConversationRevision = 0);
 }

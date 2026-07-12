@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
-using Microsoft.Extensions.Configuration;
 using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
 
 namespace DigitalBrain.Mcp;
@@ -13,11 +12,9 @@ public sealed class McpAuthorizedToolCatalog : IAuthorizedToolCatalog
     public McpAuthorizedToolCatalog(
         IMcpIntegrationToolGateway integrations,
         IInoConversationStore? conversations = null,
-        IConfiguration? configuration = null,
         ToolActionPolicy? actionPolicy = null)
     {
-        var policy = actionPolicy ?? new ToolActionPolicy(
-            configuration?["DigitalBrain:Salesforce:RedirectUri"]);
+        var policy = actionPolicy ?? new ToolActionPolicy();
         _tools = AuthorizedToolRegistry.Create(integrations, conversations, policy);
     }
 

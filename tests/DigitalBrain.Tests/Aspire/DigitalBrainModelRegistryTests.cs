@@ -59,14 +59,13 @@ public sealed class DigitalBrainModelRegistryTests
     }
 
     [Fact]
-    public void EmbeddingAndVectorRegistrationsDoNotChangeChatSelection()
+    public void EmbeddingRegistrationDoesNotChangeChatSelection()
     {
         var options = new DigitalBrainOptions();
 
         options
             .WithLLM<OllamaModels.Llama31_8B>().AsBalanced()
-            .WithEmbedding<TestEmbeddingModel>()
-            .WithVectorDatabase(DigitalBrainProviderIds.Qdrant, "documents");
+            .WithEmbedding<TestEmbeddingModel>();
 
         Assert.Equal(DigitalBrainProviderIds.Ollama, options.LlmProvider);
         Assert.Equal("llama3.1:8b", options.LlmModel);
@@ -75,11 +74,6 @@ public sealed class DigitalBrainModelRegistryTests
             registration.Model.Kind == DigitalBrainCapabilityKind.Embedding &&
             registration.Model.Provider == DigitalBrainProviderIds.OpenAI &&
             registration.Model.Id == "text-embedding-test");
-
-        Assert.Contains(options.ModelRegistry.Registrations, registration =>
-            registration.Model.Kind == DigitalBrainCapabilityKind.VectorDatabase &&
-            registration.Model.Provider == DigitalBrainProviderIds.Qdrant &&
-            registration.Model.Id == "documents");
     }
 
     [Fact]

@@ -108,7 +108,6 @@ public static class DigitalBrainOrleansExtensions
                 if (useManagedIdentity)
                 {
                     var tableOptions = new TableClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
-                    var blobOptions = new BlobClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
 
                     siloBuilder.UseAzureStorageClustering(options =>
                         options.TableServiceClient = new TableServiceClient(storageTableServiceUri!, storageCredential!, tableOptions));
@@ -125,7 +124,6 @@ public static class DigitalBrainOrleansExtensions
                 else
                 {
                     var tableOptions = new TableClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
-                    var blobOptions = new BlobClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
 
                     siloBuilder.UseAzureStorageClustering(options =>
                         options.TableServiceClient = new TableServiceClient(clusteringConnection!, tableOptions));
@@ -211,10 +209,8 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
         builder.Services.AddSingleton(new SchemaRegistry([
             new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
-            new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true),
-            new SchemaDescriptor("digitalbrain.v2.workflow-persisted-state", 2, "Operational", true)]));
+            new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true)]));
         builder.Services.AddScoped<IAggregateStore, OrleansAggregateStore>();
-        builder.Services.AddScoped<WorkflowAggregate>();
         builder.Services.AddSingleton<ICommandHandler, EffectCommandHandler>();
 
         var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted(builder.Configuration);

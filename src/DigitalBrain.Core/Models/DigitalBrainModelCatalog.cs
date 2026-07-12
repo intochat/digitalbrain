@@ -11,7 +11,6 @@ public static class DigitalBrainProviderIds
     public const string Anthropic = "anthropic";
     public const string GitHubModels = "github-models";
     public const string Xai = "xai";
-    public const string Qdrant = "qdrant";
 }
 
 /// <summary>
@@ -20,9 +19,7 @@ public static class DigitalBrainProviderIds
 public enum DigitalBrainCapabilityKind
 {
     LargeLanguageModel,
-    Embedding,
-    VoiceToText,
-    VectorDatabase
+    Embedding
 }
 
 /// <summary>

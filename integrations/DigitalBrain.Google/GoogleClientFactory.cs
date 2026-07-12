@@ -15,7 +15,7 @@ public static class GoogleClientFactory
     public const string OAuthPendingPackName = "google-oauth-pending";
     public const string DefaultScope = "default";
     public const string DefaultCallbackPath = OAuthCallbackPaths.Google;
-    public const string DefaultRedirectUri = "http://localhost:8081" + DefaultCallbackPath;
+    public const string DefaultRedirectUri = "http://localhost:51014" + DefaultCallbackPath;
 
     public const string ClientIdKey = "client_id";
     public const string ClientSecretKey = "client_secret";

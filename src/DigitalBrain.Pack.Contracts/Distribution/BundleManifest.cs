@@ -3,8 +3,11 @@ namespace DigitalBrain.Core.Distribution;
 [GenerateSerializer]
 public enum BundleTier { Substrate, Channel, Content }
 
+// Telegram (ordinal 1) was retired with the Telegram integration. Web keeps its original ordinal (2) --
+// [GenerateSerializer] enums serialize by underlying int value, so reusing 1 for a future member would
+// silently reinterpret any already-persisted Telegram value as that new member.
 [GenerateSerializer]
-public enum BundleChannel { InApp, Telegram, Web }
+public enum BundleChannel { InApp = 0, Web = 2 }
 
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.Distribution.ExperienceRef")]

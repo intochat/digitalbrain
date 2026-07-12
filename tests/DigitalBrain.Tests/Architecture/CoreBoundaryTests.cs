@@ -110,7 +110,6 @@ public class CoreBoundaryTests
         Assert.Equal("DigitalBrain.Ui.Contracts", typeof(TableSurface).Assembly.GetName().Name);
         Assert.Equal("DigitalBrain.Ui.Contracts", typeof(IdeSurface).Assembly.GetName().Name);
         Assert.Equal("DigitalBrain.Ui.Contracts", typeof(RfwCard).Assembly.GetName().Name);
-        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(IFlutterUiNeuron).Assembly.GetName().Name);
     }
 
     [Fact]

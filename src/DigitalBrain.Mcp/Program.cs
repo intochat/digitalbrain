@@ -36,10 +36,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 var mcpAudience = SessionAudiences.RequireFixedMcp(builder.Configuration["DigitalBrain:Runtime:Mcp:Audience"]);
 builder.Services.AddSingleton(new SchemaRegistry([
     new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
-    new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true),
-    new SchemaDescriptor("digitalbrain.v2.workflow-persisted-state", 2, "Operational", true)]));
-var toolActionPolicy = new ToolActionPolicy(builder.Configuration["DigitalBrain:Salesforce:RedirectUri"]);
-builder.Services.AddSingleton(toolActionPolicy);
+    new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true)]));
+builder.Services.AddSingleton(new ToolActionPolicy());
 builder.Services.AddSingleton<ConversationStateClient>();
 builder.Services.AddSingleton<IInoConversationStore>(services => services.GetRequiredService<ConversationStateClient>());
 builder.Services.AddSingleton<IContextAssembler, McpConversationContextAssembler>();

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Core.Runtime;
 
@@ -31,7 +32,10 @@ public static class ConversationSurfacePayload
             };
         if (operation is not null && !string.IsNullOrWhiteSpace(current!.SafeReason))
             operation["safeReason"] = current.SafeReason;
-        if (operation is not null && current!.Action is { } action)
+        // Re-validate on every render, not just when the action is freshly issued -- a historically
+        // persisted record can carry a target that predates this policy or that recovery hasn't rewritten
+        // yet, and it must never surface as a clickable action.
+        if (operation is not null && current!.Action is { } action && OAuthCallbackPaths.IsStructurallyValidAction(action))
         {
             operation["action"] = new Dictionary<string, object?>
             {

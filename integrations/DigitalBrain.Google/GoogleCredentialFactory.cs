@@ -16,19 +16,4 @@ public static class GoogleCredentialFactory
         var token = new TokenResponse { RefreshToken = refreshToken };
         return new UserCredential(flow, "digitalbrain-user", token);
     }
-
-    public static string CreateAuthorizationUrl(string clientId, string clientSecret, string redirectUri, params string[] scopes)
-    {
-        var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
-        {
-            ClientSecrets = new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret },
-            Scopes = scopes.Length > 0 ? scopes : new[] { GoogleClientFactory.DefaultGmailScope }
-        });
-
-        var codeRequest = flow.CreateAuthorizationCodeRequest(redirectUri);
-        var baseUrl = codeRequest.Build().AbsoluteUri;
-        // Append offline + consent to ensure refresh_token is returned (library request does not set them by default).
-        var separator = baseUrl.Contains('?') ? "&" : "?";
-        return baseUrl + separator + "access_type=offline&prompt=consent";
-    }
 }

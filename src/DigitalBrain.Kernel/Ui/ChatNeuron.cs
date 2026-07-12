@@ -6,8 +6,8 @@ namespace DigitalBrain.Kernel.Ui;
 using DigitalBrain.Ui.Contracts;
 using DigitalBrain.Ui.Contracts.Ui;
 
-// The Chat neuron (server-driven UI). On a data-visualization request it emits an RfwCard, journals it as
-// conversation history, and broadcasts it to the live Home feed (HomeFeedBus) for streaming to clients.
+// The Chat neuron (server-driven UI). On a data-visualization request it emits an RfwCard, journaled as
+// conversation history.
 [GrainType("digitalbrain.chat.v1")]
 public class ChatNeuron(ILogger<ChatNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IChatNeuron
 {
@@ -22,15 +22,6 @@ public class ChatNeuron(ILogger<ChatNeuron> logger, NeuronJournals journals) : N
         var card = new RfwCard("digitalbrain", "DataChartCard", dataJson);
 
         await FireAsync(card, cancellationToken);  // keep for conversation journal compat
-        // Prefer routing through IFlutterUiNeuron (item 14) for dedicated UI channel + context.
-        var surface = new UiSurface(UiSurfaceKinds.DataChart, new Dictionary<string, object?>
-        {
-            ["prompt"] = request.Prompt,
-            ["data"] = request.DataJson,
-            ["chartHint"] = request.ChartHint
-        });
-        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>(IFlutterUiNeuron.SingletonKey);
-        await flutter.DeliverAsync(StampCurrent(surface), cancellationToken);
     }
 
     public Task<RfwCard[]> GetConversationAsync()

@@ -194,6 +194,44 @@ public sealed class EffectStateSafetyTests
     }
 
     [Fact]
+    public async Task Ambiguous_write_failure_after_the_effect_transition_actually_landed_is_not_rolled_back()
+    {
+        var storage = new FailingPersistentState();
+        var grain = new AggregateGrain(storage);
+        var payload = JsonSerializer.SerializeToElement(new { value = 1 });
+        var effect = new OutboxRecord("effect", "operation", 0, "fake", payload, DateTimeOffset.UtcNow.AddMinutes(5));
+        await grain.CommitAsync(new V2CommitRequest("command", 0, payload, [], [effect], DateTimeOffset.UtcNow));
+
+        // The write lands durably (the storage provider commits it) but the caller never sees the
+        // acknowledgement -- a blind rollback here would silently forget a durably-committed effect
+        // transition, letting EffectCoordinator's next pass re-execute an already-succeeded effect.
+        storage.CommitThenThrow = true;
+        await grain.AppendEffectTransitionAsync(new("effect", "transition", "Succeeded", null, DateTimeOffset.UtcNow));
+
+        var afterAmbiguousWrite = await grain.ReadAsync();
+        Assert.Single(afterAmbiguousWrite.EffectTransitions);
+        Assert.Equal("transition", afterAmbiguousWrite.EffectTransitions[0].TransitionId);
+    }
+
+    [Fact]
+    public async Task Ambiguous_write_failure_poisons_the_grain_and_rejects_further_calls()
+    {
+        var storage = new FailingPersistentState { FailWrites = true, FailReads = true };
+        var grain = new AggregateGrain(storage);
+        var payload = JsonSerializer.SerializeToElement(new { value = 1 });
+        var effect = new OutboxRecord("effect", "operation", 0, "fake", payload, DateTimeOffset.UtcNow.AddMinutes(5));
+
+        // The write fails AND the recovery read that would normally tell us what actually landed also
+        // fails -- the durable outcome is genuinely unknown, so this activation must never be trusted again.
+        await Assert.ThrowsAsync<PersistedStateWriteOutcomeUnknownException>(() => grain.CommitAsync(
+            new V2CommitRequest("command", 0, payload, [], [effect], DateTimeOffset.UtcNow)));
+
+        await Assert.ThrowsAsync<RuntimeStateIntegrityException>(() => grain.ReadAsync());
+        await Assert.ThrowsAsync<RuntimeStateIntegrityException>(() => grain.AppendEffectTransitionAsync(
+            new("effect", "transition", "Applying", null, DateTimeOffset.UtcNow)));
+    }
+
+    [Fact]
     public async Task Aggregate_retention_is_bounded_and_never_discards_an_active_effect_intent()
     {
         var store = new InMemoryAggregateStore();
@@ -388,24 +426,55 @@ public sealed class EffectStateSafetyTests
 
     private sealed class FailingPersistentState : IPersistentState<AggregateGrainState>
     {
+        private AggregateGrainState _committedState = new();
+        private string _committedEtag = string.Empty;
+        private bool _committedRecordExists;
+        private int _writeAttempts;
+
         public AggregateGrainState State { get; set; } = new();
         public string Etag { get; set; } = string.Empty;
         public bool RecordExists { get; set; }
         public bool FailWrites { get; set; }
+        public bool FailReads { get; set; }
+        public bool CommitThenThrow { get; set; }
 
         public Task ClearStateAsync()
         {
             State = new();
+            Etag = string.Empty;
             RecordExists = false;
+            _committedState = State;
+            _committedEtag = Etag;
+            _committedRecordExists = false;
             return Task.CompletedTask;
         }
 
-        public Task ReadStateAsync() => Task.CompletedTask;
+        // A real storage provider's ReadStateAsync reflects what is durably committed, not whatever the
+        // grain last assigned to .State -- distinguishing the two is exactly what the reconcile-via-re-read
+        // path under test depends on.
+        public Task ReadStateAsync()
+        {
+            if (FailReads) throw new IOException("injected recovery-read failure");
+            State = _committedState;
+            Etag = _committedEtag;
+            RecordExists = _committedRecordExists;
+            return Task.CompletedTask;
+        }
 
         public Task WriteStateAsync()
         {
+            _writeAttempts++;
             if (FailWrites) throw new IOException("injected persistent-state failure");
+            Etag = "etag-" + _writeAttempts;
             RecordExists = true;
+            _committedState = State;
+            _committedEtag = Etag;
+            _committedRecordExists = true;
+            if (CommitThenThrow)
+            {
+                CommitThenThrow = false;
+                throw new IOException("injected lost write response");
+            }
             return Task.CompletedTask;
         }
     }

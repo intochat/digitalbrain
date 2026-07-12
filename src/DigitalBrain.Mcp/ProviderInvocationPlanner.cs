@@ -401,7 +401,7 @@ internal sealed class ProviderInvocationPlanner(
                      validator.IsValidProviderIdentifier(entityValue)
             ? entityValue
             : null;
-        var recordIds = SalesforceRecordIds(grounding.Content)
+        var recordIds = validator.SalesforceRecordIds(grounding.Content)
             .Distinct(StringComparer.Ordinal)
             .Take(20)
             .ToArray();
@@ -416,46 +416,6 @@ internal sealed class ProviderInvocationPlanner(
         return true;
     }
 
-    private IEnumerable<string> SalesforceRecordIds(JsonElement value)
-    {
-        if (value.ValueKind == JsonValueKind.String)
-        {
-            if (validator.IsValidSalesforceRecordId(value.GetString()))
-            {
-                yield return value.GetString()!;
-                yield break;
-            }
-            JsonElement parsed;
-            try
-            {
-                parsed = JsonElement.Parse(value.GetString() ?? string.Empty);
-            }
-            catch (JsonException)
-            {
-                yield break;
-            }
-            foreach (var id in SalesforceRecordIds(parsed)) yield return id;
-            yield break;
-        }
-        if (value.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in value.EnumerateArray())
-            {
-                foreach (var id in SalesforceRecordIds(item))
-                    yield return id;
-            }
-            yield break;
-        }
-        if (value.ValueKind != JsonValueKind.Object) yield break;
-        if (value.TryGetProperty("RecordId", out var recordId) && recordId.ValueKind == JsonValueKind.String &&
-            validator.IsValidSalesforceRecordId(recordId.GetString()))
-            yield return recordId.GetString()!;
-        foreach (var property in value.EnumerateObject())
-        {
-            if (property.Name is "Fields" or "attributes" or "RecordId") continue;
-            foreach (var id in SalesforceRecordIds(property.Value)) yield return id;
-        }
-    }
 
     private static bool TryGetProviderEnvelope(JsonElement content, string[] names, out JsonElement envelope)
     {

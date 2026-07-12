@@ -43,69 +43,6 @@ public sealed class ContractsTests
     }
 
     [Fact]
-    public void Workflow_approval_queues_apply_and_terminal_guards_fail_closed()
-    {
-        var workflow = new Workflow();
-        workflow.SubmitForApproval();
-        workflow.Approve(new ApprovalRecord(
-            new("operator", PrincipalKind.Operator),
-            DateTimeOffset.UtcNow,
-            "decision",
-            null));
-
-        Assert.Equal(WorkflowState.ApplyQueued, workflow.State);
-        Assert.Equal(
-            [WorkflowState.AwaitingApproval, WorkflowState.Approved, WorkflowState.ApplyQueued],
-            workflow.Transitions.Select(transition => transition.To));
-
-        var rejected = new Workflow();
-        rejected.SubmitForApproval();
-        rejected.Reject("policy denied");
-        Assert.Equal(WorkflowState.Rejected, rejected.State);
-        Assert.Throws<InvalidOperationException>(() => rejected.BeginApply());
-
-        var expired = new Workflow();
-        expired.SubmitForApproval();
-        expired.Expire();
-        Assert.Equal(WorkflowState.Expired, expired.State);
-    }
-
-    [Fact]
-    public async Task Durable_workflow_approval_persists_audit_and_apply_queue()
-    {
-        var store = new InMemoryAggregateStore();
-        var aggregate = new WorkflowAggregate(store);
-        var context = Context("brain.approve") with
-        {
-            Principal = new("operator", PrincipalKind.Operator)
-        };
-        await aggregate.SubmitForApprovalAsync("proposal", "submit", context);
-        var effect = new OutboxRecord(
-            "effect",
-            "operation",
-            0,
-            "fake",
-            JsonElement.Parse("{}"),
-            DateTimeOffset.UtcNow.AddMinutes(5));
-
-        var snapshot = await aggregate.ApproveAsync(
-            "proposal",
-            "approve",
-            context,
-            new ApprovalRecord(context.Principal, DateTimeOffset.UtcNow, "decision", "safe"),
-            effect);
-
-        Assert.Contains(snapshot.Commits.SelectMany(commit => commit.Events),
-            item => item.Type == "v2.workflow.ApplyQueued");
-        Assert.Contains(snapshot.Outbox, item => item.EffectId == "effect");
-        var persisted = JsonSerializer.Deserialize<WorkflowPersistedState>(
-            snapshot.State.GetRawText(),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        Assert.Equal(WorkflowState.ApplyQueued, persisted!.State);
-        Assert.Equal("operator", persisted.Approval!.Approver.Value);
-    }
-
-    [Fact]
     public void Schema_registry_is_stable_and_fail_closed()
     {
         var registry = new SchemaRegistry([

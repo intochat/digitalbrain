@@ -8,10 +8,17 @@ namespace DigitalBrain.Kernel;
 [GrainType("digitalbrain.v2.aggregate")]
 public sealed class AggregateGrain([PersistentState("v2-aggregate", "Default")] IPersistentState<AggregateGrainState> state) : Grain, IAggregateGrain
 {
-    public Task<V2AggregateSnapshot> ReadAsync() => Task.FromResult(state.State.Snapshot());
+    private bool _poisoned;
+
+    public Task<V2AggregateSnapshot> ReadAsync()
+    {
+        DemandUsable();
+        return Task.FromResult(state.State.Snapshot());
+    }
 
     public async Task<V2CommitResult> CommitAsync(V2CommitRequest request)
     {
+        DemandUsable();
         var current = state.State.Snapshot();
         var duplicate = current.Inbox.FirstOrDefault(x => x.CommandId == request.CommandId && x.CommitId is not null);
         if (duplicate?.CommitId is not null)
@@ -37,6 +44,7 @@ public sealed class AggregateGrain([PersistentState("v2-aggregate", "Default")] 
 
     public async Task AppendEffectTransitionAsync(EffectTransitionRecord transition)
     {
+        DemandUsable();
         var current = state.State.Snapshot();
         if (current.EffectTransitions.Any(x => x.TransitionId == transition.TransitionId)) return;
         await PersistAsync(AggregateRetention.Compact(current with
@@ -47,6 +55,7 @@ public sealed class AggregateGrain([PersistentState("v2-aggregate", "Default")] 
 
     public async Task<bool> TryAppendEffectTransitionAsync(string effectId, string? expectedTransitionId, EffectTransitionRecord transition)
     {
+        DemandUsable();
         if (!string.Equals(effectId, transition.EffectId, StringComparison.Ordinal))
             throw new ArgumentException("The effect transition does not match the requested effect.", nameof(transition));
         var current = state.State.Snapshot();
@@ -62,16 +71,36 @@ public sealed class AggregateGrain([PersistentState("v2-aggregate", "Default")] 
 
     private async Task PersistAsync(V2AggregateSnapshot next)
     {
-        var previous = state.State;
-        state.State = AggregateGrainState.FromSnapshot(next);
         try
         {
-            await state.WriteStateAsync();
+            await PersistedStateReconciliation.WriteWithRollbackAsync(
+                state, AggregateGrainState.FromSnapshot(next), SameAggregateState);
         }
-        catch
+        catch (PersistedStateWriteOutcomeUnknownException)
         {
-            state.State = previous;
+            // The write outcome is genuinely unknown (the write failed and the recovery read also failed) --
+            // this activation may be holding an unconfirmed snapshot, so it must not serve another read or
+            // accept another commit until Orleans reactivates it fresh from durable storage.
+            _poisoned = true;
             throw;
         }
     }
+
+    private void DemandUsable()
+    {
+        if (_poisoned)
+            throw new RuntimeStateIntegrityException("aggregate write outcome for this activation is unknown");
+    }
+
+    // Cheap structural proxy rather than a full deep comparison: PersistAsync always constructs a
+    // monotonically-appended next state, so matching sequence/count plus the tail identity of each list is
+    // enough to tell "this exact write landed" from "it didn't", the same way SameEnvelope does for the
+    // immutable encrypted envelope.
+    private static bool SameAggregateState(AggregateGrainState first, AggregateGrainState second) =>
+        first.CommitSequence == second.CommitSequence &&
+        first.Commits.Count == second.Commits.Count &&
+        (first.Commits.Count == 0 || first.Commits[^1].CommitId == second.Commits[^1].CommitId) &&
+        first.EffectTransitions.Count == second.EffectTransitions.Count &&
+        (first.EffectTransitions.Count == 0 ||
+         first.EffectTransitions[^1].TransitionId == second.EffectTransitions[^1].TransitionId);
 }
