@@ -11,3 +11,7 @@ DISCREPANCY (P1.4): Plan verify for features/live requires no external reference
 - app/lib/rfw_host/digitalbrain_rfw_library.dart imports features/live/graph/domain_palette.dart
 - app/lib/rfw_host/synapse_stream_scope.dart imports features/live/graph/cluster_layout.dart
 Per rule 5: logged, skipping deletion of live/ for now. Will re-evaluate after P1.14/P1.15 RFW pruning or when those callers are removed. Continuing to next verifiable task.
+
+DISCREPANCY (P1.5): Plan verify for features/brain requires the grep outside the dir to be empty. Found:
+- app/lib/rfw_host/digitalbrain_rfw_library.dart:31 imports features/brain/voice_input.dart
+Per rule 5: logged, skipping. Same RFW registration bloat issue.
