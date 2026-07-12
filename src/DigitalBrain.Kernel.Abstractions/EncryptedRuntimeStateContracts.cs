@@ -117,7 +117,6 @@ public static class RuntimeStateKeys
 public static class RuntimeStateStorageNames
 {
     public const string DefaultNamespace = "main";
-    public const string MigrationContainerKind = "migrations";
 
     public static string NormalizeNamespace(string? value)
     {
@@ -139,19 +138,6 @@ public static class RuntimeStateStorageNames
             throw new ArgumentException("Runtime storage kind is invalid.", nameof(kind));
         var digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(storageNamespace)))[..16];
         return $"dbrt-{digest}-{kind}";
-    }
-
-    public static string MigrationMarkerBlob(string storageNamespace)
-    {
-        storageNamespace = NormalizeNamespace(storageNamespace);
-        return Convert.ToHexStringLower(SHA256.HashData(
-            Encoding.UTF8.GetBytes("digitalbrain-runtime-migration-marker-v1\n" + storageNamespace)));
-    }
-
-    public static string MigrationMarkerBinding(string storageNamespace)
-    {
-        storageNamespace = NormalizeNamespace(storageNamespace);
-        return storageNamespace + "\n" + MigrationMarkerBlob(storageNamespace);
     }
 }
 

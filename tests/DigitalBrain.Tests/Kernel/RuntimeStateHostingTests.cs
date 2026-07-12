@@ -72,10 +72,6 @@ public sealed class RuntimeStateHostingTests
 
         Assert.Equal(mainContainer, RuntimeStateStorageNames.Container(" MAIN ", "conversations"));
         Assert.NotEqual(mainContainer, isolatedContainer);
-        Assert.NotEqual(
-            RuntimeStateStorageNames.MigrationMarkerBlob("main"),
-            RuntimeStateStorageNames.MigrationMarkerBlob("test-run"));
-        Assert.DoesNotContain("main", RuntimeStateStorageNames.MigrationMarkerBlob("main"), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -100,13 +96,12 @@ public sealed class RuntimeStateHostingTests
         var result = await registration.Factory(services).CheckHealthAsync(new HealthCheckContext());
 
         Assert.Equal(HealthStatus.Healthy, result.Status);
-        Assert.Equal(["backendKind", "keyVersion", "migrationStatus", "namespace", "schemaVersion"],
+        Assert.Equal(["backendKind", "keyVersion", "namespace", "schemaVersion"],
             result.Data.Keys.Order(StringComparer.Ordinal).ToArray());
         Assert.Equal(expectedBackend, Assert.IsType<string>(result.Data["backendKind"]));
         Assert.Equal("main", Assert.IsType<string>(result.Data["namespace"]));
         Assert.Equal(RuntimeStateSchemas.Envelope, Assert.IsType<int>(result.Data["schemaVersion"]));
         Assert.Equal(1, Assert.IsType<int>(result.Data["keyVersion"]));
-        Assert.Equal("not-required", Assert.IsType<string>(result.Data["migrationStatus"]));
 
         void AssertProvider(string name, string kind)
         {
@@ -127,7 +122,6 @@ public sealed class RuntimeStateHostingTests
         else
             AddStorageConnections(builder);
         AddKeys(builder, rawKek);
-        builder.Configuration["DigitalBrain:Runtime:MigrationStatusOverride"] = "not-required";
         return builder;
     }
 

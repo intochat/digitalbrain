@@ -150,8 +150,7 @@ public static class Extensions
                          "backendKind",
                          "namespace",
                          "schemaVersion",
-                         "keyVersion",
-                         "migrationStatus"
+                         "keyVersion"
                      })
                 if (runtimeState.Data.TryGetValue(key, out var value)) safe[key] = value;
             payload["runtimeState"] = safe;

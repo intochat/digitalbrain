@@ -43,7 +43,7 @@
     <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
-    <ProjectReference Include="..\..\tools\DigitalBrain.RuntimeMigration\DigitalBrain.RuntimeMigration.csproj" Aliases="RuntimeMigrationProject" />
+
     <!-- AppHost model tests load the real entry point; alias avoids Program type clash with the kernel host. -->
     <ProjectReference Include="..\..\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" Aliases="AppHostProject" />
     <!-- Kernel transitively references Mcp unaliased (DigitalBrain.Kernel.csproj:58); both projects use

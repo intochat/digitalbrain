@@ -70,15 +70,6 @@ public static class DigitalBrainOrleansExtensions
                 ? new BlobServiceClient(storageBlobServiceUri!, storageCredential!, runtimeBlobOptions)
                 : new BlobServiceClient(grainStateConnection!, runtimeBlobOptions)
             : null;
-        var migrationStatusOverride = builder.Configuration["DigitalBrain:Runtime:MigrationStatusOverride"];
-        if (!string.IsNullOrWhiteSpace(migrationStatusOverride) && builder.Environment.IsProduction())
-            throw new InvalidOperationException("DigitalBrain:Runtime:MigrationStatusOverride is not permitted in Production.");
-        builder.Services.AddSingleton<IRuntimeMigrationStatusProbe>(
-            !string.IsNullOrWhiteSpace(migrationStatusOverride)
-                ? new FixedRuntimeMigrationStatusProbe(migrationStatusOverride)
-                : runtimeStateBlobs is null
-                    ? new FixedRuntimeMigrationStatusProbe("not-required")
-                    : new BlobRuntimeMigrationStatusProbe(runtimeStateBlobs, runtimeStorageNamespace, keyRing));
 
         builder.UseOrleans(siloBuilder =>
         {

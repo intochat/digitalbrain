@@ -132,99 +132,26 @@ internal sealed record RuntimeStateHealthMetadata(
     int SchemaVersion,
     int ActiveKekVersion);
 
-internal interface IRuntimeMigrationStatusProbe
-{
-    Task<string> ReadAsync(CancellationToken cancellationToken);
-}
-
-internal sealed class FixedRuntimeMigrationStatusProbe : IRuntimeMigrationStatusProbe
-{
-    private readonly string _status;
-
-    public FixedRuntimeMigrationStatusProbe(string status)
-    {
-        _status = status is "pending" or "complete" or "not-required"
-            ? status
-            : throw new InvalidOperationException("Runtime migration status override is invalid.");
-    }
-
-    public Task<string> ReadAsync(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(_status);
-    }
-}
-
-internal sealed class BlobRuntimeMigrationStatusProbe(
-    BlobServiceClient blobs,
-    string storageNamespace,
-    IRuntimeStateKeyRing keys) : IRuntimeMigrationStatusProbe
-{
-    public async Task<string> ReadAsync(CancellationToken cancellationToken)
-    {
-        var container = blobs.GetBlobContainerClient(RuntimeStateStorageNames.Container(
-            storageNamespace,
-            RuntimeStateStorageNames.MigrationContainerKind));
-        var blob = container.GetBlobClient(RuntimeStateStorageNames.MigrationMarkerBlob(storageNamespace));
-        BinaryData content;
-        try
-        {
-            content = (await blob.DownloadContentAsync(cancellationToken).ConfigureAwait(false)).Value.Content;
-        }
-        catch (RequestFailedException exception) when (exception.Status == 404)
-        {
-            return "pending";
-        }
-        _ = RuntimeMigrationMarkerCodec.Unprotect(
-            content.ToMemory().Span,
-            RuntimeStateStorageNames.MigrationMarkerBinding(storageNamespace),
-            keys);
-        return "complete";
-    }
-}
-
 internal sealed class RuntimeStateHealthCheck : IHealthCheck
 {
     private readonly RuntimeStateHealthMetadata _metadata;
-    private readonly IRuntimeMigrationStatusProbe _migration;
 
-    public RuntimeStateHealthCheck(
-        RuntimeStateHealthMetadata metadata,
-        IRuntimeMigrationStatusProbe migration)
+    public RuntimeStateHealthCheck(RuntimeStateHealthMetadata metadata)
     {
         _metadata = metadata;
-        _migration = migration;
     }
 
-    public async Task<HealthCheckResult> CheckHealthAsync(
+    public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        string migrationStatus;
-        try
-        {
-            migrationStatus = await _migration.ReadAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch
-        {
-            migrationStatus = "unavailable";
-        }
         var data = new Dictionary<string, object>
         {
             ["backendKind"] = _metadata.BackendKind,
             ["namespace"] = _metadata.StorageNamespace,
             ["schemaVersion"] = _metadata.SchemaVersion,
-            ["keyVersion"] = _metadata.ActiveKekVersion,
-            ["migrationStatus"] = migrationStatus
+            ["keyVersion"] = _metadata.ActiveKekVersion
         };
-        return migrationStatus == "unavailable"
-            ? HealthCheckResult.Unhealthy(
-                "Encrypted runtime state migration status is unavailable.",
-                data: data)
-            : HealthCheckResult.Healthy("Encrypted runtime state is configured.", data);
+        return Task.FromResult(HealthCheckResult.Healthy("Encrypted runtime state is configured.", data));
     }
 }

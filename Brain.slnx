@@ -36,7 +36,7 @@
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
   </Folder>
   <Folder Name="/tools/">
-    <Project Path="tools/DigitalBrain.RuntimeMigration/DigitalBrain.RuntimeMigration.csproj" />
+
   </Folder>
 </Solution>
 
