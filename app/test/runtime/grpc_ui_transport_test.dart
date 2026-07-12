@@ -55,6 +55,54 @@ void main() {
     );
 
     test(
+      'external bootstrap sends bearer identity and an empty bootstrap secret',
+      () async {
+        const identityToken =
+            'identityheader.identitypayload.identitysignature';
+        final port = _FakeGrpcClientPort();
+        final transport = GrpcUiTransport.forTesting(client: port);
+
+        final session = await transport.bootstrapExternalSession(identityToken);
+
+        expect(port.bootstrapRequest?.secret, isEmpty);
+        expect(port.bootstrapOptions?.metadata, {
+          'authorization': 'Bearer $identityToken',
+          'x-v2-audience': digitalBrainUiAudience,
+        });
+        expect(
+          port.bootstrapOptions?.metadata,
+          isNot(contains('x-v2-session')),
+        );
+        expect(port.bootstrapOptions?.timeout, unaryRequestTimeout);
+        expect(session.identity.sessionId, 'session-a');
+      },
+    );
+
+    test(
+      'external bootstrap rejects malformed compact identity tokens',
+      () async {
+        final port = _FakeGrpcClientPort();
+        final transport = GrpcUiTransport.forTesting(client: port);
+
+        for (final token in [
+          '',
+          'identity-token-without-compact-segments',
+          'header.payload',
+          ' headerheader.payloadpayload.signaturesignature',
+          'headerheader.payload payload.signaturesignature',
+        ]) {
+          await expectLater(
+            transport.bootstrapExternalSession(token),
+            throwsA(isA<AuthenticationException>()),
+          );
+        }
+
+        expect(port.bootstrapRequest, isNull);
+        expect(port.bootstrapOptions, isNull);
+      },
+    );
+
+    test(
       'refresh sends exact audience and never requires expired access',
       () async {
         final port = _FakeGrpcClientPort();
@@ -68,6 +116,21 @@ void main() {
         });
         expect(port.refreshOptions?.metadata, isNot(contains('x-v2-session')));
         expect(port.refreshOptions?.timeout, unaryRequestTimeout);
+      },
+    );
+
+    test(
+      'logout revokes with the opaque refresh token and UI audience',
+      () async {
+        final port = _FakeGrpcClientPort();
+        final transport = GrpcUiTransport.forTesting(client: port);
+
+        await transport.logout(refreshToken: 'refresh-opaque');
+
+        expect(port.logoutRequest?.refreshToken, 'refresh-opaque');
+        expect(port.logoutOptions?.metadata, {
+          'x-v2-audience': digitalBrainUiAudience,
+        });
       },
     );
 
@@ -248,6 +311,8 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   CallOptions? bootstrapOptions;
   wire.RefreshSessionRequest? refreshRequest;
   CallOptions? refreshOptions;
+  wire.LogoutSessionRequest? logoutRequest;
+  CallOptions? logoutOptions;
   wire.WatchSurfaceFeedRequest? watchRequest;
   CallOptions? watchOptions;
   wire.AcknowledgeSurfaceFeedRequest? ackRequest;
@@ -294,6 +359,16 @@ class _FakeGrpcClientPort implements GrpcClientPort {
     refreshRequest = request;
     refreshOptions = options;
     return _FakeGrpcUnaryResponse(Future.value(sessionReply));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.LogoutSessionReply> logoutSession(
+    wire.LogoutSessionRequest request,
+    CallOptions options,
+  ) {
+    logoutRequest = request;
+    logoutOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.LogoutSessionReply()));
   }
 
   @override

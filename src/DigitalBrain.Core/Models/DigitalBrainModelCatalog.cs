@@ -8,7 +8,6 @@ public static class DigitalBrainProviderIds
     public const string Ollama = "ollama";
     public const string AzureOpenAI = "azureopenai";
     public const string OpenAI = "openai";
-    public const string OpenAICompatible = "openai-compatible";
     public const string Anthropic = "anthropic";
     public const string GitHubModels = "github-models";
     public const string Xai = "xai";
@@ -116,16 +115,6 @@ public sealed class DigitalBrainModelRegistry
             x.Role == DigitalBrainModelRole.Fast)
         ?? registrations.LastOrDefault(static x =>
             x.Model.Kind == DigitalBrainCapabilityKind.LargeLanguageModel);
-
-    /// <summary>
-    /// Preferred voice-to-text model for speech transcription runtime consumers.
-    /// </summary>
-    public DigitalBrainModelRegistration? DefaultVoiceToText =>
-        registrations.LastOrDefault(static x =>
-            x.Model.Kind == DigitalBrainCapabilityKind.VoiceToText &&
-            x.Role == DigitalBrainModelRole.Default)
-        ?? registrations.LastOrDefault(static x =>
-            x.Model.Kind == DigitalBrainCapabilityKind.VoiceToText);
 
     public DigitalBrainModelRegistration? DefaultEmbedding =>
         registrations.LastOrDefault(static x =>

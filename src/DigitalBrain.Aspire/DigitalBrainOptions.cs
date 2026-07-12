@@ -63,13 +63,6 @@ public sealed class DigitalBrainOptions
         return this;
     }
 
-    public DigitalBrainOptions WithVoice2Text<TModel>() where TModel : VoiceToTextModel, new()
-    {
-        var model = new TModel();
-        lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Default);
-        return this;
-    }
-
     public DigitalBrainOptions WithVectorDatabase(string provider, string id = "default")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);

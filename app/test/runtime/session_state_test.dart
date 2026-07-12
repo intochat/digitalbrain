@@ -45,6 +45,26 @@ void main() {
       expect(controller.status, SessionStatus.authenticated);
       expect(await controller.accessToken(transport), 'access-newer');
     });
+
+    test('external bootstrap establishes the server-derived session', () async {
+      final transport = _ExternalBootstrapTransport();
+      final controller = SessionController(now: () => testNow);
+
+      final established = await controller.bootstrapExternal(
+        transport,
+        'identityheader.identitypayload.identitysignature',
+      );
+
+      expect(established, isTrue);
+      expect(transport.identityTokens, [
+        'identityheader.identitypayload.identitysignature',
+      ]);
+      expect(controller.status, SessionStatus.authenticated);
+      expect(controller.sessionId, 'session-a');
+      expect(controller.tenantId, 'tenant-a');
+      expect(controller.workspaceId, 'workspace-a');
+      expect(controller.principalId, 'principal-a');
+    });
   });
 
   group('SessionController refresh', () {
@@ -183,6 +203,16 @@ void main() {
   });
 }
 
+class _ExternalBootstrapTransport implements ExternalSessionTransport {
+  final List<String> identityTokens = [];
+
+  @override
+  Future<SessionBundle> bootstrapExternalSession(String identityToken) async {
+    identityTokens.add(identityToken);
+    return testSession();
+  }
+}
+
 class _PendingBootstrapTransport implements SessionTransport {
   final Map<String, Completer<SessionBundle>> pending = {};
 
@@ -193,6 +223,9 @@ class _PendingBootstrapTransport implements SessionTransport {
   @override
   Future<SessionBundle> refreshSession({required String refreshToken}) =>
       throw UnimplementedError();
+
+  @override
+  Future<void> logout({required String refreshToken}) async {}
 }
 
 class _PendingRefreshTransport implements SessionTransport {
@@ -211,4 +244,7 @@ class _PendingRefreshTransport implements SessionTransport {
     refreshTokens.add(refreshToken);
     return pendingRefresh.future;
   }
+
+  @override
+  Future<void> logout({required String refreshToken}) async {}
 }

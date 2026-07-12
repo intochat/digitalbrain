@@ -69,6 +69,48 @@ public sealed class OAuthConnectorSecurityTests
     }
 
     [Fact]
+    public async Task Google_provider_challenge_preserves_the_internal_start_reference_for_replay()
+    {
+        const string flowReference = "abcdefghijklmnopqrstuvwxyzABCDEF0123456789-_";
+        var store = new FakePackConfigStore();
+        await store.SetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, GoogleAppConfig());
+        var owner = new NeuronId("principal-local-start-google");
+        var localFlowId = GoogleClientFactory.CreateAuthorizationFlowId();
+        await store.SetAsync(
+            UserScope(owner),
+            GoogleClientFactory.OAuthPendingPackName,
+            new Dictionary<string, string>
+            {
+                [GoogleClientFactory.OAuthPhaseKey] = GoogleClientFactory.OAuthPhaseLocalStart,
+                [GoogleClientFactory.OAuthFlowIdKey] = localFlowId,
+                [GoogleClientFactory.OAuthStartTokenKey] = flowReference,
+                [GoogleClientFactory.OAuthStartTokenFingerprintKey] =
+                    GoogleClientFactory.AuthorizationAttemptFingerprint(flowReference),
+                [GoogleClientFactory.OAuthStartExpiresAtKey] = "4102444800"
+            });
+        var connector = new GoogleConnector(store, new FakeOAuthStateProtector());
+        var localPending = await store.GetAsync(
+            UserScope(owner),
+            GoogleClientFactory.OAuthPendingPackName);
+
+        var first = await connector.BeginAuthAsync(owner);
+        var providerPending = await store.GetAsync(
+            UserScope(owner),
+            GoogleClientFactory.OAuthPendingPackName);
+        var replay = await connector.BeginAuthAsync(owner);
+
+        Assert.Equal(
+            ExternalAuthorizationResolutionState.Waiting,
+            GoogleClientFactory.ResolveAuthorization(new Dictionary<string, string>(), localPending).State);
+        Assert.True(GoogleClientFactory.IsAllowedAuthorizationUrl(first.UrlOrForm));
+        Assert.Equal(GoogleClientFactory.OAuthPhaseChallengeIssued, providerPending[GoogleClientFactory.OAuthPhaseKey]);
+        Assert.Equal(localFlowId, providerPending[GoogleClientFactory.OAuthFlowIdKey]);
+        Assert.Equal(flowReference, providerPending[GoogleClientFactory.OAuthStartTokenKey]);
+        Assert.True(SameSecret(first.UrlOrForm, replay.UrlOrForm), "The provider challenge changed on replay.");
+        Assert.True(SameSecret(first.State, replay.State), "The provider state changed on replay.");
+    }
+
+    [Fact]
     public async Task Google_begin_never_mutates_app_owned_configuration()
     {
         var store = new FakePackConfigStore();

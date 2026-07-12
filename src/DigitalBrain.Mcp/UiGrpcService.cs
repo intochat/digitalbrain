@@ -16,14 +16,28 @@ public sealed record UiBootstrapOptions(
     WorkspaceId WorkspaceId,
     PrincipalRef Principal,
     TimeSpan AccessLifetime,
-    IReadOnlySet<string> Grants)
+    IReadOnlySet<string> Grants,
+    bool Enabled = true)
 {
-    public static UiBootstrapOptions FromConfiguration(IConfiguration configuration)
+    public static UiBootstrapOptions FromConfiguration(IConfiguration configuration, RuntimeProfile profile)
     {
-        var secret = configuration["DigitalBrain:V2:Ui:BootstrapSecret"] ?? string.Empty;
-        var tenant = configuration["DigitalBrain:V2:Ui:TenantId"] ?? "local";
-        var workspace = configuration["DigitalBrain:V2:Ui:WorkspaceId"] ?? "default";
-        var principal = configuration["DigitalBrain:V2:Ui:PrincipalId"] ?? "flutter-ui";
+        var secret = configuration["DigitalBrain:Runtime:Ui:BootstrapSecret"] ?? string.Empty;
+        if (profile == RuntimeProfile.Production)
+        {
+            if (!string.IsNullOrWhiteSpace(secret))
+                throw new InvalidOperationException("DigitalBrain:Runtime:Ui:BootstrapSecret is forbidden in Production.");
+            return new(
+                string.Empty,
+                new TenantId("disabled"),
+                new WorkspaceId("disabled"),
+                new PrincipalRef("disabled", PrincipalKind.User),
+                TimeSpan.FromMinutes(15),
+                new HashSet<string>(StringComparer.Ordinal),
+                Enabled: false);
+        }
+        var tenant = configuration["DigitalBrain:Runtime:Ui:TenantId"] ?? "local";
+        var workspace = configuration["DigitalBrain:Runtime:Ui:WorkspaceId"] ?? "default";
+        var principal = configuration["DigitalBrain:Runtime:Ui:PrincipalId"] ?? "flutter-ui";
         if (string.IsNullOrWhiteSpace(tenant) || string.IsNullOrWhiteSpace(workspace) || string.IsNullOrWhiteSpace(principal) ||
             tenant.Length > 256 || workspace.Length > 256 || principal.Length > 256)
             throw new InvalidOperationException("UI bootstrap identity configuration must be complete.");
@@ -48,24 +62,22 @@ public sealed record UiDeliveryOptions(
     }
 }
 
-public sealed class UiBootstrapAuthenticator(UiBootstrapOptions options, ISessionManager sessions)
+public sealed class UiBootstrapAuthenticator(UiBootstrapOptions options)
 {
-    public bool TryBootstrap(string suppliedSecret, out RuntimeRequestContext context, out SessionPair pair)
+    public bool TryAuthenticate(string suppliedSecret, out RuntimeRequestContext context)
     {
         context = default!;
-        pair = default!;
-        if (string.IsNullOrEmpty(options.Secret) || string.IsNullOrEmpty(suppliedSecret) ||
+        if (!options.Enabled || string.IsNullOrEmpty(options.Secret) || string.IsNullOrEmpty(suppliedSecret) ||
             !FixedTimeEquals(options.Secret, suppliedSecret)) return false;
         context = new RuntimeRequestContext(
             options.TenantId,
             options.WorkspaceId,
             options.Principal,
-            $"v2-ui-session-{Guid.NewGuid():N}",
+            $"runtime-ui-session-{Guid.NewGuid():N}",
             AuthAssurance.Password,
             Guid.NewGuid().ToString("N"),
             null,
             options.Grants);
-        pair = sessions.Create(context, options.AccessLifetime, SessionAudiences.Ui);
         return true;
     }
 
@@ -79,46 +91,85 @@ public sealed class UiBootstrapAuthenticator(UiBootstrapOptions options, ISessio
 
 public sealed class UiGrpcService(
     UiBootstrapAuthenticator bootstrap,
-    ISessionManager sessions,
-    SessionTokenService tokens,
-    IPrivateFeedStore feed,
-    WorkspaceSurfaceProducer producer,
+    UiExternalIdentityAuthenticator externalIdentity,
+    RuntimeSessionAuthority sessions,
+    RuntimeSurfaceFeed feed,
+    ConversationLifecycleCoordinator conversationLifecycle,
+    ConversationAuthorizationResumer authorizationResumer,
+    ConversationRecoveryWorker recovery,
     SurfaceEnvelopeWriter envelopeWriter,
-    ActionExecutor actionExecutor,
-    ApplicationService application,
+    McpInoCommandHandler conversationHandler,
     UiDeliveryOptions deliveryOptions,
     ILogger<UiGrpcService> logger) : DigitalBrainV2Ui.DigitalBrainV2UiBase
 {
     private const int MaximumInputBytes = 64 * 1024;
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Mcp");
 
-    public override Task<SessionReply> BootstrapSession(BootstrapSessionRequest request, ServerCallContext context)
+    public override async Task<SessionReply> BootstrapSession(BootstrapSessionRequest request, ServerCallContext context)
     {
         DemandAudience(context);
-        if (!bootstrap.TryBootstrap(request.Secret, out var authenticated, out var pair))
+        var external = await externalIdentity.AuthenticateAsync(context).ConfigureAwait(false);
+        RuntimeRequestContext bootstrapContext;
+        var authenticationKind = "bootstrap";
+        if (external.Status == UiExternalAuthenticationStatus.Authenticated)
+        {
+            bootstrapContext = external.Context!;
+            authenticationKind = "oidc";
+        }
+        else if (external.Status == UiExternalAuthenticationStatus.Rejected ||
+                 !bootstrap.TryAuthenticate(request.Secret, out bootstrapContext))
         {
             logger.LogWarning("UI bootstrap was denied.");
             throw Unauthenticated();
         }
+        var issued = await sessions.CreateAsync(
+            bootstrapContext,
+            TimeSpan.FromMinutes(15),
+            SessionAudiences.Ui,
+            context.CancellationToken).ConfigureAwait(false);
         using var activity = ActivitySource.StartActivity("v2.ui.session.bootstrap", ActivityKind.Internal);
         activity?.SetTag("db.v2.ui.outcome", "success");
+        activity?.SetTag("db.v2.ui.authentication_kind", authenticationKind);
         logger.LogInformation("UI bootstrap issued a workspace-scoped session.");
-        return Task.FromResult(ToReply(authenticated, pair));
+        return ToReply(issued.Context, issued.Pair);
     }
 
-    public override Task<SessionReply> RefreshSession(RefreshSessionRequest request, ServerCallContext context)
+    public override async Task<SessionReply> RefreshSession(RefreshSessionRequest request, ServerCallContext context)
     {
         DemandAudience(context);
-        if (string.IsNullOrWhiteSpace(request.RefreshToken) ||
-            !sessions.TryRefresh(request.RefreshToken, TimeSpan.FromMinutes(15), SessionAudiences.Ui, out var pair) ||
-            !tokens.TryValidate(pair.AccessToken, SessionAudiences.Ui, out var authenticated))
+        var issued = string.IsNullOrWhiteSpace(request.RefreshToken)
+            ? null
+            : await sessions.RefreshAsync(
+                request.RefreshToken,
+                TimeSpan.FromMinutes(15),
+                SessionAudiences.Ui,
+                context.CancellationToken).ConfigureAwait(false);
+        if (issued is null)
         {
             logger.LogWarning("UI session refresh was denied.");
             throw Unauthenticated();
         }
         using var activity = ActivitySource.StartActivity("v2.ui.session.refresh", ActivityKind.Internal);
         activity?.SetTag("db.v2.ui.outcome", "success");
-        return Task.FromResult(ToReply(authenticated, pair));
+        return ToReply(issued.Context, issued.Pair);
+    }
+
+    public override async Task<LogoutSessionReply> LogoutSession(LogoutSessionRequest request, ServerCallContext context)
+    {
+        DemandAudience(context);
+        if (string.IsNullOrWhiteSpace(request.RefreshToken) ||
+            !await sessions.RevokeAsync(
+                request.RefreshToken,
+                SessionAudiences.Ui,
+                context.CancellationToken).ConfigureAwait(false))
+        {
+            logger.LogWarning("UI session logout was denied.");
+            throw Unauthenticated();
+        }
+        using var activity = ActivitySource.StartActivity("v2.ui.session.logout", ActivityKind.Internal);
+        activity?.SetTag("db.v2.ui.outcome", "success");
+        logger.LogInformation("UI session was revoked.");
+        return new LogoutSessionReply();
     }
 
     public override async Task WatchSurfaceFeed(
@@ -126,20 +177,22 @@ public sealed class UiGrpcService(
         IServerStreamWriter<SurfaceFeedEvent> responseStream,
         ServerCallContext context)
     {
-        var session = Authenticate(context);
+        var session = await AuthenticateAsync(context).ConfigureAwait(false);
         var authenticated = session.Context;
         if (request.AfterSequence < 0) throw new RpcException(new Status(StatusCode.InvalidArgument, "after_sequence cannot be negative."));
         var audienceKind = AudienceKind(request.Audience);
+        if (audienceKind != SurfaceAudienceKind.Principal)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Only the authenticated principal feed is supported."));
         var capabilities = ValidateCapabilities(request.ClientCapabilities);
         var batchSize = Math.Clamp(request.MaxBatchSize <= 0 ? 50 : request.MaxBatchSize, 1, 100);
-        producer.EnsureInitial(authenticated, audienceKind);
-
         logger.LogInformation("UI feed opened for {AudienceKind} audience.", audienceKind);
         var cursor = request.AfterSequence;
         var delivered = false;
-        var firstRead = true;
-        var rematerializeAfterResume = request.AfterSequence > 0;
-        var forceSnapshotReason = string.Empty;
+        await recovery.RecoverAsync(authenticated, context.CancellationToken).ConfigureAwait(false);
+        var prepared = await feed.PrepareSessionAsync(authenticated, context.CancellationToken).ConfigureAwait(false);
+        var state = prepared.State;
+        var actionTokens = prepared.ActionTokens;
+        var forceSnapshotReason = request.AfterSequence > 0 ? "reconnect-token-rematerialization" : string.Empty;
         var nextActionRenewal = DateTimeOffset.UtcNow.Add(deliveryOptions.ActionTokenRenewalInterval);
         using var leaseCancellation = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
         var leaseRemaining = session.ExpiresAt - DateTimeOffset.UtcNow;
@@ -149,20 +202,37 @@ public sealed class UiGrpcService(
         {
             while (!leaseCancellation.IsCancellationRequested)
             {
-                Revalidate(session);
-                producer.EnsureInitial(authenticated, audienceKind);
-                var page = string.IsNullOrEmpty(forceSnapshotReason)
-                    ? feed.CatchUp(authenticated, audienceKind, cursor, batchSize)
-                    : feed.CatchUp(authenticated, audienceKind, long.MaxValue, batchSize);
-                if (firstRead && request.AfterSequence > 0 && !page.ResetRequired && page.Items.Count == 0 &&
-                    page.LatestSequence == request.AfterSequence)
+                await RevalidateAsync(session, leaseCancellation.Token).ConfigureAwait(false);
+                var recovered = await recovery.RecoverAsync(authenticated, leaseCancellation.Token).ConfigureAwait(false);
+                var authorizationRecovered = await authorizationResumer.ResumeIfReadyAsync(
+                    authenticated,
+                    leaseCancellation.Token).ConfigureAwait(false);
+                if (recovered || authorizationRecovered)
                 {
-                    forceSnapshotReason = "reconnect-token-rematerialization";
-                    rematerializeAfterResume = false;
-                    page = feed.CatchUp(authenticated, audienceKind, long.MaxValue, batchSize);
+                    prepared = await feed.PrepareSessionAsync(authenticated, leaseCancellation.Token).ConfigureAwait(false);
+                    state = prepared.State;
+                    actionTokens = prepared.ActionTokens;
+                    forceSnapshotReason = "conversation-recovery";
+                    nextActionRenewal = DateTimeOffset.UtcNow.Add(deliveryOptions.ActionTokenRenewalInterval);
                 }
-                firstRead = false;
-                if (page.ResetRequired)
+                else
+                {
+                    state = await feed.ReadAsync(authenticated, leaseCancellation.Token).ConfigureAwait(false);
+                }
+                if (DateTimeOffset.UtcNow >= nextActionRenewal)
+                {
+                    prepared = await feed.PrepareSessionAsync(authenticated, leaseCancellation.Token).ConfigureAwait(false);
+                    state = prepared.State;
+                    actionTokens = prepared.ActionTokens;
+                    forceSnapshotReason = "action-token-renewal";
+                    nextActionRenewal = DateTimeOffset.UtcNow.Add(deliveryOptions.ActionTokenRenewalInterval);
+                }
+                var page = feed.ReadPage(
+                    authenticated,
+                    state,
+                    string.IsNullOrEmpty(forceSnapshotReason) ? cursor : 0,
+                    batchSize);
+                if (page.ResetRequired || !string.IsNullOrEmpty(forceSnapshotReason))
                 {
                     var reset = new SurfaceFeedReset
                     {
@@ -170,50 +240,38 @@ public sealed class UiGrpcService(
                         ResumeSequence = page.LatestSequence
                     };
                     foreach (var item in page.Items)
-                        reset.SnapshotJson.Add(Materialize(authenticated, item, capabilities));
-                    Revalidate(session);
+                        reset.SnapshotJson.Add(Materialize(authenticated, item, capabilities, actionTokens));
+                    await RevalidateAsync(session, leaseCancellation.Token).ConfigureAwait(false);
                     await responseStream.WriteAsync(new SurfaceFeedEvent { Reset = reset }).ConfigureAwait(false);
-                    feed.MarkDelivered(authenticated, audienceKind, page.LatestSequence);
+                    if (page.LatestSequence > 0)
+                        await feed.RecordDeliveredAsync(authenticated, page.LatestSequence, leaseCancellation.Token).ConfigureAwait(false);
                     cursor = page.LatestSequence;
                     RecordDelivery("reset", audienceKind, reset.SnapshotJson.Count);
                     delivered = true;
-                    rematerializeAfterResume = false;
                     forceSnapshotReason = string.Empty;
-                    nextActionRenewal = DateTimeOffset.UtcNow.Add(deliveryOptions.ActionTokenRenewalInterval);
                     continue;
                 }
 
                 foreach (var item in page.Items)
                 {
                     leaseCancellation.Token.ThrowIfCancellationRequested();
-                    Revalidate(session);
+                    await RevalidateAsync(session, leaseCancellation.Token).ConfigureAwait(false);
                     var feedEvent = new SurfaceFeedEvent
                     {
-                        SurfaceJson = Materialize(authenticated, item, capabilities)
+                        SurfaceJson = Materialize(authenticated, item, capabilities, actionTokens)
                     };
                     await responseStream.WriteAsync(feedEvent).ConfigureAwait(false);
-                    feed.MarkDelivered(authenticated, audienceKind, item.Sequence);
+                    await feed.RecordDeliveredAsync(authenticated, item.Sequence, leaseCancellation.Token).ConfigureAwait(false);
                     cursor = item.Sequence;
                     if (!delivered)
                     {
                         RecordDelivery("surface", audienceKind, 1);
                         delivered = true;
                     }
-                    nextActionRenewal = DateTimeOffset.UtcNow.Add(deliveryOptions.ActionTokenRenewalInterval);
                 }
-                if (page.Next is not null) continue;
-                if (rematerializeAfterResume)
-                {
-                    rematerializeAfterResume = false;
-                    forceSnapshotReason = "reconnect-token-rematerialization";
-                    continue;
-                }
-
                 var now = DateTimeOffset.UtcNow;
                 var revalidateAfter = deliveryOptions.AuthenticationRevalidationInterval;
-                var renewAfter = audienceKind == SurfaceAudienceKind.Principal
-                    ? nextActionRenewal - now
-                    : TimeSpan.MaxValue;
+                var renewAfter = nextActionRenewal - now;
                 var wakeAfter = renewAfter < revalidateAfter ? renewAfter : revalidateAfter;
                 if (wakeAfter <= TimeSpan.Zero)
                 {
@@ -224,13 +282,13 @@ public sealed class UiGrpcService(
                 wakeCancellation.CancelAfter(wakeAfter);
                 try
                 {
-                    await feed.WaitForChangeAsync(authenticated, audienceKind, cursor, wakeCancellation.Token).ConfigureAwait(false);
-                    Revalidate(session);
+                    await feed.WaitForChangeAsync(authenticated, cursor, wakeCancellation.Token).ConfigureAwait(false);
+                    await RevalidateAsync(session, leaseCancellation.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (!leaseCancellation.IsCancellationRequested)
                 {
-                    Revalidate(session);
-                    if (audienceKind == SurfaceAudienceKind.Principal && DateTimeOffset.UtcNow >= nextActionRenewal)
+                    await RevalidateAsync(session, leaseCancellation.Token).ConfigureAwait(false);
+                    if (DateTimeOffset.UtcNow >= nextActionRenewal)
                         forceSnapshotReason = "action-token-renewal";
                 }
             }
@@ -252,21 +310,28 @@ public sealed class UiGrpcService(
 
     public override async Task<AcknowledgeSurfaceFeedReply> AcknowledgeSurfaceFeed(AcknowledgeSurfaceFeedRequest request, ServerCallContext context)
     {
-        var authenticated = Authenticate(context).Context;
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
         if (request.Sequence < 0) throw new RpcException(new Status(StatusCode.InvalidArgument, "sequence cannot be negative."));
         var audienceKind = AudienceKind(request.Audience);
-        using var wait = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
-        wait.CancelAfter(TimeSpan.FromMilliseconds(250));
-        if (!await feed.WaitUntilDeliveredAsync(authenticated, audienceKind, request.Sequence, wait.Token).ConfigureAwait(false))
+        if (audienceKind != SurfaceAudienceKind.Principal)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Only the authenticated principal feed is supported."));
+        try
+        {
+            var acknowledged = await feed.AcknowledgeAsync(
+                authenticated,
+                request.Sequence,
+                context.CancellationToken).ConfigureAwait(false);
+            return new AcknowledgeSurfaceFeedReply { AcknowledgedSequence = acknowledged };
+        }
+        catch (InvalidOperationException)
+        {
             throw new RpcException(new Status(StatusCode.FailedPrecondition, "The feed sequence has not been delivered."));
-        try { feed.Acknowledge(authenticated, audienceKind, request.Sequence); }
-        catch (InvalidOperationException) { throw new RpcException(new Status(StatusCode.FailedPrecondition, "The feed sequence has not been delivered.")); }
-        return new AcknowledgeSurfaceFeedReply { AcknowledgedSequence = request.Sequence };
+        }
     }
 
     public override async Task<SubmitActionReply> SubmitAction(SubmitActionRequest request, ServerCallContext context)
     {
-        var authenticated = Authenticate(context).Context;
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
         if (Encoding.UTF8.GetByteCount(request.InputJson) > MaximumInputBytes)
             throw new RpcException(new Status(StatusCode.ResourceExhausted, "Action input is too large."));
         JsonElement input;
@@ -288,13 +353,17 @@ public sealed class UiGrpcService(
         try { DemandSafeActionInput(input, depth: 0); }
         catch (ArgumentException) { throw new RpcException(new Status(StatusCode.InvalidArgument, "Action input contains a forbidden authority or credential field.")); }
 
-        ActionSubmission submission;
-        ActionExecutor.Authorization authorization;
+        AuthorizedRuntimeAction authorized;
         try
         {
-            authorization = await actionExecutor.ReserveAsync(authenticated, request.BindingId, request.ActionToken,
-                request.SurfaceId, request.SurfaceRevision, input, context.CancellationToken).ConfigureAwait(false);
-            submission = authorization.Submission;
+            authorized = await feed.AuthorizeActionAsync(
+                authenticated,
+                request.BindingId,
+                request.ActionToken,
+                request.SurfaceId,
+                request.SurfaceRevision,
+                input,
+                context.CancellationToken).ConfigureAwait(false);
         }
         catch (ActionRejectedException exception)
         {
@@ -306,73 +375,92 @@ public sealed class UiGrpcService(
             throw new RpcException(new Status(status, "Action authorization failed."));
         }
 
-        // The session itself receives neither command capability. Only a successfully reauthorized,
-        // server-bound action crosses command admission, and its type comes from the stored binding.
-        var internalCapability = string.Equals(
-            submission.ActionType,
-            McpInoCommandHandler.CommandType,
-            StringComparison.Ordinal)
-            ? "brain.interact"
-            : "brain.act";
-        var internalGrants = authenticated.Grants.Append(internalCapability).ToHashSet(StringComparer.Ordinal);
+        var submission = authorized.Submission;
+        if (string.Equals(submission.ActionType, ConversationSurfacePayload.NewActionType, StringComparison.Ordinal))
+        {
+            await conversationLifecycle.CreateAsync(
+                authenticated,
+                authorized.ConversationId,
+                submission.OperationId,
+                context.CancellationToken).ConfigureAwait(false);
+            return Accepted(submission);
+        }
+        if (string.Equals(submission.ActionType, ConversationSurfacePayload.DeleteActionType, StringComparison.Ordinal))
+        {
+            await conversationLifecycle.DeleteAsync(
+                authenticated,
+                authorized.ConversationId,
+                submission.OperationId,
+                context.CancellationToken).ConfigureAwait(false);
+            return Accepted(submission);
+        }
+        if (!string.Equals(submission.ActionType, ConversationSurfacePayload.SendActionType, StringComparison.Ordinal))
+            throw new RpcException(new Status(StatusCode.PermissionDenied, "Action authorization failed."));
+        var internalGrants = authenticated.Grants.Append("brain.interact").ToHashSet(StringComparer.Ordinal);
         var commandContext = authenticated with
         {
             IdempotencyKey = submission.IdempotencyKey,
             Grants = internalGrants,
-            CorrelationId = Guid.NewGuid().ToString("N")
+            CorrelationId = Guid.NewGuid().ToString("N"),
+            ConversationId = authorized.ConversationId
         };
         var command = new CommandEnvelope(
             submission.ActionType,
             2,
-            $"v2-ui-command-{Guid.NewGuid():N}",
+            submission.IdempotencyKey,
             commandContext,
             submission.Input);
-        OperationStatus operation;
-        try
-        {
-            operation = await application.SubmitAsync(commandContext, command, context.CancellationToken).ConfigureAwait(false);
-        }
-        catch (IdempotencyConflictException)
-        {
-            actionExecutor.Release(authorization);
-            throw new RpcException(new Status(StatusCode.AlreadyExists,
-                "The action was already submitted with different input."));
-        }
-        catch
-        {
-            actionExecutor.Release(authorization);
-            throw;
-        }
-        if (!actionExecutor.Commit(authorization, operation.OperationId))
-            throw new RpcException(new Status(StatusCode.AlreadyExists, "Action authorization failed."));
+        using var executionTimeout = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+        executionTimeout.CancelAfter(TimeSpan.FromMinutes(2));
+        await conversationHandler.ExecuteAsync(command, executionTimeout.Token).ConfigureAwait(false);
+        return Accepted(submission);
+    }
+
+    private SubmitActionReply Accepted(ActionSubmission submission)
+    {
         using var activity = ActivitySource.StartActivity("v2.ui.action.submit", ActivityKind.Internal);
         activity?.SetTag("db.v2.ui.action_type", submission.ActionType);
         activity?.SetTag("db.v2.ui.outcome", "accepted");
         logger.LogInformation("UI action {ActionType} was accepted.", submission.ActionType);
-        return new SubmitActionReply { OperationId = operation.OperationId, IdempotencyKey = submission.IdempotencyKey };
+        return new() { OperationId = submission.OperationId, IdempotencyKey = submission.IdempotencyKey };
     }
 
-    private AuthenticatedSession Authenticate(ServerCallContext context)
+    private async Task<AuthenticatedSession> AuthenticateAsync(ServerCallContext context)
     {
         var metadata = ToMetadata(context.RequestHeaders);
-        if (!GrpcAuthentication.TryAuthenticate(metadata, tokens, SessionAudiences.Ui, out var authenticated, out var expiresAt) ||
-            !metadata.TryGetValue("x-v2-session", out var token))
+        if (!metadata.TryGetValue("x-v2-session", out var token))
             throw Unauthenticated();
-        return new(authenticated, token, expiresAt);
+        var validated = await sessions.ValidateAccessAsync(
+            token,
+            SessionAudiences.Ui,
+            context.CancellationToken).ConfigureAwait(false);
+        return validated is null
+            ? throw Unauthenticated()
+            : new(validated.Context, token, validated.AccessExpiresAt, validated.SessionVersion);
     }
 
-    private void Revalidate(AuthenticatedSession session)
+    private async Task RevalidateAsync(AuthenticatedSession session, CancellationToken cancellationToken)
     {
-        if (!tokens.TryValidate(session.Token, SessionAudiences.Ui, out var current, out var expiresAt) ||
-            expiresAt != session.ExpiresAt || current.TenantId != session.Context.TenantId ||
-            current.WorkspaceId != session.Context.WorkspaceId || current.Principal != session.Context.Principal ||
-            !string.Equals(current.SessionId, session.Context.SessionId, StringComparison.Ordinal))
+        var validated = await sessions.ValidateAccessAsync(
+            session.Token,
+            SessionAudiences.Ui,
+            cancellationToken).ConfigureAwait(false);
+        if (validated is null || validated.AccessExpiresAt != session.ExpiresAt ||
+            validated.SessionVersion != session.SessionVersion ||
+            validated.Context.TenantId != session.Context.TenantId ||
+            validated.Context.WorkspaceId != session.Context.WorkspaceId ||
+            validated.Context.Principal != session.Context.Principal ||
+            !string.Equals(validated.Context.SessionId, session.Context.SessionId, StringComparison.Ordinal))
             throw Unauthenticated();
     }
 
-    private string Materialize(RuntimeRequestContext recipient, StoredSurfaceRecord record, IReadOnlySet<string> capabilities)
+    private string Materialize(
+        RuntimeRequestContext recipient,
+        StoredSurfaceRecord record,
+        IReadOnlySet<string> capabilities,
+        IReadOnlyDictionary<string, SurfaceActionToken> actionTokens)
     {
-        try { return envelopeWriter.Write(recipient, record, capabilities); }
+        try { return envelopeWriter.Write(recipient, record, capabilities, actionTokens); }
         catch (SurfaceCapabilityException)
         {
             throw new RpcException(new Status(StatusCode.FailedPrecondition, "The client does not support the required surface capabilities."));
@@ -470,5 +558,9 @@ public sealed class UiGrpcService(
     private static RpcException Unauthenticated() =>
         new(new Status(StatusCode.Unauthenticated, "A valid UI session for the exact transport audience is required."));
 
-    private sealed record AuthenticatedSession(RuntimeRequestContext Context, string Token, DateTimeOffset ExpiresAt);
+    private sealed record AuthenticatedSession(
+        RuntimeRequestContext Context,
+        string Token,
+        DateTimeOffset ExpiresAt,
+        long SessionVersion);
 }

@@ -147,6 +147,13 @@ public class SalesforceConnector : IConnector
         var appValues = await _store.GetAsync(PackConfigScopes.App, SalesforceClientFactory.PackName, cancellationToken);
         var pending = await _store.GetAsync(userScope, SalesforceClientFactory.OAuthPendingPackName, cancellationToken);
         var existingUser = await _store.GetAsync(userScope, SalesforceClientFactory.PackName, cancellationToken);
+        var callbackFingerprint = SalesforceClientFactory.AuthorizationAttemptFingerprint(state);
+        var mergedCredentials = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
+        foreach (var item in existingUser)
+            mergedCredentials[item.Key] = item.Value;
+
+        if (IsCompletedReplay(callbackFingerprint, pending, existingUser, mergedCredentials))
+            return new AuthResult(true);
 
         if (IsPendingExpired(pending))
         {
@@ -156,16 +163,6 @@ public class SalesforceConnector : IConnector
 
         if (!pending.TryGetValue(SalesforceClientFactory.OAuthStateKey, out var expectedState) || string.IsNullOrWhiteSpace(expectedState))
         {
-            var callbackFingerprint = SalesforceClientFactory.AuthorizationAttemptFingerprint(state);
-            var mergedCredentials = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
-            foreach (var item in existingUser)
-                mergedCredentials[item.Key] = item.Value;
-            if (existingUser.TryGetValue(SalesforceClientFactory.OAuthCompletedFingerprintKey, out var completedFingerprint) &&
-                SalesforceClientFactory.SameAuthorizationAttempt(callbackFingerprint, completedFingerprint) &&
-                SalesforceClientFactory.HasUsableCredential(mergedCredentials))
-            {
-                return new AuthResult(true);
-            }
             return new AuthResult(false, "no-pending", "No pending OAuth flow.");
         }
 
@@ -203,10 +200,10 @@ public class SalesforceConnector : IConnector
                                    string.Equals(flowId, completedFlowForReplay, StringComparison.Ordinal);
         if (completedMatches && completedFlowMatches)
         {
-            var mergedCredentials = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
+            var replayCredentials = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
             foreach (var item in existingUser)
-                mergedCredentials[item.Key] = item.Value;
-            if (SalesforceClientFactory.HasUsableCredential(mergedCredentials))
+                replayCredentials[item.Key] = item.Value;
+            if (SalesforceClientFactory.HasUsableCredential(replayCredentials))
                 return new AuthResult(true);
         }
 
@@ -264,6 +261,10 @@ public class SalesforceConnector : IConnector
                 userTokenValues[kv.Key] = kv.Value;
             }
             userTokenValues[SalesforceClientFactory.OAuthCompletedFingerprintKey] = attemptFingerprint;
+            userTokenValues[SalesforceClientFactory.OAuthCompletedExpiresAtKey] = DateTimeOffset.UtcNow
+                .Add(SalesforceClientFactory.OAuthCompletedWitnessLifetime)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture);
             if (flowId is not null)
                 userTokenValues[SalesforceClientFactory.OAuthCompletedFlowIdKey] = flowId;
 
@@ -282,6 +283,25 @@ public class SalesforceConnector : IConnector
             await SetPendingResultAsync(userScope, pending, "exchange-failed", attemptFingerprint, flowId);
             return new AuthResult(false, "exchange-failed", "The authorization code exchange failed.");
         }
+    }
+
+    private static bool IsCompletedReplay(
+        string callbackFingerprint,
+        IReadOnlyDictionary<string, string> pending,
+        IReadOnlyDictionary<string, string> existingUser,
+        IReadOnlyDictionary<string, string> mergedCredentials)
+    {
+        if (!existingUser.TryGetValue(SalesforceClientFactory.OAuthCompletedFingerprintKey, out var completedFingerprint) ||
+            !SalesforceClientFactory.SameAuthorizationAttempt(callbackFingerprint, completedFingerprint) ||
+            !existingUser.TryGetValue(SalesforceClientFactory.OAuthCompletedExpiresAtKey, out var completedExpiresAt) ||
+            !long.TryParse(completedExpiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAt) ||
+            expiresAt <= DateTimeOffset.UtcNow.ToUnixTimeSeconds() ||
+            !SalesforceClientFactory.HasUsableCredential(mergedCredentials))
+            return false;
+
+        return !pending.TryGetValue(SalesforceClientFactory.OAuthFlowIdKey, out var pendingFlowId) ||
+               existingUser.TryGetValue(SalesforceClientFactory.OAuthCompletedFlowIdKey, out var completedFlowId) &&
+               string.Equals(pendingFlowId, completedFlowId, StringComparison.Ordinal);
     }
 
     private Task SetPendingResultAsync(

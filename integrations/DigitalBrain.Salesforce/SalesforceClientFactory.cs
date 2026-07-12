@@ -39,6 +39,7 @@ public static class SalesforceClientFactory
     public const string OAuthResultKey = "oauth_result";
     public const string OAuthAttemptFingerprintKey = "oauth_attempt_fingerprint";
     public const string OAuthCompletedFingerprintKey = "oauth_completed_fingerprint";
+    public const string OAuthCompletedExpiresAtKey = "oauth_completed_expires_at";
     public const string OAuthProcessingExpiresAtKey = "oauth_processing_expires_at";
     public const string OAuthFlowIdKey = "oauth_flow_id";
     public const string OAuthCompletedFlowIdKey = "oauth_completed_flow_id";
@@ -53,6 +54,7 @@ public static class SalesforceClientFactory
     public const string OAuthPhaseFailed = "failed";
     public static readonly TimeSpan OAuthPendingLifetime = TimeSpan.FromMinutes(10);
     public static readonly TimeSpan OAuthProcessingLifetime = TimeSpan.FromMinutes(3);
+    public static readonly TimeSpan OAuthCompletedWitnessLifetime = TimeSpan.FromHours(1);
     public const string AuthenticationFailureMessage =
         "Salesforce authentication failed. Reconnect Salesforce and try again.";
     public const string MissingConnectedAppConfigMessage =
@@ -148,7 +150,8 @@ public static class SalesforceClientFactory
     {
         var hasCredential = HasUsableCredential(credentials);
         var hasCompletedAttempt = credentials.TryGetValue(OAuthCompletedFingerprintKey, out var completedAttempt) &&
-                                  IsAuthorizationAttemptFingerprint(completedAttempt);
+                                  IsAuthorizationAttemptFingerprint(completedAttempt) &&
+                                  TryGetFutureUnixSeconds(credentials, OAuthCompletedExpiresAtKey, out _);
         var hasCompletedFlow = credentials.TryGetValue(OAuthCompletedFlowIdKey, out var completedFlow) &&
                                IsAuthorizationFlowId(completedFlow);
         var hasPendingAttempt = pending.TryGetValue(OAuthAttemptFingerprintKey, out var pendingAttempt) &&
@@ -345,33 +348,19 @@ public static class SalesforceClientFactory
     public static string ResolveRedirectUri(IReadOnlyDictionary<string, string> values) =>
         NormalizeRedirectUri(Optional(values, RedirectUriKey, DefaultRedirectUri));
 
-    public static string CreateOAuthStartUrl(IReadOnlyDictionary<string, string> values, string token)
+    public static string CreateOAuthStartUrl(string flowReference) =>
+        OAuthCallbackPaths.CreateInternalStartPath(OAuthCallbackPaths.SalesforceProvider, flowReference);
+
+    public static string CreateOAuthStartUrl(
+        IReadOnlyDictionary<string, string> values,
+        string flowReference)
     {
-        if (string.IsNullOrWhiteSpace(token) || token.Length > 4096)
-        {
-            throw new ArgumentException("A bounded OAuth start token is required.", nameof(token));
-        }
-
-        var redirect = new Uri(ResolveRedirectUri(values), UriKind.Absolute);
-        var start = new UriBuilder(redirect)
-        {
-            Path = OAuthCallbackPaths.SalesforceStart,
-            Query = "t=" + Uri.EscapeDataString(token),
-            Fragment = string.Empty
-        }.Uri.AbsoluteUri;
-        if (!OAuthCallbackPaths.IsAllowedSalesforceStartUrl(start, redirect.AbsoluteUri))
-        {
-            throw new InvalidOperationException("Salesforce OAuth start URL could not be resolved safely.");
-        }
-
-        return start;
+        ArgumentNullException.ThrowIfNull(values);
+        return CreateOAuthStartUrl(flowReference);
     }
 
     public static bool IsAllowedAuthorizationUrl(string? value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps &&
-        string.Equals(uri.AbsolutePath, "/services/oauth2/authorize", StringComparison.OrdinalIgnoreCase) &&
-        IsAllowedLoginHost(uri.Host);
+        OAuthCallbackPaths.IsAllowedProviderAuthorizationUrl(OAuthCallbackPaths.SalesforceProvider, value);
 
     public static string CreateAuthorizationUrl(
         IReadOnlyDictionary<string, string> values,

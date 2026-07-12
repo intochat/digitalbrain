@@ -2,7 +2,6 @@ using DigitalBrain.Aspire;
 using DigitalBrain.Core.Models;
 using AzureOpenAIModels = DigitalBrain.Core.Models.AzureOpenAI;
 using OllamaModels = DigitalBrain.Core.Models.Ollama;
-using VoiceModels = DigitalBrain.Core.Models.Voice;
 
 namespace DigitalBrain.Tests.Aspire;
 
@@ -60,14 +59,13 @@ public sealed class DigitalBrainModelRegistryTests
     }
 
     [Fact]
-    public void EmbeddingVoiceAndVectorRegistrationsDoNotChangeChatSelection()
+    public void EmbeddingAndVectorRegistrationsDoNotChangeChatSelection()
     {
         var options = new DigitalBrainOptions();
 
         options
             .WithLLM<OllamaModels.Llama31_8B>().AsBalanced()
             .WithEmbedding<TestEmbeddingModel>()
-            .WithVoice2Text<TestVoiceModel>()
             .WithVectorDatabase(DigitalBrainProviderIds.Qdrant, "documents");
 
         Assert.Equal(DigitalBrainProviderIds.Ollama, options.LlmProvider);
@@ -79,29 +77,9 @@ public sealed class DigitalBrainModelRegistryTests
             registration.Model.Id == "text-embedding-test");
 
         Assert.Contains(options.ModelRegistry.Registrations, registration =>
-            registration.Model.Kind == DigitalBrainCapabilityKind.VoiceToText &&
-            registration.Model.Provider == DigitalBrainProviderIds.OpenAI &&
-            registration.Model.Id == "whisper-test");
-        Assert.Equal("whisper-test", options.ModelRegistry.DefaultVoiceToText?.Model.Id);
-
-        Assert.Contains(options.ModelRegistry.Registrations, registration =>
             registration.Model.Kind == DigitalBrainCapabilityKind.VectorDatabase &&
             registration.Model.Provider == DigitalBrainProviderIds.Qdrant &&
             registration.Model.Id == "documents");
-    }
-
-    [Fact]
-    public void LocalWhisperVoiceModelUsesOpenAICompatibleProvider()
-    {
-        var options = new DigitalBrainOptions();
-
-        options.WithVoice2Text<VoiceModels.Whisper1Local>();
-
-        var voice = Assert.Single(options.ModelRegistry.Registrations);
-        Assert.Equal(DigitalBrainCapabilityKind.VoiceToText, voice.Model.Kind);
-        Assert.Equal(DigitalBrainProviderIds.OpenAICompatible, voice.Model.Provider);
-        Assert.Equal("whisper-1", voice.Model.Id);
-        Assert.Equal("Local Whisper", voice.Model.DisplayName);
     }
 
     [Fact]
@@ -174,9 +152,4 @@ public sealed class DigitalBrainModelRegistryTests
         public override string Id => "text-embedding-test";
     }
 
-    private sealed class TestVoiceModel : VoiceToTextModel
-    {
-        public override string Provider => DigitalBrainProviderIds.OpenAI;
-        public override string Id => "whisper-test";
-    }
 }

@@ -1,8 +1,12 @@
 encryptionsalt: v1:1mTrpGijTVE=:v1:AvipetckTQKaHa+L:NbyRQ4eNUUDLr1Yu7UywG1VqnUlyWg==
 config:
+  digitalbrain-deploy:dockerHubUsername: vhorbachov
   digitalbrain-deploy:imageTag: v4
-  digitalbrain-deploy:usePlaceholderImages: "false"
-  # Telegram transport secrets — set via: pulumi config set --secret telegramBotToken <value>
-  # (no real values committed; transport boots idle when token is absent)
-  # digitalbrain-deploy:telegramBotToken: <set-via-pulumi-config-set-secret>
-  # digitalbrain-deploy:internalServiceKey: <set-via-pulumi-config-set-secret>
+  digitalbrain-deploy:mcpAudience: digitalbrain-v2
+  digitalbrain-deploy:uiAudience: digitalbrain-v2-ui
+
+# Production evaluation intentionally fails unless the remaining identity and OAuth inputs are supplied
+# through the deploy workflow or encrypted Pulumi config. Never commit their values here:
+# sessionSigningKey, runtimeStateKek, runtimeStateSigningKey, googleClientId, googleClientSecret,
+# googleRedirectUri, salesforceClientId, salesforceClientSecret, salesforceRedirectUri, oidcIssuer,
+# oidcAudience, checkpointKey, and dockerHubToken.

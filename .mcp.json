@@ -1,22 +1,5 @@
 {
   "mcpServers": {
-    "digitalbrain": {
-      "command": "dotnet",
-      "args": [
-        "run",
-        "--no-build",
-        "--project",
-        "src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj",
-        "--no-launch-profile"
-      ],
-      "env": {
-        "DOTNET_ENVIRONMENT": "Development"
-      }
-    },
-    "digitalbrain-http": {
-      "type": "http",
-      "url": "http://localhost:5000/mcp"
-    },
     "codegraph": {
       "command": "npx",
       "args": ["-y", "@colbymchenry/codegraph", "serve", "--mcp"]

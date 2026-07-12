@@ -23,21 +23,5 @@ args = [
     "@upstash/context7-mcp@latest",
 ]
 
-[mcp_servers.digitalbrain]
-command = "dotnet"
-args = [
-    "run",
-    "--no-build",
-    "--project",
-    "src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj",
-    "--no-launch-profile",
-]
-
-[mcp_servers.digitalbrain.env]
-DOTNET_ENVIRONMENT = "Development"
-
-[mcp_servers.digitalbrain-http]
-url = "http://localhost:5000/mcp"
-
 [mcp_servers.microsoft-learn]
 url = "https://learn.microsoft.com/api/mcp"

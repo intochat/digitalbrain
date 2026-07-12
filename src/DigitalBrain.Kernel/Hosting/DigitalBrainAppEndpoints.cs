@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Google;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.Salesforce;
@@ -8,32 +9,42 @@ namespace DigitalBrain.Kernel.Hosting;
 
 public static class DigitalBrainAppEndpoints
 {
-    private static readonly HashSet<string> Providers = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "google",
-        "salesforce"
-    };
-
     public static WebApplication MapConnectorOAuthCallbacks(this WebApplication app)
     {
-        app.MapGet(OAuthCallbackPaths.SalesforceStart, async (
+        app.MapGet("/oauth/start/{provider}", async (
+            string provider,
             HttpRequest request,
             IServiceProvider services) =>
         {
             SetOAuthResponseHeaders(request.HttpContext.Response);
-            var startToken = request.Query["t"].FirstOrDefault() ?? string.Empty;
+            var target = (request.Path.Value ?? string.Empty) + (request.QueryString.Value ?? string.Empty);
+            if (!OAuthCallbackPaths.IsSupportedProvider(provider) ||
+                !OAuthCallbackPaths.TryParseInternalStartPath(target, provider, out var flowReference))
+                return Results.StatusCode(StatusCodes.Status400BadRequest);
+
             var protector = services.GetRequiredService<IOAuthStateProtector>();
-            if (!protector.TryUnprotect(startToken, out var owner))
+            if (!protector.TryUnprotect(flowReference, out var owner))
                 return Results.StatusCode(StatusCodes.Status400BadRequest);
 
             var cluster = services.GetRequiredService<IClusterClient>();
             using var startDeadline = CreateServerOperationDeadline(services);
-            var result = await cluster
+            if (string.Equals(provider, OAuthCallbackPaths.GoogleProvider, StringComparison.Ordinal))
+            {
+                var googleResult = await cluster
+                    .GetGrain<IGmailReadToolGrain>(owner.Value)
+                    .BeginAuthorizationAsync(flowReference, startDeadline.Token);
+                return googleResult.Status == GmailReadStatus.NeedsAuth &&
+                       GoogleClientFactory.IsAllowedAuthorizationUrl(googleResult.ConnectionUrl)
+                    ? Results.Redirect(googleResult.ConnectionUrl!, permanent: false, preserveMethod: false)
+                    : Results.StatusCode(StatusCodes.Status400BadRequest);
+            }
+
+            var salesforceResult = await cluster
                 .GetGrain<ISalesforceReadToolGrain>(owner.Value)
-                .BeginAuthorizationAsync(startToken, startDeadline.Token);
-            return result.Status == SalesforceReadStatus.NeedsAuth &&
-                   SalesforceClientFactory.IsAllowedAuthorizationUrl(result.ConnectionUrl)
-                ? Results.Redirect(result.ConnectionUrl!, permanent: false, preserveMethod: false)
+                .BeginAuthorizationAsync(flowReference, startDeadline.Token);
+            return salesforceResult.Status == SalesforceReadStatus.NeedsAuth &&
+                   SalesforceClientFactory.IsAllowedAuthorizationUrl(salesforceResult.ConnectionUrl)
+                ? Results.Redirect(salesforceResult.ConnectionUrl!, permanent: false, preserveMethod: false)
                 : Results.StatusCode(StatusCodes.Status400BadRequest);
         });
 
@@ -43,7 +54,7 @@ public static class DigitalBrainAppEndpoints
             IServiceProvider services) =>
         {
             SetOAuthResponseHeaders(request.HttpContext.Response);
-            if (!Providers.Contains(provider)) return Results.NotFound();
+            if (!OAuthCallbackPaths.IsSupportedProvider(provider)) return Results.NotFound();
 
             var callback = new OAuthCallback(
                 Code: request.Query["code"].FirstOrDefault() ?? string.Empty,
@@ -51,7 +62,7 @@ public static class DigitalBrainAppEndpoints
                 Error: request.Query["error"].FirstOrDefault(),
                 ErrorDescription: request.Query["error_description"].FirstOrDefault());
             AuthResult result;
-            if (string.Equals(provider, "salesforce", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(provider, OAuthCallbackPaths.SalesforceProvider, StringComparison.Ordinal))
             {
                 var protector = services.GetRequiredService<IOAuthStateProtector>();
                 if (!protector.TryUnprotect(callback.State, out var owner))

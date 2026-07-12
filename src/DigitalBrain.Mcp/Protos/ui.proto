@@ -10,6 +10,7 @@ service DigitalBrainV2Ui {
   rpc WatchSurfaceFeed(WatchSurfaceFeedRequest) returns (stream SurfaceFeedEvent);
   rpc AcknowledgeSurfaceFeed(AcknowledgeSurfaceFeedRequest) returns (AcknowledgeSurfaceFeedReply);
   rpc SubmitAction(SubmitActionRequest) returns (SubmitActionReply);
+  rpc LogoutSession(LogoutSessionRequest) returns (LogoutSessionReply);
 }
 
 message BootstrapSessionRequest {
@@ -78,3 +79,9 @@ message SubmitActionReply {
   string operation_id = 1;
   string idempotency_key = 2;
 }
+
+message LogoutSessionRequest {
+  string refresh_token = 1;
+}
+
+message LogoutSessionReply {}

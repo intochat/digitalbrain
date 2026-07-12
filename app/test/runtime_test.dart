@@ -23,7 +23,8 @@ void main() {
           isNot(anyOf(contains('access-token'), contains('refresh-token'))),
         );
 
-        session.signOut();
+        await session.signOut(transport);
+        expect(transport.logoutRefreshToken, 'refresh-token');
         expect(session.status, SessionStatus.signedOut);
         expect(session.sessionId, isNull);
         expect(session.tenantId, isNull);
@@ -31,6 +32,32 @@ void main() {
         expect(session.principalId, isNull);
       },
     );
+
+    test('server logout failure retains the authenticated session', () async {
+      final transport = _SessionTransport(
+        testSession(),
+        logoutError: const TransportException(
+          TransportErrorCode.unavailable,
+          'Logout unavailable.',
+        ),
+      );
+      final session = SessionController(now: () => testNow)
+        ..establish(testSession());
+
+      await expectLater(
+        session.signOut(transport),
+        throwsA(isA<TransportException>()),
+      );
+
+      expect(transport.logoutRefreshToken, 'refresh-token');
+      expect(session.status, SessionStatus.authenticated);
+      expect(session.isAuthenticated, isTrue);
+      expect(session.sessionId, 'session-a');
+      expect(session.tenantId, 'tenant-a');
+      expect(session.workspaceId, 'workspace-a');
+      expect(session.principalId, 'principal-a');
+      expect(session.lastError, isA<TransportException>());
+    });
 
     test(
       'rotates an expiring access session with the opaque refresh token',
@@ -64,8 +91,7 @@ void main() {
         identity: testIdentity(workspace: 'workspace-b'),
       );
       final transport = _SessionTransport(first, refreshed: changed);
-      final session = SessionController(now: () => testNow)
-        ..establish(first);
+      final session = SessionController(now: () => testNow)..establish(first);
 
       await expectLater(
         session.accessToken(transport),
@@ -165,14 +191,8 @@ void main() {
 
       expect(workspaceA.accept(surfaceA), isA<FeedSurface>());
       expect(workspaceB.accept(surfaceB), isA<FeedSurface>());
-      expect(
-        () => workspaceA.accept(surfaceB),
-        throwsA(isA<ScopeViolation>()),
-      );
-      expect(
-        () => workspaceB.accept(surfaceA),
-        throwsA(isA<ScopeViolation>()),
-      );
+      expect(() => workspaceA.accept(surfaceB), throwsA(isA<ScopeViolation>()));
+      expect(() => workspaceB.accept(surfaceA), throwsA(isA<ScopeViolation>()));
     });
 
     test('invalid reset snapshot leaves the current feed untouched', () {
@@ -195,13 +215,15 @@ void main() {
 }
 
 class _SessionTransport implements SessionTransport {
-  _SessionTransport(this.initial, {SessionBundle? refreshed})
+  _SessionTransport(this.initial, {SessionBundle? refreshed, this.logoutError})
     : refreshed = refreshed ?? initial;
 
   final SessionBundle initial;
   final SessionBundle refreshed;
+  final Object? logoutError;
   String? bootstrapSecret;
   String? refreshToken;
+  String? logoutRefreshToken;
 
   @override
   Future<SessionBundle> bootstrapSession(String bootstrapSecret) async {
@@ -213,5 +235,12 @@ class _SessionTransport implements SessionTransport {
   Future<SessionBundle> refreshSession({required String refreshToken}) async {
     this.refreshToken = refreshToken;
     return refreshed;
+  }
+
+  @override
+  Future<void> logout({required String refreshToken}) async {
+    logoutRefreshToken = refreshToken;
+    final error = logoutError;
+    if (error != null) throw error;
   }
 }

@@ -822,6 +822,100 @@ class SubmitActionReply extends $pb.GeneratedMessage {
   void clearIdempotencyKey() => $_clearField(2);
 }
 
+class LogoutSessionRequest extends $pb.GeneratedMessage {
+  factory LogoutSessionRequest({
+    $core.String? refreshToken,
+  }) {
+    final result = create();
+    if (refreshToken != null) result.refreshToken = refreshToken;
+    return result;
+  }
+
+  LogoutSessionRequest._();
+
+  factory LogoutSessionRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LogoutSessionRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LogoutSessionRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'refreshToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LogoutSessionRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LogoutSessionRequest copyWith(void Function(LogoutSessionRequest) updates) =>
+      super.copyWith((message) => updates(message as LogoutSessionRequest))
+          as LogoutSessionRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LogoutSessionRequest create() => LogoutSessionRequest._();
+  @$core.override
+  LogoutSessionRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LogoutSessionRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LogoutSessionRequest>(create);
+  static LogoutSessionRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get refreshToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set refreshToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRefreshToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRefreshToken() => $_clearField(1);
+}
+
+class LogoutSessionReply extends $pb.GeneratedMessage {
+  factory LogoutSessionReply() => create();
+
+  LogoutSessionReply._();
+
+  factory LogoutSessionReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LogoutSessionReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LogoutSessionReply',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LogoutSessionReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LogoutSessionReply copyWith(void Function(LogoutSessionReply) updates) =>
+      super.copyWith((message) => updates(message as LogoutSessionReply))
+          as LogoutSessionReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LogoutSessionReply create() => LogoutSessionReply._();
+  @$core.override
+  LogoutSessionReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LogoutSessionReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LogoutSessionReply>(create);
+  static LogoutSessionReply? _defaultInstance;
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

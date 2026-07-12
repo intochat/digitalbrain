@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
@@ -26,6 +27,8 @@ public sealed class GmailReadNeuron(
     [FromKeyedServices("google")] IConnector connector,
     IOAuthStateProtector oauthStateProtector) : Grain, IGmailReadToolGrain, IGmailMetadataToolGrain
 {
+    private static readonly TimeSpan OAuthStartLifetime = TimeSpan.FromMinutes(5);
+
     public async Task<ExternalAuthorizationResolution> ResolveAuthorizationAsync(
         CancellationToken cancellationToken = default)
     {
@@ -57,6 +60,50 @@ public sealed class GmailReadNeuron(
         return GoogleClientFactory.ResolveAuthorization(values, pending);
     }
 
+    public async Task<GmailReadResult> BeginAuthorizationAsync(
+        string flowReference,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        if (!OAuthCallbackPaths.IsOpaqueFlowReference(flowReference) ||
+            !oauthStateProtector.TryUnprotect(flowReference, out var protectedOwner) ||
+            !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal))
+            return InvalidConnectionRequest();
+
+        var userScope = PackConfigScopes.ForUser(new UserId(owner.Value));
+        var pending = await store.GetAsync(
+            userScope,
+            GoogleClientFactory.OAuthPendingPackName,
+            cancellationToken);
+        if (!GoogleClientFactory.IsCurrentOAuthStartToken(pending, flowReference))
+            return InvalidConnectionRequest();
+
+        try
+        {
+            var challenge = await connector.BeginAuthAsync(owner, cancellationToken: cancellationToken);
+            if (challenge.IsForm || !GoogleClientFactory.IsAllowedAuthorizationUrl(challenge.UrlOrForm))
+                return new GmailReadResult(
+                    GmailReadStatus.ConfigurationMissing,
+                    SafeReason: "Gmail application configuration is missing.");
+
+            return new GmailReadResult(
+                GmailReadStatus.NeedsAuth,
+                ConnectionUrl: challenge.UrlOrForm);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Principal-scoped Google authorization start failed with {ExceptionType}.", ex.GetType().Name);
+            return new GmailReadResult(
+                GmailReadStatus.Unavailable,
+                SafeReason: "Google connection is unavailable right now.");
+        }
+    }
+
     public Task<AuthResult> CompleteAuthorizationAsync(
         OAuthCallback callback,
         CancellationToken cancellationToken = default)
@@ -82,7 +129,7 @@ public sealed class GmailReadNeuron(
 
         var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
         if (!GoogleClientFactory.HasUsableCredential(values))
-            return await BuildConnectionResultAsync(owner, cancellationToken);
+            return await BuildConnectionResultAsync(owner, values, cancellationToken);
 
         try
         {
@@ -130,6 +177,7 @@ public sealed class GmailReadNeuron(
         {
             return await BuildConnectionResultAsync(
                 owner,
+                values,
                 cancellationToken,
                 "Google authorization does not include Gmail read permission. Reconnect Google and grant read access.");
         }
@@ -137,6 +185,7 @@ public sealed class GmailReadNeuron(
         {
             return await BuildConnectionResultAsync(
                 owner,
+                values,
                 cancellationToken,
                 "Google authorization expired or was revoked. Reconnect Google to continue.");
         }
@@ -248,7 +297,7 @@ public sealed class GmailReadNeuron(
         var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
         if (!GoogleClientFactory.HasUsableCredential(values))
         {
-            var connection = await BuildConnectionResultAsync(owner, cancellationToken);
+            var connection = await BuildConnectionResultAsync(owner, values, cancellationToken);
             return failure(connection.Status, connection.SafeReason, connection.ConnectionUrl);
         }
 
@@ -263,13 +312,13 @@ public sealed class GmailReadNeuron(
         }
         catch (GoogleApiException ex) when (ex.HttpStatusCode == HttpStatusCode.Forbidden)
         {
-            var connection = await BuildConnectionResultAsync(owner, cancellationToken,
+            var connection = await BuildConnectionResultAsync(owner, values, cancellationToken,
                 "Google authorization does not include Gmail read permission. Reconnect Google and grant read access.");
             return failure(connection.Status, connection.SafeReason, connection.ConnectionUrl);
         }
         catch (Exception ex) when (IsAuthorizationFailure(ex))
         {
-            var connection = await BuildConnectionResultAsync(owner, cancellationToken,
+            var connection = await BuildConnectionResultAsync(owner, values, cancellationToken,
                 "Google authorization expired or was revoked. Reconnect Google to continue.");
             return failure(connection.Status, connection.SafeReason, connection.ConnectionUrl);
         }
@@ -318,25 +367,91 @@ public sealed class GmailReadNeuron(
 
     private async Task<GmailReadResult> BuildConnectionResultAsync(
         NeuronId owner,
+        IReadOnlyDictionary<string, string> values,
         CancellationToken cancellationToken,
         string reason = "Connect your Google account to let INO read your Gmail.")
     {
-        var challenge = await connector.BeginAuthAsync(owner, cancellationToken: cancellationToken);
-        if (challenge.IsForm || !IsAllowedGoogleAuthorizationUrl(challenge.UrlOrForm))
-            return new GmailReadResult(
-                GmailReadStatus.ConfigurationMissing,
-                SafeReason: "Gmail application configuration is missing.");
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var userScope = PackConfigScopes.ForUser(new UserId(owner.Value));
+            var pending = await store.GetAsync(
+                userScope,
+                GoogleClientFactory.OAuthPendingPackName,
+                cancellationToken);
+            var providerResolution = GoogleClientFactory.ResolveAuthorization(values, pending);
+            if (pending.TryGetValue(GoogleClientFactory.OAuthPhaseKey, out var phase) &&
+                string.Equals(phase, GoogleClientFactory.OAuthPhaseProcessing, StringComparison.Ordinal) &&
+                providerResolution.State == ExternalAuthorizationResolutionState.Waiting)
+                return new GmailReadResult(
+                    GmailReadStatus.Unavailable,
+                    SafeReason: "Google authorization is being completed. Please wait a moment.");
 
-        return new GmailReadResult(
-            GmailReadStatus.NeedsAuth,
-            SafeReason: reason,
-            ConnectionUrl: challenge.UrlOrForm);
+            if (TryGetReusableOAuthStartToken(pending, owner, out var reusableFlowReference))
+                return new GmailReadResult(
+                    GmailReadStatus.NeedsAuth,
+                    SafeReason: reason,
+                    ConnectionUrl: GoogleClientFactory.CreateOAuthStartUrl(reusableFlowReference));
+
+            var flowReference = oauthStateProtector.Protect(owner);
+            var preserveProviderChallenge =
+                string.Equals(phase, GoogleClientFactory.OAuthPhaseChallengeIssued, StringComparison.Ordinal) &&
+                providerResolution.State == ExternalAuthorizationResolutionState.Waiting;
+            var nextPending = preserveProviderChallenge
+                ? new Dictionary<string, string>(pending, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [GoogleClientFactory.OAuthPhaseKey] = GoogleClientFactory.OAuthPhaseLocalStart,
+                    [GoogleClientFactory.OAuthFlowIdKey] = GoogleClientFactory.CreateAuthorizationFlowId()
+                };
+            nextPending[GoogleClientFactory.OAuthStartTokenKey] = flowReference;
+            nextPending[GoogleClientFactory.OAuthStartTokenFingerprintKey] =
+                GoogleClientFactory.AuthorizationAttemptFingerprint(flowReference);
+            nextPending[GoogleClientFactory.OAuthStartExpiresAtKey] = DateTimeOffset.UtcNow
+                .Add(OAuthStartLifetime)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture);
+            await store.SetAsync(
+                userScope,
+                GoogleClientFactory.OAuthPendingPackName,
+                nextPending,
+                CancellationToken.None);
+
+            return new GmailReadResult(
+                GmailReadStatus.NeedsAuth,
+                SafeReason: reason,
+                ConnectionUrl: GoogleClientFactory.CreateOAuthStartUrl(flowReference));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Principal-scoped Google connection link creation failed with {ExceptionType}.", ex.GetType().Name);
+            return new GmailReadResult(
+                GmailReadStatus.Unavailable,
+                SafeReason: "Google connection is unavailable right now.");
+        }
     }
 
-    private static bool IsAllowedGoogleAuthorizationUrl(string value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps &&
-        string.Equals(uri.Host, "accounts.google.com", StringComparison.OrdinalIgnoreCase);
+    private static GmailReadResult InvalidConnectionRequest() => new(
+        GmailReadStatus.Unavailable,
+        SafeReason: "This Google connection request is invalid or expired. Start again from DigitalBrain.");
+
+    private bool TryGetReusableOAuthStartToken(
+        IReadOnlyDictionary<string, string> pending,
+        NeuronId owner,
+        out string flowReference)
+    {
+        flowReference = string.Empty;
+        if (!GoogleClientFactory.TryGetCurrentOAuthStartToken(pending, out var candidate) ||
+            !oauthStateProtector.TryUnprotect(candidate, out var protectedOwner) ||
+            !string.Equals(protectedOwner.Value, owner.Value, StringComparison.Ordinal))
+            return false;
+        flowReference = candidate;
+        return true;
+    }
 
     private static bool Valid(GmailReadRequest request) =>
         request.Offset is >= 0 and <= GmailTools.MaximumOffset &&

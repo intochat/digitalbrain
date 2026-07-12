@@ -63,6 +63,12 @@ abstract interface class SessionTransport {
   Future<SessionBundle> bootstrapSession(String bootstrapSecret);
 
   Future<SessionBundle> refreshSession({required String refreshToken});
+
+  Future<void> logout({required String refreshToken});
+}
+
+abstract interface class ExternalSessionTransport {
+  Future<SessionBundle> bootstrapExternalSession(String identityToken);
 }
 
 class SessionController {
@@ -112,14 +118,23 @@ class SessionController {
         'A bootstrap secret is required.',
       );
     }
+    return _bootstrap(() => transport.bootstrapSession(bootstrapSecret));
+  }
+
+  Future<bool> bootstrapExternal(
+    ExternalSessionTransport transport,
+    String identityToken,
+  ) => _bootstrap(() => transport.bootstrapExternalSession(identityToken));
+
+  Future<bool> _bootstrap(Future<SessionBundle> Function() establish) async {
     final generation = ++_bootstrapGeneration;
     _bundle = null;
     _bundleVersion++;
     begin();
     try {
-      final established = await transport.bootstrapSession(bootstrapSecret);
+      final established = await establish();
       if (generation != _bootstrapGeneration) return false;
-      establish(established);
+      this.establish(established);
       return true;
     } catch (error) {
       if (generation != _bootstrapGeneration) return false;
@@ -230,12 +245,32 @@ class SessionController {
     status = SessionStatus.expired;
   }
 
-  void signOut() {
+  Future<void> signOut(SessionTransport transport) async {
+    final bundle = _bundle;
+    final refreshToken = bundle?.credentials.refreshToken;
     _bootstrapGeneration++;
-    _bundle = null;
-    _bundleVersion++;
-    lastError = null;
-    status = SessionStatus.signedOut;
+    if (refreshToken == null) {
+      _bundle = null;
+      _bundleVersion++;
+      lastError = null;
+      status = SessionStatus.signedOut;
+      return;
+    }
+    try {
+      await transport.logout(refreshToken: refreshToken);
+    } catch (error) {
+      if (identical(_bundle, bundle)) {
+        lastError = error;
+        status = SessionStatus.authenticated;
+      }
+      rethrow;
+    }
+    if (identical(_bundle, bundle)) {
+      _bundle = null;
+      _bundleVersion++;
+      lastError = null;
+      status = SessionStatus.signedOut;
+    }
   }
 
   void _validate(SessionBundle bundle) {

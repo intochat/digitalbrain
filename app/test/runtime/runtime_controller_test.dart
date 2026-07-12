@@ -30,6 +30,88 @@ void main() {
       expect(call.cancelled, isTrue);
     });
 
+    test(
+      'external identity exchange establishes and streams a session',
+      () async {
+        final call = _FakeFeedCall.open();
+        final transport = _FakeUiTransport([call]);
+        final runtime = _runtime(transport);
+
+        await runtime.authenticateWithExternalIdentityToken(
+          'identityheader.identitypayload.identitysignature',
+        );
+        await _eventually(() => runtime.status == RuntimeStatus.streaming);
+
+        expect(transport.externalIdentityTokens, [
+          'identityheader.identitypayload.identitysignature',
+        ]);
+        expect(transport.bootstrapSecrets, isEmpty);
+        expect(runtime.session.isAuthenticated, isTrue);
+        expect(runtime.session.sessionId, 'session-a');
+        expect(transport.watchAccessTokens, ['access-token']);
+
+        await runtime.stop();
+      },
+    );
+
+    test(
+      'sign out clears runtime state only after server revocation',
+      () async {
+        final call = _FakeFeedCall.open();
+        final transport = _FakeUiTransport([call]);
+        final runtime = _runtime(transport);
+
+        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _eventually(() => runtime.status == RuntimeStatus.streaming);
+        await runtime.signOut();
+
+        expect(call.cancelled, isTrue);
+        expect(transport.logoutRefreshTokens, ['refresh-token']);
+        expect(runtime.status, RuntimeStatus.awaitingSignIn);
+        expect(runtime.session.isAuthenticated, isFalse);
+        expect(runtime.session.identity, isNull);
+
+        await runtime.stop();
+      },
+    );
+
+    test(
+      'failed server revocation retains authentication and resumes streaming',
+      () async {
+        final initialCall = _FakeFeedCall.open();
+        final resumedCall = _FakeFeedCall.open();
+        final transport = _FakeUiTransport(
+          [initialCall, resumedCall],
+          logoutError: const TransportException(
+            TransportErrorCode.unavailable,
+            'Logout unavailable.',
+          ),
+        );
+        final runtime = _runtime(transport);
+
+        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _eventually(() => runtime.status == RuntimeStatus.streaming);
+        await expectLater(
+          runtime.signOut(),
+          throwsA(isA<TransportException>()),
+        );
+        await _eventually(
+          () =>
+              runtime.status == RuntimeStatus.streaming &&
+              transport.watchAccessTokens.length == 2,
+        );
+
+        expect(initialCall.cancelled, isTrue);
+        expect(transport.logoutRefreshTokens, ['refresh-token']);
+        expect(runtime.session.isAuthenticated, isTrue);
+        expect(runtime.session.sessionId, 'session-a');
+        expect(runtime.transientError, isA<TransportException>());
+        expect(transport.watchAccessTokens, ['access-token', 'access-token']);
+
+        await runtime.stop();
+      },
+    );
+
     test('reconnect resumes after the last accepted sequence', () async {
       final first = _FakeFeedCall.fromEvents([
         FeedSurfaceJson(surfaceJsonString(sequence: 1)),
@@ -670,13 +752,14 @@ Future<void> _eventually(bool Function() condition) async {
   fail('Condition was not reached.');
 }
 
-class _FakeUiTransport implements UiTransport {
+class _FakeUiTransport implements UiTransport, ExternalSessionTransport {
   _FakeUiTransport(
     Iterable<_FakeFeedCall> calls, {
     Iterable<Object>? bootstrapResults,
     this.refreshError,
     this.actionResult,
     this.acknowledgementGate,
+    this.logoutError,
   }) : _calls = Queue.of(calls),
        _bootstrapResults = Queue.of(
          bootstrapResults ?? <Object>[testSession()],
@@ -687,10 +770,13 @@ class _FakeUiTransport implements UiTransport {
   final Object? refreshError;
   final Future<ActionResult>? actionResult;
   final Completer<void>? acknowledgementGate;
+  final Object? logoutError;
   final List<int> watchAfter = [];
   final List<String> watchAccessTokens = [];
   final List<int> acknowledged = [];
   final List<String> bootstrapSecrets = [];
+  final List<String> externalIdentityTokens = [];
+  final List<String> logoutRefreshTokens = [];
   String? bootstrapSecret;
   UiActionRef? submittedAction;
   Map<String, Object?>? submittedInput;
@@ -701,6 +787,16 @@ class _FakeUiTransport implements UiTransport {
   Future<SessionBundle> bootstrapSession(String bootstrapSecret) async {
     this.bootstrapSecret = bootstrapSecret;
     bootstrapSecrets.add(bootstrapSecret);
+    return _nextBootstrapResult();
+  }
+
+  @override
+  Future<SessionBundle> bootstrapExternalSession(String identityToken) async {
+    externalIdentityTokens.add(identityToken);
+    return _nextBootstrapResult();
+  }
+
+  Future<SessionBundle> _nextBootstrapResult() async {
     if (_bootstrapResults.isEmpty) {
       throw StateError('No fake bootstrap result is available.');
     }
@@ -719,6 +815,13 @@ class _FakeUiTransport implements UiTransport {
       accessToken: 'access-refreshed',
       refreshToken: 'refresh-rotated',
     );
+  }
+
+  @override
+  Future<void> logout({required String refreshToken}) async {
+    logoutRefreshTokens.add(refreshToken);
+    final error = logoutError;
+    if (error != null) throw error;
   }
 
   @override

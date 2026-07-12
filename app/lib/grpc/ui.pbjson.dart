@@ -242,3 +242,25 @@ const SubmitActionReply$json = {
 final $typed_data.Uint8List submitActionReplyDescriptor = $convert.base64Decode(
     'ChFTdWJtaXRBY3Rpb25SZXBseRIhCgxvcGVyYXRpb25faWQYASABKAlSC29wZXJhdGlvbklkEi'
     'cKD2lkZW1wb3RlbmN5X2tleRgCIAEoCVIOaWRlbXBvdGVuY3lLZXk=');
+
+@$core.Deprecated('Use logoutSessionRequestDescriptor instead')
+const LogoutSessionRequest$json = {
+  '1': 'LogoutSessionRequest',
+  '2': [
+    {'1': 'refresh_token', '3': 1, '4': 1, '5': 9, '10': 'refreshToken'},
+  ],
+};
+
+/// Descriptor for `LogoutSessionRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List logoutSessionRequestDescriptor = $convert.base64Decode(
+    'ChRMb2dvdXRTZXNzaW9uUmVxdWVzdBIjCg1yZWZyZXNoX3Rva2VuGAEgASgJUgxyZWZyZXNoVG'
+    '9rZW4=');
+
+@$core.Deprecated('Use logoutSessionReplyDescriptor instead')
+const LogoutSessionReply$json = {
+  '1': 'LogoutSessionReply',
+};
+
+/// Descriptor for `LogoutSessionReply`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List logoutSessionReplyDescriptor =
+    $convert.base64Decode('ChJMb2dvdXRTZXNzaW9uUmVwbHk=');

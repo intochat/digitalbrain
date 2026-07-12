@@ -48,19 +48,12 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
 
         Assert.Equal(SalesforceReadStatus.NeedsAuth, disconnected.Status);
         var localStartUrl = Assert.IsType<string>(disconnected.ConnectionUrl);
-        var localStart = new Uri(localStartUrl, UriKind.Absolute);
-        Assert.True(localStart.IsLoopback);
-        Assert.Equal(Uri.UriSchemeHttp, localStart.Scheme);
-        Assert.Equal(OAuthCallbackPaths.SalesforceStart, localStart.AbsolutePath);
-        Assert.True(HasPrefix(localStart.Query, "?t="));
-        Assert.False(localStart.Query.Contains('&'));
+        var token = FlowReference(localStartUrl);
+        Assert.Equal($"{OAuthCallbackPaths.SalesforceStart}?f={token}", localStartUrl);
         Assert.False(localStartUrl.Contains("services/oauth2/authorize", StringComparison.OrdinalIgnoreCase));
         Assert.False(localStartUrl.Contains("state=", StringComparison.OrdinalIgnoreCase));
         Assert.False(localStartUrl.Contains("client_id=", StringComparison.OrdinalIgnoreCase));
         Assert.False(localStartUrl.Contains("code_challenge=", StringComparison.OrdinalIgnoreCase));
-
-        var token = Uri.UnescapeDataString(localStart.Query["?t=".Length..]);
-        Assert.True(HasPrefix(token, "opaque-"));
         Assert.False(token.Contains("principal-oauth-start", StringComparison.Ordinal));
 
         var beforeClick = await grain.ResolveAuthorizationAsync();
@@ -95,8 +88,7 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
         var disconnected = await grain.ReadRecordsAsync(
             new SalesforceRecordReadRequest(new SalesforceSemanticEntity("Accounts")));
         var localStartUrl = Assert.IsType<string>(disconnected.ConnectionUrl);
-        var localStart = new Uri(localStartUrl, UriKind.Absolute);
-        var token = Uri.UnescapeDataString(localStart.Query["?t=".Length..]);
+        var token = FlowReference(localStartUrl);
 
         var authorization = await grain.BeginAuthorizationAsync(token);
         Assert.Equal(SalesforceReadStatus.NeedsAuth, authorization.Status);
@@ -117,14 +109,34 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task Late_callback_after_success_and_expired_pending_residue_returns_completed_result()
+    {
+        const string principal = "principal-oauth-late-callback";
+        var grain = Grain<ISalesforceReadToolGrain>(principal);
+        var disconnected = await grain.ReadRecordsAsync(
+            new SalesforceRecordReadRequest(new SalesforceSemanticEntity("Accounts")));
+        var token = FlowReference(disconnected.ConnectionUrl);
+        await grain.BeginAuthorizationAsync(token);
+        var providerState = _store.ProviderState(principal);
+        var pending = _store.PendingSnapshot(principal);
+
+        Assert.True((await grain.CompleteAuthorizationAsync(new OAuthCallback("code", providerState))).Success);
+        _store.RestoreExpiredPendingResidue(principal, pending);
+        await Cluster.DeactivateAsync(grain);
+
+        var replay = await grain.CompleteAuthorizationAsync(new OAuthCallback("same-code", providerState));
+
+        Assert.True(replay.Success);
+    }
+
+    [Fact]
     public async Task Second_read_coalesces_live_provider_attempt_without_replacing_pkce_state()
     {
         var grain = Grain<ISalesforceReadToolGrain>("principal-oauth-coalesce");
         var firstRead = await grain.ReadRecordsAsync(
             new SalesforceRecordReadRequest(new SalesforceSemanticEntity("Accounts")));
         var firstStartUrl = Assert.IsType<string>(firstRead.ConnectionUrl);
-        var firstStart = new Uri(firstStartUrl, UriKind.Absolute);
-        var token = Uri.UnescapeDataString(firstStart.Query["?t=".Length..]);
+        var token = FlowReference(firstStartUrl);
         var firstChallenge = await grain.BeginAuthorizationAsync(token);
         var pendingBeforeSecondRead = _store.PendingSnapshot("principal-oauth-coalesce");
 
@@ -155,8 +167,15 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
             SHA256.HashData(Encoding.UTF8.GetBytes(right)));
     }
 
-    private static bool HasPrefix(string value, string prefix) =>
-        value.StartsWith(prefix, StringComparison.Ordinal);
+    private static string FlowReference(string? target)
+    {
+        var value = Assert.IsType<string>(target);
+        Assert.True(OAuthCallbackPaths.TryParseInternalStartPath(
+            value,
+            OAuthCallbackPaths.SalesforceProvider,
+            out var flowReference));
+        return flowReference;
+    }
 
     private static bool SameSecretDictionary(
         IReadOnlyDictionary<string, string> left,
@@ -264,6 +283,22 @@ public sealed class SalesforceOAuthStartNeuronTests : NeuronTestBase
 
         public IReadOnlyDictionary<string, string> PendingSnapshot(string principal) =>
             new Dictionary<string, string>(ReadPending(principal), StringComparer.OrdinalIgnoreCase);
+
+        public void RestoreExpiredPendingResidue(
+            string principal,
+            IReadOnlyDictionary<string, string> pending)
+        {
+            var residue = new Dictionary<string, string>(pending, StringComparer.OrdinalIgnoreCase)
+            {
+                [SalesforceClientFactory.OAuthPendingExpiresAtKey] = DateTimeOffset.UtcNow
+                    .AddMinutes(-1)
+                    .ToUnixTimeSeconds()
+                    .ToString(System.Globalization.CultureInfo.InvariantCulture)
+            };
+            _values[(
+                PackConfigScopes.ForUser(new UserId(principal)),
+                SalesforceClientFactory.OAuthPendingPackName)] = residue;
+        }
 
         private IReadOnlyDictionary<string, string> ReadPending(string principal) =>
             _values.GetValueOrDefault((

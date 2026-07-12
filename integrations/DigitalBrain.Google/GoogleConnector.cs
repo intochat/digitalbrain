@@ -117,7 +117,12 @@ public class GoogleConnector : IConnector
             return new AuthChallenge(replayUrl, IsForm: false, State: replayState);
         }
 
-        var flowId = GoogleClientFactory.CreateAuthorizationFlowId();
+        var flowId = priorPending.TryGetValue(GoogleClientFactory.OAuthPhaseKey, out var priorPhase) &&
+                     string.Equals(priorPhase, GoogleClientFactory.OAuthPhaseLocalStart, StringComparison.Ordinal) &&
+                     priorPending.TryGetValue(GoogleClientFactory.OAuthFlowIdKey, out var currentFlowId) &&
+                     GoogleClientFactory.IsAuthorizationFlowId(currentFlowId)
+            ? currentFlowId
+            : GoogleClientFactory.CreateAuthorizationFlowId();
 
         var state = _stateProtector.Protect(user);
 
@@ -137,7 +142,7 @@ public class GoogleConnector : IConnector
             await store.SetAsync(userScope, GoogleClientFactory.PackName, existingUser, CancellationToken.None);
         }
 
-        await store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, new Dictionary<string, string>
+        var providerPending = new Dictionary<string, string>
         {
             [GoogleClientFactory.OAuthPhaseKey] = GoogleClientFactory.OAuthPhaseChallengeIssued,
             [GoogleClientFactory.OAuthFlowIdKey] = flowId,
@@ -151,7 +156,20 @@ public class GoogleConnector : IConnector
                 .Add(GoogleClientFactory.OAuthPendingLifetime)
                 .ToUnixTimeSeconds()
                 .ToString(CultureInfo.InvariantCulture)
-        }, cancellationToken);
+        };
+        if (GoogleClientFactory.TryGetCurrentOAuthStartToken(priorPending, out var flowReference))
+        {
+            providerPending[GoogleClientFactory.OAuthStartTokenKey] = flowReference;
+            providerPending[GoogleClientFactory.OAuthStartTokenFingerprintKey] =
+                priorPending[GoogleClientFactory.OAuthStartTokenFingerprintKey];
+            providerPending[GoogleClientFactory.OAuthStartExpiresAtKey] =
+                priorPending[GoogleClientFactory.OAuthStartExpiresAtKey];
+        }
+        await store.SetAsync(
+            userScope,
+            GoogleClientFactory.OAuthPendingPackName,
+            providerPending,
+            cancellationToken);
 
         return new AuthChallenge(authUrl, IsForm: false, State: state);
     }

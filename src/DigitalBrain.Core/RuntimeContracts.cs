@@ -31,7 +31,8 @@ public sealed record RequestContext(
     [property: Id(4)] AuthAssurance Assurance,
     [property: Id(5)] string CorrelationId,
     [property: Id(6)] string? IdempotencyKey,
-    [property: Id(7)] IReadOnlySet<string> Grants);
+    [property: Id(7)] IReadOnlySet<string> Grants,
+    [property: Id(8)] string? ConversationId = null);
 
 public static class SessionAudiences
 {
@@ -94,18 +95,24 @@ public static class GrainIds
 
 public sealed class SessionTokenService
 {
-    private const string StructuredPrefix = "v2s";
+    private const string StructuredPrefix = "v3s";
     private readonly byte[] _key;
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _revoked = new(StringComparer.Ordinal);
-    public SessionTokenService(byte[] key)
+    private readonly TimeProvider _timeProvider;
+    public SessionTokenService(byte[] key, TimeProvider? timeProvider = null)
     {
         if (key.Length < 32) throw new ArgumentException("The session signing key must be at least 256 bits.", nameof(key));
         _key = key.ToArray();
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
-    public string Issue(RequestContext context, TimeSpan lifetime, string audience = SessionAudiences.Mcp)
+    public string Issue(
+        RequestContext context,
+        TimeSpan lifetime,
+        string audience = SessionAudiences.Mcp,
+        long sessionVersion = 1)
     {
         if (lifetime <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(lifetime));
         if (string.IsNullOrWhiteSpace(audience)) throw new ArgumentException("A non-empty session audience is required.", nameof(audience));
+        if (sessionVersion < 1) throw new ArgumentOutOfRangeException(nameof(sessionVersion));
         if (string.IsNullOrWhiteSpace(context.SessionId) || string.IsNullOrWhiteSpace(context.TenantId.Value) ||
             string.IsNullOrWhiteSpace(context.WorkspaceId.Value) || string.IsNullOrWhiteSpace(context.Principal.Value))
             throw new ArgumentException("A complete request context is required.", nameof(context));
@@ -114,10 +121,11 @@ public sealed class SessionTokenService
             context.Grants.Any(static grant => string.IsNullOrWhiteSpace(grant) || grant.Length > 128))
             throw new ArgumentException("Session claims exceed the signed transport bound.", nameof(context));
 
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         var claims = new SessionClaims(
-            2,
+            3,
             context.SessionId,
+            sessionVersion,
             context.TenantId.Value,
             context.WorkspaceId.Value,
             context.Principal.Value,
@@ -134,25 +142,45 @@ public sealed class SessionTokenService
     }
 
     public bool TryValidate(string token, out RequestContext context)
-        => TryValidateCore(token, expectedAudience: null, out context, out _);
+        => TryValidateCore(token, expectedAudience: null, out context, out _, out _);
 
     public bool TryValidate(string token, string expectedAudience, out RequestContext context)
     {
         context = default!;
-        return !string.IsNullOrWhiteSpace(expectedAudience) && TryValidateCore(token, expectedAudience, out context, out _);
+        return !string.IsNullOrWhiteSpace(expectedAudience) && TryValidateCore(token, expectedAudience, out context, out _, out _);
     }
 
     public bool TryValidate(string token, string expectedAudience, out RequestContext context, out DateTimeOffset expiresAt)
     {
         context = default!;
         expiresAt = default;
-        return !string.IsNullOrWhiteSpace(expectedAudience) && TryValidateCore(token, expectedAudience, out context, out expiresAt);
+        return !string.IsNullOrWhiteSpace(expectedAudience) && TryValidateCore(token, expectedAudience, out context, out expiresAt, out _);
     }
 
-    private bool TryValidateCore(string token, string? expectedAudience, out RequestContext context, out DateTimeOffset expiresAt)
+    public bool TryValidate(
+        string token,
+        string expectedAudience,
+        out RequestContext context,
+        out DateTimeOffset expiresAt,
+        out long sessionVersion)
     {
         context = default!;
         expiresAt = default;
+        sessionVersion = 0;
+        return !string.IsNullOrWhiteSpace(expectedAudience) &&
+               TryValidateCore(token, expectedAudience, out context, out expiresAt, out sessionVersion);
+    }
+
+    private bool TryValidateCore(
+        string token,
+        string? expectedAudience,
+        out RequestContext context,
+        out DateTimeOffset expiresAt,
+        out long sessionVersion)
+    {
+        context = default!;
+        expiresAt = default;
+        sessionVersion = 0;
         if (string.IsNullOrWhiteSpace(token) || token.Length > 16_384) return false;
         var parts = token.Split('.');
         if (parts.Length != 3 || parts[0] != StructuredPrefix) return false;
@@ -165,7 +193,7 @@ public sealed class SessionTokenService
         SessionClaims? claims;
         try { claims = JsonSerializer.Deserialize<SessionClaims>(Base64UrlDecode(parts[1])); }
         catch (Exception ex) when (ex is FormatException or JsonException or ArgumentException) { return false; }
-        if (claims is null || claims.Version != 2 || string.IsNullOrWhiteSpace(claims.SessionId) ||
+        if (claims is null || claims.Version != 3 || claims.SessionVersion < 1 || string.IsNullOrWhiteSpace(claims.SessionId) ||
             string.IsNullOrWhiteSpace(claims.TenantId) || string.IsNullOrWhiteSpace(claims.WorkspaceId) ||
             string.IsNullOrWhiteSpace(claims.PrincipalId) || string.IsNullOrWhiteSpace(claims.Audience) ||
             claims.SessionId.Length > 256 || claims.TenantId.Length > 256 || claims.WorkspaceId.Length > 256 ||
@@ -181,8 +209,8 @@ public sealed class SessionTokenService
             expiry = DateTimeOffset.FromUnixTimeSeconds(claims.ExpiresAtUnixSeconds);
         }
         catch (ArgumentOutOfRangeException) { return false; }
-        var now = DateTimeOffset.UtcNow;
-        if (expiry <= now || issuedAt > now.AddMinutes(5) || expiry <= issuedAt || _revoked.ContainsKey(claims.SessionId)) return false;
+        var now = _timeProvider.GetUtcNow();
+        if (expiry <= now || issuedAt > now.AddMinutes(5) || expiry <= issuedAt) return false;
         var grants = (claims.Grants ?? [])
             .Where(static grant => !string.IsNullOrWhiteSpace(grant))
             .ToHashSet(StringComparer.Ordinal);
@@ -196,9 +224,9 @@ public sealed class SessionTokenService
             null,
             grants);
         expiresAt = expiry;
+        sessionVersion = claims.SessionVersion;
         return true;
     }
-    public void Revoke(string sessionId) => _revoked[sessionId] = DateTimeOffset.UtcNow;
 
     private static string Base64UrlEncode(ReadOnlySpan<byte> value) =>
         Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
@@ -213,6 +241,7 @@ public sealed class SessionTokenService
     private sealed record SessionClaims(
         int Version,
         string SessionId,
+        long SessionVersion,
         string TenantId,
         string WorkspaceId,
         string PrincipalId,
@@ -230,246 +259,6 @@ public sealed record SessionPair(
     DateTimeOffset RefreshExpiresAt,
     DateTimeOffset AccessExpiresAt = default,
     string Audience = SessionAudiences.Mcp);
-public interface ISessionManager
-{
-    SessionPair Create(RequestContext context, TimeSpan accessLifetime, string audience = SessionAudiences.Mcp);
-    bool TryRefresh(string refreshToken, TimeSpan accessLifetime, out SessionPair pair);
-    bool TryRefresh(string refreshToken, TimeSpan accessLifetime, string expectedAudience, out SessionPair pair);
-    bool Revoke(string refreshToken);
-    bool Revoke(string refreshToken, string expectedAudience);
-}
-
-/// <summary>One-use refresh rotation and revocation for signed sessions. Store this behind a durable repository in production.</summary>
-public sealed class SessionManager : ISessionManager
-{
-    private readonly SessionTokenService _tokens;
-    private readonly TimeSpan _refreshLifetime;
-    private readonly ConcurrentDictionary<string, RefreshEntry> _refresh = new(StringComparer.Ordinal);
-
-    public SessionManager(SessionTokenService tokens, TimeSpan? refreshLifetime = null)
-    {
-        _tokens = tokens;
-        _refreshLifetime = refreshLifetime ?? TimeSpan.FromDays(30);
-    }
-
-    public SessionPair Create(RequestContext context, TimeSpan accessLifetime, string audience = SessionAudiences.Mcp)
-    {
-        var refresh = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        var expires = DateTimeOffset.UtcNow.Add(_refreshLifetime);
-        var accessExpires = DateTimeOffset.UtcNow.Add(accessLifetime);
-        _refresh[Hash(refresh)] = new RefreshEntry(context, expires, audience);
-        return new SessionPair(_tokens.Issue(context, accessLifetime, audience), refresh, expires, accessExpires, audience);
-    }
-
-    public bool TryRefresh(string refreshToken, TimeSpan accessLifetime, out SessionPair pair)
-        => TryRefreshCore(refreshToken, accessLifetime, expectedAudience: null, out pair);
-
-    public bool TryRefresh(string refreshToken, TimeSpan accessLifetime, string expectedAudience, out SessionPair pair)
-        => TryRefreshCore(refreshToken, accessLifetime, expectedAudience, out pair);
-
-    private bool TryRefreshCore(string refreshToken, TimeSpan accessLifetime, string? expectedAudience, out SessionPair pair)
-    {
-        pair = default!;
-        var key = Hash(refreshToken);
-        if (!_refresh.TryGetValue(key, out var entry) || entry.ExpiresAt <= DateTimeOffset.UtcNow ||
-            (expectedAudience is not null && !string.Equals(entry.Audience, expectedAudience, StringComparison.Ordinal)) ||
-            !_refresh.TryRemove(key, out entry)) return false;
-        pair = Create(entry.Context with { CorrelationId = Guid.NewGuid().ToString("N") }, accessLifetime, entry.Audience);
-        return true;
-    }
-
-    public bool Revoke(string refreshToken)
-        => RevokeCore(refreshToken, expectedAudience: null);
-
-    public bool Revoke(string refreshToken, string expectedAudience)
-        => RevokeCore(refreshToken, expectedAudience);
-
-    private bool RevokeCore(string refreshToken, string? expectedAudience)
-    {
-        var hash = Hash(refreshToken);
-        if (!_refresh.TryGetValue(hash, out var entry) ||
-            (expectedAudience is not null && !string.Equals(entry.Audience, expectedAudience, StringComparison.Ordinal)) ||
-            !_refresh.TryRemove(hash, out entry)) return false;
-        _tokens.Revoke(entry.Context.SessionId);
-        return true;
-    }
-
-    private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value ?? string.Empty)));
-    private sealed record RefreshEntry(RequestContext Context, DateTimeOffset ExpiresAt, string Audience);
-}
-
-public sealed class FileSessionManager : ISessionManager
-{
-    private readonly SessionTokenService _tokens;
-    private readonly TimeSpan _lifetime;
-    private readonly AuthenticatedJsonLinesJournal _journal;
-    private readonly Dictionary<string, RefreshEntry> _entries = new(StringComparer.Ordinal);
-    private readonly object _gate = new();
-
-    public FileSessionManager(
-        SessionTokenService tokens,
-        string path,
-        TimeSpan? refreshLifetime = null,
-        byte[]? journalIntegrityKey = null)
-        : this(tokens, path, refreshLifetime, journalIntegrityKey, null)
-    {
-    }
-
-    internal FileSessionManager(
-        AuthenticatedJournalFaultInjection journalFaultInjection,
-        SessionTokenService tokens,
-        string path,
-        TimeSpan? refreshLifetime = null,
-        byte[]? journalIntegrityKey = null)
-        : this(tokens, path, refreshLifetime, journalIntegrityKey, journalFaultInjection)
-    {
-    }
-
-    private FileSessionManager(
-        SessionTokenService tokens,
-        string path,
-        TimeSpan? refreshLifetime,
-        byte[]? journalIntegrityKey,
-        AuthenticatedJournalFaultInjection? journalFaultInjection)
-    {
-        if (journalIntegrityKey is not { Length: >= 32 })
-            throw new ArgumentException("A stable journal integrity key of at least 256 bits is required.", nameof(journalIntegrityKey));
-        _tokens = tokens;
-        _lifetime = refreshLifetime ?? TimeSpan.FromDays(30);
-        _journal = new AuthenticatedJsonLinesJournal("digitalbrain.v2.sessions", journalIntegrityKey, path, journalFaultInjection);
-        Load();
-    }
-
-    public SessionPair Create(RequestContext context, TimeSpan accessLifetime, string audience = SessionAudiences.Mcp)
-    {
-        lock (_gate)
-        {
-            var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            var entry = new RefreshEntry(context, DateTimeOffset.UtcNow.Add(_lifetime), audience);
-            var hash = Hash(token);
-            var accessExpires = DateTimeOffset.UtcNow.Add(accessLifetime);
-            var accessToken = _tokens.Issue(context, accessLifetime, audience);
-            Append(new("create", hash, entry));
-            _entries[hash] = entry;
-            return new(accessToken, token, entry.ExpiresAt, accessExpires, audience);
-        }
-    }
-
-    public bool TryRefresh(string refreshToken, TimeSpan accessLifetime, out SessionPair pair)
-        => TryRefreshCore(refreshToken, accessLifetime, expectedAudience: null, out pair);
-
-    public bool TryRefresh(string refreshToken, TimeSpan accessLifetime, string expectedAudience, out SessionPair pair)
-        => TryRefreshCore(refreshToken, accessLifetime, expectedAudience, out pair);
-
-    private bool TryRefreshCore(string refreshToken, TimeSpan accessLifetime, string? expectedAudience, out SessionPair pair)
-    {
-        lock (_gate)
-        {
-            pair = default!;
-            var hash = Hash(refreshToken);
-            if (!_entries.TryGetValue(hash, out var entry) || entry.ExpiresAt <= DateTimeOffset.UtcNow ||
-                (expectedAudience is not null && !string.Equals(entry.Audience, expectedAudience, StringComparison.Ordinal))) return false;
-
-            var nextToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            var nextHash = Hash(nextToken);
-            var nextContext = entry.Context with { CorrelationId = Guid.NewGuid().ToString("N") };
-            var nextEntry = new RefreshEntry(nextContext, DateTimeOffset.UtcNow.Add(_lifetime), entry.Audience);
-            var accessExpires = DateTimeOffset.UtcNow.Add(accessLifetime);
-            var accessToken = _tokens.Issue(nextContext, accessLifetime, entry.Audience);
-            Append(new("rotate", nextHash, nextEntry, null, hash));
-            _entries.Remove(hash);
-            _entries[nextHash] = nextEntry;
-            pair = new(accessToken, nextToken, nextEntry.ExpiresAt, accessExpires, entry.Audience);
-            return true;
-        }
-    }
-
-    public bool Revoke(string refreshToken)
-        => RevokeCore(refreshToken, expectedAudience: null);
-
-    public bool Revoke(string refreshToken, string expectedAudience)
-        => RevokeCore(refreshToken, expectedAudience);
-
-    private bool RevokeCore(string refreshToken, string? expectedAudience)
-    {
-        lock (_gate)
-        {
-            var hash = Hash(refreshToken);
-            if (!_entries.TryGetValue(hash, out var entry) ||
-                (expectedAudience is not null && !string.Equals(entry.Audience, expectedAudience, StringComparison.Ordinal))) return false;
-            Append(new("logout", hash, null, entry.Context.SessionId));
-            _entries.Remove(hash);
-            _tokens.Revoke(entry.Context.SessionId);
-            return true;
-        }
-    }
-
-    private void Load()
-    {
-        foreach (var record in _journal.Read())
-        {
-            PersistedSession? item;
-            try { item = JsonSerializer.Deserialize<PersistedSession>(record.Payload); }
-            catch (JsonException)
-            {
-                throw _journal.Invalid(record, "invalid-json", $"The session journal contains invalid JSON at line {record.LineNumber}.");
-            }
-            if (item is null || !IsHash(item.Hash)) Invalid(record, "invalid-record");
-            if (!record.IsLegacy && !string.Equals(record.Kind, "session." + item!.Kind, StringComparison.Ordinal))
-                Invalid(record, "kind-mismatch");
-            if (item!.Kind == "create" && ValidEntry(item.Entry) && !_entries.ContainsKey(item.Hash))
-                _entries[item.Hash] = item.Entry!;
-            else if (item.Kind == "rotate" && ValidEntry(item.Entry) && IsHash(item.PreviousHash) &&
-                     _entries.ContainsKey(item.PreviousHash!) && !_entries.ContainsKey(item.Hash))
-            {
-                _entries.Remove(item.PreviousHash!);
-                _entries[item.Hash] = item.Entry!;
-            }
-            else if (item.Kind == "revoke" && _entries.ContainsKey(item.Hash))
-                _entries.Remove(item.Hash);
-            else if (item.Kind == "logout" && _entries.TryGetValue(item.Hash, out var logoutEntry) &&
-                     !string.IsNullOrWhiteSpace(item.SessionId) && item.SessionId.Length <= 256 &&
-                     string.Equals(logoutEntry.Context.SessionId, item.SessionId, StringComparison.Ordinal))
-            {
-                _entries.Remove(item.Hash);
-                _tokens.Revoke(item.SessionId);
-            }
-            else
-                Invalid(record, "invalid-transition");
-        }
-        _journal.SealLegacy();
-        foreach (var expired in _entries.Where(static pair => pair.Value.ExpiresAt <= DateTimeOffset.UtcNow).Select(static pair => pair.Key).ToArray())
-            _entries.Remove(expired);
-    }
-
-    private void Invalid(AuthenticatedJournalRecord record, string reason)
-    {
-        throw _journal.Invalid(record, reason, $"The session journal contains an invalid transition at line {record.LineNumber}.");
-    }
-
-    private void Append(PersistedSession item)
-    {
-        _journal.Append("session." + item.Kind, JsonSerializer.Serialize(item));
-    }
-
-    private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value ?? string.Empty)));
-    private static bool IsHash(string? value) => value is { Length: 64 } && value.All(static character => Uri.IsHexDigit(character));
-    private static bool ValidEntry(RefreshEntry? entry) => entry is not null && entry.Context is not null && entry.ExpiresAt != default &&
-        !string.IsNullOrWhiteSpace(entry.Audience) && entry.Audience.Length <= 128 &&
-        !string.IsNullOrWhiteSpace(entry.Context.SessionId) && entry.Context.SessionId.Length <= 256 &&
-        !string.IsNullOrWhiteSpace(entry.Context.TenantId.Value) && entry.Context.TenantId.Value.Length <= 256 &&
-        !string.IsNullOrWhiteSpace(entry.Context.WorkspaceId.Value) && entry.Context.WorkspaceId.Value.Length <= 256 &&
-        !string.IsNullOrWhiteSpace(entry.Context.Principal.Value) && entry.Context.Principal.Value.Length <= 256 &&
-        Enum.IsDefined(entry.Context.Principal.Kind) && Enum.IsDefined(entry.Context.Assurance) && entry.Context.Grants is not null &&
-        entry.Context.Grants.Count <= 64 && entry.Context.Grants.All(static grant => !string.IsNullOrWhiteSpace(grant) && grant.Length <= 128);
-    private sealed record RefreshEntry(RequestContext Context, DateTimeOffset ExpiresAt, string Audience = SessionAudiences.Mcp);
-    private sealed record PersistedSession(
-        string Kind,
-        string Hash,
-        RefreshEntry? Entry,
-        string? SessionId = null,
-        string? PreviousHash = null);
-}
 
 public enum Sensitivity { Public, Internal, Confidential, Secret }
 public sealed record SensitiveValue(string Value, Sensitivity Classification);

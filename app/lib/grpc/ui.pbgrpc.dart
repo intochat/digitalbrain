@@ -70,6 +70,13 @@ class DigitalBrainV2UiClient extends $grpc.Client {
     return $createUnaryCall(_$submitAction, request, options: options);
   }
 
+  $grpc.ResponseFuture<$0.LogoutSessionReply> logoutSession(
+    $0.LogoutSessionRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$logoutSession, request, options: options);
+  }
+
   // method descriptors
 
   static final _$bootstrapSession =
@@ -97,6 +104,11 @@ class DigitalBrainV2UiClient extends $grpc.Client {
           '/digitalbrain.v2.ui.DigitalBrainV2Ui/SubmitAction',
           ($0.SubmitActionRequest value) => value.writeToBuffer(),
           $0.SubmitActionReply.fromBuffer);
+  static final _$logoutSession =
+      $grpc.ClientMethod<$0.LogoutSessionRequest, $0.LogoutSessionReply>(
+          '/digitalbrain.v2.ui.DigitalBrainV2Ui/LogoutSession',
+          ($0.LogoutSessionRequest value) => value.writeToBuffer(),
+          $0.LogoutSessionReply.fromBuffer);
 }
 
 @$pb.GrpcServiceName('digitalbrain.v2.ui.DigitalBrainV2Ui')
@@ -147,6 +159,15 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
             ($core.List<$core.int> value) =>
                 $0.SubmitActionRequest.fromBuffer(value),
             ($0.SubmitActionReply value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.LogoutSessionRequest, $0.LogoutSessionReply>(
+            'LogoutSession',
+            logoutSession_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.LogoutSessionRequest.fromBuffer(value),
+            ($0.LogoutSessionReply value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.SessionReply> bootstrapSession_Pre($grpc.ServiceCall $call,
@@ -190,4 +211,13 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
 
   $async.Future<$0.SubmitActionReply> submitAction(
       $grpc.ServiceCall call, $0.SubmitActionRequest request);
+
+  $async.Future<$0.LogoutSessionReply> logoutSession_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.LogoutSessionRequest> $request) async {
+    return logoutSession($call, await $request);
+  }
+
+  $async.Future<$0.LogoutSessionReply> logoutSession(
+      $grpc.ServiceCall call, $0.LogoutSessionRequest request);
 }

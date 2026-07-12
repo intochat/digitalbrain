@@ -117,6 +117,21 @@ class RuntimeController extends ChangeNotifier {
   }
 
   Future<void> authenticateWithBootstrap(String secret) async {
+    await _authenticate(() => session.bootstrap(transport, secret));
+  }
+
+  Future<void> authenticateWithExternalIdentityToken(String token) async {
+    final externalTransport = transport;
+    if (externalTransport is! ExternalSessionTransport) {
+      throw const AuthenticationException(
+        'External identity is not supported by this runtime transport.',
+      );
+    }
+    final typedTransport = externalTransport as ExternalSessionTransport;
+    await _authenticate(() => session.bootstrapExternal(typedTransport, token));
+  }
+
+  Future<void> _authenticate(Future<bool> Function() bootstrap) async {
     final authenticationGeneration = ++_authenticationGeneration;
     await stop(closeTransport: false, invalidateAuthentication: false);
     if (authenticationGeneration != _authenticationGeneration) return;
@@ -126,7 +141,7 @@ class RuntimeController extends ChangeNotifier {
     _clearProtectedState(clearFeedIdentity: true);
     _setStatus(RuntimeStatus.authenticating);
     try {
-      final applied = await session.bootstrap(transport, secret);
+      final applied = await bootstrap();
       if (!applied || authenticationGeneration != _authenticationGeneration) {
         return;
       }
@@ -137,6 +152,31 @@ class RuntimeController extends ChangeNotifier {
       if (authenticationGeneration != _authenticationGeneration) return;
       transientError = error;
       _setStatus(RuntimeStatus.awaitingSignIn);
+      rethrow;
+    }
+  }
+
+  Future<void> signOut() async {
+    final authenticationGeneration = ++_authenticationGeneration;
+    await stop(closeTransport: false, invalidateAuthentication: false);
+    if (authenticationGeneration != _authenticationGeneration) return;
+    try {
+      await session.signOut(transport);
+      if (authenticationGeneration != _authenticationGeneration) return;
+      terminalError = null;
+      transientError = null;
+      _clearProtectedState(clearFeedIdentity: true);
+      _setStatus(RuntimeStatus.awaitingSignIn);
+    } catch (error) {
+      if (authenticationGeneration != _authenticationGeneration) return;
+      transientError = error;
+      if (session.isAuthenticated) {
+        _bindIdentity(session.identity!);
+        _stopRequested = false;
+        _launchLoop();
+      } else {
+        _setStatus(RuntimeStatus.awaitingSignIn);
+      }
       rethrow;
     }
   }

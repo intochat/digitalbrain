@@ -1,8 +1,6 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:opentelemetry/api.dart' as otel_api;
 import 'package:opentelemetry/sdk.dart' as otel_sdk;
 
-import 'package:digitalbrain_flutter/grpc/endpoint.dart';
 import 'otlp_log_exporter.dart';
 import 'otlp_metric_exporter.dart';
 import 'platform_env.dart';
@@ -96,30 +94,12 @@ class DigitalBrainTelemetry {
   }
 
   static String _resolveEndpoint() {
-    if (kIsWeb) {
-      try {
-        final (host, port, secure) = resolveKernelEndpoint();
-        final scheme = secure ? 'https' : 'http';
-        return '$scheme://$host:$port/otlp';
-      } catch (_) {
-        return '${Uri.base.origin}/otlp';
-      }
-    }
     final otlpEndpoint = getEnv('OTEL_EXPORTER_OTLP_ENDPOINT');
     final otlpProtocol = getEnv('OTEL_EXPORTER_OTLP_PROTOCOL')?.toLowerCase();
     if (otlpEndpoint != null &&
         otlpEndpoint.isNotEmpty &&
         otlpProtocol != 'grpc') {
       return otlpEndpoint.replaceAll(RegExp(r'/+$'), '');
-    }
-    // Route through the kernel's /otlp/* proxy when Aspire exposes a gRPC
-    // collector or when the Flutter executable only has service references.
-    final kernelUrl =
-        getEnv('services__kernel__web__0') ??
-        getEnv('KERNEL_WEB') ??
-        getEnv('services__kernel__https__0');
-    if (kernelUrl != null && kernelUrl.isNotEmpty) {
-      return '${kernelUrl.replaceAll(RegExp(r'/+$'), '')}/otlp';
     }
     const fallback = String.fromEnvironment(
       'OTLP_ENDPOINT',
@@ -129,7 +109,6 @@ class DigitalBrainTelemetry {
   }
 
   static Map<String, String> _resolveHeaders() {
-    if (kIsWeb) return {};
     final raw = getEnv('OTEL_EXPORTER_OTLP_HEADERS');
     if (raw == null || raw.isEmpty) return {};
     final headers = <String, String>{};

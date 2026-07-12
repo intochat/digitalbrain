@@ -708,6 +708,72 @@ void main() {
     expect(semantics.flagsCollection.isLiveRegion, isTrue);
   });
 
+  testWidgets('new and delete conversation actions submit empty typed input', (
+    tester,
+  ) async {
+    final calls = <(String, Map<String, Object?>)>[];
+    final createCompletion = Completer<ActionResult>();
+    var submissions = 0;
+    Future<ActionResult> submit(
+      Object surface,
+      String binding,
+      Map<String, Object?> input,
+    ) {
+      calls.add((binding, input));
+      submissions++;
+      if (submissions == 1) return createCompletion.future;
+      return Future.value(
+        const ActionResult(
+          operationId: 'delete-operation',
+          idempotencyKey: 'delete-idempotency',
+        ),
+      );
+    }
+
+    await tester.pumpWidget(
+      _host(
+        SurfaceView(
+          surface: _inoSurface(includeLifecycleActions: true),
+          onSubmitAction: submit,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(inoNewConversationButtonKey));
+    await tester.pump();
+    expect(calls, hasLength(1));
+    expect(calls.single.$1, 'ino.new');
+    expect(calls.single.$2, isEmpty);
+    expect(
+      tester
+          .widget<OutlinedButton>(find.byKey(inoNewConversationButtonKey))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(inoDeleteConversationButtonKey))
+          .onPressed,
+      isNull,
+    );
+
+    createCompletion.complete(
+      const ActionResult(
+        operationId: 'create-operation',
+        idempotencyKey: 'create-idempotency',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(inoDeleteConversationButtonKey));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete this conversation?'), findsOneWidget);
+    await tester.tap(find.byKey(inoDeleteConversationConfirmKey));
+    await tester.pumpAndSettle();
+
+    expect(calls.last.$1, 'ino.delete');
+    expect(calls.last.$2, isEmpty);
+  });
+
   testWidgets(
     'follows a front-pruned transcript only while the reader is at the bottom',
     (tester) async {
@@ -898,11 +964,28 @@ SurfaceEnvelope _inoSurface({
   int revision = 1,
   List<Map<String, Object?>> messages = const [],
   Map<String, Object?>? operation,
+  bool includeLifecycleActions = false,
 }) => testSurface(
   sequence: sequence,
   revision: revision,
   payload: inoConversationPayload(messages: messages, operation: operation),
-  actions: [testInoActionJson(surfaceRevision: revision)],
+  actions: [
+    testInoActionJson(surfaceRevision: revision),
+    if (includeLifecycleActions)
+      testActionJson(
+        bindingId: 'ino.new',
+        actionType: 'ino.conversation.new',
+        actionToken: 'signed-new-conversation-action-token',
+        surfaceRevision: revision,
+      ),
+    if (includeLifecycleActions)
+      testActionJson(
+        bindingId: 'ino.delete',
+        actionType: 'ino.conversation.delete',
+        actionToken: 'signed-delete-conversation-action-token',
+        surfaceRevision: revision,
+      ),
+  ],
 );
 
 Future<void> _pumpInoRevision(

@@ -46,7 +46,7 @@ public sealed class OrleansClientEffectWorkerPort(IClusterClient cluster) : IEff
 public sealed class AggregateGrainState
 {
     [Id(0)] public long CommitSequence { get; set; }
-    [Id(1)] public JsonElement State { get; set; } = JsonDocument.Parse("null").RootElement.Clone();
+    [Id(1)] public JsonElement State { get; set; } = JsonElement.Parse("null");
     [Id(2)] public List<AggregateCommit> Commits { get; set; } = [];
     [Id(3)] public List<OutboxRecord> Outbox { get; set; } = [];
     [Id(4)] public List<EffectTransitionRecord> EffectTransitions { get; set; } = [];

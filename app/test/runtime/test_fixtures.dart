@@ -136,7 +136,7 @@ Map<String, Object?> inoOperation({
 };
 
 Map<String, Object?> googleConnectionAction({
-  String target = 'https://accounts.google.com/o/oauth2/v2/auth?state=test',
+  String target = '/oauth/start/google?f=0123456789abcdefghijklmnopqrstuv',
 }) => <String, Object?>{
   'kind': 'openUrl',
   'label': 'Connect Google',
@@ -144,8 +144,7 @@ Map<String, Object?> googleConnectionAction({
 };
 
 Map<String, Object?> salesforceConnectionAction({
-  String target =
-      'http://localhost:51014/oauth/start/salesforce?t=opaque-token',
+  String target = '/oauth/start/salesforce?f=0123456789abcdefghijklmnopqrstuv',
 }) => <String, Object?>{
   'kind': 'openUrl',
   'label': 'Connect Salesforce',
@@ -189,17 +188,20 @@ SurfaceEnvelope testSurface({
   DateTime? expiresAt,
   Map<String, Object?>? payload,
   List<Map<String, Object?>>? actions,
-}) => const SurfaceEnvelopeDecoder().decode(
-  surfaceJsonString(
-    sequence: sequence,
-    revision: revision,
-    surfaceId: surfaceId,
-    tenant: tenant,
-    workspace: workspace,
-    audienceKind: audienceKind,
-    audienceId: audienceId,
-    expiresAt: expiresAt,
-    payload: payload,
-    actions: actions,
-  ),
-);
+}) =>
+    SurfaceEnvelopeDecoder(
+      oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+    ).decode(
+      surfaceJsonString(
+        sequence: sequence,
+        revision: revision,
+        surfaceId: surfaceId,
+        tenant: tenant,
+        workspace: workspace,
+        audienceKind: audienceKind,
+        audienceId: audienceId,
+        expiresAt: expiresAt,
+        payload: payload,
+        actions: actions,
+      ),
+    );

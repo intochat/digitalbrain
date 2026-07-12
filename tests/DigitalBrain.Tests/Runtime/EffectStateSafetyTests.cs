@@ -4,7 +4,6 @@ using DigitalBrain.Core.V2;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Runtime;
 using Orleans.Runtime;
-using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
 
 namespace DigitalBrain.Tests.Runtime;
 
@@ -168,38 +167,6 @@ public sealed class EffectStateSafetyTests
     }
 
     [Fact]
-    public async Task Retry_is_durable_pending_work_and_cancelled_is_a_terminal_outcome()
-    {
-        var context = Context();
-        var retryApplication = new ApplicationService();
-        var retryOperation = await retryApplication.SubmitAsync(context, Command(context, "retry"));
-        var retryHandler = new SequenceCommandHandler(
-            new(WorkflowState.RetryScheduled, "retry"),
-            CommandExecutionResult.Success());
-        var retryDispatcher = new CommandDispatcher(retryApplication, [retryHandler]);
-
-        Assert.True(await retryDispatcher.DispatchAsync(retryOperation.OperationId));
-        Assert.Equal(WorkflowState.RetryScheduled,
-            (await retryApplication.GetOperationAsync(context, retryOperation.OperationId))!.State);
-        Assert.Equal([retryOperation.OperationId], retryApplication.GetPendingOperationIds());
-        Assert.True(await retryDispatcher.DispatchAsync(retryOperation.OperationId));
-        Assert.Equal(WorkflowState.Succeeded,
-            (await retryApplication.GetOperationAsync(context, retryOperation.OperationId))!.State);
-        Assert.Empty(retryApplication.GetPendingOperationIds());
-        Assert.Equal(2, retryHandler.Calls);
-
-        var cancelApplication = new ApplicationService();
-        var cancelOperation = await cancelApplication.SubmitAsync(context with { IdempotencyKey = "cancel" },
-            Command(context with { IdempotencyKey = "cancel" }, "cancel"));
-        var cancelDispatcher = new CommandDispatcher(cancelApplication,
-            [new SequenceCommandHandler(new CommandExecutionResult(WorkflowState.Cancelled, "cancelled"))]);
-        Assert.True(await cancelDispatcher.DispatchAsync(cancelOperation.OperationId));
-        Assert.Equal(WorkflowState.Cancelled,
-            (await cancelApplication.GetOperationAsync(context, cancelOperation.OperationId))!.State);
-        Assert.Empty(cancelApplication.GetPendingOperationIds());
-    }
-
-    [Fact]
     public async Task Failed_grain_writes_do_not_leak_uncommitted_commit_or_transition_state()
     {
         var storage = new FailingPersistentState { FailWrites = true };
@@ -282,31 +249,6 @@ public sealed class EffectStateSafetyTests
         Assert.True(afterTerminal.EffectTransitions.Count <= AggregateRetention.MaxRetainedInactiveEffects);
     }
 
-    [Fact]
-    public async Task File_store_compare_and_append_allows_only_one_durable_claim_across_instances()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "v2-effect-cas-" + Guid.NewGuid().ToString("N"));
-        try
-        {
-            var firstStore = new FileAggregateStore(root);
-            await SeedEffectAsync(firstStore);
-            var secondStore = new FileAggregateStore(root);
-            var first = new EffectTransitionRecord("effect", "claim-a", "Applying", null, DateTimeOffset.UtcNow);
-            var second = new EffectTransitionRecord("effect", "claim-b", "Applying", null, DateTimeOffset.UtcNow);
-
-            var results = await Task.WhenAll(
-                firstStore.TryAppendEffectTransitionAsync("aggregate", "effect", null, first),
-                secondStore.TryAppendEffectTransitionAsync("aggregate", "effect", null, second));
-
-            Assert.Single(results, static result => result);
-            Assert.Single((await firstStore.ReadAsync("aggregate")).EffectTransitions);
-        }
-        finally
-        {
-            if (Directory.Exists(root)) Directory.Delete(root, true);
-        }
-    }
-
     private static async Task SeedEffectAsync(
         IAggregateStore store,
         string operationId = "operation")
@@ -321,23 +263,6 @@ public sealed class EffectStateSafetyTests
             DateTimeOffset.Parse("2030-01-01T00:00:00Z"));
         await store.CommitAsync("aggregate", new("command", 0, payload, [], [effect], DateTimeOffset.UtcNow));
     }
-
-    private static RuntimeRequestContext Context() => new(
-        new("tenant"),
-        new("workspace"),
-        new("user", PrincipalKind.User),
-        "session",
-        AuthAssurance.Password,
-        "correlation",
-        "retry",
-        new HashSet<string> { "brain.act", "brain.read" });
-
-    private static CommandEnvelope Command(RuntimeRequestContext context, string suffix) => new(
-        "test.command",
-        2,
-        "command-" + suffix,
-        context,
-        JsonSerializer.SerializeToElement(new { suffix }));
 
     private sealed class CountingEffectHandler(EffectExecutionResult result) : IEffectHandler
     {
@@ -453,19 +378,6 @@ public sealed class EffectStateSafetyTests
         {
             VerificationCalls++;
             return Task.FromResult(verification);
-        }
-    }
-
-    private sealed class SequenceCommandHandler(params CommandExecutionResult[] results) : ICommandHandler
-    {
-        private readonly Queue<CommandExecutionResult> _results = new(results);
-        public int Calls { get; private set; }
-        public bool CanHandle(string commandType) => true;
-
-        public Task<CommandExecutionResult> ExecuteAsync(CommandEnvelope command, CancellationToken cancellationToken = default)
-        {
-            Calls++;
-            return Task.FromResult(_results.Dequeue());
         }
     }
 

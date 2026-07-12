@@ -33,8 +33,12 @@ public static class GoogleClientFactory
     public const string OAuthCompletedFlowIdKey = "oauth_completed_flow_id";
     public const string OAuthPhaseKey = "oauth_phase";
     public const string OAuthAuthorizationUrlKey = "oauth_authorization_url";
+    public const string OAuthStartTokenKey = "oauth_start_token";
+    public const string OAuthStartTokenFingerprintKey = "oauth_start_token_fingerprint";
+    public const string OAuthStartExpiresAtKey = "oauth_start_expires_at";
     public const string OAuthPendingClientIdKey = "oauth_client_id";
     public const string OAuthPendingRedirectUriKey = "oauth_redirect_uri";
+    public const string OAuthPhaseLocalStart = "local-start";
     public const string OAuthPhaseChallengeIssued = "challenge-issued";
     public const string OAuthPhaseProcessing = "processing";
     public const string OAuthPhaseFailed = "failed";
@@ -95,6 +99,9 @@ public static class GoogleClientFactory
 
         return AuthEndpoint + "?" + QueryString(query);
     }
+
+    public static string CreateOAuthStartUrl(string flowReference) =>
+        OAuthCallbackPaths.CreateInternalStartPath(OAuthCallbackPaths.GoogleProvider, flowReference);
 
     public static async Task<IReadOnlyDictionary<string, string>> ExchangeAuthorizationCodeAsync(
         IReadOnlyDictionary<string, string> values,
@@ -177,6 +184,38 @@ public static class GoogleClientFactory
         }
     }
 
+    internal static bool TryGetCurrentOAuthStartToken(
+        IReadOnlyDictionary<string, string> pending,
+        out string flowReference)
+    {
+        flowReference = string.Empty;
+        if (!pending.TryGetValue(OAuthPhaseKey, out var phase) ||
+            (!string.Equals(phase, OAuthPhaseLocalStart, StringComparison.Ordinal) &&
+             !string.Equals(phase, OAuthPhaseChallengeIssued, StringComparison.Ordinal)) ||
+            !pending.TryGetValue(OAuthStartTokenKey, out var candidate) ||
+            !OAuthCallbackPaths.IsOpaqueFlowReference(candidate) ||
+            !pending.TryGetValue(OAuthStartTokenFingerprintKey, out var fingerprint) ||
+            !IsAuthorizationAttemptFingerprint(fingerprint) ||
+            !SameAuthorizationAttempt(fingerprint, AuthorizationAttemptFingerprint(candidate)) ||
+            !TryGetFutureUnixSeconds(pending, OAuthStartExpiresAtKey, out _))
+            return false;
+        flowReference = candidate;
+        return true;
+    }
+
+    internal static bool IsCurrentOAuthStartToken(
+        IReadOnlyDictionary<string, string> pending,
+        string flowReference)
+    {
+        if (!OAuthCallbackPaths.IsOpaqueFlowReference(flowReference) ||
+            !TryGetCurrentOAuthStartToken(pending, out var current) ||
+            current.Length != flowReference.Length)
+            return false;
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(current),
+            Encoding.UTF8.GetBytes(flowReference));
+    }
+
     public static bool IsAuthorizationReady(
         IReadOnlyDictionary<string, string> credentials,
         IReadOnlyDictionary<string, string> pending) =>
@@ -209,6 +248,10 @@ public static class GoogleClientFactory
                 : new(ExternalAuthorizationResolutionState.Failed, "authorization-flow-missing");
 
         pending.TryGetValue(OAuthPhaseKey, out var phase);
+        if (string.Equals(phase, OAuthPhaseLocalStart, StringComparison.Ordinal))
+            return hasPendingFlow && TryGetCurrentOAuthStartToken(pending, out _)
+                ? new(ExternalAuthorizationResolutionState.Waiting)
+                : new(ExternalAuthorizationResolutionState.Failed, "authorization-start-invalid");
         if (string.Equals(phase, OAuthPhaseChallengeIssued, StringComparison.Ordinal))
             return TryGetReplayableAuthorizationChallenge(pending, out _, out _)
                 ? new(ExternalAuthorizationResolutionState.Waiting)
@@ -273,10 +316,12 @@ public static class GoogleClientFactory
 
     internal static bool IsKnownPendingExpired(IReadOnlyDictionary<string, string> pending)
     {
-        var key = pending.TryGetValue(OAuthPhaseKey, out var phase) &&
-                  string.Equals(phase, OAuthPhaseProcessing, StringComparison.Ordinal)
+        pending.TryGetValue(OAuthPhaseKey, out var phase);
+        var key = string.Equals(phase, OAuthPhaseProcessing, StringComparison.Ordinal)
             ? OAuthProcessingExpiresAtKey
-            : OAuthPendingExpiresAtKey;
+            : string.Equals(phase, OAuthPhaseLocalStart, StringComparison.Ordinal)
+                ? OAuthStartExpiresAtKey
+                : OAuthPendingExpiresAtKey;
         return pending.TryGetValue(key, out var expiresAt) &&
                long.TryParse(expiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAtUnixSeconds) &&
                expiresAtUnixSeconds <= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -294,10 +339,8 @@ public static class GoogleClientFactory
         }
     }
 
-    private static bool IsAllowedAuthorizationUrl(string value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps &&
-        string.Equals(uri.Host, "accounts.google.com", StringComparison.OrdinalIgnoreCase);
+    public static bool IsAllowedAuthorizationUrl(string? value) =>
+        OAuthCallbackPaths.IsAllowedProviderAuthorizationUrl(OAuthCallbackPaths.GoogleProvider, value);
 
     private static bool IsAppOwnedConfigurationKey(string key) =>
         string.Equals(key, ClientIdKey, StringComparison.OrdinalIgnoreCase) ||

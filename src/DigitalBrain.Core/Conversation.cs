@@ -73,23 +73,43 @@ public sealed record InoConversationSnapshot(
 
 public interface IInoConversationStore
 {
-    InoConversationSnapshot Read(RequestContext context);
-    InoConversationSnapshot Begin(RequestContext context, string commandId, string prompt);
-    InoConversationSnapshot Transition(RequestContext context, string commandId, string state);
-    InoConversationSnapshot Complete(
+    Task<InoConversationSnapshot> ReadAsync(RequestContext context, CancellationToken cancellationToken = default);
+    Task<InoConversationSnapshot> BeginAsync(
+        RequestContext context,
+        string commandId,
+        string prompt,
+        CancellationToken cancellationToken = default);
+    Task<InoConversationSnapshot> TransitionAsync(
+        RequestContext context,
+        string commandId,
+        string state,
+        CancellationToken cancellationToken = default);
+    Task<InoConversationSnapshot> CompleteAsync(
         RequestContext context,
         string commandId,
         string response,
         ToolAction? action = null,
         ToolGrounding? grounding = null,
-        IReadOnlyList<ToolGrounding>? groundings = null);
-    InoConversationSnapshot AwaitAuthorization(
+        IReadOnlyList<ToolGrounding>? groundings = null,
+        CancellationToken cancellationToken = default);
+    Task<InoConversationSnapshot> AwaitAuthorizationAsync(
         RequestContext context,
         string commandId,
         string response,
         ToolAction action,
-        ExternalAuthorizationContinuation authorization);
-    InoConversationSnapshot Fail(RequestContext context, string commandId, string safeReason, bool retryable);
+        ExternalAuthorizationContinuation authorization,
+        CancellationToken cancellationToken = default);
+    Task<InoConversationSnapshot> FailAsync(
+        RequestContext context,
+        string commandId,
+        string safeReason,
+        bool retryable,
+        CancellationToken cancellationToken = default);
+    Task<InoConversationSnapshot> RecordOutcomeUnknownAsync(
+        RequestContext context,
+        string commandId,
+        string safeReason,
+        CancellationToken cancellationToken = default);
 }
 
 public enum ToolOutcomeKind { Success, NeedsAuth, Denied, RetryableFailure, PermanentFailure, OutcomeUnknown, Cancelled }

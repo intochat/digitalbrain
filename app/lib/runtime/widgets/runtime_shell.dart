@@ -17,6 +17,7 @@ const Key runtimeLoadingKey = Key('v2-runtime-loading');
 const Key runtimeSignInKey = Key('v2-runtime-sign-in');
 const Key runtimeSecretFieldKey = Key('v2-runtime-secret-field');
 const Key runtimeSignInButtonKey = Key('v2-runtime-sign-in-button');
+const Key runtimeSignOutButtonKey = Key('v2-runtime-sign-out-button');
 const Key runtimeSurfaceKey = Key('v2-runtime-surface');
 const Key runtimeTerminalErrorKey = Key('v2-runtime-terminal-error');
 
@@ -26,6 +27,7 @@ class RuntimeShell extends StatefulWidget {
     this.configuration,
     this.controller,
     this.transportFactory = GrpcUiTransport.connect,
+    this.externalIdentityTokenSourceFactory,
     this.autoStart = true,
     this.now = _utcNow,
   });
@@ -33,6 +35,7 @@ class RuntimeShell extends StatefulWidget {
   final RuntimeConfiguration? configuration;
   final RuntimeController? controller;
   final TransportFactory transportFactory;
+  final ExternalIdentityTokenSourceFactory? externalIdentityTokenSourceFactory;
   final bool autoStart;
   final DateTime Function() now;
 
@@ -54,6 +57,8 @@ class _RuntimeShellState extends State<RuntimeShell> {
       configuration: widget.configuration,
       controller: widget.controller,
       transportFactory: widget.transportFactory,
+      externalIdentityTokenSourceFactory:
+          widget.externalIdentityTokenSourceFactory,
       autoStart: widget.autoStart,
     )..addListener(_onSessionChanged);
     scheduleMicrotask(_session.initialize);
@@ -98,9 +103,7 @@ class _RuntimeShellState extends State<RuntimeShell> {
     final controller = _session.controller;
     if (controller == null) {
       return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(key: runtimeLoadingKey),
-        ),
+        body: Center(child: CircularProgressIndicator(key: runtimeLoadingKey)),
       );
     }
 
@@ -132,6 +135,19 @@ class _RuntimeShellState extends State<RuntimeShell> {
                 reconnecting: controller.status == RuntimeStatus.reconnecting,
                 connectionUnavailable:
                     controller.status == RuntimeStatus.terminalError,
+              ),
+            ),
+          if (controller.session.isAuthenticated)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Tooltip(
+                message: 'Sign out',
+                child: IconButton.filledTonal(
+                  key: runtimeSignOutButtonKey,
+                  onPressed: _session.signOut,
+                  icon: const Icon(Icons.logout),
+                ),
               ),
             ),
         ],
@@ -185,6 +201,7 @@ class _RuntimeShellState extends State<RuntimeShell> {
   }
 
   Widget _buildSignIn(RuntimeController controller) {
+    final externalIdentity = _session.hasExternalIdentity;
     return Scaffold(
       key: runtimeSignInKey,
       body: Center(
@@ -202,35 +219,41 @@ class _RuntimeShellState extends State<RuntimeShell> {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Enter the sign-in code supplied by your '
-                    'DigitalBrain administrator.',
+                  Text(
+                    externalIdentity
+                        ? 'Continue with your organization identity.'
+                        : 'Enter the sign-in code supplied by your '
+                              'DigitalBrain administrator.',
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    key: runtimeSecretFieldKey,
-                    controller: _secret,
-                    obscureText: true,
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    onSubmitted: (_) => _authenticate(),
-                    decoration: const InputDecoration(
-                      labelText: 'Sign-in code',
+                  if (!externalIdentity) ...[
+                    TextField(
+                      key: runtimeSecretFieldKey,
+                      controller: _secret,
+                      obscureText: true,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      onSubmitted: (_) => _authenticate(),
+                      decoration: const InputDecoration(
+                        labelText: 'Sign-in code',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
+                  ],
                   FilledButton(
                     key: runtimeSignInButtonKey,
-                    onPressed:
-                        controller.status == RuntimeStatus.authenticating
+                    onPressed: controller.status == RuntimeStatus.authenticating
                         ? null
                         : _authenticate,
-                    child: const Text('Sign in'),
+                    child: Text(externalIdentity ? 'Continue' : 'Sign in'),
                   ),
                   if (controller.transientError != null) ...[
                     const SizedBox(height: 12),
                     Text(
-                      'That sign-in code wasn\'t accepted. Please try again.',
+                      externalIdentity
+                          ? 'Sign-in was not accepted. Please try again.'
+                          : 'That sign-in code wasn\'t accepted. '
+                                'Please try again.',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
@@ -246,6 +269,10 @@ class _RuntimeShellState extends State<RuntimeShell> {
   }
 
   void _authenticate() {
+    if (_session.hasExternalIdentity) {
+      _session.authenticateWithExternalIdentity();
+      return;
+    }
     final value = _secret.text;
     _secret.clear();
     _session.authenticateWithBootstrap(value);

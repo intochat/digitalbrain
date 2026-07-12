@@ -23,12 +23,14 @@ jobs:
       WEB_CUSTOM_HOSTNAME: "${{ vars.DIGITALBRAIN_WEB_HOSTNAME || 'www.digitalbrain.tech' }}"
       WEB_APEX_HOSTNAME: "${{ vars.DIGITALBRAIN_WEB_APEX_HOSTNAME || 'digitalbrain.tech' }}"
       KERNEL_CUSTOM_HOSTNAME: "${{ vars.DIGITALBRAIN_KERNEL_HOSTNAME || 'api.digitalbrain.tech' }}"
+      MCP_CUSTOM_HOSTNAME: "${{ vars.DIGITALBRAIN_MCP_HOSTNAME || 'mcp.digitalbrain.tech' }}"
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '11.0.x'
+          dotnet-quality: preview
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
@@ -40,10 +42,16 @@ jobs:
 
       - run: dotnet restore Brain.slnx
 
+      - run: dotnet restore deploy/DigitalBrain.Deploy.csproj
+
       - run: dotnet format whitespace Brain.slnx --verify-no-changes --no-restore --verbosity minimal
 
+      - run: dotnet format whitespace deploy/DigitalBrain.Deploy.csproj --verify-no-changes --no-restore --verbosity minimal
+
+      - run: dotnet build deploy/DigitalBrain.Deploy.csproj --no-restore
+
       - name: Run tests
-        run: dotnet test Brain.slnx --no-restore
+        run: dotnet test --logger "console;verbosity=minimal"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -58,11 +66,11 @@ jobs:
             -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel \
             -p:ContainerImageTag="${TAG}"
 
-      - name: Publish Telegram transport image
+      - name: Publish MCP image
         run: |
-          dotnet publish hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj -c Release /t:PublishContainer \
+          dotnet publish src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj -c Release /t:PublishContainer \
             -p:ContainerRegistry=docker.io \
-            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-telegram \
+            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-mcp \
             -p:ContainerImageTag="${TAG}"
 
       - name: Azure login (OIDC)
@@ -80,12 +88,27 @@ jobs:
           # AES checkpoint-encryption key, injected from a repo secret (never committed). The program reads
           # DIGITALBRAIN_CHECKPOINT_KEY and fails the deploy if absent (kernel fail-fasts in Production without it).
           DIGITALBRAIN_CHECKPOINT_KEY: ${{ secrets.CHECKPOINT_KEY }}
-          # Docker Hub PAT so ACA can authenticate pulling the private kernel/telegram images (see
+          DIGITALBRAIN_SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
+          DIGITALBRAIN_RUNTIME_STATE_KEK: ${{ secrets.RUNTIME_STATE_KEK }}
+          DIGITALBRAIN_RUNTIME_STATE_SIGNING_KEY: ${{ secrets.RUNTIME_STATE_SIGNING_KEY }}
+          DIGITALBRAIN_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          DIGITALBRAIN_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          DIGITALBRAIN_GOOGLE_REDIRECT_URI: ${{ vars.DIGITALBRAIN_GOOGLE_REDIRECT_URI }}
+          DIGITALBRAIN_SALESFORCE_CLIENT_ID: ${{ secrets.SALESFORCE_CLIENT_ID }}
+          DIGITALBRAIN_SALESFORCE_CLIENT_SECRET: ${{ secrets.SALESFORCE_CLIENT_SECRET }}
+          DIGITALBRAIN_SALESFORCE_REDIRECT_URI: ${{ vars.DIGITALBRAIN_SALESFORCE_REDIRECT_URI }}
+          DIGITALBRAIN_OIDC_ISSUER: ${{ vars.DIGITALBRAIN_OIDC_ISSUER }}
+          DIGITALBRAIN_OIDC_AUDIENCE: ${{ vars.DIGITALBRAIN_OIDC_AUDIENCE }}
+          DIGITALBRAIN_MCP_AUDIENCE: ${{ vars.DIGITALBRAIN_MCP_AUDIENCE }}
+          DIGITALBRAIN_UI_AUDIENCE: ${{ vars.DIGITALBRAIN_UI_AUDIENCE }}
+          # Docker Hub PAT so ACA can authenticate pulling the private runtime images (see
           # deploy/Program.cs's RegistryCredentialsArgs wiring).
           DIGITALBRAIN_DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DIGITALBRAIN_DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
           DIGITALBRAIN_WEB_HOSTNAME: ${{ env.WEB_CUSTOM_HOSTNAME }}
           DIGITALBRAIN_WEB_APEX_HOSTNAME: ${{ env.WEB_APEX_HOSTNAME }}
           DIGITALBRAIN_KERNEL_HOSTNAME: ${{ env.KERNEL_CUSTOM_HOSTNAME }}
+          DIGITALBRAIN_MCP_HOSTNAME: ${{ env.MCP_CUSTOM_HOSTNAME }}
           # azblob://pulumi-state backend needs the storage account; the OIDC login above provides Azure AD auth
           # (the deploy identity needs Storage Blob Data Contributor on this account).
           AZURE_STORAGE_ACCOUNT: digitalbrainstprod
@@ -95,10 +118,10 @@ jobs:
           work-dir: deploy
           cloud-url: azblob://pulumi-state
 
-      - name: Capture stable kernel FQDN
-        id: kernel_fqdn
+      - name: Capture stable MCP FQDN
+        id: mcp_fqdn
         run: |
-          fqdn=$(az containerapp show --name digitalbrain-jobs --resource-group digitalbrain-rg --query "properties.configuration.ingress.fqdn" -o tsv)
+          fqdn=$(az containerapp show --name digitalbrain-mcp --resource-group digitalbrain-rg --query "properties.configuration.ingress.fqdn" -o tsv)
           echo "fqdn=$fqdn" >> "$GITHUB_OUTPUT"
 
       - name: Ensure Azure Static Web App
@@ -126,29 +149,39 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Ensuring Container Apps hostname ${KERNEL_CUSTOM_HOSTNAME}..."
-          binding_type=$(az containerapp hostname list \
-            --name digitalbrain-jobs \
-            --resource-group digitalbrain-rg \
-            --query "[?name=='${KERNEL_CUSTOM_HOSTNAME}'].bindingType | [0]" \
-            -o tsv)
+          ensure_container_app_hostname() {
+            local app_name="$1"
+            local hostname="$2"
+            local binding_type
 
-          if [ -z "${binding_type}" ]; then
-            az containerapp hostname add \
-              --name digitalbrain-jobs \
+            echo "Ensuring Container Apps hostname ${hostname} on ${app_name}..."
+            binding_type=$(az containerapp hostname list \
+              --name "${app_name}" \
               --resource-group digitalbrain-rg \
-              --hostname "${KERNEL_CUSTOM_HOSTNAME}" >/dev/null
-            binding_type="Disabled"
-          fi
+              --query "[?name=='${hostname}'].bindingType | [0]" \
+              -o tsv)
 
-          if [ "${binding_type}" != "SniEnabled" ]; then
-            az containerapp hostname bind \
-              --name digitalbrain-jobs \
-              --resource-group digitalbrain-rg \
-              --environment digitalbrain-cae-prod \
-              --hostname "${KERNEL_CUSTOM_HOSTNAME}" \
-              --validation-method CNAME >/dev/null
-          fi
+            if [ -z "${binding_type}" ]; then
+              az containerapp hostname add \
+                --name "${app_name}" \
+                --resource-group digitalbrain-rg \
+                --hostname "${hostname}" >/dev/null
+              binding_type="Disabled"
+            fi
+
+            if [ "${binding_type}" != "SniEnabled" ]; then
+              az containerapp hostname bind \
+                --name "${app_name}" \
+                --resource-group digitalbrain-rg \
+                --environment digitalbrain-cae-prod \
+                --hostname "${hostname}" \
+                --validation-method CNAME >/dev/null
+            fi
+          }
+
+          # The kernel hostname remains only for its existing OAuth start/callback routes.
+          ensure_container_app_hostname digitalbrain-jobs "${KERNEL_CUSTOM_HOSTNAME}"
+          ensure_container_app_hostname digitalbrain-mcp "${MCP_CUSTOM_HOSTNAME}"
 
           get_swa_hostname_status() {
             local hostname="$1"
@@ -244,14 +277,23 @@ jobs:
       - run: flutter pub get
         working-directory: app
 
+      - run: flutter analyze
+        working-directory: app
+
+      - run: flutter test
+        working-directory: app
+
       # Served at the custom domain root, so base href is "/". Flutter's default
       # hash URL strategy resolves routes client-side without a custom 404.html.
       # --no-tree-shake-icons: the app uses non-constant IconData, which blocks icon tree-shaking.
+      # Flutter distribution is wired EXCLUSIVELY to the authenticated MCP UI transport (gRPC over HTTPS with x-v2-audience + session).
+      # Kernel is used only for OAuth callbacks; no direct kernel references allowed in the bundle (enforced by smoke tests).
       - run: |
-          kernel_endpoint="https://${KERNEL_CUSTOM_HOSTNAME}"
+          mcp_endpoint="https://${MCP_CUSTOM_HOSTNAME}"
           flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run \
-            --dart-define=KERNEL_ENDPOINT="${kernel_endpoint}" \
-            --dart-define=KERNEL_UPLOAD_ENDPOINT="${kernel_endpoint}"
+            --dart-define=DIGITALBRAIN_V2_UI_ENDPOINT="${mcp_endpoint}" \
+            --dart-define=DIGITALBRAIN_OIDC_ISSUER="${{ vars.DIGITALBRAIN_OIDC_ISSUER }}" \
+            --dart-define=DIGITALBRAIN_OIDC_CLIENT_ID="${{ vars.DIGITALBRAIN_OIDC_AUDIENCE }}"
         working-directory: app
 
       - name: Deploy Flutter web to Azure Static Web Apps
@@ -265,48 +307,31 @@ jobs:
           output_location: ""
           skip_app_build: true
 
-      - name: Generated kernel FQDN smoke test
+      - name: Generated MCP FQDN health smoke test
         run: |
           for i in $(seq 1 10); do
-            if curl -fsS "https://${{ steps.kernel_fqdn.outputs.fqdn }}/health"; then
-              echo "Kernel healthy."
+            if curl -fsS "https://${{ steps.mcp_fqdn.outputs.fqdn }}/health"; then
+              echo "MCP healthy."
               exit 0
             fi
-            echo "Attempt $i: kernel not ready yet, retrying in 10s..."
+            echo "Attempt $i: MCP not ready yet, retrying in 10s..."
             sleep 10
           done
-          echo "Kernel did not become healthy within 100s." >&2
+          echo "MCP did not become healthy within 100s." >&2
           exit 1
 
-      - name: Custom kernel domain smoke test
+      - name: Custom MCP domain health smoke test
         run: |
           for i in $(seq 1 15); do
-            if curl -fsS "https://${KERNEL_CUSTOM_HOSTNAME}/health"; then
-              echo "Custom kernel domain healthy."
+            if curl -fsS "https://${MCP_CUSTOM_HOSTNAME}/health"; then
+              echo "Custom MCP domain healthy."
               exit 0
             fi
-            echo "Attempt $i: custom kernel domain not ready yet, retrying in 10s..."
+            echo "Attempt $i: custom MCP domain not ready yet, retrying in 10s..."
             sleep 10
           done
-          echo "Custom kernel domain did not become healthy within 150s." >&2
+          echo "Custom MCP domain did not become healthy within 150s." >&2
           exit 1
-
-      - name: Browser CORS smoke test
-        run: |
-          set -euo pipefail
-          for origin in "https://${WEB_APEX_HOSTNAME}" "https://${WEB_CUSTOM_HOSTNAME}"; do
-            headers=$(mktemp)
-            curl -fsS -o /dev/null -D "$headers" -X OPTIONS \
-              "https://${KERNEL_CUSTOM_HOSTNAME}/digitalbrain.DigitalBrainGateway/Health" \
-              -H "Origin: ${origin}" \
-              -H "Access-Control-Request-Method: POST" \
-              -H "Access-Control-Request-Headers: content-type,x-grpc-web"
-            if ! tr -d '\r' < "$headers" | grep -i -F "access-control-allow-origin: ${origin}" >/dev/null; then
-              echo "CORS preflight did not allow ${origin}." >&2
-              cat "$headers" >&2
-              exit 1
-            fi
-          done
 
       - name: Static Web Apps smoke test
         run: |
@@ -334,19 +359,24 @@ jobs:
           echo "Custom Static Web App domain did not become reachable within 300s." >&2
           exit 1
 
-      - name: Flutter endpoint smoke test
+      - name: Flutter MCP endpoint smoke test
         run: |
           set -euo pipefail
           js=$(mktemp)
           curl -fsS "https://${WEB_CUSTOM_HOSTNAME}/main.dart.js" -o "$js"
 
-          if ! grep -F "https://${KERNEL_CUSTOM_HOSTNAME}" "$js" >/dev/null; then
-            echo "Flutter bundle does not contain the custom kernel endpoint." >&2
+          if ! grep -F "https://${MCP_CUSTOM_HOSTNAME}" "$js" >/dev/null; then
+            echo "Flutter bundle does not contain the custom MCP endpoint." >&2
             exit 1
           fi
 
-          generated_endpoint="https://${{ steps.kernel_fqdn.outputs.fqdn }}"
+          generated_endpoint="https://${{ steps.mcp_fqdn.outputs.fqdn }}"
           if grep -F "$generated_endpoint" "$js" >/dev/null; then
             echo "Flutter bundle still contains the generated Container App endpoint." >&2
+            exit 1
+          fi
+
+          if grep -F "https://${KERNEL_CUSTOM_HOSTNAME}" "$js" >/dev/null; then
+            echo "Flutter bundle still contains the kernel endpoint; MCP must be its sole runtime endpoint." >&2
             exit 1
           fi

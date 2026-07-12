@@ -330,6 +330,9 @@ class _ShellTransport implements UiTransport {
       testSession();
 
   @override
+  Future<void> logout({required String refreshToken}) async {}
+
+  @override
   Future<FeedCall> watchSurfaceFeed({
     required String accessToken,
     required int afterSequence,

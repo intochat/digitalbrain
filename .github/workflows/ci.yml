@@ -13,6 +13,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  repository-policy:
+    name: Repository policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check changed lines for whitespace errors
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          report=$(mktemp)
+          trap 'rm -f "$report"' EXIT
+
+          if [[ -n "${BASE_SHA}" && ! "${BASE_SHA}" =~ ^0+$ ]] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            check_range=("${BASE_SHA}...${HEAD_SHA}")
+          else
+            empty_tree=$(git hash-object -t tree /dev/null)
+            check_range=("${empty_tree}" "${HEAD_SHA}")
+          fi
+
+          if ! git diff --check "${check_range[@]}" >"$report" 2>&1; then
+            echo "Whitespace validation failed. Run git diff --check locally."
+            exit 1
+          fi
+
+      - name: Scan tracked files for credential-shaped content
+        shell: bash
+        run: |
+          set -euo pipefail
+          content_findings=$(mktemp)
+          name_findings=$(mktemp)
+          trap 'rm -f "$content_findings" "$name_findings"' EXIT
+
+          credential_pattern='AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}|sk-(proj-)?[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|AIza[0-9A-Za-z_-]{35}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|-----BEGIN[[:space:]]+([A-Z0-9]+[[:space:]]+)?PRIVATE[[:space:]]+KEY-----|AccountKey=[A-Za-z0-9+/=]{16,}|Bearer[[:space:]]+[A-Za-z0-9._~+/-]{20,}|(access_token|refresh_token|id_token|client_secret|code_verifier)[[:space:]]*[:=][[:space:]]*"?[A-Za-z0-9._~+/-]{20,}'
+          set +e
+          git grep -I -l -E "$credential_pattern" -- . >"$content_findings" 2>/dev/null
+          grep_status=$?
+          set -e
+
+          if [[ $grep_status -eq 0 ]]; then
+            echo "Credential-shaped tracked content detected. Inspect with the repository scanner locally."
+            exit 1
+          fi
+          if [[ $grep_status -ne 1 ]]; then
+            echo "Credential scan could not complete."
+            exit 1
+          fi
+
+          while IFS= read -r -d '' tracked; do
+            filename=${tracked##*/}
+            case "$filename" in
+              .env|.env.*)
+                case "$filename" in
+                  *.example|*.sample|*.template) ;;
+                  *) printf 'found' >"$name_findings"; break ;;
+                esac
+                ;;
+              *.pem|*.p12|*.pfx|*.p8|*.key|id_rsa|id_ed25519|credentials.json|secrets.json|google-services.json|GoogleService-Info.plist)
+                printf 'found' >"$name_findings"
+                break
+                ;;
+            esac
+          done < <(git ls-files -z)
+
+          if [[ -s "$name_findings" ]]; then
+            echo "A tracked file has a credential-bearing filename. Inspect tracked files locally."
+            exit 1
+          fi
+
   dotnet-build-test:
     name: .NET build and test
     runs-on: ubuntu-latest
@@ -22,6 +96,7 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '11.0.x'
+          dotnet-quality: preview
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
@@ -33,14 +108,43 @@ jobs:
 
       - run: dotnet restore Brain.slnx
 
+      - run: dotnet restore deploy/DigitalBrain.Deploy.csproj
+
       - run: dotnet format whitespace Brain.slnx --verify-no-changes --no-restore --verbosity minimal
+
+      - run: dotnet format whitespace deploy/DigitalBrain.Deploy.csproj --verify-no-changes --no-restore --verbosity minimal
 
       - run: dotnet build Brain.slnx --no-restore
 
-      - run: dotnet test Brain.slnx --no-restore
+      - run: dotnet build deploy/DigitalBrain.Deploy.csproj --no-restore
+
+      - name: Install Aspire CLI
+        run: dotnet tool install --global Aspire.Cli --version 13.4.6 >/dev/null
+
+      - name: Validate Aspire publish step graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          report=$(mktemp)
+          trap 'rm -f "$report"' EXIT
+          if ! aspire publish \
+            --apphost hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj \
+            --environment Production \
+            --list-steps \
+            --no-build \
+            --non-interactive \
+            --nologo \
+            -- \
+            --DigitalBrain:Profile=Production >"$report" 2>&1; then
+            echo "Aspire publish-model validation failed. Run the same list-steps command locally."
+            exit 1
+          fi
+
+      - name: Test .NET
+        run: dotnet test --logger "console;verbosity=minimal"
 
   flutter-web-build:
-    name: Flutter web build
+    name: Flutter analyze, test, and web build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +155,12 @@ jobs:
           cache: true
 
       - run: flutter pub get
+        working-directory: app
+
+      - run: flutter analyze
+        working-directory: app
+
+      - run: flutter test
         working-directory: app
 
       - run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run

@@ -120,7 +120,7 @@ sealed class SurfacePayload {
   factory SurfacePayload.fromJson(
     Object? value, {
     required ClientCapabilities capabilities,
-    Uri? salesforceOAuthStartOrigin,
+    Uri? oauthStartOrigin,
   }) {
     final json = _object(value, 'payload');
     final kind = _boundedString(json, 'kind', maxLength: 32);
@@ -135,7 +135,7 @@ sealed class SurfacePayload {
       ),
       'native' => _nativeSurfacePayloadFromJson(
         json,
-        salesforceOAuthStartOrigin: salesforceOAuthStartOrigin,
+        oauthStartOrigin: oauthStartOrigin,
       ),
       _ => throw FormatException('Unsupported surface payload "$kind".'),
     };
@@ -379,7 +379,7 @@ class InoConversationOperation {
 
   factory InoConversationOperation.fromJson(
     Object? value, {
-    Uri? salesforceOAuthStartOrigin,
+    Uri? oauthStartOrigin,
   }) {
     final json = _safeObject(value, 'payload.data.operation');
     _demandOnlyKeys(json, const {
@@ -421,7 +421,7 @@ class InoConversationOperation {
           ? null
           : InoConversationAction.fromJson(
               json['action'],
-              salesforceOAuthStartOrigin: salesforceOAuthStartOrigin,
+              oauthStartOrigin: oauthStartOrigin,
             ),
     );
   }
@@ -447,7 +447,7 @@ class InoConversationAction {
 
   factory InoConversationAction.fromJson(
     Object? value, {
-    Uri? salesforceOAuthStartOrigin,
+    Uri? oauthStartOrigin,
   }) {
     final json = _safeObject(value, 'payload.data.operation.action');
     _demandOnlyKeys(json, const {
@@ -458,10 +458,8 @@ class InoConversationAction {
     final kind = _boundedString(json, 'kind', maxLength: 32);
     final label = _boundedString(json, 'label', maxLength: 64);
     final targetText = _boundedString(json, 'target', maxLength: 4096);
-    final target = Uri.tryParse(targetText);
-    if (kind != 'openUrl' ||
-        target == null ||
-        !_isAllowedConnectionTarget(target, salesforceOAuthStartOrigin)) {
+    final target = _resolveConnectionTarget(targetText, oauthStartOrigin);
+    if (kind != 'openUrl' || target == null) {
       throw const FormatException(
         'payload.data.operation.action is not an allowed connection action.',
       );
@@ -476,57 +474,48 @@ class InoConversationAction {
   };
 }
 
-bool _isAllowedConnectionTarget(Uri target, Uri? salesforceOAuthStartOrigin) {
-  if (!target.isAbsolute ||
-      target.host.isEmpty ||
-      target.userInfo.isNotEmpty ||
-      target.fragment.isNotEmpty) {
-    return false;
+Uri? _resolveConnectionTarget(String targetText, Uri? oauthStartOrigin) {
+  if (oauthStartOrigin == null || !_isTrustedRuntimeOrigin(oauthStartOrigin)) {
+    return null;
   }
-  if (target.scheme == 'https' &&
-      _isAllowedConnectionHost(target.host) &&
-      (!target.hasPort || target.port == 443) &&
-      target.path == '/o/oauth2/v2/auth') {
-    return true;
+  String path;
+  String flowReference;
+  const googlePrefix = '/oauth/start/google?f=';
+  const salesforcePrefix = '/oauth/start/salesforce?f=';
+  if (targetText.startsWith(googlePrefix)) {
+    path = '/oauth/start/google';
+    flowReference = targetText.substring(googlePrefix.length);
+  } else if (targetText.startsWith(salesforcePrefix)) {
+    path = '/oauth/start/salesforce';
+    flowReference = targetText.substring(salesforcePrefix.length);
+  } else {
+    return null;
   }
-  if (target.path != '/oauth/start/salesforce' || target.query.contains('&')) {
-    return false;
-  }
-  final tokenValues = target.queryParametersAll['t'];
-  if (target.queryParametersAll.length != 1 ||
-      tokenValues == null ||
-      tokenValues.length != 1 ||
-      tokenValues.single.isEmpty ||
-      tokenValues.single.length > 4096) {
-    return false;
-  }
-  if (salesforceOAuthStartOrigin != null) {
-    return _hasSameOrigin(target, salesforceOAuthStartOrigin);
-  }
-  return (target.scheme == 'http' || target.scheme == 'https') &&
-      _isLoopbackHost(target.host);
+  if (!_isBoundedFlowReference(flowReference)) return null;
+  return oauthStartOrigin.replace(path: path, query: 'f=$flowReference');
 }
 
-bool _isAllowedConnectionHost(String host) {
-  final normalized = host.toLowerCase();
-  return normalized == 'accounts.google.com';
-}
+bool _isTrustedRuntimeOrigin(Uri origin) =>
+    origin.isAbsolute &&
+    origin.scheme == 'https' &&
+    origin.host.isNotEmpty &&
+    origin.userInfo.isEmpty &&
+    !origin.hasQuery &&
+    !origin.hasFragment &&
+    (origin.path.isEmpty || origin.path == '/');
 
-bool _hasSameOrigin(Uri target, Uri expected) =>
-    target.scheme.toLowerCase() == expected.scheme.toLowerCase() &&
-    target.host.toLowerCase() == expected.host.toLowerCase() &&
-    _effectivePort(target) == _effectivePort(expected);
-
-int _effectivePort(Uri uri) {
-  if (uri.hasPort) return uri.port;
-  return uri.scheme.toLowerCase() == 'https' ? 443 : 80;
-}
-
-bool _isLoopbackHost(String host) {
-  final normalized = host.toLowerCase();
-  return normalized == 'localhost' ||
-      normalized == '127.0.0.1' ||
-      normalized == '::1';
+bool _isBoundedFlowReference(String value) {
+  if (value.length < 32 || value.length > 1024) return false;
+  for (final codeUnit in value.codeUnits) {
+    final allowed =
+        (codeUnit >= 0x30 && codeUnit <= 0x39) ||
+        (codeUnit >= 0x41 && codeUnit <= 0x5a) ||
+        (codeUnit >= 0x61 && codeUnit <= 0x7a) ||
+        codeUnit == 0x2d ||
+        codeUnit == 0x5f;
+    if (!allowed) return false;
+  }
+  return true;
 }
 
 class InoConversationSurfacePayload extends SurfacePayload {
@@ -549,7 +538,7 @@ class InoConversationSurfacePayload extends SurfacePayload {
 
   factory InoConversationSurfacePayload.fromJson(
     Map<String, Object?> json, {
-    Uri? salesforceOAuthStartOrigin,
+    Uri? oauthStartOrigin,
   }) {
     final nativeKind = _boundedString(json, 'nativeKind', maxLength: 64);
     if (nativeKind != nativeKindName) {
@@ -576,7 +565,7 @@ class InoConversationSurfacePayload extends SurfacePayload {
           ? null
           : InoConversationOperation.fromJson(
               data['operation'],
-              salesforceOAuthStartOrigin: salesforceOAuthStartOrigin,
+              oauthStartOrigin: oauthStartOrigin,
             ),
     );
   }
@@ -595,13 +584,13 @@ class InoConversationSurfacePayload extends SurfacePayload {
 
 SurfacePayload _nativeSurfacePayloadFromJson(
   Map<String, Object?> json, {
-  Uri? salesforceOAuthStartOrigin,
+  Uri? oauthStartOrigin,
 }) {
   final nativeKind = _boundedString(json, 'nativeKind', maxLength: 64);
   if (nativeKind == InoConversationSurfacePayload.nativeKindName) {
     return InoConversationSurfacePayload.fromJson(
       json,
-      salesforceOAuthStartOrigin: salesforceOAuthStartOrigin,
+      oauthStartOrigin: oauthStartOrigin,
     );
   }
   return NativeSurfacePayload.fromJson(json);
@@ -735,7 +724,7 @@ class SurfaceEnvelope {
   factory SurfaceEnvelope.fromJson(
     Map<String, Object?> json, {
     ClientCapabilities capabilities = const ClientCapabilities(),
-    Uri? salesforceOAuthStartOrigin,
+    Uri? oauthStartOrigin,
   }) {
     final protocolVersion = _positiveInt(json, 'protocolVersion');
     if (protocolVersion != digitalBrainUiProtocolVersion ||
@@ -801,7 +790,7 @@ class SurfaceEnvelope {
       payload: SurfacePayload.fromJson(
         json['payload'],
         capabilities: capabilities,
-        salesforceOAuthStartOrigin: salesforceOAuthStartOrigin,
+        oauthStartOrigin: oauthStartOrigin,
       ),
       actions: actionsRaw.map(UiActionRef.fromJson).toList(),
     );
@@ -832,11 +821,11 @@ class SurfaceEnvelope {
 class SurfaceEnvelopeDecoder {
   const SurfaceEnvelopeDecoder({
     this.capabilities = const ClientCapabilities(),
-    this.salesforceOAuthStartOrigin,
+    this.oauthStartOrigin,
   });
 
   final ClientCapabilities capabilities;
-  final Uri? salesforceOAuthStartOrigin;
+  final Uri? oauthStartOrigin;
 
   SurfaceEnvelope decode(String source) {
     if (utf8.encode(source).length > capabilities.maximumPayloadBytes) {
@@ -853,7 +842,7 @@ class SurfaceEnvelopeDecoder {
     return SurfaceEnvelope.fromJson(
       _object(value, 'surface envelope'),
       capabilities: capabilities,
-      salesforceOAuthStartOrigin: salesforceOAuthStartOrigin,
+      oauthStartOrigin: oauthStartOrigin,
     );
   }
 }

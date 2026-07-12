@@ -19,6 +19,11 @@ const Key inoConnectionUnavailableBannerKey = Key(
   'v2-ino-connection-unavailable-banner',
 );
 const Key inoSubmissionNoticeKey = Key('v2-ino-submission-notice');
+const Key inoNewConversationButtonKey = Key('v2-ino-new-conversation');
+const Key inoDeleteConversationButtonKey = Key('v2-ino-delete-conversation');
+const Key inoDeleteConversationConfirmKey = Key(
+  'v2-ino-delete-conversation-confirm',
+);
 
 typedef InoActionSubmit =
     Future<ActionResult> Function(
@@ -66,6 +71,7 @@ class _InoConversationViewState extends State<InoConversationView> {
   bool _submissionUncertain = false;
   String? _submissionNotice;
   bool _openingConnection = false;
+  bool _changingConversation = false;
   ActionResult? _lastAcceptedReceipt;
 
   @override
@@ -109,11 +115,31 @@ class _InoConversationViewState extends State<InoConversationView> {
     return action?.actionType == 'ino.interact' ? action : null;
   }
 
+  UiActionRef? get _newConversationAction {
+    final action = widget.surface.actionByBindingId('ino.new');
+    return action?.actionType == 'ino.conversation.new' ? action : null;
+  }
+
+  UiActionRef? get _deleteConversationAction {
+    final action = widget.surface.actionByBindingId('ino.delete');
+    return action?.actionType == 'ino.conversation.delete' ? action : null;
+  }
+
+  bool get _canChangeConversation =>
+      widget.actionEnabled &&
+      !widget.reconnecting &&
+      !widget.connectionUnavailable &&
+      !_submitting &&
+      !_changingConversation &&
+      !_awaitingServerConfirmation &&
+      !_submissionUncertain;
+
   bool get _canSend =>
       widget.actionEnabled &&
       !widget.reconnecting &&
       !widget.connectionUnavailable &&
       !_submitting &&
+      !_changingConversation &&
       !_awaitingServerConfirmation &&
       !_submissionUncertain &&
       (widget.payload.operation?.state.isTerminal ?? true) &&
@@ -213,6 +239,63 @@ class _InoConversationViewState extends State<InoConversationView> {
         _openingConnection = false;
         _submissionNotice =
             'Connection sign-in couldn\'t be opened. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _startNewConversation() async {
+    final action = _newConversationAction;
+    if (action == null || !_canChangeConversation) return;
+    await _submitConversationLifecycle(action);
+  }
+
+  Future<void> _deleteConversation() async {
+    final action = _deleteConversationAction;
+    if (action == null || !_canChangeConversation) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this conversation?'),
+        content: const Text(
+          'This removes this conversation and cancels any work or connection request still waiting in it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: inoDeleteConversationConfirmKey,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _submitConversationLifecycle(action);
+    }
+  }
+
+  Future<void> _submitConversationLifecycle(UiActionRef action) async {
+    setState(() {
+      _changingConversation = true;
+      _submissionNotice = null;
+    });
+    try {
+      await widget.onSubmitAction(
+        widget.surface,
+        action.bindingId,
+        const <String, Object?>{},
+      );
+      if (!mounted) return;
+      setState(() => _changingConversation = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _changingConversation = false;
+        _submissionNotice =
+            'The conversation couldn\'t be changed. Please try again.';
       });
     }
   }
@@ -385,9 +468,36 @@ class _InoConversationViewState extends State<InoConversationView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Ask INO',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Ask INO',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        key: inoNewConversationButtonKey,
+                        onPressed:
+                            _canChangeConversation &&
+                                _newConversationAction != null
+                            ? _startNewConversation
+                            : null,
+                        icon: const Icon(Icons.add_comment_outlined),
+                        label: const Text('New'),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        key: inoDeleteConversationButtonKey,
+                        tooltip: 'Delete conversation',
+                        onPressed:
+                            _canChangeConversation &&
+                                _deleteConversationAction != null
+                            ? _deleteConversation
+                            : null,
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Text(

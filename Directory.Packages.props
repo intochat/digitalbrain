@@ -41,6 +41,7 @@
     <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.1-preview.1" />
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.0" />
     <!-- Extensions / hosting -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.7.0" />
@@ -64,6 +65,7 @@
     <!-- DefaultAzureCredential for the kernel's managed-identity storage path (Task 18) — was resolving
          transitively/undeclared before; pinned explicitly now. Version verified via nuget.org 2026-07-05 -->
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.28.0" />
     <!-- MCP / LLM integration -->
     <PackageVersion Include="ModelContextProtocol" Version="1.4.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
@@ -94,8 +96,6 @@
     <!-- AppHost model tests and generated scenario-test support. -->
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
-    <!-- Telegram transport host (external process; only System.Net in the feature). -->
-    <PackageVersion Include="Telegram.BotAPI" Version="10.1.0" />
     <!-- TUI -->
     <PackageVersion Include="Spectre.Console" Version="0.57.0" />
     <PackageVersion Include="Spectre.Console.Cli" Version="0.55.0" />

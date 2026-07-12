@@ -1,16 +1,15 @@
 extern alias McpProject;
 
 using System.Text.Json;
+using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.Configuration;
 using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
 using IMcpIntegrationToolGateway = McpProject::DigitalBrain.Mcp.IMcpIntegrationToolGateway;
-using InoEffectStore = McpProject::DigitalBrain.Mcp.InoEffectStore;
 using McpAuthorizedToolCatalog = McpProject::DigitalBrain.Mcp.McpAuthorizedToolCatalog;
 using McpConversationContextAssembler = McpProject::DigitalBrain.Mcp.McpConversationContextAssembler;
 using McpIntegrationPlanner = McpProject::DigitalBrain.Mcp.McpIntegrationPlanner;
-using McpInoCommandHandler = McpProject::DigitalBrain.Mcp.McpInoCommandHandler;
 using McpResponseComposer = McpProject::DigitalBrain.Mcp.McpResponseComposer;
 using ISemanticIntentResolver = McpProject::DigitalBrain.Mcp.ISemanticIntentResolver;
 
@@ -18,6 +17,8 @@ namespace DigitalBrain.Tests.Runtime;
 
 public sealed class IntegrationToolTests
 {
+    private const string OAuthFlowReference = "abcdefghijklmnopqrstuvwxyzABCDEF0123456789-_";
+
     [Fact]
     public async Task Planner_compiles_semantic_proposals_to_closed_tool_ids()
     {
@@ -171,11 +172,15 @@ public sealed class IntegrationToolTests
             gmail: new(
                 GmailReadStatus.NeedsAuth,
                 SafeReason: "Connect your Google account to let INO read your Gmail.",
-                ConnectionUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=test"),
+                ConnectionUrl: OAuthCallbackPaths.CreateInternalStartPath(
+                    OAuthCallbackPaths.GoogleProvider,
+                    OAuthFlowReference)),
             salesforce: new(
                 SalesforceReadStatus.NeedsAuth,
                 SafeReason: "Connect your Salesforce account to let INO read Salesforce.",
-                ConnectionUrl: "http://localhost:51014/oauth/start/salesforce?t=opaque-token"));
+                ConnectionUrl: OAuthCallbackPaths.CreateInternalStartPath(
+                    OAuthCallbackPaths.SalesforceProvider,
+                    OAuthFlowReference)));
         var catalog = new McpAuthorizedToolCatalog(gateway);
 
         var gmail = await catalog.InvokeAsync(Context("user", "workspace", "gmail.read"), GmailInvocation());
@@ -183,15 +188,19 @@ public sealed class IntegrationToolTests
 
         Assert.Equal(ToolOutcomeKind.NeedsAuth, gmail.Kind);
         Assert.Equal("Connect Google", gmail.Action?.Label);
-        Assert.StartsWith("https://accounts.google.com/", gmail.Action?.Target, StringComparison.Ordinal);
+        Assert.Equal($"{OAuthCallbackPaths.GoogleStart}?f={OAuthFlowReference}", gmail.Action?.Target);
         Assert.Equal(ToolOutcomeKind.NeedsAuth, salesforce.Kind);
         Assert.Equal("Connect Salesforce", salesforce.Action?.Label);
-        Assert.StartsWith("http://localhost:51014/oauth/start/salesforce?t=", salesforce.Action?.Target, StringComparison.Ordinal);
+        Assert.Equal($"{OAuthCallbackPaths.SalesforceStart}?f={OAuthFlowReference}", salesforce.Action?.Target);
     }
 
     [Fact]
-    public async Task Untrusted_salesforce_authorization_urls_are_not_exposed_as_actions()
+    public async Task Provider_absolute_and_cross_provider_authorization_urls_are_not_exposed_as_actions()
     {
+        var googleProviderCatalog = new McpAuthorizedToolCatalog(new RecordingGateway(
+            gmail: new(
+                GmailReadStatus.NeedsAuth,
+                ConnectionUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=provider-state")));
         var providerCatalog = new McpAuthorizedToolCatalog(new RecordingGateway(
             salesforce: new(
                 SalesforceReadStatus.NeedsAuth,
@@ -199,23 +208,39 @@ public sealed class IntegrationToolTests
         var wrongOriginCatalog = new McpAuthorizedToolCatalog(new RecordingGateway(
             salesforce: new(
                 SalesforceReadStatus.NeedsAuth,
-                ConnectionUrl: "https://evil.example/oauth/start/salesforce?t=opaque-token")));
+                ConnectionUrl: $"https://evil.example{OAuthCallbackPaths.SalesforceStart}?f={OAuthFlowReference}")));
+        var wrongProviderCatalog = new McpAuthorizedToolCatalog(new RecordingGateway(
+            salesforce: new(
+                SalesforceReadStatus.NeedsAuth,
+                ConnectionUrl: OAuthCallbackPaths.CreateInternalStartPath(
+                    OAuthCallbackPaths.GoogleProvider,
+                    OAuthFlowReference))));
 
+        var googleProviderResult = await googleProviderCatalog.InvokeAsync(
+            Context("user", "workspace", "gmail.read"),
+            GmailInvocation());
         var providerResult = await providerCatalog.InvokeAsync(
             Context("user", "workspace", "salesforce.read"),
             TypedSalesforceInvocation());
         var wrongOriginResult = await wrongOriginCatalog.InvokeAsync(
             Context("user", "workspace", "salesforce.read"),
             TypedSalesforceInvocation());
+        var wrongProviderResult = await wrongProviderCatalog.InvokeAsync(
+            Context("user", "workspace", "salesforce.read"),
+            TypedSalesforceInvocation());
 
+        Assert.Equal(ToolOutcomeKind.PermanentFailure, googleProviderResult.Kind);
+        Assert.Null(googleProviderResult.Action);
         Assert.Equal(ToolOutcomeKind.PermanentFailure, providerResult.Kind);
         Assert.Null(providerResult.Action);
         Assert.Equal(ToolOutcomeKind.PermanentFailure, wrongOriginResult.Kind);
         Assert.Null(wrongOriginResult.Action);
+        Assert.Equal(ToolOutcomeKind.PermanentFailure, wrongProviderResult.Kind);
+        Assert.Null(wrongProviderResult.Action);
     }
 
     [Fact]
-    public async Task Configured_salesforce_start_origin_is_the_only_https_origin_allowed()
+    public async Task Configured_salesforce_origin_cannot_expand_the_internal_action_policy()
     {
         var configuration = new ConfigurationManager
         {
@@ -224,15 +249,15 @@ public sealed class IntegrationToolTests
         var catalog = new McpAuthorizedToolCatalog(
             new RecordingGateway(salesforce: new(
                 SalesforceReadStatus.NeedsAuth,
-                ConnectionUrl: "https://brain.example/oauth/start/salesforce?t=opaque-token")),
+                ConnectionUrl: $"https://brain.example{OAuthCallbackPaths.SalesforceStart}?f={OAuthFlowReference}")),
             configuration: configuration);
 
         var result = await catalog.InvokeAsync(
             Context("user", "workspace", "salesforce.read"),
             TypedSalesforceInvocation());
 
-        Assert.Equal(ToolOutcomeKind.NeedsAuth, result.Kind);
-        Assert.Equal("https://brain.example/oauth/start/salesforce?t=opaque-token", result.Action?.Target);
+        Assert.Equal(ToolOutcomeKind.PermanentFailure, result.Kind);
+        Assert.Null(result.Action);
     }
 
     [Fact]
@@ -324,7 +349,7 @@ public sealed class IntegrationToolTests
     [Theory]
     [InlineData("gmail")]
     [InlineData("salesforce")]
-    public async Task Successful_provider_tool_outcome_bypasses_general_model_and_exact_replay_invokes_once(string provider)
+    public async Task Successful_provider_tool_outcome_bypasses_general_model_and_persists_grounding(string provider)
     {
         var isGmail = provider == "gmail";
         var context = Context(
@@ -333,9 +358,7 @@ public sealed class IntegrationToolTests
             isGmail ? "gmail.read" : "salesforce.read",
             "brain.act",
             "ui.action");
-        var store = new InoEffectStore();
-        var feed = new PrivateFeedStore();
-        var surfaces = new WorkspaceSurfaceProducer(feed, new ActionExecutor(feed), store);
+        var store = new InMemoryConversationStore(context);
         var expectedToolId = isGmail ? GmailTools.ReadMessages : SalesforceTools.ReadRecords;
         var resolver = new RecordingSemanticIntentResolver(new SemanticIntentProposal(
             isGmail ? SemanticProvider.Gmail : SemanticProvider.Salesforce,
@@ -354,26 +377,17 @@ public sealed class IntegrationToolTests
             model,
             toolCatalog,
             composer);
-        var handler = new McpInoCommandHandler(store, surfaces, owner);
-        var command = new CommandEnvelope(
-            McpInoCommandHandler.CommandType,
-            2,
-            "stable-" + provider + "-command",
-            context,
-            JsonSerializer.SerializeToElement(new
-            {
-                prompt = isGmail ? "Get my latest Gmail" : "Show my latest Salesforce account"
-            }));
+        var commandId = "stable-" + provider + "-command";
+        var prompt = isGmail ? "Get my latest Gmail" : "Show my latest Salesforce account";
 
-        Assert.Equal(WorkflowState.Succeeded, (await handler.ExecuteAsync(command)).State);
-        Assert.Equal(WorkflowState.Succeeded, (await handler.ExecuteAsync(command)).State);
+        await ExecuteTurnAsync(store, owner, context, commandId, prompt);
 
         Assert.Equal(0, model.CallCount);
         Assert.Equal(1, toolCatalog.InvocationCount);
         Assert.Equal(expectedToolId, Assert.Single(toolCatalog.Invocations).ToolId);
         Assert.Single(resolver.Requests);
         Assert.Equal(1, composer.CallCount);
-        var snapshot = store.Read(context);
+        var snapshot = await store.ReadAsync(context);
         Assert.Equal(2, snapshot.Turns.Count);
         Assert.Equal("Grounded provider response.", snapshot.Turns.Single(static turn => turn.Role == "assistant").Text);
         Assert.Equal(expectedToolId, Assert.Single(snapshot.CurrentOperation!.Groundings!).ToolId);
@@ -383,7 +397,7 @@ public sealed class IntegrationToolTests
     public async Task Semantic_follow_up_receives_persisted_descriptor_across_an_unrelated_turn()
     {
         var context = Context("user", "workspace", "gmail.read", "brain.act", "ui.action");
-        var store = new InoEffectStore();
+        var store = new InMemoryConversationStore(context);
         var resolver = new RecordingSemanticIntentResolver(
             new SemanticIntentProposal(SemanticProvider.Gmail, SemanticOperation.List, Limit: 2),
             new SemanticIntentProposal(SemanticProvider.None, SemanticOperation.Answer),
@@ -400,20 +414,11 @@ public sealed class IntegrationToolTests
             }
         }));
         var model = new RecordingModelRouter(_ => new ModelResponse("General answer.", "test", true));
-        var handler = ConversationHandler(store, resolver, toolCatalog, model);
+        var owner = ConversationOwner(store, resolver, toolCatalog, model);
 
-        Assert.Equal(WorkflowState.Succeeded, (await handler.ExecuteAsync(Command(
-            context,
-            "latest",
-            "Show my two latest incoming emails."))).State);
-        Assert.Equal(WorkflowState.Succeeded, (await handler.ExecuteAsync(Command(
-            context,
-            "unrelated",
-            "What is two plus two?"))).State);
-        Assert.Equal(WorkflowState.Succeeded, (await handler.ExecuteAsync(Command(
-            context,
-            "previous",
-            "and previous email?"))).State);
+        await ExecuteTurnAsync(store, owner, context, "latest", "Show my two latest incoming emails.");
+        await ExecuteTurnAsync(store, owner, context, "unrelated", "What is two plus two?");
+        await ExecuteTurnAsync(store, owner, context, "previous", "and previous email?");
 
         Assert.Equal(1, model.CallCount);
         Assert.Equal(2, toolCatalog.InvocationCount);
@@ -525,29 +530,220 @@ public sealed class IntegrationToolTests
         "idempotency",
         grants.ToHashSet(StringComparer.Ordinal));
 
-    private static McpInoCommandHandler ConversationHandler(
-        InoEffectStore store,
+    private static ConversationOwner ConversationOwner(
+        IInoConversationStore store,
         ISemanticIntentResolver semanticIntents,
         IAuthorizedToolCatalog toolCatalog,
         IModelRouter model)
     {
-        var feed = new PrivateFeedStore();
-        var surfaces = new WorkspaceSurfaceProducer(feed, new ActionExecutor(feed), store);
-        var owner = new ConversationOwner(
+        return new ConversationOwner(
             new McpConversationContextAssembler(store),
             new McpIntegrationPlanner(semanticIntents, store),
             model,
             toolCatalog,
             new RecordingResponseComposer("Grounded provider response."));
-        return new McpInoCommandHandler(store, surfaces, owner);
     }
 
-    private static CommandEnvelope Command(RuntimeRequestContext context, string id, string prompt) => new(
-        McpInoCommandHandler.CommandType,
-        2,
-        id,
-        context,
-        JsonSerializer.SerializeToElement(new { prompt }));
+    private static async Task<ConversationExecutionResult> ExecuteTurnAsync(
+        IInoConversationStore store,
+        ConversationOwner owner,
+        RuntimeRequestContext context,
+        string commandId,
+        string prompt)
+    {
+        var snapshot = await store.BeginAsync(context, commandId, prompt);
+        var response = await owner.ExecuteDetailedAsync(
+            new ConversationRequest(context, snapshot.ConversationId, prompt));
+        await store.CompleteAsync(
+            context,
+            commandId,
+            response.Text,
+            response.Action,
+            response.Grounding,
+            response.Groundings);
+        return response;
+    }
+
+    private sealed class InMemoryConversationStore(RuntimeRequestContext context) : IInoConversationStore
+    {
+        private InoConversationSnapshot _snapshot = InoConversationSnapshot.Empty(context);
+
+        public Task<InoConversationSnapshot> ReadAsync(
+            RuntimeRequestContext requestContext,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DemandScope(requestContext);
+            return Task.FromResult(_snapshot);
+        }
+
+        public Task<InoConversationSnapshot> BeginAsync(
+            RuntimeRequestContext requestContext,
+            string commandId,
+            string prompt,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DemandScope(requestContext);
+            if (_snapshot.Operations.Any(operation =>
+                    string.Equals(operation.CommandId, commandId, StringComparison.Ordinal)))
+                return Task.FromResult(_snapshot);
+
+            var now = DateTimeOffset.UtcNow;
+            _snapshot = _snapshot with
+            {
+                Revision = checked(_snapshot.Revision + 1),
+                Turns =
+                [
+                    .. _snapshot.Turns,
+                    new InoConversationTurn(commandId, "user", prompt, InoConversationStates.Queued)
+                ],
+                Operations =
+                [
+                    .. _snapshot.Operations,
+                    new InoConversationOperation(
+                        commandId,
+                        prompt,
+                        InoConversationStates.Queued,
+                        null,
+                        false,
+                        now)
+                ]
+            };
+            return Task.FromResult(_snapshot);
+        }
+
+        public Task<InoConversationSnapshot> TransitionAsync(
+            RuntimeRequestContext requestContext,
+            string commandId,
+            string state,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DemandScope(requestContext);
+            UpdateOperation(commandId, operation => operation with
+            {
+                State = state,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            return Task.FromResult(_snapshot);
+        }
+
+        public Task<InoConversationSnapshot> CompleteAsync(
+            RuntimeRequestContext requestContext,
+            string commandId,
+            string response,
+            ToolAction? action = null,
+            ToolGrounding? grounding = null,
+            IReadOnlyList<ToolGrounding>? groundings = null,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DemandScope(requestContext);
+            UpdateOperation(commandId, operation => operation with
+            {
+                State = InoConversationStates.Succeeded,
+                SafeReason = null,
+                Retryable = false,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Action = action,
+                Grounding = grounding,
+                Groundings = groundings
+            }, response);
+            return Task.FromResult(_snapshot);
+        }
+
+        public Task<InoConversationSnapshot> AwaitAuthorizationAsync(
+            RuntimeRequestContext requestContext,
+            string commandId,
+            string response,
+            ToolAction action,
+            ExternalAuthorizationContinuation authorization,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DemandScope(requestContext);
+            UpdateOperation(commandId, operation => operation with
+            {
+                State = InoConversationStates.AwaitingAuthorization,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Action = action,
+                Authorization = authorization
+            }, response);
+            return Task.FromResult(_snapshot);
+        }
+
+        public Task<InoConversationSnapshot> FailAsync(
+            RuntimeRequestContext requestContext,
+            string commandId,
+            string safeReason,
+            bool retryable,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DemandScope(requestContext);
+            UpdateOperation(commandId, operation => operation with
+            {
+                State = InoConversationStates.Failed,
+                SafeReason = safeReason,
+                Retryable = retryable,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            return Task.FromResult(_snapshot);
+        }
+
+        public Task<InoConversationSnapshot> RecordOutcomeUnknownAsync(
+            RuntimeRequestContext requestContext,
+            string commandId,
+            string safeReason,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DemandScope(requestContext);
+            UpdateOperation(commandId, operation => operation with
+            {
+                State = "outcome-unknown",
+                SafeReason = safeReason,
+                Retryable = false,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            return Task.FromResult(_snapshot);
+        }
+
+        private void UpdateOperation(
+            string commandId,
+            Func<InoConversationOperation, InoConversationOperation> update,
+            string? assistantResponse = null)
+        {
+            var index = _snapshot.Operations.ToList().FindIndex(operation =>
+                string.Equals(operation.CommandId, commandId, StringComparison.Ordinal));
+            if (index < 0) throw new KeyNotFoundException("The test conversation operation does not exist.");
+            var operations = _snapshot.Operations.ToArray();
+            operations[index] = update(operations[index]);
+            var turns = assistantResponse is null
+                ? _snapshot.Turns
+                :
+                [
+                    .. _snapshot.Turns,
+                    new InoConversationTurn(commandId, "assistant", assistantResponse, operations[index].State)
+                ];
+            _snapshot = _snapshot with
+            {
+                Revision = checked(_snapshot.Revision + 1),
+                Turns = turns,
+                Operations = operations
+            };
+        }
+
+        private void DemandScope(RuntimeRequestContext requestContext)
+        {
+            if (!string.Equals(
+                    _snapshot.ConversationId,
+                    InoConversationIdentity.From(requestContext),
+                    StringComparison.Ordinal))
+                throw new UnauthorizedAccessException("The test conversation scope changed.");
+        }
+    }
 
     private sealed class RecordingSemanticIntentResolver(params SemanticIntentProposal[] proposals)
         : ISemanticIntentResolver

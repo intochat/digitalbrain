@@ -68,6 +68,11 @@ public interface IGmailReadToolGrain : IGrainWithStringKey
     Task<ExternalAuthorizationResolution> ResolveAuthorizationAsync(
         CancellationToken cancellationToken = default);
 
+    [Alias("BeginAuthorizationAsync")]
+    Task<GmailReadResult> BeginAuthorizationAsync(
+        string flowReference,
+        CancellationToken cancellationToken = default);
+
     [Alias("CompleteAuthorizationAsync")]
     Task<AuthResult> CompleteAuthorizationAsync(
         OAuthCallback callback,

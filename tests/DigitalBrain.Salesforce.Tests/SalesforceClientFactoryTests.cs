@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Salesforce.Tests;
@@ -70,16 +71,35 @@ public class SalesforceClientFactoryTests
     }
 
     [Fact]
-    public void CreateOAuthStartUrl_Uses_The_Application_Origin_Without_Provider_Parameters()
+    public void CreateOAuthStartUrl_Uses_The_Canonical_Internal_Flow_Reference()
     {
-        var url = SalesforceClientFactory.CreateOAuthStartUrl(new Dictionary<string, string>
-        {
-            [SalesforceClientFactory.RedirectUriKey] = "https://brain.example/oauth/callback/salesforce"
-        }, "opaque-token");
+        const string flowReference = "abcdefghijklmnopqrstuvwxyzABCDEF0123456789-_";
+        var url = SalesforceClientFactory.CreateOAuthStartUrl(flowReference);
 
-        Assert.Equal("https://brain.example/oauth/start/salesforce?t=opaque-token", url);
+        Assert.Equal($"{OAuthCallbackPaths.SalesforceStart}?f={flowReference}", url);
+        Assert.True(OAuthCallbackPaths.TryParseInternalStartPath(
+            url,
+            OAuthCallbackPaths.SalesforceProvider,
+            out var parsed));
+        Assert.Equal(flowReference, parsed);
         Assert.DoesNotContain("services/oauth2/authorize", url, StringComparison.Ordinal);
         Assert.DoesNotContain("state=", url, StringComparison.Ordinal);
+        Assert.DoesNotContain("brain.example", url, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://login.salesforce.com/services/oauth2/authorize?client_id=test", true)]
+    [InlineData("https://tenant.my.salesforce.com/services/oauth2/authorize?client_id=test", true)]
+    [InlineData("https://tenant.my.site.com/services/oauth2/authorize?client_id=test", true)]
+    [InlineData("http://login.salesforce.com/services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com:444/services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com/Services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com.evil.example/services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com@evil.example/services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com/services/oauth2/authorize?client_id=test#fragment", false)]
+    public void ProviderRedirectAllowlistIsExact(string target, bool expected)
+    {
+        Assert.Equal(expected, SalesforceClientFactory.IsAllowedAuthorizationUrl(target));
     }
 
     [Fact]

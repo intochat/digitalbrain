@@ -9,87 +9,58 @@ namespace DigitalBrain.Mcp;
 
 public sealed class McpAuthority(
     IHttpContextAccessor http,
-    SessionTokenService tokens,
+    RuntimeRequestAuthenticator authentication,
     IConfiguration configuration)
 {
-    public RuntimeRequestContext RequireContext()
+    public async Task<RuntimeRequestContext> RequireContextAsync(CancellationToken cancellationToken = default)
     {
-        var value = http.HttpContext?.Request.Headers.Authorization.ToString();
-        _ = SessionAudiences.RequireFixedMcp(configuration["DigitalBrain:V2:Mcp:Audience"]);
-        if (value is null || !value.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ||
-            !tokens.TryValidate(value[7..].Trim(), SessionAudiences.Mcp, out var context))
+        _ = SessionAudiences.RequireFixedMcp(configuration["DigitalBrain:Runtime:Mcp:Audience"]);
+        var httpContext = http.HttpContext;
+        if (httpContext is null)
             throw new UnauthorizedAccessException("Authenticated MCP session required.");
-        return context;
+        return await authentication.AuthenticateMcpAsync(httpContext, cancellationToken).ConfigureAwait(false)
+               ?? throw new UnauthorizedAccessException("Authenticated MCP session required.");
+    }
+
+    internal static void DemandGrant(RuntimeRequestContext context, string grant)
+    {
+        if (!context.Grants.Contains(grant))
+            throw new UnauthorizedAccessException("The authenticated principal lacks the required capability.");
     }
 }
 
 [McpServerToolType]
-public sealed class McpReadTools(McpAuthority authority, IProjectionQueryPort projections)
+public sealed class McpConversationTools(
+    McpAuthority authority,
+    McpInoCommandHandler conversation)
 {
-    [McpServerTool(Name = "brain_read"), Description("Read the authenticated workspace-scoped timeline.")]
-    public async Task<object> ReadAsync(CancellationToken cancellationToken = default)
-    {
-        var context = authority.RequireContext();
-        return await projections.TimelineAsync(context, null, 50, cancellationToken);
-    }
-}
-
-[McpServerToolType]
-public sealed class McpMutationTools(McpAuthority authority, ApplicationService application)
-{
-    [McpServerTool(Name = "brain_act"), Description("Queue an authenticated, idempotent command.")]
-    public async Task<object> ActAsync(
-        string type,
-        string commandId,
-        JsonElement payload,
-        CancellationToken cancellationToken = default)
-    {
-        var context = authority.RequireContext();
-        var command = new CommandEnvelope(type, 2, commandId, context, payload.Clone());
-        return await application.SubmitAsync(context, command, cancellationToken);
-    }
-
-    [McpServerTool(Name = "brain_approve"), Description("Queue an authenticated approval command; requires brain.approve.")]
-    public async Task<object> ApproveAsync(
-        string commandId,
-        JsonElement payload,
-        CancellationToken cancellationToken = default)
-    {
-        var context = authority.RequireContext();
-        var command = new CommandEnvelope("approval", 2, commandId, context, payload.Clone());
-        return await application.SubmitAsync(context, command, cancellationToken);
-    }
-
-    [McpServerTool(Name = "ino_interact"), Description("Queue an authenticated, idempotent INO interaction for the current workspace.")]
+    [McpServerTool(Name = "ino_interact"), Description("Run an authenticated, idempotent INO interaction for the current workspace.")]
     public async Task<object> InoInteractAsync(
         string commandId,
         string prompt,
         CancellationToken cancellationToken = default)
     {
-        var context = authority.RequireContext();
-        return await application.SubmitAsync(
-            context,
+        var context = await authority.RequireContextAsync(cancellationToken).ConfigureAwait(false);
+        McpAuthority.DemandGrant(context, "brain.interact");
+        var commandContext = context with
+        {
+            IdempotencyKey = commandId
+        };
+        var result = await conversation.ExecuteAsync(
             new CommandEnvelope(
                 McpInoCommandHandler.CommandType,
                 2,
                 commandId,
-                context,
+                commandContext,
                 JsonSerializer.SerializeToElement(new { prompt })),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+        return new
+        {
+            commandId,
+            state = result.State.ToString(),
+            result.SafeReason,
+            awaitingAuthorization = result.Authorization is not null
+        };
     }
-}
 
-[McpServerToolType]
-public sealed class McpAdminTools(McpAuthority authority, ApplicationService application)
-{
-    [McpServerTool(Name = "brain_admin"), Description("Queue an authenticated administrative command; requires brain.admin.")]
-    public async Task<object> AdminAsync(
-        string commandId,
-        JsonElement payload,
-        CancellationToken cancellationToken = default)
-    {
-        var context = authority.RequireContext();
-        var command = new CommandEnvelope("admin", 2, commandId, context, payload.Clone());
-        return await application.SubmitAsync(context, command, cancellationToken);
-    }
 }

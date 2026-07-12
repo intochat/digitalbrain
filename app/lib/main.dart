@@ -25,7 +25,9 @@ Future<void> main() async {
     MediaKit.ensureInitialized();
   }
 
-  DigitalBrainTelemetry.initialize();
+  if (!kIsWeb) {
+    DigitalBrainTelemetry.initialize();
+  }
   Bloc.observer = TelemetryBlocObserver();
 
   if (const bool.fromEnvironment('SURFACE_DEMO')) {

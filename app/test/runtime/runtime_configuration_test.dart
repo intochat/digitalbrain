@@ -25,32 +25,58 @@ void main() {
     },
   );
 
-  test('Salesforce callback resolves to a trusted OAuth start origin', () {
-    expect(
-      parseSalesforceOAuthStartOrigin(
-        'http://localhost:51014/oauth/callback/salesforce',
-      ),
-      Uri.parse('http://localhost:51014'),
+  test('external identity configuration normalizes required OIDC values', () {
+    final configuration = parseExternalIdentityConfiguration(
+      '  https://issuer.example/tenant  ',
+      '  digitalbrain-ui  ',
+      'profile,openid;email profile',
     );
+
+    expect(configuration.issuer, Uri.parse('https://issuer.example/tenant'));
+    expect(configuration.clientId, 'digitalbrain-ui');
     expect(
-      parseSalesforceOAuthStartOrigin(
-        'https://brain.example/oauth/callback/salesforce',
-      ),
-      Uri.parse('https://brain.example'),
+      configuration.scopes,
+      unorderedEquals(['openid', 'profile', 'email']),
     );
   });
 
-  test('Salesforce callback rejects untrusted or malformed origins', () {
-    for (final source in [
-      'http://brain.example/oauth/callback/salesforce',
-      'https://brain.example/oauth/start/salesforce',
-      'https://brain.example/oauth/callback/salesforce?state=unsafe',
-      'https://user@brain.example/oauth/callback/salesforce',
-    ]) {
-      expect(
-        () => parseSalesforceOAuthStartOrigin(source),
-        throwsFormatException,
-      );
-    }
-  });
+  test(
+    'external identity configuration rejects unsafe or incomplete values',
+    () {
+      final invalidConfigurations = <List<String>>[
+        ['', 'digitalbrain-ui', 'openid'],
+        ['http://issuer.example/tenant', 'digitalbrain-ui', 'openid'],
+        ['https://user@issuer.example/tenant', 'digitalbrain-ui', 'openid'],
+        [
+          'https://issuer.example/tenant?private=value',
+          'digitalbrain-ui',
+          'openid',
+        ],
+        ['https://issuer.example/tenant', '', 'openid'],
+        ['https://issuer.example/tenant', 'digitalbrain\nui', 'openid'],
+        ['https://issuer.example/tenant', 'digitalbrain-ui', 'profile email'],
+        [
+          'https://issuer.example/tenant',
+          'digitalbrain-ui',
+          'openid profile\u007f',
+        ],
+        [
+          'https://issuer.example/tenant',
+          'digitalbrain-ui',
+          'openid ${List.generate(17, (index) => 'scope$index').join(' ')}',
+        ],
+      ];
+
+      for (final values in invalidConfigurations) {
+        expect(
+          () => parseExternalIdentityConfiguration(
+            values[0],
+            values[1],
+            values[2],
+          ),
+          throwsFormatException,
+        );
+      }
+    },
+  );
 }

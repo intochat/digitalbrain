@@ -408,7 +408,7 @@ public sealed class SalesforceReadNeuron(
                 return new SalesforceReadResult(
                     SalesforceReadStatus.NeedsAuth,
                     SafeReason: reason,
-                    ConnectionUrl: SalesforceClientFactory.CreateOAuthStartUrl(values, reusableStartToken));
+                    ConnectionUrl: SalesforceClientFactory.CreateOAuthStartUrl(reusableStartToken));
             }
 
             if (pending.TryGetValue(SalesforceClientFactory.OAuthPhaseKey, out var phase) &&
@@ -421,7 +421,7 @@ public sealed class SalesforceReadNeuron(
             }
 
             var startToken = oauthStateProtector.Protect(owner);
-            var startUrl = SalesforceClientFactory.CreateOAuthStartUrl(values, startToken);
+            var startUrl = SalesforceClientFactory.CreateOAuthStartUrl(startToken);
             Dictionary<string, string> nextPending;
             var startsNewFlow = false;
             if (pending.TryGetValue(SalesforceClientFactory.OAuthPhaseKey, out phase) &&

@@ -35,8 +35,18 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         Assert.True(builder.ExecutionContext.IsRunMode);
 
-        var storage = Assert.Single(builder.Resources, r => r.Name == "storage");
+        var storage = Assert.Single(builder.Resources, r => r.Name == "runtime-storage");
         Assert.Contains(storage.Annotations, a => a.GetType().Name == "EmulatorResourceAnnotation");
+        var dataVolume = Assert.Single(
+            builder.Resources.SelectMany(resource => resource.Annotations.OfType<ContainerMountAnnotation>()),
+            mount => mount.Target == "/data");
+        Assert.Equal(ContainerMountType.Volume, dataVolume.Type);
+        Assert.Equal("digitalbrain-main-azurite-data", dataVolume.Source);
+        Assert.False(dataVolume.IsReadOnly);
+
+        Assert.Contains(builder.Resources, r => r.Name == "conversationstate" && r.GetType().Name == "AzureBlobStorageResource");
+        Assert.Contains(builder.Resources, r => r.Name == "surfacefeedstate" && r.GetType().Name == "AzureBlobStorageResource");
+        Assert.Contains(builder.Resources, r => r.Name == "sessionstate" && r.GetType().Name == "AzureBlobStorageResource");
 
         Assert.Contains(builder.Resources, r => r.Name == "ollama" && r.GetType().Name == "OllamaResource");
 
@@ -45,13 +55,6 @@ public sealed class AddDigitalBrainExecutionModeTests
 
         var embed = Assert.Single(builder.Resources, r => r.Name == "embed");
         Assert.Equal("OllamaModelResource", embed.GetType().Name);
-
-        // Local Whisper (speaches) container for voice-to-text, always present in run mode (see Task 16).
-        Assert.Contains(builder.Resources, r => r.Name == "whisper" && r.GetType().Name == "ContainerResource");
-
-        // Sync blob container (checkpoint backup/restore, M11 Task 20) — unconditional like grainstate/journal,
-        // not gated by isRunMode, but still present here as a regression guard for the resource wiring itself.
-        Assert.Contains(builder.Resources, r => r.Name == "sync" && r.GetType().Name == "AzureBlobStorageResource");
 
         // Development run mode automatically starts the authenticated Flutter shell.
         Assert.Contains(builder.Resources, r => r.Name == "flutter-ui");
@@ -71,14 +74,8 @@ public sealed class AddDigitalBrainExecutionModeTests
         var mcp = Assert.Single(builder.Resources, r => r.Name == "mcp");
         var flutter = Assert.Single(builder.Resources, r => r.Name == "flutter-ui");
         var bootstrapSecret = Assert.IsType<ParameterResource>(
-            Assert.Single(builder.Resources, r => r.Name == "v2-ui-bootstrap-secret"));
+            Assert.Single(builder.Resources, r => r.Name == "runtime-ui-bootstrap-secret"));
         Assert.True(bootstrapSecret.Secret);
-        var feedIntegrityKey = Assert.IsType<ParameterResource>(
-            Assert.Single(builder.Resources, r => r.Name == "v2-ui-feed-integrity-key"));
-        Assert.True(feedIntegrityKey.Secret);
-        var journalIntegrityKey = Assert.IsType<ParameterResource>(
-            Assert.Single(builder.Resources, r => r.Name == "v2-journal-integrity-key"));
-        Assert.True(journalIntegrityKey.Secret);
 
         var httpsEndpoint = Assert.Single(
             mcp.Annotations.OfType<EndpointAnnotation>(),
@@ -109,29 +106,29 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.Same(
             bootstrapSecret,
             flutterEnvironment[FlutterAspireExtensions.BootstrapSecretEnvironmentVariable]);
-        Assert.Equal(salesforceCallback, flutterEnvironment["DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK"]);
+        Assert.DoesNotContain("DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK", flutterEnvironment.Keys);
 
         var mcpEnvironment = await EvaluateEnvironmentAsync(builder, mcp);
-        Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__V2__Ui__BootstrapSecret"]);
-        Assert.Same(feedIntegrityKey, mcpEnvironment["DigitalBrain__V2__Ui__FeedIntegrityKey"]);
-        Assert.Same(journalIntegrityKey, mcpEnvironment["DigitalBrain__V2__JournalIntegrityKey"]);
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var operationPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__OperationStorePath"]);
-        var projectionPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__ProjectionStorePath"]);
-        var sessionPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__SessionStorePath"]);
-        var feedPath = Assert.IsType<string>(mcpEnvironment["DigitalBrain__V2__Ui__FeedStorePath"]);
-        Assert.All([operationPath, projectionPath, sessionPath, feedPath], path =>
+        Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__Runtime__Ui__BootstrapSecret"]);
+        Assert.DoesNotContain("DigitalBrain__Runtime__StorageNamespace", mcpEnvironment.Keys);
+        Assert.DoesNotContain(
+            mcpEnvironment,
+            pair => pair.Key.Contains("StorePath", StringComparison.OrdinalIgnoreCase) ||
+                    pair.Key.Contains("LocalApplicationData", StringComparison.OrdinalIgnoreCase) ||
+                    pair.Key.Contains("__V2__", StringComparison.OrdinalIgnoreCase));
+
+        var durableBlobNames = new[] { "conversationstate", "surfacefeedstate", "sessionstate" };
+        foreach (var blobName in durableBlobNames)
         {
-            Assert.StartsWith(localAppData, path, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain(Path.Combine("hosts", "DigitalBrain.AppHost", ".digitalbrain"), path, StringComparison.OrdinalIgnoreCase);
-        });
-        Assert.Equal("operations.jsonl", Path.GetFileName(operationPath));
-        Assert.Equal("projections.jsonl", Path.GetFileName(projectionPath));
-        Assert.Equal("sessions.jsonl", Path.GetFileName(sessionPath));
-        Assert.Equal("ui-feed.jsonl", Path.GetFileName(feedPath));
-        Assert.Single(new[] { operationPath, projectionPath, sessionPath, feedPath }
-            .Select(Path.GetDirectoryName)
-            .Distinct(StringComparer.OrdinalIgnoreCase));
+            var blob = Assert.Single(builder.Resources, resource => resource.Name == blobName);
+            Assert.Contains(
+                mcp.Annotations.OfType<ResourceRelationshipAnnotation>(),
+                relationship => ReferenceEquals(relationship.Resource, blob));
+            Assert.Contains(
+                mcp.Annotations.OfType<WaitAnnotation>(),
+                waitAnnotation => ReferenceEquals(waitAnnotation.Resource, blob) &&
+                                  waitAnnotation.WaitType == WaitType.WaitUntilHealthy);
+        }
 
         var relationships = flutter.Annotations.OfType<ResourceRelationshipAnnotation>().ToArray();
         Assert.Contains(relationships, relationship => ReferenceEquals(relationship.Resource, mcp));
@@ -159,7 +156,7 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.True(builder.ExecutionContext.IsRunMode);
         Assert.Contains(builder.Resources, resource => resource.Name == "mcp");
         Assert.DoesNotContain(builder.Resources, resource => resource.Name == "flutter-ui");
-        Assert.DoesNotContain(builder.Resources, resource => resource.Name == "v2-ui-bootstrap-secret");
+        Assert.DoesNotContain(builder.Resources, resource => resource.Name == "runtime-ui-bootstrap-secret");
     }
 
     [Fact]
@@ -192,12 +189,6 @@ public sealed class AddDigitalBrainExecutionModeTests
         // No local Ollama container in publish mode, so no "embed" model resource either (see Task 15).
         Assert.DoesNotContain(builder.Resources, r => r.Name == "embed");
 
-        // No local Whisper container in publish mode either (see Task 16).
-        Assert.DoesNotContain(builder.Resources, r => r.Name == "whisper");
-
-        // Sync blob container still present in publish mode (AddAzureStorage produces a valid real-Azure
-        // resource on its own — same reasoning as grainstate/journal, see Task 20).
-        Assert.Contains(builder.Resources, r => r.Name == "sync" && r.GetType().Name == "AzureBlobStorageResource");
         Assert.DoesNotContain(builder.Resources, r => r.Name == "flutter-ui");
     }
 

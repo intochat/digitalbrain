@@ -25,6 +25,11 @@ abstract interface class GrpcClientPort {
     CallOptions options,
   );
 
+  GrpcUnaryResponse<wire.LogoutSessionReply> logoutSession(
+    wire.LogoutSessionRequest request,
+    CallOptions options,
+  );
+
   GrpcFeedResponse watchSurfaceFeed(
     wire.WatchSurfaceFeedRequest request,
     CallOptions options,
@@ -51,7 +56,7 @@ abstract interface class GrpcFeedResponse {
   Future<void> cancel();
 }
 
-class GrpcUiTransport implements UiTransport {
+class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
   GrpcUiTransport.forTesting({
     required GrpcClientPort client,
     Future<void> Function()? close,
@@ -102,6 +107,28 @@ class GrpcUiTransport implements UiTransport {
   }
 
   @override
+  Future<SessionBundle> bootstrapExternalSession(String identityToken) async {
+    _validateIdentityToken(identityToken);
+    try {
+      final reply = await _awaitUnary(
+        _client.bootstrapSession(
+          wire.BootstrapSessionRequest(),
+          CallOptions(
+            metadata: {
+              'authorization': 'Bearer $identityToken',
+              'x-v2-audience': digitalBrainUiAudience,
+            },
+            timeout: unaryRequestTimeout,
+          ),
+        ),
+      );
+      return _session(reply);
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
   Future<SessionBundle> refreshSession({required String refreshToken}) async {
     try {
       final reply = await _awaitUnary(
@@ -111,6 +138,20 @@ class GrpcUiTransport implements UiTransport {
         ),
       );
       return _session(reply);
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<void> logout({required String refreshToken}) async {
+    try {
+      await _awaitUnary(
+        _client.logoutSession(
+          wire.LogoutSessionRequest(refreshToken: refreshToken),
+          _audienceOnlyOptions(),
+        ),
+      );
     } catch (error) {
       throw _safeTransportError(error);
     }
@@ -296,6 +337,17 @@ class GrpcUiTransport implements UiTransport {
   static Future<void> _noClose() async {}
 }
 
+void _validateIdentityToken(String token) {
+  if (token.length < 32 ||
+      token.length > 8 * 1024 - 7 ||
+      token.trim() != token ||
+      !RegExp(
+        r'^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$',
+      ).hasMatch(token)) {
+    throw const AuthenticationException('External identity was rejected.');
+  }
+}
+
 class _GeneratedGrpcClientPort implements GrpcClientPort {
   const _GeneratedGrpcClientPort(this.client);
 
@@ -315,6 +367,14 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
     CallOptions options,
   ) => _GeneratedGrpcUnaryResponse(
     client.refreshSession(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.LogoutSessionReply> logoutSession(
+    wire.LogoutSessionRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.logoutSession(request, options: options),
   );
 
   @override

@@ -652,26 +652,50 @@ public sealed class TypedAuthorizedToolCatalogTests
 
     private sealed class SnapshotConversationStore(InoConversationSnapshot snapshot) : IInoConversationStore
     {
-        public InoConversationSnapshot Read(RuntimeRequestContext context) => snapshot;
-        public InoConversationSnapshot Begin(RuntimeRequestContext context, string commandId, string prompt) => throw new NotSupportedException();
-        public InoConversationSnapshot Transition(RuntimeRequestContext context, string commandId, string state) => throw new NotSupportedException();
-        public InoConversationSnapshot Complete(
+        public Task<InoConversationSnapshot> ReadAsync(
+            RuntimeRequestContext context,
+            CancellationToken cancellationToken = default) => Task.FromResult(snapshot);
+
+        public Task<InoConversationSnapshot> BeginAsync(
+            RuntimeRequestContext context,
+            string commandId,
+            string prompt,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<InoConversationSnapshot> TransitionAsync(
+            RuntimeRequestContext context,
+            string commandId,
+            string state,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<InoConversationSnapshot> CompleteAsync(
             RuntimeRequestContext context,
             string commandId,
             string response,
             ToolAction? action = null,
             ToolGrounding? grounding = null,
-            IReadOnlyList<ToolGrounding>? groundings = null) => throw new NotSupportedException();
-        public InoConversationSnapshot AwaitAuthorization(
+            IReadOnlyList<ToolGrounding>? groundings = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<InoConversationSnapshot> AwaitAuthorizationAsync(
             RuntimeRequestContext context,
             string commandId,
             string response,
             ToolAction action,
-            ExternalAuthorizationContinuation authorization) => throw new NotSupportedException();
-        public InoConversationSnapshot Fail(
+            ExternalAuthorizationContinuation authorization,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<InoConversationSnapshot> FailAsync(
             RuntimeRequestContext context,
             string commandId,
             string safeReason,
-            bool retryable) => throw new NotSupportedException();
+            bool retryable,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<InoConversationSnapshot> RecordOutcomeUnknownAsync(
+            RuntimeRequestContext context,
+            string commandId,
+            string safeReason,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

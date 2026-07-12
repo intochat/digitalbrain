@@ -21,22 +21,22 @@
 
     <Project Path="integrations/DigitalBrain.Google/DigitalBrain.Google.csproj" />
     <Project Path="integrations/DigitalBrain.Salesforce/DigitalBrain.Salesforce.csproj" />
-    <Project Path="integrations/DigitalBrain.Telegram/DigitalBrain.Telegram.csproj" />
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
-    <Project Path="hosts/DigitalBrain.Telegram.Transport/DigitalBrain.Telegram.Transport.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Telegram.Tests/DigitalBrain.Telegram.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
     <Project Path="tests/DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
     <Project Path="tests/DigitalBrain.TestKit.Tests/DigitalBrain.TestKit.Tests.csproj" />
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/DigitalBrain.RuntimeMigration/DigitalBrain.RuntimeMigration.csproj" />
   </Folder>
 </Solution>
 

@@ -61,6 +61,10 @@ void main() {
   });
 
   test('rejects malformed or sensitive INO conversation data', () {
+    final decoder = SurfaceEnvelopeDecoder(
+      oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+    );
+    final tooLongFlow = List<String>.filled(1025, 'a').join();
     final invalidPayloads = <Map<String, Object?>>[
       inoConversationPayload(
         messages: [inoMessage(role: 'system', text: 'Hidden', state: 'queued')],
@@ -101,6 +105,13 @@ void main() {
         'https://accounts.google.com:444/o/oauth2/v2/auth?state=opaque',
         'https://user@accounts.google.com/o/oauth2/v2/auth?state=opaque',
         'https://accounts.google.com/o/oauth2/v2/auth?state=opaque#fragment',
+        'https://brain.example:7443/oauth/start/google?f=0123456789abcdefghijklmnopqrstuv',
+        '/oauth/start/google?t=0123456789abcdefghijklmnopqrstuv',
+        '/oauth/start/google?f=too-short',
+        '/oauth/start/google?f=0123456789abcdefghijklmnopqrstu%',
+        '/oauth/start/google?f=$tooLongFlow',
+        '/oauth/start/google?f=0123456789abcdefghijklmnopqrstuv&state=provider-state',
+        '/oauth/start/google?f=0123456789abcdefghijklmnopqrstuv#fragment',
       ])
         inoConversationPayload(
           operation: inoOperation(
@@ -117,6 +128,9 @@ void main() {
         'http://localhost:51014/oauth/start/salesforce?t=',
         'http://user@localhost:51014/oauth/start/salesforce?t=opaque-token',
         'http://localhost:51014/oauth/start/salesforce?t=opaque-token#fragment',
+        '/oauth/start/salesforce?t=0123456789abcdefghijklmnopqrstuv',
+        '/oauth/start/salesforce?f=too-short',
+        '/oauth/start/unknown?f=0123456789abcdefghijklmnopqrstuv',
       ])
         inoConversationPayload(
           operation: inoOperation(
@@ -128,35 +142,65 @@ void main() {
 
     for (final payload in invalidPayloads) {
       expect(
-        () => const SurfaceEnvelopeDecoder().decode(
-          surfaceJsonString(payload: payload),
-        ),
+        () => decoder.decode(surfaceJsonString(payload: payload)),
         throwsFormatException,
       );
     }
   });
 
   test('decodes only the bounded Google connection action', () {
-    final envelope = const SurfaceEnvelopeDecoder().decode(
-      surfaceJsonString(
-        payload: inoConversationPayload(
-          operation: inoOperation(
-            state: 'succeeded',
-            action: googleConnectionAction(),
+    final envelope =
+        SurfaceEnvelopeDecoder(
+          oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+        ).decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                action: googleConnectionAction(),
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        );
 
     final operation =
         (envelope.payload as InoConversationSurfacePayload).operation!;
     expect(operation.action?.kind, 'openUrl');
     expect(operation.action?.label, 'Connect Google');
-    expect(operation.action?.target.host, 'accounts.google.com');
+    expect(operation.action?.target.host, 'brain.example');
+    expect(operation.action?.target.path, '/oauth/start/google');
+    expect(operation.action?.target.queryParameters.keys, ['f']);
   });
 
   test('decodes the bounded Salesforce connection action', () {
-    final envelope = const SurfaceEnvelopeDecoder().decode(
+    final envelope =
+        SurfaceEnvelopeDecoder(
+          oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+        ).decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                action: salesforceConnectionAction(),
+              ),
+            ),
+          ),
+        );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.action?.kind, 'openUrl');
+    expect(operation.action?.label, 'Connect Salesforce');
+    expect(operation.action?.target.host, 'brain.example');
+    expect(operation.action?.target.path, '/oauth/start/salesforce');
+    expect(operation.action?.target.queryParameters.keys, ['f']);
+  });
+
+  test('requires a trusted HTTPS runtime origin for connection actions', () {
+    final decoder = SurfaceEnvelopeDecoder(
+      oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+    );
+    final accepted = decoder.decode(
       surfaceJsonString(
         payload: inoConversationPayload(
           operation: inoOperation(
@@ -168,54 +212,41 @@ void main() {
     );
 
     final operation =
-        (envelope.payload as InoConversationSurfacePayload).operation!;
-    expect(operation.action?.kind, 'openUrl');
-    expect(operation.action?.label, 'Connect Salesforce');
-    expect(operation.action?.target.host, 'localhost');
-    expect(operation.action?.target.path, '/oauth/start/salesforce');
-    expect(operation.action?.target.queryParameters.keys, ['t']);
-  });
-
-  test('binds an HTTPS Salesforce start action to the configured origin', () {
-    final decoder = SurfaceEnvelopeDecoder(
-      salesforceOAuthStartOrigin: Uri.parse('https://brain.example:7443'),
-    );
-    final accepted = decoder.decode(
-      surfaceJsonString(
-        payload: inoConversationPayload(
-          operation: inoOperation(
-            state: 'succeeded',
-            action: salesforceConnectionAction(
-              target:
-                  'https://brain.example:7443/oauth/start/salesforce?t=opaque-token',
+        (accepted.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.action?.target.host, 'brain.example');
+    for (final origin in [
+      'http://localhost:7443',
+      'https://user@brain.example:7443',
+      'https://brain.example:7443/runtime',
+    ]) {
+      expect(
+        () =>
+            SurfaceEnvelopeDecoder(oauthStartOrigin: Uri.parse(origin)).decode(
+              surfaceJsonString(
+                payload: inoConversationPayload(
+                  operation: inoOperation(
+                    state: 'succeeded',
+                    action: salesforceConnectionAction(),
+                  ),
+                ),
+              ),
+            ),
+        throwsFormatException,
+      );
+    }
+    expect(
+      () => const SurfaceEnvelopeDecoder().decode(
+        surfaceJsonString(
+          payload: inoConversationPayload(
+            operation: inoOperation(
+              state: 'succeeded',
+              action: googleConnectionAction(),
             ),
           ),
         ),
       ),
+      throwsFormatException,
     );
-
-    final operation =
-        (accepted.payload as InoConversationSurfacePayload).operation!;
-    expect(operation.action?.target.host, 'brain.example');
-    for (final target in [
-      'https://evil.example:7443/oauth/start/salesforce?t=opaque-token',
-      'https://brain.example:7444/oauth/start/salesforce?t=opaque-token',
-      'http://localhost:51014/oauth/start/salesforce?t=opaque-token',
-    ]) {
-      expect(
-        () => decoder.decode(
-          surfaceJsonString(
-            payload: inoConversationPayload(
-              operation: inoOperation(
-                state: 'succeeded',
-                action: salesforceConnectionAction(target: target),
-              ),
-            ),
-          ),
-        ),
-        throwsFormatException,
-      );
-    }
   });
 
   test('rejects unsupported protocol and capability requirements', () {

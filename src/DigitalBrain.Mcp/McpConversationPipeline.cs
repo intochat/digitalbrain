@@ -14,7 +14,7 @@ namespace DigitalBrain.Mcp;
 
 public sealed class McpInoCommandHandler(
     IInoConversationStore conversations,
-    WorkspaceSurfaceProducer surfaces,
+    ConversationOutboxDispatcher outbox,
     ConversationOwner owner) : ICommandHandler
 {
     private const string SafeFailure = "I couldn’t finish that response. Please try a new message.";
@@ -40,21 +40,30 @@ public sealed class McpInoCommandHandler(
             return new CommandExecutionResult(WorkflowState.Failed, "ino-request-invalid");
         }
 
-        var snapshot = conversations.Begin(command.Context, command.CommandId, prompt);
+        var snapshot = await conversations.BeginAsync(
+            command.Context,
+            command.CommandId,
+            prompt,
+            cancellationToken).ConfigureAwait(false);
+        command = command with
+        {
+            Context = command.Context with { ConversationId = snapshot.ConversationId }
+        };
         var prior = snapshot.Operations.Single(operation =>
             string.Equals(operation.CommandId, command.CommandId, StringComparison.Ordinal));
         if (string.Equals(prior.State, InoConversationStates.Succeeded, StringComparison.Ordinal))
         {
             activity?.SetTag("db.ino.replay", true);
             activity?.SetTag("db.ino.outcome", "succeeded");
-            surfaces.PublishInoConversation(command.Context, snapshot);
+            snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
             return CommandExecutionResult.Success();
         }
-        if (string.Equals(prior.State, InoConversationStates.Failed, StringComparison.Ordinal))
+        if (string.Equals(prior.State, InoConversationStates.Failed, StringComparison.Ordinal) &&
+            !prior.Retryable)
         {
             activity?.SetTag("db.ino.replay", true);
             activity?.SetTag("db.ino.outcome", "failed");
-            surfaces.PublishInoConversation(command.Context, snapshot);
+            snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
             return new CommandExecutionResult(WorkflowState.Failed, prior.SafeReason);
         }
         if (string.Equals(prior.State, InoConversationStates.AwaitingAuthorization, StringComparison.Ordinal) &&
@@ -64,12 +73,12 @@ public sealed class McpInoCommandHandler(
             {
                 activity?.SetTag("db.ino.replay", true);
                 activity?.SetTag("db.ino.outcome", "authorization-continuation-recovered");
-                surfaces.PublishInoConversation(command.Context, snapshot);
+                snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
                 return CommandExecutionResult.AwaitAuthorization(prior.Authorization);
             }
             activity?.SetTag("db.ino.replay", true);
             activity?.SetTag("db.ino.outcome", "authorization-continuation-missing");
-            surfaces.PublishInoConversation(command.Context, snapshot);
+            snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
             return new CommandExecutionResult(
                 WorkflowState.ManualIntervention,
                 "external-authorization-continuation-missing");
@@ -81,27 +90,40 @@ public sealed class McpInoCommandHandler(
         {
             activity?.SetTag("db.ino.replay", true);
             activity?.SetTag("db.ino.outcome", "authorization-continuation-mismatch");
-            surfaces.PublishInoConversation(command.Context, snapshot);
+            snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
             return new CommandExecutionResult(
                 WorkflowState.ManualIntervention,
                 "external-authorization-continuation-mismatch");
         }
 
-        surfaces.PublishInoConversation(command.Context, snapshot);
+        snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            snapshot = conversations.Transition(command.Context, command.CommandId, InoConversationStates.Running);
-            surfaces.PublishInoConversation(command.Context, snapshot);
-            snapshot = conversations.Transition(command.Context, command.CommandId, InoConversationStates.Responding);
-            surfaces.PublishInoConversation(command.Context, snapshot);
+            snapshot = await conversations.TransitionAsync(
+                command.Context,
+                command.CommandId,
+                InoConversationStates.Running,
+                cancellationToken).ConfigureAwait(false);
+            snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
+            snapshot = await conversations.TransitionAsync(
+                command.Context,
+                command.CommandId,
+                InoConversationStates.Responding,
+                cancellationToken).ConfigureAwait(false);
+            snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
 
             if (attempt.Authorization is { } expiredAuthorization &&
                 expiredAuthorization.ExpiresAt <= DateTimeOffset.UtcNow)
             {
                 const string expiredReason = "Authorization wasn’t completed in time. Send the request again when you’re ready.";
-                snapshot = conversations.Fail(command.Context, command.CommandId, expiredReason, retryable: true);
-                surfaces.PublishInoConversation(command.Context, snapshot);
+                snapshot = await conversations.FailAsync(
+                    command.Context,
+                    command.CommandId,
+                    expiredReason,
+                    retryable: true,
+                    cancellationToken).ConfigureAwait(false);
+                snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
                 activity?.SetTag("db.ino.outcome", "authorization-expired");
                 return new CommandExecutionResult(WorkflowState.Failed, "external-authorization-expired");
             }
@@ -109,8 +131,13 @@ public sealed class McpInoCommandHandler(
                 { State: ExternalAuthorizationResolutionState.Failed } failedAuthorization)
             {
                 const string failedReason = "Authorization wasn’t completed. Reconnect and send the request again.";
-                snapshot = conversations.Fail(command.Context, command.CommandId, failedReason, retryable: true);
-                surfaces.PublishInoConversation(command.Context, snapshot);
+                snapshot = await conversations.FailAsync(
+                    command.Context,
+                    command.CommandId,
+                    failedReason,
+                    retryable: true,
+                    cancellationToken).ConfigureAwait(false);
+                snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
                 activity?.SetTag("db.ino.outcome", "authorization-failed");
                 return new CommandExecutionResult(
                     WorkflowState.Failed,
@@ -143,43 +170,77 @@ public sealed class McpInoCommandHandler(
                 if (response.Action is null)
                     throw new InvalidOperationException("An external authorization response requires a safe action.");
                 var continuation = ExternalAuthorizationContinuation.Create(response.Authorization);
-                snapshot = conversations.AwaitAuthorization(
+                snapshot = await conversations.AwaitAuthorizationAsync(
                     command.Context,
                     command.CommandId,
                     response.Text,
                     response.Action,
-                    continuation);
+                    continuation,
+                    cancellationToken).ConfigureAwait(false);
                 activity?.SetTag("db.ino.outcome", "awaiting-authorization");
-                surfaces.PublishInoConversation(command.Context, snapshot);
+                snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
                 return CommandExecutionResult.AwaitAuthorization(continuation);
             }
-            snapshot = conversations.Complete(
+            snapshot = await conversations.CompleteAsync(
                 command.Context,
                 command.CommandId,
                 response.Text,
                 response.Action,
                 response.Grounding,
-                response.Groundings);
+                response.Groundings,
+                cancellationToken).ConfigureAwait(false);
             activity?.SetTag("db.ino.grounding_count", response.Groundings?.Count ?? (response.Grounding is null ? 0 : 1));
             activity?.SetTag("db.ino.outcome", "succeeded");
-            surfaces.PublishInoConversation(command.Context, snapshot);
+            snapshot = await outbox.DispatchAsync(command.Context, cancellationToken).ConfigureAwait(false);
             return CommandExecutionResult.Success();
+        }
+        catch (ConversationOperationLeaseUnavailableException)
+        {
+            activity?.SetTag("db.ino.outcome", "already-processing");
+            return new CommandExecutionResult(WorkflowState.Applying, "conversation-operation-in-progress");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "cancelled");
-            activity?.SetTag("db.ino.outcome", "cancelled");
-            snapshot = conversations.Fail(command.Context, command.CommandId, SafeFailure, retryable: false);
-            surfaces.PublishInoConversation(command.Context, snapshot);
-            return new CommandExecutionResult(WorkflowState.Failed, SafeFailure);
+            activity?.SetTag("db.ino.outcome", "outcome-unknown");
+            snapshot = await RecordUnknownSafelyAsync(command, SafeFailure).ConfigureAwait(false);
+            return new CommandExecutionResult(WorkflowState.OutcomeUnknown, SafeFailure);
         }
         catch (Exception)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "failed");
-            activity?.SetTag("db.ino.outcome", "failed");
-            snapshot = conversations.Fail(command.Context, command.CommandId, SafeFailure, retryable: false);
-            surfaces.PublishInoConversation(command.Context, snapshot);
-            return new CommandExecutionResult(WorkflowState.Failed, SafeFailure);
+            activity?.SetTag("db.ino.outcome", "outcome-unknown");
+            snapshot = await RecordUnknownSafelyAsync(command, SafeFailure).ConfigureAwait(false);
+            return new CommandExecutionResult(WorkflowState.OutcomeUnknown, SafeFailure);
+        }
+
+        async Task<InoConversationSnapshot> RecordUnknownSafelyAsync(CommandEnvelope failedCommand, string safeReason)
+        {
+            InoConversationSnapshot latest;
+            try
+            {
+                latest = await conversations.RecordOutcomeUnknownAsync(
+                    failedCommand.Context,
+                    failedCommand.CommandId,
+                    safeReason,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (InvalidOperationException)
+            {
+                latest = await conversations.ReadAsync(
+                    failedCommand.Context,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            try
+            {
+                return await outbox.DispatchAsync(
+                    failedCommand.Context,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            catch
+            {
+                return latest;
+            }
         }
     }
 
@@ -196,12 +257,12 @@ public sealed class McpInoCommandHandler(
 
 public sealed class McpConversationContextAssembler(IInoConversationStore conversations) : IContextAssembler
 {
-    public Task<ConversationContext> AssembleAsync(
+    public async Task<ConversationContext> AssembleAsync(
         ConversationRequest request,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var snapshot = conversations.Read(request.Context);
+        var snapshot = await conversations.ReadAsync(request.Context, cancellationToken).ConfigureAwait(false);
         if (!string.Equals(snapshot.ConversationId, request.ConversationId, StringComparison.Ordinal))
             throw new UnauthorizedAccessException("The conversation is outside the authenticated scope.");
         var providerGroundedCommands = snapshot.Operations
@@ -217,11 +278,11 @@ public sealed class McpConversationContextAssembler(IInoConversationStore conver
             .TakeLast(12)
             .Select(static turn => $"{turn.Role}: {turn.Text}")
             .ToArray();
-        return Task.FromResult(new ConversationContext(
+        return new ConversationContext(
             request.Context.TenantId,
             request.Context.WorkspaceId,
             request.ConversationId,
-            history));
+            history);
     }
 
     private static bool HasProviderGrounding(IReadOnlyList<ToolGrounding>? groundings) =>
@@ -338,7 +399,7 @@ public sealed class McpIntegrationPlanner : IIntentCapabilityPlanner
             return [Clarification(SalesforceCapabilityMessage)];
         }
 
-        var descriptors = GroundingDescriptors(request);
+        var descriptors = await GroundingDescriptorsAsync(request, cancellationToken).ConfigureAwait(false);
         activity?.SetTag("db.ino.grounding_descriptor_count", descriptors.Count);
         var semanticRequest = new SemanticIntentRequest(
             request.Context.TenantId.Value,
@@ -397,10 +458,12 @@ public sealed class McpIntegrationPlanner : IIntentCapabilityPlanner
             : [new ToolInvocation(toolId, JsonSerializer.SerializeToElement(normalized, SemanticJson))];
     }
 
-    private IReadOnlyList<GroundingDescriptor> GroundingDescriptors(ConversationRequest request)
+    private async Task<IReadOnlyList<GroundingDescriptor>> GroundingDescriptorsAsync(
+        ConversationRequest request,
+        CancellationToken cancellationToken)
     {
         if (_conversations is null) return [];
-        var operations = _conversations.Read(request.Context).Operations;
+        var operations = (await _conversations.ReadAsync(request.Context, cancellationToken).ConfigureAwait(false)).Operations;
         var result = new List<GroundingDescriptor>();
         var distance = 0;
         foreach (var operation in operations.Reverse())
