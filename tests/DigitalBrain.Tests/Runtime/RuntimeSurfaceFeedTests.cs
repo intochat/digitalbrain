@@ -1,6 +1,7 @@
 extern alias McpProject;
 
 using System.Text;
+using System.Text.Json;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
@@ -61,6 +62,59 @@ public sealed class RuntimeSurfaceFeedTests
         var home = prepared.State.CurrentSurfaces.Single(surface =>
             string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
         var payloadText = Encoding.UTF8.GetString(home.PayloadUtf8);
+        Assert.Contains("Salesforce is already connected.", payloadText, StringComparison.Ordinal);
+        Assert.DoesNotContain("raw=legacy", payloadText, StringComparison.Ordinal);
+        Assert.DoesNotContain("login.salesforce.com", payloadText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PrepareSessionAsync_rematerializes_a_legacy_surface_when_the_conversation_revision_is_unchanged()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var cluster = new FakeClusterClient(conversationNeuron, surfaceFeedNeuron);
+        var feed = new RuntimeSurfaceFeed(cluster, TimeProvider.System);
+
+        await feed.ProjectConversationAsync(
+            context,
+            InoConversationSnapshot.Empty(context),
+            "current-projection",
+            now,
+            CancellationToken.None);
+
+        using var legacyPayloadDocument = JsonDocument.Parse("""
+            {"data":{"action":{"target":"https://login.salesforce.com/services/oauth2/authorize?raw=legacy"}}}
+            """);
+        var legacyPresentation = new
+        {
+            context.CorrelationId,
+            CauseKind = "conversation",
+            CauseId = conversationId,
+            RequiredClientCapabilities = ConversationSurfacePayload.RequiredCapabilities,
+            Payload = legacyPayloadDocument.RootElement.Clone(),
+            ConversationRevision = 1
+        };
+        var home = surfaceFeedNeuron.Current.CurrentSurfaces.Single(surface =>
+            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        surfaceFeedNeuron.Current = surfaceFeedNeuron.Current with
+        {
+            CurrentSurfaces = surfaceFeedNeuron.Current.CurrentSurfaces.Select(surface =>
+                ReferenceEquals(surface, home)
+                    ? surface with { PayloadUtf8 = JsonSerializer.SerializeToUtf8Bytes(legacyPresentation) }
+                    : surface).ToArray()
+        };
+        conversationNeuron.Current = BuildConversationState(
+            context, conversationId, revision: 1, assistantText: "Salesforce is already connected.", now);
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+
+        var rematerialized = prepared.State.CurrentSurfaces.Single(surface =>
+            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var payloadText = Encoding.UTF8.GetString(rematerialized.PayloadUtf8);
         Assert.Contains("Salesforce is already connected.", payloadText, StringComparison.Ordinal);
         Assert.DoesNotContain("raw=legacy", payloadText, StringComparison.Ordinal);
         Assert.DoesNotContain("login.salesforce.com", payloadText, StringComparison.Ordinal);
@@ -175,7 +229,7 @@ public sealed class RuntimeSurfaceFeedTests
 
     private sealed class FakeSurfaceFeedNeuron(SurfaceFeedState initial) : ISurfaceFeedNeuron
     {
-        public SurfaceFeedState Current { get; private set; } = initial;
+        public SurfaceFeedState Current { get; set; } = initial;
 
         public Task<SurfaceFeedState> ReadAsync() => Task.FromResult(Current);
 

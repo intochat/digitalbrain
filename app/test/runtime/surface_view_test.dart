@@ -694,6 +694,39 @@ void main() {
     expect(find.textContaining('Connect your Google account'), findsOneWidget);
   });
 
+  testWidgets('awaiting authorization renders a connection-required state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        SurfaceView(
+          surface: _inoSurface(
+            messages: [
+              inoMessage(
+                role: 'assistant',
+                text: 'Connect Google to continue.',
+                state: 'awaiting-authorization',
+              ),
+            ],
+            operation: inoOperation(
+              state: 'awaiting-authorization',
+              action: googleConnectionAction(),
+            ),
+          ),
+          onSubmitAction: _unexpectedAction,
+        ),
+      ),
+    );
+
+    expect(find.text('INO is waiting for you to connect.'), findsOneWidget);
+    expect(find.text('Connection required'), findsOneWidget);
+    expect(find.byKey(inoConnectButtonKey), findsOneWidget);
+    expect(
+      tester.widget<FilledButton>(find.byKey(inoSendButtonKey)).onPressed,
+      isNull,
+    );
+  });
+
   testWidgets('terminal state is announced as a live status', (tester) async {
     await tester.pumpWidget(
       _host(

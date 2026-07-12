@@ -27,6 +27,7 @@ public sealed class RuntimeSurfaceFeed(
     TimeProvider timeProvider) : IActiveConversationFeed
 {
     private static readonly TimeSpan CursorLifetime = TimeSpan.FromDays(30);
+    private const int CurrentPresentationVersion = 1;
 
     public async Task ProjectConversationAsync(
         RuntimeRequestContext context,
@@ -134,7 +135,8 @@ public sealed class RuntimeSurfaceFeed(
         // whatever content happens to already be persisted.
         var conversation = await ReadConversationSnapshotAsync(
             context, ActiveConversationId(context, state), cancellationToken).ConfigureAwait(false);
-        if (conversation.Revision != presentation.ConversationRevision)
+        if (conversation.Revision != presentation.ConversationRevision ||
+            presentation.PresentationVersion != CurrentPresentationVersion)
         {
             await ProjectConversationAsync(
                 context,
@@ -500,7 +502,8 @@ public sealed class RuntimeSurfaceFeed(
             conversation.ConversationId,
             ConversationSurfacePayload.RequiredCapabilities,
             payload,
-            conversation.Revision);
+            conversation.Revision,
+            CurrentPresentationVersion);
         return new(
             projectionId,
             ConversationSurfacePayload.HomeSurfaceId,
@@ -654,5 +657,6 @@ public sealed class RuntimeSurfaceFeed(
         string CauseId,
         string[] RequiredClientCapabilities,
         JsonElement Payload,
-        int ConversationRevision = 0);
+        int ConversationRevision = 0,
+        int PresentationVersion = 0);
 }

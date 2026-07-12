@@ -30,6 +30,16 @@ void main() {
     expect(envelope.actions.single.actionToken, 'signed-action-token');
   });
 
+  test('decodes a conversation-projected surface cause', () {
+    final source = surfaceJsonMap()
+      ..['cause'] = {'kind': 'conversation', 'id': 'conversation-a'};
+
+    final envelope = const SurfaceEnvelopeDecoder().decode(jsonEncode(source));
+
+    expect(envelope.cause.kind, 'conversation');
+    expect(envelope.cause.id, 'conversation-a');
+  });
+
   test('decodes a typed INO conversation without opaque identifiers', () {
     final envelope = const SurfaceEnvelopeDecoder().decode(
       surfaceJsonString(
@@ -194,6 +204,43 @@ void main() {
     expect(operation.action?.target.host, 'brain.example');
     expect(operation.action?.target.path, '/oauth/start/salesforce');
     expect(operation.action?.target.queryParameters.keys, ['f']);
+  });
+
+  test('decodes an awaiting authorization conversation state', () {
+    final envelope =
+        SurfaceEnvelopeDecoder(
+          oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+        ).decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              messages: [
+                inoMessage(
+                  role: 'assistant',
+                  text: 'Connect Salesforce to continue.',
+                  state: 'awaiting-authorization',
+                ),
+              ],
+              operation: inoOperation(
+                state: 'awaiting-authorization',
+                action: salesforceConnectionAction(),
+              ),
+            ),
+          ),
+        );
+
+    final payload = envelope.payload as InoConversationSurfacePayload;
+    expect(
+      payload.messages.single.state,
+      InoConversationTurnState.awaitingAuthorization,
+    );
+    expect(
+      payload.operation?.state,
+      InoConversationOperationState.awaitingAuthorization,
+    );
+    expect(payload.messages.single.toJson()['state'], 'awaiting-authorization');
+    expect(payload.operation?.toJson()['state'], 'awaiting-authorization');
+    expect(payload.operation?.action?.target.host, 'brain.example');
+    expect(payload.operation?.action?.target.path, '/oauth/start/salesforce');
   });
 
   test('requires a trusted HTTPS runtime origin for connection actions', () {

@@ -71,6 +71,7 @@ class CauseRef {
 }
 
 const Set<String> _causeKinds = {
+  'conversation',
   'command',
   'event',
   'workflow-transition',
@@ -279,14 +280,26 @@ enum InoConversationTurnState {
   queued,
   running,
   responding,
+  awaitingAuthorization,
   succeeded,
   failed;
+
+  String get wire => switch (this) {
+    sending => 'sending',
+    queued => 'queued',
+    running => 'running',
+    responding => 'responding',
+    awaitingAuthorization => 'awaiting-authorization',
+    succeeded => 'succeeded',
+    failed => 'failed',
+  };
 
   static InoConversationTurnState fromWire(String value) => switch (value) {
     'sending' => sending,
     'queued' => queued,
     'running' => running,
     'responding' => responding,
+    'awaiting-authorization' => awaitingAuthorization,
     'succeeded' => succeeded,
     'failed' => failed,
     _ => throw FormatException(
@@ -299,8 +312,18 @@ enum InoConversationOperationState {
   queued,
   running,
   responding,
+  awaitingAuthorization,
   succeeded,
   failed;
+
+  String get wire => switch (this) {
+    queued => 'queued',
+    running => 'running',
+    responding => 'responding',
+    awaitingAuthorization => 'awaiting-authorization',
+    succeeded => 'succeeded',
+    failed => 'failed',
+  };
 
   bool get isTerminal => this == succeeded || this == failed;
 
@@ -309,6 +332,7 @@ enum InoConversationOperationState {
         'queued' => queued,
         'running' => running,
         'responding' => responding,
+        'awaiting-authorization' => awaitingAuthorization,
         'succeeded' => succeeded,
         'failed' => failed,
         _ => throw FormatException(
@@ -351,7 +375,7 @@ class InoConversationMessage {
       ),
       text: _boundedString(json, 'text', maxLength: 32 * 1024),
       state: InoConversationTurnState.fromWire(
-        _boundedString(json, 'state', maxLength: 16),
+        _boundedString(json, 'state', maxLength: 32),
       ),
     );
   }
@@ -360,7 +384,7 @@ class InoConversationMessage {
     'turnKey': turnKey,
     'role': role.name,
     'text': text,
-    'state': state.name,
+    'state': state.wire,
   };
 }
 
@@ -413,7 +437,7 @@ class InoConversationOperation {
     }
     return InoConversationOperation(
       state: InoConversationOperationState.fromWire(
-        _boundedString(json, 'state', maxLength: 16),
+        _boundedString(json, 'state', maxLength: 32),
       ),
       retryable: retryable,
       safeReason: normalizedReason,
@@ -427,7 +451,7 @@ class InoConversationOperation {
   }
 
   Map<String, Object?> toJson() => {
-    'state': state.name,
+    'state': state.wire,
     'retryable': retryable,
     'safeReason': ?safeReason,
     'action': action?.toJson(),

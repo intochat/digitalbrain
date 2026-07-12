@@ -692,6 +692,8 @@ class _OperationStatus extends StatelessWidget {
       InoConversationOperationState.queued => 'Your message is queued.',
       InoConversationOperationState.running => 'INO is working on it.',
       InoConversationOperationState.responding => 'INO is writing a response.',
+      InoConversationOperationState.awaitingAuthorization =>
+        'INO is waiting for you to connect.',
       InoConversationOperationState.succeeded => 'Response ready.',
       InoConversationOperationState.failed =>
         operation.safeReason ?? 'INO couldn\'t complete that request.',
@@ -808,6 +810,7 @@ String _turnStatus(InoConversationTurnState state) => switch (state) {
   InoConversationTurnState.queued => 'Queued',
   InoConversationTurnState.running => 'Working',
   InoConversationTurnState.responding => 'Responding',
+  InoConversationTurnState.awaitingAuthorization => 'Connection required',
   InoConversationTurnState.succeeded => 'Complete',
   InoConversationTurnState.failed => 'Not completed',
 };
