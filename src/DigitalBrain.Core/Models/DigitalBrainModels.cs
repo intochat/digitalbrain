@@ -30,4 +30,3 @@ public abstract class EmbeddingModel : DigitalBrainModel
 {
     public sealed override DigitalBrainCapabilityKind Kind => DigitalBrainCapabilityKind.Embedding;
 }
-

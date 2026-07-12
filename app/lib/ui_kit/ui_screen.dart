@@ -41,7 +41,10 @@ class _UiKitScreenState extends State<UiKitScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final child in flow)
-            Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: child),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: child,
+            ),
         ],
       ),
     );

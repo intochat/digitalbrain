@@ -17,10 +17,12 @@ class OtelGrpcInterceptor extends ClientInterceptor {
       bool isBootstrap = false;
       if (request is gw.SynapseEnvelope) {
         final type = request.typeName;
-        isBootstrap = type == 'DigitalBrain.SDK.Identity.Contracts.RequestLogin' ||
+        isBootstrap =
+            type == 'DigitalBrain.SDK.Identity.Contracts.RequestLogin' ||
             type == 'DigitalBrain.SDK.Identity.Contracts.RequestLoginCard' ||
             type == 'DigitalBrain.SDK.Identity.Contracts.RequestCreateBrain' ||
-            type == 'DigitalBrain.Domains.Onboarding.Contracts.RequestOnboarding' ||
+            type ==
+                'DigitalBrain.Domains.Onboarding.Contracts.RequestOnboarding' ||
             type == 'DigitalBrain.Domains.Onboarding.Contracts.AcceptPolicy' ||
             type == 'DigitalBrain.Domains.Onboarding.Contracts.PolicyAccepted';
       }

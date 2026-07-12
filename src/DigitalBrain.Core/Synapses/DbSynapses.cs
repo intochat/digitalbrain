@@ -70,4 +70,3 @@ public record DbIndex(
     [property: Id(4)] bool IsPartial = false,
     [property: Id(5)] string? Origin = null,
     [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
-

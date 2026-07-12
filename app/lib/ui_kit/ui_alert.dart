@@ -7,6 +7,8 @@ class UiKitAlert extends StatelessWidget {
   final String subtitle;
 
   @override
-  Widget build(BuildContext context) =>
-      FAlert(title: Text(title), subtitle: subtitle.isEmpty ? null : Text(subtitle));
+  Widget build(BuildContext context) => FAlert(
+    title: Text(title),
+    subtitle: subtitle.isEmpty ? null : Text(subtitle),
+  );
 }

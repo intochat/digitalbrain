@@ -9,9 +9,15 @@ class DigitalBrainColors {
   static const obsidianSlate = Color(0xFF0A0A0C);
   static const panelGlass = Color(0x06FFFFFF);
 
-  static Color glassBg([double alpha = 0.04]) => const Color(0xFFFFFFFF).withValues(alpha: alpha);
+  static Color glassBg([double alpha = 0.04]) =>
+      const Color(0xFFFFFFFF).withValues(alpha: alpha);
 
-  static Color hslColor(double hue, double saturation, double lightness, [double alpha = 1.0]) {
+  static Color hslColor(
+    double hue,
+    double saturation,
+    double lightness, [
+    double alpha = 1.0,
+  ]) {
     return HSLColor.fromAHSL(alpha, hue, saturation, lightness).toColor();
   }
 
@@ -52,7 +58,9 @@ class DigitalBrainColors {
   static const violet = Color(0xFF86868B); // Slate grey
   static const violetSoft = Color(0xFFE5E5E5); // Silver chrome
 
-  static const rose = Color(0xFFFF9500); // Precise Apple Hardware Amber indicator
+  static const rose = Color(
+    0xFFFF9500,
+  ); // Precise Apple Hardware Amber indicator
 }
 
 class DigitalBrainTypography {
@@ -135,13 +143,15 @@ ThemeData buildDigitalBrainTheme() {
     canvasColor: DigitalBrainColors.pitchBlack,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     splashFactory: InkSparkle.splashFactory,
-    pageTransitionsTheme: const PageTransitionsTheme(builders: {
-      TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.iOS: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.macOS: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
-    }),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.iOS: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.macOS: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+      },
+    ),
   );
 
   final interText = GoogleFonts.interTextTheme(base.textTheme);

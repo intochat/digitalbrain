@@ -70,7 +70,9 @@ class _DebugBrainStatsState extends State<DebugBrainStats>
                     color: const Color(0xFF10E5B2), // Emerald-Teal accent
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF10E5B2).withValues(alpha: 0.5 * _pulseAnimation.value),
+                        color: const Color(
+                          0xFF10E5B2,
+                        ).withValues(alpha: 0.5 * _pulseAnimation.value),
                         blurRadius: 6 * _pulseAnimation.value,
                         spreadRadius: 1 * _pulseAnimation.value,
                       ),

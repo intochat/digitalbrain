@@ -183,7 +183,10 @@ Widget _taskRow(BuildContext c, DataSource s) {
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     decoration: BoxDecoration(
       gradient: LinearGradient(
-        colors: [statusTone.withValues(alpha: 0.10), DigitalBrainColors.panelGlass],
+        colors: [
+          statusTone.withValues(alpha: 0.10),
+          DigitalBrainColors.panelGlass,
+        ],
       ),
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: statusTone.withValues(alpha: 0.20)),

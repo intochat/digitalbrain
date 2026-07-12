@@ -18,7 +18,7 @@ class NeuronVectorLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = neuronId.toLowerCase();
-    
+
     IconData? iconData;
     Color? iconColor;
 
@@ -30,7 +30,8 @@ class NeuronVectorLogo extends StatelessWidget {
       iconColor = SimpleIconColors.gmail;
     } else if (normalized.contains('github') || normalized.contains('issue')) {
       iconData = SimpleIcons.github;
-      iconColor = Colors.white; // SimpleIconColors.github is black, which might not be visible in dark mode
+      iconColor = Colors
+          .white; // SimpleIconColors.github is black, which might not be visible in dark mode
     } else if (normalized.contains('stripe')) {
       iconData = SimpleIcons.stripe;
       iconColor = SimpleIconColors.stripe;
@@ -43,7 +44,8 @@ class NeuronVectorLogo extends StatelessWidget {
     } else if (normalized.contains('sqlite')) {
       iconData = SimpleIcons.sqlite;
       iconColor = SimpleIconColors.sqlite;
-    } else if (normalized.contains('postgres') || normalized.contains('postgresql')) {
+    } else if (normalized.contains('postgres') ||
+        normalized.contains('postgresql')) {
       iconData = SimpleIcons.postgresql;
       iconColor = SimpleIconColors.postgresql;
     } else if (normalized.contains('flutter')) {
@@ -52,20 +54,18 @@ class NeuronVectorLogo extends StatelessWidget {
     } else if (normalized.contains('google')) {
       iconData = SimpleIcons.google;
       iconColor = SimpleIconColors.google;
-    } else if (normalized.contains('salesforce') || normalized.contains('crm')) {
+    } else if (normalized.contains('salesforce') ||
+        normalized.contains('crm')) {
       iconData = Icons.cloud_queue;
       iconColor = const Color(0xFF00A1E0); // Salesforce blue
-    } else if (normalized.contains('travel') || normalized.contains('tripadvisor')) {
+    } else if (normalized.contains('travel') ||
+        normalized.contains('tripadvisor')) {
       iconData = SimpleIcons.tripadvisor;
       iconColor = SimpleIconColors.tripadvisor;
     }
 
     if (iconData != null) {
-      return Icon(
-        iconData,
-        size: size,
-        color: color ?? iconColor,
-      );
+      return Icon(iconData, size: size, color: color ?? iconColor);
     }
 
     final category = resolveCategory(neuronId);
@@ -80,18 +80,34 @@ class NeuronVectorLogo extends StatelessWidget {
 
   static String resolveCategory(String id) {
     final normalized = id.toLowerCase();
-    
+
     if (normalized.contains('creator')) return 'creator';
-    if (normalized.contains('identity') || normalized.contains('auth')) return 'identity';
+    if (normalized.contains('identity') || normalized.contains('auth')) {
+      return 'identity';
+    }
     if (normalized.contains('travel')) return 'travel';
-    if (normalized.contains('gmail') || normalized.contains('mail')) return 'gmail';
+    if (normalized.contains('gmail') || normalized.contains('mail')) {
+      return 'gmail';
+    }
     if (normalized.contains('ai') || normalized.contains('llm')) return 'ai';
-    if (normalized.contains('sqlite') || normalized.contains('query')) return 'sqlite';
-    if (normalized.contains('taskmanager') || normalized.contains('alarm')) return 'taskmanager';
-    if (normalized.contains('github') || normalized.contains('issue')) return 'github';
-    if (normalized.contains('csharp') || normalized.contains('c#') || normalized.contains('csharpfile')) return 'csharp';
-    if (normalized.contains('digitalbrain') || normalized.contains('brand')) return 'brand';
-    
+    if (normalized.contains('sqlite') || normalized.contains('query')) {
+      return 'sqlite';
+    }
+    if (normalized.contains('taskmanager') || normalized.contains('alarm')) {
+      return 'taskmanager';
+    }
+    if (normalized.contains('github') || normalized.contains('issue')) {
+      return 'github';
+    }
+    if (normalized.contains('csharp') ||
+        normalized.contains('c#') ||
+        normalized.contains('csharpfile')) {
+      return 'csharp';
+    }
+    if (normalized.contains('digitalbrain') || normalized.contains('brand')) {
+      return 'brand';
+    }
+
     return 'default';
   }
 }
@@ -139,7 +155,7 @@ class LogoPainter extends CustomPainter {
   void _paintBrandBrain(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
-    
+
     final leftPaint = Paint()
       ..shader = LinearGradient(
         colors: [
@@ -189,9 +205,21 @@ class LogoPainter extends CustomPainter {
     canvas.drawPath(leftPath, leftPaint);
     canvas.drawPath(rightPath, rightPaint);
 
-    canvas.drawLine(Offset(cx - w * 0.12, cy - h * 0.05), Offset(cx + w * 0.12, cy - h * 0.05), connectorPaint);
-    canvas.drawLine(Offset(cx - w * 0.15, cy + h * 0.10), Offset(cx + w * 0.15, cy + h * 0.10), connectorPaint);
-    canvas.drawLine(Offset(cx - w * 0.08, cy + h * 0.22), Offset(cx + w * 0.08, cy + h * 0.22), connectorPaint);
+    canvas.drawLine(
+      Offset(cx - w * 0.12, cy - h * 0.05),
+      Offset(cx + w * 0.12, cy - h * 0.05),
+      connectorPaint,
+    );
+    canvas.drawLine(
+      Offset(cx - w * 0.15, cy + h * 0.10),
+      Offset(cx + w * 0.15, cy + h * 0.10),
+      connectorPaint,
+    );
+    canvas.drawLine(
+      Offset(cx - w * 0.08, cy + h * 0.22),
+      Offset(cx + w * 0.08, cy + h * 0.22),
+      connectorPaint,
+    );
 
     canvas.drawCircle(Offset(cx - w * 0.12, cy - h * 0.05), w * 0.05, dotPaint);
     canvas.drawCircle(Offset(cx + w * 0.12, cy - h * 0.05), w * 0.05, dotPaint);
@@ -202,10 +230,13 @@ class LogoPainter extends CustomPainter {
   void _paintCreatorSpark(Canvas canvas, Size size, double cx, double cy) {
     final w = size.width;
     final h = size.height;
-    
+
     final paint = Paint()
       ..shader = LinearGradient(
-        colors: [overrideColor ?? DigitalBrainColors.violetSoft, overrideColor ?? Colors.indigoAccent],
+        colors: [
+          overrideColor ?? DigitalBrainColors.violetSoft,
+          overrideColor ?? Colors.indigoAccent,
+        ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Offset.zero & size)
@@ -220,11 +251,7 @@ class LogoPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    canvas.drawCircle(
-      Offset(cx, cy),
-      w * 0.15,
-      Paint()..color = Colors.white,
-    );
+    canvas.drawCircle(Offset(cx, cy), w * 0.15, Paint()..color = Colors.white);
   }
 
   void _paintIdentityShield(Canvas canvas, Size size, double cx, double cy) {
@@ -233,7 +260,10 @@ class LogoPainter extends CustomPainter {
 
     final paint = Paint()
       ..shader = LinearGradient(
-        colors: [overrideColor ?? Colors.purple, overrideColor ?? Colors.pinkAccent],
+        colors: [
+          overrideColor ?? Colors.purple,
+          overrideColor ?? Colors.pinkAccent,
+        ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Offset.zero & size)
@@ -254,11 +284,14 @@ class LogoPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = w * 0.06;
     canvas.drawCircle(Offset(cx, cy - h * 0.05), w * 0.15, innerPaint);
-    
+
     final bodyPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.8)
       ..style = PaintingStyle.fill;
-    canvas.drawRect(Rect.fromLTWH(cx - w * 0.03, cy + h * 0.1, w * 0.06, h * 0.15), bodyPaint);
+    canvas.drawRect(
+      Rect.fromLTWH(cx - w * 0.03, cy + h * 0.1, w * 0.06, h * 0.15),
+      bodyPaint,
+    );
   }
 
   void _paintTravelPlane(Canvas canvas, Size size, double cx, double cy) {
@@ -275,7 +308,10 @@ class LogoPainter extends CustomPainter {
 
     final paint2 = Paint()
       ..shader = LinearGradient(
-        colors: [overrideColor ?? Colors.deepOrangeAccent, overrideColor ?? Colors.orange],
+        colors: [
+          overrideColor ?? Colors.deepOrangeAccent,
+          overrideColor ?? Colors.orange,
+        ],
         begin: Alignment.topRight,
         end: Alignment.bottomLeft,
       ).createShader(Offset.zero & size)
@@ -311,13 +347,22 @@ class LogoPainter extends CustomPainter {
 
     final bgPaint = Paint()
       ..shader = LinearGradient(
-        colors: [overrideColor ?? Colors.red, overrideColor ?? Colors.redAccent],
+        colors: [
+          overrideColor ?? Colors.red,
+          overrideColor ?? Colors.redAccent,
+        ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.1, h * 0.2, w * 0.8, h * 0.6), Radius.circular(w * 0.08)), bgPaint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.1, h * 0.2, w * 0.8, h * 0.6),
+        Radius.circular(w * 0.08),
+      ),
+      bgPaint,
+    );
 
     final flapPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.3)
@@ -347,13 +392,22 @@ class LogoPainter extends CustomPainter {
 
     final chipPaint = Paint()
       ..shader = LinearGradient(
-        colors: [overrideColor ?? Colors.teal, overrideColor ?? Colors.greenAccent],
+        colors: [
+          overrideColor ?? Colors.teal,
+          overrideColor ?? Colors.greenAccent,
+        ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.2, h * 0.2, w * 0.6, h * 0.6), Radius.circular(w * 0.1)), chipPaint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.2, h * 0.2, w * 0.6, h * 0.6),
+        Radius.circular(w * 0.1),
+      ),
+      chipPaint,
+    );
 
     final pinPaint = Paint()
       ..color = (overrideColor ?? Colors.white).withValues(alpha: 0.7)
@@ -361,13 +415,37 @@ class LogoPainter extends CustomPainter {
       ..strokeWidth = w * 0.05
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawLine(Offset(w * 0.08, h * 0.35), Offset(w * 0.20, h * 0.35), pinPaint);
-    canvas.drawLine(Offset(w * 0.08, h * 0.50), Offset(w * 0.20, h * 0.50), pinPaint);
-    canvas.drawLine(Offset(w * 0.08, h * 0.65), Offset(w * 0.20, h * 0.65), pinPaint);
+    canvas.drawLine(
+      Offset(w * 0.08, h * 0.35),
+      Offset(w * 0.20, h * 0.35),
+      pinPaint,
+    );
+    canvas.drawLine(
+      Offset(w * 0.08, h * 0.50),
+      Offset(w * 0.20, h * 0.50),
+      pinPaint,
+    );
+    canvas.drawLine(
+      Offset(w * 0.08, h * 0.65),
+      Offset(w * 0.20, h * 0.65),
+      pinPaint,
+    );
 
-    canvas.drawLine(Offset(w * 0.80, h * 0.35), Offset(w * 0.92, h * 0.35), pinPaint);
-    canvas.drawLine(Offset(w * 0.80, h * 0.50), Offset(w * 0.92, h * 0.50), pinPaint);
-    canvas.drawLine(Offset(w * 0.80, h * 0.65), Offset(w * 0.92, h * 0.65), pinPaint);
+    canvas.drawLine(
+      Offset(w * 0.80, h * 0.35),
+      Offset(w * 0.92, h * 0.35),
+      pinPaint,
+    );
+    canvas.drawLine(
+      Offset(w * 0.80, h * 0.50),
+      Offset(w * 0.92, h * 0.50),
+      pinPaint,
+    );
+    canvas.drawLine(
+      Offset(w * 0.80, h * 0.65),
+      Offset(w * 0.92, h * 0.65),
+      pinPaint,
+    );
 
     canvas.drawCircle(Offset(cx, cy), w * 0.12, Paint()..color = Colors.white);
   }
@@ -402,19 +480,33 @@ class LogoPainter extends CustomPainter {
     canvas.drawOval(r, borderPaint);
   }
 
-  void _paintTaskManagerClipboard(Canvas canvas, Size size, double cx, double cy) {
+  void _paintTaskManagerClipboard(
+    Canvas canvas,
+    Size size,
+    double cx,
+    double cy,
+  ) {
     final w = size.width;
     final h = size.height;
 
     final bgPaint = Paint()
       ..shader = LinearGradient(
-        colors: [overrideColor ?? Colors.indigo, overrideColor ?? Colors.blueAccent],
+        colors: [
+          overrideColor ?? Colors.indigo,
+          overrideColor ?? Colors.blueAccent,
+        ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.15, h * 0.15, w * 0.7, h * 0.7), Radius.circular(w * 0.08)), bgPaint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.15, h * 0.15, w * 0.7, h * 0.7),
+        Radius.circular(w * 0.08),
+      ),
+      bgPaint,
+    );
 
     final linePaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.8)
@@ -422,9 +514,21 @@ class LogoPainter extends CustomPainter {
       ..strokeWidth = w * 0.04
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawLine(Offset(w * 0.35, h * 0.4), Offset(w * 0.7, h * 0.4), linePaint);
-    canvas.drawLine(Offset(w * 0.35, h * 0.55), Offset(w * 0.7, h * 0.55), linePaint);
-    canvas.drawLine(Offset(w * 0.35, h * 0.7), Offset(w * 0.65, h * 0.7), linePaint);
+    canvas.drawLine(
+      Offset(w * 0.35, h * 0.4),
+      Offset(w * 0.7, h * 0.4),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(w * 0.35, h * 0.55),
+      Offset(w * 0.7, h * 0.55),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(w * 0.35, h * 0.7),
+      Offset(w * 0.65, h * 0.7),
+      linePaint,
+    );
 
     final checkPaint = Paint()
       ..color = Colors.white
@@ -440,13 +544,22 @@ class LogoPainter extends CustomPainter {
 
     final paint = Paint()
       ..shader = LinearGradient(
-        colors: [overrideColor ?? Colors.blueGrey.shade800, overrideColor ?? Colors.indigo.shade900],
+        colors: [
+          overrideColor ?? Colors.blueGrey.shade800,
+          overrideColor ?? Colors.indigo.shade900,
+        ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.1, h * 0.1, w * 0.8, h * 0.8), Radius.circular(w * 0.12)), paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.1, h * 0.1, w * 0.8, h * 0.8),
+        Radius.circular(w * 0.12),
+      ),
+      paint,
+    );
 
     final gitPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.85)
@@ -458,7 +571,11 @@ class LogoPainter extends CustomPainter {
       ..color = DigitalBrainColors.tealSoft
       ..style = PaintingStyle.fill;
 
-    canvas.drawLine(Offset(w * 0.35, h * 0.25), Offset(w * 0.35, h * 0.75), gitPaint);
+    canvas.drawLine(
+      Offset(w * 0.35, h * 0.25),
+      Offset(w * 0.35, h * 0.75),
+      gitPaint,
+    );
     final branchPath = Path()
       ..moveTo(w * 0.35, h * 0.5)
       ..quadraticBezierTo(w * 0.5, h * 0.5, w * 0.65, h * 0.35);
@@ -466,7 +583,11 @@ class LogoPainter extends CustomPainter {
 
     canvas.drawCircle(Offset(w * 0.35, h * 0.3), w * 0.07, nodePaint);
     canvas.drawCircle(Offset(w * 0.35, h * 0.7), w * 0.07, nodePaint);
-    canvas.drawCircle(Offset(w * 0.65, h * 0.35), w * 0.07, Paint()..color = DigitalBrainColors.violetSoft);
+    canvas.drawCircle(
+      Offset(w * 0.65, h * 0.35),
+      w * 0.07,
+      Paint()..color = DigitalBrainColors.violetSoft,
+    );
   }
 
   void _paintCSharpHex(Canvas canvas, Size size, double cx, double cy) {
@@ -475,7 +596,10 @@ class LogoPainter extends CustomPainter {
 
     final paint = Paint()
       ..shader = LinearGradient(
-        colors: [overrideColor ?? Colors.deepPurple, overrideColor ?? Colors.purpleAccent],
+        colors: [
+          overrideColor ?? Colors.deepPurple,
+          overrideColor ?? Colors.purpleAccent,
+        ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ).createShader(Offset.zero & size)
@@ -514,10 +638,26 @@ class LogoPainter extends CustomPainter {
       ..color = DigitalBrainColors.tealSoft
       ..style = PaintingStyle.stroke
       ..strokeWidth = w * 0.04;
-    canvas.drawLine(Offset(cx + w * 0.15, cy - h * 0.15), Offset(cx + w * 0.15, cy + h * 0.15), sharpPaint);
-    canvas.drawLine(Offset(cx + w * 0.25, cy - h * 0.15), Offset(cx + w * 0.25, cy + h * 0.15), sharpPaint);
-    canvas.drawLine(Offset(cx + w * 0.1, cy - h * 0.05), Offset(Offset.zero.dx + cx + w * 0.3, cy - h * 0.05), sharpPaint);
-    canvas.drawLine(Offset(cx + w * 0.1, cy + h * 0.05), Offset(Offset.zero.dx + cx + w * 0.3, cy + h * 0.05), sharpPaint);
+    canvas.drawLine(
+      Offset(cx + w * 0.15, cy - h * 0.15),
+      Offset(cx + w * 0.15, cy + h * 0.15),
+      sharpPaint,
+    );
+    canvas.drawLine(
+      Offset(cx + w * 0.25, cy - h * 0.15),
+      Offset(cx + w * 0.25, cy + h * 0.15),
+      sharpPaint,
+    );
+    canvas.drawLine(
+      Offset(cx + w * 0.1, cy - h * 0.05),
+      Offset(Offset.zero.dx + cx + w * 0.3, cy - h * 0.05),
+      sharpPaint,
+    );
+    canvas.drawLine(
+      Offset(cx + w * 0.1, cy + h * 0.05),
+      Offset(Offset.zero.dx + cx + w * 0.3, cy + h * 0.05),
+      sharpPaint,
+    );
   }
 
   @override

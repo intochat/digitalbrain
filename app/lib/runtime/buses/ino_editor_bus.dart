@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'ino_source_subscription.dart';
 
-/// A global singleton to link the active [InoSourceSubscription] 
+/// A global singleton to link the active [InoSourceSubscription]
 /// with any native interactive editor inside the RFW tree.
 class InoEditorBus extends ChangeNotifier {
   InoEditorBus._privateConstructor();

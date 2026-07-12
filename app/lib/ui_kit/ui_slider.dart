@@ -17,10 +17,10 @@ class UiKitSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => FSlider(
-        label: label.isEmpty ? null : Text(label),
-        onEnd: (FSliderValue v) {
-          final scaled = min + (max - min) * v.max;
-          UiKitFormScope.of(context)?.set(name, scaled.toString());
-        },
-      );
+    label: label.isEmpty ? null : Text(label),
+    onEnd: (FSliderValue v) {
+      final scaled = min + (max - min) * v.max;
+      UiKitFormScope.of(context)?.set(name, scaled.toString());
+    },
+  );
 }

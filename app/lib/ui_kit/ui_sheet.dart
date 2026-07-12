@@ -3,7 +3,12 @@ import 'package:forui/forui.dart';
 import 'ui_overlay_host.dart';
 
 class UiKitSheet extends StatefulWidget {
-  const UiKitSheet({super.key, required this.open, required this.title, required this.children});
+  const UiKitSheet({
+    super.key,
+    required this.open,
+    required this.title,
+    required this.children,
+  });
   final bool open;
   final String title;
   final List<Widget> children;
@@ -21,7 +26,10 @@ class _UiKitSheetState extends State<UiKitSheet> with PresentOnce {
         side: FLayout.btt,
         builder: (context) => Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [Text(widget.title), ...widget.children]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [Text(widget.title), ...widget.children],
+          ),
         ),
       );
     });

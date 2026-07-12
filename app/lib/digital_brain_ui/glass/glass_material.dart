@@ -36,7 +36,8 @@ class GlassMaterial extends StatefulWidget {
   State<GlassMaterial> createState() => _GlassMaterialState();
 }
 
-class _GlassMaterialState extends State<GlassMaterial> with SingleTickerProviderStateMixin {
+class _GlassMaterialState extends State<GlassMaterial>
+    with SingleTickerProviderStateMixin {
   static ui.FragmentProgram? _shaderProgram;
   static bool _loadingShader = false;
   static bool get _shadersEnabled => false;
@@ -96,10 +97,9 @@ class _GlassMaterialState extends State<GlassMaterial> with SingleTickerProvider
 
     Widget body = DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: widget.tintOpacity),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(
+          alpha: widget.tintOpacity,
+        ),
         borderRadius: widget.effectiveBorderRadius,
       ),
       child: Stack(

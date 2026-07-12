@@ -25,7 +25,9 @@ class CatalogContractSchema {
 // Synapse parsing replicated exactly from brain_scene_screen.dart
 List<String> parseSynapses(String code) {
   final List<String> list = [];
-  final regex = RegExp(r'\bon\s+synapse\s*\(\s*(DB\.[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*)\s*\)');
+  final regex = RegExp(
+    r'\bon\s+synapse\s*\(\s*(DB\.[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*)\s*\)',
+  );
   final matches = regex.allMatches(code);
   for (final match in matches) {
     final type = match.group(1);
@@ -34,7 +36,9 @@ List<String> parseSynapses(String code) {
     }
   }
 
-  final outboundRegex = RegExp(r'\b(?:emit\s+signal|fire\s+synapse)\s*\(\s*(DB\.[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*)\s*\)');
+  final outboundRegex = RegExp(
+    r'\b(?:emit\s+signal|fire\s+synapse)\s*\(\s*(DB\.[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*)\s*\)',
+  );
   final outboundMatches = outboundRegex.allMatches(code);
   for (final match in outboundMatches) {
     final type = match.group(1);
@@ -59,8 +63,10 @@ List<String> parseSynapses(String code) {
 // Wildcard checking replicated exactly from PromptTextEditingController logic in digitalbrain_rfw_library.dart
 bool checkWildcard(String word) {
   final lowercaseWord = word.toLowerCase();
-  final isWildcard = word.endsWith('.*') &&
-      (lowercaseWord.startsWith('digitalbrain.sdk.') || lowercaseWord.startsWith('acme.'));
+  final isWildcard =
+      word.endsWith('.*') &&
+      (lowercaseWord.startsWith('digitalbrain.sdk.') ||
+          lowercaseWord.startsWith('acme.'));
   return isWildcard;
 }
 
@@ -87,19 +93,42 @@ void main() {
   try {
     final file = File('assets/ino-catalog.json');
     if (!file.existsSync()) {
-      stdout.writeln('[WARN] assets/ino-catalog.json not found in current directory. Trying relative UI/flutter/assets/...');
+      stdout.writeln(
+        '[WARN] assets/ino-catalog.json not found in current directory. Trying relative UI/flutter/assets/...',
+      );
     }
-    final jsonPath = file.existsSync() ? 'assets/ino-catalog.json' : 'UI/flutter/assets/ino-catalog.json';
+    final jsonPath = file.existsSync()
+        ? 'assets/ino-catalog.json'
+        : 'UI/flutter/assets/ino-catalog.json';
     final jsonStr = File(jsonPath).readAsStringSync();
     final decoded = jsonDecode(jsonStr);
-    
-    List schemasJson = decoded is List ? decoded : (decoded['Schemas'] ?? decoded['schemas']);
-    final catalog = schemasJson.map((s) => CatalogContractSchema.fromJson(s)).toList();
-    
-    assertTest('Catalog is successfully loaded and not empty', catalog.isNotEmpty);
-    assertTest('Catalog parses Fqn accurately', catalog.any((s) => s.fqn == 'DB.Google.Auth'));
-    assertTest('Catalog parses Kind accurately', catalog.firstWhere((s) => s.fqn == 'DB.Google.Auth').kind == 0);
-    assertTest('Catalog parses Fields accurately', catalog.firstWhere((s) => s.fqn == 'DB.Google.Auth').fields.contains('token'));
+
+    List schemasJson = decoded is List
+        ? decoded
+        : (decoded['Schemas'] ?? decoded['schemas']);
+    final catalog = schemasJson
+        .map((s) => CatalogContractSchema.fromJson(s))
+        .toList();
+
+    assertTest(
+      'Catalog is successfully loaded and not empty',
+      catalog.isNotEmpty,
+    );
+    assertTest(
+      'Catalog parses Fqn accurately',
+      catalog.any((s) => s.fqn == 'DB.Google.Auth'),
+    );
+    assertTest(
+      'Catalog parses Kind accurately',
+      catalog.firstWhere((s) => s.fqn == 'DB.Google.Auth').kind == 0,
+    );
+    assertTest(
+      'Catalog parses Fields accurately',
+      catalog
+          .firstWhere((s) => s.fqn == 'DB.Google.Auth')
+          .fields
+          .contains('token'),
+    );
   } catch (e) {
     assertTest('Catalog loading threw no exceptions: $e', false);
   }
@@ -107,61 +136,115 @@ void main() {
   // -------------------------------------------------------------
   // Test 2: Wildcard Parsing Boundaries in PromptInput
   // -------------------------------------------------------------
-  stdout.writeln('\n--- Testing Wildcard Parsing Boundaries in Creator Prompt ---');
-  assertTest('DigitalBrain.SDK.* matches wildcard boundary', checkWildcard('DigitalBrain.SDK.*'));
-  assertTest('digitalbrain.sdk.* is case-insensitive and matches', checkWildcard('digitalbrain.sdk.*'));
-  assertTest('DigitalBrain.SDK.Storage.* matches deeper wildcard nested path', checkWildcard('DigitalBrain.SDK.Storage.*'));
+  stdout.writeln(
+    '\n--- Testing Wildcard Parsing Boundaries in Creator Prompt ---',
+  );
+  assertTest(
+    'DigitalBrain.SDK.* matches wildcard boundary',
+    checkWildcard('DigitalBrain.SDK.*'),
+  );
+  assertTest(
+    'digitalbrain.sdk.* is case-insensitive and matches',
+    checkWildcard('digitalbrain.sdk.*'),
+  );
+  assertTest(
+    'DigitalBrain.SDK.Storage.* matches deeper wildcard nested path',
+    checkWildcard('DigitalBrain.SDK.Storage.*'),
+  );
   assertTest('Acme.* matches wildcard boundary', checkWildcard('Acme.*'));
-  assertTest('acme.Worker.* matches deeper nested wildcard path', checkWildcard('acme.Worker.*'));
-  assertTest('DB.Google.* should NOT match (unsupported prefix)', !checkWildcard('DB.Google.*'));
-  assertTest('DigitalBrain.SDK. (trailing dot but no *) should NOT match', !checkWildcard('DigitalBrain.SDK.'));
-  assertTest('DigitalBrain.SDK (no trailing dot or *) should NOT match', !checkWildcard('DigitalBrain.SDK'));
-  assertTest('Acme (no trailing dot or *) should NOT match', !checkWildcard('Acme'));
+  assertTest(
+    'acme.Worker.* matches deeper nested wildcard path',
+    checkWildcard('acme.Worker.*'),
+  );
+  assertTest(
+    'DB.Google.* should NOT match (unsupported prefix)',
+    !checkWildcard('DB.Google.*'),
+  );
+  assertTest(
+    'DigitalBrain.SDK. (trailing dot but no *) should NOT match',
+    !checkWildcard('DigitalBrain.SDK.'),
+  );
+  assertTest(
+    'DigitalBrain.SDK (no trailing dot or *) should NOT match',
+    !checkWildcard('DigitalBrain.SDK'),
+  );
+  assertTest(
+    'Acme (no trailing dot or *) should NOT match',
+    !checkWildcard('Acme'),
+  );
 
   // -------------------------------------------------------------
   // Test 3: Outbound Signals Regex Extraction under Stress Scenarios
   // -------------------------------------------------------------
   stdout.writeln('\n--- Testing Outbound Signals Extraction Regex ---');
-  
+
   // Base cases
-  assertTest('Matches standard on synapse', parseSynapses('on synapse(DB.Google.Auth)').contains('DB.Google.Auth'));
-  assertTest('Matches standard emit signal', parseSynapses('emit signal(DB.Google.Auth)').contains('DB.Google.Auth'));
-  assertTest('Matches standard fire synapse', parseSynapses('fire synapse(DB.Google.Auth)').contains('DB.Google.Auth'));
+  assertTest(
+    'Matches standard on synapse',
+    parseSynapses('on synapse(DB.Google.Auth)').contains('DB.Google.Auth'),
+  );
+  assertTest(
+    'Matches standard emit signal',
+    parseSynapses('emit signal(DB.Google.Auth)').contains('DB.Google.Auth'),
+  );
+  assertTest(
+    'Matches standard fire synapse',
+    parseSynapses('fire synapse(DB.Google.Auth)').contains('DB.Google.Auth'),
+  );
 
   // Spaces stress tests
-  assertTest('Handles spaces inside parenthesis: ( DB.Google.Auth )', 
-      parseSynapses('emit signal( DB.Google.Auth )').contains('DB.Google.Auth'));
-  assertTest('Handles excessive spaces around keywords: emit  signal  (DB.Google.Auth)', 
-      parseSynapses('emit  signal  (DB.Google.Auth)').contains('DB.Google.Auth'));
-  assertTest('Handles no spaces around keyword call: emit signal(DB.Google.Auth)', 
-      parseSynapses('emit signal(DB.Google.Auth)').contains('DB.Google.Auth'));
+  assertTest(
+    'Handles spaces inside parenthesis: ( DB.Google.Auth )',
+    parseSynapses('emit signal( DB.Google.Auth )').contains('DB.Google.Auth'),
+  );
+  assertTest(
+    'Handles excessive spaces around keywords: emit  signal  (DB.Google.Auth)',
+    parseSynapses('emit  signal  (DB.Google.Auth)').contains('DB.Google.Auth'),
+  );
+  assertTest(
+    'Handles no spaces around keyword call: emit signal(DB.Google.Auth)',
+    parseSynapses('emit signal(DB.Google.Auth)').contains('DB.Google.Auth'),
+  );
 
   // Line breaks
-  assertTest('Handles multiline synapse block syntax: emit\\n\\tsignal\\n\\t(DB.Google.Auth)', 
-      parseSynapses('emit\n\tsignal\n\t(DB.Google.Auth)').contains('DB.Google.Auth'));
+  assertTest(
+    'Handles multiline synapse block syntax: emit\\n\\tsignal\\n\\t(DB.Google.Auth)',
+    parseSynapses(
+      'emit\n\tsignal\n\t(DB.Google.Auth)',
+    ).contains('DB.Google.Auth'),
+  );
 
   // Duplicate FQNs
-  final duplicateParse = parseSynapses('emit signal(DB.Google.Auth); fire synapse(DB.Google.Auth);');
-  assertTest('Filters out duplicate FQNs', duplicateParse.length == 1 && duplicateParse.first == 'DB.Google.Auth');
+  final duplicateParse = parseSynapses(
+    'emit signal(DB.Google.Auth); fire synapse(DB.Google.Auth);',
+  );
+  assertTest(
+    'Filters out duplicate FQNs',
+    duplicateParse.length == 1 && duplicateParse.first == 'DB.Google.Auth',
+  );
 
   // Invalid spaces inside FQNs (should NOT match)
-  assertTest('Does not match invalid space in FQN: DB. Google.Auth', 
-      !parseSynapses('emit signal(DB. Google.Auth)').contains('DB. Google.Auth'));
+  assertTest(
+    'Does not match invalid space in FQN: DB. Google.Auth',
+    !parseSynapses('emit signal(DB. Google.Auth)').contains('DB. Google.Auth'),
+  );
 
   // Multiple parameters stress test
   // Note: the current regex matches strictly up to the closing parenthesis: \\s*\\)
   // If there are other arguments like true, or nested commas, let's see if it fails to extract or how it behaves.
   final multiParams = 'emit signal(DB.Google.Auth, true)';
   final multiParse = parseSynapses(multiParams);
-  assertTest('Multiple parameters check (current regex expects immediate closing parenthesis, hence should fail to extract FQN)', 
-      !multiParse.contains('DB.Google.Auth'));
+  assertTest(
+    'Multiple parameters check (current regex expects immediate closing parenthesis, hence should fail to extract FQN)',
+    !multiParse.contains('DB.Google.Auth'),
+  );
 
   // Summary
   stdout.writeln('\n=== SUMMARY ===');
   stdout.writeln('Total tests executed: $totalTests');
   stdout.writeln('Passed: $passedTests');
   stdout.writeln('Failed: ${totalTests - passedTests}');
-  
+
   if (passedTests == totalTests) {
     stdout.writeln('\nALL STRESS TESTS PASSED SUCCESSFULLY!');
     exit(0);

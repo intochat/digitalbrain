@@ -38,8 +38,8 @@ class ProtocolException extends TransportException {
 
 class PreconditionException extends ProtocolException {
   const PreconditionException([
-    String message = 'UI action is stale. Refresh and try again.',
-  ]) : super(message);
+    super.message = 'UI action is stale. Refresh and try again.',
+  ]);
 }
 
 class ScopeViolation extends ProtocolException {

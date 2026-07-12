@@ -50,7 +50,9 @@ Widget _stack(BuildContext c, DataSource s, Axis axis) {
     crossAxisAlignment: cross,
     mainAxisAlignment: main,
     mainAxisSize: MainAxisSize.min,
-    children: children.map((c) => Flexible(fit: FlexFit.loose, child: c)).toList(),
+    children: children
+        .map((c) => Flexible(fit: FlexFit.loose, child: c))
+        .toList(),
   );
   // A Row that stretches its children on the cross (vertical) axis needs a
   // bounded height. RFW content renders inside an unbounded scroll viewport,

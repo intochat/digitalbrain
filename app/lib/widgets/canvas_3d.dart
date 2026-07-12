@@ -22,10 +22,7 @@ class Atom3D {
 }
 
 class Bond3D {
-  const Bond3D({
-    required this.from,
-    required this.to,
-  });
+  const Bond3D({required this.from, required this.to});
 
   final int from;
   final int to;
@@ -49,7 +46,8 @@ class Canvas3DWidget extends StatefulWidget {
   State<Canvas3DWidget> createState() => _Canvas3DWidgetState();
 }
 
-class _Canvas3DWidgetState extends State<Canvas3DWidget> with SingleTickerProviderStateMixin {
+class _Canvas3DWidgetState extends State<Canvas3DWidget>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _spinController;
   double _yaw = 0.0;
   double _pitch = 0.0;
@@ -105,7 +103,9 @@ class _Canvas3DWidgetState extends State<Canvas3DWidget> with SingleTickerProvid
           animation: _spinController,
           builder: (context, child) {
             // Apply auto-spin to yaw based on spinSpeed
-            final currentYaw = _yaw + (_spinController.value * 2.0 * math.pi * widget.spinSpeed);
+            final currentYaw =
+                _yaw +
+                (_spinController.value * 2.0 * math.pi * widget.spinSpeed);
             return CustomPaint(
               size: Size.infinite,
               painter: _Canvas3DPainter(
@@ -178,7 +178,8 @@ class _Canvas3DPainter extends CustomPainter {
       // Paint an elegant empty message
       final textPainter = TextPainter(
         text: TextSpan(
-          text: 'Empty 3D Canvas ($sceneName)\nUse .ino scripts to load geometry',
+          text:
+              'Empty 3D Canvas ($sceneName)\nUse .ino scripts to load geometry',
           style: GoogleFonts.manrope(
             fontSize: 14,
             color: DigitalBrainColors.inkLow,
@@ -231,35 +232,40 @@ class _Canvas3DPainter extends CustomPainter {
 
     // Add bonds as projected items
     for (final b in bonds) {
-      if (b.from >= 0 && b.from < atoms.length && b.to >= 0 && b.to < atoms.length) {
+      if (b.from >= 0 &&
+          b.from < atoms.length &&
+          b.to >= 0 &&
+          b.to < atoms.length) {
         final avgDepth = (projZ[b.from] + projZ[b.to]) / 2;
-        drawItems.add(_ProjectedItem(avgDepth, (canvas, size) {
-          final p1 = Offset(projX[b.from], projY[b.from]);
-          final p2 = Offset(projX[b.to], projY[b.to]);
+        drawItems.add(
+          _ProjectedItem(avgDepth, (canvas, size) {
+            final p1 = Offset(projX[b.from], projY[b.from]);
+            final p2 = Offset(projX[b.to], projY[b.to]);
 
-          final paint = Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 6.0
-            ..strokeCap = StrokeCap.round
-            ..shader = LinearGradient(
-              colors: [
-                _resolveColor(atoms[b.from].colorName),
-                _resolveColor(atoms[b.to].colorName),
-              ],
-            ).createShader(Rect.fromPoints(p1, p2));
-
-          canvas.drawLine(p1, p2, paint);
-          // Highlight overlay for a premium glowing 3D vibe
-          canvas.drawLine(
-            p1,
-            p2,
-            Paint()
+            final paint = Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = 2.0
+              ..strokeWidth = 6.0
               ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.6),
-          );
-        }));
+              ..shader = LinearGradient(
+                colors: [
+                  _resolveColor(atoms[b.from].colorName),
+                  _resolveColor(atoms[b.to].colorName),
+                ],
+              ).createShader(Rect.fromPoints(p1, p2));
+
+            canvas.drawLine(p1, p2, paint);
+            // Highlight overlay for a premium glowing 3D vibe
+            canvas.drawLine(
+              p1,
+              p2,
+              Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 2.0
+                ..strokeCap = StrokeCap.round
+                ..color = Colors.white.withValues(alpha: 0.6),
+            );
+          }),
+        );
       }
     }
 
@@ -275,53 +281,50 @@ class _Canvas3DPainter extends CustomPainter {
       final r = a.radius * factor;
       final color = _resolveColor(a.colorName);
 
-      drawItems.add(_ProjectedItem(az, (canvas, size) {
-        final rect = Rect.fromCircle(center: Offset(ax, ay), radius: r);
-        
-        // Beautiful radial gradient shader to render the atom as a shiny 3D sphere
-        final paint = Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-0.35, -0.35), // light source offset
-            colors: [
-              Colors.white,
-              color,
-              color.withValues(alpha: 0.7),
-            ],
-            stops: const [0.0, 0.6, 1.0],
-          ).createShader(rect);
+      drawItems.add(
+        _ProjectedItem(az, (canvas, size) {
+          final rect = Rect.fromCircle(center: Offset(ax, ay), radius: r);
 
-        // Shadow glow
-        canvas.drawCircle(
-          Offset(ax, ay),
-          r + 3.0,
-          Paint()
-            ..color = color.withValues(alpha: 0.24)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
-        );
+          // Beautiful radial gradient shader to render the atom as a shiny 3D sphere
+          final paint = Paint()
+            ..shader = RadialGradient(
+              center: const Alignment(-0.35, -0.35), // light source offset
+              colors: [Colors.white, color, color.withValues(alpha: 0.7)],
+              stops: const [0.0, 0.6, 1.0],
+            ).createShader(rect);
 
-        canvas.drawCircle(Offset(ax, ay), r, paint);
+          // Shadow glow
+          canvas.drawCircle(
+            Offset(ax, ay),
+            r + 3.0,
+            Paint()
+              ..color = color.withValues(alpha: 0.24)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+          );
 
-        // Draw chemical symbol text cleanly in monospaced font
-        final textPainter = TextPainter(
-          text: TextSpan(
-            text: a.symbol,
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: r * 0.9,
-              fontWeight: FontWeight.w800,
-              color: a.colorName.toLowerCase() == 'white' ? Colors.grey.shade800 : Colors.white,
+          canvas.drawCircle(Offset(ax, ay), r, paint);
+
+          // Draw chemical symbol text cleanly in monospaced font
+          final textPainter = TextPainter(
+            text: TextSpan(
+              text: a.symbol,
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: r * 0.9,
+                fontWeight: FontWeight.w800,
+                color: a.colorName.toLowerCase() == 'white'
+                    ? Colors.grey.shade800
+                    : Colors.white,
+              ),
             ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        
-        textPainter.paint(
-          canvas,
-          Offset(
-            ax - textPainter.width / 2,
-            ay - textPainter.height / 2,
-          ),
-        );
-      }));
+            textDirection: TextDirection.ltr,
+          )..layout();
+
+          textPainter.paint(
+            canvas,
+            Offset(ax - textPainter.width / 2, ay - textPainter.height / 2),
+          );
+        }),
+      );
     }
 
     // 3. Sort draw items from back to front (Z-depth) and paint!

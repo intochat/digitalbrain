@@ -22,9 +22,8 @@ class LogRecord {
     required this.body,
     this.attributes = const {},
     DateTime? timestamp,
-  }) : timestampNano = (timestamp ?? DateTime.now())
-            .microsecondsSinceEpoch *
-        1000;
+  }) : timestampNano =
+           (timestamp ?? DateTime.now()).microsecondsSinceEpoch * 1000;
 
   final Severity severity;
   final String body;
@@ -79,9 +78,9 @@ class OtlpLogExporter {
             {
               'scope': {'name': serviceName, 'version': serviceVersion},
               'logRecords': batch.map(_recordToJson).toList(),
-            }
+            },
           ],
-        }
+        },
       ],
     };
 
@@ -109,7 +108,9 @@ class OtlpLogExporter {
       'severityText': r.severity.text,
       'body': {'stringValue': r.body},
       if (r.attributes.isNotEmpty)
-        'attributes': r.attributes.entries.map((e) => _attr(e.key, e.value)).toList(),
+        'attributes': r.attributes.entries
+            .map((e) => _attr(e.key, e.value))
+            .toList(),
     };
   }
 
@@ -130,18 +131,18 @@ class OtlpLogger {
   OtlpLogger(this._exporter);
   final OtlpLogExporter _exporter;
 
-  void trace(String msg, {Map<String, String> attrs = const {}}) =>
-      _exporter.emit(LogRecord(severity: Severity.trace, body: msg, attributes: attrs));
+  void trace(String msg, {Map<String, String> attrs = const {}}) => _exporter
+      .emit(LogRecord(severity: Severity.trace, body: msg, attributes: attrs));
 
-  void debug(String msg, {Map<String, String> attrs = const {}}) =>
-      _exporter.emit(LogRecord(severity: Severity.debug, body: msg, attributes: attrs));
+  void debug(String msg, {Map<String, String> attrs = const {}}) => _exporter
+      .emit(LogRecord(severity: Severity.debug, body: msg, attributes: attrs));
 
-  void info(String msg, {Map<String, String> attrs = const {}}) =>
-      _exporter.emit(LogRecord(severity: Severity.info, body: msg, attributes: attrs));
+  void info(String msg, {Map<String, String> attrs = const {}}) => _exporter
+      .emit(LogRecord(severity: Severity.info, body: msg, attributes: attrs));
 
-  void warn(String msg, {Map<String, String> attrs = const {}}) =>
-      _exporter.emit(LogRecord(severity: Severity.warn, body: msg, attributes: attrs));
+  void warn(String msg, {Map<String, String> attrs = const {}}) => _exporter
+      .emit(LogRecord(severity: Severity.warn, body: msg, attributes: attrs));
 
-  void error(String msg, {Map<String, String> attrs = const {}}) =>
-      _exporter.emit(LogRecord(severity: Severity.error, body: msg, attributes: attrs));
+  void error(String msg, {Map<String, String> attrs = const {}}) => _exporter
+      .emit(LogRecord(severity: Severity.error, body: msg, attributes: attrs));
 }

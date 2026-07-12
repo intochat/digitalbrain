@@ -28,7 +28,8 @@ class VoiceInput extends StatefulWidget {
   State<VoiceInput> createState() => _VoiceInputState();
 }
 
-class _VoiceInputState extends State<VoiceInput> with SingleTickerProviderStateMixin {
+class _VoiceInputState extends State<VoiceInput>
+    with SingleTickerProviderStateMixin {
   final AudioRecorder _recorder = AudioRecorder();
   bool _recording = false;
   bool _busy = false;
@@ -111,7 +112,9 @@ class _VoiceInputState extends State<VoiceInput> with SingleTickerProviderStateM
     } finally {
       if (mounted) setState(() => _busy = false);
       // Tidy up the temp recording. Errors deleting are non-fatal.
-      try { await File(path).delete(); } catch (_) {}
+      try {
+        await File(path).delete();
+      } catch (_) {}
     }
   }
 
@@ -160,7 +163,9 @@ class _VoiceInputState extends State<VoiceInput> with SingleTickerProviderStateM
       builder: (context, child) {
         final scale = 1.0 + (_pulseController.value * 0.15);
         final glowColor = _recording
-            ? Colors.redAccent.withValues(alpha: 0.3 * (1.0 - _pulseController.value))
+            ? Colors.redAccent.withValues(
+                alpha: 0.3 * (1.0 - _pulseController.value),
+              )
             : Colors.transparent;
 
         return Transform.scale(
@@ -190,11 +195,15 @@ class _VoiceInputState extends State<VoiceInput> with SingleTickerProviderStateM
                   ],
                 ),
                 child: Material(
-                  color: _recording ? Colors.redAccent.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
+                  color: _recording
+                      ? Colors.redAccent.withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.05),
                   type: MaterialType.circle,
                   clipBehavior: Clip.antiAlias,
                   child: IconButton(
-                    tooltip: _recording ? 'Tap to stop & transcribe' : 'Hold to speak',
+                    tooltip: _recording
+                        ? 'Tap to stop & transcribe'
+                        : 'Hold to speak',
                     onPressed: _toggle,
                     icon: Icon(
                       _recording ? Icons.stop : Icons.mic,
@@ -231,8 +240,10 @@ class LiquidWavePainter extends CustomPainter {
     for (int i = 0; i < 3; i++) {
       paint.color = color.withValues(alpha: 0.10 + (i * 0.10));
       final path = Path();
-      
-      final amplitude = (6.0 + i * 4.0) * (0.3 + 0.7 * math.sin(animationValue * math.pi * 2 + i));
+
+      final amplitude =
+          (6.0 + i * 4.0) *
+          (0.3 + 0.7 * math.sin(animationValue * math.pi * 2 + i));
       final frequency = 0.04 + i * 0.02;
       final phase = animationValue * math.pi * 2 + (i * math.pi / 3);
 
@@ -250,6 +261,7 @@ class LiquidWavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant LiquidWavePainter oldDelegate) {
-    return oldDelegate.animationValue != animationValue || oldDelegate.color != color;
+    return oldDelegate.animationValue != animationValue ||
+        oldDelegate.color != color;
   }
 }

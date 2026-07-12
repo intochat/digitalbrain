@@ -21,7 +21,14 @@ class LlmSettingsBus extends ChangeNotifier {
   bool get showSynapses => _showSynapses;
   bool get localAiMode => _localAiMode;
 
-  void update(String model, double temp, int attempts, bool replaceSpheresWithIcons, bool showSynapses, bool localAiMode) {
+  void update(
+    String model,
+    double temp,
+    int attempts,
+    bool replaceSpheresWithIcons,
+    bool showSynapses,
+    bool localAiMode,
+  ) {
     _model = model;
     _temp = temp;
     _attempts = attempts;

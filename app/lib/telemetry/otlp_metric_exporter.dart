@@ -4,11 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:digitalbrain_flutter/telemetry/export_circuit_breaker.dart';
 
 class SimpleCounter {
-  SimpleCounter({
-    required this.name,
-    this.unit = '',
-    this.description = '',
-  });
+  SimpleCounter({required this.name, this.unit = '', this.description = ''});
 
   final String name;
   final String unit;
@@ -24,17 +20,14 @@ class SimpleCounter {
   final Map<String, Map<String, String>> _latestAttrs = {};
 
   String _attrsKey(Map<String, String> attrs) {
-    final entries = attrs.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+    final entries = attrs.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
     return entries.map((e) => '${e.key}=${e.value}').join(',');
   }
 }
 
 class SimpleHistogram {
-  SimpleHistogram({
-    required this.name,
-    this.unit = '',
-    this.description = '',
-  });
+  SimpleHistogram({required this.name, this.unit = '', this.description = ''});
 
   final String name;
   final String unit;
@@ -53,7 +46,8 @@ class SimpleHistogram {
   }
 
   String _attrsKey(Map<String, String> attrs) {
-    final entries = attrs.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+    final entries = attrs.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
     return entries.map((e) => '${e.key}=${e.value}').join(',');
   }
 }
@@ -88,13 +82,21 @@ class OtlpMetricExporter {
 
   final _breaker = ExportCircuitBreaker();
 
-  SimpleCounter createCounter(String name, {String unit = '', String description = ''}) {
+  SimpleCounter createCounter(
+    String name, {
+    String unit = '',
+    String description = '',
+  }) {
     final c = SimpleCounter(name: name, unit: unit, description: description);
     _counters.add(c);
     return c;
   }
 
-  SimpleHistogram createHistogram(String name, {String unit = '', String description = ''}) {
+  SimpleHistogram createHistogram(
+    String name, {
+    String unit = '',
+    String description = '',
+  }) {
     final h = SimpleHistogram(name: name, unit: unit, description: description);
     _histograms.add(h);
     return h;
@@ -174,9 +176,9 @@ class OtlpMetricExporter {
             {
               'scope': {'name': serviceName, 'version': serviceVersion},
               'metrics': metrics,
-            }
+            },
           ],
-        }
+        },
       ],
     };
 
