@@ -62,9 +62,6 @@ public static class UiHostingExtensions
         services.AddSingleton(new UiDeliveryOptions(renewal, revalidation).Validate());
 
         services.AddSingleton<RuntimeSurfaceFeed>();
-        services.AddSingleton<IActiveConversationFeed>(services => services.GetRequiredService<RuntimeSurfaceFeed>());
-        services.AddSingleton<IConversationLifecycleState>(services => services.GetRequiredService<ConversationStateClient>());
-        services.AddSingleton<ConversationLifecycleCoordinator>();
         services.AddSingleton<SurfaceEnvelopeWriter>();
         services.AddSingleton<UiGrpcService>();
         services.AddHealthChecks().AddCheck<UiTransportHealthCheck>("runtime-ui-transport", tags: ["ready"]);

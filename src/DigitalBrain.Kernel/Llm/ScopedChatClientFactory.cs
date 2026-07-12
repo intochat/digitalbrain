@@ -81,14 +81,11 @@ internal static class DigitalBrainChatClients
 
 public static class DigitalBrainChatTelemetry
 {
-    public static IChatClient Wrap(IChatClient client) =>
+    public static IChatClient Wrap(IChatClient client, DigitalBrainChatPolicyOptions? policy = null) =>
         new ChatClientBuilder(client)
+            .Use(inner => new BoundedNoRetryChatClient(inner, policy ?? DigitalBrainChatPolicyOptions.Default))
             .UseOpenTelemetry(
                 sourceName: "DigitalBrain.Neuron",
-                configure: options => options.EnableSensitiveData =
-                    bool.TryParse(
-                        Environment.GetEnvironmentVariable("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"),
-                        out var enabled) &&
-                    enabled)
+                configure: options => options.EnableSensitiveData = false)
             .Build();
 }

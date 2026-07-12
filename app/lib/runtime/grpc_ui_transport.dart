@@ -492,9 +492,7 @@ TransportException _safeTransportError(Object error) {
         TransportErrorCode.permissionDenied,
         'UI action is no longer available.',
       ),
-      StatusCode.failedPrecondition => const ProtocolException(
-        'UI feed state was rejected.',
-      ),
+      StatusCode.failedPrecondition => const PreconditionException(),
       StatusCode.resourceExhausted => const TransportException(
         TransportErrorCode.invalidArgument,
         'UI request exceeded its size limit.',

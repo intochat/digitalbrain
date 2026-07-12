@@ -1,11 +1,13 @@
 extern alias McpProject;
 
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using Orleans.Runtime;
+using ConversationStateClient = McpProject::DigitalBrain.Mcp.ConversationStateClient;
 using RuntimeSurfaceFeed = McpProject::DigitalBrain.Mcp.RuntimeSurfaceFeed;
 using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
 
@@ -18,110 +20,62 @@ namespace DigitalBrain.Tests.Runtime;
 public sealed class RuntimeSurfaceFeedTests
 {
     [Fact]
-    public async Task PrepareSessionAsync_rematerializes_a_poisoned_surface_from_the_corrected_conversation_on_the_first_delivery()
+    public async Task ReadPage_returns_each_ordered_phase_even_when_the_home_surface_is_replaced()
     {
         var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var clock = new MutableTimeProvider(now);
         var context = Context();
         var conversationId = InoConversationIdentity.From(context);
 
-        // Simulates a surface projected before this fix, from a conversation turn that carried a raw
-        // (non-internal) Salesforce authorization URL -- the exact poisoned payload the Flutter decoder
-        // rejects (runtime_controller_test.dart's legacy-Salesforce-URL regression scenario).
-        var poisoned = new InoConversationSnapshot(
+        var accepted = new InoConversationSnapshot(
             conversationId,
             1,
-            [new InoConversationTurn("command-1", "assistant", "Connect Salesforce to continue.", InoConversationStates.Succeeded)],
+            [new InoConversationTurn("command-1", "user", "summarize the status", InoConversationStates.Queued)],
             [new InoConversationOperation(
+                "operation-1",
                 "command-1",
-                "connect salesforce",
-                InoConversationStates.Succeeded,
+                "summarize the status",
+                InoConversationStates.Queued,
                 null,
                 false,
-                now,
-                new ToolAction("openUrl", "Connect Salesforce", "https://login.salesforce.com/services/oauth2/authorize?raw=legacy"),
-                null,
-                null,
-                null)]);
+                now)]);
 
         var conversationNeuron = new FakeConversationNeuron(ConversationState.Empty());
         var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
         var cluster = new FakeClusterClient(conversationNeuron, surfaceFeedNeuron);
-        var feed = new RuntimeSurfaceFeed(cluster, TimeProvider.System);
+        var feed = new RuntimeSurfaceFeed(cluster, clock, ActionCapabilities(clock));
 
-        // Seed the durable surface with the poisoned projection, as if it were written before recovery
-        // corrected the conversation.
-        await feed.ProjectConversationAsync(context, poisoned, "poisoned-projection", now, CancellationToken.None);
+        await SeedConversationPhaseAsync(surfaceFeedNeuron, context, accepted, "phase-accepted", now);
+        await SeedConversationPhaseAsync(surfaceFeedNeuron, context, accepted with
+        {
+            Revision = 2,
+            Operations = [accepted.CurrentOperation! with { State = InoConversationStates.Running, Version = 2 }]
+        }, "phase-running", now);
+        await SeedConversationPhaseAsync(surfaceFeedNeuron, context, accepted with
+        {
+            Revision = 3,
+            Turns = [.. accepted.Turns, new InoConversationTurn("operation-1", "assistant", "The status is ready.", InoConversationStates.Succeeded)],
+            Operations = [accepted.CurrentOperation! with { State = InoConversationStates.Succeeded, Version = 3 }]
+        }, "phase-succeeded", now);
 
-        // Recovery neutralizes the conversation out-of-band (an append-only corrected revision) -- the
-        // already-persisted surface is not touched by that correction.
-        conversationNeuron.Current = BuildConversationState(
-            context, conversationId, revision: 4, assistantText: "Salesforce is already connected.", now);
+        var state = await feed.ReadAsync(context, CancellationToken.None);
+        var page = feed.ReadPage(context, state, 0, 100);
+
+        Assert.Single(state.CurrentSurfaces);
+        Assert.Equal([1L, 2L, 3L], page.Items.Select(item => item.Sequence));
+        Assert.Equal(3, page.Items.Count);
 
         var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        Assert.Equal(state.Revision, prepared.State.Revision);
+        Assert.Contains(ConversationSurfacePayload.SendBindingId, prepared.ActionTokens.Keys);
 
-        var home = prepared.State.CurrentSurfaces.Single(surface =>
-            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
-        var payloadText = Encoding.UTF8.GetString(home.PayloadUtf8);
-        Assert.Contains("Salesforce is already connected.", payloadText, StringComparison.Ordinal);
-        Assert.DoesNotContain("raw=legacy", payloadText, StringComparison.Ordinal);
-        Assert.DoesNotContain("login.salesforce.com", payloadText, StringComparison.Ordinal);
+        var ahead = feed.ReadPage(context, state, 99, 100);
+        Assert.True(ahead.ResetRequired);
+        Assert.Single(ahead.Items);
     }
 
     [Fact]
-    public async Task PrepareSessionAsync_rematerializes_a_legacy_surface_when_the_conversation_revision_is_unchanged()
-    {
-        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
-        var context = Context();
-        var conversationId = InoConversationIdentity.From(context);
-        var conversationNeuron = new FakeConversationNeuron(
-            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
-        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
-        var cluster = new FakeClusterClient(conversationNeuron, surfaceFeedNeuron);
-        var feed = new RuntimeSurfaceFeed(cluster, TimeProvider.System);
-
-        await feed.ProjectConversationAsync(
-            context,
-            InoConversationSnapshot.Empty(context),
-            "current-projection",
-            now,
-            CancellationToken.None);
-
-        using var legacyPayloadDocument = JsonDocument.Parse("""
-            {"data":{"action":{"target":"https://login.salesforce.com/services/oauth2/authorize?raw=legacy"}}}
-            """);
-        var legacyPresentation = new
-        {
-            context.CorrelationId,
-            CauseKind = "conversation",
-            CauseId = conversationId,
-            RequiredClientCapabilities = ConversationSurfacePayload.RequiredCapabilities,
-            Payload = legacyPayloadDocument.RootElement.Clone(),
-            ConversationRevision = 1
-        };
-        var home = surfaceFeedNeuron.Current.CurrentSurfaces.Single(surface =>
-            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
-        surfaceFeedNeuron.Current = surfaceFeedNeuron.Current with
-        {
-            CurrentSurfaces = surfaceFeedNeuron.Current.CurrentSurfaces.Select(surface =>
-                ReferenceEquals(surface, home)
-                    ? surface with { PayloadUtf8 = JsonSerializer.SerializeToUtf8Bytes(legacyPresentation) }
-                    : surface).ToArray()
-        };
-        conversationNeuron.Current = BuildConversationState(
-            context, conversationId, revision: 1, assistantText: "Salesforce is already connected.", now);
-
-        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
-
-        var rematerialized = prepared.State.CurrentSurfaces.Single(surface =>
-            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
-        var payloadText = Encoding.UTF8.GetString(rematerialized.PayloadUtf8);
-        Assert.Contains("Salesforce is already connected.", payloadText, StringComparison.Ordinal);
-        Assert.DoesNotContain("raw=legacy", payloadText, StringComparison.Ordinal);
-        Assert.DoesNotContain("login.salesforce.com", payloadText, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task PrepareSessionAsync_does_not_reproject_content_when_the_conversation_revision_is_unchanged()
+    public async Task PrepareSessionAsync_uses_the_typed_home_surface_transition_once_then_issues_read_only_action_capabilities()
     {
         var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
         var context = Context();
@@ -131,7 +85,7 @@ public sealed class RuntimeSurfaceFeedTests
             BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
         var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
         var cluster = new FakeClusterClient(conversationNeuron, surfaceFeedNeuron);
-        var feed = new RuntimeSurfaceFeed(cluster, TimeProvider.System);
+        var feed = new RuntimeSurfaceFeed(cluster, TimeProvider.System, ActionCapabilities());
 
         var first = await feed.PrepareSessionAsync(context, CancellationToken.None);
         var second = await feed.PrepareSessionAsync(context, CancellationToken.None);
@@ -143,6 +97,363 @@ public sealed class RuntimeSurfaceFeedTests
         Assert.Equal(
             Encoding.UTF8.GetString(firstHome.PayloadUtf8),
             Encoding.UTF8.GetString(secondHome.PayloadUtf8));
+        Assert.Equal(first.State.Revision, second.State.Revision);
+        Assert.Equal(first.State.LastSequence, second.State.LastSequence);
+        Assert.Equal(1, surfaceFeedNeuron.HomeSurfaceTransitions);
+        Assert.Equal(0, surfaceFeedNeuron.GenericProjectionCalls);
+    }
+
+    [Fact]
+    public void EnsureHomeSurface_rejects_a_canonical_conversation_id_from_another_scope()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var state = SurfaceFeedTransitions.Initialize(
+            SurfaceFeedState.Empty(),
+            0,
+            new SurfaceFeedIdentity(context.TenantId, context.WorkspaceId, context.Principal));
+        var expectedConversationId = InoConversationIdentity.From(context);
+        var wrongConversationId = expectedConversationId[..^1] +
+                                  (expectedConversationId[^1] == 'a' ? "b" : "a");
+
+        var exception = Assert.Throws<ArgumentException>(() => SurfaceFeedTransitions.EnsureHomeSurface(
+            state,
+            state.Revision,
+            new HomeSurfaceBootstrap("bootstrap-other-scope", wrongConversationId, "request-bootstrap", now)));
+
+        Assert.Equal("bootstrap", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task PrepareSessionAsync_renews_an_expired_durable_action_binding_without_projecting_a_new_surface()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var clock = new MutableTimeProvider(now);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            clock,
+            ActionCapabilities(clock));
+
+        var initial = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var initialSurface = initial.State.CurrentSurfaces.Single(surface =>
+            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var initialBinding = initial.State.ActionBindings.Single(binding =>
+            string.Equals(binding.BindingId, ConversationSurfacePayload.SendBindingId, StringComparison.Ordinal));
+        clock.UtcNow = initialBinding.ExpiresAt.AddSeconds(1);
+
+        var renewed = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var renewedSurface = renewed.State.CurrentSurfaces.Single(surface =>
+            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var renewedBinding = renewed.State.ActionBindings.Single(binding =>
+            string.Equals(binding.BindingId, ConversationSurfacePayload.SendBindingId, StringComparison.Ordinal));
+
+        Assert.True(renewedBinding.ExpiresAt > clock.UtcNow);
+        Assert.True(renewed.State.Revision > initial.State.Revision);
+        Assert.Equal(initial.State.LastSequence, renewed.State.LastSequence);
+        Assert.Equal(initialSurface.SurfaceRevision, renewedSurface.SurfaceRevision);
+        Assert.True(renewed.ActionTokens.ContainsKey(ConversationSurfacePayload.SendBindingId));
+
+        var authorized = await feed.AuthorizeActionAsync(
+            context,
+            ConversationSurfacePayload.SendBindingId,
+            renewed.ActionTokens[ConversationSurfacePayload.SendBindingId].Token,
+            renewedSurface.SurfaceId,
+            renewedSurface.SurfaceRevision,
+            JsonSerializer.SerializeToElement(new { prompt = "Hello" }),
+            CancellationToken.None);
+
+        Assert.Equal(ConversationSurfacePayload.SendActionType, authorized.Submission.ActionType);
+    }
+
+    [Fact]
+    public async Task AuthorizeActionAsync_reports_wrong_revision_when_an_obsolete_surface_binding_was_pruned()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(new FakeClusterClient(conversationNeuron, surfaceFeedNeuron), TimeProvider.System, ActionCapabilities());
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var obsoleteSurface = prepared.State.CurrentSurfaces.Single(surface =>
+            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var obsoleteToken = prepared.ActionTokens[ConversationSurfacePayload.SendBindingId].Token;
+        await surfaceFeedNeuron.ApplyProjectionAsync(
+            prepared.State.Revision,
+            new SurfaceFeedProjection(
+                "prune-obsolete-send-binding",
+                obsoleteSurface.SurfaceId,
+                checked(obsoleteSurface.SurfaceRevision + 1),
+                obsoleteSurface.ContentHash,
+                obsoleteSurface.PayloadUtf8,
+                now.AddSeconds(1),
+                null,
+                []),
+            now.AddSeconds(1));
+
+        var exception = await Assert.ThrowsAsync<ActionRejectedException>(() => feed.AuthorizeActionAsync(
+            context,
+            ConversationSurfacePayload.SendBindingId,
+            obsoleteToken,
+            obsoleteSurface.SurfaceId,
+            obsoleteSurface.SurfaceRevision,
+            JsonSerializer.SerializeToElement(new { prompt = "Hello" }),
+            CancellationToken.None));
+
+        Assert.Equal(ActionRejection.WrongRevision, exception.Reason);
+    }
+
+    [Fact]
+    public async Task AuthorizeActionAsync_replays_the_same_signed_client_submission_without_a_second_consumption()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(new FakeClusterClient(conversationNeuron, surfaceFeedNeuron), TimeProvider.System, ActionCapabilities());
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var surface = prepared.State.CurrentSurfaces.Single(candidate =>
+            string.Equals(candidate.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var token = prepared.ActionTokens[ConversationSurfacePayload.SendBindingId].Token;
+        var input = JsonSerializer.SerializeToElement(new
+        {
+            prompt = "Hello",
+            clientSubmissionId = "client-submission-000000000000000000000001"
+        });
+
+        var first = await feed.AuthorizeActionAsync(
+            context,
+            ConversationSurfacePayload.SendBindingId,
+            token,
+            surface.SurfaceId,
+            surface.SurfaceRevision,
+            input,
+            CancellationToken.None);
+        var replay = await feed.AuthorizeActionAsync(
+            context,
+            ConversationSurfacePayload.SendBindingId,
+            token,
+            surface.SurfaceId,
+            surface.SurfaceRevision,
+            input,
+            CancellationToken.None);
+
+        Assert.Equal(first.Submission.OperationId, replay.Submission.OperationId);
+        Assert.Equal(1, surfaceFeedNeuron.Current.ActionBindings.Single(binding =>
+            string.Equals(binding.BindingId, ConversationSurfacePayload.SendBindingId, StringComparison.Ordinal)).Uses);
+    }
+
+    [Fact]
+    public async Task AuthorizeActionAsync_rejects_a_tampered_signed_capability_without_consuming_the_binding()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(new FakeClusterClient(conversationNeuron, surfaceFeedNeuron), TimeProvider.System, ActionCapabilities());
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var surface = prepared.State.CurrentSurfaces.Single(candidate =>
+            string.Equals(candidate.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var token = prepared.ActionTokens[ConversationSurfacePayload.SendBindingId].Token;
+
+        var exception = await Assert.ThrowsAsync<ActionRejectedException>(() => feed.AuthorizeActionAsync(
+            context,
+            ConversationSurfacePayload.SendBindingId,
+            token[..^1] + (token[^1] == 'A' ? "B" : "A"),
+            surface.SurfaceId,
+            surface.SurfaceRevision,
+            JsonSerializer.SerializeToElement(new { prompt = "Hello" }),
+            CancellationToken.None));
+
+        Assert.Equal(ActionRejection.Forged, exception.Reason);
+        Assert.Equal(0, surfaceFeedNeuron.Current.ActionBindings.Single(binding =>
+            string.Equals(binding.BindingId, ConversationSurfacePayload.SendBindingId, StringComparison.Ordinal)).Uses);
+    }
+
+    [Fact]
+    public async Task AuthorizeActionAsync_treats_a_missing_current_binding_as_stale()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(new FakeClusterClient(conversationNeuron, surfaceFeedNeuron), TimeProvider.System, ActionCapabilities());
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var previous = prepared.State.CurrentSurfaces.Single(surface =>
+            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var token = prepared.ActionTokens[ConversationSurfacePayload.SendBindingId].Token;
+        var current = await surfaceFeedNeuron.ApplyProjectionAsync(
+            prepared.State.Revision,
+            new SurfaceFeedProjection(
+                "remove-send-binding",
+                previous.SurfaceId,
+                checked(previous.SurfaceRevision + 1),
+                previous.ContentHash,
+                previous.PayloadUtf8,
+                now.AddSeconds(1),
+                null,
+                []),
+            now.AddSeconds(1));
+        var currentSurface = current.CurrentSurfaces.Single(surface =>
+            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+
+        var exception = await Assert.ThrowsAsync<ActionRejectedException>(() => feed.AuthorizeActionAsync(
+            context,
+            ConversationSurfacePayload.SendBindingId,
+            token,
+            currentSurface.SurfaceId,
+            currentSurface.SurfaceRevision,
+            JsonSerializer.SerializeToElement(new { prompt = "Hello" }),
+            CancellationToken.None));
+
+        Assert.Equal(ActionRejection.WrongRevision, exception.Reason);
+    }
+
+    [Fact]
+    public async Task AuthorizeActionAsync_treats_an_expired_binding_as_stale()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var clock = new MutableTimeProvider(now);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            clock,
+            ActionCapabilities(clock));
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var surface = prepared.State.CurrentSurfaces.Single(candidate =>
+            string.Equals(candidate.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var token = prepared.ActionTokens[ConversationSurfacePayload.SendBindingId].Token;
+        clock.UtcNow = now.Add(UiProtocol.ActionTokenLifetime).AddSeconds(1);
+
+        var exception = await Assert.ThrowsAsync<ActionRejectedException>(() => feed.AuthorizeActionAsync(
+            context,
+            ConversationSurfacePayload.SendBindingId,
+            token,
+            surface.SurfaceId,
+            surface.SurfaceRevision,
+            JsonSerializer.SerializeToElement(new { prompt = "Hello" }),
+            CancellationToken.None));
+
+        Assert.Equal(ActionRejection.WrongRevision, exception.Reason);
+    }
+
+    [Fact]
+    public async Task AuthorizeActionAsync_rejects_an_approval_for_an_operation_not_rendered_by_the_signed_surface()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var clock = new MutableTimeProvider(now);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversation = BuildAwaitingApprovalState(context, conversationId, now);
+        var conversationNeuron = new FakeConversationNeuron(conversation);
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(new FakeClusterClient(conversationNeuron, surfaceFeedNeuron), clock, ActionCapabilities(clock));
+
+        await SeedConversationPhaseAsync(
+            surfaceFeedNeuron,
+            context,
+            ConversationStateClient.ToSnapshot(context with { ConversationId = conversationId }, conversation),
+            "awaiting-approval-phase",
+            now);
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var surface = prepared.State.CurrentSurfaces.Single(candidate =>
+            string.Equals(candidate.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        var approvalToken = prepared.ActionTokens[ConversationSurfacePayload.ApprovalBindingId].Token;
+
+        var exception = await Assert.ThrowsAsync<ActionRejectedException>(() => feed.AuthorizeActionAsync(
+            context,
+            ConversationSurfacePayload.ApprovalBindingId,
+            approvalToken,
+            surface.SurfaceId,
+            surface.SurfaceRevision,
+            JsonSerializer.SerializeToElement(new
+            {
+                operationId = "operation-earlier",
+                approvalId = "approval-earlier",
+                decision = "approve",
+                clientDecisionId = "ui-decision-000000000000000000000000"
+            }),
+            CancellationToken.None));
+
+        Assert.Equal(ActionRejection.PolicyDenied, exception.Reason);
+        Assert.Equal(0, surfaceFeedNeuron.Current.ActionBindings.Single(binding =>
+            string.Equals(binding.BindingId, ConversationSurfacePayload.ApprovalBindingId, StringComparison.Ordinal)).Uses);
+    }
+
+    private static async Task SeedConversationPhaseAsync(
+        FakeSurfaceFeedNeuron feed,
+        RuntimeRequestContext context,
+        InoConversationSnapshot conversation,
+        string projectionId,
+        DateTimeOffset now)
+    {
+        var state = feed.Current;
+        if (state.Identity is null)
+            state = await feed.InitializeAsync(
+                state.Revision,
+                new SurfaceFeedIdentity(context.TenantId, context.WorkspaceId, context.Principal));
+        var descriptors = ConversationSurfacePayload.Actions(conversation, now);
+        var payload = ConversationSurfacePayload.Build(conversation);
+        var revision = checked((state.CurrentSurfaces.FirstOrDefault(surface =>
+            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal))?.SurfaceRevision ?? 0) + 1);
+        var bindings = descriptors.Select(descriptor => new SurfaceActionBinding(
+            descriptor.BindingId,
+            ConversationSurfacePayload.HomeSurfaceId,
+            revision,
+            descriptor.ActionType,
+            descriptor.InputSchemaRef,
+            descriptor.RequiredGrant,
+            descriptor.ActionSchemaVersion,
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(projectionId + "\0" + descriptor.BindingId))),
+            descriptor.MaxUses,
+            0,
+            descriptor.ExpiresAt,
+            null,
+            null)).ToArray();
+        var persisted = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            CorrelationId = "request-" + projectionId,
+            CauseKind = "conversation",
+            CauseId = conversation.ConversationId,
+            RequiredClientCapabilities = ConversationSurfacePayload.RequiredCapabilities,
+            Payload = payload,
+            ConversationRevision = conversation.Revision,
+            PresentationVersion = 2
+        });
+        await feed.ApplyProjectionAsync(
+            state.Revision,
+            new SurfaceFeedProjection(
+                projectionId,
+                ConversationSurfacePayload.HomeSurfaceId,
+                revision,
+                SurfaceContentHash.Compute(payload, descriptors),
+                persisted,
+                now,
+                null,
+                bindings),
+            now);
     }
 
     private static RuntimeRequestContext Context() => new(
@@ -154,6 +465,16 @@ public sealed class RuntimeSurfaceFeedTests
         "correlation",
         null,
         new HashSet<string>(["ui.action"], StringComparer.Ordinal));
+
+    private static SessionTokenService ActionCapabilities(TimeProvider? timeProvider = null) =>
+        new(Enumerable.Repeat((byte)3, 32).ToArray(), timeProvider ?? TimeProvider.System);
+
+    private sealed class MutableTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; set; } = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
+    }
 
     private static ConversationState BuildConversationState(
         RuntimeRequestContext context, string conversationId, long revision, string assistantText, DateTimeOffset now) => new(
@@ -171,6 +492,47 @@ public sealed class RuntimeSurfaceFeedTests
         null,
         []);
 
+    private static ConversationState BuildAwaitingApprovalState(
+        RuntimeRequestContext context,
+        string conversationId,
+        DateTimeOffset now) => new(
+        RuntimeStateSchemas.Conversation,
+        2,
+        ConversationLifecycle.Active,
+        new ConversationIdentity(context.TenantId, context.WorkspaceId, context.Principal, conversationId),
+        [],
+        [],
+        [
+            AwaitingApprovalOperation("operation-earlier", "approval-earlier", now),
+            AwaitingApprovalOperation("operation-current", "approval-current", now)
+        ],
+        [],
+        null,
+        null,
+        []);
+
+    private static ConversationOperation AwaitingApprovalOperation(string operationId, string approvalId, DateTimeOffset now) => new(
+        operationId,
+        "command-" + operationId,
+        ConversationOperationStatus.AwaitingApproval,
+        1,
+        null,
+        null,
+        null,
+        ConversationTerminalPolicy.ManualIntervention,
+        null,
+        null,
+        now,
+        Version: 1,
+        RequestId: "request-" + operationId,
+        Approval: new ApprovalRecord(
+            approvalId,
+            operationId,
+            "effect-" + operationId,
+            "requested",
+            1,
+            now));
+
     private sealed class FakeConversationNeuron(ConversationState initial) : IConversationNeuron
     {
         public ConversationState Current { get; set; } = initial;
@@ -182,54 +544,56 @@ public sealed class RuntimeSurfaceFeedTests
         public Task<ConversationState> InitializeAsync(long expectedRevision, ConversationIdentity identity) =>
             throw new NotSupportedException();
         public Task<ConversationState> BeginOperationAsync(
-            long expectedRevision, string commandId, string inputHash, string operationId, string userText, DateTimeOffset createdAt) =>
-            throw new NotSupportedException();
-        public Task<ConversationState> AppendTurnAsync(
-            long expectedRevision, string commandId, string inputHash, string operationId, string role, string text, DateTimeOffset createdAt) =>
-            throw new NotSupportedException();
-        public Task<ConversationState> PutOperationAsync(long expectedRevision, ConversationOperation operation) =>
-            throw new NotSupportedException();
-        public Task<ConversationState> AppendAssistantTurnAsync(
-            long expectedRevision, string operationId, string text, DateTimeOffset createdAt) =>
+            long expectedRevision, string commandId, string inputHash, string operationId, string userText, string requestId,
+            ConversationOutboxEntry acceptedOutbox, DateTimeOffset createdAt) =>
             throw new NotSupportedException();
         public Task<ConversationClaim> TryClaimOperationAsync(
-            long expectedRevision, string operationId, string leaseOwner, DateTimeOffset now, TimeSpan leaseDuration) =>
+            long expectedRevision, string operationId, string leaseOwner, DateTimeOffset now, TimeSpan leaseDuration,
+            ConversationOutboxEntry? runningOutbox = null) =>
             throw new NotSupportedException();
         public Task<ConversationClaim> TryClaimAuthorizationAsync(
-            long expectedRevision, string operationId, string authorizationAttemptId, string leaseOwner, DateTimeOffset now, TimeSpan leaseDuration) =>
-            throw new NotSupportedException();
-        public Task<ConversationState> SuspendAuthorizationAsync(
-            long expectedRevision, string operationId, SuspendedInvocation invocation, DateTimeOffset now) =>
+            long expectedRevision, string operationId, string authorizationAttemptId, string leaseOwner, DateTimeOffset now,
+            TimeSpan leaseDuration, ConversationOutboxEntry? runningOutbox = null) =>
             throw new NotSupportedException();
         public Task<ConversationState> SuspendAuthorizationWithAssistantAsync(
             long expectedRevision, string operationId, SuspendedInvocation invocation, string assistantText,
-            ConversationOutboxEntry feedOutbox, DateTimeOffset now) =>
+            ConversationOutboxEntry feedOutbox, DateTimeOffset now, ConversationLeaseFence? leaseFence = null) =>
+            throw new NotSupportedException();
+        public Task<ConversationState> RequestApprovalWithAssistantAsync(
+            long expectedRevision, string operationId, ApprovalRecord approval, EffectRecord effect,
+            string assistantText, ConversationOutboxEntry feedOutbox, DateTimeOffset now,
+            WorkflowReference? workflow = null, ConversationLeaseFence? leaseFence = null) =>
+            throw new NotSupportedException();
+        public Task<ConversationState> DecideApprovalWithAssistantAsync(
+            long expectedRevision, string operationId, string approvalId, bool approved, string decisionId, string decidedBy,
+            string assistantText, ConversationOutboxEntry feedOutbox, DateTimeOffset now) =>
             throw new NotSupportedException();
         public Task<ConversationState> ScheduleRetryAsync(
-            long expectedRevision, string operationId, DateTimeOffset nextAttemptAt, string safeReason, DateTimeOffset now) =>
-            throw new NotSupportedException();
-        public Task<ConversationState> CompleteOperationAsync(
-            long expectedRevision, string operationId, ConversationOperationStatus terminalStatus,
-            ConversationTerminalPolicy terminalPolicy, string? safeReason, DateTimeOffset now) =>
+            long expectedRevision, string operationId, DateTimeOffset nextAttemptAt, string safeReason,
+            DateTimeOffset now, ConversationOutboxEntry? retryOutbox = null, ConversationLeaseFence? leaseFence = null) =>
             throw new NotSupportedException();
         public Task<ConversationState> CompleteWithAssistantAsync(
             long expectedRevision, string operationId, ConversationOperationStatus terminalStatus,
             ConversationTerminalPolicy terminalPolicy, string? safeReason, string assistantText,
-            ConversationOutboxEntry feedOutbox, DateTimeOffset now) =>
+            ConversationOutboxEntry feedOutbox, DateTimeOffset now, WorkflowReference? workflow = null,
+            ConversationLeaseFence? leaseFence = null) =>
             throw new NotSupportedException();
-        public Task<ConversationState> EnqueueOutboxAsync(long expectedRevision, ConversationOutboxEntry entry) =>
+        public Task<ConversationState> CompleteEffectWithAssistantAsync(
+            long expectedRevision, string operationId, EffectRecord effect, ConversationOperationStatus terminalStatus,
+            ConversationTerminalPolicy terminalPolicy, string? safeReason, string assistantText,
+            ConversationOutboxEntry feedOutbox, DateTimeOffset now, ConversationLeaseFence? leaseFence = null) =>
             throw new NotSupportedException();
         public Task<ConversationState> MarkOutboxDispatchedAsync(long expectedRevision, string outboxId, DateTimeOffset dispatchedAt) =>
             throw new NotSupportedException();
         public Task<ConversationState> RecordMigrationAsync(long expectedRevision, string migrationId) =>
-            throw new NotSupportedException();
-        public Task<ConversationState> TombstoneAsync(long expectedRevision, DateTimeOffset deletedAt, string reason) =>
             throw new NotSupportedException();
     }
 
     private sealed class FakeSurfaceFeedNeuron(SurfaceFeedState initial) : ISurfaceFeedNeuron
     {
         public SurfaceFeedState Current { get; set; } = initial;
+        public int GenericProjectionCalls { get; private set; }
+        public int HomeSurfaceTransitions { get; private set; }
 
         public Task<SurfaceFeedState> ReadAsync() => Task.FromResult(Current);
 
@@ -239,8 +603,16 @@ public sealed class RuntimeSurfaceFeedTests
             return Task.FromResult(Current);
         }
 
+        public Task<SurfaceFeedState> EnsureHomeSurfaceAsync(long expectedRevision, HomeSurfaceBootstrap bootstrap)
+        {
+            HomeSurfaceTransitions++;
+            Current = SurfaceFeedTransitions.EnsureHomeSurface(Current, expectedRevision, bootstrap);
+            return Task.FromResult(Current);
+        }
+
         public Task<SurfaceFeedState> ApplyProjectionAsync(long expectedRevision, SurfaceFeedProjection projection, DateTimeOffset now)
         {
+            GenericProjectionCalls++;
             Current = SurfaceFeedTransitions.ApplyProjection(Current, expectedRevision, projection, now);
             return Task.FromResult(Current);
         }
@@ -253,8 +625,24 @@ public sealed class RuntimeSurfaceFeedTests
         public Task<SurfaceFeedState> RevokeSessionAsync(long expectedRevision, string sessionScopeHash, DateTimeOffset now) =>
             throw new NotSupportedException();
         public Task<SurfaceActionConsumption> ConsumeActionAsync(
-            long expectedRevision, string bindingId, string tokenHash, string idempotencyKey, string operationId, DateTimeOffset now) =>
-            throw new NotSupportedException();
+            long expectedRevision, string bindingId, string tokenHash, string idempotencyKey, string operationId, DateTimeOffset now)
+        {
+            var consumption = SurfaceFeedTransitions.ConsumeAction(
+                Current,
+                expectedRevision,
+                bindingId,
+                tokenHash,
+                idempotencyKey,
+                operationId,
+                now);
+            Current = consumption.State;
+            return Task.FromResult(consumption);
+        }
+        public Task<SurfaceFeedState> RenewActionBindingsAsync(long expectedRevision, DateTimeOffset now)
+        {
+            Current = SurfaceFeedTransitions.RenewActionBindings(Current, expectedRevision, now);
+            return Task.FromResult(Current);
+        }
         public Task<SurfaceFeedState> RebuildAsync(long expectedRevision, string projectionId, DateTimeOffset now) =>
             throw new NotSupportedException();
     }

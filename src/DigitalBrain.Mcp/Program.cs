@@ -37,22 +37,8 @@ var mcpAudience = SessionAudiences.RequireFixedMcp(builder.Configuration["Digita
 builder.Services.AddSingleton(new SchemaRegistry([
     new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
     new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true)]));
-builder.Services.AddSingleton(new ToolActionPolicy());
 builder.Services.AddSingleton<ConversationStateClient>();
-builder.Services.AddSingleton<IInoConversationStore>(services => services.GetRequiredService<ConversationStateClient>());
-builder.Services.AddSingleton<IContextAssembler, McpConversationContextAssembler>();
-builder.Services.AddSingleton<ISemanticIntentResolver, McpSemanticIntentResolver>();
-builder.Services.AddSingleton<IIntentCapabilityPlanner, McpIntegrationPlanner>();
-builder.Services.AddSingleton<IModelRouter, McpConversationModelRouter>();
-builder.Services.AddSingleton<IMcpIntegrationToolGateway, McpIntegrationToolGateway>();
-builder.Services.AddSingleton<IAuthorizedToolCatalog, McpAuthorizedToolCatalog>();
-builder.Services.AddSingleton<IResponseSurfaceComposer, McpResponseComposer>();
-builder.Services.AddSingleton<ConversationOwner>();
 builder.Services.AddSingleton<McpInoCommandHandler>();
-builder.Services.AddSingleton<ConversationOutboxDispatcher>();
-builder.Services.AddSingleton<ConversationRecoveryWorker>();
-builder.Services.AddSingleton<IExternalAuthorizationProbe, OrleansExternalAuthorizationProbe>();
-builder.Services.AddSingleton<ConversationAuthorizationResumer>();
 builder.Services.AddSingleton(AuthorizationFlowProxyOptions.FromConfiguration(builder.Configuration, profile));
 builder.Services.AddHttpClient<AuthorizationFlowStartProxy>()
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler

@@ -156,13 +156,8 @@ public class ChatClientRegistrationTests
         Assert.NotNull(sp.GetService<IChatClient>());
     }
 
-    [Theory]
-    [InlineData(null, false)]
-    [InlineData("", false)]
-    [InlineData("not-a-boolean", false)]
-    [InlineData("false", false)]
-    [InlineData("true", true)]
-    public async Task ChatTelemetryHonorsStandardMessageCaptureEnvironmentVariable(string? configured, bool expected)
+    [Fact]
+    public async Task ChatTelemetry_never_captures_message_content_even_when_the_standard_environment_variable_is_enabled()
     {
         const string environmentVariable = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT";
         const string prompt = "telemetry-secret-prompt";
@@ -170,7 +165,7 @@ public class ChatClientRegistrationTests
 
         try
         {
-            Environment.SetEnvironmentVariable(environmentVariable, configured);
+            Environment.SetEnvironmentVariable(environmentVariable, "true");
             var stopped = new List<Activity>();
             using var listener = new ActivityListener
             {
@@ -188,8 +183,8 @@ public class ChatClientRegistrationTests
                 activity.Tags.Select(static tag => $"{tag.Key}={tag.Value}")
                     .Concat(activity.Events.SelectMany(static activityEvent => activityEvent.Tags.Select(tag =>
                         $"{activityEvent.Name}:{tag.Key}={tag.Value}")))));
-            Assert.Equal(expected, telemetry.Contains(prompt, StringComparison.Ordinal));
-            Assert.Equal(expected, telemetry.Contains("telemetry-response", StringComparison.Ordinal));
+            Assert.DoesNotContain(prompt, telemetry, StringComparison.Ordinal);
+            Assert.DoesNotContain("telemetry-response", telemetry, StringComparison.Ordinal);
         }
         finally
         {

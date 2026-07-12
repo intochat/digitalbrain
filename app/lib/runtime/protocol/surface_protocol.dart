@@ -280,18 +280,26 @@ enum InoConversationTurnState {
   queued,
   running,
   responding,
+  awaitingApproval,
   awaitingAuthorization,
+  retryScheduled,
   succeeded,
-  failed;
+  failed,
+  outcomeUnknown,
+  cancelled;
 
   String get wire => switch (this) {
     sending => 'sending',
     queued => 'queued',
     running => 'running',
     responding => 'responding',
+    awaitingApproval => 'awaiting-approval',
     awaitingAuthorization => 'awaiting-authorization',
+    retryScheduled => 'retry-scheduled',
     succeeded => 'succeeded',
     failed => 'failed',
+    outcomeUnknown => 'outcome-unknown',
+    cancelled => 'cancelled',
   };
 
   static InoConversationTurnState fromWire(String value) => switch (value) {
@@ -299,9 +307,13 @@ enum InoConversationTurnState {
     'queued' => queued,
     'running' => running,
     'responding' => responding,
+    'awaiting-approval' => awaitingApproval,
     'awaiting-authorization' => awaitingAuthorization,
+    'retry-scheduled' => retryScheduled,
     'succeeded' => succeeded,
     'failed' => failed,
+    'outcome-unknown' => outcomeUnknown,
+    'cancelled' => cancelled,
     _ => throw FormatException(
       'Unsupported INO conversation turn state "$value".',
     ),
@@ -312,31 +324,96 @@ enum InoConversationOperationState {
   queued,
   running,
   responding,
+  awaitingApproval,
   awaitingAuthorization,
+  retryScheduled,
   succeeded,
-  failed;
+  failed,
+  outcomeUnknown,
+  cancelled;
 
   String get wire => switch (this) {
     queued => 'queued',
     running => 'running',
     responding => 'responding',
+    awaitingApproval => 'awaiting-approval',
     awaitingAuthorization => 'awaiting-authorization',
+    retryScheduled => 'retry-scheduled',
     succeeded => 'succeeded',
     failed => 'failed',
+    outcomeUnknown => 'outcome-unknown',
+    cancelled => 'cancelled',
   };
 
-  bool get isTerminal => this == succeeded || this == failed;
+  bool get isTerminal =>
+      this == succeeded ||
+      this == failed ||
+      this == outcomeUnknown ||
+      this == cancelled;
 
   static InoConversationOperationState fromWire(String value) =>
       switch (value) {
         'queued' => queued,
         'running' => running,
         'responding' => responding,
+        'awaiting-approval' => awaitingApproval,
         'awaiting-authorization' => awaitingAuthorization,
+        'retry-scheduled' => retryScheduled,
         'succeeded' => succeeded,
         'failed' => failed,
+        'outcome-unknown' => outcomeUnknown,
+        'cancelled' => cancelled,
         _ => throw FormatException(
           'Unsupported INO conversation operation state "$value".',
+        ),
+      };
+}
+
+enum InoConversationOperationPhase {
+  accepted,
+  queued,
+  running,
+  awaitingApproval,
+  approved,
+  applyingEffect,
+  awaitingAuthorization,
+  retryScheduled,
+  succeeded,
+  failed,
+  outcomeUnknown,
+  cancelled;
+
+  String get wire => switch (this) {
+    accepted => 'accepted',
+    queued => 'queued',
+    running => 'running',
+    awaitingApproval => 'awaiting-approval',
+    approved => 'approved',
+    applyingEffect => 'applying-effect',
+    awaitingAuthorization => 'awaiting-authorization',
+    retryScheduled => 'retry-scheduled',
+    succeeded => 'succeeded',
+    failed => 'failed',
+    outcomeUnknown => 'outcome-unknown',
+    cancelled => 'cancelled',
+  };
+
+  static InoConversationOperationPhase fromWire(String value) =>
+      switch (value) {
+        'accepted' => accepted,
+        'queued' => queued,
+        'running' => running,
+        'awaiting-approval' => awaitingApproval,
+        'approved' => approved,
+        'applying-effect' => applyingEffect,
+        'awaiting-authorization' => awaitingAuthorization,
+        'retry-scheduled' => retryScheduled,
+        'succeeded' => succeeded,
+        'failed' => failed,
+        'outcome-unknown' => outcomeUnknown,
+        'cancelled' => cancelled,
+        _ => throw FormatException(
+          'Unsupported INO conversation operation phase "$value".',
         ),
       };
 }
@@ -392,14 +469,22 @@ class InoConversationOperation {
   const InoConversationOperation({
     required this.state,
     required this.retryable,
+    this.operationId = '',
+    this.phase = InoConversationOperationPhase.queued,
+    this.version = 0,
     this.safeReason,
     this.action,
+    this.approvalId,
   });
 
+  final String operationId;
+  final InoConversationOperationPhase phase;
+  final int version;
   final InoConversationOperationState state;
   final bool retryable;
   final String? safeReason;
   final InoConversationAction? action;
+  final String? approvalId;
 
   factory InoConversationOperation.fromJson(
     Object? value, {
@@ -407,11 +492,27 @@ class InoConversationOperation {
   }) {
     final json = _safeObject(value, 'payload.data.operation');
     _demandOnlyKeys(json, const {
+      'operationId',
+      'phase',
+      'version',
       'state',
       'safeReason',
       'retryable',
       'action',
+      'approvalId',
     }, 'payload.data.operation');
+    final operationId = _boundedString(json, 'operationId', maxLength: 128);
+    if (!RegExp(r'^[a-z][a-z0-9-]{2,127}$').hasMatch(operationId)) {
+      throw const FormatException(
+        'payload.data.operation.operationId has an invalid format.',
+      );
+    }
+    final version = json['version'];
+    if (version is! int || version < 1 || version > 9007199254740991) {
+      throw const FormatException(
+        'payload.data.operation.version must be a positive safe integer.',
+      );
+    }
     final retryable = json['retryable'];
     if (retryable is! bool) {
       throw const FormatException(
@@ -435,10 +536,55 @@ class InoConversationOperation {
         'payload.data.operation.safeReason has an invalid length.',
       );
     }
+    final state = InoConversationOperationState.fromWire(
+      _boundedString(json, 'state', maxLength: 32),
+    );
+    final approvalValue = json['approvalId'];
+    final String? approvalId;
+    if (approvalValue == null) {
+      approvalId = null;
+    } else if (approvalValue is String &&
+        approvalValue.length >= 3 &&
+        approvalValue.length <= 128 &&
+        RegExp(r'^[a-z][a-z0-9-]{2,127}$').hasMatch(approvalValue)) {
+      approvalId = approvalValue;
+    } else {
+      throw const FormatException(
+        'payload.data.operation.approvalId has an invalid format.',
+      );
+    }
+    if (state == InoConversationOperationState.awaitingApproval &&
+        approvalId == null) {
+      throw const FormatException(
+        'payload.data.operation.approvalId is required while awaiting approval.',
+      );
+    }
+    if (state != InoConversationOperationState.awaitingApproval &&
+        approvalId != null) {
+      throw const FormatException(
+        'payload.data.operation.approvalId is only valid while awaiting approval.',
+      );
+    }
+    final phase = InoConversationOperationPhase.fromWire(
+      _boundedString(json, 'phase', maxLength: 32),
+    );
+    if (phase == InoConversationOperationPhase.approved &&
+        state != InoConversationOperationState.queued) {
+      throw const FormatException(
+        'payload.data.operation.approved must remain queued.',
+      );
+    }
+    if (phase == InoConversationOperationPhase.applyingEffect &&
+        state != InoConversationOperationState.running) {
+      throw const FormatException(
+        'payload.data.operation.applying-effect must remain running.',
+      );
+    }
     return InoConversationOperation(
-      state: InoConversationOperationState.fromWire(
-        _boundedString(json, 'state', maxLength: 32),
-      ),
+      operationId: operationId,
+      phase: phase,
+      version: version,
+      state: state,
       retryable: retryable,
       safeReason: normalizedReason,
       action: json['action'] == null
@@ -447,14 +593,19 @@ class InoConversationOperation {
               json['action'],
               oauthStartOrigin: oauthStartOrigin,
             ),
+      approvalId: approvalId,
     );
   }
 
   Map<String, Object?> toJson() => {
+    'operationId': operationId,
+    'phase': phase.wire,
+    'version': version,
     'state': state.wire,
     'retryable': retryable,
     'safeReason': ?safeReason,
     'action': action?.toJson(),
+    'approvalId': ?approvalId,
   };
 }
 

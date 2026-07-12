@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using DigitalBrain.Core.Runtime;
 using Orleans;
 
@@ -37,6 +38,25 @@ public sealed record SurfaceFeedProjection(
     [property: Id(6)] DateTimeOffset? ExpiresAt,
     [property: Id(7)] SurfaceActionBinding[] ActionBindings);
 
+[GenerateSerializer, Alias("digitalbrain.runtime.home-surface-bootstrap")]
+public sealed record HomeSurfaceBootstrap(
+    [property: Id(0)] string ProjectionId,
+    [property: Id(1)] string ConversationId,
+    [property: Id(2)] string CorrelationId,
+    [property: Id(3)] DateTimeOffset CreatedAt);
+
+public sealed record SurfaceFeedPresentation(
+    string CorrelationId,
+    string CauseKind,
+    string CauseId,
+    string[] RequiredClientCapabilities,
+    JsonElement Payload,
+    int ConversationRevision = 0,
+    int PresentationVersion = 0)
+{
+    public const int CurrentVersion = 2;
+}
+
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-feed-record")]
 public sealed record SurfaceFeedRecord(
     [property: Id(0)] long Sequence,
@@ -74,6 +94,8 @@ public sealed record SurfaceFeedState(
     [property: Id(8)] SurfaceDeliveryRecord[] DeliveryDedupe,
     [property: Id(9)] SurfaceFeedAckCursor[] Acknowledgements)
 {
+    [Id(10)] public SurfaceFeedRecord[] EventHistory { get; init; } = [];
+
     public static SurfaceFeedState Empty() => new(
         RuntimeStateSchemas.SurfaceFeed,
         0,
@@ -101,6 +123,8 @@ public interface ISurfaceFeedNeuron : IGrainWithStringKey
     Task<SurfaceFeedState> ReadAsync();
     [Alias("digitalbrain.runtime.surface-feed.initialize")]
     Task<SurfaceFeedState> InitializeAsync(long expectedRevision, SurfaceFeedIdentity identity);
+    [Alias("digitalbrain.runtime.surface-feed.ensure-home-surface")]
+    Task<SurfaceFeedState> EnsureHomeSurfaceAsync(long expectedRevision, HomeSurfaceBootstrap bootstrap);
     [Alias("digitalbrain.runtime.surface-feed.apply-projection")]
     Task<SurfaceFeedState> ApplyProjectionAsync(
         long expectedRevision,
@@ -129,6 +153,8 @@ public interface ISurfaceFeedNeuron : IGrainWithStringKey
         string idempotencyKey,
         string operationId,
         DateTimeOffset now);
+    [Alias("digitalbrain.runtime.surface-feed.renew-action-bindings")]
+    Task<SurfaceFeedState> RenewActionBindingsAsync(long expectedRevision, DateTimeOffset now);
     [Alias("digitalbrain.runtime.surface-feed.rebuild")]
     Task<SurfaceFeedState> RebuildAsync(long expectedRevision, string projectionId, DateTimeOffset now);
 }
@@ -140,6 +166,8 @@ public static class SurfaceFeedTransitions
     public const int MaximumProjectionDedupe = 512;
     public const int MaximumDeliveryDedupe = 512;
     public const int MaximumAcknowledgements = 256;
+    public const int MaximumEventHistory = 512;
+    public const int MaximumEventHistoryPayloadBytes = 1 * 1024 * 1024;
 
     public static SurfaceFeedState Initialize(SurfaceFeedState state, long expectedRevision, SurfaceFeedIdentity identity)
     {
@@ -153,6 +181,38 @@ public static class SurfaceFeedTransitions
         return ValidateAndCompact(
             state with { Revision = checked(state.Revision + 1), Identity = identity },
             DateTimeOffset.MinValue);
+    }
+
+    public static SurfaceFeedState EnsureHomeSurface(
+        SurfaceFeedState state,
+        long expectedRevision,
+        HomeSurfaceBootstrap bootstrap)
+    {
+        DemandMutable(state, expectedRevision);
+        ValidateHomeSurfaceBootstrap(state, bootstrap);
+        if (state.CurrentSurfaces.Length > 0) return state;
+
+        var conversation = new InoConversationSnapshot(bootstrap.ConversationId, 0, [], []);
+        var descriptors = ConversationSurfacePayload.Actions(conversation, bootstrap.CreatedAt);
+        var payload = ConversationSurfacePayload.Build(conversation);
+        var presentation = new SurfaceFeedPresentation(
+            bootstrap.CorrelationId,
+            "conversation",
+            bootstrap.ConversationId,
+            ConversationSurfacePayload.RequiredCapabilities,
+            payload,
+            conversation.Revision,
+            SurfaceFeedPresentation.CurrentVersion);
+        var projection = new SurfaceFeedProjection(
+            bootstrap.ProjectionId,
+            ConversationSurfacePayload.HomeSurfaceId,
+            1,
+            SurfaceContentHash.Compute(payload, descriptors),
+            JsonSerializer.SerializeToUtf8Bytes(presentation),
+            bootstrap.CreatedAt,
+            null,
+            CreateHomeBindings(descriptors, 1));
+        return ApplyProjection(state, expectedRevision, projection, bootstrap.CreatedAt);
     }
 
     public static SurfaceFeedState ApplyProjection(
@@ -174,6 +234,7 @@ public static class SurfaceFeedTransitions
 
         var surfaces = state.CurrentSurfaces;
         var bindings = state.ActionBindings;
+        var history = state.EventHistory ?? [];
         var lastSequence = state.LastSequence;
         if (current is null || projection.SurfaceRevision > current.SurfaceRevision)
         {
@@ -189,6 +250,7 @@ public static class SurfaceFeedTransitions
                 projection.ExpiresAt);
             surfaces = surfaces.Where(surface => !string.Equals(surface.SurfaceId, projection.SurfaceId, StringComparison.Ordinal))
                 .Append(record).ToArray();
+            history = history.Append(record).ToArray();
             bindings = bindings.Where(binding => !string.Equals(binding.SurfaceId, projection.SurfaceId, StringComparison.Ordinal))
                 .Concat(projection.ActionBindings.Select(binding => binding with { TokenHash = binding.TokenHash.ToLowerInvariant() }))
                 .ToArray();
@@ -198,6 +260,7 @@ public static class SurfaceFeedTransitions
             Revision = checked(state.Revision + 1),
             LastSequence = lastSequence,
             CurrentSurfaces = surfaces,
+            EventHistory = history,
             ActionBindings = bindings,
             AppliedProjectionIds = state.AppliedProjectionIds.Append(projection.ProjectionId).ToArray()
         }, now);
@@ -311,6 +374,31 @@ public static class SurfaceFeedTransitions
         return new(next, operationId, true, updated);
     }
 
+    public static SurfaceFeedState RenewActionBindings(
+        SurfaceFeedState state,
+        long expectedRevision,
+        DateTimeOffset now)
+    {
+        DemandMutable(state, expectedRevision);
+        var activeSurfaces = state.CurrentSurfaces
+            .Select(surface => (surface.SurfaceId, surface.SurfaceRevision))
+            .ToHashSet();
+        var nextExpiry = now.Add(UiProtocol.ActionTokenLifetime);
+        var renewalThreshold = now.Add(TimeSpan.FromTicks(UiProtocol.ActionTokenLifetime.Ticks / 2));
+        var bindings = state.ActionBindings.Select(binding =>
+            activeSurfaces.Contains((binding.SurfaceId, binding.SurfaceRevision)) &&
+            binding.Uses < binding.MaxUses &&
+            binding.ExpiresAt <= renewalThreshold
+                ? binding with { ExpiresAt = nextExpiry }
+                : binding).ToArray();
+        if (bindings.SequenceEqual(state.ActionBindings)) return state;
+        return ValidateAndCompact(state with
+        {
+            Revision = checked(state.Revision + 1),
+            ActionBindings = bindings
+        }, now);
+    }
+
     public static SurfaceFeedState Rebuild(
         SurfaceFeedState state,
         long expectedRevision,
@@ -325,6 +413,7 @@ public static class SurfaceFeedTransitions
             Revision = checked(state.Revision + 1),
             RebuildEpoch = checked(state.RebuildEpoch + 1),
             CurrentSurfaces = [],
+            EventHistory = [],
             ActionBindings = [],
             AppliedProjectionIds = state.AppliedProjectionIds.Append(projectionId).ToArray()
         }, now);
@@ -333,19 +422,30 @@ public static class SurfaceFeedTransitions
     public static void Validate(SurfaceFeedState state)
     {
         if (state.SchemaVersion != RuntimeStateSchemas.SurfaceFeed || state.Revision < 0 || state.LastSequence < 0 ||
-            state.RebuildEpoch < 0 || state.CurrentSurfaces is null || state.ActionBindings is null ||
+            state.RebuildEpoch < 0 || state.CurrentSurfaces is null || state.EventHistory is null || state.ActionBindings is null ||
             state.AppliedProjectionIds is null || state.DeliveryDedupe is null || state.Acknowledgements is null)
             throw new RuntimeStateIntegrityException("invalid surface-feed schema");
         if (state.Revision == 0 && state.Identity is not null || state.Revision > 0 && state.Identity is null)
             throw new RuntimeStateIntegrityException("invalid surface-feed identity lifecycle");
         if (state.Identity is not null) ValidateIdentity(state.Identity);
-        if (state.CurrentSurfaces.Length > MaximumCurrentSurfaces || state.ActionBindings.Length > MaximumActionBindings ||
+        if (state.CurrentSurfaces.Length > MaximumCurrentSurfaces || state.EventHistory.Length > MaximumEventHistory ||
+            state.EventHistory.Sum(record => record.PayloadUtf8?.Length ?? 0) > MaximumEventHistoryPayloadBytes ||
+            state.ActionBindings.Length > MaximumActionBindings ||
             state.AppliedProjectionIds.Length > MaximumProjectionDedupe || state.DeliveryDedupe.Length > MaximumDeliveryDedupe ||
             state.Acknowledgements.Length > MaximumAcknowledgements)
             throw new RuntimeStateIntegrityException("surface-feed retention bound exceeded");
         if (state.CurrentSurfaces.Select(surface => surface.SurfaceId).Distinct(StringComparer.Ordinal).Count() != state.CurrentSurfaces.Length ||
             state.ActionBindings.Select(binding => binding.BindingId).Distinct(StringComparer.Ordinal).Count() != state.ActionBindings.Length)
             throw new RuntimeStateIntegrityException("duplicate surface-feed identity");
+        for (var index = 0; index < state.EventHistory.Length; index++)
+        {
+            var record = state.EventHistory[index];
+            if (record.PayloadUtf8 is null || record.PayloadUtf8.Length > 64 * 1024 || record.Sequence < 1 ||
+                index > 0 && state.EventHistory[index - 1].Sequence >= record.Sequence)
+                throw new RuntimeStateIntegrityException("invalid surface-feed event history");
+        }
+        if (state.EventHistory.Length > 0 && state.EventHistory[^1].Sequence != state.LastSequence)
+            throw new RuntimeStateIntegrityException("surface-feed history does not reach the latest sequence");
         foreach (var binding in state.ActionBindings) ValidateBinding(binding);
     }
 
@@ -355,6 +455,7 @@ public static class SurfaceFeedTransitions
         {
             CurrentSurfaces = state.CurrentSurfaces.Where(surface => surface.ExpiresAt is null || surface.ExpiresAt > now)
                 .OrderBy(surface => surface.Sequence).TakeLast(MaximumCurrentSurfaces).ToArray(),
+            EventHistory = CompactHistory(state.EventHistory ?? []),
             AppliedProjectionIds = state.AppliedProjectionIds.TakeLast(MaximumProjectionDedupe).ToArray(),
             DeliveryDedupe = state.DeliveryDedupe.OrderBy(delivery => delivery.DeliveredAt).TakeLast(MaximumDeliveryDedupe).ToArray(),
             Acknowledgements = state.Acknowledgements.Where(cursor => cursor.ExpiresAt > now)
@@ -368,6 +469,20 @@ public static class SurfaceFeedTransitions
         };
         Validate(state);
         return state;
+    }
+
+    private static SurfaceFeedRecord[] CompactHistory(IEnumerable<SurfaceFeedRecord> history)
+    {
+        var retained = history.OrderBy(record => record.Sequence)
+            .TakeLast(MaximumEventHistory)
+            .ToList();
+        var bytes = retained.Sum(record => record.PayloadUtf8.Length);
+        while (bytes > MaximumEventHistoryPayloadBytes && retained.Count > 0)
+        {
+            bytes -= retained[0].PayloadUtf8.Length;
+            retained.RemoveAt(0);
+        }
+        return retained.ToArray();
     }
 
     private static void DemandMutable(SurfaceFeedState state, long expectedRevision)
@@ -407,6 +522,36 @@ public static class SurfaceFeedTransitions
                 throw new ArgumentException("Action bindings must target the projected surface revision and remain unexpired.", nameof(projection));
         }
     }
+
+    private static void ValidateHomeSurfaceBootstrap(SurfaceFeedState state, HomeSurfaceBootstrap bootstrap)
+    {
+        DemandId(bootstrap.ProjectionId, nameof(bootstrap.ProjectionId));
+        DemandId(bootstrap.CorrelationId, nameof(bootstrap.CorrelationId));
+        var identity = state.Identity ?? throw new RuntimeStateIntegrityException("surface-feed identity is missing");
+        var expectedConversationId = "ino-" + RequestScope.Id(
+            identity.TenantId,
+            identity.WorkspaceId,
+            identity.Principal);
+        if (!string.Equals(bootstrap.ConversationId, expectedConversationId, StringComparison.Ordinal))
+            throw new ArgumentException("The home surface must target the feed identity's conversation.", nameof(bootstrap));
+    }
+
+    private static SurfaceActionBinding[] CreateHomeBindings(
+        IReadOnlyList<StoredActionBinding> descriptors,
+        int surfaceRevision) => descriptors.Select(descriptor => new SurfaceActionBinding(
+            descriptor.BindingId,
+            ConversationSurfacePayload.HomeSurfaceId,
+            surfaceRevision,
+            descriptor.ActionType,
+            descriptor.InputSchemaRef,
+            descriptor.RequiredGrant,
+            descriptor.ActionSchemaVersion,
+            Convert.ToHexStringLower(SHA256.HashData(RandomNumberGenerator.GetBytes(32))),
+            descriptor.MaxUses,
+            0,
+            descriptor.ExpiresAt,
+            null,
+            null)).ToArray();
 
     private static void ValidateBinding(SurfaceActionBinding binding)
     {

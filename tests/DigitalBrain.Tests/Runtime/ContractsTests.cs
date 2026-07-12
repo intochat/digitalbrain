@@ -1,6 +1,5 @@
 using System.Text.Json;
 using DigitalBrain.Core.Runtime;
-using DigitalBrain.Core.V2;
 using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
 
 namespace DigitalBrain.Tests.Runtime;
@@ -56,79 +55,60 @@ public sealed class ContractsTests
     }
 
     [Fact]
-    public async Task Aggregate_store_commits_contiguously_and_deduplicates_inbox()
+    public void Signed_action_capability_binds_the_session_scope_binding_and_expiry()
     {
-        var store = new InMemoryAggregateStore();
-        var payload = JsonElement.Parse("""{"value":1}""");
-        var item = new EventEnvelope("v2.state.changed", 1, "event", "correlation", null, payload);
-        var request = new V2CommitRequest(
-            "command",
-            0,
-            payload,
-            [item],
-            [new OutboxRecord(
-                "effect",
-                "operation",
-                0,
-                "fake",
-                payload,
-                DateTimeOffset.UtcNow.AddMinutes(1))],
-            DateTimeOffset.UtcNow);
+        var now = new DateTimeOffset(2026, 7, 12, 10, 0, 0, TimeSpan.Zero);
+        var clock = new MutableTimeProvider(now);
+        var tokens = new SessionTokenService(Enumerable.Repeat((byte)7, 32).ToArray(), clock);
+        var context = Context("ui.action");
+        const string bindingTokenHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        var expiresAt = now.AddMinutes(5);
 
-        var first = await store.CommitAsync("aggregate", request);
-        var duplicate = await store.CommitAsync("aggregate", request);
+        var token = tokens.IssueActionCapability(
+            context,
+            "ino.approval.decision",
+            "workspace-home",
+            7,
+            bindingTokenHash,
+            expiresAt);
 
-        Assert.True(first.Accepted);
-        Assert.True(duplicate.Duplicate);
-        Assert.Equal(first.Commit.CommitId, duplicate.Commit.CommitId);
-        Assert.Single(duplicate.Snapshot.Outbox);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => store.CommitAsync(
-            "aggregate",
-            request with { CommandId = "different-command" }));
-    }
+        Assert.True(tokens.TryValidateActionCapability(
+            token,
+            context,
+            "ino.approval.decision",
+            "workspace-home",
+            7,
+            bindingTokenHash));
+        Assert.False(tokens.TryValidateActionCapability(
+            token,
+            context with { SessionId = "other-session" },
+            "ino.approval.decision",
+            "workspace-home",
+            7,
+            bindingTokenHash));
+        Assert.False(tokens.TryValidateActionCapability(
+            token,
+            context with { WorkspaceId = new WorkspaceId("other-workspace") },
+            "ino.approval.decision",
+            "workspace-home",
+            7,
+            bindingTokenHash));
+        Assert.False(tokens.TryValidateActionCapability(
+            token[..^1] + (token[^1] == 'A' ? "B" : "A"),
+            context,
+            "ino.approval.decision",
+            "workspace-home",
+            7,
+            bindingTokenHash));
 
-    [Fact]
-    public async Task Effect_transition_history_is_append_only_and_idempotent()
-    {
-        var store = new InMemoryAggregateStore();
-        var transition = new EffectTransitionRecord(
-            "effect",
-            "transition",
-            "Applying",
-            "safe",
-            DateTimeOffset.UtcNow);
-
-        await store.AppendEffectTransitionAsync("aggregate", transition);
-        await store.AppendEffectTransitionAsync("aggregate", transition);
-
-        Assert.Single((await store.ReadAsync("aggregate")).EffectTransitions);
-    }
-
-    [Fact]
-    public async Task Effect_coordinator_marks_unknown_without_retrying()
-    {
-        var store = new InMemoryAggregateStore();
-        var payload = JsonElement.Parse("""{"value":1}""");
-        await store.CommitAsync("aggregate", new V2CommitRequest(
-            "command",
-            0,
-            payload,
-            [],
-            [new OutboxRecord(
-                "effect",
-                "operation",
-                0,
-                "fake",
-                payload,
-                DateTimeOffset.UtcNow.AddMinutes(5))],
-            DateTimeOffset.UtcNow));
-        var handler = new FakeEffectHandler(EffectDisposition.OutcomeUnknown);
-
-        var result = await new EffectCoordinator(store, [handler])
-            .ExecuteOnceAsync("aggregate", "effect", "worker", TimeSpan.FromMinutes(1));
-
-        Assert.Equal("OutcomeUnknown", result.State);
-        Assert.Equal(1, handler.Calls);
+        clock.UtcNow = expiresAt.AddSeconds(1);
+        Assert.False(tokens.TryValidateActionCapability(
+            token,
+            context,
+            "ino.approval.decision",
+            "workspace-home",
+            7,
+            bindingTokenHash));
     }
 
     [Fact]
@@ -213,17 +193,10 @@ public sealed class ContractsTests
         "idempotency",
         grants.ToHashSet(StringComparer.Ordinal));
 
-    private sealed class FakeEffectHandler(EffectDisposition disposition) : IEffectHandler
+    private sealed class MutableTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
-        public string EffectType => "fake";
-        public int Calls { get; private set; }
+        public DateTimeOffset UtcNow { get; set; } = utcNow;
 
-        public Task<EffectExecutionResult> ExecuteAsync(
-            OutboxRecord intent,
-            CancellationToken cancellationToken = default)
-        {
-            Calls++;
-            return Task.FromResult(new EffectExecutionResult(disposition, "safe-result"));
-        }
+        public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 }

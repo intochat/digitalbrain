@@ -217,6 +217,30 @@ void main() {
       expect(result.operationId, 'operation-a');
     });
 
+    test('maps a stale action precondition to a safe rejection', () async {
+      final port = _FakeGrpcClientPort()
+        ..actionError = GrpcError.failedPrecondition(
+          'surface revision 1 is stale and must not escape',
+        );
+      final transport = GrpcUiTransport.forTesting(client: port);
+      final action = testSurface(actions: [testActionJson()]).actions.single;
+
+      await expectLater(
+        transport.submitAction(
+          accessToken: 'signed-session',
+          action: action,
+          input: const {'confirmed': true},
+        ),
+        throwsA(
+          isA<PreconditionException>().having(
+            (error) => error.safeMessage,
+            'safeMessage',
+            'UI action is stale. Refresh and try again.',
+          ),
+        ),
+      );
+    });
+
     test('close cancels an in-flight unary response', () async {
       final pending = Completer<wire.AcknowledgeSurfaceFeedReply>();
       final response = _FakeGrpcUnaryResponse(
@@ -320,6 +344,7 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   wire.SubmitActionRequest? actionRequest;
   CallOptions? actionOptions;
   Object? bootstrapError;
+  Object? actionError;
   GrpcFeedResponse? feedResponse;
   GrpcUnaryResponse<wire.AcknowledgeSurfaceFeedReply>? ackResponse;
 
@@ -405,6 +430,9 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   ) {
     actionRequest = request;
     actionOptions = options;
+    if (actionError case final error?) {
+      return _FakeGrpcUnaryResponse(Future.error(error));
+    }
     return _FakeGrpcUnaryResponse(
       Future.value(
         wire.SubmitActionReply(

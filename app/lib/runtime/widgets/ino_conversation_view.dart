@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,17 +14,15 @@ const Key inoTranscriptKey = Key('v2-ino-transcript');
 const Key inoEmptyTranscriptKey = Key('v2-ino-empty-transcript');
 const Key inoOperationStatusKey = Key('v2-ino-operation-status');
 const Key inoRetryButtonKey = Key('v2-ino-retry-button');
+const Key inoRetryDeliveryButtonKey = Key('v2-ino-retry-delivery-button');
 const Key inoConnectButtonKey = Key('v2-ino-connect-button');
+const Key inoApproveButtonKey = Key('v2-ino-approve-button');
+const Key inoRejectButtonKey = Key('v2-ino-reject-button');
 const Key inoReconnectBannerKey = Key('v2-ino-reconnect-banner');
 const Key inoConnectionUnavailableBannerKey = Key(
   'v2-ino-connection-unavailable-banner',
 );
 const Key inoSubmissionNoticeKey = Key('v2-ino-submission-notice');
-const Key inoNewConversationButtonKey = Key('v2-ino-new-conversation');
-const Key inoDeleteConversationButtonKey = Key('v2-ino-delete-conversation');
-const Key inoDeleteConversationConfirmKey = Key(
-  'v2-ino-delete-conversation-confirm',
-);
 
 typedef InoActionSubmit =
     Future<ActionResult> Function(
@@ -55,6 +54,7 @@ class InoConversationView extends StatefulWidget {
 }
 
 class _InoConversationViewState extends State<InoConversationView> {
+  static final Random _secureRandom = Random.secure();
   final TextEditingController _composer = TextEditingController();
   final FocusNode _composerFocus = FocusNode(debugLabel: 'INO composer');
   final ScrollController _transcriptScroll = ScrollController();
@@ -62,16 +62,18 @@ class _InoConversationViewState extends State<InoConversationView> {
   bool _submitting = false;
   String? _optimisticPrompt;
   String? _pendingPrompt;
-  int _pendingPromptBaseline = 0;
-  int _pendingSurfaceRevision = 0;
-  bool _pendingWasRetry = false;
+  String? _pendingOperationId;
+  String? _pendingClientSubmissionId;
   bool _serverConfirmedCurrentSubmission = false;
   bool _currentSubmissionAccepted = false;
   bool _awaitingServerConfirmation = false;
   bool _submissionUncertain = false;
   String? _submissionNotice;
   bool _openingConnection = false;
-  bool _changingConversation = false;
+  bool _decidingApproval = false;
+  String? _pendingApprovalId;
+  bool? _pendingApprovalApproved;
+  String? _pendingApprovalClientDecisionId;
   ActionResult? _lastAcceptedReceipt;
 
   @override
@@ -90,6 +92,15 @@ class _InoConversationViewState extends State<InoConversationView> {
       widget.payload.messages,
     );
     _reconcilePendingSubmission();
+    final currentApproval = widget.payload.operation;
+    if (currentApproval?.state !=
+            InoConversationOperationState.awaitingApproval ||
+        currentApproval?.approvalId != _pendingApprovalId) {
+      _decidingApproval = false;
+      _pendingApprovalId = null;
+      _pendingApprovalApproved = null;
+      _pendingApprovalClientDecisionId = null;
+    }
     if (transcriptChanged && followTranscript) {
       _scheduleScrollToEnd();
     }
@@ -115,31 +126,16 @@ class _InoConversationViewState extends State<InoConversationView> {
     return action?.actionType == 'ino.interact' ? action : null;
   }
 
-  UiActionRef? get _newConversationAction {
-    final action = widget.surface.actionByBindingId('ino.new');
-    return action?.actionType == 'ino.conversation.new' ? action : null;
+  UiActionRef? get _approvalAction {
+    final action = widget.surface.actionByBindingId('ino.approval.decision');
+    return action?.actionType == 'ino.approval.decision' ? action : null;
   }
-
-  UiActionRef? get _deleteConversationAction {
-    final action = widget.surface.actionByBindingId('ino.delete');
-    return action?.actionType == 'ino.conversation.delete' ? action : null;
-  }
-
-  bool get _canChangeConversation =>
-      widget.actionEnabled &&
-      !widget.reconnecting &&
-      !widget.connectionUnavailable &&
-      !_submitting &&
-      !_changingConversation &&
-      !_awaitingServerConfirmation &&
-      !_submissionUncertain;
 
   bool get _canSend =>
       widget.actionEnabled &&
       !widget.reconnecting &&
       !widget.connectionUnavailable &&
       !_submitting &&
-      !_changingConversation &&
       !_awaitingServerConfirmation &&
       !_submissionUncertain &&
       (widget.payload.operation?.state.isTerminal ?? true) &&
@@ -153,31 +149,63 @@ class _InoConversationViewState extends State<InoConversationView> {
     return position.maxScrollExtent - position.pixels <= 80;
   }
 
+  bool _canDecideApproval(bool approved) {
+    final operation = widget.payload.operation;
+    if (operation?.state != InoConversationOperationState.awaitingApproval ||
+        operation?.approvalId == null ||
+        _approvalAction == null ||
+        !widget.actionEnabled ||
+        widget.reconnecting ||
+        widget.connectionUnavailable ||
+        _submitting ||
+        _decidingApproval) {
+      return false;
+    }
+    return _pendingApprovalApproved == null ||
+        _pendingApprovalApproved == approved;
+  }
+
   void _onDraftChanged() {
     if (mounted) setState(() {});
   }
 
   void _reconcilePendingSubmission() {
-    final prompt = _pendingPrompt;
-    if (prompt == null) return;
-    final matchingTurns = widget.payload.messages
-        .where(
-          (message) =>
-              message.role == InoConversationRole.user &&
-              message.text == prompt,
-        )
-        .length;
-    final retryAdvanced =
-        _pendingWasRetry &&
-        widget.surface.revision > _pendingSurfaceRevision &&
-        matchingTurns >= _pendingPromptBaseline &&
-        widget.payload.operation?.state != InoConversationOperationState.failed;
-    if (matchingTurns <= _pendingPromptBaseline && !retryAdvanced) return;
+    final operationId = _pendingOperationId;
+    final operation = widget.payload.operation;
+    if (operationId == null) {
+      final pendingPrompt = _pendingPrompt;
+      final lastUserTurn = widget.payload.messages.lastWhere(
+        (message) => message.role == InoConversationRole.user,
+        orElse: () => const InoConversationMessage(
+          turnKey: '',
+          role: InoConversationRole.assistant,
+          text: '',
+          state: InoConversationTurnState.sending,
+        ),
+      );
+      if (pendingPrompt != null &&
+          operation != null &&
+          lastUserTurn.text == pendingPrompt) {
+        _serverConfirmedCurrentSubmission = true;
+        _awaitingServerConfirmation = false;
+        _optimisticPrompt = null;
+        _pendingPrompt = null;
+        _pendingClientSubmissionId = null;
+        _currentSubmissionAccepted = false;
+        _submissionUncertain = false;
+        _submissionNotice = null;
+      }
+      return;
+    }
+    if (operation == null || operation.operationId != operationId) {
+      return;
+    }
     _serverConfirmedCurrentSubmission = true;
     _awaitingServerConfirmation = false;
     _optimisticPrompt = null;
     _pendingPrompt = null;
-    _pendingWasRetry = false;
+    _pendingOperationId = null;
+    _pendingClientSubmissionId = null;
     _currentSubmissionAccepted = false;
     _submissionUncertain = false;
     _submissionNotice = null;
@@ -191,6 +219,15 @@ class _InoConversationViewState extends State<InoConversationView> {
   }
 
   Future<void> _retry() async {
+    if (_submissionUncertain &&
+        _pendingPrompt != null &&
+        !_submitting &&
+        widget.actionEnabled &&
+        !widget.reconnecting &&
+        !widget.connectionUnavailable) {
+      await _submit(_pendingPrompt!, showOptimisticTurn: false);
+      return;
+    }
     if (_submitting ||
         _awaitingServerConfirmation ||
         _submissionUncertain ||
@@ -243,59 +280,52 @@ class _InoConversationViewState extends State<InoConversationView> {
     }
   }
 
-  Future<void> _startNewConversation() async {
-    final action = _newConversationAction;
-    if (action == null || !_canChangeConversation) return;
-    await _submitConversationLifecycle(action);
-  }
-
-  Future<void> _deleteConversation() async {
-    final action = _deleteConversationAction;
-    if (action == null || !_canChangeConversation) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this conversation?'),
-        content: const Text(
-          'This removes this conversation and cancels any work or connection request still waiting in it.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            key: inoDeleteConversationConfirmKey,
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      await _submitConversationLifecycle(action);
+  Future<void> _submitApproval(bool approved) async {
+    final action = _approvalAction;
+    final operation = widget.payload.operation;
+    final approvalId = operation?.approvalId;
+    if (action == null ||
+        operation == null ||
+        approvalId == null ||
+        !_canDecideApproval(approved)) {
+      return;
     }
-  }
-
-  Future<void> _submitConversationLifecycle(UiActionRef action) async {
+    final clientDecisionId =
+        _pendingApprovalClientDecisionId ?? _newClientSubmissionId();
     setState(() {
-      _changingConversation = true;
+      _decidingApproval = true;
+      _pendingApprovalId = approvalId;
+      _pendingApprovalApproved = approved;
+      _pendingApprovalClientDecisionId = clientDecisionId;
       _submissionNotice = null;
     });
     try {
-      await widget.onSubmitAction(
-        widget.surface,
-        action.bindingId,
-        const <String, Object?>{},
-      );
-      if (!mounted) return;
-      setState(() => _changingConversation = false);
-    } catch (_) {
+      await widget
+          .onSubmitAction(widget.surface, action.bindingId, <String, Object?>{
+            'operationId': operation.operationId,
+            'approvalId': approvalId,
+            'decision': approved ? 'approve' : 'reject',
+            'clientDecisionId': clientDecisionId,
+          });
       if (!mounted) return;
       setState(() {
-        _changingConversation = false;
-        _submissionNotice =
-            'The conversation couldn\'t be changed. Please try again.';
+        // Keep the signed decision disabled until the authoritative feed advances the operation.
+        _decidingApproval = true;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _decidingApproval = false;
+        if (_definitelyNotSubmitted(error)) {
+          _pendingApprovalId = null;
+          _pendingApprovalApproved = null;
+          _pendingApprovalClientDecisionId = null;
+          _submissionNotice =
+              'The approval decision was not sent. Please try again.';
+        } else {
+          _submissionNotice =
+              'The approval decision may have been accepted. Retry the same choice if it does not update.';
+        }
       });
     }
   }
@@ -306,19 +336,13 @@ class _InoConversationViewState extends State<InoConversationView> {
   }) async {
     final action = _sendAction;
     if (action == null || _submitting) return;
-    final matchingTurns = widget.payload.messages
-        .where(
-          (message) =>
-              message.role == InoConversationRole.user &&
-              message.text == prompt,
-        )
-        .length;
+    final clientSubmissionId =
+        _pendingClientSubmissionId ?? _newClientSubmissionId();
     setState(() {
       _submitting = true;
       _pendingPrompt = prompt;
-      _pendingPromptBaseline = matchingTurns;
-      _pendingSurfaceRevision = widget.surface.revision;
-      _pendingWasRetry = !showOptimisticTurn;
+      _pendingOperationId = null;
+      _pendingClientSubmissionId = clientSubmissionId;
       _serverConfirmedCurrentSubmission = false;
       _currentSubmissionAccepted = false;
       _awaitingServerConfirmation = true;
@@ -332,17 +356,22 @@ class _InoConversationViewState extends State<InoConversationView> {
       final receipt = await widget.onSubmitAction(
         widget.surface,
         action.bindingId,
-        <String, Object?>{'prompt': prompt},
+        <String, Object?>{
+          'prompt': prompt,
+          'clientSubmissionId': clientSubmissionId,
+        },
       );
       if (!mounted) return;
       setState(() {
         _lastAcceptedReceipt = receipt;
+        _pendingOperationId = receipt.operationId;
         _currentSubmissionAccepted = true;
         _submitting = false;
         if (_serverConfirmedCurrentSubmission) {
           _awaitingServerConfirmation = false;
           _pendingPrompt = null;
-          _pendingWasRetry = false;
+          _pendingOperationId = null;
+          _pendingClientSubmissionId = null;
           _currentSubmissionAccepted = false;
         }
       });
@@ -355,7 +384,8 @@ class _InoConversationViewState extends State<InoConversationView> {
           _submitting = false;
           _awaitingServerConfirmation = false;
           _pendingPrompt = null;
-          _pendingWasRetry = false;
+          _pendingOperationId = null;
+          _pendingClientSubmissionId = null;
           _currentSubmissionAccepted = false;
         });
         _scheduleComposerFocus();
@@ -372,7 +402,8 @@ class _InoConversationViewState extends State<InoConversationView> {
           _submitting = false;
           _awaitingServerConfirmation = false;
           _pendingPrompt = null;
-          _pendingWasRetry = false;
+          _pendingOperationId = null;
+          _pendingClientSubmissionId = null;
           _currentSubmissionAccepted = false;
           _optimisticPrompt = null;
           _submissionUncertain = false;
@@ -408,11 +439,20 @@ class _InoConversationViewState extends State<InoConversationView> {
   }
 
   static bool _definitelyNotSubmitted(Object error) {
-    if (error is StateError) return true;
+    if (error is StateError || error is PreconditionException) return true;
     return error is TransportException &&
         (error.code == TransportErrorCode.unauthenticated ||
             error.code == TransportErrorCode.permissionDenied ||
             error.code == TransportErrorCode.invalidArgument);
+  }
+
+  static String _newClientSubmissionId() {
+    const alphabet = '0123456789abcdefghijklmnopqrstuvwxyz';
+    final buffer = StringBuffer('ui-');
+    for (var index = 0; index < 30; index++) {
+      buffer.write(alphabet[_secureRandom.nextInt(alphabet.length)]);
+    }
+    return buffer.toString();
   }
 
   void _scheduleScrollToEnd() {
@@ -468,36 +508,9 @@ class _InoConversationViewState extends State<InoConversationView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Ask INO',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        key: inoNewConversationButtonKey,
-                        onPressed:
-                            _canChangeConversation &&
-                                _newConversationAction != null
-                            ? _startNewConversation
-                            : null,
-                        icon: const Icon(Icons.add_comment_outlined),
-                        label: const Text('New'),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        key: inoDeleteConversationButtonKey,
-                        tooltip: 'Delete conversation',
-                        onPressed:
-                            _canChangeConversation &&
-                                _deleteConversationAction != null
-                            ? _deleteConversation
-                            : null,
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    ],
+                  Text(
+                    'Ask INO',
+                    style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -540,6 +553,19 @@ class _InoConversationViewState extends State<InoConversationView> {
                   if (_submissionNotice case final notice?) ...[
                     const SizedBox(height: 10),
                     _SafeNotice(message: notice),
+                    if (_submissionUncertain && _pendingPrompt != null) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        key: inoRetryDeliveryButtonKey,
+                        onPressed:
+                            _submitting ||
+                                widget.reconnecting ||
+                                widget.connectionUnavailable
+                            ? null
+                            : _retry,
+                        child: const Text('Retry delivery'),
+                      ),
+                    ],
                   ],
                   if (operation != null) ...[
                     const SizedBox(height: 10),
@@ -562,6 +588,9 @@ class _InoConversationViewState extends State<InoConversationView> {
                           !widget.reconnecting &&
                           !widget.connectionUnavailable,
                       onConnect: _openConnection,
+                      approvalEnabled: _canDecideApproval,
+                      onApprove: () => _submitApproval(true),
+                      onReject: () => _submitApproval(false),
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -677,6 +706,9 @@ class _OperationStatus extends StatelessWidget {
     required this.onRetry,
     required this.connectionEnabled,
     required this.onConnect,
+    required this.approvalEnabled,
+    required this.onApprove,
+    required this.onReject,
   });
 
   final InoConversationOperation operation;
@@ -684,19 +716,38 @@ class _OperationStatus extends StatelessWidget {
   final VoidCallback onRetry;
   final bool connectionEnabled;
   final Future<void> Function(InoConversationAction action) onConnect;
+  final bool Function(bool approved) approvalEnabled;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
 
   @override
   Widget build(BuildContext context) {
     final isActive = !operation.state.isTerminal;
-    final message = switch (operation.state) {
-      InoConversationOperationState.queued => 'Your message is queued.',
-      InoConversationOperationState.running => 'INO is working on it.',
-      InoConversationOperationState.responding => 'INO is writing a response.',
-      InoConversationOperationState.awaitingAuthorization =>
-        'INO is waiting for you to connect.',
-      InoConversationOperationState.succeeded => 'Response ready.',
-      InoConversationOperationState.failed =>
-        operation.safeReason ?? 'INO couldn\'t complete that request.',
+    final message = switch (operation.phase) {
+      InoConversationOperationPhase.approved =>
+        'Approval accepted. INO is preparing the approved action.',
+      InoConversationOperationPhase.applyingEffect =>
+        'INO is applying the approved action.',
+      _ => switch (operation.state) {
+        InoConversationOperationState.queued => 'Your message is queued.',
+        InoConversationOperationState.running => 'INO is working on it.',
+        InoConversationOperationState.responding =>
+          'INO is writing a response.',
+        InoConversationOperationState.awaitingApproval =>
+          'INO is waiting for your approval.',
+        InoConversationOperationState.awaitingAuthorization =>
+          'INO is waiting for you to connect.',
+        InoConversationOperationState.retryScheduled =>
+          'INO will retry this request shortly.',
+        InoConversationOperationState.succeeded => 'Response ready.',
+        InoConversationOperationState.failed =>
+          operation.safeReason ?? 'INO couldn\'t complete that request.',
+        InoConversationOperationState.outcomeUnknown =>
+          operation.safeReason ??
+              'INO couldn\'t confirm the result. Review it before trying again.',
+        InoConversationOperationState.cancelled =>
+          operation.safeReason ?? 'This request was cancelled.',
+      },
     };
     return Semantics(
       container: true,
@@ -735,6 +786,22 @@ class _OperationStatus extends StatelessWidget {
                       ? () => unawaited(onConnect(action))
                       : null,
                   child: Text(action.label),
+                ),
+              ],
+              if (operation.state ==
+                      InoConversationOperationState.awaitingApproval &&
+                  operation.approvalId != null) ...[
+                const SizedBox(width: 10),
+                OutlinedButton(
+                  key: inoRejectButtonKey,
+                  onPressed: approvalEnabled(false) ? onReject : null,
+                  child: const Text('Reject'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  key: inoApproveButtonKey,
+                  onPressed: approvalEnabled(true) ? onApprove : null,
+                  child: const Text('Approve'),
                 ),
               ],
             ],
@@ -810,7 +877,11 @@ String _turnStatus(InoConversationTurnState state) => switch (state) {
   InoConversationTurnState.queued => 'Queued',
   InoConversationTurnState.running => 'Working',
   InoConversationTurnState.responding => 'Responding',
+  InoConversationTurnState.awaitingApproval => 'Approval required',
   InoConversationTurnState.awaitingAuthorization => 'Connection required',
+  InoConversationTurnState.retryScheduled => 'Retry scheduled',
   InoConversationTurnState.succeeded => 'Complete',
   InoConversationTurnState.failed => 'Not completed',
+  InoConversationTurnState.outcomeUnknown => 'Needs review',
+  InoConversationTurnState.cancelled => 'Cancelled',
 };

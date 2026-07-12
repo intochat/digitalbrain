@@ -34,7 +34,7 @@ public sealed class McpConversationTools(
     McpAuthority authority,
     McpInoCommandHandler conversation)
 {
-    [McpServerTool(Name = "ino_interact"), Description("Run an authenticated, idempotent INO interaction for the current workspace.")]
+    [McpServerTool(Name = "ino_interact"), Description("Durably accept an authenticated, idempotent INO interaction for the current workspace.")]
     public async Task<object> InoInteractAsync(
         string commandId,
         string prompt,
@@ -46,20 +46,19 @@ public sealed class McpConversationTools(
         {
             IdempotencyKey = commandId
         };
-        var result = await conversation.ExecuteAsync(
+        var receipt = await conversation.AcceptAsync(
             new CommandEnvelope(
                 McpInoCommandHandler.CommandType,
                 2,
                 commandId,
                 commandContext,
-                JsonSerializer.SerializeToElement(new { prompt })),
-            cancellationToken).ConfigureAwait(false);
+                JsonSerializer.SerializeToElement(new { prompt }))).ConfigureAwait(false);
         return new
         {
             commandId,
-            state = result.State.ToString(),
-            result.SafeReason,
-            awaitingAuthorization = result.Authorization is not null
+            operationId = receipt.OperationId,
+            phase = receipt.Phase.ToString(),
+            receipt.Version
         };
     }
 

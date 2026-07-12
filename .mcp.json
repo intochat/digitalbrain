@@ -13,8 +13,12 @@
       "url": "https://learn.microsoft.com/api/mcp"
     },
     "context7": {
-      "command": "cmd",
-      "args": ["/c", "gcf-proxy", "npx", "-y", "@upstash/context7-mcp@latest"]
+      "command": "gcf-proxy",
+      "args": ["npx", "-y", "@upstash/context7-mcp@latest"]
+    },
+    "dart": {
+      "command": "gcf-proxy",
+      "args": ["dart", "mcp-server"]
     }
   }
 }

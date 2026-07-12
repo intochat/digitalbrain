@@ -50,14 +50,19 @@ public static class SessionAudiences
 
 public static class RequestScope
 {
-    public static string Id(RequestContext context)
+    public static string Id(RequestContext context) => Id(
+        context.TenantId,
+        context.WorkspaceId,
+        context.Principal);
+
+    public static string Id(TenantId tenantId, WorkspaceId workspaceId, PrincipalRef principal)
     {
         var canonical = JsonSerializer.SerializeToUtf8Bytes(new
         {
-            tenant = context.TenantId.Value,
-            workspace = context.WorkspaceId.Value,
-            principalKind = (int)context.Principal.Kind,
-            principal = context.Principal.Value
+            tenant = tenantId.Value,
+            workspace = workspaceId.Value,
+            principalKind = (int)principal.Kind,
+            principal = principal.Value
         });
         return Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant();
     }
@@ -96,6 +101,9 @@ public static class GrainIds
 public sealed class SessionTokenService
 {
     private const string StructuredPrefix = "v3s";
+    private const string ActionCapabilityPrefix = "v1a";
+    private const string ActionCapabilityDomain = "digitalbrain.surface-action.v1\0";
+    private const string ActionBindingProofDomain = "digitalbrain.surface-action.binding.v1\0";
     private readonly byte[] _key;
     private readonly TimeProvider _timeProvider;
     public SessionTokenService(byte[] key, TimeProvider? timeProvider = null)
@@ -171,6 +179,86 @@ public sealed class SessionTokenService
                TryValidateCore(token, expectedAudience, out context, out expiresAt, out sessionVersion);
     }
 
+    public string IssueActionCapability(
+        RequestContext context,
+        string bindingId,
+        string surfaceId,
+        int surfaceRevision,
+        string bindingTokenHash,
+        DateTimeOffset expiresAt)
+    {
+        if (!IsActionCapabilityInputValid(context, bindingId, surfaceId, surfaceRevision, bindingTokenHash))
+            throw new ArgumentException("A bounded action binding and complete request context are required.");
+
+        var now = _timeProvider.GetUtcNow();
+        if (expiresAt <= now || expiresAt > now.Add(UiProtocol.ActionTokenLifetime))
+            throw new ArgumentOutOfRangeException(nameof(expiresAt));
+
+        var claims = new ActionCapabilityClaims(
+            1,
+            RequestScope.Id(context),
+            context.SessionId,
+            bindingId,
+            surfaceId,
+            surfaceRevision,
+            ActionBindingProof(bindingTokenHash),
+            now.ToUnixTimeSeconds(),
+            expiresAt.ToUnixTimeSeconds());
+        var body = ActionCapabilityPrefix + "." + Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(claims));
+        var signature = Convert.ToHexString(HMACSHA256.HashData(
+            _key,
+            Encoding.UTF8.GetBytes(ActionCapabilityDomain + body)));
+        return body + "." + signature;
+    }
+
+    public bool TryValidateActionCapability(
+        string token,
+        RequestContext context,
+        string bindingId,
+        string surfaceId,
+        int surfaceRevision,
+        string bindingTokenHash)
+    {
+        if (!IsActionCapabilityInputValid(context, bindingId, surfaceId, surfaceRevision, bindingTokenHash) ||
+            string.IsNullOrWhiteSpace(token) || token.Length > 4_096)
+            return false;
+
+        var parts = token.Split('.');
+        if (parts.Length != 3 || !string.Equals(parts[0], ActionCapabilityPrefix, StringComparison.Ordinal)) return false;
+        var body = string.Join('.', parts.Take(2));
+        var expectedSignature = HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(ActionCapabilityDomain + body));
+        byte[] actualSignature;
+        try { actualSignature = Convert.FromHexString(parts[2]); }
+        catch (FormatException) { return false; }
+        if (actualSignature.Length != expectedSignature.Length ||
+            !CryptographicOperations.FixedTimeEquals(actualSignature, expectedSignature))
+            return false;
+
+        ActionCapabilityClaims? claims;
+        try { claims = JsonSerializer.Deserialize<ActionCapabilityClaims>(Base64UrlDecode(parts[1])); }
+        catch (Exception exception) when (exception is FormatException or JsonException or ArgumentException) { return false; }
+        if (claims is null || claims.Version != 1 ||
+            !string.Equals(claims.ScopeId, RequestScope.Id(context), StringComparison.Ordinal) ||
+            !string.Equals(claims.SessionId, context.SessionId, StringComparison.Ordinal) ||
+            !string.Equals(claims.BindingId, bindingId, StringComparison.Ordinal) ||
+            !string.Equals(claims.SurfaceId, surfaceId, StringComparison.Ordinal) ||
+            claims.SurfaceRevision != surfaceRevision ||
+            !FixedHashEquals(claims.BindingProof, ActionBindingProof(bindingTokenHash)))
+            return false;
+
+        DateTimeOffset issuedAt;
+        DateTimeOffset expiresAt;
+        try
+        {
+            issuedAt = DateTimeOffset.FromUnixTimeSeconds(claims.IssuedAtUnixSeconds);
+            expiresAt = DateTimeOffset.FromUnixTimeSeconds(claims.ExpiresAtUnixSeconds);
+        }
+        catch (ArgumentOutOfRangeException) { return false; }
+        var now = _timeProvider.GetUtcNow();
+        return expiresAt > now && issuedAt <= now.AddMinutes(5) &&
+               expiresAt > issuedAt && expiresAt <= issuedAt.Add(UiProtocol.ActionTokenLifetime);
+    }
+
     private bool TryValidateCore(
         string token,
         string? expectedAudience,
@@ -231,6 +319,40 @@ public sealed class SessionTokenService
     private static string Base64UrlEncode(ReadOnlySpan<byte> value) =>
         Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
+    private static bool IsActionCapabilityInputValid(
+        RequestContext context,
+        string? bindingId,
+        string? surfaceId,
+        int surfaceRevision,
+        string? bindingTokenHash) =>
+        !string.IsNullOrWhiteSpace(context.SessionId) && context.SessionId.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(context.TenantId.Value) && context.TenantId.Value.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(context.WorkspaceId.Value) && context.WorkspaceId.Value.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(context.Principal.Value) && context.Principal.Value.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(bindingId) && bindingId.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(surfaceId) && surfaceId.Length <= 256 &&
+        surfaceRevision > 0 && IsSha256Hash(bindingTokenHash);
+
+    private static bool IsSha256Hash(string? value)
+    {
+        if (value is not { Length: 64 }) return false;
+        try { return Convert.FromHexString(value).Length == 32; }
+        catch (FormatException) { return false; }
+    }
+
+    private static bool FixedHashEquals(string? first, string? second)
+    {
+        if (first is not { } firstHash || second is not { } secondHash ||
+            !IsSha256Hash(firstHash) || !IsSha256Hash(secondHash))
+            return false;
+        return CryptographicOperations.FixedTimeEquals(Convert.FromHexString(firstHash), Convert.FromHexString(secondHash));
+    }
+
+    private string ActionBindingProof(string bindingTokenHash) =>
+        Convert.ToHexString(HMACSHA256.HashData(
+            _key,
+            Encoding.UTF8.GetBytes(ActionBindingProofDomain + bindingTokenHash.ToLowerInvariant())));
+
     private static byte[] Base64UrlDecode(string value)
     {
         var padded = value.Replace('-', '+').Replace('_', '/');
@@ -249,6 +371,17 @@ public sealed class SessionTokenService
         AuthAssurance Assurance,
         string Audience,
         string[] Grants,
+        long IssuedAtUnixSeconds,
+        long ExpiresAtUnixSeconds);
+
+    private sealed record ActionCapabilityClaims(
+        int Version,
+        string ScopeId,
+        string SessionId,
+        string BindingId,
+        string SurfaceId,
+        int SurfaceRevision,
+        string BindingProof,
         long IssuedAtUnixSeconds,
         long ExpiresAtUnixSeconds);
 }
@@ -276,20 +409,6 @@ public sealed record CommandEnvelope([property: Id(0)] string Type, [property: I
 public sealed record EventEnvelope([property: Id(0)] string Type, [property: Id(1)] int Version, [property: Id(2)] string EventId, [property: Id(3)] string CorrelationId, [property: Id(4)] string? CausationId, [property: Id(5)] JsonElement Payload);
 
 public enum WorkflowState { Proposed, AwaitingApproval, Approved, Rejected, Expired, Cancelled, ApplyQueued, Applying, RetryScheduled, Succeeded, Failed, OutcomeUnknown, CompensationQueued, Compensated, ManualIntervention, AwaitingExternalAuthorization }
-[GenerateSerializer, Alias("digitalbrain.v2.aggregate-commit")]
-public sealed record AggregateCommit([property: Id(0)] long CommitSequence, [property: Id(1)] string CommitId, [property: Id(2)] IReadOnlyList<EventEnvelope> Events, [property: Id(3)] string Checksum, [property: Id(4)] DateTimeOffset CommittedAt);
-[GenerateSerializer, Alias("digitalbrain.v2.outbox-record")]
-public sealed record OutboxRecord([property: Id(0)] string EffectId, [property: Id(1)] string OperationId, [property: Id(2)] int Ordinal, [property: Id(3)] string EffectType, [property: Id(4)] JsonElement Intent, [property: Id(5)] DateTimeOffset Deadline);
-[GenerateSerializer, Alias("digitalbrain.v2.effect-transition")]
-public sealed record EffectTransitionRecord(
-    [property: Id(0)] string EffectId,
-    [property: Id(1)] string TransitionId,
-    [property: Id(2)] string State,
-    [property: Id(3)] string? SafeResult,
-    [property: Id(4)] DateTimeOffset At,
-    [property: Id(5)] string? LeaseOwner = null,
-    [property: Id(6)] DateTimeOffset? LeaseExpiresAt = null,
-    [property: Id(7)] string? ProviderOperationId = null);
 
 public static class CommitSeal
 {

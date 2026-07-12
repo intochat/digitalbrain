@@ -1,19 +1,13 @@
 using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Configuration;
-using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
 
 namespace DigitalBrain.Kernel;
 
 public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClosedLoopNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IClosedLoopNeuron
 {
-    private const string AspireInspectionEnabledKey = "DigitalBrain:ClosedLoop:InspectAspireMcp";
-    private McpClient? _aspireMcp;
-
     public async Task HandleAsync(ClosedLoopRequest req, CancellationToken cancellationToken = default)
     {
-        Logger.LogInformation("ClosedLoop {Type} requested: {Prompt}", req.LoopType, req.Prompt);
+        Logger.LogInformation("ClosedLoop {Type} requested.", req.LoopType);
 
         var chat = ServiceProvider.GetService<IChatClient>();
         string analysis = "no-llm-fallback";
@@ -34,10 +28,10 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.LogWarning(ex, "ClosedLoop LLM analysis failed; recording fallback completion.");
-                analysis = "llm-error-fallback: " + ex.GetBaseException().Message;
+                Logger.LogWarning("ClosedLoop LLM analysis failed; recording fallback completion.");
+                analysis = "llm-error-fallback";
             }
         }
 
@@ -51,26 +45,6 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
         if (shouldStageSelfEvolution)
         {
             await StageSelfEvolutionProposalAsync(req, analysis, cancellationToken);
-
-            if (!ShouldInspectAspireMcp())
-            {
-                return;
-            }
-
-            await EnsureAspireMcpAsync(cancellationToken);
-            if (_aspireMcp != null)
-            {
-                try
-                {
-                    var res = await CallAspireMcpAsync("list_resources", ct: cancellationToken);
-                    Logger.LogInformation("ClosedLoop staged self-evolution proposal with Aspire resources visible: {Res}", res.Substring(0, Math.Min(200, res.Length)));
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch { }
-            }
         }
     }
 
@@ -109,59 +83,4 @@ public class SoftwareEngineeringClosedLoopNeuron(ILogger<SoftwareEngineeringClos
         await GrainFactory.GetGrain<ISelfEvolutionNeuron>(SelfEvolutionNeuronIds.Main).DeliverAsync(proposal, cancellationToken);
     }
 
-    private bool ShouldInspectAspireMcp()
-    {
-        var config = ServiceProvider.GetService<IConfiguration>();
-        return config?.GetValue(AspireInspectionEnabledKey, true) ?? true;
-    }
-
-    private async Task EnsureAspireMcpAsync(CancellationToken cancellationToken)
-    {
-        if (_aspireMcp != null)
-        {
-            return;
-        }
-
-        try
-        {
-            var workDir = Directory.GetCurrentDirectory();
-            _aspireMcp = await McpClient.CreateAsync(
-                new StdioClientTransport(new StdioClientTransportOptions
-                {
-                    Name = "aspire-closedloop",
-                    Command = "aspire",
-                    Arguments = ["agent", "mcp"],
-                    WorkingDirectory = workDir
-                }),
-                cancellationToken: cancellationToken);
-            await FireAsync(new SystemStatusChanged("closedloop-aspire-mcp", "connected"), cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "ClosedLoop Aspire MCP connect failed");
-        }
-    }
-
-    private async Task<string> CallAspireMcpAsync(string tool, object? args = null, CancellationToken ct = default)
-    {
-        if (_aspireMcp == null)
-        {
-            return "mcp-unavailable";
-        }
-
-        var dict = new Dictionary<string, object?>();
-        if (args != null)
-        {
-            foreach (var p in args.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
-            {
-                dict[p.Name] = p.GetValue(args);
-            }
-        }
-        var res = await _aspireMcp.CallToolAsync(tool, dict, cancellationToken: ct);
-        return res.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "no-data";
-    }
 }

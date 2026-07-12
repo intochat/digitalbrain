@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using Orleans.Runtime;
@@ -9,9 +10,12 @@ public sealed class ConversationNeuron(
     [PersistentState("conversation", RuntimeStateStorageProviders.Conversations)]
     IPersistentState<EncryptedRuntimeStateEnvelope> persistentState,
     EncryptedRuntimeStateProtector protector,
-    IGrainFactory grainFactory) : Grain, IConversationNeuron
+    IGrainFactory grainFactory) : Grain, IConversationNeuron, IRemindable
 {
+    private const string OperationReminderName = "ino.operation-worker.v1";
+    private static readonly TimeSpan OperationReminderPeriod = TimeSpan.FromSeconds(5);
     private EncryptedPersistentState<ConversationState>? _state;
+    private IGrainReminder? _operationReminder;
 
     private EncryptedPersistentState<ConversationState> State => _state ??= new(
         persistentState,
@@ -25,6 +29,39 @@ public sealed class ConversationNeuron(
         PrepareArchiveAsync);
 
     public Task<ConversationState> ReadAsync() => State.ReadAsync();
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        var state = await State.ReadAsync(cancellationToken);
+        if (state.Inbox.Any(entry => state.AcceptedCommands.All(command =>
+            !string.Equals(command.CommandId, entry.CommandId, StringComparison.Ordinal))))
+        {
+            state = await State.UpdateAsync(
+                state.Revision,
+                ConversationTransitions.MigrateLegacyAcceptedCommands,
+                cancellationToken);
+        }
+        if (state.Outbox.Any(entry => entry.Sequence == 0))
+        {
+            state = await State.UpdateAsync(
+                state.Revision,
+                ConversationTransitions.MigrateLegacyOutboxSequences,
+                cancellationToken);
+        }
+        if (state.Operations.Any(operation => operation.SuspendedInvocation is { } invocation &&
+            (invocation.InputUtf8.Length > 0 || invocation.Workflow is not null)))
+        {
+            state = await State.UpdateAsync(
+                state.Revision,
+                ConversationTransitions.RemoveLegacyAuthorizationPayloads,
+                cancellationToken);
+        }
+        if (HasOperationToWatch(state))
+            await EnsureOperationReminderAsync();
+        else
+            await StopOperationReminderIfIdleAsync(state);
+    }
 
     public async Task<ConversationArchivePage> ReadArchiveAsync(
         ConversationArchiveCursor? cursor,
@@ -60,62 +97,81 @@ public sealed class ConversationNeuron(
         State.UpdateAsync(expectedRevision, current =>
             ConversationTransitions.Initialize(current, expectedRevision, identity));
 
-    public Task<ConversationState> BeginOperationAsync(
+    public async Task<ConversationState> BeginOperationAsync(
         long expectedRevision,
         string commandId,
         string inputHash,
         string operationId,
         string userText,
-        DateTimeOffset createdAt) =>
-        State.UpdateAsync(expectedRevision, current => ConversationTransitions.BeginOperation(
+        string requestId,
+        ConversationOutboxEntry acceptedOutbox,
+        DateTimeOffset createdAt)
+    {
+        var state = await State.UpdateAsync(expectedRevision, current => ConversationTransitions.BeginOperation(
             current,
             expectedRevision,
             commandId,
             inputHash,
             operationId,
             userText,
+            requestId,
+            acceptedOutbox,
             createdAt));
+        await EnsureOperationReminderAsync();
+        return state;
+    }
 
-    public Task<ConversationState> AppendTurnAsync(
-        long expectedRevision,
-        string commandId,
-        string inputHash,
-        string operationId,
-        string role,
-        string text,
-        DateTimeOffset createdAt) =>
-        State.UpdateAsync(expectedRevision, current => ConversationTransitions.AppendTurn(
-            current,
-            expectedRevision,
-            commandId,
-            inputHash,
-            operationId,
-            role,
-            text,
-            createdAt));
+    public async Task ReceiveReminder(string reminderName, TickStatus status)
+    {
+        if (!string.Equals(reminderName, OperationReminderName, StringComparison.Ordinal)) return;
+        var state = await State.ReadAsync();
+        var conversationKey = this.GetPrimaryKeyString() ?? throw new InvalidOperationException("Conversation grains require a string key.");
+        foreach (var operation in state.Operations.Where(HasOperationToWatch).ToArray())
+        {
+            var worker = grainFactory.GetGrain<IInoOperationWorkerGrain>(conversationKey + "|" + operation.OperationId);
+            await worker.ScheduleAsync();
+        }
+        await StopOperationReminderIfIdleAsync(await State.ReadAsync());
+    }
 
-    public Task<ConversationState> PutOperationAsync(long expectedRevision, ConversationOperation operation) =>
-        State.UpdateAsync(expectedRevision, current =>
-            ConversationTransitions.PutOperation(current, expectedRevision, operation));
+    private async Task EnsureOperationReminderAsync()
+    {
+        _operationReminder ??= await this.RegisterOrUpdateReminder(
+            OperationReminderName,
+            TimeSpan.FromSeconds(1),
+            OperationReminderPeriod);
+    }
 
-    public Task<ConversationState> AppendAssistantTurnAsync(
-        long expectedRevision,
-        string operationId,
-        string text,
-        DateTimeOffset createdAt) =>
-        State.UpdateAsync(expectedRevision, current => ConversationTransitions.AppendAssistantTurn(
-            current,
-            expectedRevision,
-            operationId,
-            text,
-            createdAt));
+    private async Task StopOperationReminderIfIdleAsync(ConversationState state)
+    {
+        if (HasOperationToWatch(state)) return;
+        _operationReminder ??= await this.GetReminder(OperationReminderName);
+        if (_operationReminder is null) return;
+        await this.UnregisterReminder(_operationReminder);
+        _operationReminder = null;
+    }
+
+    private static bool HasOperationToWatch(ConversationState state) =>
+        state.Outbox.Any(entry => entry.DispatchedAt is null) ||
+        state.Operations.Any(operation => operation.Status is
+            ConversationOperationStatus.Pending or
+            ConversationOperationStatus.AwaitingAuthorization or
+            ConversationOperationStatus.RetryScheduled or
+            ConversationOperationStatus.Running);
+
+    private static bool HasOperationToWatch(ConversationOperation operation) =>
+        operation.Status == ConversationOperationStatus.Pending ||
+        operation.Status == ConversationOperationStatus.AwaitingAuthorization ||
+        operation.Status == ConversationOperationStatus.RetryScheduled ||
+        operation.Status == ConversationOperationStatus.Running;
 
     public Task<ConversationClaim> TryClaimOperationAsync(
         long expectedRevision,
         string operationId,
         string leaseOwner,
         DateTimeOffset now,
-        TimeSpan leaseDuration) =>
+        TimeSpan leaseDuration,
+        ConversationOutboxEntry? runningOutbox = null) =>
         State.UpdateAsync(expectedRevision, current =>
         {
             var result = ConversationTransitions.TryClaimOperation(
@@ -124,7 +180,8 @@ public sealed class ConversationNeuron(
                 operationId,
                 leaseOwner,
                 now,
-                leaseDuration);
+                leaseDuration,
+                runningOutbox);
             return (result.State, result);
         });
 
@@ -134,7 +191,8 @@ public sealed class ConversationNeuron(
         string authorizationAttemptId,
         string leaseOwner,
         DateTimeOffset now,
-        TimeSpan leaseDuration) =>
+        TimeSpan leaseDuration,
+        ConversationOutboxEntry? runningOutbox = null) =>
         State.UpdateAsync(expectedRevision, current =>
         {
             var result = ConversationTransitions.TryClaimAuthorization(
@@ -144,21 +202,10 @@ public sealed class ConversationNeuron(
                 authorizationAttemptId,
                 leaseOwner,
                 now,
-                leaseDuration);
+                leaseDuration,
+                runningOutbox);
             return (result.State, result);
         });
-
-    public Task<ConversationState> SuspendAuthorizationAsync(
-        long expectedRevision,
-        string operationId,
-        SuspendedInvocation invocation,
-        DateTimeOffset now) =>
-        State.UpdateAsync(expectedRevision, current => ConversationTransitions.SuspendAuthorization(
-            current,
-            expectedRevision,
-            operationId,
-            invocation,
-            now));
 
     public Task<ConversationState> SuspendAuthorizationWithAssistantAsync(
         long expectedRevision,
@@ -166,7 +213,8 @@ public sealed class ConversationNeuron(
         SuspendedInvocation invocation,
         string assistantText,
         ConversationOutboxEntry feedOutbox,
-        DateTimeOffset now) =>
+        DateTimeOffset now,
+        ConversationLeaseFence? leaseFence = null) =>
         State.UpdateAsync(expectedRevision, current => ConversationTransitions.SuspendAuthorizationWithAssistant(
             current,
             expectedRevision,
@@ -174,37 +222,78 @@ public sealed class ConversationNeuron(
             invocation,
             assistantText,
             feedOutbox,
-            now));
+            now,
+            leaseFence));
 
-    public Task<ConversationState> ScheduleRetryAsync(
+    public Task<ConversationState> RequestApprovalWithAssistantAsync(
+        long expectedRevision,
+        string operationId,
+        ApprovalRecord approval,
+        EffectRecord effect,
+        string assistantText,
+        ConversationOutboxEntry feedOutbox,
+        DateTimeOffset now,
+        WorkflowReference? workflow = null,
+        ConversationLeaseFence? leaseFence = null) =>
+        State.UpdateAsync(expectedRevision, current => ConversationTransitions.RequestApprovalWithAssistant(
+            current,
+            expectedRevision,
+            operationId,
+            approval,
+            effect,
+            assistantText,
+            feedOutbox,
+            now,
+            workflow,
+            leaseFence));
+
+    public async Task<ConversationState> DecideApprovalWithAssistantAsync(
+        long expectedRevision,
+        string operationId,
+        string approvalId,
+        bool approved,
+        string decisionId,
+        string decidedBy,
+        string assistantText,
+        ConversationOutboxEntry feedOutbox,
+        DateTimeOffset now)
+    {
+        var state = await State.UpdateAsync(expectedRevision, current => ConversationTransitions.DecideApprovalWithAssistant(
+            current,
+            expectedRevision,
+            operationId,
+            approvalId,
+            approved,
+            decisionId,
+            decidedBy,
+            assistantText,
+            feedOutbox,
+            now));
+        await EnsureOperationReminderAsync();
+        return state;
+    }
+
+    public async Task<ConversationState> ScheduleRetryAsync(
         long expectedRevision,
         string operationId,
         DateTimeOffset nextAttemptAt,
         string safeReason,
-        DateTimeOffset now) =>
-        State.UpdateAsync(expectedRevision, current => ConversationTransitions.ScheduleRetry(
+        DateTimeOffset now,
+        ConversationOutboxEntry? retryOutbox = null,
+        ConversationLeaseFence? leaseFence = null)
+    {
+        var state = await State.UpdateAsync(expectedRevision, current => ConversationTransitions.ScheduleRetry(
             current,
             expectedRevision,
             operationId,
             nextAttemptAt,
             safeReason,
-            now));
-
-    public Task<ConversationState> CompleteOperationAsync(
-        long expectedRevision,
-        string operationId,
-        ConversationOperationStatus terminalStatus,
-        ConversationTerminalPolicy terminalPolicy,
-        string? safeReason,
-        DateTimeOffset now) =>
-        State.UpdateAsync(expectedRevision, current => ConversationTransitions.CompleteOperation(
-            current,
-            expectedRevision,
-            operationId,
-            terminalStatus,
-            terminalPolicy,
-            safeReason,
-            now));
+            now,
+            retryOutbox,
+            leaseFence));
+        await EnsureOperationReminderAsync();
+        return state;
+    }
 
     public Task<ConversationState> CompleteWithAssistantAsync(
         long expectedRevision,
@@ -214,7 +303,9 @@ public sealed class ConversationNeuron(
         string? safeReason,
         string assistantText,
         ConversationOutboxEntry feedOutbox,
-        DateTimeOffset now) =>
+        DateTimeOffset now,
+        WorkflowReference? workflow = null,
+        ConversationLeaseFence? leaseFence = null) =>
         State.UpdateAsync(expectedRevision, current => ConversationTransitions.CompleteWithAssistant(
             current,
             expectedRevision,
@@ -224,11 +315,33 @@ public sealed class ConversationNeuron(
             safeReason,
             assistantText,
             feedOutbox,
-            now));
+            now,
+            workflow,
+            leaseFence));
 
-    public Task<ConversationState> EnqueueOutboxAsync(long expectedRevision, ConversationOutboxEntry entry) =>
-        State.UpdateAsync(expectedRevision, current =>
-            ConversationTransitions.EnqueueOutbox(current, expectedRevision, entry));
+    public Task<ConversationState> CompleteEffectWithAssistantAsync(
+        long expectedRevision,
+        string operationId,
+        EffectRecord effect,
+        ConversationOperationStatus terminalStatus,
+        ConversationTerminalPolicy terminalPolicy,
+        string? safeReason,
+        string assistantText,
+        ConversationOutboxEntry feedOutbox,
+        DateTimeOffset now,
+        ConversationLeaseFence? leaseFence = null) =>
+        State.UpdateAsync(expectedRevision, current => ConversationTransitions.CompleteEffectWithAssistant(
+            current,
+            expectedRevision,
+            operationId,
+            effect,
+            terminalStatus,
+            terminalPolicy,
+            safeReason,
+            assistantText,
+            feedOutbox,
+            now,
+            leaseFence));
 
     public Task<ConversationState> MarkOutboxDispatchedAsync(
         long expectedRevision,
@@ -243,11 +356,4 @@ public sealed class ConversationNeuron(
     public Task<ConversationState> RecordMigrationAsync(long expectedRevision, string migrationId) =>
         State.UpdateAsync(expectedRevision, current =>
             ConversationTransitions.RecordMigration(current, expectedRevision, migrationId));
-
-    public Task<ConversationState> TombstoneAsync(
-        long expectedRevision,
-        DateTimeOffset deletedAt,
-        string reason) =>
-        State.UpdateAsync(expectedRevision, current =>
-            ConversationTransitions.Tombstone(current, expectedRevision, deletedAt, reason));
 }

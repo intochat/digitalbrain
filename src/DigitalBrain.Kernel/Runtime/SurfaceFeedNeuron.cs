@@ -28,6 +28,10 @@ public sealed class SurfaceFeedNeuron(
         State.UpdateAsync(expectedRevision, current =>
             SurfaceFeedTransitions.Initialize(current, expectedRevision, identity));
 
+    public Task<SurfaceFeedState> EnsureHomeSurfaceAsync(long expectedRevision, HomeSurfaceBootstrap bootstrap) =>
+        State.UpdateAsync(expectedRevision, current =>
+            SurfaceFeedTransitions.EnsureHomeSurface(current, expectedRevision, bootstrap));
+
     public Task<SurfaceFeedState> ApplyProjectionAsync(
         long expectedRevision,
         SurfaceFeedProjection projection,
@@ -90,6 +94,10 @@ public sealed class SurfaceFeedNeuron(
                 now);
             return (result.State, result);
         });
+
+    public Task<SurfaceFeedState> RenewActionBindingsAsync(long expectedRevision, DateTimeOffset now) =>
+        State.UpdateAsync(expectedRevision, current =>
+            SurfaceFeedTransitions.RenewActionBindings(current, expectedRevision, now));
 
     public Task<SurfaceFeedState> RebuildAsync(
         long expectedRevision,

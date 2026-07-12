@@ -81,6 +81,7 @@ public static class DigitalBrainOrleansExtensions
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
+                services.AddSingleton<IInoToolGateway, ClosedInoToolGateway>();
             });
             siloBuilder.AddFoundry();
 
@@ -210,9 +211,6 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton(new SchemaRegistry([
             new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
             new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true)]));
-        builder.Services.AddScoped<IAggregateStore, OrleansAggregateStore>();
-        builder.Services.AddSingleton<ICommandHandler, EffectCommandHandler>();
-
         var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted(builder.Configuration);
 
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
@@ -244,6 +242,7 @@ public static class DigitalBrainOrleansExtensions
         }
 
         builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
+        builder.Services.AddSingleton<IAgentWorkflowRunner, AgentFrameworkWorkflowRunner>();
 
         BlobServiceClient? packConfigBlobs = null;
         if (isAspireHosted)

@@ -129,7 +129,15 @@ void main() {
     await tester.pump();
 
     expect(binding, 'ino.send');
-    expect(submittedInput, {'prompt': prompt});
+    expect(submittedInput?['prompt'], prompt);
+    expect(
+      submittedInput?['clientSubmissionId'],
+      isA<String>().having(
+        (value) => value.length,
+        'length',
+        greaterThanOrEqualTo(16),
+      ),
+    );
     expect(find.text(prompt), findsOneWidget);
     expect(find.text('Sending'), findsOneWidget);
     expect(
@@ -433,22 +441,64 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(inoSubmissionNoticeKey), findsNothing);
-    expect(
-      tester.widget<FilledButton>(find.byKey(inoSendButtonKey)).onPressed,
-      isNotNull,
-    );
   });
 
-  testWidgets('definite preflight rejection restores the draft', (
+  testWidgets('terminal feed state reconciles an uncertain lost receipt', (
     tester,
   ) async {
+    const prompt = 'Finish before my receipt arrives';
+    Future<ActionResult> submit(
+      Object surface,
+      String binding,
+      Map<String, Object?> input,
+    ) async => throw Exception('connection closed after acceptance');
+
+    await tester.pumpWidget(
+      _host(SurfaceView(surface: _inoSurface(), onSubmitAction: submit)),
+    );
+    await tester.enterText(find.byKey(inoComposerFieldKey), prompt);
+    await tester.pump();
+    await tester.tap(find.byKey(inoSendButtonKey));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(inoSubmissionNoticeKey), findsOneWidget);
+
+    await _pumpInoRevision(
+      tester,
+      surface: _inoSurface(
+        sequence: 2,
+        revision: 2,
+        messages: [
+          inoMessage(
+            turnKey: 'turn-user-terminal',
+            role: 'user',
+            text: prompt,
+            state: 'succeeded',
+          ),
+          inoMessage(
+            turnKey: 'turn-assistant-terminal',
+            role: 'assistant',
+            text: 'Completed before the receipt returned.',
+            state: 'succeeded',
+          ),
+        ],
+        operation: inoOperation(state: 'succeeded'),
+      ),
+      submit: submit,
+    );
+
+    expect(find.byKey(inoSubmissionNoticeKey), findsNothing);
+  });
+
+  testWidgets('stale action precondition restores the draft', (tester) async {
     const prompt = 'Keep this message';
     await tester.pumpWidget(
       _host(
         SurfaceView(
           surface: _inoSurface(),
           onSubmitAction: (surface, binding, input) async =>
-              throw StateError('stale action'),
+              throw const PreconditionException(),
         ),
       ),
     );
@@ -469,6 +519,125 @@ void main() {
       tester.widget<FilledButton>(find.byKey(inoSendButtonKey)).onPressed,
       isNotNull,
     );
+  });
+
+  testWidgets('generic protocol failure remains an uncertain delivery', (
+    tester,
+  ) async {
+    const prompt = 'Keep this delivery uncertain';
+    await tester.pumpWidget(
+      _host(
+        SurfaceView(
+          surface: _inoSurface(),
+          onSubmitAction: (surface, binding, input) async =>
+              throw const ProtocolException('Action reply was malformed.'),
+        ),
+      ),
+    );
+    await tester.enterText(find.byKey(inoComposerFieldKey), prompt);
+    await tester.pump();
+    await tester.tap(find.byKey(inoSendButtonKey));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(inoRetryDeliveryButtonKey), findsOneWidget);
+    expect(
+      find.text(
+        'We couldn\'t confirm that INO received this message. '
+        'Your conversation will update when the connection recovers.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(inoComposerFieldKey))
+          .controller
+          ?.text,
+      isEmpty,
+    );
+  });
+
+  testWidgets('approval decisions require the current signed feed binding', (
+    tester,
+  ) async {
+    Object? submittedSurface;
+    String? submittedBinding;
+    Map<String, Object?>? submittedInput;
+    Future<ActionResult> submit(
+      Object surface,
+      String binding,
+      Map<String, Object?> input,
+    ) async {
+      submittedSurface = surface;
+      submittedBinding = binding;
+      submittedInput = input;
+      return const ActionResult(
+        operationId: 'operation-pending',
+        idempotencyKey: 'approval-idempotency',
+      );
+    }
+
+    await tester.pumpWidget(
+      _host(
+        SurfaceView(
+          surface: _inoSurface(
+            operation: inoOperation(
+              state: 'awaiting-approval',
+              operationId: 'operation-pending',
+              approvalId: 'approval-pending',
+            ),
+          ),
+          onSubmitAction: submit,
+        ),
+      ),
+    );
+
+    expect(
+      tester.widget<FilledButton>(find.byKey(inoApproveButtonKey)).onPressed,
+      isNull,
+    );
+    expect(
+      tester.widget<OutlinedButton>(find.byKey(inoRejectButtonKey)).onPressed,
+      isNull,
+    );
+    expect(submittedBinding, isNull);
+
+    final signedApprovalSurface = _inoSurface(
+      sequence: 2,
+      revision: 2,
+      operation: inoOperation(
+        state: 'awaiting-approval',
+        operationId: 'operation-pending',
+        approvalId: 'approval-pending',
+      ),
+      actions: [
+        testActionJson(
+          bindingId: 'ino.approval.decision',
+          actionType: 'ino.approval.decision',
+          actionToken: 'signed-approval-action-token',
+          surfaceRevision: 2,
+        ),
+      ],
+    );
+    await _pumpInoRevision(
+      tester,
+      surface: signedApprovalSurface,
+      submit: submit,
+    );
+
+    await tester.tap(find.byKey(inoApproveButtonKey));
+    await tester.pump();
+
+    expect(submittedSurface, same(signedApprovalSurface));
+    expect(submittedBinding, 'ino.approval.decision');
+    expect(submittedInput, containsPair('operationId', 'operation-pending'));
+    expect(submittedInput, containsPair('approvalId', 'approval-pending'));
+    expect(submittedInput, containsPair('decision', 'approve'));
+    expect(
+      submittedInput?['clientDecisionId'],
+      isA<String>().having((value) => value, 'value', startsWith('ui-')),
+    );
+    expect(submittedInput, isNot(contains('actionToken')));
   });
 
   testWidgets('keeps the draft and disables Send while reconnecting', (
@@ -540,7 +709,8 @@ void main() {
       Map<String, Object?> input,
     ) async {
       submissions++;
-      expect(input, {'prompt': 'Please try this'});
+      expect(input['prompt'], 'Please try this');
+      expect(input['clientSubmissionId'], isA<String>());
       return const ActionResult(
         operationId: 'operation-a',
         idempotencyKey: 'idempotency-a',
@@ -727,6 +897,41 @@ void main() {
     );
   });
 
+  testWidgets('renders distinct approved and applying-effect phase status', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        SurfaceView(
+          surface: _inoSurface(
+            operation: inoOperation(state: 'queued', phase: 'approved'),
+          ),
+          onSubmitAction: _unexpectedAction,
+        ),
+      ),
+    );
+
+    expect(
+      find.text('Approval accepted. INO is preparing the approved action.'),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(
+      _host(
+        SurfaceView(
+          surface: _inoSurface(
+            sequence: 2,
+            revision: 2,
+            operation: inoOperation(state: 'running', phase: 'applying-effect'),
+          ),
+          onSubmitAction: _unexpectedAction,
+        ),
+      ),
+    );
+
+    expect(find.text('INO is applying the approved action.'), findsOneWidget);
+  });
+
   testWidgets('terminal state is announced as a live status', (tester) async {
     await tester.pumpWidget(
       _host(
@@ -741,70 +946,34 @@ void main() {
     expect(semantics.flagsCollection.isLiveRegion, isTrue);
   });
 
-  testWidgets('new and delete conversation actions submit empty typed input', (
-    tester,
-  ) async {
-    final calls = <(String, Map<String, Object?>)>[];
-    final createCompletion = Completer<ActionResult>();
-    var submissions = 0;
-    Future<ActionResult> submit(
-      Object surface,
-      String binding,
-      Map<String, Object?> input,
-    ) {
-      calls.add((binding, input));
-      submissions++;
-      if (submissions == 1) return createCompletion.future;
-      return Future.value(
-        const ActionResult(
-          operationId: 'delete-operation',
-          idempotencyKey: 'delete-idempotency',
-        ),
-      );
-    }
-
+  testWidgets('legacy lifecycle actions are not rendered', (tester) async {
     await tester.pumpWidget(
       _host(
         SurfaceView(
-          surface: _inoSurface(includeLifecycleActions: true),
-          onSubmitAction: submit,
+          surface: _inoSurface(
+            actions: [
+              testInoActionJson(surfaceRevision: 1),
+              testActionJson(
+                bindingId: 'ino.new',
+                actionType: 'ino.conversation.new',
+                actionToken: 'signed-new-conversation-action-token',
+                surfaceRevision: 1,
+              ),
+              testActionJson(
+                bindingId: 'ino.delete',
+                actionType: 'ino.conversation.delete',
+                actionToken: 'signed-delete-conversation-action-token',
+                surfaceRevision: 1,
+              ),
+            ],
+          ),
+          onSubmitAction: _unexpectedAction,
         ),
       ),
     );
 
-    await tester.tap(find.byKey(inoNewConversationButtonKey));
-    await tester.pump();
-    expect(calls, hasLength(1));
-    expect(calls.single.$1, 'ino.new');
-    expect(calls.single.$2, isEmpty);
-    expect(
-      tester
-          .widget<OutlinedButton>(find.byKey(inoNewConversationButtonKey))
-          .onPressed,
-      isNull,
-    );
-    expect(
-      tester
-          .widget<IconButton>(find.byKey(inoDeleteConversationButtonKey))
-          .onPressed,
-      isNull,
-    );
-
-    createCompletion.complete(
-      const ActionResult(
-        operationId: 'create-operation',
-        idempotencyKey: 'create-idempotency',
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(inoDeleteConversationButtonKey));
-    await tester.pumpAndSettle();
-    expect(find.text('Delete this conversation?'), findsOneWidget);
-    await tester.tap(find.byKey(inoDeleteConversationConfirmKey));
-    await tester.pumpAndSettle();
-
-    expect(calls.last.$1, 'ino.delete');
-    expect(calls.last.$2, isEmpty);
+    expect(find.text('New'), findsNothing);
+    expect(find.byTooltip('Delete conversation'), findsNothing);
   });
 
   testWidgets(
@@ -997,28 +1166,12 @@ SurfaceEnvelope _inoSurface({
   int revision = 1,
   List<Map<String, Object?>> messages = const [],
   Map<String, Object?>? operation,
-  bool includeLifecycleActions = false,
+  List<Map<String, Object?>>? actions,
 }) => testSurface(
   sequence: sequence,
   revision: revision,
   payload: inoConversationPayload(messages: messages, operation: operation),
-  actions: [
-    testInoActionJson(surfaceRevision: revision),
-    if (includeLifecycleActions)
-      testActionJson(
-        bindingId: 'ino.new',
-        actionType: 'ino.conversation.new',
-        actionToken: 'signed-new-conversation-action-token',
-        surfaceRevision: revision,
-      ),
-    if (includeLifecycleActions)
-      testActionJson(
-        bindingId: 'ino.delete',
-        actionType: 'ino.conversation.delete',
-        actionToken: 'signed-delete-conversation-action-token',
-        surfaceRevision: revision,
-      ),
-  ],
+  actions: actions ?? [testInoActionJson(surfaceRevision: revision)],
 );
 
 Future<void> _pumpInoRevision(

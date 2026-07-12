@@ -19,46 +19,21 @@ public sealed record PreparedRuntimeFeed(
 
 public sealed record AuthorizedRuntimeAction(
     ActionSubmission Submission,
-    SurfaceActionBinding Binding,
+    SurfaceActionBinding? Binding,
     string ConversationId);
+
+internal sealed record ApprovalDecisionInput(
+    string OperationId,
+    string ApprovalId,
+    bool Approved,
+    string ClientDecisionId);
 
 public sealed class RuntimeSurfaceFeed(
     IClusterClient cluster,
-    TimeProvider timeProvider) : IActiveConversationFeed
+    TimeProvider timeProvider,
+    SessionTokenService actionCapabilities)
 {
     private static readonly TimeSpan CursorLifetime = TimeSpan.FromDays(30);
-    private const int CurrentPresentationVersion = 1;
-
-    public async Task ProjectConversationAsync(
-        RuntimeRequestContext context,
-        InoConversationSnapshot conversation,
-        string projectionId,
-        DateTimeOffset createdAt,
-        CancellationToken cancellationToken = default)
-    {
-        DemandPrincipal(context);
-        ConversationStateClient.DemandConversationId(conversation.ConversationId);
-        var neuron = Feed(context);
-        var state = await EnsureInitializedAsync(context, neuron, cancellationToken).ConfigureAwait(false);
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            if (!string.Equals(ActiveConversationId(context, state), conversation.ConversationId, StringComparison.Ordinal))
-                return;
-            if (state.AppliedProjectionIds.Contains(projectionId, StringComparer.Ordinal)) return;
-            var projection = CreateConversationProjection(context, state, conversation, projectionId, createdAt);
-            try
-            {
-                await neuron.ApplyProjectionAsync(state.Revision, projection, timeProvider.GetUtcNow())
-                    .WaitAsync(cancellationToken).ConfigureAwait(false);
-                return;
-            }
-            catch (RuntimeStateConflictException) when (attempt < 2)
-            {
-                state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        throw new InvalidOperationException("Conversation projection revision retry exhausted.");
-    }
 
     public async Task<string> ResolveActiveConversationIdAsync(
         RuntimeRequestContext context,
@@ -70,42 +45,6 @@ public sealed class RuntimeSurfaceFeed(
         return ActiveConversationId(context, state);
     }
 
-    public async Task<bool> TryActivateConversationAsync(
-        RuntimeRequestContext context,
-        string expectedConversationId,
-        InoConversationSnapshot conversation,
-        string projectionId,
-        DateTimeOffset createdAt,
-        CancellationToken cancellationToken)
-    {
-        DemandPrincipal(context);
-        ConversationStateClient.DemandConversationId(expectedConversationId);
-        ConversationStateClient.DemandConversationId(conversation.ConversationId);
-        var neuron = Feed(context);
-        var state = await EnsureInitializedAsync(context, neuron, cancellationToken).ConfigureAwait(false);
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            var activeConversationId = ActiveConversationId(context, state);
-            if (string.Equals(activeConversationId, conversation.ConversationId, StringComparison.Ordinal))
-                return true;
-            if (!string.Equals(activeConversationId, expectedConversationId, StringComparison.Ordinal))
-                return false;
-
-            var projection = CreateConversationProjection(context, state, conversation, projectionId, createdAt);
-            try
-            {
-                await neuron.ApplyProjectionAsync(state.Revision, projection, timeProvider.GetUtcNow())
-                    .WaitAsync(cancellationToken).ConfigureAwait(false);
-                return true;
-            }
-            catch (RuntimeStateConflictException) when (attempt < 2)
-            {
-                state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        return false;
-    }
-
     public async Task<PreparedRuntimeFeed> PrepareSessionAsync(
         RuntimeRequestContext context,
         CancellationToken cancellationToken = default)
@@ -114,64 +53,10 @@ public sealed class RuntimeSurfaceFeed(
         var neuron = Feed(context);
         var state = await EnsureInitializedAsync(context, neuron, cancellationToken).ConfigureAwait(false);
         if (state.CurrentSurfaces.Length == 0)
-        {
-            await ProjectConversationAsync(
-                context,
-                InoConversationSnapshot.Empty(context),
-                "bootstrap-" + RequestScope.Id(context),
-                timeProvider.GetUtcNow(),
-                cancellationToken).ConfigureAwait(false);
-            state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
+            state = await EnsureHomeSurfaceAsync(context, neuron, state, cancellationToken).ConfigureAwait(false);
+        state = await RenewActionBindingsAsync(neuron, state, cancellationToken).ConfigureAwait(false);
 
-        var current = state.CurrentSurfaces.Single(surface =>
-            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
-        var presentation = ReadPresentation(current);
-        var now = timeProvider.GetUtcNow();
-
-        // The persisted surface can go stale relative to its conversation (e.g. a recovery-neutralized
-        // revision was written to the conversation but never reprojected). Force a full rematerialization
-        // whenever the conversation has moved on, instead of only refreshing action-binding tokens over
-        // whatever content happens to already be persisted.
-        var conversation = await ReadConversationSnapshotAsync(
-            context, ActiveConversationId(context, state), cancellationToken).ConfigureAwait(false);
-        if (conversation.Revision != presentation.ConversationRevision ||
-            presentation.PresentationVersion != CurrentPresentationVersion)
-        {
-            await ProjectConversationAsync(
-                context,
-                conversation,
-                "reproject-" + Guid.NewGuid().ToString("N"),
-                now,
-                cancellationToken).ConfigureAwait(false);
-            state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-            current = state.CurrentSurfaces.Single(surface =>
-                string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
-            presentation = ReadPresentation(current);
-        }
-
-        var descriptors = PresentationAllowsSend(presentation.Payload)
-            ? ConversationSurfacePayload.Actions(conversation, now).ToArray()
-            : ConversationSurfacePayload.LifecycleActions(now);
-
-        var nextRevision = checked(current.SurfaceRevision + 1);
-        var projectionId = "session-actions-" + Guid.NewGuid().ToString("N");
-        var bindings = CreateBindings(descriptors, nextRevision, out var tokens);
-        var projection = new SurfaceFeedProjection(
-            projectionId,
-            current.SurfaceId,
-            nextRevision,
-            SurfaceContentHash.Compute(presentation.Payload, descriptors),
-            current.PayloadUtf8,
-            now,
-            null,
-            bindings);
-        state = await RetryConflictAsync(
-            neuron,
-            state,
-            latest => neuron.ApplyProjectionAsync(latest.Revision, projection, timeProvider.GetUtcNow()),
-            cancellationToken).ConfigureAwait(false);
-        return new(state, tokens);
+        return new(state, IssueActionCapabilities(context, state));
     }
 
     public RuntimeFeedPage ReadPage(
@@ -183,21 +68,29 @@ public sealed class RuntimeSurfaceFeed(
         DemandPrincipal(context);
         if (afterSequence < 0) throw new ArgumentOutOfRangeException(nameof(afterSequence));
         var bounded = Math.Clamp(limit, 1, 100);
-        var items = state.CurrentSurfaces
+        var history = state.EventHistory ?? [];
+        var oldestRetained = history.Length == 0 ? (long?)null : history[0].Sequence;
+        var reset = afterSequence > state.LastSequence ||
+                    afterSequence < state.LastSequence &&
+                    (oldestRetained is null || afterSequence < oldestRetained.Value - 1);
+        var items = reset
+            ? state.CurrentSurfaces
+                .OrderBy(surface => surface.Sequence)
+                .TakeLast(bounded)
+                .Select(surface => ToStoredRecord(context, state, surface, includeActions: true))
+                .ToArray()
+            : history
             .Where(surface => surface.Sequence > afterSequence)
             .OrderBy(surface => surface.Sequence)
             .Take(bounded)
-            .Select(surface => ToStoredRecord(context, state, surface))
+            .Select(surface => ToStoredRecord(
+                context,
+                state,
+                surface,
+                includeActions: state.CurrentSurfaces.Any(current =>
+                    string.Equals(current.SurfaceId, surface.SurfaceId, StringComparison.Ordinal) &&
+                    current.SurfaceRevision == surface.SurfaceRevision && current.Sequence == surface.Sequence)))
             .ToArray();
-        var reset = afterSequence > 0 && afterSequence < state.LastSequence && items.Length == 0;
-        if (reset)
-        {
-            items = state.CurrentSurfaces
-                .OrderBy(surface => surface.Sequence)
-                .TakeLast(bounded)
-                .Select(surface => ToStoredRecord(context, state, surface))
-                .ToArray();
-        }
         return new(items, reset, state.LastSequence);
     }
 
@@ -264,21 +157,95 @@ public sealed class RuntimeSurfaceFeed(
         DemandPrincipal(context);
         var neuron = Feed(context);
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-        var binding = DemandBinding(state, context, bindingId, surfaceId, surfaceRevision);
-        var authorizedInput = AuthorizeInput(binding, input);
         var activeConversationId = ActiveConversationId(context, state);
-        var idempotencyKey = "surface-action-" + Hash(
-            RequestScope.Id(context) + "\0" + bindingId + "\0" + surfaceRevision + "\0" + CanonicalJson(input));
-        var operationId = ConversationStateClient.OperationId(
-            context with { ConversationId = activeConversationId },
-            idempotencyKey);
+        var hasApprovalDecision = TryReadApprovalDecision(input, out var approvalDecision);
+        if (TryReadPrompt(input, out var requestedPrompt, out var clientSubmissionId) &&
+            clientSubmissionId is not null)
+        {
+            if (!context.Grants.Contains("ui.action"))
+                throw new ActionRejectedException(ActionRejection.PolicyDenied);
+            var acceptedIdempotencyKey = StableIdempotencyKey(context, clientSubmissionId);
+            var acceptedOperationId = ConversationStateClient.OperationId(
+                context with { ConversationId = activeConversationId },
+                acceptedIdempotencyKey);
+            var conversation = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
+                context.TenantId,
+                context.WorkspaceId,
+                context.Principal,
+                activeConversationId));
+            var conversationState = await conversation.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            var existing = conversationState.Operations.FirstOrDefault(candidate =>
+                string.Equals(candidate.OperationId, acceptedOperationId, StringComparison.Ordinal));
+            if (existing is not null)
+            {
+                var priorPrompt = conversationState.Turns.LastOrDefault(turn =>
+                    turn.Kind == ConversationTurnKind.User &&
+                    string.Equals(turn.OperationId, acceptedOperationId, StringComparison.Ordinal))?.Text;
+                if (!string.Equals(priorPrompt, requestedPrompt, StringComparison.Ordinal))
+                    throw new ActionRejectedException(ActionRejection.Replay);
+                return new(
+                    new ActionSubmission(
+                        acceptedOperationId,
+                        acceptedIdempotencyKey,
+                        JsonSerializer.SerializeToElement(new { prompt = requestedPrompt }),
+                        ConversationSurfacePayload.SendActionType),
+                    null,
+                    activeConversationId);
+            }
+        }
+        if (hasApprovalDecision)
+        {
+            if (!context.Grants.Contains("ui.action"))
+                throw new ActionRejectedException(ActionRejection.PolicyDenied);
+            var decisionId = StableIdempotencyKey(context, approvalDecision.ClientDecisionId);
+            var conversation = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
+                context.TenantId,
+                context.WorkspaceId,
+                context.Principal,
+                activeConversationId));
+            var conversationState = await conversation.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            var target = conversationState.Operations.FirstOrDefault(candidate =>
+                string.Equals(candidate.OperationId, approvalDecision.OperationId, StringComparison.Ordinal));
+            if (target?.Approval is { DecisionId: not null } approval)
+            {
+                if (!string.Equals(approval.ApprovalId, approvalDecision.ApprovalId, StringComparison.Ordinal) ||
+                    !string.Equals(approval.DecisionId, decisionId, StringComparison.Ordinal) ||
+                    !string.Equals(approval.State, approvalDecision.Approved ? "approved" : "rejected", StringComparison.Ordinal))
+                    throw new ActionRejectedException(ActionRejection.Replay);
+                return new(
+                    new ActionSubmission(
+                        target.OperationId,
+                        decisionId,
+                        CanonicalApprovalDecision(approvalDecision),
+                        ConversationSurfacePayload.ApprovalActionType),
+                    null,
+                    activeConversationId);
+            }
+        }
+        var binding = DemandBinding(state, context, bindingId, surfaceId, surfaceRevision);
+        DemandActionCapability(context, actionToken, binding);
+        if (hasApprovalDecision)
+            DemandApprovalMatchesBoundSurface(state, binding, approvalDecision);
+        var authorizedInput = AuthorizeInput(binding, input);
+        var clientActionId = clientSubmissionId ?? (hasApprovalDecision ? approvalDecision.ClientDecisionId : null);
+        var idempotencyKey = clientActionId is null
+            ? "surface-action-" + Hash(
+                RequestScope.Id(context) + "\0" + bindingId + "\0" + surfaceRevision + "\0" + CanonicalJson(input))
+            : StableIdempotencyKey(context, clientActionId);
+        var operationId = hasApprovalDecision
+            ? approvalDecision.OperationId
+            : ConversationStateClient.OperationId(
+                context with { ConversationId = activeConversationId },
+                idempotencyKey);
+        if (hasApprovalDecision)
+            await DemandAwaitingApprovalAsync(context, activeConversationId, approvalDecision, cancellationToken).ConfigureAwait(false);
         SurfaceActionConsumption consumption;
         try
         {
             consumption = await neuron.ConsumeActionAsync(
                 state.Revision,
                 bindingId,
-                Hash(actionToken),
+                binding.TokenHash,
                 idempotencyKey,
                 operationId,
                 timeProvider.GetUtcNow()).WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -287,14 +254,22 @@ public sealed class RuntimeSurfaceFeed(
         {
             state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
             binding = DemandBinding(state, context, bindingId, surfaceId, surfaceRevision);
+            DemandActionCapability(context, actionToken, binding);
+            if (hasApprovalDecision)
+                DemandApprovalMatchesBoundSurface(state, binding, approvalDecision);
             authorizedInput = AuthorizeInput(binding, input);
             activeConversationId = ActiveConversationId(context, state);
+            operationId = hasApprovalDecision
+                ? approvalDecision.OperationId
+                : ConversationStateClient.OperationId(
+                    context with { ConversationId = activeConversationId },
+                    idempotencyKey);
             try
             {
                 consumption = await neuron.ConsumeActionAsync(
                     state.Revision,
                     bindingId,
-                    Hash(actionToken),
+                    binding.TokenHash,
                     idempotencyKey,
                     operationId,
                     timeProvider.GetUtcNow()).WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -305,11 +280,11 @@ public sealed class RuntimeSurfaceFeed(
             }
             catch (KeyNotFoundException)
             {
-                throw new ActionRejectedException(ActionRejection.Unavailable);
+                throw new ActionRejectedException(ActionRejection.WrongRevision);
             }
             catch (UnauthorizedAccessException)
             {
-                throw new ActionRejectedException(ActionRejection.Forged);
+                throw new ActionRejectedException(ActionRejection.WrongRevision);
             }
             catch (InvalidOperationException)
             {
@@ -318,11 +293,11 @@ public sealed class RuntimeSurfaceFeed(
         }
         catch (KeyNotFoundException)
         {
-            throw new ActionRejectedException(ActionRejection.Unavailable);
+            throw new ActionRejectedException(ActionRejection.WrongRevision);
         }
         catch (UnauthorizedAccessException)
         {
-            throw new ActionRejectedException(ActionRejection.Forged);
+            throw new ActionRejectedException(ActionRejection.WrongRevision);
         }
         catch (InvalidOperationException)
         {
@@ -338,20 +313,22 @@ public sealed class RuntimeSurfaceFeed(
             activeConversationId);
     }
 
-    private static SurfaceActionBinding DemandBinding(
+    private SurfaceActionBinding DemandBinding(
         SurfaceFeedState state,
         RuntimeRequestContext context,
         string bindingId,
         string surfaceId,
         int surfaceRevision)
     {
+        var surface = state.CurrentSurfaces.FirstOrDefault(candidate =>
+            string.Equals(candidate.SurfaceId, surfaceId, StringComparison.Ordinal));
+        if (surface is null || surface.SurfaceRevision != surfaceRevision)
+            throw new ActionRejectedException(ActionRejection.WrongRevision);
         var binding = state.ActionBindings.FirstOrDefault(candidate =>
             string.Equals(candidate.BindingId, bindingId, StringComparison.Ordinal))
-            ?? throw new ActionRejectedException(ActionRejection.Unavailable);
+            ?? throw new ActionRejectedException(ActionRejection.WrongRevision);
         if (!string.Equals(binding.SurfaceId, surfaceId, StringComparison.Ordinal) ||
-            binding.SurfaceRevision != surfaceRevision ||
-            state.CurrentSurfaces.FirstOrDefault(surface =>
-                string.Equals(surface.SurfaceId, surfaceId, StringComparison.Ordinal))?.SurfaceRevision != surfaceRevision)
+            binding.SurfaceRevision != surfaceRevision || binding.ExpiresAt <= timeProvider.GetUtcNow())
             throw new ActionRejectedException(ActionRejection.WrongRevision);
         if (!context.Grants.Contains(binding.RequiredGrant))
             throw new ActionRejectedException(ActionRejection.PolicyDenied);
@@ -397,66 +374,118 @@ public sealed class RuntimeSurfaceFeed(
         }
     }
 
+    private async Task<SurfaceFeedState> EnsureHomeSurfaceAsync(
+        RuntimeRequestContext context,
+        ISurfaceFeedNeuron neuron,
+        SurfaceFeedState initial,
+        CancellationToken cancellationToken)
+    {
+        var state = initial;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            if (state.CurrentSurfaces.Length > 0) return state;
+            var bootstrap = new HomeSurfaceBootstrap(
+                "bootstrap-" + RequestScope.Id(context) + "-" + state.RebuildEpoch,
+                InoConversationIdentity.From(context),
+                context.CorrelationId,
+                timeProvider.GetUtcNow());
+            try
+            {
+                return await neuron.EnsureHomeSurfaceAsync(state.Revision, bootstrap)
+                    .WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (RuntimeStateConflictException) when (attempt < 2)
+            {
+                state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        throw new InvalidOperationException("Surface-feed home-surface revision retry exhausted.");
+    }
+
     private ISurfaceFeedNeuron Feed(RuntimeRequestContext context) =>
         cluster.GetGrain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(
             context.TenantId,
             context.WorkspaceId,
             context.Principal));
 
-    private async Task<InoConversationSnapshot> ReadConversationSnapshotAsync(
-        RuntimeRequestContext context,
-        string conversationId,
+    private async Task<SurfaceFeedState> RenewActionBindingsAsync(
+        ISurfaceFeedNeuron neuron,
+        SurfaceFeedState initial,
         CancellationToken cancellationToken)
     {
-        var neuron = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
-            context.TenantId,
-            context.WorkspaceId,
-            context.Principal,
-            conversationId));
-        var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-        return ConversationStateClient.ToSnapshot(context with { ConversationId = conversationId }, state);
+        var state = initial;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var now = timeProvider.GetUtcNow();
+            try
+            {
+                return await neuron.RenewActionBindingsAsync(state.Revision, now)
+                    .WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (RuntimeStateConflictException) when (attempt < 2)
+            {
+                state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        throw new InvalidOperationException("Surface-feed action-binding renewal revision retry exhausted.");
     }
 
-    private static SurfaceActionBinding[] CreateBindings(
-        IReadOnlyList<StoredActionBinding> descriptors,
-        int surfaceRevision,
-        out IReadOnlyDictionary<string, SurfaceActionToken> actionTokens)
+    private IReadOnlyDictionary<string, SurfaceActionToken> IssueActionCapabilities(
+        RuntimeRequestContext context,
+        SurfaceFeedState state)
     {
-        var tokens = new Dictionary<string, SurfaceActionToken>(StringComparer.Ordinal);
-        var bindings = descriptors.Select(descriptor =>
+        var now = timeProvider.GetUtcNow();
+        var activeSurfaces = state.CurrentSurfaces
+            .Select(surface => (surface.SurfaceId, surface.SurfaceRevision))
+            .ToHashSet();
+        var issued = new Dictionary<string, SurfaceActionToken>(StringComparer.Ordinal);
+        foreach (var binding in state.ActionBindings
+                     .Where(binding => binding.ExpiresAt > now && activeSurfaces.Contains((binding.SurfaceId, binding.SurfaceRevision)))
+                     .OrderBy(binding => binding.BindingId, StringComparer.Ordinal))
         {
-            var token = Base64Url(RandomNumberGenerator.GetBytes(32));
-            tokens[descriptor.BindingId] = new(token, descriptor.ExpiresAt);
-            return new SurfaceActionBinding(
-                descriptor.BindingId,
-                ConversationSurfacePayload.HomeSurfaceId,
-                surfaceRevision,
-                descriptor.ActionType,
-                descriptor.InputSchemaRef,
-                descriptor.RequiredGrant,
-                descriptor.ActionSchemaVersion,
-                Hash(token),
-                descriptor.MaxUses,
-                0,
-                descriptor.ExpiresAt,
-                null,
-                null);
-        }).ToArray();
-        actionTokens = tokens;
-        return bindings;
+            if (!issued.TryAdd(
+                    binding.BindingId,
+                    new SurfaceActionToken(
+                        actionCapabilities.IssueActionCapability(
+                            context,
+                            binding.BindingId,
+                            binding.SurfaceId,
+                            binding.SurfaceRevision,
+                            binding.TokenHash,
+                            binding.ExpiresAt),
+                        binding.ExpiresAt)))
+                throw new RuntimeStateIntegrityException("active action bindings must have unique binding identifiers");
+        }
+        return issued;
+    }
+
+    private void DemandActionCapability(
+        RuntimeRequestContext context,
+        string actionToken,
+        SurfaceActionBinding binding)
+    {
+        if (!actionCapabilities.TryValidateActionCapability(
+                actionToken,
+                context,
+                binding.BindingId,
+                binding.SurfaceId,
+                binding.SurfaceRevision,
+                binding.TokenHash))
+            throw new ActionRejectedException(ActionRejection.Forged);
     }
 
     private static StoredSurfaceRecord ToStoredRecord(
         RuntimeRequestContext context,
         SurfaceFeedState state,
-        SurfaceFeedRecord surface)
+        SurfaceFeedRecord surface,
+        bool includeActions)
     {
         var presentation = ReadPresentation(surface);
-        var actions = state.ActionBindings
+        var actions = includeActions ? state.ActionBindings
             .Where(binding => string.Equals(binding.SurfaceId, surface.SurfaceId, StringComparison.Ordinal) &&
                               binding.SurfaceRevision == surface.SurfaceRevision)
             .Select(ToStoredBinding)
-            .ToArray();
+            .ToArray() : [];
         return new(
             surface.Sequence,
             context.TenantId,
@@ -485,36 +514,6 @@ public sealed class RuntimeSurfaceFeed(
         binding.ExpiresAt,
         binding.ActionSchemaVersion);
 
-    private static SurfaceFeedProjection CreateConversationProjection(
-        RuntimeRequestContext context,
-        SurfaceFeedState state,
-        InoConversationSnapshot conversation,
-        string projectionId,
-        DateTimeOffset createdAt)
-    {
-        var payload = ConversationSurfacePayload.Build(conversation);
-        var descriptors = ConversationSurfacePayload.Actions(conversation, createdAt);
-        var revision = checked((state.CurrentSurfaces.FirstOrDefault(surface =>
-            string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal))?.SurfaceRevision ?? 0) + 1);
-        var persisted = new PersistedSurfacePresentation(
-            context.CorrelationId,
-            "conversation",
-            conversation.ConversationId,
-            ConversationSurfacePayload.RequiredCapabilities,
-            payload,
-            conversation.Revision,
-            CurrentPresentationVersion);
-        return new(
-            projectionId,
-            ConversationSurfacePayload.HomeSurfaceId,
-            revision,
-            SurfaceContentHash.Compute(payload, descriptors),
-            JsonSerializer.SerializeToUtf8Bytes(persisted),
-            createdAt,
-            null,
-            CreateBindings(descriptors, revision, out _));
-    }
-
     private static string ActiveConversationId(RuntimeRequestContext context, SurfaceFeedState state)
     {
         var current = state.CurrentSurfaces.FirstOrDefault(surface =>
@@ -536,11 +535,11 @@ public sealed class RuntimeSurfaceFeed(
         return true;
     }
 
-    private static PersistedSurfacePresentation ReadPresentation(SurfaceFeedRecord surface)
+    private static SurfaceFeedPresentation ReadPresentation(SurfaceFeedRecord surface)
     {
         try
         {
-            return JsonSerializer.Deserialize<PersistedSurfacePresentation>(surface.PayloadUtf8)
+            return JsonSerializer.Deserialize<SurfaceFeedPresentation>(surface.PayloadUtf8)
                    ?? throw new RuntimeStateIntegrityException("empty surface presentation");
         }
         catch (JsonException)
@@ -549,14 +548,46 @@ public sealed class RuntimeSurfaceFeed(
         }
     }
 
-    private static bool PresentationAllowsSend(JsonElement payload)
+    private async Task DemandAwaitingApprovalAsync(
+        RuntimeRequestContext context,
+        string conversationId,
+        ApprovalDecisionInput decision,
+        CancellationToken cancellationToken)
     {
+        var conversation = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
+            context.TenantId,
+            context.WorkspaceId,
+            context.Principal,
+            conversationId));
+        var state = await conversation.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var operation = state.Operations.FirstOrDefault(candidate =>
+            string.Equals(candidate.OperationId, decision.OperationId, StringComparison.Ordinal));
+        if (operation?.Status != ConversationOperationStatus.AwaitingApproval ||
+            !string.Equals(operation.Approval?.ApprovalId, decision.ApprovalId, StringComparison.Ordinal) ||
+            operation.Approval?.DecisionId is not null)
+            throw new ActionRejectedException(ActionRejection.Unavailable);
+    }
+
+    private static void DemandApprovalMatchesBoundSurface(
+        SurfaceFeedState state,
+        SurfaceActionBinding binding,
+        ApprovalDecisionInput decision)
+    {
+        if (!string.Equals(binding.ActionType, ConversationSurfacePayload.ApprovalActionType, StringComparison.Ordinal))
+            throw new ActionRejectedException(ActionRejection.PolicyDenied);
+        var surface = state.CurrentSurfaces.FirstOrDefault(candidate =>
+            string.Equals(candidate.SurfaceId, binding.SurfaceId, StringComparison.Ordinal) &&
+            candidate.SurfaceRevision == binding.SurfaceRevision)
+            ?? throw new ActionRejectedException(ActionRejection.WrongRevision);
+        var payload = ReadPresentation(surface).Payload;
         if (payload.ValueKind != JsonValueKind.Object ||
             !payload.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object ||
-            !data.TryGetProperty("operation", out var operation) || operation.ValueKind == JsonValueKind.Null)
-            return true;
-        if (!operation.TryGetProperty("state", out var state) || state.ValueKind != JsonValueKind.String) return true;
-        return !InoConversationStates.IsActive(state.GetString() ?? string.Empty);
+            !data.TryGetProperty("operation", out var operation) || operation.ValueKind != JsonValueKind.Object ||
+            !operation.TryGetProperty("operationId", out var operationId) || operationId.ValueKind != JsonValueKind.String ||
+            !operation.TryGetProperty("approvalId", out var approvalId) || approvalId.ValueKind != JsonValueKind.String ||
+            !string.Equals(operationId.GetString(), decision.OperationId, StringComparison.Ordinal) ||
+            !string.Equals(approvalId.GetString(), decision.ApprovalId, StringComparison.Ordinal))
+            throw new ActionRejectedException(ActionRejection.PolicyDenied);
     }
 
     private static JsonElement AuthorizeInput(SurfaceActionBinding binding, JsonElement input)
@@ -565,25 +596,86 @@ public sealed class RuntimeSurfaceFeed(
             throw new ActionRejectedException(ActionRejection.PolicyDenied);
         if (string.Equals(binding.ActionType, ConversationSurfacePayload.SendActionType, StringComparison.Ordinal) &&
             string.Equals(binding.InputSchemaRef, ConversationSurfacePayload.SendInputSchema, StringComparison.Ordinal) &&
-            TryReadPrompt(input, out var prompt))
+            TryReadPrompt(input, out var prompt, out _))
             return JsonSerializer.SerializeToElement(new { prompt });
-        if ((string.Equals(binding.ActionType, ConversationSurfacePayload.NewActionType, StringComparison.Ordinal) ||
-             string.Equals(binding.ActionType, ConversationSurfacePayload.DeleteActionType, StringComparison.Ordinal)) &&
-            string.Equals(binding.InputSchemaRef, ConversationSurfacePayload.EmptyInputSchema, StringComparison.Ordinal) &&
-            input.ValueKind == JsonValueKind.Object && !input.EnumerateObject().Any())
-            return JsonSerializer.SerializeToElement(new { });
+        if (string.Equals(binding.ActionType, ConversationSurfacePayload.ApprovalActionType, StringComparison.Ordinal) &&
+            string.Equals(binding.InputSchemaRef, ConversationSurfacePayload.ApprovalInputSchema, StringComparison.Ordinal) &&
+            TryReadApprovalDecision(input, out var decision))
+            return CanonicalApprovalDecision(decision);
         throw new ActionRejectedException(ActionRejection.PolicyDenied);
     }
 
-    private static bool TryReadPrompt(JsonElement input, out string prompt)
+    private static JsonElement CanonicalApprovalDecision(ApprovalDecisionInput decision) =>
+        JsonSerializer.SerializeToElement(new
+        {
+            operationId = decision.OperationId,
+            approvalId = decision.ApprovalId,
+            decision = decision.Approved ? "approve" : "reject",
+            clientDecisionId = decision.ClientDecisionId
+        });
+
+    private static bool TryReadPrompt(
+        JsonElement input,
+        out string prompt,
+        out string? clientSubmissionId)
     {
         prompt = string.Empty;
-        if (input.ValueKind != JsonValueKind.Object || input.EnumerateObject().Count() != 1 ||
+        clientSubmissionId = null;
+        if (input.ValueKind != JsonValueKind.Object ||
             !input.TryGetProperty("prompt", out var value) || value.ValueKind != JsonValueKind.String)
             return false;
+        var properties = input.EnumerateObject().ToArray();
+        if (properties.Length is < 1 or > 2 || properties.Any(property =>
+                !string.Equals(property.Name, "prompt", StringComparison.Ordinal) &&
+                !string.Equals(property.Name, "clientSubmissionId", StringComparison.Ordinal)))
+            return false;
+        if (input.TryGetProperty("clientSubmissionId", out var submission))
+        {
+            if (submission.ValueKind != JsonValueKind.String) return false;
+            clientSubmissionId = submission.GetString();
+            if (string.IsNullOrWhiteSpace(clientSubmissionId) || clientSubmissionId.Length is < 16 or > 128 ||
+                !clientSubmissionId.All(character =>
+                    (character is >= 'a' and <= 'z') ||
+                    (character is >= '0' and <= '9') ||
+                    character == '-'))
+                return false;
+        }
         prompt = value.GetString()?.Trim() ?? string.Empty;
         return prompt.Length is > 0 and <= 4096;
     }
+
+    internal static bool TryReadApprovalDecision(JsonElement input, out ApprovalDecisionInput decision)
+    {
+        decision = default!;
+        if (input.ValueKind != JsonValueKind.Object) return false;
+        var properties = input.EnumerateObject().ToArray();
+        if (properties.Length != 4 || properties.Any(property => property.Name is not
+                ("operationId" or "approvalId" or "decision" or "clientDecisionId")))
+            return false;
+        if (!input.TryGetProperty("operationId", out var operation) || operation.ValueKind != JsonValueKind.String ||
+            !input.TryGetProperty("approvalId", out var approval) || approval.ValueKind != JsonValueKind.String ||
+            !input.TryGetProperty("decision", out var action) || action.ValueKind != JsonValueKind.String ||
+            !input.TryGetProperty("clientDecisionId", out var client) || client.ValueKind != JsonValueKind.String)
+            return false;
+        var operationId = operation.GetString();
+        var approvalId = approval.GetString();
+        var decisionText = action.GetString();
+        var clientDecisionId = client.GetString();
+        if (!IsOpaqueId(operationId) || !IsOpaqueId(approvalId) ||
+            clientDecisionId is null || clientDecisionId.Length is < 16 or > 128 ||
+            !clientDecisionId.All(character =>
+                (character is >= 'a' and <= 'z') || (character is >= '0' and <= '9') || character == '-') ||
+            decisionText is not ("approve" or "reject"))
+            return false;
+        decision = new(operationId!, approvalId!, decisionText == "approve", clientDecisionId);
+        return true;
+    }
+
+    private static bool IsOpaqueId(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && value.Length <= 256 && !value.Any(char.IsControl);
+
+    private static string StableIdempotencyKey(RuntimeRequestContext context, string clientSubmissionId) =>
+        "client-submission-" + Hash(RequestScope.Id(context) + "\0" + clientSubmissionId);
 
     private static string CanonicalJson(JsonElement input)
     {
@@ -642,21 +734,10 @@ public sealed class RuntimeSurfaceFeed(
     private static string Hash(string value) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
-    private static string Base64Url(ReadOnlySpan<byte> value) =>
-        Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
     private static void DemandPrincipal(RuntimeRequestContext context)
     {
         if (context.Principal.Kind != PrincipalKind.User || string.IsNullOrWhiteSpace(context.SessionId))
             throw new UnauthorizedAccessException("A principal session is required for the surface feed.");
     }
 
-    private sealed record PersistedSurfacePresentation(
-        string CorrelationId,
-        string CauseKind,
-        string CauseId,
-        string[] RequiredClientCapabilities,
-        JsonElement Payload,
-        int ConversationRevision = 0,
-        int PresentationVersion = 0);
 }

@@ -125,14 +125,28 @@ Map<String, Object?> inoMessage({
 
 Map<String, Object?> inoOperation({
   required String state,
+  String operationId = 'operation-a',
+  String? phase,
+  int version = 1,
   bool retryable = false,
   String? safeReason,
   Map<String, Object?>? action,
+  String? approvalId,
 }) => <String, Object?>{
+  'operationId': operationId,
+  'phase':
+      phase ??
+      switch (state) {
+        'queued' => 'accepted',
+        'responding' => 'running',
+        _ => state,
+      },
+  'version': version,
   'state': state,
   'retryable': retryable,
   'safeReason': ?safeReason,
   'action': ?action,
+  'approvalId': ?approvalId,
 };
 
 Map<String, Object?> googleConnectionAction({

@@ -40,34 +40,61 @@ void main() {
     expect(envelope.cause.id, 'conversation-a');
   });
 
-  test('decodes a typed INO conversation without opaque identifiers', () {
-    final envelope = const SurfaceEnvelopeDecoder().decode(
-      surfaceJsonString(
-        payload: inoConversationPayload(
-          messages: [
-            inoMessage(role: 'user', text: 'Hello', state: 'queued'),
-            inoMessage(
-              role: 'assistant',
-              text: 'How can I help?',
-              state: 'succeeded',
-            ),
-          ],
-          operation: inoOperation(state: 'succeeded'),
+  test(
+    'decodes a typed INO conversation with authoritative operation identity',
+    () {
+      final envelope = const SurfaceEnvelopeDecoder().decode(
+        surfaceJsonString(
+          payload: inoConversationPayload(
+            messages: [
+              inoMessage(role: 'user', text: 'Hello', state: 'queued'),
+              inoMessage(
+                role: 'assistant',
+                text: 'How can I help?',
+                state: 'succeeded',
+              ),
+            ],
+            operation: inoOperation(state: 'succeeded'),
+          ),
+          actions: [testInoActionJson()],
         ),
-        actions: [testInoActionJson()],
-      ),
-    );
+      );
 
-    final payload = envelope.payload as InoConversationSurfacePayload;
-    expect(payload.intro, 'Ask INO about this workspace.');
-    expect(payload.messages, hasLength(2));
-    expect(payload.messages.first.turnKey, startsWith('turn-user-'));
-    expect(payload.messages.first.role, InoConversationRole.user);
-    expect(payload.messages.last.role, InoConversationRole.assistant);
-    expect(payload.operation?.state, InoConversationOperationState.succeeded);
-    expect(payload.operation?.retryable, isFalse);
-    expect(envelope.actions.single.bindingId, 'ino.send');
-    expect(envelope.actions.single.actionType, 'ino.interact');
+      final payload = envelope.payload as InoConversationSurfacePayload;
+      expect(payload.intro, 'Ask INO about this workspace.');
+      expect(payload.messages, hasLength(2));
+      expect(payload.messages.first.turnKey, startsWith('turn-user-'));
+      expect(payload.messages.first.role, InoConversationRole.user);
+      expect(payload.messages.last.role, InoConversationRole.assistant);
+      expect(payload.operation?.state, InoConversationOperationState.succeeded);
+      expect(payload.operation?.operationId, 'operation-a');
+      expect(payload.operation?.phase, InoConversationOperationPhase.succeeded);
+      expect(payload.operation?.version, 1);
+      expect(payload.operation?.retryable, isFalse);
+      expect(envelope.actions.single.bindingId, 'ino.send');
+      expect(envelope.actions.single.actionType, 'ino.interact');
+    },
+  );
+
+  test('decodes distinct approved and applying-effect operation phases', () {
+    for (final expectation in <({String phase, String state})>[
+      (phase: 'approved', state: 'queued'),
+      (phase: 'applying-effect', state: 'running'),
+    ]) {
+      final envelope = const SurfaceEnvelopeDecoder().decode(
+        surfaceJsonString(
+          payload: inoConversationPayload(
+            operation: inoOperation(
+              state: expectation.state,
+              phase: expectation.phase,
+            ),
+          ),
+        ),
+      );
+
+      final payload = envelope.payload as InoConversationSurfacePayload;
+      expect(payload.operation?.phase.wire, expectation.phase);
+    }
   });
 
   test('rejects malformed or sensitive INO conversation data', () {
@@ -101,7 +128,7 @@ void main() {
       inoConversationPayload(
         operation: {
           ...inoOperation(state: 'failed', retryable: true),
-          'operationId': 'must-not-reach-renderer',
+          'operationId': 'must-not-reach-renderer!',
         },
       ),
       inoConversationPayload(

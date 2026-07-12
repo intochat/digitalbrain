@@ -165,11 +165,13 @@ public sealed class EncryptedRuntimeStateEnvelope
     [Id(10)] public byte[] Signature { get; set; } = [];
 }
 
+[GenerateSerializer]
+[Alias("digitalbrain.runtime.state-conflict")]
 public sealed class RuntimeStateConflictException(long expectedRevision, long actualRevision)
     : InvalidOperationException($"Runtime state revision conflict; expected {expectedRevision}, actual {actualRevision}.")
 {
-    public long ExpectedRevision { get; } = expectedRevision;
-    public long ActualRevision { get; } = actualRevision;
+    [Id(0)] public long ExpectedRevision { get; } = expectedRevision;
+    [Id(1)] public long ActualRevision { get; } = actualRevision;
 }
 
 public sealed class RuntimeStateIntegrityException(string reason)
