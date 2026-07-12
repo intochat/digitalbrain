@@ -44,8 +44,6 @@ public sealed class DigitalBrainOptions
 
     public int KernelReplicas { get; set; } = 3;
 
-    public bool EnableOrleansDashboard { get; set; } = true;
-    public int? OrleansDashboardPort { get; set; } = 8080;
     public bool EnableMcp { get; set; } = true;
 
     public DigitalBrainOptions WithLLM<TModel>() where TModel : LlmModel, new()

@@ -59,12 +59,6 @@ public static class DigitalBrainBuilderExtensions
             githubModelsToken = builder.AddParameter("github-models-token", secret: true);
         }
 
-        IResourceBuilder<ParameterResource>? xaiApiKey = null;
-        if (options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase)))
-        {
-            xaiApiKey = builder.AddParameter("xai-api-key", secret: true);
-        }
-
         var isRunMode = builder.ExecutionContext.IsRunMode;
         var runtimeStorageNamespace = ResolveRuntimeStorageNamespace(
             builder.Configuration["DigitalBrain:Runtime:StorageNamespace"]);
@@ -176,9 +170,6 @@ public static class DigitalBrainBuilderExtensions
             OpenAIApiKey = openAIApiKey,
             AnthropicApiKey = anthropicApiKey,
             GitHubModelsToken = githubModelsToken,
-            XaiApiKey = xaiApiKey,
-            EnableOrleansDashboard = options.EnableOrleansDashboard,
-            OrleansDashboardPort = options.OrleansDashboardPort,
             EnableMcp = options.EnableMcp,
             GrainBlobs = grainBlobs,
             ConversationStateBlobs = conversationStateBlobs,
@@ -266,15 +257,6 @@ public static class DigitalBrainBuilderExtensions
         if (ctx.GitHubModelsToken is not null)
         {
             kernel.WithEnvironment("DigitalBrain__Llm__GitHubModelsToken", ctx.GitHubModelsToken);
-        }
-        if (ctx.XaiApiKey is not null)
-        {
-            kernel.WithEnvironment("DigitalBrain__Llm__XaiApiKey", ctx.XaiApiKey);
-        }
-
-        if (ctx.EnableOrleansDashboard && ctx.OrleansDashboardPort.HasValue)
-        {
-            kernel.WithEnvironment("ORLEANS_DASHBOARD_PORT", ctx.OrleansDashboardPort.Value.ToString());
         }
 
         return kernel;

@@ -27,7 +27,6 @@ public sealed class DigitalBrainContext
     public IResourceBuilder<ParameterResource>? OpenAIApiKey { get; init; }
     public IResourceBuilder<ParameterResource>? AnthropicApiKey { get; init; }
     public IResourceBuilder<ParameterResource>? GitHubModelsToken { get; init; }
-    public IResourceBuilder<ParameterResource>? XaiApiKey { get; init; }
 
     public required IResourceBuilder<AzureBlobStorageResource> GrainBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> ConversationStateBlobs { get; init; }
@@ -36,7 +35,5 @@ public sealed class DigitalBrainContext
     public required IResourceBuilder<AzureBlobStorageResource> JournalBlobs { get; init; }
     public required IResourceBuilder<AzureTableStorageResource> ClusteringTable { get; init; }
 
-    public bool EnableOrleansDashboard { get; init; }
-    public int? OrleansDashboardPort { get; init; }
     public bool EnableMcp { get; init; }
 }
