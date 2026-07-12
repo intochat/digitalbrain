@@ -1,12 +1,12 @@
 {
   "mcpServers": {
     "codegraph": {
-      "command": "npx",
-      "args": ["-y", "@colbymchenry/codegraph", "serve", "--mcp"]
+      "command": "gcf-proxy",
+      "args": ["npx", "-y", "@colbymchenry/codegraph", "serve", "--mcp"]
     },
     "aspire": {
-      "command": "aspire",
-      "args": ["agent", "mcp"]
+      "command": "gcf-proxy",
+      "args": ["aspire", "agent", "mcp"]
     },
     "microsoft-learn": {
       "type": "http",
@@ -14,7 +14,7 @@
     },
     "context7": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
+      "args": ["/c", "gcf-proxy", "npx", "-y", "@upstash/context7-mcp@latest"]
     }
   }
 }
