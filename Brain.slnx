@@ -23,6 +23,7 @@
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="hosts/DigitalBrain.FeatureBuilder/DigitalBrain.FeatureBuilder.csproj" />
+    <Project Path="hosts/DigitalBrain.FeatureHost/DigitalBrain.FeatureHost.csproj" />
     <Project Path="hosts/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
     <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
   </Folder>
@@ -34,6 +35,7 @@
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
     <Project Path="tests/DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
     <Project Path="tests/DigitalBrain.TestKit.Tests/DigitalBrain.TestKit.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.UnitTests/DigitalBrain.UnitTests.csproj" />
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />

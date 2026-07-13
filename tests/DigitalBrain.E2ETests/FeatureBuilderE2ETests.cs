@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using DigitalBrain.FeatureBuilder;
+using DigitalBrain.FeatureHost;
+using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Kernel.Contracts;
 using Xunit;
 
 namespace DigitalBrain.E2ETests;
@@ -37,6 +40,7 @@ public sealed class FeatureBuilderE2ETests
             Directory.EnumerateFiles(first.ReleaseDirectory, "*", SearchOption.AllDirectories),
             path => Path.GetExtension(path) is ".zip" or ".nupkg" or ".dbpkg");
         AssertReleaseFilesEqual(first.ReleaseDirectory, second.ReleaseDirectory);
+        await VerifyRestartReloadAsync(first.ReleaseDirectory, first.Digest);
     }
 
     [Theory]
@@ -274,6 +278,29 @@ public sealed class FeatureBuilderE2ETests
         }
     }
 
+    private static async Task VerifyRestartReloadAsync(string releaseDirectory, string digest)
+    {
+        var installation = new FeatureInstallationId("email-summarizer-e2e");
+        var descriptor = new FeatureReleaseDescriptor(new ReleaseDigest(digest), releaseDirectory);
+        await using (var manager = Manager())
+        {
+            await manager.ActivateAsync(installation, descriptor);
+            using var lease = manager.Acquire(installation, descriptor.Digest);
+            Assert.Equal(descriptor.Digest, lease.Digest);
+        }
+
+        await using (var restarted = Manager())
+        {
+            await restarted.LoadActiveAsync([new FeatureActiveInstallation(installation, descriptor)]);
+            using var lease = restarted.Acquire(installation, descriptor.Digest);
+            Assert.Equal(descriptor.Digest, lease.Digest);
+        }
+    }
+
+    private static FeatureReleaseManager Manager() => new(
+        new SingleServiceProvider(new GmailReader()),
+        new NoopRecycle());
+
     private static string RepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -292,6 +319,26 @@ public sealed class FeatureBuilderE2ETests
         Ambiguous,
         Blocking,
         Network
+    }
+
+    private sealed class SingleServiceProvider(object service) : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(service) ? service : null;
+    }
+
+    private sealed class GmailReader : IGmailMessageReader
+    {
+        public Task<GmailMessage> ReadAsync(
+            GmailMessageReadRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class NoopRecycle : IFeatureHostRecycle
+    {
+        public void RequestRecycle()
+        {
+        }
     }
 
     private sealed class TemporaryDirectory : IDisposable

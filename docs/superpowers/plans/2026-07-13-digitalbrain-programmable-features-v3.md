@@ -210,9 +210,11 @@ Task 7 evidence: pure immutable transitions enforce every approved capacity and 
 - SDK and Integration Contracts always resolve from the default context; only release implementation/private dependencies load collectible.
 - New release stages and validates, new claims switch atomically, old claims drain, old context unloads, and failed unload requests proof-host recycle.
 
-- [ ] Test type identity, deterministic resolution, concurrency, no recursive callbacks, deadline cancellation, drain, weak-reference unload, failed unload, restart reload, and rollback.
-- [ ] Implement one owned worker loop with bounded cancellation/disposal and no credentials or direct mutation clients.
-- [ ] Commit `feat: hot load feature releases`.
+- [x] Test type identity, deterministic resolution, concurrency, no recursive callbacks, deadline cancellation, drain, weak-reference unload, failed unload, restart reload, and rollback.
+- [x] Implement one owned worker loop with bounded cancellation/disposal and no credentials or direct mutation clients.
+- [x] Commit `feat: hot load feature releases`.
+
+Evidence: the loader now stages digest-verified host-owned snapshots, shares only explicit contracts, rejects arbitrary default-context fallback, atomically switches installations, drains outside the mutation lock, proves collectible unload, and requests recycling for unsafe staging, execution, disposal, or unload outcomes. The single worker foundation uses claim and lease-derived deadlines capped at 60 seconds, exact-release acquisition, bounded context/handler/disposal phases, ambiguous-commit handling, and non-cooperative execution quarantine without credentials or provider mutation clients. Unit, integration-contract, feature BDD, Orleans, TestKit, Salesforce, kernel/runtime, and E2E suites pass 577 tests with zero failures; `aspire doctor` passes 5/5. Production FeatureHost composition remains intentionally assigned to Task 10.
 
 ### Task 9: Lexical Memory capability
 
