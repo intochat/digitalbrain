@@ -16,7 +16,6 @@ internal sealed class NoOpScopedChatClientFactory : IScopedChatClientFactory
     public IChatClient? Create(string provider, string? apiKey) => null;
 }
 
-// Shared in-process cluster kernel wiring: in-memory dual journals plus current INO/automation services.
 public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder)

@@ -34,10 +34,6 @@ public record Synapse(
 public record NeuronTelemetry(NeuronId Neuron, string Event, int Count = 1) : Synapse(nameof(NeuronTelemetry), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-[Alias("DigitalBrain.Core.WiringOptimizationProposed")]
-public record WiringOptimizationProposed(string Proposal, string FromNeuron) : Synapse(nameof(WiringOptimizationProposed), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
 [Alias("DigitalBrain.Core.ExperienceUsed")]
 public record ExperienceUsed(
     string Pack,
@@ -65,9 +61,6 @@ public readonly record struct UserId([property: Id(0)] string Value)
 {
     public static UserId Anonymous => new("anonymous");
 }
-
-[Alias("DigitalBrain.Core.IMetaOptimizerNeuron")]
-public interface IMetaOptimizerNeuron : INeuron, IHandle<NeuronTelemetry>, IHandle<WiringOptimizationProposed> { }
 
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.LlmPrompt")]

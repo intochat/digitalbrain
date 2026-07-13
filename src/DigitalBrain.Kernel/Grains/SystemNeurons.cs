@@ -1,7 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Ui.Contracts.Ui;
 using DigitalBrain.Ui.Runtime;
-using Microsoft.Extensions.AI;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
@@ -136,41 +135,5 @@ public class ObservabilityNeuron(ILogger<ObservabilityNeuron> logger, NeuronJour
         await FireAsync(surface, cancellationToken);
     }
 }
-
-[GrainType("digitalbrain.optimizer.v1")]
-public class MetaOptimizerNeuron(ILogger<MetaOptimizerNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IMetaOptimizerNeuron
-{
-    public async Task HandleAsync(NeuronTelemetry telemetry, CancellationToken cancellationToken = default)
-    {
-        var count = IncomingJournal.Concat(OutgoingJournal).OfType<NeuronTelemetry>().Count();
-        Logger.LogInformation("Optimizer received telemetry from {Neuron}: {Event} (total {Count})", telemetry.Neuron, telemetry.Event, count);
-
-        if (count % 5 == 0)
-        {
-            string proposal;
-            var chat = ServiceProvider.GetService<IChatClient>();
-            if (chat != null)
-            {
-                var p = $"Telemetry count reached {count}. Propose ONE short, actionable wiring or scaling improvement for the DigitalBrain neuron system (Orleans grains + Aspire + compiler for code gen from English).";
-                var response = await chat.GetResponseAsync(p, cancellationToken: cancellationToken);
-                var acc = response.Text;
-                proposal = acc.Length > 20 ? acc.Trim() : "Add parallel compiler neurons and route create requests through LlmNeuron";
-            }
-            else
-            {
-                proposal = "Add parallel compiler neurons routed via LlmNeuron for faster self-gen";
-            }
-            await FireAsync(new WiringOptimizationProposed(proposal, Self.Value), cancellationToken);
-        }
-    }
-
-    public Task HandleAsync(WiringOptimizationProposed proposal, CancellationToken cancellationToken = default)
-    {
-        Logger.LogInformation("Optimizer proposal received: {Proposal} from {From}", proposal.Proposal, proposal.FromNeuron);
-        return Task.CompletedTask;
-    }
-}
-
-
 
 

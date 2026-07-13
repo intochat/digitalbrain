@@ -183,8 +183,6 @@ public static class DigitalBrainBuilderExtensions
     /// <summary>
     /// Wires a kernel project with the core kernel features out of the box:
     /// dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
-    /// This makes the kernel provide built-in capabilities (INO, automations, status, tasks, etc.)
-    /// immediately when the kernel starts.
     /// </summary>
     public static IResourceBuilder<ProjectResource> WireKernelSilo(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {

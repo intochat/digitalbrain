@@ -21,21 +21,6 @@ public static class UiSurfaceSamples
                         ["id"] = "ino-main",
                         ["label"] = "INO",
                         ["activity"] = 0.8
-                    },
-                    new Dictionary<string, object?>
-                    {
-                        ["id"] = "automation-main",
-                        ["label"] = "Automations",
-                        ["activity"] = 0.4
-                    }
-                },
-                ["edges"] = new[]
-                {
-                    new Dictionary<string, object?>
-                    {
-                        ["from"] = "ino-main",
-                        ["to"] = "automation-main",
-                        ["value"] = 0.3
                     }
                 },
                 ["events"] = new[]

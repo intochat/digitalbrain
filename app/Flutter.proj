@@ -6,8 +6,6 @@
     - Participates in `dotnet build` for pub get + incremental web bundle (used by gateway static or E2E).
     - The live Windows client is launched by Aspire AddFlutterClient (AddExecutable "flutter run -d windows")
       from the app/ working dir, with service discovery env injected for kernel gRPC + Orleans.
-    - When embodied as NeuroPack (DigitalBrain.UI.AspireFlutter or custom shell pack), the pack can
-      supply upgraded RFW definitions / ForUI chrome / nav surfaces; this host remains thin renderer.
     Harvested/adapted from Projects/*/Flutter.proj patterns for solution integration.
   -->
 
