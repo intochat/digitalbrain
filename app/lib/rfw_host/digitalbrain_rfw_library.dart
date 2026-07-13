@@ -8,7 +8,6 @@
 // an RFW document can only assemble these vetted widgets.
 
 import 'dart:convert';
-import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -25,9 +24,6 @@ import 'package:digitalbrain_flutter/runtime/buses/llm_settings_bus.dart';
 import 'package:digitalbrain_flutter/runtime/buses/ino_editor_bus.dart';
 import 'package:digitalbrain_flutter/rfw_host/synapse_stream_scope.dart';
 import 'package:digitalbrain_flutter/theme/digitalbrain_theme.dart';
-import 'package:digitalbrain_flutter/shell/digitalbrain_client_scope.dart';
-import 'package:digitalbrain_flutter/features/brain/voice_input.dart';
-import 'package:digitalbrain_flutter/grpc/digitalbrain.pbgrpc.dart';
 
 part 'library/helpers.dart';
 part 'library/layout.dart';
@@ -431,54 +427,7 @@ class DigitalBrainCatalogManager {
   }
 
   Future<void> reload(BuildContext context) async {
-    final client = DigitalBrainClientScope.of(context);
     final assetBundle = DefaultAssetBundle.of(context);
-
-    final requestPayload = jsonEncode({
-      'SynapseId': '00000000-0000-0000-0000-000000000000',
-      'CorrelationId': '00000000-0000-0000-0000-000000000000',
-      'CallerNeuronId': '00000000-0000-0000-0000-000000000000',
-      'CallerNeuronType': 'External',
-      'ReceiverNeuronId': '00000000-0000-0000-0000-000000000000',
-      'ReceiverNeuronType': 'IntrospectorNeuron',
-      'Timestamp': DateTime.now().toUtc().toIso8601String(),
-    });
-
-    final envelope = SynapseEnvelope()
-      ..correlationId = ''
-      ..typeName =
-          'DigitalBrain.Kernel.Contracts.Introspector.QueryCatalogContractsRequest'
-      ..payload = Uint8List.fromList(utf8.encode(requestPayload));
-
-    try {
-      if (client != null) {
-        final response = await client.send(envelope);
-        final responsePayload = utf8.decode(response.payload);
-        final decoded = jsonDecode(responsePayload);
-        List? schemasJson;
-        if (decoded is List) {
-          schemasJson = decoded;
-        } else if (decoded is Map) {
-          schemasJson = (decoded['Schemas'] ?? decoded['schemas']) as List?;
-        }
-        if (schemasJson != null) {
-          _cachedCatalog = schemasJson
-              .map(
-                (s) =>
-                    CatalogContractSchema.fromJson(s as Map<String, dynamic>),
-              )
-              .toList();
-          _loaded = true;
-          return;
-        }
-      }
-    } catch (e) {
-      debugPrint(
-        'Failed to load contract catalog: $e. Attempting local assets fallback.',
-      );
-    }
-
-    // Try fallback
     try {
       final jsonStr = await assetBundle.loadString('assets/ino-catalog.json');
       final decoded = jsonDecode(jsonStr);
@@ -497,7 +446,7 @@ class DigitalBrainCatalogManager {
         _loaded = true;
       }
     } catch (assetErr) {
-      debugPrint('Local assets fallback failed: $assetErr');
+      debugPrint('Local catalog load failed: $assetErr');
       if (!_loaded) {
         _cachedCatalog = [];
       }
@@ -606,10 +555,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
   // Hover card state
   OverlayEntry? _hoverCardEntry;
   String? _hoveredFqn;
-
-  // Compilation state
-  String _compileStatus = 'idle'; // 'idle', 'compiling', 'success', 'error'
-  List<String> _compileErrors = [];
 
   @override
   void initState() {
@@ -781,323 +726,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
     _hoveredFqn = null;
     _hoverCardEntry?.remove();
     _hoverCardEntry = null;
-  }
-
-  String? _getActiveNeuronId() {
-    final correlationId =
-        InoEditorBus.instance.activeSubscription?.correlationId;
-    if (correlationId != null && correlationId.startsWith('editor-')) {
-      return correlationId.substring('editor-'.length);
-    }
-    return null;
-  }
-
-  Future<void> _runCompileAndStage() async {
-    setState(() {
-      _compileStatus = 'compiling';
-      _compileErrors = [];
-    });
-
-    final code = _textController.text;
-    final client = DigitalBrainClientScope.of(context);
-
-    if (client != null) {
-      final neuronId = _getActiveNeuronId() ?? 'Unknown.Neuron';
-      final requestPayload = jsonEncode({'Fqn': neuronId, 'InoSource': code});
-
-      final envelope = SynapseEnvelope()
-        ..typeName = 'DigitalBrain.Runtime.Introspector.PromoteNeuronRequest'
-        ..payload = Uint8List.fromList(utf8.encode(requestPayload));
-
-      try {
-        final response = await client.send(envelope);
-        final responsePayload = utf8.decode(response.payload);
-        final responseData =
-            jsonDecode(responsePayload) as Map<String, dynamic>;
-
-        final success =
-            (responseData['Success'] ?? responseData['success'] ?? false)
-                as bool;
-        final message =
-            (responseData['Message'] ?? responseData['message'] ?? '')
-                as String;
-        final version =
-            (responseData['Version'] ?? responseData['version'] ?? '')
-                as String;
-
-        if (mounted) {
-          setState(() {
-            if (success) {
-              _compileStatus = 'success';
-              _compileErrors = [];
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: DigitalBrainColors.teal,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Promoted successfully to version $version!',
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: const Color(0xFF101222),
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-            } else {
-              _compileStatus = 'error';
-              _compileErrors = message.isNotEmpty
-                  ? message.split('|').map((e) => e.trim()).toList()
-                  : ['Compilation failed'];
-            }
-          });
-        }
-        return;
-      } catch (e) {
-        debugPrint(
-          'gRPC compilation failed, falling back to local verification: $e',
-        );
-      }
-    }
-
-    // Fallback: local simulation verification
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
-
-      final errors = <String>[];
-
-      // BOSN001: Check for neuron declaration
-      if (!code.contains(
-        RegExp(r'\bneuron\s+[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)+\b'),
-      )) {
-        errors.add(
-          'BOSN001: Missing or invalid neuron FQN declaration. Every .ino document must declare a valid dotted FQN (e.g. neuron DigitalBrain.Examples.MyNeuron).',
-        );
-      }
-
-      // BOSN002: Check for scenario block (L6 gate)
-      if (!code.contains('scenario') && !code.contains('@')) {
-        errors.add(
-          'BOSN002: L6 Gate Violation - Document contains zero scenarios. Every neuron must carry at least one scenario block or DDD reference.',
-        );
-      }
-
-      // BOSN003: Check that every using alias points to a valid FQN in the catalog
-      final usingMatches = RegExp(
-        r'\busing\s+(\w+)\s*=\s*(synapse|signal|neuron)\(([^)]+)\)',
-      ).allMatches(code);
-      for (final match in usingMatches) {
-        final alias = match.group(1)!;
-        final fqn = match.group(3)!.trim();
-
-        final exists = _catalog.any(
-          (s) => s.fqn.toLowerCase() == fqn.toLowerCase(),
-        );
-        if (!exists && _catalog.isNotEmpty) {
-          errors.add(
-            'BOSN003: Unknown contract FQN "$fqn" used in alias "$alias". Contract was not found in the live DigitalBrain catalog.',
-          );
-        }
-      }
-
-      // BOSN004 & BOSN005: Balanced parenthesis and brackets
-      int parens = 0;
-      int brackets = 0;
-      for (int i = 0; i < code.length; i++) {
-        if (code[i] == '(') parens++;
-        if (code[i] == ')') parens--;
-        if (code[i] == '[') brackets++;
-        if (code[i] == ']') brackets--;
-      }
-      if (parens != 0) {
-        errors.add(
-          'BOSN004: Unbalanced parentheses. Found mismatched ( and ).',
-        );
-      }
-      if (brackets != 0) {
-        errors.add('BOSN005: Unbalanced brackets. Found mismatched [ and ].');
-      }
-
-      setState(() {
-        if (errors.isEmpty) {
-          _compileStatus = 'success';
-          _compileErrors = [];
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: DigitalBrainColors.teal,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Staged and compiled successfully!',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              backgroundColor: const Color(0xFF101222),
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        } else {
-          _compileStatus = 'error';
-          _compileErrors = errors;
-        }
-      });
-    });
-  }
-
-  Widget _buildCompileStatusIndicator() {
-    switch (_compileStatus) {
-      case 'compiling':
-        return const SizedBox(
-          width: 12,
-          height: 12,
-          child: CircularProgressIndicator(
-            strokeWidth: 1.5,
-            valueColor: AlwaysStoppedAnimation<Color>(DigitalBrainColors.gold),
-          ),
-        );
-      case 'success':
-        return const Icon(
-          Icons.check_circle,
-          color: DigitalBrainColors.teal,
-          size: 14,
-        );
-      case 'error':
-        return const Icon(
-          Icons.error,
-          color: DigitalBrainColors.rose,
-          size: 14,
-        );
-      case 'idle':
-      default:
-        return Container(
-          width: 6,
-          height: 6,
-          decoration: const BoxDecoration(
-            color: DigitalBrainColors.inkLow,
-            shape: BoxShape.circle,
-          ),
-        );
-    }
-  }
-
-  Widget _buildCompileButton() {
-    String label = 'Compile & Stage';
-    if (_compileStatus == 'compiling') label = 'Compiling…';
-    if (_compileStatus == 'success') label = 'Staged & Verified';
-    if (_compileStatus == 'error') label = 'Compile Failed';
-
-    final Color color = _compileStatus == 'success'
-        ? DigitalBrainColors.tealSoft
-        : _compileStatus == 'error'
-        ? DigitalBrainColors.rose
-        : DigitalBrainColors.violetSoft;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        key: const Key('compile-stage-btn'),
-        onTap: _compileStatus == 'compiling' ? null : _runCompileAndStage,
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Text(
-            label,
-            style: GoogleFonts.outfit(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompileDiagnosticsConsole() {
-    if (_compileStatus != 'error' || _compileErrors.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: DigitalBrainColors.rose.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      color: DigitalBrainColors.rose,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'COMPILER DIAGNOSTICS (${_compileErrors.length} errors)',
-                      style: GoogleFonts.outfit(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: DigitalBrainColors.rose,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final err in _compileErrors)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Text(
-                          err,
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 10,
-                            color: DigitalBrainColors.inkMid,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -1458,39 +1086,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
           children: [
             _buildCode(),
 
-            // Premium Floating Staging Panel
-            Positioned(
-              top: 12,
-              right: 12,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.12),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildCompileStatusIndicator(),
-                        const SizedBox(width: 8),
-                        _buildCompileButton(),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
             if (_suggestionsVisible && _suggestions.isNotEmpty)
               Positioned(
                 bottom: 12,
@@ -1593,7 +1188,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
               ),
           ],
         ),
-        _buildCompileDiagnosticsConsole(),
       ],
     );
   }
@@ -1915,7 +1509,6 @@ class _PromptInputBodyState extends State<_PromptInputBody> {
 
   @override
   Widget build(BuildContext context) {
-    final client = DigitalBrainClientScope.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -1951,25 +1544,6 @@ class _PromptInputBodyState extends State<_PromptInputBody> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            if (client != null)
-              VoiceInput(
-                client: client,
-                onTranscript: (t) {
-                  setState(() {
-                    _controller.text = '${_controller.text} $t'.trim();
-                  });
-                },
-                onError: (err) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(err),
-                      backgroundColor: DigitalBrainColors.rose,
-                    ),
-                  );
-                },
-              )
-            else
-              const SizedBox.shrink(),
             FilledButton(
               onPressed: widget.onSubmit == null ? null : _submit,
               child: Text(widget.submitLabel),
@@ -2353,105 +1927,7 @@ class _SynapseRowWidgetState extends State<_SynapseRowWidget> {
     super.dispose();
   }
 
-  Future<void> _fireSynapse() async {
-    final client = DigitalBrainClientScope.of(context);
-    if (client == null) {
-      widget.onFire?.call();
-      return;
-    }
-
-    final customFields = <String, dynamic>{};
-    for (final entry in _controllers.entries) {
-      final textVal = entry.value.text.trim();
-      if (textVal.isEmpty) continue;
-
-      dynamic val = textVal;
-      if (textVal.toLowerCase() == 'true') {
-        val = true;
-      } else if (textVal.toLowerCase() == 'false') {
-        val = false;
-      } else if (int.tryParse(textVal) != null) {
-        val = int.parse(textVal);
-      } else if (double.tryParse(textVal) != null) {
-        val = double.parse(textVal);
-      }
-      customFields[entry.key] = val;
-    }
-
-    final randomGuid = _generateGuid();
-    var fqn = widget.type;
-    if (_schema != null) {
-      fqn = _schema!.fqn;
-    }
-
-    var receiverNeuronType = 'GatewayNeuron';
-    if (fqn.contains('RequestDigestFeed') || fqn.contains('FetchDigestFeed')) {
-      receiverNeuronType = 'DigitalBrain.Digest.DigestEmailFeedNeuron';
-    } else if (fqn.contains('StoreLastNGmailSenders') ||
-        fqn.contains('StoreLastNGmailSendersRequest')) {
-      receiverNeuronType = 'GmailDigestNeuron';
-    }
-
-    final requestPayload = jsonEncode({
-      'SynapseId': _generateGuid(),
-      'CorrelationId': randomGuid,
-      'CausationId': null,
-      'CallerNeuronId': '00000000-0000-0000-0000-000000000000',
-      'CallerNeuronType': 'External',
-      'ReceiverNeuronId': '00000000-0000-0000-0000-000000000000',
-      'ReceiverNeuronType': receiverNeuronType,
-      'Timestamp': DateTime.now().toUtc().toIso8601String(),
-      ...customFields,
-    });
-
-    final envelope = SynapseEnvelope()
-      ..correlationId = randomGuid
-      ..typeName = fqn
-      ..payload = Uint8List.fromList(utf8.encode(requestPayload));
-
-    try {
-      widget.onFire?.call();
-
-      await client.send(envelope);
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(
-                Icons.flash_on,
-                color: DigitalBrainColors.gold,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Fired synapse ${fqn.split('.').last} with custom parameters!',
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: DigitalBrainColors.teal,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to fire synapse: $e'),
-          backgroundColor: DigitalBrainColors.rose,
-        ),
-      );
-    }
-  }
-
-  String _generateGuid() {
-    final rand = math.Random();
-    String hexDigit(int index) => rand.nextInt(16).toRadixString(16);
-    return '${List.generate(8, hexDigit).join()}-${List.generate(4, hexDigit).join()}-4${List.generate(3, hexDigit).join()}-${(rand.nextInt(4) + 8).toRadixString(16)}${List.generate(3, hexDigit).join()}-${List.generate(12, hexDigit).join()}';
-  }
+  void _fireSynapse() => widget.onFire?.call();
 
   @override
   Widget build(BuildContext context) {

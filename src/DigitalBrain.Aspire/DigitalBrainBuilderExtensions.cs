@@ -183,10 +183,8 @@ public static class DigitalBrainBuilderExtensions
     /// <summary>
     /// Wires a kernel project with the core kernel features out of the box:
     /// dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
-    /// This makes the kernel provide built-in capabilities (INO, automations, status, tasks, etc.)
-    /// immediately when the kernel starts.
     /// </summary>
-    public static IResourceBuilder<ProjectResource> WireKernelSilo(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
+    public static IResourceBuilder<ProjectResource> ConfigureServer(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
         kernel = kernel
             .WithReference(ctx.Orleans)
@@ -219,8 +217,6 @@ public static class DigitalBrainBuilderExtensions
 
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
-        // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks). Provider/model come from
-        // DigitalBrainOptions.WithLLM<TModel>() (see DigitalBrain.Core/Models/DigitalBrainModels.cs) rather than a hardcoded string.
         kernel.WithEnvironment("DigitalBrain__Llm__Provider", ctx.LlmProvider);
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
         if (ctx.OllamaEndpoint is not null)
@@ -262,9 +258,11 @@ public static class DigitalBrainBuilderExtensions
         return kernel;
     }
 
-    // Builds "http://{host}:{port}{pathSuffix}" against a container endpoint discovered at orchestration time
-    // (Ollama, its embedding alias, or Whisper) — shared by the three call sites in WireKernelSilo method above so the
-    // host/port interpolation lives in exactly one place.
+    public static IResourceBuilder<ProjectResource> ConfigureClient(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> client)
+    {
+        return client.WithReference(ctx.OrleansClient);
+    }
+
     private static ReferenceExpression HttpUrl(EndpointReference endpoint, string pathSuffix = "") =>
         ReferenceExpression.Create($"http://{endpoint.Property(EndpointProperty.Host)}:{endpoint.Property(EndpointProperty.Port)}{pathSuffix}");
 

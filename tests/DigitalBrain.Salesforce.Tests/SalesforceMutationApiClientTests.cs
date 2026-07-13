@@ -98,6 +98,20 @@ public sealed class SalesforceMutationApiClientTests
         Assert.Single(handler.Patches);
     }
 
+    [Fact]
+    public async Task Verify_reads_the_provider_after_apply_and_confirms_the_approved_value()
+    {
+        var (client, _) = CreateClient("Original");
+        var preview = await client.PreviewUpdateAsync(Request("Desired"), CancellationToken.None);
+        var apply = await client.ApplyUpdateAsync(preview.PreparedUpdate!, CancellationToken.None);
+
+        var verification = await client.VerifyUpdateAsync(preview.PreparedUpdate!, CancellationToken.None);
+
+        Assert.Equal(SalesforceMutationStatus.Applied, apply.Status);
+        Assert.True(verification.Verified);
+        Assert.Null(verification.SafeReason);
+    }
+
     private static SalesforceUpdatePreviewRequest Request(string newValue) =>
         new(new SalesforceSemanticEntity("Accounts"), RecordId, new SalesforceSemanticField("Account Name"), newValue);
 

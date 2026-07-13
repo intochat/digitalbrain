@@ -9,7 +9,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Core</PackageId>
     <Version>0.3.0</Version>
-    <Description>Core abstractions (INeuron, Synapse with full causal lineage, IHandle, and basic universal contracts). Pure stable layer. UI contracts live in DigitalBrain.Ui.Contracts; pack authoring contracts live in DigitalBrain.Pack.Contracts; kernel-specific runtime lives in the kernel package.</Description>
+    <Description>Core abstractions (INeuron, Synapse with full causal lineage, IHandle, and basic universal contracts). Pure stable layer. UI contracts live in DigitalBrain.Ui.Contracts; kernel-specific runtime lives in the kernel package.</Description>
   </PropertyGroup>
 
   <ItemGroup>

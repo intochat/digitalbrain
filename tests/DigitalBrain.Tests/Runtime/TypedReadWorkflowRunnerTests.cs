@@ -479,6 +479,10 @@ public sealed class TypedReadWorkflowRunnerTests
             ApplyCalls++;
             throw new NotSupportedException();
         }
+
+        public Task<SalesforceMutationVerificationResult> VerifyUpdateAsync(
+            SalesforcePreparedUpdate preparedUpdate,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class RecordingGrainFactory(

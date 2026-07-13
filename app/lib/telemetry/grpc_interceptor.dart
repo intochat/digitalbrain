@@ -1,6 +1,5 @@
 import 'package:grpc/service_api.dart';
 import 'package:opentelemetry/api.dart' as otel;
-import 'package:digitalbrain_flutter/grpc/digitalbrain.pb.dart' as gw;
 import 'telemetry.dart';
 
 class OtelGrpcInterceptor extends ClientInterceptor {
@@ -12,25 +11,6 @@ class OtelGrpcInterceptor extends ClientInterceptor {
     ClientUnaryInvoker<Q, R> invoker,
   ) {
     final enrichedMetadata = Map<String, String>.from(options.metadata);
-
-    if (!enrichedMetadata.containsKey('x-brain-id')) {
-      bool isBootstrap = false;
-      if (request is gw.SynapseEnvelope) {
-        final type = request.typeName;
-        isBootstrap =
-            type == 'DigitalBrain.SDK.Identity.Contracts.RequestLogin' ||
-            type == 'DigitalBrain.SDK.Identity.Contracts.RequestLoginCard' ||
-            type == 'DigitalBrain.SDK.Identity.Contracts.RequestCreateBrain' ||
-            type ==
-                'DigitalBrain.Domains.Onboarding.Contracts.RequestOnboarding' ||
-            type == 'DigitalBrain.Domains.Onboarding.Contracts.AcceptPolicy' ||
-            type == 'DigitalBrain.Domains.Onboarding.Contracts.PolicyAccepted';
-      }
-      if (!isBootstrap) {
-        enrichedMetadata['x-brain-id'] = 'primary';
-        enrichedMetadata['x-active-scope'] = 'primary';
-      }
-    }
 
     if (!DigitalBrainTelemetry.isInitialized) {
       final enrichedOptions = options.mergedWith(

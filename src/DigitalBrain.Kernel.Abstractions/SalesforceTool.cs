@@ -139,6 +139,11 @@ public sealed record SalesforceMutationApplyResult(
     [property: Id(0)] SalesforceMutationStatus Status,
     [property: Id(1)] string? SafeReason = null);
 
+[GenerateSerializer, Alias("digitalbrain.v2.salesforce-mutation-verification-result")]
+public sealed record SalesforceMutationVerificationResult(
+    [property: Id(0)] bool Verified,
+    [property: Id(1)] string? SafeReason = null);
+
 [GenerateSerializer, Alias("digitalbrain.v2.salesforce-read-scope")]
 public sealed record SalesforceReadScope(
     [property: Id(0)] string PrincipalId,
@@ -230,6 +235,11 @@ public interface ISalesforceMutationToolGrain : IGrainWithStringKey
 
     [Alias("ApplyUpdateAsync")]
     Task<SalesforceMutationApplyResult> ApplyUpdateAsync(
+        SalesforcePreparedUpdate preparedUpdate,
+        CancellationToken cancellationToken = default);
+
+    [Alias("VerifyUpdateAsync")]
+    Task<SalesforceMutationVerificationResult> VerifyUpdateAsync(
         SalesforcePreparedUpdate preparedUpdate,
         CancellationToken cancellationToken = default);
 }

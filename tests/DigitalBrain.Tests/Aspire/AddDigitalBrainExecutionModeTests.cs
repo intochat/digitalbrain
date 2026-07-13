@@ -151,9 +151,7 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.DoesNotContain(
             flutterEnvironment,
             pair => pair.Key.Contains("WatchHomeFeed", StringComparison.OrdinalIgnoreCase)
-                || pair.Key.Contains("DigitalBrainGateway", StringComparison.OrdinalIgnoreCase)
-                || pair.Value?.ToString()?.Contains("WatchHomeFeed", StringComparison.OrdinalIgnoreCase) == true
-                || pair.Value?.ToString()?.Contains("DigitalBrainGateway", StringComparison.OrdinalIgnoreCase) == true);
+                || pair.Value?.ToString()?.Contains("WatchHomeFeed", StringComparison.OrdinalIgnoreCase) == true);
 
         var webEndpoint = Assert.Single(
             flutterWeb.Annotations.OfType<EndpointAnnotation>(),

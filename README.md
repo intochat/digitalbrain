@@ -1,12 +1,8 @@
 # DigitalBrain
 
-**DigitalBrain** is the .NET Aspire + Orleans kernel for self-evolving personal OS where everything is a **Neuron** (Orleans grain) or **Synapse** (typed message).
+**DigitalBrain** is the .NET Aspire + Orleans runtime for a self-evolving personal OS.
 
-The core product: **safe, explicit, journaled, human-approved self-evolution is the *only* path** for any user-visible mutation (packs, automations, new neurons, Ino proposals, foundry runs, etc.).
-
-Ino (the orchestrator) + Marketplace + Foundry + automations all stage proposals. Only approved decisions apply effects. Everything is durable, replayable, and rollback-capable.
-
-Thin client (Flutter + RFW/ForUI) consumes server-driven `UiSurface` / `UiWidgetTree` emitted by neurons.
+Keep one path: `Client -> Edge/Auth -> INO operation -> deterministic function or bounded model workflow -> effect gate -> connector adapter`. Commands and queries use typed grain interfaces. Orleans streams are reserved for progress, fan-out, and observability. The generic Neuron/Synapse runtime, legacy gateway, second auth system, Foundry execution loop, pack runtime, and duplicate UI rail are removed after their remaining behavior is either migrated or explicitly discarded.
 
 ## Quick Start (Local)
 
@@ -46,13 +42,34 @@ Do not keep a separate `aspire run` / `aspire start` session alive while running
 
 ## Core Ideas
 
-- **Self-evolution rail** (the point): Proposals → human (or trusted) approval → apply handler. Ino proposes; rail executes. No side doors for user mutations.
-- **Neuron / Synapse**: Actor model with causation, journals, broadcasts.
-- **Packs**: Signed C# (NeuroPack) embodied at runtime via collectible ALC. Marketplace install = instant new behavior.
-- **UI**: Neurons emit rich server-driven surfaces. Client is thin renderer.
+- **External mutation rail**: Durable INO effect plans with approval evidence, idempotency, lease/fence checks, and outcome verification.
+- **External edge**: V2 UI gRPC plus the retained MCP operation surface.
+- **Orleans**: Typed grain interfaces for commands and queries; streams only for progress, fan-out, and observability.
 - **Aspire hosting**:  AppHost wires replicas, Ollama, storage, MCP, flutter client.
 
 Use the CodeGraph MCP (see .mcp.json and CLAUDE.md) as the primary tool for architecture and codebase understanding.
+
+## Target Dependency Direction
+
+```text
+DigitalBrain.Core
+        ^
+DigitalBrain.Kernel.Abstractions
+        ^
+        +----------------+----------------+
+        ^                ^                ^
+DigitalBrain.Kernel  DigitalBrain.Google  DigitalBrain.Salesforce
+        ^                ^                ^
+        +--------- DigitalBrain.RuntimeHost --------+
+                           ^
+             DigitalBrain.AppHost resource graph
+
+DigitalBrain.Mcp -> DigitalBrain.Kernel.Abstractions
+```
+
+The final names may be simplified after deletion, but dependency direction must remain inward. `DigitalBrain.RuntimeHost` is the only process project allowed to compose the runtime with concrete providers. `DigitalBrain.AppHost` models resources and references the RuntimeHost executable without owning its service registrations.
+
+No external mutation may bypass `InoEffectPlanAuthority`, durable approval evidence, idempotency, lease/fence checks, and outcome verification.
 
 ## Working Rules (see CLAUDE.md)
 
@@ -66,14 +83,6 @@ Use the CodeGraph MCP (see .mcp.json and CLAUDE.md) as the primary tool for arch
 - Relative paths. Self-explanatory names. No vacuous summaries.
 - Self-evolution is non-negotiable for mutations. Use rail to propose WoW improvements.
 - Minimal/isolated starts when possible; pre-build for MCP; parallel Context7 + MCP.
-
-## Vision (Self-Evolving System)
-
-The OS evolves itself safely through one explicit rail. Durable journals capture proposals/decisions/applies. Ino is the smart front-end that proposes; the rail is the trusted executor. Human approval (or explicit trusted bypasses for seeds/dev) gates everything.
-
-Packs, Ino creations, automations, foundry outputs — all flow the same way.
-
-This is the architecture north star. Use the CodeGraph MCP for exploring the implementation. See the SelfEvolution types + handlers in Core/Kernel for the implementation.
 
 ## Status
 

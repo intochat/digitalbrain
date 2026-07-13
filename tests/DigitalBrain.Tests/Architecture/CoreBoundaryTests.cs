@@ -1,6 +1,5 @@
 using System.Reflection;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Distribution;
 using DigitalBrain.Ui.Contracts.Ui;
 
 namespace DigitalBrain.Tests.Architecture;
@@ -35,16 +34,6 @@ public class CoreBoundaryTests
     }
 
     [Fact]
-    public void Pack_Contracts_Depend_On_Core_Not_The_Other_Way_Around()
-    {
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-        var packContractsAssemblyName = typeof(IPackBehavior).Assembly.GetName().Name!;
-
-        Assert.Contains(coreAssemblyName, PackContractsReferenceNames());
-        Assert.DoesNotContain(packContractsAssemblyName, CoreReferenceNames());
-    }
-
-    [Fact]
     public void Ui_Contracts_Depend_On_Core_Not_The_Other_Way_Around()
     {
         var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
@@ -53,13 +42,6 @@ public class CoreBoundaryTests
 
         Assert.Contains(coreAssemblyName, references);
         Assert.DoesNotContain(uiContractsAssemblyName, CoreReferenceNames());
-    }
-
-    [Fact]
-    public void Pack_Contracts_Own_NeuroPack_And_Bundle_Manifest()
-    {
-        Assert.Equal("DigitalBrain.Pack.Contracts", typeof(NeuroPack).Assembly.GetName().Name);
-        Assert.Equal("DigitalBrain.Pack.Contracts", typeof(BundleManifest).Assembly.GetName().Name);
     }
 
     [Fact]
@@ -157,22 +139,7 @@ public class CoreBoundaryTests
         Assert.Empty(offenders);
     }
 
-    [Fact]
-    public void Ui_Surface_Live_Data_Does_Not_Expose_NeuroPack_Projection_Methods()
-    {
-        var offenders = typeof(UiSurfaceLiveData)
-            .GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
-            .Where(method => MethodSignatureContains(method, typeof(NeuroPack)))
-            .Select(method => method.Name)
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(offenders);
-    }
-
     private static string[] CoreReferenceNames() => ReferenceNames(typeof(Synapse).Assembly);
-
-    private static string[] PackContractsReferenceNames() => ReferenceNames(typeof(IPackBehavior).Assembly);
 
     private static string[] UiContractsReferenceNames() => ReferenceNames(typeof(UiSurface).Assembly);
 

@@ -1,5 +1,3 @@
-using DigitalBrain.Core.Sdk;
-
 namespace DigitalBrain.Core;
 
 [GenerateSerializer]
@@ -36,10 +34,6 @@ public record Synapse(
 public record NeuronTelemetry(NeuronId Neuron, string Event, int Count = 1) : Synapse(nameof(NeuronTelemetry), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-[Alias("DigitalBrain.Core.WiringOptimizationProposed")]
-public record WiringOptimizationProposed(string Proposal, string FromNeuron) : Synapse(nameof(WiringOptimizationProposed), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
 [Alias("DigitalBrain.Core.ExperienceUsed")]
 public record ExperienceUsed(
     string Pack,
@@ -47,9 +41,6 @@ public record ExperienceUsed(
     string UserId = "anonymous",
     string? SessionId = null) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
 
-
-[Alias("DigitalBrain.Core.IAspireNeuron")]
-public interface IAspireNeuron : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
 
 // Thin common marker for channel neurons.
 // Allows discovery and shared patterns (e.g. CorrelationId/CausationId for reply context across channels).
@@ -69,97 +60,6 @@ public readonly record struct UserId([property: Id(0)] string Value)
 }
 
 [GenerateSerializer]
-[Alias("DigitalBrain.Core.LoginRequest")]
-public record LoginRequest(
-    string Username,
-    string Password,
-    string ClientId = "flutter") : Synapse(nameof(LoginRequest), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.LoginSucceeded")]
-public record LoginSucceeded(
-    UserId UserId,
-    string SessionId,
-    string DisplayName,
-    IReadOnlyList<string> Roles,
-    string ClientId) : Synapse(nameof(LoginSucceeded), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.LoginFailed")]
-public record LoginFailed(
-    string Username,
-    string Reason,
-    string ClientId) : Synapse(nameof(LoginFailed), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.LogoutRequest")]
-public record LogoutRequest(
-    string SessionId,
-    string ClientId = "flutter") : Synapse(nameof(LogoutRequest), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.UserSessionCreated")]
-public record UserSessionCreated(
-    UserId UserId,
-    string SessionId,
-    DateTimeOffset ExpiresAt,
-    string ClientId) : Synapse(nameof(UserSessionCreated), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.UserSessionEnded")]
-public record UserSessionEnded(
-    string SessionId,
-    string ClientId) : Synapse(nameof(UserSessionEnded), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.CapabilityRegistered")]
-public record CapabilityRegistered(
-    string Id,
-    string Description,
-    IReadOnlyList<string> Examples,
-    string Tier,
-    string? Origin = null) : Synapse(nameof(CapabilityRegistered), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.LocalUserRegistered")]
-public record LocalUserRegistered(
-    UserId UserId,
-    string Username,
-    string DisplayName,
-    string PasswordHashBase64,
-    string PasswordSaltBase64,
-    IReadOnlyList<string> Roles) : Synapse(nameof(LocalUserRegistered), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.UserSessionState")]
-public record UserSessionState(
-    UserId UserId,
-    string SessionId,
-    string DisplayName,
-    IReadOnlyList<string> Roles,
-    DateTimeOffset ExpiresAt,
-    bool Active);
-
-[Alias("DigitalBrain.Core.IUserGrain")]
-public interface IUserGrain : IGrainWithStringKey
-{
-    [Alias("GetProfileAsync")]
-    Task<UserProfile> GetProfileAsync();
-    [Alias("HasEntitlementAsync")]
-    Task<bool> HasEntitlementAsync(string bundleOrResource, string actionOrCapability);
-}
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.UserProfile")]
-public record UserProfile(UserId Id, string DisplayName, IReadOnlyList<string> Roles);
-
-[Alias("DigitalBrain.Core.IMetaOptimizerNeuron")]
-public interface IMetaOptimizerNeuron : INeuron, IHandle<NeuronTelemetry>, IHandle<WiringOptimizationProposed> { }
-
-[Alias("DigitalBrain.Core.IGeneratedNeuron")]
-public interface IGeneratedNeuron : INeuron { }
-
-[GenerateSerializer]
 [Alias("DigitalBrain.Core.LlmPrompt")]
 public record LlmPrompt(string Prompt, string? PreferredModel = null) : Synapse(nameof(LlmPrompt), DateTimeOffset.UtcNow);
 
@@ -173,25 +73,6 @@ public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
 
 
 // Self-awareness: SystemStatus + proposals (MVP for auto diagnose + simulate fix)
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.SystemLaunched")]
-public record SystemLaunched(string SystemName, DateTimeOffset Timestamp) : Synapse(nameof(SystemLaunched), Timestamp);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.SystemStatusChanged")]
-public record SystemStatusChanged(string Component, string Status, string? Details = null) : Synapse(nameof(SystemStatusChanged), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.FixProposal")]
-public record FixProposal(string Issue, string ProposedFix, string From) : Synapse(nameof(FixProposal), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.SimulationResult")]
-public record SimulationResult(string Scenario, bool Success, string Details) : Synapse(nameof(SimulationResult), DateTimeOffset.UtcNow);
-
-[Alias("DigitalBrain.Core.ISystemStatus")]
-public interface ISystemStatus : INeuron, IHandle<SystemStatusChanged>, IHandle<FixProposal> { }
-
 // Dual journal checkpoints + branching for simulation / time travel.
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.Checkpoint")]
@@ -246,56 +127,6 @@ public record TaskInfo(
     [property: Id(2)] string? Result = null
 );
 
-// NuGet + Roslyn architect for closed loops (SEClosedLoopNeuron).
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.NuGetCommand")]
-public record NuGetCommand(string Action, string Target, string Args = "") : Synapse(nameof(NuGetCommand), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.NuGetResult")]
-public record NuGetResult(string Target, bool Success, string Output) : Synapse(nameof(NuGetResult), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.ArchitectRequest")]
-public record ArchitectRequest(string Path, string Task) : Synapse(nameof(ArchitectRequest), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.ArchitectReport")]
-public record ArchitectReport(string Path, string Report) : Synapse(nameof(ArchitectReport), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.ArchitectResult")]
-public record ArchitectResult(string Path, string Result, string Task) : Synapse(nameof(ArchitectResult), DateTimeOffset.UtcNow);
-
-// Closed loop request. The public MCP mutation path is intentionally disabled while INO owns automation staging.
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.ClosedLoopRequest")]
-public record ClosedLoopRequest(string LoopType, string Prompt) : Synapse(nameof(ClosedLoopRequest), DateTimeOffset.UtcNow);
-
-[Alias("DigitalBrain.Core.IClosedLoopNeuron")]
-public interface IClosedLoopNeuron : INeuron, IHandle<ClosedLoopRequest>, IHandle<ExperienceUsed> { }
-
-// Smart ContextNeuron for INO - manages chat, agent, filter, cluster contexts like context providers
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.ContextUpdate")]
-public record ContextUpdate(string ContextName, string Key, string Value) : Synapse(nameof(ContextUpdate), DateTimeOffset.UtcNow);
-
-// A stored semantic memory: the text plus its embedding (empty when no real embedder is configured).
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.MemoryStored")]
-public record MemoryStored(
-    string Text,
-    float[] Embedding,
-    string? WorkspaceId = null,
-    string? SourceKind = null,
-    string? TrustLevel = null,
-    string? Origin = null) : Synapse(nameof(MemoryStored), DateTimeOffset.UtcNow);
-
-// Filter changes - INO/Context must be notified so assistant knows current UI view state
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.FilterChanged")]
-public record FilterChanged(string View, string Filter, string Value) : Synapse(nameof(FilterChanged), DateTimeOffset.UtcNow);
-
 // 3D graph / cluster observation synapses
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.ClusterActivity")]
@@ -314,58 +145,4 @@ public record VisualizeDataRequest(
     string? RequestId = null,
     string UserId = "anonymous",
     string? SessionId = null) : Synapse(nameof(VisualizeDataRequest), DateTimeOffset.UtcNow, CorrelationId: RequestId);
-
-// First-class chart interaction and modification (conversational + selection driven)
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.ChartCommand")]
-public record ChartCommand(string SurfaceId, string Instruction, string? Context = null) : Synapse(nameof(ChartCommand), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.ChartInteraction")]
-public record ChartInteraction(string SurfaceId, string Kind, IReadOnlyDictionary<string, object?> Payload) : Synapse(nameof(ChartInteraction), DateTimeOffset.UtcNow);
-
-// Chart neuron supports agent metadata for routing + full conversational + selection driven updates.
-[Alias("DigitalBrain.Core.IChartNeuron")]
-public interface IChartNeuron : IAgent, IHandle<VisualizeDataRequest>, IHandle<ChartCommand>, IHandle<ChartInteraction> { }
-
-// Closed-loop UI/system modification records.
-
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.WidgetTreeInspected")]
-public record WidgetTreeInspected(string Summary, string TreeJson = "", string App = "flutter_demo") : Synapse(nameof(WidgetTreeInspected), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.UIModificationProposed")]
-public record UIModificationProposed(string TargetFileOrWidget, string Rationale, string ProposedDartCode) : Synapse(nameof(UIModificationProposed), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.SystemModificationProposed")]
-public record SystemModificationProposed(string Component, string Rationale, string ProposedChange, string ApplyVia = "aspire-restart") : Synapse(nameof(SystemModificationProposed), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.ClosedLoopCompleted")]
-public record ClosedLoopCompleted(string LoopType, string Outcome, bool AppliedViaMcpOrMarket) : Synapse(nameof(ClosedLoopCompleted), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.PerformKernelSelfUpdate")]
-public record PerformKernelSelfUpdate(string Version = "", int FailAtReplica = 0) : Synapse(nameof(PerformKernelSelfUpdate), DateTimeOffset.UtcNow);
-
-// Salesforce OAuth callback completion (MULTIUSER S1: grain-routed callback, replaces direct
-// Program.cs store IO so the completion always reaches the activation that started the flow).
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.SalesforceOAuthCallback")]
-public record SalesforceOAuthCallback(
-    [property: Id(0)] string? Code,
-    [property: Id(1)] string? State,
-    [property: Id(2)] string? Error,
-    [property: Id(3)] string? ErrorDescription,
-    [property: Id(4)] string FallbackRedirectUri);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.SalesforceOAuthCallbackResult")]
-public record SalesforceOAuthCallbackResult(
-    [property: Id(0)] bool Success,
-    [property: Id(1)] string Title,
-    [property: Id(2)] string Message);
 

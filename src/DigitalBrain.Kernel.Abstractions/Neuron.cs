@@ -115,9 +115,6 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         await SubscribeTimelineIfNeeded(ct);
     }
 
-    // A neuron subscribes to the broadcast timeline iff it has a way to react to broadcasts. The default rule
-    // is "declares at least one IHandle<T>"; dynamic hosts (GeneratedNeuron, whose handled types come from an
-    // embodied pack's manifest, not static interfaces) override this to subscribe unconditionally.
     protected virtual bool ShouldSubscribeToTimeline => SynapseDispatch.HandledTypes(GetType()).Count > 0;
 
     // Subscribe to the broadcast timeline when ShouldSubscribeToTimeline says so, so point-to-point-only

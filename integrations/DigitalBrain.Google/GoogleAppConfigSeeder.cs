@@ -1,10 +1,26 @@
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
+using DigitalBrain.Kernel.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Google;
+
+public static class GoogleServiceCollectionExtensions
+{
+    public static IServiceCollection AddDigitalBrainGoogle(this IServiceCollection services)
+    {
+        services.AddHostedService<GoogleAppConfigSeeder>();
+        services.AddSingleton<IGmailApiClientFactory, GmailApiClientFactory>();
+        services.AddKeyedSingleton<IConnector>("google", (provider, _) => new GoogleConnector(
+            provider.GetRequiredService<IPackConfigStore>(),
+            provider.GetRequiredService<IOAuthStateProtector>(),
+            provider.GetService<IConfiguration>()));
+        return services;
+    }
+}
 
 public sealed class GoogleAppConfigSeeder(
     IConfiguration configuration,

@@ -72,8 +72,8 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 var salesforceAppConfig = builder.AddSalesforceAppConfig();
 var googleAppConfig = builder.AddGoogleAppConfig();
 
-var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
-ctx.WireKernelSilo(kernel);  // Provides surfaces, journals, 3 replicas HA, and LLM wiring via the Aspire package.
+var kernel = builder.AddProject<Projects.DigitalBrain_RuntimeHost>("kernel");
+ctx.ConfigureServer(kernel);
 kernel.WithEnvironment("DigitalBrain__Profile", profile);
 kernel.WithEnvironment("DigitalBrain__Tools__Enabled", "true");
 kernel.WithEnvironment("DigitalBrain__Runtime__State__ActiveKekVersion", "1");
@@ -90,7 +90,6 @@ if (ctx.EnableMcp)
     // The local launch profile pins ports that collide with the AppHost's proxy model.
     // Exclude it so Aspire owns randomized proxy and target ports in every isolated session.
     var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp", launchProfileName: null)
-        .WithReference(ctx.OrleansClient)
         .WithEnvironment("DigitalBrain__Runtime__OAuth__InternalOrigin", kernel.GetEndpoint("web"))
         .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", sessionSigningKey)
         .WithEnvironment("DigitalBrain__Profile", profile)
@@ -103,6 +102,7 @@ if (ctx.EnableMcp)
         .WithEndpoint("https", endpoint => endpoint.Transport = "http2")
         .WithHttpHealthCheck(path: "/health", endpointName: "https")
         .WithReplicas(1);
+    ctx.ConfigureClient(mcp);
     mcp.WaitFor(ctx.ConversationStateBlobs);
     mcp.WaitFor(ctx.SurfaceFeedStateBlobs);
     mcp.WaitFor(ctx.SessionStateBlobs);

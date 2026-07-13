@@ -68,6 +68,32 @@ public sealed class SalesforceMutationNeuron(
         }
     }
 
+    public async Task<SalesforceMutationVerificationResult> VerifyUpdateAsync(
+        SalesforcePreparedUpdate preparedUpdate,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var connection = await CreateClientAsync(cancellationToken);
+            if (connection.Status is { } status)
+                return new SalesforceMutationVerificationResult(false, SafeReason(status));
+            return await connection.Client!.VerifyUpdateAsync(preparedUpdate, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                "Principal-scoped Salesforce update verification failed with {ExceptionType}.",
+                ex.GetType().Name);
+            return new SalesforceMutationVerificationResult(
+                false,
+                SafeReason(SalesforceMutationStatus.Unavailable));
+        }
+    }
+
     private async Task<(SalesforceMutationStatus? Status, ISalesforceApiClient? Client)> CreateClientAsync(
         CancellationToken cancellationToken)
     {

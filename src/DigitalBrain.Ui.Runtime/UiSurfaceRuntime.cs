@@ -21,21 +21,6 @@ public static class UiSurfaceSamples
                         ["id"] = "ino-main",
                         ["label"] = "INO",
                         ["activity"] = 0.8
-                    },
-                    new Dictionary<string, object?>
-                    {
-                        ["id"] = "automation-main",
-                        ["label"] = "Automations",
-                        ["activity"] = 0.4
-                    }
-                },
-                ["edges"] = new[]
-                {
-                    new Dictionary<string, object?>
-                    {
-                        ["from"] = "ino-main",
-                        ["to"] = "automation-main",
-                        ["value"] = 0.3
                     }
                 },
                 ["events"] = new[]
@@ -104,83 +89,6 @@ public static class UiSurfaceSamples
                     ["taskId"] = "task-demo-1"
                 })
             }));
-
-    public static UiSurface Login(
-        string? error = null,
-        string clientId = "flutter",
-        string? defaultUsername = null,
-        string? defaultPassword = null)
-    {
-        static Dictionary<string, object?> Field(string name, string label, string kind, string? value) => new()
-        {
-            ["name"] = name,
-            ["label"] = label,
-            ["kind"] = kind,
-            ["required"] = true,
-            ["value"] = value ?? string.Empty
-        };
-
-        Dictionary<string, object?>[] Fields() => new[]
-        {
-            Field("username", "Username", "text", defaultUsername),
-            Field("password", "Password", "password", defaultPassword)
-        };
-
-        return new(
-            UiSurfaceKinds.Login,
-            WithCommon(
-                surfaceId: "surface.login.local",
-                emitter: "session-main",
-                title: "Sign In",
-                layout: UiSurfaceLayouts.Panel,
-                requiresInput: true,
-                priority: 100,
-                props: new Dictionary<string, object?>
-                {
-                    ["clientId"] = clientId,
-                    ["mode"] = "local",
-                    ["error"] = error,
-                    ["fields"] = Fields(),
-                    ["submitAction"] = SynapseAction(
-                        "local-login",
-                        "Sign in",
-                        nameof(LoginRequest),
-                        new Dictionary<string, object?>
-                        {
-                            ["clientId"] = clientId
-                        }),
-                    ["tree"] = new UiWidgetTree(UiKitVocabulary.Column, new Dictionary<string, object?>(),
-                    [
-                        new UiWidgetTree(
-                            NeuronUiKit.Form,
-                            new Dictionary<string, object?>
-                            {
-                                ["title"] = "Sign In",
-                                ["submitLabel"] = "Sign in",
-                                ["error"] = error,
-                                [UiSurfaceKeys.SynapseType] = nameof(LoginRequest),
-                                ["clientId"] = clientId,
-                                ["fields"] = Fields()
-                            }),
-                        new UiWidgetTree(UiKitVocabulary.Divider, new Dictionary<string, object?>()),
-                        new UiWidgetTree(UiKitVocabulary.Heading, new Dictionary<string, object?> { ["text"] = "Or connect accounts" }),
-                        new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
-                        {
-                            ["label"] = "Login via Google",
-                            ["icon"] = "google",
-                            ["synapseType"] = GoogleSignals.AuthRequested,
-                            ["clientId"] = clientId
-                        }),
-                        new UiWidgetTree(UiKitVocabulary.Button, new Dictionary<string, object?>
-                        {
-                            ["label"] = "Login via Salesforce",
-                            ["icon"] = "salesforce",
-                            ["synapseType"] = SalesforceSignals.AuthRequested,
-                            ["clientId"] = clientId
-                        })
-                    ])
-                }));
-    }
 
     public static UiSurface Workspace() =>
         UiSurfaceLiveData.WorkspaceBoundary("anonymous", WorkspaceIds.Default, "workbench");

@@ -18,7 +18,6 @@
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
 
-    <ProjectReference Include="..\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
     <ProjectReference Include="..\..\hosts\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />

@@ -38,7 +38,7 @@
 
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
+    <ProjectReference Include="..\..\hosts\DigitalBrain.RuntimeHost\DigitalBrain.RuntimeHost.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
     <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
@@ -46,10 +46,6 @@
 
     <!-- AppHost model tests load the real entry point; alias avoids Program type clash with the kernel host. -->
     <ProjectReference Include="..\..\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" Aliases="AppHostProject" />
-    <!-- Kernel transitively references Mcp unaliased (DigitalBrain.Kernel.csproj:58); both projects use
-         top-level statements, so both generate a global::Program, colliding in
-         KernelWebApplicationFactory's WebApplicationFactory<Program>. Alias Mcp here so only Kernel's
-         Program resolves unqualified. -->
     <ProjectReference Include="..\..\src\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" Aliases="McpProject" />
   </ItemGroup>
 

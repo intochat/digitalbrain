@@ -37,11 +37,3 @@ public sealed record StoredSurfaceRecord(
     int SurfaceSchemaVersion = UiProtocol.SurfaceSchemaVersion,
     int ActionSchemaVersion = UiProtocol.ActionSchemaVersion,
     PrincipalKind? AudiencePrincipalKind = null);
-
-public sealed record FeedCursor(long Sequence, string Nonce);
-public sealed record FeedPage(
-    IReadOnlyList<StoredSurfaceRecord> Items,
-    FeedCursor? Next,
-    bool ResetRequired,
-    bool IsSnapshot = false,
-    long LatestSequence = 0);

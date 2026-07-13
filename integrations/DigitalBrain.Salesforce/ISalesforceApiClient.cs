@@ -37,4 +37,11 @@ public interface ISalesforceApiClient
         Task.FromResult(new SalesforceMutationApplyResult(
             SalesforceMutationStatus.Unavailable,
             "Salesforce updates are unavailable right now."));
+
+    Task<SalesforceMutationVerificationResult> VerifyUpdateAsync(
+        SalesforcePreparedUpdate preparedUpdate,
+        CancellationToken ct) =>
+        Task.FromResult(new SalesforceMutationVerificationResult(
+            false,
+            "Salesforce updates are unavailable right now."));
 }

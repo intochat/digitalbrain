@@ -151,7 +151,6 @@ public static class NeuronUiKit
     public const string NeuronButton = "neuron:NeuronButton";
     public const string NeuronList = "neuron:NeuronList";
     public const string NeuronListItem = "neuron:NeuronListItem";
-    public const string Form = "neuron:Form";
     public const string Header = "neuron:Header";
     public const string Panel = "neuron:Panel";
     public const string Divider = "neuron:Divider";
@@ -400,7 +399,6 @@ public record GraphicSpec(
 public static class UiSurfaceKinds
 {
     public const string AuthButton = "auth-button";
-    public const string Login = "login";
     public const string List = "list";
     public const string Ide = "ide";
     public const string ActivityGraph = "activity-graph";
@@ -492,75 +490,6 @@ public record ListSurface(
     ["items"] = Items
 });
 
-/// Dedicated surface for lightweight automations observability (reactions + scripts + last exec info).
-/// Emitted by AutomationNeuron on register/remove/execute/query. Consumable by UI/HomeFeed.
-[GenerateSerializer]
-[Alias("DigitalBrain.Ui.Contracts.AutomationSurface")]
-public record AutomationSurface(
-    IReadOnlyList<ReactionView> Reactions,
-    IReadOnlyList<ScriptView> Scripts,
-    DateTimeOffset LastUpdated
-) : UiSurface("automation", new Dictionary<string, object?>
-{
-    ["reactions"] = Reactions,
-    ["scripts"] = Scripts,
-    ["lastUpdated"] = LastUpdated
-});
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Ui.Contracts.ReactionView")]
-public record ReactionView(
-    [property: Id(0)] string Id,
-    [property: Id(1)] string When,
-    [property: Id(2)] string ScriptRef,
-    [property: Id(3)] string? Target = null,
-    [property: Id(4)] int ExecCount = 0
-);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Ui.Contracts.ScriptView")]
-public record ScriptView(
-    [property: Id(0)] string Id,
-    [property: Id(1)] string Description,
-    [property: Id(2)] string CodePreview,
-    [property: Id(3)] int UsageCount = 0
-);
-
-/// Data-only visual graph foundation for automations (priority 7). Nodes = reactions/scripts, edges capture when/then.
-/// A future editor emits the same RegisterScript/RegisterReaction records; this is just observable surface.
-/// Rfw / Flutter can render from the nodes/edges.
-[GenerateSerializer]
-[Alias("DigitalBrain.Ui.Contracts.AutomationGraphSurface")]
-public record AutomationGraphSurface(
-    [property: Id(0)] string Title,
-    [property: Id(1)] IReadOnlyList<AutomationGraphNode> Nodes,
-    [property: Id(2)] IReadOnlyList<AutomationGraphEdge> Edges,
-    [property: Id(3)] DateTimeOffset GeneratedAt
-) : UiSurface("automation-graph", new Dictionary<string, object?>
-{
-    ["title"] = Title,
-    ["nodes"] = Nodes,
-    ["edges"] = Edges,
-    ["generatedAt"] = GeneratedAt
-});
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Ui.Contracts.AutomationGraphNode")]
-public record AutomationGraphNode(
-    [property: Id(0)] string Id,
-    [property: Id(1)] string Kind, // "reaction" | "script"
-    [property: Id(2)] string Label,
-    [property: Id(3)] IReadOnlyDictionary<string, object?>? Props = null
-);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Ui.Contracts.AutomationGraphEdge")]
-public record AutomationGraphEdge(
-    [property: Id(0)] string From,
-    [property: Id(1)] string To,
-    [property: Id(2)] string Label // e.g. "when" or "uses"
-);
-
 /// <summary>
 /// Tabular data surface rendered by the client as a rich UI kit table (used for dropped Excel/CSV in chat).
 /// Columns and rows are string data for simple, self-explanatory rendering.
@@ -593,15 +522,3 @@ public record IdeSurface(
     ["code"] = InitialCode,
     ["language"] = Language
 });
-
-// Kernel-owned surface kinds centralized here with the other UI contract names.
-// Kernel surfaces remain versioned with the kernel pack but names are single-sourced in UI contracts.
-public static class KernelUiSurfaceKinds
-{
-    public const string Dashboard = "kernel-dashboard";
-    public const string Rolling = "kernel-rolling";
-    public const string RollingDrain = "kernel-rolling-drain";
-    public const string RollingVerify = "kernel-rolling-verify";
-    public const string RollingComplete = "kernel-rolling-complete";
-    public const string RollingRollback = "kernel-rolling-rollback";
-}

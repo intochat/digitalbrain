@@ -1,10 +1,26 @@
 using DigitalBrain.Core.Config;
+using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Salesforce;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Salesforce;
+
+public static class SalesforceServiceCollectionExtensions
+{
+    public static IServiceCollection AddDigitalBrainSalesforce(this IServiceCollection services)
+    {
+        services.AddHostedService<SalesforceAppConfigSeeder>();
+        services.AddSingleton<ISalesforceApiClientFactory, SalesforceApiClientFactory>();
+        services.AddKeyedSingleton<IConnector>("salesforce", (provider, _) => new SalesforceConnector(
+            provider.GetRequiredService<ISalesforceApiClientFactory>(),
+            provider.GetRequiredService<IPackConfigStore>(),
+            provider.GetRequiredService<IOAuthStateProtector>()));
+        return services;
+    }
+}
 
 public sealed class SalesforceAppConfigSeeder(
     IConfiguration configuration,
