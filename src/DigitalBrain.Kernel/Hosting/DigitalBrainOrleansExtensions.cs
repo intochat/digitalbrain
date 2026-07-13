@@ -4,6 +4,7 @@ using Azure.Storage.Blobs;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Runtime;
@@ -64,11 +65,10 @@ public static class DigitalBrainOrleansExtensions
             siloBuilder.ConfigureServices(services =>
             {
                 services.AddSingleton<IInoEffectPlanStore, InoEffectPlanStore>();
-                services.AddSingleton<IInoOperationCapability, NoOpInoOperationCapability>();
                 if (builder.Configuration.GetValue<bool>("DigitalBrain:Tools:Enabled"))
-                    services.AddSingleton<IInoToolGateway, PlanInoToolGateway>();
+                    services.AddSingleton<IInoEffectExecutor, InoEffectExecutor>();
                 else
-                    services.AddSingleton<IInoToolGateway, ClosedInoToolGateway>();
+                    services.AddSingleton<IInoEffectExecutor, DisabledInoEffectExecutor>();
             });
 
             if (!requiresDurableStorage)
@@ -198,6 +198,10 @@ public static class DigitalBrainOrleansExtensions
         }
 
         builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
+        builder.Services.AddSingleton<CapabilityGrantValidator>();
+        builder.Services.AddSingleton<ICapabilityGrantSource, RetainedInoCapabilityGrantSource>();
+        builder.Services.AddSingleton<ICapabilityDispatcher, CapabilityDispatcher>();
+        builder.Services.AddHostedService<CapabilityDispatcherStartupValidation>();
         builder.Services.AddSingleton<IAgentWorkflowRunner, AgentFrameworkWorkflowRunner>();
 
         BlobServiceClient? packConfigBlobs = null;

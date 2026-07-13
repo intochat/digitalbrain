@@ -148,10 +148,12 @@ Task 4 evidence: the package-family architecture test first failed on fifteen mi
 - Handlers register explicitly by stable capability ID; duplicate IDs fail startup.
 - Query returns immediately, InternalWrite returns a buffered intent, ExternalEffect returns a proposal intent.
 
-- [ ] Test exact-grant acceptance, wrong digest/connection/revision rejection, pause/revocation on the next call, bounded payload/deadline checks, and duplicate handler registration.
-- [ ] Migrate retained INO Gmail and Salesforce reads through the dispatcher while characterization tests keep output stable.
-- [ ] Migrate effect proposals through the dispatcher while preserving signed-plan and verifier tests.
-- [ ] Prove the final gateway/provider-switch callers are gone, delete them, and commit `refactor: route operations through capability dispatcher`.
+- [x] Test exact-grant acceptance, wrong digest/connection/revision rejection, pause/revocation on the next call, bounded payload/deadline checks, and duplicate handler registration.
+- [x] Migrate retained INO Gmail and Salesforce reads through the dispatcher while characterization tests keep output stable.
+- [x] Migrate effect proposals through the dispatcher while preserving signed-plan and verifier tests.
+- [x] Prove the final gateway/provider-switch callers are gone, delete them, and commit `refactor: route operations through capability dispatcher`.
+
+Task 5 evidence: the dispatcher validates the complete live grant coordinate on every call, enforces capability-scoped tool constraints, bounds payloads, applies a hard `TimeProvider` deadline even to uncooperative handlers, and resolves eagerly at startup so duplicate stable IDs fail composition. Retained Gmail and Salesforce reads, authorization probes, and effect proposals now cross this single dispatch seam; signed effect application uses an explicit effect-handler registry with exact execution proof. Final-caller searches prove the old operation-capability, tool-gateway, and provider-switch rails are absent from production source, and their files were deleted. Context7 was quota-blocked, so deadline and live-configuration behavior were checked against current official Microsoft documentation. The owning suite passed 374 tests, the exact root suite passed 475 tests with no failures or skips, Aspire doctor passed all five checks, `git diff --check` was clean, and independent re-review reported no remaining Critical or Important issue.
 
 ### Task 6: FeatureBuilder immutable release pipeline
 

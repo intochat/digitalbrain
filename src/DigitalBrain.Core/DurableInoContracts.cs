@@ -330,12 +330,6 @@ public sealed record InoToolEffectResult(
     [property: Id(0)] InoToolEffectDisposition Disposition,
     [property: Id(1)] string SafeResult);
 
-public interface IInoToolGateway
-{
-    bool TryAuthorizeMutation(InoToolRequest request, string actorScope, out InoApprovedTool tool);
-    Task<InoToolEffectResult> ExecuteApprovedAsync(InoToolEffectRequest request, CancellationToken cancellationToken = default);
-}
-
 public sealed record InoWorkflowResult(
     string Text,
     WorkflowReference Workflow,

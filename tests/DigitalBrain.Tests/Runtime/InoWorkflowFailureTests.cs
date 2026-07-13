@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Threading;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +34,7 @@ public sealed class InoWorkflowFailureTests : NeuronTestBase
                 services.AddSingleton(new EncryptedRuntimeStateProtector(keyRing));
                 services.AddSingleton(_workflowRunner);
                 services.AddSingleton<IAgentWorkflowRunner>(_workflowRunner);
-                services.AddSingleton<IInoToolGateway, ClosedInoToolGateway>();
+                services.AddSingleton<IInoEffectExecutor, DisabledInoEffectExecutor>();
             });
     }
 

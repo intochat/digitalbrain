@@ -17,8 +17,7 @@ public sealed class LegacyInoPipelineRemovalTests
 
         Assert.Equal(typeof(ConversationStateClient), parameter.ParameterType);
         Assert.Null(typeof(McpInoCommandHandler).GetMethod("ExecuteAsync"));
-        var acceptance = Assert.Single(typeof(McpInoCommandHandler).GetMethods()
-            .Where(method => method.Name == "AcceptAsync"));
+        var acceptance = Assert.Single(typeof(McpInoCommandHandler).GetMethods(), method => method.Name == "AcceptAsync");
         Assert.Single(acceptance.GetParameters());
     }
 
@@ -55,6 +54,10 @@ public sealed class LegacyInoPipelineRemovalTests
         Assert.Null(kernel.GetType("DigitalBrain.Kernel.Runtime.EffectCommandHandler"));
         Assert.Null(kernel.GetType("DigitalBrain.Kernel.Runtime.EffectWorkerGrain"));
         Assert.Null(kernel.GetType("DigitalBrain.Kernel.OrleansAggregateStore"));
+        Assert.Null(core.GetType("DigitalBrain.Core.Runtime.IInoToolGateway"));
+        Assert.Null(abstractions.GetType("DigitalBrain.Kernel.Runtime.IInoOperationCapability"));
+        Assert.Null(kernel.GetType("DigitalBrain.Kernel.Runtime.PlanInoToolGateway"));
+        Assert.Null(kernel.GetType("DigitalBrain.Kernel.Runtime.ClosedInoToolGateway"));
     }
 
     [Fact]

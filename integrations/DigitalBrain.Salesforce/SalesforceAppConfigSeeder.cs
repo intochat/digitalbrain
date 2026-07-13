@@ -1,5 +1,6 @@
 using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Salesforce;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,9 @@ public static class SalesforceServiceCollectionExtensions
     {
         services.AddHostedService<SalesforceAppConfigSeeder>();
         services.AddSingleton<ISalesforceApiClientFactory, SalesforceApiClientFactory>();
+        services.AddSingleton<ICapabilityHandler, SalesforceRecordReadCapabilityHandler>();
+        services.AddSingleton<ICapabilityHandler, SalesforceUpdateProposalCapabilityHandler>();
+        services.AddSingleton<IInoEffectHandler, SalesforceUpdateEffectHandler>();
         services.AddKeyedSingleton<IConnector>("salesforce", (provider, _) => new SalesforceConnector(
             provider.GetRequiredService<ISalesforceApiClientFactory>(),
             provider.GetRequiredService<IPackConfigStore>(),

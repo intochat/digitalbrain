@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Capabilities;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
@@ -14,7 +15,7 @@ namespace DigitalBrain.Kernel.Runtime;
 public sealed class InoOperationWorkerGrain(
     IGrainFactory grainFactory,
     IAgentWorkflowRunner workflowRunner,
-    IInoToolGateway toolGateway,
+    IInoEffectExecutor effectExecutor,
     TimeProvider timeProvider,
     ILogger<InoOperationWorkerGrain> logger) : Grain, IInoOperationWorkerGrain, IRemindable
 {
@@ -366,7 +367,7 @@ public sealed class InoOperationWorkerGrain(
         if (requestedTool is { Access: InoToolAccess.Mutation })
         {
             var actorScope = RequestScope.Id(identity.OwnerId, identity.ActorId);
-            if (toolGateway.TryAuthorizeMutation(requestedTool, actorScope, out var authorized))
+            if (effectExecutor.TryAuthorizeMutation(requestedTool, actorScope, out var authorized))
                 approvedTool = authorized;
         }
 
@@ -736,7 +737,7 @@ public sealed class InoOperationWorkerGrain(
         try
         {
             using var deadline = new CancellationTokenSource(WorkerDeadline);
-            result = await toolGateway.ExecuteApprovedAsync(
+            result = await effectExecutor.ExecuteAsync(
                 new InoToolEffectRequest(
                     claimed.OperationId,
                     effect.EffectId,

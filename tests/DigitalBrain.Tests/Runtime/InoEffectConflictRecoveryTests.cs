@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Threading;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,7 +37,7 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
                 services.AddSingleton(_timeProvider);
                 services.AddSingleton(_effectCalls);
                 services.AddSingleton<IAgentWorkflowRunner, UnusedWorkflowRunner>();
-                services.AddSingleton<IInoToolGateway, SucceedingEffectGateway>();
+                services.AddSingleton<IInoEffectExecutor, SucceedingEffectGateway>();
             });
     }
 
@@ -233,7 +234,7 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
 
     private sealed class SucceedingEffectGateway(
         PostEffectResultBarrierTimeProvider timeProvider,
-        EffectCallCounter effectCalls) : IInoToolGateway
+        EffectCallCounter effectCalls) : IInoEffectExecutor
     {
         public bool TryAuthorizeMutation(InoToolRequest request, string actorScope, out InoApprovedTool tool)
         {
@@ -241,7 +242,7 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
             return true;
         }
 
-        public Task<InoToolEffectResult> ExecuteApprovedAsync(
+        public Task<InoToolEffectResult> ExecuteAsync(
             InoToolEffectRequest request,
             CancellationToken cancellationToken = default)
         {

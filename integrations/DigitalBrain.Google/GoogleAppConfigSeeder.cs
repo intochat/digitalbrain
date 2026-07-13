@@ -1,6 +1,7 @@
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Kernel.Capabilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +15,9 @@ public static class GoogleServiceCollectionExtensions
     {
         services.AddHostedService<GoogleAppConfigSeeder>();
         services.AddSingleton<IGmailApiClientFactory, GmailApiClientFactory>();
+        services.AddSingleton<ICapabilityHandler, GmailMailboxCapabilityHandler>();
+        services.AddSingleton<ICapabilityHandler, GmailSendProposalCapabilityHandler>();
+        services.AddSingleton<IInoEffectHandler, GmailSendEffectHandler>();
         services.AddKeyedSingleton<IConnector>("google", (provider, _) => new GoogleConnector(
             provider.GetRequiredService<IPackConfigStore>(),
             provider.GetRequiredService<IOAuthStateProtector>(),

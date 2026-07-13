@@ -4,6 +4,7 @@ using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel.Hosting;
 using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.RuntimeHost;
 using DigitalBrain.Salesforce;
@@ -73,11 +74,14 @@ public sealed class KernelCompositionTests
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IGmailApiClientFactory));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(ISalesforceApiClientFactory));
         Assert.Contains(descriptors, descriptor =>
-            descriptor.ServiceType == typeof(IInoToolGateway) &&
-            descriptor.ImplementationType == typeof(ClosedInoToolGateway));
+            descriptor.ServiceType == typeof(IHostedService) &&
+            descriptor.ImplementationType == typeof(CapabilityDispatcherStartupValidation));
+        Assert.Contains(descriptors, descriptor =>
+            descriptor.ServiceType == typeof(IInoEffectExecutor) &&
+            descriptor.ImplementationType == typeof(DisabledInoEffectExecutor));
         Assert.DoesNotContain(descriptors, descriptor =>
-            descriptor.ServiceType == typeof(IInoToolGateway) &&
-            descriptor.ImplementationType == typeof(PlanInoToolGateway));
+            descriptor.ServiceType == typeof(IInoEffectExecutor) &&
+            descriptor.ImplementationType == typeof(InoEffectExecutor));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IConnector) && Equals(descriptor.ServiceKey, "google"));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IConnector) && Equals(descriptor.ServiceKey, "salesforce"));
 

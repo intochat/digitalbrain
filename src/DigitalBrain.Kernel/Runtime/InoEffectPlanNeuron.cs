@@ -1,6 +1,5 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Capabilities;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
@@ -14,15 +13,12 @@ public sealed class InoEffectPlanNeuron(
     EncryptedRuntimeStateProtector protector,
     TimeProvider timeProvider,
     InoEffectPlanAuthority authority,
+    IEnumerable<IInoEffectHandler> handlers,
     ILogger<InoEffectPlanNeuron> logger) : Grain, IInoEffectPlanNeuron, IRemindable
 {
     private const string ExpiryReminderName = "ino.effect-plan.expire.v1";
     private static readonly TimeSpan ExpiryReminderPeriod = TimeSpan.FromHours(1);
-    private static readonly JsonSerializerOptions PayloadJson = new(JsonSerializerDefaults.Web)
-    {
-        MaxDepth = 16,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
-    };
+    private readonly IReadOnlyDictionary<string, IInoEffectHandler> _handlers = Register(handlers);
     private EncryptedPersistentState<InoEffectPlanState>? _state;
     private IGrainReminder? _expiryReminder;
 
@@ -108,7 +104,7 @@ public sealed class InoEffectPlanNeuron(
         {
             try
             {
-                result = await ExecuteProviderAsync(plan, cancellationToken);
+                result = await ExecuteRegisteredEffectAsync(plan, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -205,72 +201,24 @@ public sealed class InoEffectPlanNeuron(
         _expiryReminder = null;
     }
 
-    private async Task<InoToolEffectResult> ExecuteProviderAsync(
+    private Task<InoToolEffectResult> ExecuteRegisteredEffectAsync(
         InoEffectPlan plan,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        _handlers.TryGetValue(plan.ToolId, out var handler)
+            ? handler.ApplyAsync(plan.ActorScope, plan.PayloadUtf8, cancellationToken)
+            : throw new RuntimeStateIntegrityException("effect plan tool is not registered");
+
+    private static IReadOnlyDictionary<string, IInoEffectHandler> Register(IEnumerable<IInoEffectHandler> handlers)
     {
-        if (string.Equals(plan.ToolId, GmailTools.Send, StringComparison.Ordinal))
+        ArgumentNullException.ThrowIfNull(handlers);
+        var registered = new Dictionary<string, IInoEffectHandler>(StringComparer.Ordinal);
+        foreach (var handler in handlers)
         {
-            var request = JsonSerializer.Deserialize<GmailSendRequest>(plan.PayloadUtf8, PayloadJson)
-                          ?? throw new RuntimeStateIntegrityException("Gmail effect plan payload is empty");
-            var result = await GrainFactory.GetGrain<IGmailMutationToolGrain>(plan.ActorScope)
-                .SendAsync(request, cancellationToken);
-            return result.Status switch
-            {
-                GmailSendStatus.Applied => new(
-                    InoToolEffectDisposition.Succeeded,
-                    "The approved email was sent."),
-                GmailSendStatus.AlreadyApplied => new(
-                    InoToolEffectDisposition.Succeeded,
-                    "The approved email had already been sent; no duplicate was created."),
-                GmailSendStatus.Unavailable => new(
-                    InoToolEffectDisposition.OutcomeUnknown,
-                    "The approved email could not be confirmed. Check Sent mail before trying again."),
-                GmailSendStatus.NeedsAuth => new(
-                    InoToolEffectDisposition.Failed,
-                    "The Gmail connection is no longer ready. No retry was attempted."),
-                GmailSendStatus.ConfigurationMissing => new(
-                    InoToolEffectDisposition.Failed,
-                    "Gmail is not configured for this workspace. No email was sent."),
-                _ => new(
-                    InoToolEffectDisposition.Failed,
-                    "The approved email request was rejected before it could be sent.")
-            };
+            ArgumentNullException.ThrowIfNull(handler);
+            ArgumentException.ThrowIfNullOrWhiteSpace(handler.ToolId);
+            if (!registered.TryAdd(handler.ToolId, handler))
+                throw new InvalidOperationException($"Effect handler '{handler.ToolId}' is registered more than once.");
         }
-
-        if (string.Equals(plan.ToolId, SalesforceTools.UpdateRecord, StringComparison.Ordinal))
-        {
-            var result = await GrainFactory.GetGrain<ISalesforceMutationToolGrain>(plan.ActorScope)
-                .ApplyUpdateAsync(new SalesforcePreparedUpdate(plan.PayloadUtf8), cancellationToken);
-            return result.Status switch
-            {
-                SalesforceMutationStatus.Applied => new(
-                    InoToolEffectDisposition.Succeeded,
-                    "The approved Salesforce field update was applied and verified."),
-                SalesforceMutationStatus.AlreadyApplied => new(
-                    InoToolEffectDisposition.Succeeded,
-                    "The approved Salesforce value was already present; no duplicate update was made."),
-                SalesforceMutationStatus.Unavailable or SalesforceMutationStatus.VerificationFailed => new(
-                    InoToolEffectDisposition.OutcomeUnknown,
-                    "The Salesforce update could not be confirmed. Review the record before trying again."),
-                SalesforceMutationStatus.Conflict => new(
-                    InoToolEffectDisposition.Failed,
-                    "The Salesforce record changed after approval was prepared. No update was applied."),
-                SalesforceMutationStatus.NeedsAuth => new(
-                    InoToolEffectDisposition.Failed,
-                    "The Salesforce connection is no longer ready. No retry was attempted."),
-                SalesforceMutationStatus.ConfigurationMissing => new(
-                    InoToolEffectDisposition.Failed,
-                    "Salesforce is not configured for this workspace. No update was applied."),
-                SalesforceMutationStatus.AccessDenied => new(
-                    InoToolEffectDisposition.Failed,
-                    "Salesforce denied the approved field update. No update was applied."),
-                _ => new(
-                    InoToolEffectDisposition.Failed,
-                    "The approved Salesforce update was rejected before it could be applied.")
-            };
-        }
-
-        throw new RuntimeStateIntegrityException("effect plan tool is not registered");
+        return registered;
     }
 }

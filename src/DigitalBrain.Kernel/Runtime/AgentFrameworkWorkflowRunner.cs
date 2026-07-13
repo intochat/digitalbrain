@@ -6,6 +6,9 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Integrations.Salesforce.Contracts;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -106,7 +109,6 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
                     "The saved connection handoff does not match this change request. Send it again.",
                     workflow);
             return await ExecuteTypedMutationAsync(
-                grains,
                 model,
                 request,
                 intent,
@@ -130,14 +132,13 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
             return new InoWorkflowResult("The saved connection handoff does not match this read request. Send it again.", workflow);
 
         return toolId.StartsWith("gmail.", StringComparison.Ordinal)
-            ? await ExecuteGmailReadAsync(grains, request, intent, toolId, workflow, cancellationToken).ConfigureAwait(false)
+            ? await ExecuteGmailReadAsync(request, intent, toolId, workflow, cancellationToken).ConfigureAwait(false)
             : toolId.StartsWith("salesforce.", StringComparison.Ordinal)
-                ? await ExecuteSalesforceReadAsync(grains, request, intent, toolId, workflow, cancellationToken).ConfigureAwait(false)
+                ? await ExecuteSalesforceReadAsync(request, intent, toolId, workflow, cancellationToken).ConfigureAwait(false)
                 : new InoWorkflowResult("That integration read is not available through this workflow.", workflow);
     }
 
     private async Task<InoWorkflowResult> ExecuteTypedMutationAsync(
-        IGrainFactory grains,
         IConversationModelGrain model,
         InoWorkflowRequest request,
         SemanticIntentProposal intent,
@@ -155,8 +156,7 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
                 workflow);
 
         var authorization = await EnsureMutationAuthorizationAsync(
-            grains,
-            request.ActorScope!,
+            request,
             provider,
             workflow,
             cancellationToken).ConfigureAwait(false);
@@ -178,23 +178,25 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
 
         return provider == SemanticProvider.Gmail
             ? await PrepareGmailSendAsync(request, proposal, workflow, cancellationToken).ConfigureAwait(false)
-            : await PrepareSalesforceUpdateAsync(grains, request, proposal, workflow, cancellationToken).ConfigureAwait(false);
+            : await PrepareSalesforceUpdateAsync(request, proposal, workflow, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<InoWorkflowResult?> EnsureMutationAuthorizationAsync(
-        IGrainFactory grains,
-        string actorScope,
+        InoWorkflowRequest request,
         SemanticProvider provider,
         WorkflowReference workflow,
         CancellationToken cancellationToken)
     {
         if (provider == SemanticProvider.Gmail)
         {
-            var gmail = grains.GetGrain<IGmailReadToolGrain>(actorScope);
-            var resolution = await gmail.ResolveAuthorizationAsync(cancellationToken).ConfigureAwait(false);
-            if (resolution.State == ExternalAuthorizationResolutionState.Ready) return null;
-            var probe = await grains.GetGrain<IGmailMetadataToolGrain>(actorScope)
-                .ReadMailboxOverviewAsync(cancellationToken).ConfigureAwait(false);
+            var probe = await DispatchInoAsync<GmailMailboxOverviewResult>(
+                request,
+                GoogleCapabilityIds.GmailMailboxRead,
+                GmailTools.ReadMailboxOverview,
+                JsonSerializer.SerializeToElement(new { }, PlanJson),
+                CapabilityOperationKind.Query,
+                cancellationToken).ConfigureAwait(false);
+            if (probe.Status == GmailReadStatus.Success) return null;
             return probe.Status == GmailReadStatus.NeedsAuth
                 ? AuthorizationResult(
                     OAuthCallbackPaths.GoogleProvider,
@@ -207,10 +209,14 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
                     workflow);
         }
 
-        var salesforce = grains.GetGrain<ISalesforceReadToolGrain>(actorScope);
-        var salesforceResolution = await salesforce.ResolveAuthorizationAsync(cancellationToken).ConfigureAwait(false);
-        if (salesforceResolution.State == ExternalAuthorizationResolutionState.Ready) return null;
-        var salesforceProbe = await salesforce.ReadCurrentProfileAsync(cancellationToken).ConfigureAwait(false);
+        var salesforceProbe = await DispatchInoAsync<SalesforceReadResult>(
+            request,
+            SalesforceCapabilityIds.RecordRead,
+            SalesforceTools.ReadCurrentProfile,
+            JsonSerializer.SerializeToElement(new { }, PlanJson),
+            CapabilityOperationKind.Query,
+            cancellationToken).ConfigureAwait(false);
+        if (salesforceProbe.Status == SalesforceReadStatus.Success) return null;
         return salesforceProbe.Status == SalesforceReadStatus.NeedsAuth
             ? AuthorizationResult(
                 OAuthCallbackPaths.SalesforceProvider,
@@ -235,6 +241,13 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
                 workflow);
         var summary =
             $"send an email to {send.Recipient} with subject “{send.Subject}” and body “{send.Body}”";
+        send = await DispatchInoAsync<GmailSendRequest>(
+            request,
+            GoogleCapabilityIds.GmailSendPropose,
+            GmailTools.Send,
+            send,
+            CapabilityOperationKind.ExternalEffect,
+            cancellationToken).ConfigureAwait(false);
         var toolRequest = await services.GetRequiredService<IInoEffectPlanStore>().PrepareAsync(
             request.ActorScope!,
             request.OperationId,
@@ -247,7 +260,6 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
     }
 
     private async Task<InoWorkflowResult> PrepareSalesforceUpdateAsync(
-        IGrainFactory grains,
         InoWorkflowRequest request,
         SemanticMutationProposal proposal,
         WorkflowReference workflow,
@@ -257,16 +269,26 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
             return new InoWorkflowResult(
                 "A Salesforce update needs one explicit entity, record id, field, and new value.",
                 workflow);
-        var result = await grains.GetGrain<ISalesforceMutationToolGrain>(request.ActorScope!)
-            .PreviewUpdateAsync(new SalesforceUpdatePreviewRequest(
+        var result = await DispatchInoAsync<SalesforceMutationPreviewResult>(
+            request,
+            SalesforceCapabilityIds.RecordUpdatePropose,
+            SalesforceTools.UpdateRecord,
+            new SalesforceUpdatePreviewRequest(
                 new SalesforceSemanticEntity(proposal.Entity!),
                 proposal.RecordId!,
                 new SalesforceSemanticField(proposal.Field!),
-                proposal.NewValue!), cancellationToken).ConfigureAwait(false);
+                proposal.NewValue!),
+            CapabilityOperationKind.ExternalEffect,
+            cancellationToken).ConfigureAwait(false);
         if (result.Status == SalesforceMutationStatus.NeedsAuth)
         {
-            var probe = await grains.GetGrain<ISalesforceReadToolGrain>(request.ActorScope!)
-                .ReadCurrentProfileAsync(cancellationToken).ConfigureAwait(false);
+            var probe = await DispatchInoAsync<SalesforceReadResult>(
+                request,
+                SalesforceCapabilityIds.RecordRead,
+                SalesforceTools.ReadCurrentProfile,
+                JsonSerializer.SerializeToElement(new { }, PlanJson),
+                CapabilityOperationKind.Query,
+                cancellationToken).ConfigureAwait(false);
             return probe.Status == SalesforceReadStatus.NeedsAuth
                 ? AuthorizationResult(
                     OAuthCallbackPaths.SalesforceProvider,
@@ -306,25 +328,23 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
     }
 
     private async Task<InoWorkflowResult> ExecuteGmailReadAsync(
-        IGrainFactory grains,
         InoWorkflowRequest request,
         SemanticIntentProposal intent,
         string toolId,
         WorkflowReference workflow,
         CancellationToken cancellationToken)
     {
-        var metadata = grains.GetGrain<IGmailMetadataToolGrain>(request.ActorScope!);
         return toolId switch
         {
-            GmailTools.ReadMessages => await ReadGmailMessagesAsync(metadata, intent, workflow, cancellationToken).ConfigureAwait(false),
-            GmailTools.ReadMailboxOverview => await ReadGmailOverviewAsync(metadata, workflow, cancellationToken).ConfigureAwait(false),
-            GmailTools.ReadThreads => await ReadGmailThreadsAsync(metadata, intent, workflow, cancellationToken).ConfigureAwait(false),
+            GmailTools.ReadMessages => await ReadGmailMessagesAsync(request, intent, workflow, cancellationToken).ConfigureAwait(false),
+            GmailTools.ReadMailboxOverview => await ReadGmailOverviewAsync(request, workflow, cancellationToken).ConfigureAwait(false),
+            GmailTools.ReadThreads => await ReadGmailThreadsAsync(request, intent, workflow, cancellationToken).ConfigureAwait(false),
             _ => new InoWorkflowResult("That Gmail read is not available through this workflow.", workflow)
         };
     }
 
     private async Task<InoWorkflowResult> ReadGmailMessagesAsync(
-        IGmailMetadataToolGrain gmail,
+        InoWorkflowRequest request,
         SemanticIntentProposal intent,
         WorkflowReference workflow,
         CancellationToken cancellationToken)
@@ -332,10 +352,16 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
         if (intent.RelativeDays is < 1 or > 365)
             return new InoWorkflowResult("The requested Gmail date window is outside the supported range.", workflow);
 
-        var result = await gmail.ReadMessagesAsync(new GmailMessageListRequest(
-            GmailSelection(intent),
-            Offset: Math.Max(0, (intent.Ordinal ?? 1) - 1),
-            Limit: Math.Clamp(intent.Limit, 1, GmailTools.MaximumResultCount)), cancellationToken).ConfigureAwait(false);
+        var result = await DispatchInoAsync<GmailMessageListResult>(
+            request,
+            GoogleCapabilityIds.GmailMailboxRead,
+            GmailTools.ReadMessages,
+            new GmailMessageListRequest(
+                GmailSelection(intent),
+                Offset: Math.Max(0, (intent.Ordinal ?? 1) - 1),
+                Limit: Math.Clamp(intent.Limit, 1, GmailTools.MaximumResultCount)),
+            CapabilityOperationKind.Query,
+            cancellationToken).ConfigureAwait(false);
         if (result.Status == GmailReadStatus.NeedsAuth)
             return AuthorizationResult(
                 OAuthCallbackPaths.GoogleProvider,
@@ -358,11 +384,17 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
     }
 
     private async Task<InoWorkflowResult> ReadGmailOverviewAsync(
-        IGmailMetadataToolGrain gmail,
+        InoWorkflowRequest request,
         WorkflowReference workflow,
         CancellationToken cancellationToken)
     {
-        var result = await gmail.ReadMailboxOverviewAsync(cancellationToken).ConfigureAwait(false);
+        var result = await DispatchInoAsync<GmailMailboxOverviewResult>(
+            request,
+            GoogleCapabilityIds.GmailMailboxRead,
+            GmailTools.ReadMailboxOverview,
+            JsonSerializer.SerializeToElement(new { }, PlanJson),
+            CapabilityOperationKind.Query,
+            cancellationToken).ConfigureAwait(false);
         if (result.Status == GmailReadStatus.NeedsAuth)
             return AuthorizationResult(
                 OAuthCallbackPaths.GoogleProvider,
@@ -381,7 +413,7 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
     }
 
     private async Task<InoWorkflowResult> ReadGmailThreadsAsync(
-        IGmailMetadataToolGrain gmail,
+        InoWorkflowRequest request,
         SemanticIntentProposal intent,
         WorkflowReference workflow,
         CancellationToken cancellationToken)
@@ -389,11 +421,17 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
         if (intent.RelativeDays is < 1 or > 365)
             return new InoWorkflowResult("The requested Gmail date window is outside the supported range.", workflow);
         var limit = Math.Clamp(intent.Limit, 1, GmailTools.MaximumResultCount);
-        var result = await gmail.ReadThreadsAsync(new GmailThreadListRequest(
-            GmailSelection(intent),
-            Offset: Math.Max(0, (intent.Ordinal ?? 1) - 1),
-            Limit: limit,
-            MaxMessagesPerThread: limit), cancellationToken).ConfigureAwait(false);
+        var result = await DispatchInoAsync<GmailThreadListResult>(
+            request,
+            GoogleCapabilityIds.GmailMailboxRead,
+            GmailTools.ReadThreads,
+            new GmailThreadListRequest(
+                GmailSelection(intent),
+                Offset: Math.Max(0, (intent.Ordinal ?? 1) - 1),
+                Limit: limit,
+                MaxMessagesPerThread: limit),
+            CapabilityOperationKind.Query,
+            cancellationToken).ConfigureAwait(false);
         if (result.Status == GmailReadStatus.NeedsAuth)
             return AuthorizationResult(
                 OAuthCallbackPaths.GoogleProvider,
@@ -415,60 +453,64 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
     }
 
     private async Task<InoWorkflowResult> ExecuteSalesforceReadAsync(
-        IGrainFactory grains,
         InoWorkflowRequest request,
         SemanticIntentProposal intent,
         string toolId,
         WorkflowReference workflow,
         CancellationToken cancellationToken)
     {
-        var salesforce = grains.GetGrain<ISalesforceReadToolGrain>(request.ActorScope!);
-        SalesforceReadResult result;
+        object arguments;
         switch (toolId)
         {
             case SalesforceTools.DiscoverObjects:
-                result = await salesforce.DiscoverObjectsAsync(
-                    new SalesforceDiscoveryRequest(Math.Clamp(intent.Limit, 1, 50)), cancellationToken).ConfigureAwait(false);
+                arguments = new SalesforceDiscoveryRequest(Math.Clamp(intent.Limit, 1, 50));
                 break;
             case SalesforceTools.SearchRecords:
                 if (string.IsNullOrWhiteSpace(intent.SearchText) || string.IsNullOrWhiteSpace(intent.Entity))
                     return new InoWorkflowResult("A Salesforce search needs both a search term and an entity.", workflow);
-                result = await salesforce.SearchRecordsAsync(new SalesforceSearchRequest(
+                arguments = new SalesforceSearchRequest(
                     intent.SearchText,
                     [new SalesforceSemanticEntity(intent.Entity)],
-                    Math.Clamp(intent.Limit, 1, 50)), cancellationToken).ConfigureAwait(false);
+                    Math.Clamp(intent.Limit, 1, 50));
                 break;
             case SalesforceTools.ReadRecords:
                 if (string.IsNullOrWhiteSpace(intent.Entity))
                     return new InoWorkflowResult("A Salesforce record read needs an entity.", workflow);
-                result = await salesforce.ReadRecordsAsync(new SalesforceRecordReadRequest(
+                arguments = new SalesforceRecordReadRequest(
                     new SalesforceSemanticEntity(intent.Entity),
                     SalesforceRecordReadKind.List,
                     Filters: SalesforceFilters(intent.Filters),
                     Sorts: SalesforceSorts(intent.Sorts),
-                    Limit: Math.Clamp(intent.Limit, 1, 50)), cancellationToken).ConfigureAwait(false);
+                    Limit: Math.Clamp(intent.Limit, 1, 50));
                 break;
             case SalesforceTools.AggregateRecords:
                 if (string.IsNullOrWhiteSpace(intent.Entity) || intent.Aggregate is null)
                     return new InoWorkflowResult("A Salesforce aggregate needs an entity and aggregate function.", workflow);
-                result = await salesforce.AggregateRecordsAsync(new SalesforceAggregateRequest(
+                arguments = new SalesforceAggregateRequest(
                     new SalesforceSemanticEntity(intent.Entity),
                     intent.Aggregate.Function,
                     OptionalSalesforceField(intent.Aggregate.Field),
                     OptionalSalesforceField(intent.Aggregate.GroupBy),
                     SalesforceFilters(intent.Filters),
-                    Math.Clamp(intent.Limit, 1, 50)), cancellationToken).ConfigureAwait(false);
+                    Math.Clamp(intent.Limit, 1, 50));
                 break;
             case SalesforceTools.ContinueRecords:
                 var continuation = request.PriorWorkflow?.CheckpointId;
                 if (!IsBoundedOpaqueValue(continuation))
                     return new InoWorkflowResult("That Salesforce continuation is no longer available.", workflow);
-                result = await salesforce.ContinueRecordsAsync(
-                    new SalesforceContinuationRequest(continuation!), cancellationToken).ConfigureAwait(false);
+                arguments = new SalesforceContinuationRequest(continuation!);
                 break;
             default:
                 return new InoWorkflowResult("That Salesforce read is not available through this workflow.", workflow);
         }
+
+        var result = await DispatchInoAsync<SalesforceReadResult>(
+            request,
+            SalesforceCapabilityIds.RecordRead,
+            toolId,
+            arguments,
+            CapabilityOperationKind.Query,
+            cancellationToken).ConfigureAwait(false);
 
         if (result.Status == SalesforceReadStatus.NeedsAuth)
             return AuthorizationResult(
@@ -758,6 +800,37 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
 
     private DateTimeOffset CurrentTime() =>
         (services.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow();
+
+    private async Task<T> DispatchInoAsync<T>(
+        InoWorkflowRequest workflowRequest,
+        string capabilityId,
+        string toolId,
+        object arguments,
+        CapabilityOperationKind expectedKind,
+        CancellationToken cancellationToken)
+    {
+        if (workflowRequest.OwnerId is not { } ownerId || workflowRequest.ActorId is not { } actorId)
+            throw new ArgumentException("Owner and actor identities are required for capability dispatch.", nameof(workflowRequest));
+        var payload = new RetainedInoCapabilityPayload(
+            toolId,
+            JsonSerializer.SerializeToElement(arguments, arguments.GetType(), PlanJson));
+        var request = RetainedInoCapabilityAuthority.CreateRequest(
+            ownerId,
+            actorId,
+            workflowRequest.RequestId,
+            $"{workflowRequest.OperationId}-{toolId}",
+            capabilityId,
+            JsonSerializer.SerializeToElement(payload, PlanJson),
+            CurrentTime(),
+            workflowRequest.RequestId,
+            workflowRequest.OperationId);
+        var result = await services.GetRequiredService<ICapabilityDispatcher>()
+            .ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+        if (result.Kind != expectedKind)
+            throw new InvalidOperationException("Capability handler returned an invalid operation kind.");
+        return result.Payload.Deserialize<T>(PlanJson)
+               ?? throw new InvalidOperationException("Capability handler returned an empty result.");
+    }
 
     private static bool ToolMatchesProvider(string provider, string toolId) =>
         string.Equals(provider, OAuthCallbackPaths.GoogleProvider, StringComparison.Ordinal)

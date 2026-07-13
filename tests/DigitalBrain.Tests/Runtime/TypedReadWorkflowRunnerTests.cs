@@ -2,9 +2,11 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
 using System.Text.Json;
 
@@ -332,11 +334,26 @@ public sealed class TypedReadWorkflowRunnerTests
         IInoEffectPlanStore plans)
     {
         var factory = new RecordingGrainFactory(model, gmail, salesforce);
+        var timeProvider = new FrozenTimeProvider(Now);
+        var configuration = new ConfigurationManager
+        {
+            [RetainedInoCapabilityGrantSource.EnabledKey] = "true"
+        };
+        var dispatcher = new CapabilityDispatcher(
+            [
+                new DigitalBrain.Google.GmailMailboxCapabilityHandler(factory),
+                new DigitalBrain.Google.GmailSendProposalCapabilityHandler(),
+                new DigitalBrain.Salesforce.SalesforceRecordReadCapabilityHandler(factory),
+                new DigitalBrain.Salesforce.SalesforceUpdateProposalCapabilityHandler(factory)
+            ],
+            new RetainedInoCapabilityGrantSource(configuration),
+            timeProvider);
         var services = new ServiceCollection()
             .AddSingleton<IChatClient>(chat)
             .AddSingleton<IGrainFactory>(factory)
             .AddSingleton(plans)
-            .AddSingleton<TimeProvider>(new FrozenTimeProvider(Now))
+            .AddSingleton<TimeProvider>(timeProvider)
+            .AddSingleton<ICapabilityDispatcher>(dispatcher)
             .BuildServiceProvider();
         return new AgentFrameworkWorkflowRunner(services);
     }
@@ -485,7 +502,7 @@ public sealed class TypedReadWorkflowRunnerTests
         public Task<SalesforceReadResult> BeginAuthorizationAsync(string startToken, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<AuthResult> CompleteAuthorizationAsync(OAuthCallback callback, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<SalesforceReadResult> ReadLatestAccountAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<SalesforceReadResult> ReadCurrentProfileAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<SalesforceReadResult> ReadCurrentProfileAsync(CancellationToken cancellationToken = default) => Record(SalesforceTools.ReadCurrentProfile);
         public Task<SalesforceReadResult> ReadRecentAccountsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<SalesforceReadResult> ReadRecentContactsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<SalesforceReadResult> ReadCrmSchemaAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
