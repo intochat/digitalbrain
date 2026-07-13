@@ -189,10 +189,12 @@ Task 6 evidence: compile-first contract tests failed on the absent builder API, 
 - Installation operations cover append, claim with lease/fence, fail/retry/park, schedule occurrence, commit, list/apply intents, pause/resume, release switch, and rollback.
 - `FeatureRunCommit` atomically includes new state, input acknowledgment, completion entry, and at most 32 intents.
 
-- [ ] Write pure transition tests for every 100/1,000/64-KiB/32/60-second/20-read/4-model/5-attempt limit.
-- [ ] Write Orleans-host tests for duplicate delivery, ambiguous retry, stale fence, crash/lease expiry, reminder duplication, downtime catch-up, restart, and independent fan-out.
-- [ ] Implement the two grains without reentrancy, reflection serialization, provider I/O, or success-before-write.
-- [ ] Assert no third new grain type exists and commit `feat: add durable feature grains`.
+- [x] Write pure transition tests for every 100/1,000/64-KiB/32/60-second/20-read/4-model/5-attempt limit.
+- [x] Write Orleans-host tests for duplicate delivery, ambiguous retry, stale fence, crash/lease expiry, reminder duplication, downtime catch-up, restart, and independent fan-out.
+- [x] Implement the two grains without reentrancy, reflection serialization, provider I/O, or success-before-write.
+- [x] Assert no third new grain type exists and commit `feat: add durable feature grains`.
+
+Task 7 evidence: pure immutable transitions enforce every approved capacity and execution bound, while owner-scoped hub and installation grains persist fan-out, inbox, fenced leases, retries and parking, schedules, atomic completions, bounded intents, pause/resume, and one-shot release rollback. Ambiguous writes reconcile by complete durable-state equality, stale or exactly-expired fences cannot complete work, idle polling is write-free, crash recovery cannot exceed five attempts, pending fan-out and intents are never evicted, and same identifiers cannot be rebound to different content. Orleans-host tests exercise pre-commit failure, lost acknowledgement, competing same-revision state, first-write failure, deactivation, real silo restart, duplicate delivery, downtime catch-up, and independent recipient progress. The focused Orleans suite passed 40 tests, affected suites passed 66 Integration Contract and 374 kernel/runtime tests, and the exact root suite passed 552 tests with no failures or skips. Aspire doctor passed all five checks, `git diff --check` was clean, and independent review plus three re-review cycles reported no remaining Critical, Important, or Moderate Task 7 issue.
 
 ### Task 8: FeatureHost collectible loading and bounded execution
 

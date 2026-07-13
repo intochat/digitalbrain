@@ -29,6 +29,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.E2ETests/DigitalBrain.E2ETests.csproj" />
     <Project Path="tests/DigitalBrain.IntegrationContractTests/DigitalBrain.IntegrationContractTests.csproj" />
+    <Project Path="tests/DigitalBrain.OrleansTests/DigitalBrain.OrleansTests.csproj" />
     <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
     <Project Path="tests/DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
