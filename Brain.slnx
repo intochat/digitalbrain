@@ -1,15 +1,10 @@
 <Solution>
   <Folder Name="/clients/">
-    <!-- Flutter client integration.
-         By default (via Directory.Build.props) we SkipFlutterBuild=true so normal `dotnet build/test`
-         stays fast and doesn't require Flutter CLI. CI or full builds can override with -p:SkipFlutterBuild=false. -->
     <Project Path="app/Flutter.proj" Type="C#" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/DigitalBrain.Core/DigitalBrain.Core.csproj" />
-
-
     <Project Path="src/DigitalBrain.Kernel.Abstractions/DigitalBrain.Kernel.Abstractions.csproj" />
     <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
@@ -17,8 +12,9 @@
     <Project Path="src/DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj" />
   </Folder>
   <Folder Name="/integrations/">
-
     <Project Path="integrations/DigitalBrain.Google/DigitalBrain.Google.csproj" />
+    <Project Path="integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj" />
+    <Project Path="integrations/DigitalBrain.Integrations.Salesforce.Contracts/DigitalBrain.Integrations.Salesforce.Contracts.csproj" />
     <Project Path="integrations/DigitalBrain.Salesforce/DigitalBrain.Salesforce.csproj" />
   </Folder>
   <Folder Name="/hosts/">
@@ -27,6 +23,7 @@
     <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DigitalBrain.IntegrationContractTests/DigitalBrain.IntegrationContractTests.csproj" />
     <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
     <Project Path="tests/DigitalBrain.TestKit/DigitalBrain.TestKit.csproj" />
@@ -36,7 +33,3 @@
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
   </Folder>
 </Solution>
-
-
-
-

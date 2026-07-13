@@ -55,12 +55,12 @@ Prefix all prompts with the ritual. Rely on CodeGraph for architecture understan
   - `aspire doctor` before/after changes.
 - **Pre-build for MCP**: Before MCP tasks or starting digitalbrain, run quick `dotnet build src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj --no-restore`. Use `--no-build` in run args. Delete repeated rebuild waste.
 - **Minimal/isolated AppHost**: Use `aspire run` with resource filters or isolated mode when full stack not needed. Inject live `aspire__list_resources` + doctor output into context at start (dynamic state over static docs).
-- **Tests**: ONLY run `dotnet test --logger "console;verbosity=minimal"` from the repo root. **Never use --filter**. Run full from root for high signal.
-  - Always launch in background; immediately poll for results with `aspire__list_console_logs` or `list_traces` (no blocking on full output).
+- **Tests**: During TDD, run the smallest owning test project with `dotnet test <project> --logger "console;verbosity=minimal"`. **Never use --filter**. Before every checkpoint or completion claim, run the exact root command `dotnet test --logger "console;verbosity=minimal"`.
+  - Launch the full root suite in the background and poll immediately. Focused project tests may run in the foreground.
 - **Targeted restarts (use Aspire MCP)**: After changes to Mcp/Kernel/INO, use `aspire__execute_resource_command` "restart" on only the affected resource (e.g. "mcp" or specific kernel). Poll with `aspire__list_console_logs` / `list_traces`. Delete full `aspire run` default.
 - **After every change** (small slice):
   1. Build (root or targeted).
-  2. `dotnet test --logger "console;verbosity=minimal"`.
+  2. Run the owning test project; run the exact root suite once the slice integrates.
   3. `aspire doctor` (MCP or CLI).
   4. Relevant MCP inspection (resources, logs, traces).
 - **Cycle metrics + retro**: Log start/end time for iterations (use terminal Measure-Command or timestamps). At end, quick retro: "which of 5 steps skipped?". Use Aspire MCP traces for "time to green". Apply 5 steps to reduce time.
@@ -100,7 +100,7 @@ To accelerate iteration cycles (using Context7 + Aspire MCP/CLI + 5 steps):
 - Context7 before any API-touching code.
 - **CodeGraph MCP first for architecture**: Use `codegraph` server (init after clean via build target or `codegraph init`) for all codebase structure, symbols, and impact questions. Do not manually explore files for architecture.
 - Aspire MCP/CLI + doctor in every cycle.
-- `dotnet test` root + min verbosity only. No filters.
+- Project-level TDD + exact root `dotnet test` integration gate. No filters.
 - Delete > add. Clean docs = fast brains.
 - Relative paths. Meaningful names.
 - Self-evolution rail is sacred for mutations.
