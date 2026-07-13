@@ -403,6 +403,46 @@ public sealed class SalesforceApiClient(ForceClient client, string? identityUrl 
         }
     }
 
+    public async Task<SalesforceMutationVerificationResult> VerifyUpdateAsync(
+        SalesforcePreparedUpdate preparedUpdate,
+        CancellationToken ct)
+    {
+        try
+        {
+            var document = ReadPreparedUpdate(preparedUpdate);
+            var schema = await ResolveObjectAsync(
+                new SalesforceSemanticEntity(document.EntityLabel),
+                requireQueryable: true,
+                requireSearchable: false,
+                ct,
+                requireUpdateable: true).ConfigureAwait(false);
+            ValidateRecordId(document.RecordId, schema.KeyPrefix);
+            var field = ResolveField(schema, new SalesforceSemanticField(document.FieldLabel), "verification");
+            if (!string.Equals(schema.ApiName, document.ObjectApiName, StringComparison.Ordinal) ||
+                !string.Equals(field.ApiName, document.FieldApiName, StringComparison.Ordinal) ||
+                !string.Equals(field.Type, document.FieldType, StringComparison.OrdinalIgnoreCase))
+                return new SalesforceMutationVerificationResult(
+                    false,
+                    "The approved Salesforce update no longer matches provider metadata.");
+            var currentValue = await ReadMutationValueAsync(schema, field, document.RecordId, ct).ConfigureAwait(false);
+            return string.Equals(currentValue, document.DesiredValue, StringComparison.Ordinal)
+                ? new SalesforceMutationVerificationResult(true)
+                : new SalesforceMutationVerificationResult(
+                    false,
+                    "Salesforce did not confirm the requested update.");
+        }
+        catch (SalesforceReadException ex)
+        {
+            return new SalesforceMutationVerificationResult(false, ex.Message);
+        }
+        catch (Exception ex) when (IsSalesforceClientException(ex))
+        {
+            return new SalesforceMutationVerificationResult(
+                false,
+                "Salesforce verification is unavailable right now.");
+        }
+    }
+
     private async Task<string?> ReadMutationValueAsync(
         ObjectSchema schema,
         FieldSchema field,

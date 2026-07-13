@@ -5,7 +5,8 @@ namespace DigitalBrain.Kernel.Runtime;
 
 public sealed class PlanInoToolGateway(
     IGrainFactory grainFactory,
-    InoEffectPlanAuthority authority) : IInoToolGateway
+    InoEffectPlanAuthority authority,
+    IInoOperationCapability operations) : IInoToolGateway
 {
     public bool TryAuthorizeMutation(InoToolRequest request, string actorScope, out InoApprovedTool tool)
     {
@@ -50,7 +51,6 @@ public sealed class PlanInoToolGateway(
                 cancellationToken);
     }
 
-    private static bool IsSupported(string toolId) =>
-        string.Equals(toolId, GmailTools.Send, StringComparison.Ordinal) ||
-        string.Equals(toolId, SalesforceTools.UpdateRecord, StringComparison.Ordinal);
+    private bool IsSupported(string toolId) =>
+        string.Equals(toolId, GmailTools.Send, StringComparison.Ordinal) || operations.Supports(toolId);
 }

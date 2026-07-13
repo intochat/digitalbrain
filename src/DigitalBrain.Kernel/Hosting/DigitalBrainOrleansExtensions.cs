@@ -71,6 +71,7 @@ public static class DigitalBrainOrleansExtensions
             {
                 services.AddScoped<NeuronJournals>();
                 services.AddSingleton<IInoEffectPlanStore, InoEffectPlanStore>();
+                services.AddSingleton<IInoOperationCapability, NoOpInoOperationCapability>();
                 if (builder.Configuration.GetValue<bool>("DigitalBrain:Tools:Enabled"))
                     services.AddSingleton<IInoToolGateway, PlanInoToolGateway>();
                 else
