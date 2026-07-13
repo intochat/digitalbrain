@@ -5,8 +5,8 @@ using DigitalBrain.Google;
 using DigitalBrain.Kernel.Hosting;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Runtime;
+using DigitalBrain.RuntimeHost;
 using DigitalBrain.Salesforce;
-using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.AI;
@@ -66,9 +66,7 @@ public sealed class KernelCompositionTests
             ["DigitalBrain:Llm:OllamaEndpoint"] = "http://localhost:11434",
             ["DigitalBrain:Llm:Model"] = "test-model"
         });
-        builder.AddServiceDefaults();
-        builder.UseDigitalBrainOrleans();
-        builder.AddDigitalBrainClients();
+        builder.AddDigitalBrainRuntimeHost();
 
         var descriptors = builder.Services.ToArray();
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IPackConfigStore));
@@ -96,7 +94,7 @@ public sealed class KernelCompositionTests
         Assert.NotNull(app.Services.GetRequiredService<ISalesforceApiClientFactory>());
         Assert.NotNull(app.Services.GetRequiredKeyedService<IConnector>("google"));
         Assert.NotNull(app.Services.GetRequiredKeyedService<IConnector>("salesforce"));
-        app.MapDigitalBrainSetup();
+        app.MapDigitalBrainRuntimeHost();
         var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(static source => source.Endpoints).ToArray();
         var endpointGraph = string.Join('\n', endpoints.Select(static endpoint =>
             endpoint is RouteEndpoint route ? $"{endpoint.DisplayName}|{route.RoutePattern.RawText}" : endpoint.DisplayName));

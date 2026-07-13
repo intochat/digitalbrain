@@ -1,7 +1,7 @@
-﻿{
+{
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
-    "DigitalBrain.Kernel": {
+    "DigitalBrain.RuntimeHost": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "environmentVariables": {

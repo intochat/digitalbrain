@@ -7,10 +7,7 @@ using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Runtime;
-using DigitalBrain.ServiceDefaults;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -254,90 +251,6 @@ public static class DigitalBrainOrleansExtensions
         }
         builder.Services.AddPackConfigStore(packConfigBlobs);
         builder.Services.AddSingleton<DigitalBrain.Kernel.Abstractions.IOAuthStateProtector, DataProtectionOAuthStateProtector>();
-        builder.Services.AddHostedService<DigitalBrain.Salesforce.SalesforceAppConfigSeeder>();
-        builder.Services.AddHostedService<DigitalBrain.Google.GoogleAppConfigSeeder>();
-
-        builder.Services.AddSingleton<DigitalBrain.Salesforce.ISalesforceApiClientFactory, DigitalBrain.Salesforce.SalesforceApiClientFactory>();
-        builder.Services.AddSingleton<DigitalBrain.Google.IGmailApiClientFactory, DigitalBrain.Google.GmailApiClientFactory>();
-
-        builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("salesforce", (sp, _) => new DigitalBrain.Salesforce.SalesforceConnector(
-            sp.GetRequiredService<DigitalBrain.Salesforce.ISalesforceApiClientFactory>(),
-            sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
-            sp.GetRequiredService<DigitalBrain.Kernel.Abstractions.IOAuthStateProtector>()));
-        builder.Services.AddKeyedSingleton<DigitalBrain.Kernel.Abstractions.IConnector>("google", (sp, _) => new DigitalBrain.Google.GoogleConnector(
-            sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>(),
-            sp.GetRequiredService<DigitalBrain.Kernel.Abstractions.IOAuthStateProtector>(),
-            sp.GetService<Microsoft.Extensions.Configuration.IConfiguration>()));
-
-        builder.Services.AddHealthChecks()
-            .AddAsyncCheck("google-connector", static _ => Task.FromResult(
-                HealthCheckResult.Healthy("Google connector is registered")))
-            .AddAsyncCheck("salesforce-connector", static _ => Task.FromResult(
-                HealthCheckResult.Healthy("Salesforce connector is registered")));
-
-        return builder;
-    }
-
-    public static WebApplication MapDigitalBrainSetup(this WebApplication app)
-    {
-        app.UseRouting();
-        app.MapDefaultEndpoints();
-        app.UseCors("browser");
-
-        var webRoot = app.Configuration["DIGITALBRAIN_WEBROOT"];
-        var serveWebBundle = !string.IsNullOrWhiteSpace(webRoot) && Directory.Exists(webRoot);
-        if (serveWebBundle)
-        {
-            var fileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(Path.GetFullPath(webRoot!));
-            app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = fileProvider });
-            app.UseStaticFiles(new StaticFileOptions { FileProvider = fileProvider });
-        }
-
-        if (serveWebBundle)
-        {
-            var indexPath = Path.Combine(Path.GetFullPath(webRoot!), "index.html");
-            app.MapFallback(async context =>
-            {
-                context.Response.ContentType = "text/html";
-                await context.Response.SendFileAsync(indexPath);
-            });
-        }
-
-        return app;
-    }
-
-    public static WebApplicationBuilder ConfigureDigitalBrainKestrel(this WebApplicationBuilder builder)
-    {
-        var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted(builder.Configuration);
-
-        builder.WebHost.ConfigureKestrel(options =>
-        {
-            if (isAspireHosted)
-            {
-                var webPort = Environment.GetEnvironmentVariable("DIGITALBRAIN_WEB_PORT");
-                var hasWebEndpoint = int.TryParse(webPort, out var webEndpointPort);
-
-                var grpcPorts = (Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS") ?? string.Empty)
-                    .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                foreach (var grpcPort in grpcPorts)
-                {
-                    if (int.TryParse(grpcPort, out var grpcEndpointPort) &&
-                        (!hasWebEndpoint || grpcEndpointPort != webEndpointPort))
-                    {
-                        options.ListenAnyIP(grpcEndpointPort, listen => listen.Protocols = HttpProtocols.Http2);
-                    }
-                }
-
-                if (hasWebEndpoint)
-                {
-                    options.ListenAnyIP(webEndpointPort, listen => listen.Protocols = HttpProtocols.Http1AndHttp2);
-                }
-                return;
-            }
-
-            options.ListenAnyIP(8080, listen => listen.Protocols = HttpProtocols.Http2);
-            options.ListenAnyIP(8081, listen => listen.Protocols = HttpProtocols.Http1AndHttp2);
-        });
 
         return builder;
     }

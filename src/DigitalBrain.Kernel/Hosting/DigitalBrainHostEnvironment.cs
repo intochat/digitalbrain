@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Kernel.Hosting;
 
-internal static class DigitalBrainHostEnvironment
+public static class DigitalBrainHostEnvironment
 {
     private static readonly string[] AspireConnectionKeys =
     [

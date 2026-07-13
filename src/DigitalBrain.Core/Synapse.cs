@@ -42,9 +42,6 @@ public record ExperienceUsed(
     string? SessionId = null) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
 
 
-[Alias("DigitalBrain.Core.IAspireNeuron")]
-public interface IAspireNeuron : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
-
 // Thin common marker for channel neurons.
 // Allows discovery and shared patterns (e.g. CorrelationId/CausationId for reply context across channels).
 // No methods yet - keeps it thin; specific contracts live in feature contract assemblies, not Core.
@@ -76,10 +73,6 @@ public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
 
 
 // Self-awareness: SystemStatus + proposals (MVP for auto diagnose + simulate fix)
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.SystemStatusChanged")]
-public record SystemStatusChanged(string Component, string Status, string? Details = null) : Synapse(nameof(SystemStatusChanged), DateTimeOffset.UtcNow);
-
 // Dual journal checkpoints + branching for simulation / time travel.
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.Checkpoint")]
@@ -152,8 +145,4 @@ public record VisualizeDataRequest(
     string? RequestId = null,
     string UserId = "anonymous",
     string? SessionId = null) : Synapse(nameof(VisualizeDataRequest), DateTimeOffset.UtcNow, CorrelationId: RequestId);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.PerformKernelSelfUpdate")]
-public record PerformKernelSelfUpdate(string Version = "", int FailAtReplica = 0) : Synapse(nameof(PerformKernelSelfUpdate), DateTimeOffset.UtcNow);
 

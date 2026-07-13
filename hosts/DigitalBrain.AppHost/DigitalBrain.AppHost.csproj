@@ -13,7 +13,7 @@
     <PackageReference Include="Aspire.Hosting.Azure.Storage" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\DigitalBrain.RuntimeHost\DigitalBrain.RuntimeHost.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">

@@ -23,6 +23,7 @@
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+    <Project Path="hosts/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
     <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/tests/">

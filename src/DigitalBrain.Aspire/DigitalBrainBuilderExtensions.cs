@@ -184,7 +184,7 @@ public static class DigitalBrainBuilderExtensions
     /// Wires a kernel project with the core kernel features out of the box:
     /// dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
     /// </summary>
-    public static IResourceBuilder<ProjectResource> WireKernelSilo(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
+    public static IResourceBuilder<ProjectResource> ConfigureServer(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
         kernel = kernel
             .WithReference(ctx.Orleans)
@@ -258,9 +258,11 @@ public static class DigitalBrainBuilderExtensions
         return kernel;
     }
 
-    // Builds "http://{host}:{port}{pathSuffix}" against a container endpoint discovered at orchestration time
-    // (Ollama, its embedding alias, or Whisper) — shared by the three call sites in WireKernelSilo method above so the
-    // host/port interpolation lives in exactly one place.
+    public static IResourceBuilder<ProjectResource> ConfigureClient(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> client)
+    {
+        return client.WithReference(ctx.OrleansClient);
+    }
+
     private static ReferenceExpression HttpUrl(EndpointReference endpoint, string pathSuffix = "") =>
         ReferenceExpression.Create($"http://{endpoint.Property(EndpointProperty.Host)}:{endpoint.Property(EndpointProperty.Port)}{pathSuffix}");
 

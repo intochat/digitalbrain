@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
@@ -6,21 +6,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>DigitalBrain.Kernel</RootNamespace>
     <AssemblyName>DigitalBrain.Kernel</AssemblyName>
-    <UserSecretsId>dotnet-DigitalBrain.Kernel-ea55b00e-5a06-4791-b7d3-a9f3aabb83f9</UserSecretsId>
-    <!-- Allow alpha/experimental Orleans Journalling APIs (DurableGrain etc); MEAI001 is the official
-         Anthropic SDK's AsIChatClient() experimental-API marker (Task 7 real Anthropic provider). -->
     <NoWarn>$(NoWarn);ORLEANSEXP005;MEAI001</NoWarn>
-    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
-    <ContainerRepository>digitalbrain-kernel</ContainerRepository>
-    <!-- noble-chiseled not yet published for .NET 11 preview; use standard preview base -->
-    <!-- aspnet base: the kernel transitively references Microsoft.AspNetCore.App (Aspire ServiceDefaults /
-         health checks / OpenTelemetry), so the plain runtime image fails to launch it. -->
-    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
-    <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
-    <ContainerRuntimeIdentifier>linux-x64</ContainerRuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Anthropic" />
     <PackageReference Include="Aspire.Azure.Data.Tables" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" />
@@ -32,8 +22,6 @@
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Microsoft.Agents.AI" />
-    <PackageReference Include="ModelContextProtocol" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Core" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
@@ -48,12 +36,13 @@
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
 
-    <ProjectReference Include="..\..\integrations\DigitalBrain.Google\DigitalBrain.Google.csproj" />
-    <ProjectReference Include="..\..\integrations\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
-    <ProjectReference Include="..\..\hosts\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.Configuration" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+    <Using Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
 </Project>

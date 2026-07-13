@@ -2,9 +2,6 @@ namespace DigitalBrain.Ui.Contracts;
 
 using DigitalBrain.Core;
 
-[Alias("DigitalBrain.Ui.Contracts.IObservabilityNeuron")]
-public interface IObservabilityNeuron : INeuron, IHandle<UiSurface>, IHandle<ClusterActivity>, IHandle<ThreeDGraphUpdate> { }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.DataChartGenerated")]
 public record DataChartGenerated(string RequestId, UiSurface Surface) : Synapse(nameof(DataChartGenerated), DateTimeOffset.UtcNow);
