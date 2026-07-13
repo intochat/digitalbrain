@@ -66,23 +66,18 @@ Prefix all prompts with the ritual. Rely on CodeGraph for architecture understan
 - **Cycle metrics + retro**: Log start/end time for iterations (use terminal Measure-Command or timestamps). At end, quick retro: "which of 5 steps skipped?". Use Aspire MCP traces for "time to green". Apply 5 steps to reduce time.
 - **Delete trash aggressively** (docs, dead code, plans). 99% of historical plans/specs are noise — kill them. Keep only living README.md + this CLAUDE.md.
 - **Relative paths only**. Never reference anything under C:\Users\.
-- **Self-explanatory names**. No vacuous `/// <summary>`. Small inline `//` comments only in exceptional cases.
+- COMMENTS ARE FORBIDDEN.
+- No tracked C#, Dart, Proto, PowerShell, shell, XML, MSBuild, YAML, or JSON-with-comments file may contain line comments, block comments, documentation comments, commented-out code, generated comments, or explanatory annotations.
+- Markdown prose is documentation, not a source-code comment. Only `README.md`, `CLAUDE.md`, and this temporary execution plan may remain while the plan is active.
+- Generated source must either be untracked and produced during build or be sanitized before it is tracked. Generated code is not exempt from the zero-comment rule.
+- Replace useful comments with names, types, tests, validation, or smaller functions. Delete stale, narrative, redundant, and commented-out code.
 - **Latest deliberate versions** via central `Directory.Packages.props`.
 - **Self-evolution is the product**: The only path for user-visible mutations (packs, automations, new neurons, Ino creations) is human-approved proposals through the journaled rail. Ino + Foundry + Marketplace feed the same approved rail. Durable, replayable, rollback-capable.
 - **Self-evolution meta for WoW**: Use Ino/rail to propose improvements to CLAUDE.md, .mcp.json, or this WoW (e.g. "propose new optimization"). Stage via proposal, get approved, apply. The process improves itself.
 
-## Self-Evolving System Vision (North Star)
+## Retained Execution Path (North Star)
 
-NeuroOS makes safe, explicit, journaled, human-approved self-evolution the *only* path.
-
-- Every mutation stages a `SelfEvolutionProposal`.
-- Only after `SelfEvolutionDecision.Approved` does an apply handler run the effect.
-- Ino is the orchestrator that proposes; actual creation/apply happens in the rail.
-- Everything is a Neuron (grain) or Synapse (message). Packs are signed C# embodied at runtime.
-- Durable journals + replay for the evolution stream itself.
-- Fast inner loop + MCP for inspection; full `aspire run` only for end-to-end when necessary.
-
-See the self-evolution rail in Core + Kernel/SelfEvolution + apply handlers. Bypasses are explicit/trusted/config-gated only (never default for user/MCP paths).
+Keep one path: `Client -> Edge/Auth -> INO operation -> deterministic function or bounded model workflow -> effect gate -> connector adapter`. Commands and queries use typed grain interfaces. Orleans streams are reserved for progress, fan-out, and observability. The generic Neuron/Synapse runtime, legacy gateway, second auth system, Foundry execution loop, pack runtime, and duplicate UI rail are removed after their remaining behavior is either migrated or explicitly discarded.
 
 ## Local Dev Speed Hacks (Brainstormed Improvements)
 

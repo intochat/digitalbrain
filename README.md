@@ -54,6 +54,28 @@ Do not keep a separate `aspire run` / `aspire start` session alive while running
 
 Use the CodeGraph MCP (see .mcp.json and CLAUDE.md) as the primary tool for architecture and codebase understanding.
 
+## Target Dependency Direction
+
+```text
+DigitalBrain.Core
+        ^
+DigitalBrain.Kernel.Abstractions
+        ^
+        +----------------+----------------+
+        ^                ^                ^
+DigitalBrain.Kernel  DigitalBrain.Google  DigitalBrain.Salesforce
+        ^                ^                ^
+        +--------- DigitalBrain.RuntimeHost --------+
+                           ^
+             DigitalBrain.AppHost resource graph
+
+DigitalBrain.Mcp -> DigitalBrain.Kernel.Abstractions
+```
+
+The final names may be simplified after deletion, but dependency direction must remain inward. `DigitalBrain.RuntimeHost` is the only process project allowed to compose the runtime with concrete providers. `DigitalBrain.AppHost` models resources and references the RuntimeHost executable without owning its service registrations.
+
+No external mutation may bypass `InoEffectPlanAuthority`, durable approval evidence, idempotency, lease/fence checks, and outcome verification.
+
 ## Working Rules (see CLAUDE.md)
 
 - Always follow Elon's 5 steps **in order**: less dumb reqs → delete (target 10%+) → simplify → accelerate → automate last.
