@@ -4,10 +4,6 @@ using Orleans.Serialization.Invocation;
 
 namespace DigitalBrain.Tests.Kernel;
 
-// Minimal IGrainContext fake — Orleans.TestingHost (10.2.0) has no ready-made fake grain context to
-// reuse, so this hand-rolls the full member list of the installed Orleans.Runtime.IGrainContext
-// (verified via reflection against the restored 10.2.1-preview.1 assembly, not guessed), throwing
-// NotSupportedException for everything this test doesn't exercise beyond ActivationServices.
 internal sealed class FakeGrainContext(IServiceProvider services) : IGrainContext
 {
     public IServiceProvider ActivationServices => services;

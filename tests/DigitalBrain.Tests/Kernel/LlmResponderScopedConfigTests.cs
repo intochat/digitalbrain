@@ -64,7 +64,11 @@ public interface IScopedAskLlmEmitter : INeuron
     Task StoreConfigAsync(string scope, string pack, Dictionary<string, string> values);
 }
 
-public sealed class ScopedAskLlmEmitter(Microsoft.Extensions.Logging.ILogger<ScopedAskLlmEmitter> logger, NeuronJournals journals) : Neuron(logger, journals), IScopedAskLlmEmitter
+public sealed class ScopedAskLlmEmitter(
+    Microsoft.Extensions.Logging.ILogger<ScopedAskLlmEmitter> logger,
+    [Orleans.Runtime.PersistentState("timeline", "Default")]
+    Orleans.Runtime.IPersistentState<DigitalBrain.Kernel.Runtime.EncryptedRuntimeStateEnvelope> persistentState,
+    EncryptedRuntimeStateProtector protector) : Neuron(logger, persistentState, protector), IScopedAskLlmEmitter
 {
     public Task BroadcastScopedAskAsync(
         string prompt, string replyType, IReadOnlyDictionary<string, object?> replyProps,

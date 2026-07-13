@@ -15,7 +15,7 @@ using StorageInputs = Pulumi.AzureNative.Storage.Inputs;
 namespace DigitalBrain.Deploy;
 
 // Minimal Pulumi program for DigitalBrain / NeuroOS. Provisions only what the runtime actually uses:
-// a resource group, one Storage account (Orleans Table clustering + Blob grain/journal), Azure OpenAI,
+// a resource group, one Storage account (Orleans Table clustering + Blob grain state), Azure OpenAI,
 // Log Analytics + App Insights, an ACA managed environment, the kernel, and the public one-replica MCP/UI edge.
 // Replaces the vendored DeploymentKit.
 internal static class Program

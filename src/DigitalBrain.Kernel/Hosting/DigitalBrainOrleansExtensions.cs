@@ -10,8 +10,6 @@ using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Journaling.Json;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Kernel.Hosting;
@@ -29,7 +27,7 @@ public static class DigitalBrainOrleansExtensions
             builder.Configuration,
             requireConfiguredKeys: requiresDurableStorage,
             production: builder.Environment.IsProduction());
-        var stateProtector = new EncryptedRuntimeStateProtector(keyRing);
+        var stateProtector = new EncryptedRuntimeStateProtector(keyRing, SynapseJson.CreateOptions());
 
         builder.Services.AddSingleton(keyRing);
         builder.Services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
@@ -54,10 +52,6 @@ public static class DigitalBrainOrleansExtensions
         var grainStateConnection = requiresDurableStorage && !useManagedIdentity
             ? RequireConnectionString(builder.Configuration, "grainstate")
             : null;
-        var journalConnection = requiresDurableStorage && !useManagedIdentity
-            ? RequireConnectionString(builder.Configuration, "journal")
-            : null;
-
         var runtimeBlobOptions = new BlobClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
         var runtimeStateBlobs = requiresDurableStorage
             ? useManagedIdentity
@@ -69,7 +63,6 @@ public static class DigitalBrainOrleansExtensions
         {
             siloBuilder.ConfigureServices(services =>
             {
-                services.AddScoped<NeuronJournals>();
                 services.AddSingleton<IInoEffectPlanStore, InoEffectPlanStore>();
                 services.AddSingleton<IInoOperationCapability, NoOpInoOperationCapability>();
                 if (builder.Configuration.GetValue<bool>("DigitalBrain:Tools:Enabled"))
@@ -86,7 +79,6 @@ public static class DigitalBrainOrleansExtensions
                 siloBuilder.AddMemoryGrainStorage(RuntimeStateStorageProviders.Conversations);
                 siloBuilder.AddMemoryGrainStorage(RuntimeStateStorageProviders.SurfaceFeeds);
                 siloBuilder.AddMemoryGrainStorage(RuntimeStateStorageProviders.Sessions);
-                siloBuilder.ConfigurePrototypeJournals();
             }
             else
             {
@@ -113,7 +105,6 @@ public static class DigitalBrainOrleansExtensions
                     var blobs = runtimeStateBlobs!;
                     siloBuilder.AddAzureBlobGrainStorage("Default", options => options.BlobServiceClient = blobs);
                     ConfigureRuntimeStateStorage(siloBuilder, blobs, runtimeStorageNamespace);
-                    siloBuilder.AddAzureBlobJournalStorage(options => options.BlobServiceClient = blobs);
                 }
                 else
                 {
@@ -129,20 +120,7 @@ public static class DigitalBrainOrleansExtensions
                     var grainStateBlobs = runtimeStateBlobs!;
                     siloBuilder.AddAzureBlobGrainStorage("Default", options => options.BlobServiceClient = grainStateBlobs);
                     ConfigureRuntimeStateStorage(siloBuilder, grainStateBlobs, runtimeStorageNamespace);
-                    siloBuilder.AddAzureBlobJournalStorage(options =>
-                    {
-                        options.BlobServiceClient = new BlobServiceClient(journalConnection!, runtimeBlobOptions);
-                    });
                 }
-
-                siloBuilder.UseJsonJournalFormat(options =>
-                {
-                    JournalJson.Configure(options);
-                    options.SerializerOptions.Converters.Add(new EncryptedSynapseJsonConverter(
-                        stateProtector,
-                        RuntimeStateKeys.SynapseJournal(runtimeStorageNamespace),
-                        EncryptedSynapseJsonConverter.DiscoverLoadedSynapseTypes()));
-                });
             }
 
         });

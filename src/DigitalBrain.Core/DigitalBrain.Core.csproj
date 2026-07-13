@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- Core abstractions package. This is the stable primitive layer (INeuron, Synapse, journals, and universal contracts) for the company brain. -->
+    <!-- Core abstractions package. This is the stable primitive layer for the company brain. -->
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Core</PackageId>
     <Version>0.3.0</Version>

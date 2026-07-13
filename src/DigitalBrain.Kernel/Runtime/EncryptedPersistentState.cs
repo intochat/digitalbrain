@@ -47,7 +47,7 @@ public sealed class EncryptedRuntimeStateProtector
     private const int NonceSize = 12;
     private const int TagSize = 16;
     private const int DataEncryptionKeySize = 32;
-    private const int MaximumCiphertextBytes = 4 * 1024 * 1024;
+    internal const int MaximumProtectedPlaintextBytes = 4 * 1024 * 1024;
     private readonly IRuntimeStateKeyRing _keys;
     private readonly JsonSerializerOptions _json;
 
@@ -94,6 +94,9 @@ public sealed class EncryptedRuntimeStateProtector
 
     public bool RequiresRewrap(EncryptedRuntimeStateEnvelope envelope) =>
         envelope.KekVersion != _keys.ActiveKekVersion;
+
+    internal int MeasurePlaintextBytes<TState>(TState value) =>
+        JsonSerializer.SerializeToUtf8Bytes(value, _json).Length;
 
     internal OpenedRuntimeState<TState> Open<TState>(
         string scopeHash,
@@ -165,7 +168,7 @@ public sealed class EncryptedRuntimeStateProtector
         if (!_keys.TryGetKek(_keys.ActiveKekVersion, out var kek))
             throw new RuntimeStateIntegrityException("active key unavailable");
         var plaintext = JsonSerializer.SerializeToUtf8Bytes(value, _json);
-        if (plaintext.Length > MaximumCiphertextBytes)
+        if (plaintext.Length > MaximumProtectedPlaintextBytes)
             throw new InvalidOperationException("Encrypted runtime state exceeds the persistence bound.");
         var aad = BuildAad(scopeHash, aggregateKind, schemaVersion, revision);
         try
@@ -258,14 +261,14 @@ public sealed class EncryptedRuntimeStateProtector
             envelope.PayloadNonce is not { Length: NonceSize } ||
             envelope.PayloadTag is not { Length: TagSize } ||
             envelope.Signature is not { Length: 32 } ||
-            envelope.PayloadCiphertext is null || envelope.PayloadCiphertext.Length > MaximumCiphertextBytes)
+            envelope.PayloadCiphertext is null || envelope.PayloadCiphertext.Length > MaximumProtectedPlaintextBytes)
             throw new RuntimeStateIntegrityException("invalid envelope metadata");
     }
 
     private static void DemandKind(string aggregateKind)
     {
         if (aggregateKind is not (RuntimeStateKinds.Conversation or RuntimeStateKinds.ConversationArchive or
-            RuntimeStateKinds.SurfaceFeed or RuntimeStateKinds.Session or RuntimeStateKinds.SynapseJournal or
+            RuntimeStateKinds.SurfaceFeed or RuntimeStateKinds.Session or RuntimeStateKinds.SynapseTimeline or
             RuntimeStateKinds.InoEffectPlan))
             throw new ArgumentException("Unsupported encrypted runtime-state kind.", nameof(aggregateKind));
     }

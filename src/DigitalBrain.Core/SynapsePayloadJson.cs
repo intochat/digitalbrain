@@ -24,7 +24,7 @@ public static class SynapsePayloadJson
         }
 
         public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options) =>
-            JsonSerializer.Serialize(writer, value, options);
+            JsonSerializer.Serialize(writer, value, value.GetType(), options);
 
         private static object? Unwrap(JsonElement element) => element.ValueKind switch
         {

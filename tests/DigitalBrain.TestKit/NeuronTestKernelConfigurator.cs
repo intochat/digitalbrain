@@ -1,9 +1,9 @@
-using DigitalBrain.Core;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
+using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
 using Orleans.TestingHost;
 
 namespace DigitalBrain.TestKit;
@@ -27,14 +27,22 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
             .AddMemoryGrainStorage("PubSubStore")
             .ConfigureServices(services =>
             {
-                services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddScoped<NeuronJournals>();
-                services.Configure<NeuronLifecycleOptions>(options => options.JournalActivationMarkers = true);
-                services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
+                AddRuntimeStateProtection(services);
+                services.Configure<NeuronLifecycleOptions>(options => options.PersistActivationMarkers = true);
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
             });
+    }
+
+    public static void AddRuntimeStateProtection(IServiceCollection services)
+    {
+        var keyRing = new RuntimeStateKeyRing(
+            1,
+            new Dictionary<int, byte[]> { [1] = Enumerable.Repeat((byte)0x31, 32).ToArray() },
+            Enumerable.Repeat((byte)0x53, 32).ToArray());
+        services.AddSingleton(keyRing);
+        services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
+        services.AddSingleton(new EncryptedRuntimeStateProtector(keyRing, SynapseJson.CreateOptions()));
     }
 }
 

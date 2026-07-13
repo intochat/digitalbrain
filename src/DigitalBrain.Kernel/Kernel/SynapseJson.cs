@@ -1,15 +1,17 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using DigitalBrain.Core;
-using Orleans.Journaling.Json;
 
 namespace DigitalBrain.Kernel.Kernel;
 
-public static class JournalJson
+public static class SynapseJson
 {
-    public static void Configure(JsonJournalOptions options) =>
-        options.AddTypeInfoResolver(CreateTypeInfoResolver());
+    public static JsonSerializerOptions CreateOptions() => new(SynapsePayloadJson.Options)
+    {
+        TypeInfoResolver = CreateTypeInfoResolver()
+    };
 
     public static IJsonTypeInfoResolver CreateTypeInfoResolver()
     {
@@ -40,7 +42,7 @@ public static class JournalJson
 
     private static IReadOnlyList<Type> DiscoverSynapseTypes()
     {
-        LoadReferencedDigitalBrainAssemblies(typeof(JournalJson).Assembly);
+        LoadReferencedDigitalBrainAssemblies(typeof(SynapseJson).Assembly);
 
         return AppDomain.CurrentDomain.GetAssemblies()
             .Where(assembly => assembly.GetName().Name?.StartsWith("DigitalBrain.", StringComparison.Ordinal) == true)

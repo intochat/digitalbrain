@@ -125,11 +125,13 @@ Task 3 evidence: compile-first tests failed on the absent v3 identity and capabi
 - Pin all Orleans core, client, server, serialization, clustering, persistence, reminders, and testing packages to stable 10.2.1.
 - Use source-generated serialization, awaited ordinary persistent writes, `RegisterGrainTimer`, persistent reminders as wake-up hints, and no journaling API.
 
-- [ ] Add a package-family architecture test that fails on mixed Orleans versions and journaling references.
-- [ ] Use `dotnet-inspect diff` for every referenced package moving from preview/stable 10.2.0 to 10.2.1 and address the single observed `ClusterMembershipOptions.MaxDefunctSiloEntries` removal if used.
-- [ ] Replace journal-backed behavior only after equivalent ordinary-persistence tests pass.
-- [ ] Remove journaling package references, configuration, state, tests, and the AppHost `journal` resource together.
-- [ ] Commit `refactor: converge on orleans 10.2.1`.
+- [x] Add a package-family architecture test that fails on mixed Orleans versions and journaling references.
+- [x] Use `dotnet-inspect diff` for every referenced package moving from preview/stable 10.2.0 to 10.2.1 and address the single observed `ClusterMembershipOptions.MaxDefunctSiloEntries` removal if used.
+- [x] Replace journal-backed behavior only after equivalent ordinary-persistence tests pass.
+- [x] Remove journaling package references, configuration, state, tests, and the AppHost `journal` resource together.
+- [x] Commit `refactor: converge on orleans 10.2.1`.
+
+Task 4 evidence: the package-family architecture test first failed on fifteen mixed pins and the production journaling rail. `dotnet-inspect diff` covered every direct Orleans package moved to 10.2.1 and confirmed the removed `ClusterMembershipOptions.MaxDefunctSiloEntries` member was unused. Context7 was quota-blocked, so current Orleans persistence, timer, and reminder behavior was verified against official Microsoft documentation and the installed 10.2.1 API surface. Journal state was replaced with awaited encrypted ordinary persistence, explicit count-and-byte timeline retention, durable drop counters, and deactivation/reactivation regressions that prove polymorphic state and bounded recent history survive and accept subsequent writes. Oversize input is rejected without poisoning later persistence. The AppHost journal resource and all direct production journaling packages, configuration, state, and tests are gone; production uses only `RegisterGrainTimer`. The stable TestingHost package retains upstream alpha journaling internals transitively, but no production or direct project reference uses them. The owning suite passed 362 tests, the exact root suite passed 463 tests with no failures or skips, and independent re-review reported no remaining Critical or Important issue.
 
 ### Task 5: Shared RuntimeHost capability dispatcher and retained INO migration
 

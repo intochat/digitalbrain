@@ -8,7 +8,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Aspire</PackageId>
     <Version>0.3.0</Version>
-    <Description>Aspire hosting for the DigitalBrain INO kernel with HA replicas, durable journals, dynamic UI surfaces, and connector wiring.</Description>
+    <Description>Aspire hosting for the DigitalBrain INO kernel with HA replicas, durable state, dynamic UI surfaces, and connector wiring.</Description>
   </PropertyGroup>
 
   <ItemGroup>

@@ -25,7 +25,7 @@ var profileText = configuredProfile;
 if (!Enum.TryParse<RuntimeProfile>(profileText, true, out var profile))
     throw new InvalidOperationException($"Unknown runtime profile '{profileText}'.");
 // HTTP is the authoritative MCP surface. INO is the sole user-facing mutation path;
-// generic command/admin tools would bypass the journaled conversation rail.
+// generic command/admin tools would bypass the durable conversation rail.
 builder.Services.AddMcpServer()
     .WithHttpTransport()
     .WithTools<McpConversationTools>();

@@ -73,7 +73,7 @@ public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
 
 
 // Self-awareness: SystemStatus + proposals (MVP for auto diagnose + simulate fix)
-// Dual journal checkpoints + branching for simulation / time travel.
+// Timeline checkpoints and branching for simulation and replay.
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.Checkpoint")]
 public record Checkpoint(NeuronId Source, IReadOnlyList<Synapse> Snapshot, DateTimeOffset TakenAt) : Synapse(nameof(Checkpoint), TakenAt);

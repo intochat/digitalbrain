@@ -129,7 +129,6 @@ public sealed class RuntimeStateHostingTests
     {
         builder.Configuration["ConnectionStrings:clustering"] = "UseDevelopmentStorage=true";
         builder.Configuration["ConnectionStrings:grainstate"] = "UseDevelopmentStorage=true";
-        builder.Configuration["ConnectionStrings:journal"] = "UseDevelopmentStorage=true";
     }
 
     private static void AddKeys(HostApplicationBuilder builder, byte[] rawKek)

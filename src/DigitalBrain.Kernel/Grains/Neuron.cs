@@ -4,33 +4,50 @@ using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Journaling;
+using DigitalBrain.Kernel.Runtime;
+using Orleans.Runtime;
 using Orleans.Streams;
-
-#pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
 namespace DigitalBrain.Kernel;
 
 public sealed class NeuronLifecycleOptions
 {
-    public bool JournalActivationMarkers { get; set; }
+    public bool PersistActivationMarkers { get; set; }
+    public int MaximumRetainedSynapsesPerDirection { get; set; } = 512;
+    public int MaximumTimelinePlaintextBytes { get; set; } = 2 * 1024 * 1024;
 }
 
-public sealed class NeuronJournals(
-    [FromKeyedServices("in-journal")] IDurableList<Synapse> incoming,
-    [FromKeyedServices("out-journal")] IDurableList<Synapse> outgoing)
+internal sealed record NeuronTimelineState(
+    long Revision,
+    long DroppedIncoming,
+    long DroppedOutgoing,
+    Synapse[] Incoming,
+    Synapse[] Outgoing)
 {
-    public IDurableList<Synapse> Incoming { get; } = incoming;
-    public IDurableList<Synapse> Outgoing { get; } = outgoing;
+    public static NeuronTimelineState Empty() => new(0, 0, 0, [], []);
 }
 
 [GrainType("digitalbrain.base.v2")]
-public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableGrain, INeuron, IAsyncObserver<Synapse>
+public abstract class Neuron(
+    ILogger logger,
+    IPersistentState<EncryptedRuntimeStateEnvelope> persistentState,
+    EncryptedRuntimeStateProtector protector) : Grain, INeuron, IAsyncObserver<Synapse>
 {
     protected readonly ILogger Logger = logger;
-    private IDurableList<Synapse>? _incomingSynapses = journals.Incoming;
-    private IDurableList<Synapse>? _outgoingSynapses = journals.Outgoing;
+    private EncryptedPersistentState<NeuronTimelineState>? _timelineState;
+    private NeuronTimelineState _timeline = NeuronTimelineState.Empty();
     private StreamSubscriptionHandle<Synapse>? _timelineSubscription;
+    private NeuronLifecycleOptions _lifecycle = new();
+
+    private EncryptedPersistentState<NeuronTimelineState> TimelineState => _timelineState ??= new(
+        persistentState,
+        protector,
+        RuntimeStateKeys.SynapseTimeline(Self.Value),
+        RuntimeStateKinds.SynapseTimeline,
+        RuntimeStateSchemas.SynapseTimeline,
+        NeuronTimelineState.Empty,
+        static value => value.Revision,
+        ValidateTimeline);
 
     // The synapse currently being handled. Synapses fired while handling it are caused by it.
     // Grains are non-reentrant by Orleans contract, so plain field + finally-restore correctly nests causal chains.
@@ -48,68 +65,18 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     // Centralizes without duplication for cross-channel flows (e.g. viz -> chart UiSurface -> flutter).
     protected Synapse StampCurrent(Synapse s) => s.Stamp(Self, CurrentCause);
 
-    // Dual journals (self-explanatory names): incoming received via Deliver, outgoing from our Fire calls.
-    protected IDurableList<Synapse> IncomingJournal => _incomingSynapses ??= ResolveRequiredJournal("in-journal");
-    protected IDurableList<Synapse> OutgoingJournal => _outgoingSynapses ??= ResolveRequiredJournal("out-journal");
-
-    private IDurableList<Synapse> ResolveRequiredJournal(string key)
-    {
-        var journal = this.ServiceProvider.GetKeyedService<IDurableList<Synapse>>(key);
-        if (journal is not null)
-        {
-            return journal;
-        }
-
-        // Fail fast: missing registration means wiring error. No silent in-memory degradation.
-        throw new InvalidOperationException($"Required journal '{key}' not registered for {Self}. Ensure journal storage (AddAzureBlobJournalStorage + UseJsonJournalFormat or prototype for fast paths) registered on silo builder.");
-    }
-
-    private void AddToJournal(ref IDurableList<Synapse>? journalField, string key, Synapse synapse)
-    {
-        var target = journalField ??= ResolveRequiredJournal(key);
-        try
-        {
-            target.Add(synapse);
-        }
-        catch (Exception ex) when (IsJournalWriterUninitialized(ex))
-        {
-            // Fail fast instead of silent switch. Durability is required for causation and checkpoints.
-            Logger.LogError(ex, "Journal writer not initialized for durable write of {Key} in {Neuron}.", key, Self);
-            throw new InvalidOperationException($"Journal writer for '{key}' is not initialized for {Self}. Operation aborted to preserve durability guarantees.", ex);
-        }
-    }
-
     public override async Task OnActivateAsync(CancellationToken ct)
     {
-        _incomingSynapses ??= ResolveRequiredJournal("in-journal");
-        _outgoingSynapses ??= ResolveRequiredJournal("out-journal");
-
-        try
-        {
-            await base.OnActivateAsync(ct);
-        }
-        catch (Exception ex) when (IsJournalWriterUninitialized(ex))
-        {
-            Logger.LogError(ex, "Journal state writer not initialized on activation for {Neuron}. Durability required.", Self);
-            throw new InvalidOperationException($"Journal not ready on activation for {Self}.", ex);
-        }
-
+        await base.OnActivateAsync(ct);
+        _lifecycle = ServiceProvider.GetService<IOptions<NeuronLifecycleOptions>>()?.Value ?? new NeuronLifecycleOptions();
+        ValidateLifecycleOptions(_lifecycle);
+        _timeline = await TimelineState.ReadAsync(ct);
         ActivatedAt = DateTimeOffset.UtcNow;
 
-        // Activation records are lifecycle metadata, not user synapse handling. Avoid durable writes
-        // during Orleans journal recovery; only the prototype/in-memory harness opts into this marker.
-        if (ServiceProvider.GetService<IOptions<NeuronLifecycleOptions>>()?.Value.JournalActivationMarkers == true)
+        if (_lifecycle.PersistActivationMarkers)
         {
-            try
-            {
-                AddToJournal(ref _outgoingSynapses, "out-journal", new NeuronActivated(Self).Stamp(Self));
-                await WriteJournalStateAsync(ct);
-                NeuronInstrumentation.SynapsesOut.Add(1);
-            }
-            catch (Exception ex) when (IsJournalWriterUninitialized(ex))
-            {
-                Logger.LogWarning(ex, "Activation marker was not journaled for {Neuron}; continuing so the first real synapse can initialize the journal.", Self);
-            }
+            await AppendOutgoingAsync(new NeuronActivated(Self).Stamp(Self), ct);
+            NeuronInstrumentation.SynapsesOut.Add(1);
         }
 
         await SubscribeTimelineIfNeeded(ct);
@@ -159,13 +126,12 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     }
 
     // Broadcast reception mirrors DeliverAsync's point-to-point contract: record the observed synapse
-    // in the incoming journal first (so GetIncomingTimelineAsync reflects everything this neuron has
+    // in the incoming timeline first (so GetIncomingTimelineAsync reflects everything this neuron has
     // witnessed, not just what it had a declared handler for), then dispatch to it if applicable.
     protected Task RecordBroadcastReceivedAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        AddToJournal(ref _incomingSynapses, "in-journal", synapse);
-        return WriteJournalStateAsync(cancellationToken);
+        return AppendIncomingAsync(synapse, cancellationToken);
     }
 
     // Default broadcast reception: dispatch only synapse types this neuron statically declares IHandle<T> for.
@@ -193,8 +159,7 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     {
         cancellationToken.ThrowIfCancellationRequested();
         var stamped = payload.Stamp(Self, _currentCause);
-        AddToJournal(ref _outgoingSynapses, "out-journal", stamped);
-        await WriteJournalStateAsync(cancellationToken);
+        await AppendOutgoingAsync(stamped, cancellationToken);
 
         if (stamped.IsBroadcast)
         {
@@ -218,18 +183,18 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     protected Task Broadcast(Synapse s, CancellationToken cancellationToken = default) => FireAsync(s with { IsBroadcast = true }, cancellationToken);
 
     public Task<IReadOnlyList<Synapse>> GetTimelineAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(OutgoingJournal));
+        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(_timeline.Outgoing));
 
     public Task<IReadOnlyList<Synapse>> GetIncomingTimelineAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(IncomingJournal));
+        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(_timeline.Incoming));
 
     public Task<IReadOnlyList<Synapse>> GetOutgoingTimelineAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(OutgoingJournal));
+        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(_timeline.Outgoing));
 
     public Task<IReadOnlyList<Synapse>> GetCausalLineageAsync(string correlationId, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(OutgoingJournal
+        Task.FromResult<IReadOnlyList<Synapse>>(SnapshotTimeline(_timeline.Outgoing
             .Where(s => s.CorrelationId == correlationId || s.SynapseId == correlationId)
-            .Concat(IncomingJournal.Where(s => s.CorrelationId == correlationId || s.SynapseId == correlationId))
+            .Concat(_timeline.Incoming.Where(s => s.CorrelationId == correlationId || s.SynapseId == correlationId))
             .OrderBy(s => s.Timestamp)
             .DistinctBy(s => s.SynapseId)
             .ToList()));
@@ -244,9 +209,9 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
     public async Task<Checkpoint> CreateCheckpointAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Dedup by the stable SynapseId (a synapse fired then self-delivered appears in both journals as the
+        // Dedup by the stable SynapseId (a synapse fired then self-delivered appears in both timelines as the
         // same instance) — robust vs. the old {Timestamp,Type,Sender,Receiver} heuristic.
-        var snap = OutgoingJournal.Concat(IncomingJournal).DistinctBy(s => s.SynapseId).ToList();
+        var snap = _timeline.Outgoing.Concat(_timeline.Incoming).DistinctBy(s => s.SynapseId).ToList();
         var cp = new Checkpoint(Self, snap.AsReadOnly(), DateTimeOffset.UtcNow);
         await FireAsync(cp, cancellationToken);
         return cp;
@@ -268,24 +233,25 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         return new NeuronId(branchKey);
     }
 
-    // Restore: seed this neuron's incoming journal from a checkpoint WITHOUT re-dispatching handlers
+    // Restore: seed this neuron's incoming timeline from a checkpoint WITHOUT re-dispatching handlers
     // (state recovery, not re-execution). Branching, by contrast, replays into a fresh grain.
     public async Task RestoreCheckpointAsync(Checkpoint checkpoint, CancellationToken cancellationToken = default)
     {
-        foreach (var s in checkpoint.Snapshot)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            AddToJournal(ref _incomingSynapses, "in-journal", s);
-        }
-        await WriteJournalStateAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        await UpdateTimelineAsync(
+            current => CompactTimeline(current with
+            {
+                Revision = checked(current.Revision + 1),
+                Incoming = [.. current.Incoming, .. checkpoint.Snapshot]
+            }),
+            cancellationToken);
     }
 
     // Internal for point to point. Incoming synapses are auto-recorded here (called by sender Fire or direct).
     public async Task DeliverAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        AddToJournal(ref _incomingSynapses, "in-journal", synapse);
-        await WriteJournalStateAsync(cancellationToken);
+        await AppendIncomingAsync(synapse, cancellationToken);
 
         var previousCause = _currentCause;
         _currentCause = synapse;
@@ -363,25 +329,129 @@ public abstract class Neuron(ILogger logger, NeuronJournals journals) : DurableG
         return false;
     }
 
-    private async Task WriteJournalStateAsync(CancellationToken cancellationToken = default)
+    private Task AppendIncomingAsync(Synapse synapse, CancellationToken cancellationToken) =>
+        UpdateTimelineAsync(
+            current => CompactTimeline(current with
+            {
+                Revision = checked(current.Revision + 1),
+                Incoming = [.. current.Incoming, synapse]
+            }, synapse.SynapseId),
+            cancellationToken);
+
+    private Task AppendOutgoingAsync(Synapse synapse, CancellationToken cancellationToken) =>
+        UpdateTimelineAsync(
+            current => CompactTimeline(current with
+            {
+                Revision = checked(current.Revision + 1),
+                Outgoing = [.. current.Outgoing, synapse]
+            }, synapse.SynapseId),
+            cancellationToken);
+
+    private NeuronTimelineState CompactTimeline(NeuronTimelineState state, string? requiredSynapseId = null)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        try
+        var incoming = state.Incoming;
+        var outgoing = state.Outgoing;
+        var droppedIncoming = state.DroppedIncoming;
+        var droppedOutgoing = state.DroppedOutgoing;
+
+        if (incoming.Length > _lifecycle.MaximumRetainedSynapsesPerDirection)
         {
-            await WriteStateAsync(cancellationToken);
+            var remove = incoming.Length - _lifecycle.MaximumRetainedSynapsesPerDirection;
+            incoming = incoming[remove..];
+            droppedIncoming = checked(droppedIncoming + remove);
         }
-        catch (Exception ex) when (IsJournalWriterUninitialized(ex))
+        if (outgoing.Length > _lifecycle.MaximumRetainedSynapsesPerDirection)
         {
-            Logger.LogError(ex, "Journal state writer not initialized for durable WriteStateAsync in {Neuron}.", Self);
-            throw new InvalidOperationException($"Durable journal writer not initialized for {Self}.", ex);
+            var remove = outgoing.Length - _lifecycle.MaximumRetainedSynapsesPerDirection;
+            outgoing = outgoing[remove..];
+            droppedOutgoing = checked(droppedOutgoing + remove);
         }
+
+        var compacted = state with
+        {
+            DroppedIncoming = droppedIncoming,
+            DroppedOutgoing = droppedOutgoing,
+            Incoming = incoming,
+            Outgoing = outgoing
+        };
+
+        while (protector.MeasurePlaintextBytes(compacted) > _lifecycle.MaximumTimelinePlaintextBytes)
+        {
+            var incomingCandidate = FirstRemovable(incoming, requiredSynapseId);
+            var outgoingCandidate = FirstRemovable(outgoing, requiredSynapseId);
+            if (incomingCandidate < 0 && outgoingCandidate < 0)
+                throw new InvalidOperationException("A synapse exceeds the neuron timeline retention bound.");
+
+            if (outgoingCandidate < 0 || incomingCandidate >= 0 &&
+                incoming[incomingCandidate].Timestamp <= outgoing[outgoingCandidate].Timestamp)
+            {
+                incoming = RemoveAt(incoming, incomingCandidate);
+                droppedIncoming = checked(droppedIncoming + 1);
+            }
+            else
+            {
+                outgoing = RemoveAt(outgoing, outgoingCandidate);
+                droppedOutgoing = checked(droppedOutgoing + 1);
+            }
+
+            compacted = compacted with
+            {
+                DroppedIncoming = droppedIncoming,
+                DroppedOutgoing = droppedOutgoing,
+                Incoming = incoming,
+                Outgoing = outgoing
+            };
+        }
+
+        return compacted;
     }
 
-    private static bool IsJournalWriterUninitialized(Exception exception) =>
-        exception.GetBaseException().Message.Contains("state journal stream writer is not initialized", StringComparison.OrdinalIgnoreCase);
+    private static int FirstRemovable(IReadOnlyList<Synapse> timeline, string? requiredSynapseId)
+    {
+        for (var i = 0; i < timeline.Count; i++)
+            if (!string.Equals(timeline[i].SynapseId, requiredSynapseId, StringComparison.Ordinal))
+                return i;
+        return -1;
+    }
 
-    private static IReadOnlyList<Synapse> SnapshotTimeline(IEnumerable<Synapse> journal)
-        => journal.ToArray();
+    private static Synapse[] RemoveAt(Synapse[] timeline, int index) =>
+        [.. timeline.Take(index), .. timeline.Skip(index + 1)];
+
+    private async Task UpdateTimelineAsync(
+        Func<NeuronTimelineState, NeuronTimelineState> transition,
+        CancellationToken cancellationToken)
+    {
+        _timeline = await TimelineState.UpdateAsync(
+            _timeline.Revision,
+            current =>
+            {
+                var next = transition(current);
+                return (next, next);
+            },
+            cancellationToken);
+    }
+
+    private void ValidateTimeline(NeuronTimelineState state)
+    {
+        if (state.Revision < 0 || state.DroppedIncoming < 0 || state.DroppedOutgoing < 0 ||
+            state.Incoming is null || state.Outgoing is null ||
+            state.Incoming.Length > _lifecycle.MaximumRetainedSynapsesPerDirection ||
+            state.Outgoing.Length > _lifecycle.MaximumRetainedSynapsesPerDirection ||
+            state.Incoming.Any(static synapse => synapse is null) ||
+            state.Outgoing.Any(static synapse => synapse is null) ||
+            protector.MeasurePlaintextBytes(state) > _lifecycle.MaximumTimelinePlaintextBytes)
+            throw new InvalidOperationException("Neuron timeline state is invalid.");
+    }
+
+    private static void ValidateLifecycleOptions(NeuronLifecycleOptions options)
+    {
+        if (options.MaximumRetainedSynapsesPerDirection < 1 ||
+            options.MaximumTimelinePlaintextBytes is < 1024 or > EncryptedRuntimeStateProtector.MaximumProtectedPlaintextBytes)
+            throw new InvalidOperationException("Neuron timeline retention options are invalid.");
+    }
+
+    private static IReadOnlyList<Synapse> SnapshotTimeline(IEnumerable<Synapse> timeline)
+        => timeline.ToArray();
 
     public static class NeuronInstrumentation
     {

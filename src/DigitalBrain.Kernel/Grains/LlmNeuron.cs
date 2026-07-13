@@ -3,7 +3,11 @@ using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.llm.v1")]
-public class LlmNeuron(ILogger<LlmNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ILlmNeuron
+public class LlmNeuron(
+    ILogger<LlmNeuron> logger,
+    [Orleans.Runtime.PersistentState("timeline", "Default")]
+    Orleans.Runtime.IPersistentState<Runtime.EncryptedRuntimeStateEnvelope> persistentState,
+    EncryptedRuntimeStateProtector protector) : Neuron(logger, persistentState, protector), ILlmNeuron
 {
     public async Task HandleAsync(LlmPrompt prompt, CancellationToken cancellationToken = default)
     {

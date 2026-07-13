@@ -97,7 +97,7 @@ public static class UiSurfaceSamples
         UiSurfaceKinds.Timeline,
         WithCommon(
             surfaceId: "surface.timeline",
-            emitter: "digitalbrain.journal",
+            emitter: "digitalbrain.runtime",
             title: "Timeline",
             layout: UiSurfaceLayouts.Drawer,
             props: new Dictionary<string, object?>
@@ -319,7 +319,7 @@ public static class UiSurfaceLiveData
             UiSurfaceKinds.Timeline,
             WithCommon(
                 surfaceId: "surface.timeline.live",
-                emitter: "digitalbrain.journal",
+                emitter: "digitalbrain.runtime",
                 title: "Timeline",
                 layout: UiSurfaceLayouts.Drawer,
                 priority: 2,

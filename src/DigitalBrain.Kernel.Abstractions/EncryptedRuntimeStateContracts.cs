@@ -21,7 +21,7 @@ public static class RuntimeStateSchemas
     public const int ConversationArchive = 1;
     public const int SurfaceFeed = 1;
     public const int Session = 1;
-    public const int SynapseJournal = 1;
+    public const int SynapseTimeline = 1;
     public const int InoEffectPlan = 1;
 }
 
@@ -31,7 +31,7 @@ public static class RuntimeStateKinds
     public const string ConversationArchive = "conversation-archive";
     public const string SurfaceFeed = "surface-feed";
     public const string Session = "session";
-    public const string SynapseJournal = "synapse-journal";
+    public const string SynapseTimeline = "synapse-timeline";
     public const string InoEffectPlan = "ino-effect-plan";
 }
 
@@ -74,8 +74,8 @@ public static class RuntimeStateKeys
     public static string Session(string opaqueSessionId) =>
         Hash(RuntimeStateKinds.Session, opaqueSessionId);
 
-    public static string SynapseJournal(string journalNamespace) =>
-        Hash(RuntimeStateKinds.SynapseJournal, journalNamespace);
+    public static string SynapseTimeline(string neuronId) =>
+        Hash(RuntimeStateKinds.SynapseTimeline, neuronId);
 
     public static bool IsScopeHash(string? value) =>
         value is { Length: 64 } && value.All(static character =>

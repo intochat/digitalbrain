@@ -7,7 +7,7 @@ namespace DigitalBrain.Tests.Kernel;
 // AzureClientHealthCheckRegistrationTests.cs's approach: replicate Program.cs's conditional-wiring logic
 // against a bare IHostApplicationBuilder rather than booting a real silo, since useManagedIdentity is a local
 // variable inside Program.cs's top-level statements (not a testable static method) and the actual Orleans
-// clustering/grain-storage/journal calls it gates require either Azurite (connection-string branch, already
+// clustering and grain-storage calls it gates require either Azurite (connection-string branch, already
 // covered by every other test that boots the fast path) or a real Azure Entra token exchange (managed-identity
 // branch, impossible to exercise without live infra - see Task 18's live-verification step, deferred).
 public class ManagedIdentityStorageSelectionTests

@@ -84,7 +84,6 @@ public static class DigitalBrainBuilderExtensions
         var conversationStateBlobs = storage.AddBlobs("conversationstate");
         var surfaceFeedStateBlobs = storage.AddBlobs("surfacefeedstate");
         var sessionStateBlobs = storage.AddBlobs("sessionstate");
-        var journalBlobs = storage.AddBlobs("journal");
 
         var orleans = builder.AddOrleans("kernel")
             .WithClustering(clusteringTable)
@@ -175,14 +174,13 @@ public static class DigitalBrainBuilderExtensions
             ConversationStateBlobs = conversationStateBlobs,
             SurfaceFeedStateBlobs = surfaceFeedStateBlobs,
             SessionStateBlobs = sessionStateBlobs,
-            JournalBlobs = journalBlobs,
             ClusteringTable = clusteringTable
         };
     }
 
     /// <summary>
     /// Wires a kernel project with the core kernel features out of the box:
-    /// dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
+    /// dynamic UI surfaces, clustering, LLM, and replica count for HA.
     /// </summary>
     public static IResourceBuilder<ProjectResource> ConfigureServer(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
@@ -193,7 +191,6 @@ public static class DigitalBrainBuilderExtensions
             .WithReference(ctx.ConversationStateBlobs)
             .WithReference(ctx.SurfaceFeedStateBlobs)
             .WithReference(ctx.SessionStateBlobs)
-            .WithReference(ctx.JournalBlobs)
             .WithReference(ctx.Llm)
             .WithEndpoint(name: "grpc", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
             .WithEndpoint(
@@ -213,7 +210,6 @@ public static class DigitalBrainBuilderExtensions
         kernel.WaitFor(ctx.ConversationStateBlobs);
         kernel.WaitFor(ctx.SurfaceFeedStateBlobs);
         kernel.WaitFor(ctx.SessionStateBlobs);
-        kernel.WaitFor(ctx.JournalBlobs);
 
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 

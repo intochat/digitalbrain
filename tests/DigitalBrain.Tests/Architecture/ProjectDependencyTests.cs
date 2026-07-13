@@ -58,7 +58,9 @@ public sealed class ProjectDependencyTests
         var hostingSource = string.Join(
             Environment.NewLine,
             GetTrackedPaths(repositoryRoot, "src/DigitalBrain.Kernel/Hosting/*.cs")
-                .Select(path => File.ReadAllText(Path.Combine(repositoryRoot, path))));
+                .Select(path => Path.Combine(repositoryRoot, path))
+                .Where(File.Exists)
+                .Select(File.ReadAllText));
 
         Assert.DoesNotContain("AddCors(", hostingSource, StringComparison.Ordinal);
     }

@@ -5,8 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Tests.Kernel;
 
-#pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Tests.Kernel.Ping")]
 public record Ping(string Note) : Synapse(nameof(Ping), DateTimeOffset.UtcNow, IsBroadcast: true);
@@ -29,7 +27,11 @@ public interface IPingEmitter : INeuron
     Task EmitPingAsync(string note);
 }
 
-public sealed class PingSink(ILogger<PingSink> logger, NeuronJournals journals) : Neuron(logger, journals), IPingSink, IHandle<Ping>
+public sealed class PingSink(
+    ILogger<PingSink> logger,
+    [Orleans.Runtime.PersistentState("timeline", "Default")]
+    Orleans.Runtime.IPersistentState<DigitalBrain.Kernel.Runtime.EncryptedRuntimeStateEnvelope> persistentState,
+    EncryptedRuntimeStateProtector protector) : Neuron(logger, persistentState, protector), IPingSink, IHandle<Ping>
 {
     private int _received;
 
@@ -44,7 +46,11 @@ public sealed class PingSink(ILogger<PingSink> logger, NeuronJournals journals) 
     }
 }
 
-public sealed class PingEmitter(ILogger<PingEmitter> logger, NeuronJournals journals) : Neuron(logger, journals), IPingEmitter
+public sealed class PingEmitter(
+    ILogger<PingEmitter> logger,
+    [Orleans.Runtime.PersistentState("timeline", "Default")]
+    Orleans.Runtime.IPersistentState<DigitalBrain.Kernel.Runtime.EncryptedRuntimeStateEnvelope> persistentState,
+    EncryptedRuntimeStateProtector protector) : Neuron(logger, persistentState, protector), IPingEmitter
 {
     public Task EnsureActiveAsync() => Task.CompletedTask;
 

@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>DigitalBrain.Kernel</RootNamespace>
     <AssemblyName>DigitalBrain.Kernel</AssemblyName>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;MEAI001</NoWarn>
+    <NoWarn>$(NoWarn);MEAI001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,8 +24,6 @@
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Core" />
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
-    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Persistence.Memory" />
     <PackageReference Include="Microsoft.Orleans.Server" />

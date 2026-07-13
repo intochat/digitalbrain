@@ -32,7 +32,6 @@ public sealed class DigitalBrainContext
     public required IResourceBuilder<AzureBlobStorageResource> ConversationStateBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> SurfaceFeedStateBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> SessionStateBlobs { get; init; }
-    public required IResourceBuilder<AzureBlobStorageResource> JournalBlobs { get; init; }
     public required IResourceBuilder<AzureTableStorageResource> ClusteringTable { get; init; }
 
     public bool EnableMcp { get; init; }

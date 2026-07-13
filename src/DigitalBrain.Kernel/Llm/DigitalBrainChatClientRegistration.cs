@@ -73,7 +73,7 @@ public static class DigitalBrainChatClientRegistration
     }
 
     // Official anthropics/anthropic-sdk-csharp AsIChatClient() is [Experimental("MEAI001")] — suppressed
-    // repo-wide in DigitalBrain.Kernel.csproj's <NoWarn>, matching the existing ORLEANSEXP005 pattern.
+    // repo-wide in DigitalBrain.Kernel.csproj's <NoWarn>.
     private static IChatClient BuildAnthropic(DigitalBrainLlmRuntimeOptions options, string modelId)
     {
         if (string.IsNullOrWhiteSpace(options.AnthropicApiKey))

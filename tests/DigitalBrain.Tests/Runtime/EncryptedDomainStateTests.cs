@@ -4,6 +4,7 @@ using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Runtime;
 using Orleans.Runtime;
 
@@ -602,7 +603,7 @@ public sealed class EncryptedDomainStateTests
     }
 
     [Fact]
-    public void Mutation_approval_request_is_journaled_with_a_distinct_phase_outbox()
+    public void Mutation_approval_request_is_persisted_with_a_distinct_phase_outbox()
     {
         var now = Utc(0);
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
@@ -1142,29 +1143,40 @@ public sealed class EncryptedDomainStateTests
     }
 
     [Fact]
-    public void Synapse_converter_hides_type_and_content_and_rejects_authenticated_envelope_tamper()
+    public void Synapse_timeline_encryption_hides_content_round_trips_polymorphism_and_rejects_tamper()
     {
-        var protector = Protector();
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-        options.Converters.Add(new EncryptedSynapseJsonConverter(
-            protector,
-            Hash("journal-scope"),
-            [typeof(LlmResponse)]));
-        Synapse value = new LlmResponse("private prompt", "private response", "private model");
+        var protector = new EncryptedRuntimeStateProtector(
+            new RuntimeStateKeyRing(1, new Dictionary<int, byte[]> { [1] = Key(11) }, Key(90)),
+            SynapseJson.CreateOptions());
+        var scope = RuntimeStateKeys.SynapseTimeline("neuron-1");
+        var value = new SynapseTimelineTestState(
+            1,
+            [new LlmResponse("private prompt", "private response", "private model")]);
 
-        var json = JsonSerializer.Serialize(value, options);
+        var envelope = protector.Protect(
+            scope,
+            RuntimeStateKinds.SynapseTimeline,
+            RuntimeStateSchemas.SynapseTimeline,
+            value.Revision,
+            value);
+        var json = JsonSerializer.Serialize(envelope);
 
         Assert.DoesNotContain("private prompt", json);
         Assert.DoesNotContain("private response", json);
         Assert.DoesNotContain(typeof(LlmResponse).FullName!, json);
-        var roundTrip = Assert.IsType<LlmResponse>(JsonSerializer.Deserialize<Synapse>(json, options));
-        Assert.Equal("private response", roundTrip.Response);
+        var roundTrip = protector.Unprotect<SynapseTimelineTestState>(
+            scope,
+            RuntimeStateKinds.SynapseTimeline,
+            RuntimeStateSchemas.SynapseTimeline,
+            envelope);
+        Assert.Equal("private response", Assert.IsType<LlmResponse>(Assert.Single(roundTrip.Items)).Response);
 
-        var envelopeOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-        var envelope = JsonSerializer.Deserialize<EncryptedRuntimeStateEnvelope>(json, envelopeOptions)!;
         envelope.Signature[0] ^= 0x01;
-        var tampered = JsonSerializer.Serialize(envelope, envelopeOptions);
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<Synapse>(tampered, options));
+        Assert.Throws<RuntimeStateIntegrityException>(() => protector.Unprotect<SynapseTimelineTestState>(
+            scope,
+            RuntimeStateKinds.SynapseTimeline,
+            RuntimeStateSchemas.SynapseTimeline,
+            envelope));
     }
 
     private static SessionState InitializeSession(SessionState state) => SessionTransitions.Initialize(
@@ -1222,6 +1234,8 @@ public sealed class EncryptedDomainStateTests
 
     private static DateTimeOffset Utc(int minutes) =>
         DateTimeOffset.Parse("2026-01-01T00:00:00Z").AddMinutes(minutes);
+
+    private sealed record SynapseTimelineTestState(long Revision, Synapse[] Items);
 
     private static ConversationOutboxEntry AcceptedOutbox(string operationId, DateTimeOffset createdAt) => new(
         "accepted-" + operationId,

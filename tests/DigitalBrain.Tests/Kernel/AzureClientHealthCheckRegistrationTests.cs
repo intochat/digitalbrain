@@ -8,7 +8,7 @@ namespace DigitalBrain.Tests.Kernel;
 
 // Regression coverage for the task-23 "/health returns 500 under aspire run" bug. HealthEndpointTests.cs
 // exercises Program.cs via WebApplicationFactory<Program>, which never sets ConnectionStrings__clustering/
-// grainstate/journal, so it takes the isAspireHosted=false branch and never calls
+// grainstate, so it takes the isAspireHosted=false branch and never calls
 // AddKeyedAzureTableServiceClient / AddKeyedAzureBlobServiceClient / AddAzureBlobServiceClient at all --
 // the exact registrations that were at fault. This test instead replicates Program.cs's isAspireHosted=true
 // Azure client wiring directly against a bare IHostApplicationBuilder.

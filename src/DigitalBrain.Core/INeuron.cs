@@ -10,7 +10,7 @@ public interface INeuron : IGrainWithStringKey
     [Alias("DeliverAsync")]
     Task DeliverAsync(Synapse synapse, CancellationToken cancellationToken = default);
 
-    // Dual journal accessors (outgoing is primary causal log of actions taken by this neuron).
+    // Dual timeline accessors (outgoing is the primary causal record of actions taken by this neuron).
     [Alias("GetIncomingTimelineAsync")]
     Task<IReadOnlyList<Synapse>> GetIncomingTimelineAsync(CancellationToken cancellationToken = default);
     [Alias("GetOutgoingTimelineAsync")]

@@ -3,12 +3,14 @@ using DigitalBrain.Core.Config;
 using DigitalBrain.Kernel.Llm;
 using Microsoft.Extensions.AI;
 
-#pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
-
 namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.llm-responder")]
-public class LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), ILlmResponderNeuron
+public class LlmResponderNeuron(
+    ILogger<LlmResponderNeuron> logger,
+    [Orleans.Runtime.PersistentState("timeline", "Default")]
+    Orleans.Runtime.IPersistentState<Runtime.EncryptedRuntimeStateEnvelope> persistentState,
+    EncryptedRuntimeStateProtector protector) : Neuron(logger, persistentState, protector), ILlmResponderNeuron
 {
     // Cache scoped clients per (provider, key) so a chatty pack does not rebuild a client per message.
     private readonly Dictionary<(string Provider, string? Key), IChatClient> _scopedClients = [];

@@ -4,7 +4,7 @@
     <!-- 
       Pinned versions captured 2026-06-21 after applying Elon's 5-step algorithm.
       - Deleted blanket "always latest" and Version="*".
-      - Pins chosen from actual resolved versions in current working restore (Aspire 13.4.6 daily channel, Orleans preview for journaling features).
+      - Pins chosen from actual resolved versions in current working restore (Aspire 13.4.6 and stable Orleans 10.2.1).
       - Update intentionally via Dependabot/renovate or manual PR after validation, not on every restore.
     -->
   </PropertyGroup>
@@ -20,22 +20,20 @@
     <!-- Community Toolkit (Ollama) -->
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.4.0" />
-    <!-- Orleans (note: journaling features use specific preview) -->
-    <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.0" />
-    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.0" />
-    <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.0" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.0" />
-    <PackageVersion Include="Microsoft.Orleans.Core" Version="10.2.1-preview.1" />
-    <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.1-preview.1" />
-    <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.1-preview.1.alpha.1" />
-    <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.1-preview.1.alpha.1" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="10.2.1-preview.1" />
-    <PackageVersion Include="Microsoft.Orleans.Serialization" Version="10.2.1-preview.1" />
-    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.1-preview.1" />
-    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.1-preview.1" />
-    <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.0" />
-    <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.1-preview.1" />
-    <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.0" />
+    <!-- Orleans -->
+    <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Core" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Serialization" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.1" />
     <!-- Extensions / hosting -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />

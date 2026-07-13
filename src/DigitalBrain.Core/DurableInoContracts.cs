@@ -310,7 +310,7 @@ public sealed record InoToolRequest(
 
 /// <summary>
 /// The only execution boundary for a mutation. The gateway turns an agent-requested descriptor into a
-/// registered, least-privileged tool identity before it may be journaled or run. It never receives raw model
+/// registered, least-privileged tool identity before it may be persisted or run. It never receives raw model
 /// or provider payloads.
 /// </summary>
 public sealed record InoApprovedTool(string ToolId, string Scope, string SafeSummary);

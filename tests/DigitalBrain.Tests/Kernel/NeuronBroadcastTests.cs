@@ -6,7 +6,7 @@ namespace DigitalBrain.Tests.Kernel;
 
 // Guards the observable broadcast contract across the transport swap (hand-rolled memory-stream subscription
 // -> Orleans AddBroadcastChannel / [ImplicitChannelSubscription]): a broadcast fired by one grain must reach a
-// different, already-activated grain that declares a matching IHandle<T>, and be recorded in its incoming journal.
+// different, already-activated grain that declares a matching IHandle<T>, and be recorded in its incoming timeline.
 public class NeuronBroadcastTests : NeuronTestBase
 {
     [Fact]

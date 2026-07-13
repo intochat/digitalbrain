@@ -8,7 +8,7 @@ namespace DigitalBrain.Tests;
 public class NeuronTests : NeuronTestBase
 {
     [Fact]
-    public async Task Neuron_Activates_And_Journals_NeuronActivated()
+    public async Task Neuron_activates_and_persists_the_activation_marker()
     {
         var grain = Grain<IProbeNeuron>("demo1");
         var timeline = await grain.GetTimelineAsync();
