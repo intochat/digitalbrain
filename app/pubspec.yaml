@@ -62,8 +62,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/rfw/
     - assets/ino-catalog.json
-    - assets/lottie/
   shaders:
     - assets/shaders/glass_refract.frag
