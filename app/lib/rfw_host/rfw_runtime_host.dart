@@ -73,7 +73,6 @@ class UiSurfaceTreeRenderer {
   /// Renders a node from a neuron-provided tree (from UiSurface props['tree'] or the surface itself).
   /// onNavSelected receives the target kind when a nav item or link is activated.
   /// onEvent receives ('press'|'select'|'action', args) for buttons, list items, and declared actions so
-  /// callers can dispatch real synapses (see DigitalBrainClientScope + UiGateway).
   Widget build(
     Map<String, Object?> node,
     RemoteEventHandler onEvent, {

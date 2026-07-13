@@ -9,7 +9,6 @@ using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
-using DigitalBrain.Kernel.Ui;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -200,8 +199,6 @@ public static class DigitalBrainOrleansExtensions
     {
         builder.Services.AddSingleton<SqliteSchemaInspector>();
 
-        builder.Services.AddGrpc();
-
         var corsOrigins = builder.Configuration
             .GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
             ?? new[] { "https://digitalbrain.tech", "https://www.digitalbrain.tech" };
@@ -209,8 +206,7 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy
             .WithOrigins(corsOrigins)
             .AllowAnyMethod()
-            .AllowAnyHeader()
-            .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding")));
+            .AllowAnyHeader()));
 
         builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
         builder.Services.AddSingleton(new SchemaRegistry([
@@ -299,7 +295,6 @@ public static class DigitalBrainOrleansExtensions
         app.UseRouting();
         app.MapDefaultEndpoints();
         app.UseCors("browser");
-        app.UseGrpcWeb(new GrpcWebOptions { DefaultEnabled = true });
 
         var webRoot = app.Configuration["DIGITALBRAIN_WEBROOT"];
         var serveWebBundle = !string.IsNullOrWhiteSpace(webRoot) && Directory.Exists(webRoot);

@@ -1,4 +1,5 @@
 using Grpc.Core;
+using Microsoft.AspNetCore.Http;
 
 namespace DigitalBrain.Tests.TestSupport;
 
@@ -7,6 +8,10 @@ public sealed class TestServerCallContext : ServerCallContext
 {
     private readonly CancellationToken _cancellationToken;
     private readonly Metadata _requestHeaders;
+    private readonly IDictionary<object, object> _userState = new Dictionary<object, object>
+    {
+        ["__HttpContext"] = new DefaultHttpContext()
+    };
 
     private TestServerCallContext(CancellationToken cancellationToken = default, Metadata? requestHeaders = null)
     {
@@ -40,6 +45,7 @@ public sealed class TestServerCallContext : ServerCallContext
     protected override Status StatusCore { get; set; }
     protected override WriteOptions? WriteOptionsCore { get; set; }
     protected override AuthContext AuthContextCore => new(string.Empty, []);
+    protected override IDictionary<object, object> UserStateCore => _userState;
     protected override ContextPropagationToken CreatePropagationTokenCore(ContextPropagationOptions? options) => null!;
     protected override Task WriteResponseHeadersAsyncCore(Metadata responseHeaders) => Task.CompletedTask;
 }

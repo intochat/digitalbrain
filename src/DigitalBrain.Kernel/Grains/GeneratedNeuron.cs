@@ -2,7 +2,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
 using DigitalBrain.Kernel.Foundry;
-using DigitalBrain.Kernel.Ui;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel;

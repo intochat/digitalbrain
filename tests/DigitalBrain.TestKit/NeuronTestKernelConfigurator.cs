@@ -4,7 +4,6 @@ using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
-using DigitalBrain.Kernel.Ui;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,8 +45,6 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
                 services.AddSingleton<SqliteSchemaInspector>();
-                services.AddSingleton<SignalEgressBus>();
-                services.AddSignalEgressStreamSubscriber();
                 services.AddSingleton<IConfiguration>(
                     new ConfigurationBuilder()
                         .AddInMemoryCollection(new Dictionary<string, string?>

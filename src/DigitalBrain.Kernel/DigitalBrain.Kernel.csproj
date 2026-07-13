@@ -64,14 +64,6 @@
     <ProjectReference Include="..\..\hosts\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Grpc.AspNetCore" />
-    <PackageReference Include="Grpc.AspNetCore.Web" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Protobuf Include="Protos\digitalbrain.proto" GrpcServices="Both" />
-  </ItemGroup>
 </Project>
 
 

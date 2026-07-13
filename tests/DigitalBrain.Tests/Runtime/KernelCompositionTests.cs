@@ -71,9 +71,6 @@ public sealed class KernelCompositionTests
         builder.AddDigitalBrainClients();
 
         var descriptors = builder.Services.ToArray();
-        Assert.DoesNotContain(descriptors, descriptor =>
-            string.Equals(descriptor.ServiceType.FullName, "DigitalBrain.Kernel.Ui.SignalEgressStreamSubscriber", StringComparison.Ordinal) ||
-            string.Equals(descriptor.ImplementationType?.FullName, "DigitalBrain.Kernel.Ui.SignalEgressStreamSubscriber", StringComparison.Ordinal));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IPackConfigStore));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IGmailApiClientFactory));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(ISalesforceApiClientFactory));
@@ -103,7 +100,6 @@ public sealed class KernelCompositionTests
         var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(static source => source.Endpoints).ToArray();
         var endpointGraph = string.Join('\n', endpoints.Select(static endpoint =>
             endpoint is RouteEndpoint route ? $"{endpoint.DisplayName}|{route.RoutePattern.RawText}" : endpoint.DisplayName));
-        Assert.DoesNotContain("digitalbrain.DigitalBrainGateway", endpointGraph, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("digitalbrain.ui.UiGateway", endpointGraph, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("WatchHomeFeed", endpointGraph, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("WatchSynapses", endpointGraph, StringComparison.OrdinalIgnoreCase);
