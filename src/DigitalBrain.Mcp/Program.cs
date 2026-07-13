@@ -35,8 +35,7 @@ builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
 builder.Services.AddSingleton(TimeProvider.System);
 var mcpAudience = SessionAudiences.RequireFixedMcp(builder.Configuration["DigitalBrain:Runtime:Mcp:Audience"]);
 builder.Services.AddSingleton(new SchemaRegistry([
-    new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
-    new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true)]));
+    new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true)]));
 builder.Services.AddSingleton<ConversationStateClient>();
 builder.Services.AddSingleton<McpInoCommandHandler>();
 builder.Services.AddSingleton(AuthorizationFlowProxyOptions.FromConfiguration(builder.Configuration, profile));

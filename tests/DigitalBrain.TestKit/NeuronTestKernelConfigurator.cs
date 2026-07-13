@@ -1,6 +1,5 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
-using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
@@ -44,7 +43,6 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
-                services.AddSingleton<SqliteSchemaInspector>();
                 services.AddSingleton<IConfiguration>(
                     new ConfigurationBuilder()
                         .AddInMemoryCollection(new Dictionary<string, string?>

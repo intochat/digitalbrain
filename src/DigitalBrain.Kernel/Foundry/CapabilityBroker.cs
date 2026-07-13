@@ -42,7 +42,6 @@ public class CapabilityBroker : ICapabilityBroker
 
     public Task<string> WriteWorkbookAsync(string specJson)
     {
-        // caps.Market: narrow workbook (artifact ref; host would use ClosedXML or equiv).
         return Task.FromResult("artifact:workbook.xlsx:spec=" + (specJson.Length > 20 ? specJson.Substring(0, 20) : specJson));
     }
 }

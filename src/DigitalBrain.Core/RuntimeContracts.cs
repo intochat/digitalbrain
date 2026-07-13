@@ -68,14 +68,6 @@ public static class RequestScope
     }
 }
 
-[GenerateSerializer, Alias("digitalbrain.v2.persisted-actor-snapshot")]
-public sealed record PersistedActorSnapshot(
-    [property: Id(0)] TenantId TenantId,
-    [property: Id(1)] WorkspaceId WorkspaceId,
-    [property: Id(2)] PrincipalRef Principal,
-    [property: Id(3)] AuthAssurance Assurance,
-    [property: Id(4)] DateTimeOffset CapturedAt);
-
 public static class GrainIds
 {
     public static string Aggregate(TenantId tenant, WorkspaceId workspace, string aggregate) =>
@@ -394,7 +386,6 @@ public sealed record SessionPair(
     string Audience = SessionAudiences.Mcp);
 
 public enum Sensitivity { Public, Internal, Confidential, Secret }
-public sealed record SensitiveValue(string Value, Sensitivity Classification);
 public static class Redaction
 {
     public static string SafeSummary(string? value, Sensitivity classification = Sensitivity.Internal) =>
@@ -405,22 +396,3 @@ public static class Redaction
 
 [GenerateSerializer, Alias("digitalbrain.v2.command-envelope")]
 public sealed record CommandEnvelope([property: Id(0)] string Type, [property: Id(1)] int Version, [property: Id(2)] string CommandId, [property: Id(3)] RequestContext Context, [property: Id(4)] JsonElement Payload);
-[GenerateSerializer, Alias("digitalbrain.v2.event-envelope")]
-public sealed record EventEnvelope([property: Id(0)] string Type, [property: Id(1)] int Version, [property: Id(2)] string EventId, [property: Id(3)] string CorrelationId, [property: Id(4)] string? CausationId, [property: Id(5)] JsonElement Payload);
-
-public enum WorkflowState { Proposed, AwaitingApproval, Approved, Rejected, Expired, Cancelled, ApplyQueued, Applying, RetryScheduled, Succeeded, Failed, OutcomeUnknown, CompensationQueued, Compensated, ManualIntervention, AwaitingExternalAuthorization }
-
-public static class CommitSeal
-{
-    public static string Compute(IEnumerable<EventEnvelope> events) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(events))));
-}
-
-public sealed class CapabilityIsolationGate
-{
-    public bool IsAllowed(RequestContext context, TenantId tenant, WorkspaceId workspace, string capability) =>
-        context.TenantId == tenant && context.WorkspaceId == workspace && context.Grants.Contains(capability);
-    public void Demand(RequestContext context, TenantId tenant, WorkspaceId workspace, string capability)
-    {
-        if (!IsAllowed(context, tenant, workspace, capability)) throw new UnauthorizedAccessException("Capability denied.");
-    }
-}

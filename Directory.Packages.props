@@ -115,10 +115,5 @@
     <!-- Salesforce CRM ino — Force.com Toolkit REST client; version verified via nuget.org 2026-07-03 -->
     <PackageVersion Include="DeveloperForce.Force" Version="2.1.0" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-    <!-- Excel ingestion for chat attachments — version verified via nuget.org 2026-07-03 -->
-    <PackageVersion Include="ClosedXML" Version="0.105.0" />
-    <!-- SQLite schema inspection for dropped/local database files. -->
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
-    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
   </ItemGroup>
 </Project>

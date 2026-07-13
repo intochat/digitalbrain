@@ -4,7 +4,6 @@ using Azure.Storage.Blobs;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
-using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
@@ -197,8 +196,6 @@ public static class DigitalBrainOrleansExtensions
 
     public static IHostApplicationBuilder AddDigitalBrainClients(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddSingleton<SqliteSchemaInspector>();
-
         var corsOrigins = builder.Configuration
             .GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
             ?? new[] { "https://digitalbrain.tech", "https://www.digitalbrain.tech" };
@@ -210,8 +207,7 @@ public static class DigitalBrainOrleansExtensions
 
         builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
         builder.Services.AddSingleton(new SchemaRegistry([
-            new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true),
-            new SchemaDescriptor("digitalbrain.v2.event-envelope", 2, "Operational", true)]));
+            new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true)]));
         var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted(builder.Configuration);
 
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
