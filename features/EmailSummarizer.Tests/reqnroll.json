@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schemas.reqnroll.net/reqnroll-config-latest.json",
+  "bindingAssemblies": [
+    {
+      "assembly": "DigitalBrain.Features.Testing"
+    }
+  ],
+  "runtime": {
+    "missingOrPendingStepsOutcome": "Error",
+    "stopAtFirstError": false
+  }
+}

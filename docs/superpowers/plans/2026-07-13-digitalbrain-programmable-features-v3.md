@@ -85,11 +85,13 @@ Task 1 evidence: the missing namespaces/types produced the expected compile-time
 - `IFeatureContext` exposes only constructor-injected Integration Contracts, Memory read/write, bounded model workflow, state, surfaces, events, and external-effect proposal buffering.
 - Email Summarizer consumes `IGmailMessageReader`, emits one surface intent, and contains no runtime-host or provider-SDK dependency.
 
-- [ ] Write the Gherkin happy path, duplicate-input scenario, missing-grant scenario, and model-miss scenario first; configure missing/pending steps as errors.
-- [ ] Run the Email Summarizer BDD project and observe undefined bindings/types.
-- [ ] Implement the minimum SDK/testing APIs and Email Summarizer handler required by the scenarios.
-- [ ] Run Feature and Integration Contract suites; assert the SDK public dependency allowlist and no static mutable state.
-- [ ] Add four projects to the solution and commit `feat: add source-first email summarizer`.
+- [x] Write the Gherkin happy path, duplicate-input scenario, missing-grant scenario, and model-miss scenario first; configure missing/pending steps as errors.
+- [x] Run the Email Summarizer BDD project and observe undefined bindings/types.
+- [x] Implement the minimum SDK/testing APIs and Email Summarizer handler required by the scenarios.
+- [x] Run Feature and Integration Contract suites; assert the SDK public dependency allowlist and no static mutable state.
+- [x] Add four projects to the solution and commit `feat: add source-first email summarizer`.
+
+Task 2 evidence: strict Reqnroll first failed all four initial scenarios with missing-step errors, and the empty SDK seam produced the expected compile-time contract failures. The final SDK exposes bounded clock, identifier, state, Memory, model, surface, event, and external-effect ports; UTF-8/JSON value bounds are enforced before execution. The testing package provides exact-request recording fakes, deterministic time/IDs, transactional intent staging, explicit FIFO execution, atomic per-run budgets, cancellation takeover, shared bindings, and a build-transitive generated duplicate scenario. Focused verification passed 36 Integration Contract tests and four Email BDD scenarios, a clean rebuild produced zero warnings, both packages packed, and the exact root suite passed 448 tests with no failures or skips. The additive checkpoint has 24 C# projects and 25 solution entries including Flutter; later deletion tasks remain responsible for the approved final size/API gates.
 
 ### Task 3: Owner identity and generic platform contracts
 

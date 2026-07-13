@@ -5,6 +5,8 @@
   <Folder Name="/src/">
     <Project Path="src/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <Project Path="src/DigitalBrain.Features.Sdk/DigitalBrain.Features.Sdk.csproj" />
+    <Project Path="src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj" />
     <Project Path="src/DigitalBrain.Kernel.Abstractions/DigitalBrain.Kernel.Abstractions.csproj" />
     <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
@@ -31,5 +33,9 @@
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
+  </Folder>
+  <Folder Name="/features/">
+    <Project Path="features/EmailSummarizer/DigitalBrain.Features.EmailSummarizer.csproj" />
+    <Project Path="features/EmailSummarizer.Tests/DigitalBrain.Features.EmailSummarizer.Tests.csproj" />
   </Folder>
 </Solution>
