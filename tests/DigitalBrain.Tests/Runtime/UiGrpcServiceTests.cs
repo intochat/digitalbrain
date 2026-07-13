@@ -120,6 +120,30 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task V2_refresh_replay_is_rejected_and_revokes_the_rotated_session()
+    {
+        var (service, sessions) = CreateService();
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Secret = BootstrapSecret },
+            TestServerCallContext.WithHeaders(audience));
+        var refreshed = await service.RefreshSession(
+            new RefreshSessionRequest { RefreshToken = bootstrap.RefreshToken },
+            TestServerCallContext.WithHeaders(audience));
+
+        var replay = await Assert.ThrowsAsync<RpcException>(() => service.RefreshSession(
+            new RefreshSessionRequest { RefreshToken = bootstrap.RefreshToken },
+            TestServerCallContext.WithHeaders(audience)));
+
+        Assert.Equal(StatusCode.Unauthenticated, replay.StatusCode);
+        Assert.Null(await sessions.ValidateAccessAsync(refreshed.AccessToken, SessionAudiences.Ui));
+        var rotatedRefresh = await Assert.ThrowsAsync<RpcException>(() => service.RefreshSession(
+            new RefreshSessionRequest { RefreshToken = refreshed.RefreshToken },
+            TestServerCallContext.WithHeaders(audience)));
+        Assert.Equal(StatusCode.Unauthenticated, rotatedRefresh.StatusCode);
+    }
+
+    [Fact]
     public void Wrong_revision_is_mapped_to_failed_precondition()
     {
         Assert.Equal(

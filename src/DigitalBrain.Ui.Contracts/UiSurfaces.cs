@@ -151,7 +151,6 @@ public static class NeuronUiKit
     public const string NeuronButton = "neuron:NeuronButton";
     public const string NeuronList = "neuron:NeuronList";
     public const string NeuronListItem = "neuron:NeuronListItem";
-    public const string Form = "neuron:Form";
     public const string Header = "neuron:Header";
     public const string Panel = "neuron:Panel";
     public const string Divider = "neuron:Divider";
@@ -400,7 +399,6 @@ public record GraphicSpec(
 public static class UiSurfaceKinds
 {
     public const string AuthButton = "auth-button";
-    public const string Login = "login";
     public const string List = "list";
     public const string Ide = "ide";
     public const string ActivityGraph = "activity-graph";

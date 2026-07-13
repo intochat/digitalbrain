@@ -69,49 +69,6 @@ public readonly record struct UserId([property: Id(0)] string Value)
 }
 
 [GenerateSerializer]
-[Alias("DigitalBrain.Core.LoginRequest")]
-public record LoginRequest(
-    string Username,
-    string Password,
-    string ClientId = "flutter") : Synapse(nameof(LoginRequest), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.LoginSucceeded")]
-public record LoginSucceeded(
-    UserId UserId,
-    string SessionId,
-    string DisplayName,
-    IReadOnlyList<string> Roles,
-    string ClientId) : Synapse(nameof(LoginSucceeded), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.LoginFailed")]
-public record LoginFailed(
-    string Username,
-    string Reason,
-    string ClientId) : Synapse(nameof(LoginFailed), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.LogoutRequest")]
-public record LogoutRequest(
-    string SessionId,
-    string ClientId = "flutter") : Synapse(nameof(LogoutRequest), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.UserSessionCreated")]
-public record UserSessionCreated(
-    UserId UserId,
-    string SessionId,
-    DateTimeOffset ExpiresAt,
-    string ClientId) : Synapse(nameof(UserSessionCreated), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.UserSessionEnded")]
-public record UserSessionEnded(
-    string SessionId,
-    string ClientId) : Synapse(nameof(UserSessionEnded), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
 [Alias("DigitalBrain.Core.CapabilityRegistered")]
 public record CapabilityRegistered(
     string Id,
@@ -119,26 +76,6 @@ public record CapabilityRegistered(
     IReadOnlyList<string> Examples,
     string Tier,
     string? Origin = null) : Synapse(nameof(CapabilityRegistered), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.LocalUserRegistered")]
-public record LocalUserRegistered(
-    UserId UserId,
-    string Username,
-    string DisplayName,
-    string PasswordHashBase64,
-    string PasswordSaltBase64,
-    IReadOnlyList<string> Roles) : Synapse(nameof(LocalUserRegistered), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.UserSessionState")]
-public record UserSessionState(
-    UserId UserId,
-    string SessionId,
-    string DisplayName,
-    IReadOnlyList<string> Roles,
-    DateTimeOffset ExpiresAt,
-    bool Active);
 
 [Alias("DigitalBrain.Core.IUserGrain")]
 public interface IUserGrain : IGrainWithStringKey
