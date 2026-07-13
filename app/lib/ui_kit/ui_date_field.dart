@@ -40,7 +40,7 @@ class _UiKitDateFieldState extends State<UiKitDateField> {
 
   @override
   Widget build(BuildContext context) => FDateField(
-        control: FDateFieldControl.managed(controller: _ctrl),
-        label: widget.label.isEmpty ? null : Text(widget.label),
-      );
+    control: FDateFieldControl.managed(controller: _ctrl),
+    label: widget.label.isEmpty ? null : Text(widget.label),
+  );
 }

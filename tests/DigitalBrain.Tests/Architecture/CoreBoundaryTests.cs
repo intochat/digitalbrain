@@ -1,7 +1,6 @@
 using System.Reflection;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Distribution;
-using DigitalBrain.Ino;
 using DigitalBrain.Ui.Contracts.Ui;
 
 namespace DigitalBrain.Tests.Architecture;
@@ -111,7 +110,6 @@ public class CoreBoundaryTests
         Assert.Equal("DigitalBrain.Ui.Contracts", typeof(TableSurface).Assembly.GetName().Name);
         Assert.Equal("DigitalBrain.Ui.Contracts", typeof(IdeSurface).Assembly.GetName().Name);
         Assert.Equal("DigitalBrain.Ui.Contracts", typeof(RfwCard).Assembly.GetName().Name);
-        Assert.Equal("DigitalBrain.Ui.Contracts", typeof(IFlutterUiNeuron).Assembly.GetName().Name);
     }
 
     [Fact]
@@ -132,61 +130,6 @@ public class CoreBoundaryTests
         Assert.Equal("DigitalBrain.Ui.Runtime", typeof(UiSurfaceLiveData).Assembly.GetName().Name);
     }
 
-    [Fact]
-    public void Ino_Integration_Owns_Assistant_Reasoning_Not_Kernel_Orleans()
-    {
-        Assert.Equal("DigitalBrain.Ino", typeof(InoIntentClassifier).Assembly.GetName().Name);
-        Assert.Equal("DigitalBrain.Ino", typeof(IInoCapabilityRecall).Assembly.GetName().Name);
-
-        var references = InoReferenceNames();
-        var coreAssemblyName = typeof(Synapse).Assembly.GetName().Name!;
-        var packContractsAssemblyName = typeof(IPackBehavior).Assembly.GetName().Name!;
-        var uiContractsAssemblyName = typeof(UiSurface).Assembly.GetName().Name!;
-        var uiRuntimeAssemblyName = typeof(UiSurfaceLiveData).Assembly.GetName().Name!;
-
-        // Ino is a full peer integration (commit 4ee79a4): it legitimately references Core, its own
-        // Google/Salesforce peers, Kernel.Abstractions (to host itself as a real grain), and the UI
-        // contract/runtime layers it emits surfaces through. Anything DigitalBrain.* outside this allowlist -
-        // e.g. DigitalBrain.Kernel, DigitalBrain.Mcp, DigitalBrain.AppHost - would be a real boundary violation.
-        var allowedDigitalBrainReferences = new[]
-        {
-            coreAssemblyName,
-            "DigitalBrain.Kernel.Abstractions",
-            packContractsAssemblyName,
-            uiContractsAssemblyName,
-            uiRuntimeAssemblyName,
-            "DigitalBrain.Google",
-            "DigitalBrain.Salesforce"
-        };
-
-        var unexpectedDigitalBrainReferences = references
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
-                !allowedDigitalBrainReferences.Contains(name, StringComparer.Ordinal))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(unexpectedDigitalBrainReferences);
-
-        // Ino hosting itself as a grain legitimately needs the grain-abstraction packages (Orleans.Core.Abstractions,
-        // Orleans.Journaling, Orleans.Serialization*). Only the hosting/server packages - which would mean Ino
-        // pulled in a full silo host instead of just grain abstractions - are a real violation.
-        var forbiddenOrleansHostingAssemblyNames = new[]
-        {
-            "Orleans.Server",
-            "Microsoft.Orleans.Server",
-            "Orleans.Runtime"
-        };
-
-        var offenders = references
-            .Where(name =>
-                forbiddenOrleansHostingAssemblyNames.Contains(name, StringComparer.Ordinal) ||
-                name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) ||
-                name.StartsWith("Microsoft.Extensions.Hosting", StringComparison.Ordinal))
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(offenders);
-    }
     [Fact]
     public void Ui_Runtime_Depends_On_Core_And_Ui_Contracts_Not_Runtime_Host_Or_Integrations()
     {
@@ -234,8 +177,6 @@ public class CoreBoundaryTests
     private static string[] UiContractsReferenceNames() => ReferenceNames(typeof(UiSurface).Assembly);
 
     private static string[] UiRuntimeReferenceNames() => ReferenceNames(typeof(UiSurfaceLiveData).Assembly);
-
-    private static string[] InoReferenceNames() => ReferenceNames(typeof(InoIntentClassifier).Assembly);
 
     private static bool MethodSignatureContains(MethodInfo method, Type type) =>
         TypeContains(method.ReturnType, type) ||

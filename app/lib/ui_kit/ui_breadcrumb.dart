@@ -27,7 +27,13 @@ class UiKitBreadcrumb extends StatelessWidget {
       children: [
         for (final item in parsed)
           FBreadcrumbItem(
-            onPress: () => fireNav(onEvent, pack, experienceId, item.eventName, scope?.values ?? const {}),
+            onPress: () => fireNav(
+              onEvent,
+              pack,
+              experienceId,
+              item.eventName,
+              scope?.values ?? const {},
+            ),
             child: Text(item.label),
           ),
       ],

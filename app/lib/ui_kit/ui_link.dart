@@ -5,11 +5,7 @@ class UiKitLink extends StatelessWidget {
   final String label;
   final String url;
 
-  const UiKitLink({
-    required this.label,
-    required this.url,
-    super.key,
-  });
+  const UiKitLink({required this.label, required this.url, super.key});
 
   @override
   Widget build(BuildContext context) {

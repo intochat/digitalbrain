@@ -58,7 +58,7 @@ public class ScheduleTriggerNeuron(ILogger<ScheduleTriggerNeuron> logger, Neuron
         cancellationToken.ThrowIfCancellationRequested();
         if (!_reminders.ContainsKey(r.Id))
         {
-            // Due/period fixed for v1; cron parse would compute next due here (e.g. via NCrontab or custom).
+            // Due/period is fixed; cron parsing can compute the next due time when needed.
             // Schedule field carries the expression (e.g. "0 * * * *") for future use / UI.
             var rem = await this.RegisterOrUpdateReminder(r.Id, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(1));
             _reminders[r.Id] = rem;

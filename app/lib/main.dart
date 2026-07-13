@@ -10,7 +10,6 @@ import 'package:media_kit/media_kit.dart';
 
 import 'package:digitalbrain_flutter/app.dart';
 import 'package:digitalbrain_flutter/digital_brain_ui/glow/glow_icon.dart';
-import 'package:digitalbrain_flutter/features/surface_demo/surface_demo_screen.dart';
 import 'package:digitalbrain_flutter/telemetry/bloc_observer.dart';
 import 'package:digitalbrain_flutter/telemetry/telemetry.dart';
 
@@ -25,13 +24,10 @@ Future<void> main() async {
     MediaKit.ensureInitialized();
   }
 
-  DigitalBrainTelemetry.initialize();
-  Bloc.observer = TelemetryBlocObserver();
-
-  if (const bool.fromEnvironment('SURFACE_DEMO')) {
-    runApp(const SurfaceDemoApp());
-    return;
+  if (!kIsWeb) {
+    DigitalBrainTelemetry.initialize();
   }
+  Bloc.observer = TelemetryBlocObserver();
 
   // The kernel does not implement the perf RPCs yet. Keep local perf probing
   // active, but do not spam the gateway with unimplemented calls.

@@ -19,6 +19,5 @@ class UiKitIcon extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) =>
-      Icon(_icons[name] ?? FIcons.circle);
+  Widget build(BuildContext context) => Icon(_icons[name] ?? FIcons.circle);
 }

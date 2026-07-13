@@ -9,6 +9,10 @@ namespace DigitalBrain.Aspire;
 public static class DigitalBrainBuilderExtensions
 {
     public const int DefaultKernelWebPort = 51014;
+    public const string DefaultRuntimeStorageNamespace = "main";
+    private const string ConversationStateProvider = "runtime-conversations";
+    private const string SurfaceFeedStateProvider = "runtime-surface-feeds";
+    private const string SessionStateProvider = "runtime-sessions";
 
     public static DigitalBrainContext AddDigitalBrain(
         this IDistributedApplicationBuilder builder,
@@ -55,32 +59,39 @@ public static class DigitalBrainBuilderExtensions
             githubModelsToken = builder.AddParameter("github-models-token", secret: true);
         }
 
-        IResourceBuilder<ParameterResource>? xaiApiKey = null;
-        if (options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.Xai, StringComparison.OrdinalIgnoreCase)))
-        {
-            xaiApiKey = builder.AddParameter("xai-api-key", secret: true);
-        }
-
         var isRunMode = builder.ExecutionContext.IsRunMode;
+        var runtimeStorageNamespace = ResolveRuntimeStorageNamespace(
+            builder.Configuration["DigitalBrain:Runtime:StorageNamespace"]);
 
         // No publish-mode else branch needed here (unlike Ollama below): AddAzureStorage already
         // produces a valid real-Azure resource on its own — RunAsEmulator() is purely a run-mode add-on.
-        var storage = builder.AddAzureStorage("storage");
+        // The legacy local emulator used the generic "storage" resource name and therefore
+        // retained an anonymous-volume container. A distinct run-mode identity forces a safe
+        // one-time replacement while leaving that rollback container untouched. Publish keeps
+        // the stable Azure resource identity.
+        var storage = builder.AddAzureStorage(isRunMode ? "runtime-storage" : "storage");
         if (isRunMode)
         {
             storage.RunAsEmulator(azurite =>
             {
-                azurite.WithLifetime(ContainerLifetime.Persistent);
+                azurite
+                    .WithDataVolume($"{name}-{runtimeStorageNamespace}-azurite-data")
+                    .WithLifetime(ContainerLifetime.Persistent);
             });
         }
         var clusteringTable = storage.AddTables("clustering");
         var grainBlobs = storage.AddBlobs("grainstate");
+        var conversationStateBlobs = storage.AddBlobs("conversationstate");
+        var surfaceFeedStateBlobs = storage.AddBlobs("surfacefeedstate");
+        var sessionStateBlobs = storage.AddBlobs("sessionstate");
         var journalBlobs = storage.AddBlobs("journal");
-        var syncBlobs = storage.AddBlobs("sync");
 
         var orleans = builder.AddOrleans("kernel")
             .WithClustering(clusteringTable)
             .WithGrainStorage("Default", grainBlobs)
+            .WithGrainStorage(ConversationStateProvider, conversationStateBlobs)
+            .WithGrainStorage(SurfaceFeedStateProvider, surfaceFeedStateBlobs)
+            .WithGrainStorage(SessionStateProvider, sessionStateBlobs)
             .WithReminders(clusteringTable);
 
         if (isRunMode)
@@ -140,30 +151,6 @@ public static class DigitalBrainBuilderExtensions
             llm = builder.AddConnectionString("llm");
         }
 
-        // Local Whisper server for voice-to-text (speech-to-text), same run-mode-only guard as Ollama above:
-        // `aspire publish` never emits this container into a publish manifest — prod voice endpoints are wired
-        // externally via a manually configured DigitalBrain:Voice:Endpoint (see WireKernelSilo).
-        //
-        // Image: ghcr.io/speaches-ai/speaches (the actively-maintained continuation of fedirz/faster-whisper-server,
-        // which was archived and renamed upstream — see https://github.com/speaches-ai/speaches). It genuinely
-        // speaks the OpenAI-compatible POST /v1/audio/transcriptions contract that VoiceTranscription.cs's
-        // OpenAICompatibleVoiceTranscriber calls, unlike onerahmet/openai-whisper-asr-webservice's non-OpenAI-shaped
-        // /asr route. The "-cpu" tag avoids requiring host GPU/CUDA drivers for local dev; swap to "latest-cuda" and
-        // add container GPU args if faster inference is needed. "whisper-1" (Whisper1Local.Id) resolves via
-        // speaches' built-in model alias map to Systran/faster-whisper-large-v3 with no extra config required.
-        EndpointReference? whisperEndpoint = null;
-        if (isRunMode)
-        {
-            var whisper = builder.AddContainer("whisper", "speaches-ai/speaches")
-                .WithImageRegistry("ghcr.io")
-                .WithImageTag("latest-cpu")
-                .WithEnvironment("ENABLE_UI", "false")
-                .WithEnvironment("WHISPER__COMPUTE_TYPE", "int8")
-                .WithHttpEndpoint(targetPort: 8000, name: "http")
-                .WithVolume("whisper-cache", "/home/ubuntu/.cache/huggingface/hub");
-            whisperEndpoint = whisper.GetEndpoint("http");
-        }
-
         return new DigitalBrainContext
         {
             Name = name,
@@ -178,19 +165,17 @@ public static class DigitalBrainBuilderExtensions
             LlmProvider = llmProvider,
             OllamaEndpoint = ollamaEndpoint,
             EmbeddingOllamaEndpoint = embeddingOllamaEndpoint,
-            WhisperEndpoint = whisperEndpoint,
             AzureOpenAIEndpoint = azureOpenAIEndpoint,
             AzureOpenAIKey = azureOpenAIKey,
             OpenAIApiKey = openAIApiKey,
             AnthropicApiKey = anthropicApiKey,
             GitHubModelsToken = githubModelsToken,
-            XaiApiKey = xaiApiKey,
-            EnableOrleansDashboard = options.EnableOrleansDashboard,
-            OrleansDashboardPort = options.OrleansDashboardPort,
             EnableMcp = options.EnableMcp,
             GrainBlobs = grainBlobs,
+            ConversationStateBlobs = conversationStateBlobs,
+            SurfaceFeedStateBlobs = surfaceFeedStateBlobs,
+            SessionStateBlobs = sessionStateBlobs,
             JournalBlobs = journalBlobs,
-            SyncBlobs = syncBlobs,
             ClusteringTable = clusteringTable
         };
     }
@@ -207,8 +192,10 @@ public static class DigitalBrainBuilderExtensions
             .WithReference(ctx.Orleans)
             .WithReference(ctx.ClusteringTable)
             .WithReference(ctx.GrainBlobs)
+            .WithReference(ctx.ConversationStateBlobs)
+            .WithReference(ctx.SurfaceFeedStateBlobs)
+            .WithReference(ctx.SessionStateBlobs)
             .WithReference(ctx.JournalBlobs)
-            .WithReference(ctx.SyncBlobs)
             .WithReference(ctx.Llm)
             .WithEndpoint(name: "grpc", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
             .WithEndpoint(
@@ -221,12 +208,14 @@ public static class DigitalBrainBuilderExtensions
             .WithReplicas(ctx.KernelReplicas);
 
         // Ensure storage emulator (Azurite) resources are healthy before launching kernel process.
-        // This sequences azurite ready (for clustering/journals/grainstate/sync) ahead of silo init + health probe, reducing races and time-to-healthy in E2E/CI.
+        // This sequences Azurite ahead of silo initialization and its health probe.
         // LLM waits already present below; storage waits complement the WithReference calls.
         kernel.WaitFor(ctx.ClusteringTable);
         kernel.WaitFor(ctx.GrainBlobs);
+        kernel.WaitFor(ctx.ConversationStateBlobs);
+        kernel.WaitFor(ctx.SurfaceFeedStateBlobs);
+        kernel.WaitFor(ctx.SessionStateBlobs);
         kernel.WaitFor(ctx.JournalBlobs);
-        kernel.WaitFor(ctx.SyncBlobs);
 
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
@@ -268,36 +257,6 @@ public static class DigitalBrainBuilderExtensions
         if (ctx.GitHubModelsToken is not null)
         {
             kernel.WithEnvironment("DigitalBrain__Llm__GitHubModelsToken", ctx.GitHubModelsToken);
-        }
-        if (ctx.XaiApiKey is not null)
-        {
-            kernel.WithEnvironment("DigitalBrain__Llm__XaiApiKey", ctx.XaiApiKey);
-        }
-
-        kernel.WithOptionalEnvironment("DigitalBrain:Voice:Provider", "DIGITALBRAIN_VOICE_PROVIDER", "DigitalBrain__Voice__Provider");
-        kernel.WithOptionalEnvironment("DigitalBrain:Voice:Model", "DIGITALBRAIN_VOICE_MODEL", "DigitalBrain__Voice__Model");
-
-        // A manually configured endpoint (e.g. an externally-hosted Whisper/OpenAI service) always wins, for
-        // backward compat with anyone already relying on it. Otherwise, default to the local Whisper container
-        // (see ctx.WhisperEndpoint above) whenever one is present (run mode only) — /v1 is the path segment
-        // speaches (ghcr.io/speaches-ai/speaches) exposes its OpenAI-compatible route under; TranscriptionEndpoint
-        // in VoiceTranscription.cs appends "/audio/transcriptions" on top of this base.
-        var manualVoiceEndpoint = ctx.ApplicationBuilder.Configuration["DigitalBrain:Voice:Endpoint"]
-            ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_VOICE_ENDPOINT");
-        if (!string.IsNullOrWhiteSpace(manualVoiceEndpoint))
-        {
-            kernel.WithEnvironment("DigitalBrain__Voice__Endpoint", manualVoiceEndpoint);
-        }
-        else if (ctx.WhisperEndpoint is not null)
-        {
-            kernel.WithEnvironment("DigitalBrain__Voice__Endpoint", HttpUrl(ctx.WhisperEndpoint, "/v1"));
-        }
-
-        kernel.WithOptionalEnvironment("DigitalBrain:Voice:ApiKey", "DIGITALBRAIN_VOICE_API_KEY", "DigitalBrain__Voice__ApiKey");
-
-        if (ctx.EnableOrleansDashboard && ctx.OrleansDashboardPort.HasValue)
-        {
-            kernel.WithEnvironment("ORLEANS_DASHBOARD_PORT", ctx.OrleansDashboardPort.Value.ToString());
         }
 
         return kernel;
@@ -369,6 +328,22 @@ public static class DigitalBrainBuilderExtensions
         return int.TryParse(configured, out var port) && port > 0
             ? port
             : DefaultKernelWebPort;
+    }
+
+    internal static string ResolveRuntimeStorageNamespace(string? configured)
+    {
+        var value = string.IsNullOrWhiteSpace(configured)
+            ? DefaultRuntimeStorageNamespace
+            : configured.Trim().ToLowerInvariant();
+
+        if (value.Length > 48 || !char.IsAsciiLetterOrDigit(value[0]) ||
+            value.Any(static character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_' and not '.'))
+        {
+            throw new InvalidOperationException(
+                "DigitalBrain:Runtime:StorageNamespace must start with an ASCII letter or digit and contain at most 48 ASCII letters, digits, hyphens, underscores, or periods.");
+        }
+
+        return value;
     }
 
     internal static string ResolveLocalClusterId() => ResolveLocalClusterId(Environment.GetEnvironmentVariable);

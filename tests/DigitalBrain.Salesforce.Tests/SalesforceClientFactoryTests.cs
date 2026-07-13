@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Salesforce.Tests;
@@ -44,12 +45,12 @@ public class SalesforceClientFactoryTests
             [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
             [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
             [SalesforceClientFactory.LoginUrlKey] = "https://test.salesforce.com"
-        }, "http://localhost:8081/oauth/callback/salesforce", "state-1");
+        }, SalesforceClientFactory.DefaultRedirectUri, "state-1");
 
         Assert.StartsWith("https://test.salesforce.com/services/oauth2/authorize?", url);
         Assert.Contains("response_type=code", url);
         Assert.Contains("client_id=connected-app-id", url);
-        Assert.Contains("redirect_uri=http%3A%2F%2Flocalhost%3A8081%2Foauth%2Fcallback%2Fsalesforce", url);
+        Assert.Contains("redirect_uri=" + Uri.EscapeDataString(SalesforceClientFactory.DefaultRedirectUri), url);
         Assert.Contains("scope=api%20refresh_token", url);
         Assert.DoesNotContain("offline_access", url);
         Assert.Contains("state=state-1", url);
@@ -63,10 +64,61 @@ public class SalesforceClientFactoryTests
             [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
             [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
             [SalesforceClientFactory.LoginUrlKey] = "https://test.salesforce.com"
-        }, "http://localhost:8081/oauth/callback/salesforce", "state-1", "challenge-1");
+        }, SalesforceClientFactory.DefaultRedirectUri, "state-1", "challenge-1");
 
         Assert.Contains("code_challenge=challenge-1", url);
         Assert.Contains("code_challenge_method=S256", url);
+    }
+
+    [Fact]
+    public void CreateOAuthStartUrl_Uses_The_Canonical_Internal_Flow_Reference()
+    {
+        const string flowReference = "abcdefghijklmnopqrstuvwxyzABCDEF0123456789-_";
+        var url = SalesforceClientFactory.CreateOAuthStartUrl(flowReference);
+
+        Assert.Equal($"{OAuthCallbackPaths.SalesforceStart}?f={flowReference}", url);
+        Assert.True(OAuthCallbackPaths.TryParseInternalStartPath(
+            url,
+            OAuthCallbackPaths.SalesforceProvider,
+            out var parsed));
+        Assert.Equal(flowReference, parsed);
+        Assert.DoesNotContain("services/oauth2/authorize", url, StringComparison.Ordinal);
+        Assert.DoesNotContain("state=", url, StringComparison.Ordinal);
+        Assert.DoesNotContain("brain.example", url, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://login.salesforce.com/services/oauth2/authorize?client_id=test", true)]
+    [InlineData("https://tenant.my.salesforce.com/services/oauth2/authorize?client_id=test", true)]
+    [InlineData("https://tenant.my.site.com/services/oauth2/authorize?client_id=test", true)]
+    [InlineData("http://login.salesforce.com/services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com:444/services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com/Services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com.evil.example/services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com@evil.example/services/oauth2/authorize?client_id=test", false)]
+    [InlineData("https://login.salesforce.com/services/oauth2/authorize?client_id=test#fragment", false)]
+    public void ProviderRedirectAllowlistIsExact(string target, bool expected)
+    {
+        Assert.Equal(expected, SalesforceClientFactory.IsAllowedAuthorizationUrl(target));
+    }
+
+    [Fact]
+    public void App_config_rejects_untrusted_login_and_non_loopback_callback_origins()
+    {
+        var insecureLogin = ValidAppConfig();
+        insecureLogin[SalesforceClientFactory.LoginUrlKey] = "http://login.salesforce.com";
+        var untrustedLogin = ValidAppConfig();
+        untrustedLogin[SalesforceClientFactory.LoginUrlKey] = "https://example.com";
+        var insecureCallback = ValidAppConfig();
+        insecureCallback[SalesforceClientFactory.RedirectUriKey] = "http://brain.example/oauth/callback/salesforce";
+
+        Assert.False(SalesforceClientFactory.TryValidateAppConfig(insecureLogin, out var loginKey, out _));
+        Assert.Equal(SalesforceClientFactory.LoginUrlKey, loginKey);
+        Assert.False(SalesforceClientFactory.TryValidateAppConfig(untrustedLogin, out var untrustedLoginKey, out _));
+        Assert.Equal(SalesforceClientFactory.LoginUrlKey, untrustedLoginKey);
+        Assert.False(SalesforceClientFactory.TryValidateAppConfig(insecureCallback, out var callbackKey, out _));
+        Assert.Equal(SalesforceClientFactory.RedirectUriKey, callbackKey);
+        Assert.True(SalesforceClientFactory.TryValidateAppConfig(ValidAppConfig(), out _, out _));
     }
 
     [Fact]
@@ -116,14 +168,17 @@ public class SalesforceClientFactoryTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             SalesforceClientFactory.CreateForceClientAsync(new Dictionary<string, string>()));
 
-        Assert.Contains("missing client_id", ex.Message);
-        Assert.Contains("Salesforce", ex.Message);
+        Assert.Equal("Salesforce is not connected for this principal.", ex.Message);
     }
 
     [Fact]
     public async Task ExchangeAuthorizationCodeAsync_Uses_Provided_Handler_Instead_Of_Real_Network_Call()
     {
-        var handler = new FakeSalesforceTokenHandler("fake-access-token", "https://fake.my.salesforce.com", "fake-refresh-token");
+        var handler = new FakeSalesforceTokenHandler(
+            "fake-access-token",
+            "https://fake.my.salesforce.com",
+            "fake-refresh-token",
+            "https://login.salesforce.com/id/org/user");
 
         var result = await SalesforceClientFactory.ExchangeAuthorizationCodeAsync(
             new Dictionary<string, string>
@@ -134,12 +189,36 @@ public class SalesforceClientFactoryTests
                 [SalesforceClientFactory.OAuthCodeVerifierKey] = "verifier-1"
             },
             "auth-code-1",
-            "http://localhost:8081/oauth/callback/salesforce",
+            SalesforceClientFactory.DefaultRedirectUri,
             handler);
 
         Assert.Equal("fake-access-token", result[SalesforceClientFactory.AccessTokenKey]);
         Assert.Equal("https://fake.my.salesforce.com", result[SalesforceClientFactory.InstanceUrlKey]);
         Assert.Equal("fake-refresh-token", result[SalesforceClientFactory.RefreshTokenKey]);
+        Assert.Equal("https://login.salesforce.com/id/org/user", result[SalesforceClientFactory.IdentityUrlKey]);
         Assert.Equal(1, handler.RequestCount);
     }
+
+    [Fact]
+    public async Task CreateSessionAsync_Preserves_Stored_Identity_Url()
+    {
+        var session = await SalesforceClientFactory.CreateSessionAsync(new Dictionary<string, string>
+        {
+            [SalesforceClientFactory.AccessTokenKey] = "access-token",
+            [SalesforceClientFactory.InstanceUrlKey] = "https://example.my.salesforce.com",
+            [SalesforceClientFactory.IdentityUrlKey] = "https://login.salesforce.com/id/org/user"
+        });
+
+        Assert.NotNull(session.Client);
+        Assert.Equal("https://login.salesforce.com/id/org/user", session.IdentityUrl);
+    }
+
+    private static Dictionary<string, string> ValidAppConfig() => new()
+    {
+        [SalesforceClientFactory.ClientIdKey] = "connected-app-id",
+        [SalesforceClientFactory.ClientSecretKey] = "connected-app-secret",
+        [SalesforceClientFactory.LoginUrlKey] = SalesforceClientFactory.DefaultLoginUrl,
+        [SalesforceClientFactory.RedirectUriKey] = SalesforceClientFactory.DefaultRedirectUri,
+        [SalesforceClientFactory.ApiVersionKey] = SalesforceClientFactory.DefaultApiVersion
+    };
 }

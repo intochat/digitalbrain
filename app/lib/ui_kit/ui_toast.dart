@@ -13,7 +13,10 @@ class UiKitToast extends StatefulWidget {
 class _UiKitToastState extends State<UiKitToast> with PresentOnce {
   @override
   Widget build(BuildContext context) {
-    presentOnce(true, () => showFToast(context: context, title: Text(widget.message)));
+    presentOnce(
+      true,
+      () => showFToast(context: context, title: Text(widget.message)),
+    );
     return const SizedBox.shrink();
   }
 }

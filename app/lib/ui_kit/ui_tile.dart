@@ -12,20 +12,20 @@ FTile buildExperienceFTile({
   required RemoteEventHandler onEvent,
   Map<String, String> capturedValues = const {},
 }) => FTile(
-      title: Text(title),
-      subtitle: subtitle.isEmpty ? null : Text(subtitle),
-      onPress: eventName.isEmpty
-          ? null
-          : () => onEvent('press', {
-                'synapseType': 'ExperienceStep',
-                'props': {
-                  'pack': pack,
-                  'experienceId': experienceId,
-                  'eventName': eventName,
-                  ...capturedValues,
-                },
-              }),
-    );
+  title: Text(title),
+  subtitle: subtitle.isEmpty ? null : Text(subtitle),
+  onPress: eventName.isEmpty
+      ? null
+      : () => onEvent('press', {
+          'synapseType': 'ExperienceStep',
+          'props': {
+            'pack': pack,
+            'experienceId': experienceId,
+            'eventName': eventName,
+            ...capturedValues,
+          },
+        }),
+);
 
 class UiKitTile extends StatelessWidget {
   const UiKitTile({

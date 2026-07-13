@@ -3,7 +3,12 @@ import 'package:forui/forui.dart';
 import 'ui_overlay_host.dart';
 
 class UiKitDialog extends StatefulWidget {
-  const UiKitDialog({super.key, required this.open, required this.title, required this.children});
+  const UiKitDialog({
+    super.key,
+    required this.open,
+    required this.title,
+    required this.children,
+  });
   final bool open;
   final String title;
   final List<Widget> children;
@@ -20,7 +25,10 @@ class _UiKitDialogState extends State<UiKitDialog> with PresentOnce {
         context: context,
         builder: (context, style, animation) => FDialog(
           title: Text(widget.title),
-          body: Column(mainAxisSize: MainAxisSize.min, children: widget.children),
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: widget.children,
+          ),
           actions: const [],
         ),
       );

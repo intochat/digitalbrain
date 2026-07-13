@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Core.Runtime;
 using Salesforce.Force;
 
 namespace DigitalBrain.Salesforce;
@@ -15,25 +17,46 @@ public static class SalesforceClientFactory
     public const string DefaultLoginUrl = "https://login.salesforce.com";
     public const string DefaultApiVersion = "v60.0";
     public const string DefaultCallbackPath = OAuthCallbackPaths.Salesforce;
-    public const string DefaultRedirectUri = "http://localhost:8081" + DefaultCallbackPath;
+    public const string DefaultRedirectUri = "http://localhost:51014" + DefaultCallbackPath;
     public const string DefaultOAuthScope = "api refresh_token";
 
     public const string ClientIdKey = "client_id";
     public const string ClientSecretKey = "client_secret";
-    public const string UsernameKey = "username";
-    public const string PasswordKey = "password";
-    public const string SecurityTokenKey = "security_token";
     public const string LoginUrlKey = "login_url";
     public const string ApiVersionKey = "api_version";
     public const string AccessTokenKey = "access_token";
     public const string RefreshTokenKey = "refresh_token";
     public const string InstanceUrlKey = "instance_url";
+    public const string IdentityUrlKey = "identity_url";
     public const string RedirectUriKey = "redirect_uri";
     public const string OAuthStateKey = "oauth_state";
     public const string OAuthScopeKey = "oauth_scope";
     public const string OAuthCodeVerifierKey = "oauth_code_verifier";
+    public const string OAuthPendingClientIdKey = "oauth_client_id";
+    public const string OAuthPendingLoginUrlKey = "oauth_login_url";
+    public const string OAuthPendingRedirectUriKey = "oauth_redirect_uri";
+    public const string OAuthPendingExpiresAtKey = "oauth_expires_at";
+    public const string OAuthResultKey = "oauth_result";
+    public const string OAuthAttemptFingerprintKey = "oauth_attempt_fingerprint";
+    public const string OAuthCompletedFingerprintKey = "oauth_completed_fingerprint";
+    public const string OAuthCompletedExpiresAtKey = "oauth_completed_expires_at";
+    public const string OAuthProcessingExpiresAtKey = "oauth_processing_expires_at";
+    public const string OAuthFlowIdKey = "oauth_flow_id";
+    public const string OAuthCompletedFlowIdKey = "oauth_completed_flow_id";
+    public const string OAuthPhaseKey = "oauth_phase";
+    public const string OAuthAuthorizationUrlKey = "oauth_authorization_url";
+    public const string OAuthStartTokenKey = "oauth_start_token";
+    public const string OAuthStartTokenFingerprintKey = "oauth_start_token_fingerprint";
+    public const string OAuthStartExpiresAtKey = "oauth_start_expires_at";
+    public const string OAuthPhaseLocalStart = "local-start";
+    public const string OAuthPhaseChallengeIssued = "challenge-issued";
+    public const string OAuthPhaseProcessing = "processing";
+    public const string OAuthPhaseFailed = "failed";
+    public static readonly TimeSpan OAuthPendingLifetime = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan OAuthProcessingLifetime = TimeSpan.FromMinutes(3);
+    public static readonly TimeSpan OAuthCompletedWitnessLifetime = TimeSpan.FromHours(1);
     public const string AuthenticationFailureMessage =
-        "Salesforce authentication failed. Check the connected app client ID/secret, username, password, security token, and login URL, then save the credentials again.";
+        "Salesforce authentication failed. Reconnect Salesforce and try again.";
     public const string MissingConnectedAppConfigMessage =
         "Salesforce OAuth is not configured. Configure the Connected App Client ID and Client Secret in Aspire parameters (salesforce-client-id and salesforce-client-secret) or save them in the Salesforce credentials form, then try Login via Salesforce again.";
 
@@ -48,55 +71,34 @@ public static class SalesforceClientFactory
         var merged = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in userValues)
         {
-            merged[key] = value;
+            if (!AppOwnedKeys.Contains(key))
+            {
+                merged[key] = value;
+            }
         }
 
         return merged;
     }
 
     public static async Task<ForceClient> CreateForceClientAsync(IReadOnlyDictionary<string, string> values, CancellationToken cancellationToken = default)
+        => (await CreateSessionAsync(values, cancellationToken).ConfigureAwait(false)).Client;
+
+    public static async Task<SalesforceClientSession> CreateSessionAsync(
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken = default)
     {
         var apiVersion = NormalizeApiVersion(Optional(values, ApiVersionKey, DefaultApiVersion));
 
         if (HasOAuthCredential(values))
         {
-            return await CreateOAuthForceClientAsync(values, apiVersion, cancellationToken).ConfigureAwait(false);
+            return await CreateOAuthSessionAsync(values, apiVersion, cancellationToken).ConfigureAwait(false);
         }
 
-        var clientId = Required(values, ClientIdKey);
-        var clientSecret = Required(values, ClientSecretKey);
-        var username = Required(values, UsernameKey);
-        var password = Required(values, PasswordKey);
-        var passwordWithToken = password + Optional(values, SecurityTokenKey);
-        var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
-        var tokenEndpoint = TokenEndpoint(loginUrl);
-
-        var token = await RequestTokenAsync(tokenEndpoint, new Dictionary<string, string>
-        {
-            ["grant_type"] = "password",
-            ["client_id"] = clientId,
-            ["client_secret"] = clientSecret,
-            ["username"] = username,
-            ["password"] = passwordWithToken
-        }, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.InstanceUrl))
-        {
-            throw new InvalidOperationException(
-                "Salesforce authentication response did not include access_token and instance_url.");
-        }
-
-        return new ForceClient(token.InstanceUrl, token.AccessToken, apiVersion);
+        throw new InvalidOperationException("Salesforce is not connected for this principal.");
     }
 
     public static bool HasUsableCredential(IReadOnlyDictionary<string, string> values) =>
-        HasOAuthCredential(values) || HasPasswordCredential(values);
-
-    public static bool HasPasswordCredential(IReadOnlyDictionary<string, string> values) =>
-        HasValue(values, ClientIdKey) &&
-        HasValue(values, ClientSecretKey) &&
-        HasValue(values, UsernameKey) &&
-        HasValue(values, PasswordKey);
+        HasOAuthCredential(values);
 
     public static bool HasOAuthCredential(IReadOnlyDictionary<string, string> values) =>
         (HasValue(values, AccessTokenKey) && HasValue(values, InstanceUrlKey)) ||
@@ -104,6 +106,261 @@ public static class SalesforceClientFactory
 
     public static bool HasConnectedAppConfig(IReadOnlyDictionary<string, string> values) =>
         HasValue(values, ClientIdKey) && HasValue(values, ClientSecretKey);
+
+    public static string AuthorizationAttemptFingerprint(string state)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(state);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(state))).ToLowerInvariant();
+    }
+
+    public static string CreateAuthorizationFlowId() =>
+        Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+
+    public static bool IsAuthorizationFlowId(string value)
+    {
+        try
+        {
+            return Convert.FromHexString(value).Length == 16;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    public static bool SameAuthorizationAttempt(string left, string right)
+    {
+        try
+        {
+            var leftBytes = Convert.FromHexString(left);
+            var rightBytes = Convert.FromHexString(right);
+            return leftBytes.Length == SHA256.HashSizeInBytes &&
+                   rightBytes.Length == SHA256.HashSizeInBytes &&
+                   CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    public static ExternalAuthorizationResolution ResolveAuthorization(
+        IReadOnlyDictionary<string, string> credentials,
+        IReadOnlyDictionary<string, string> pending)
+    {
+        var hasCredential = HasUsableCredential(credentials);
+        var hasCompletedAttempt = credentials.TryGetValue(OAuthCompletedFingerprintKey, out var completedAttempt) &&
+                                  IsAuthorizationAttemptFingerprint(completedAttempt) &&
+                                  TryGetFutureUnixSeconds(credentials, OAuthCompletedExpiresAtKey, out _);
+        var hasCompletedFlow = credentials.TryGetValue(OAuthCompletedFlowIdKey, out var completedFlow) &&
+                               IsAuthorizationFlowId(completedFlow);
+        var hasPendingAttempt = pending.TryGetValue(OAuthAttemptFingerprintKey, out var pendingAttempt) &&
+                                IsAuthorizationAttemptFingerprint(pendingAttempt);
+        var hasPendingFlow = pending.TryGetValue(OAuthFlowIdKey, out var pendingFlow) &&
+                             IsAuthorizationFlowId(pendingFlow);
+
+        var explicitPhase = pending.ContainsKey(OAuthPhaseKey);
+        if (hasCredential && hasCompletedAttempt && hasPendingAttempt &&
+            SameAuthorizationAttempt(pendingAttempt!, completedAttempt!) &&
+            (explicitPhase
+                ? hasPendingFlow && hasCompletedFlow && string.Equals(pendingFlow, completedFlow, StringComparison.Ordinal)
+                : !hasPendingFlow || hasCompletedFlow && string.Equals(pendingFlow, completedFlow, StringComparison.Ordinal)))
+            return new(ExternalAuthorizationResolutionState.Ready);
+
+        if (pending.Count == 0)
+            return hasCredential && hasCompletedAttempt && (!credentials.ContainsKey(OAuthCompletedFlowIdKey) || hasCompletedFlow)
+                ? new(ExternalAuthorizationResolutionState.Ready)
+                : new(ExternalAuthorizationResolutionState.Failed, "authorization-flow-missing");
+
+        pending.TryGetValue(OAuthPhaseKey, out var phase);
+        if (string.Equals(phase, OAuthPhaseLocalStart, StringComparison.Ordinal))
+        {
+            if (!hasPendingFlow ||
+                !pending.TryGetValue(OAuthStartTokenKey, out var startToken) || string.IsNullOrWhiteSpace(startToken) ||
+                !pending.TryGetValue(OAuthStartTokenFingerprintKey, out var startFingerprint) ||
+                !SameAuthorizationAttempt(startFingerprint, AuthorizationAttemptFingerprint(startToken)) ||
+                !TryGetFutureUnixSeconds(pending, OAuthStartExpiresAtKey, out _))
+            {
+                return new(ExternalAuthorizationResolutionState.Failed, "authorization-start-invalid");
+            }
+
+            return new(ExternalAuthorizationResolutionState.Waiting);
+        }
+
+        if (string.Equals(phase, OAuthPhaseChallengeIssued, StringComparison.Ordinal))
+            return TryGetReplayableAuthorizationChallenge(pending, out _, out _)
+                ? new(ExternalAuthorizationResolutionState.Waiting)
+                : new(ExternalAuthorizationResolutionState.Failed, "authorization-challenge-invalid");
+
+        if (string.Equals(phase, OAuthPhaseProcessing, StringComparison.Ordinal))
+            return hasPendingAttempt && hasPendingFlow &&
+                   TryGetFutureUnixSeconds(pending, OAuthProcessingExpiresAtKey, out _)
+                ? new(ExternalAuthorizationResolutionState.Waiting)
+                : new(ExternalAuthorizationResolutionState.Failed, "authorization-exchange-interrupted");
+
+        if (string.Equals(phase, OAuthPhaseFailed, StringComparison.Ordinal))
+            return new(ExternalAuthorizationResolutionState.Failed, "authorization-failed");
+
+        if (!string.IsNullOrWhiteSpace(phase))
+            return new(ExternalAuthorizationResolutionState.Failed, "authorization-phase-invalid");
+
+        if (!pending.TryGetValue(OAuthResultKey, out var result))
+            return pending.TryGetValue(OAuthStateKey, out var state) &&
+                   pending.TryGetValue(OAuthAttemptFingerprintKey, out var attempt) &&
+                   !string.IsNullOrWhiteSpace(state) &&
+                   SameAuthorizationAttempt(attempt, AuthorizationAttemptFingerprint(state)) &&
+                   (!pending.ContainsKey(OAuthPendingExpiresAtKey) ||
+                    TryGetFutureUnixSeconds(pending, OAuthPendingExpiresAtKey, out _))
+                ? new(ExternalAuthorizationResolutionState.Waiting)
+                : new(ExternalAuthorizationResolutionState.Failed, "authorization-state-invalid");
+        if (!string.Equals(result, "processing", StringComparison.Ordinal))
+            return new(ExternalAuthorizationResolutionState.Failed, "authorization-failed");
+
+        return pending.TryGetValue(OAuthProcessingExpiresAtKey, out var processingExpiresAt) &&
+               long.TryParse(processingExpiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAt) &&
+               expiresAt > DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            ? new(ExternalAuthorizationResolutionState.Waiting)
+            : new(ExternalAuthorizationResolutionState.Failed, "authorization-exchange-interrupted");
+    }
+
+    internal static bool IsProviderAuthorizationPhase(IReadOnlyDictionary<string, string> pending) =>
+        pending.TryGetValue(OAuthPhaseKey, out var phase) &&
+        (string.Equals(phase, OAuthPhaseChallengeIssued, StringComparison.Ordinal) ||
+         string.Equals(phase, OAuthPhaseProcessing, StringComparison.Ordinal) ||
+         string.Equals(phase, OAuthPhaseFailed, StringComparison.Ordinal));
+
+    internal static bool TryGetReplayableAuthorizationChallenge(
+        IReadOnlyDictionary<string, string> pending,
+        out string authorizationUrl,
+        out string state)
+    {
+        authorizationUrl = string.Empty;
+        state = string.Empty;
+        if (!pending.TryGetValue(OAuthPhaseKey, out var phase) ||
+            !string.Equals(phase, OAuthPhaseChallengeIssued, StringComparison.Ordinal) ||
+            !pending.TryGetValue(OAuthFlowIdKey, out var flowId) || !IsAuthorizationFlowId(flowId) ||
+            !pending.TryGetValue(OAuthStateKey, out var persistedState) || string.IsNullOrWhiteSpace(persistedState) ||
+            !pending.TryGetValue(OAuthAttemptFingerprintKey, out var attempt) ||
+            !SameAuthorizationAttempt(attempt, AuthorizationAttemptFingerprint(persistedState)) ||
+            !pending.TryGetValue(OAuthAuthorizationUrlKey, out var persistedAuthorizationUrl) ||
+            !IsAllowedAuthorizationUrl(persistedAuthorizationUrl) ||
+            !TryGetFutureUnixSeconds(pending, OAuthPendingExpiresAtKey, out _))
+        {
+            authorizationUrl = string.Empty;
+            state = string.Empty;
+            return false;
+        }
+
+        state = persistedState;
+        authorizationUrl = persistedAuthorizationUrl;
+        return true;
+    }
+
+    internal static bool IsKnownPendingExpired(IReadOnlyDictionary<string, string> pending)
+    {
+        if (pending.Count == 0)
+            return false;
+        var key = pending.TryGetValue(OAuthPhaseKey, out var phase)
+            ? phase switch
+            {
+                OAuthPhaseLocalStart => OAuthStartExpiresAtKey,
+                OAuthPhaseChallengeIssued => OAuthPendingExpiresAtKey,
+                OAuthPhaseProcessing => OAuthProcessingExpiresAtKey,
+                OAuthPhaseFailed => OAuthPendingExpiresAtKey,
+                _ => null
+            }
+            : pending.ContainsKey(OAuthPendingExpiresAtKey)
+                ? OAuthPendingExpiresAtKey
+                : null;
+        return key is not null &&
+               pending.TryGetValue(key, out var expiresAt) &&
+               long.TryParse(expiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAtUnixSeconds) &&
+               expiresAtUnixSeconds <= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    }
+
+    private static bool TryGetFutureUnixSeconds(
+        IReadOnlyDictionary<string, string> values,
+        string key,
+        out long expiresAtUnixSeconds)
+    {
+        expiresAtUnixSeconds = 0;
+        return values.TryGetValue(key, out var expiresAt) &&
+               long.TryParse(expiresAt, NumberStyles.None, CultureInfo.InvariantCulture, out expiresAtUnixSeconds) &&
+               expiresAtUnixSeconds > DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    }
+
+    internal static bool IsAuthorizationAttemptFingerprint(string value)
+    {
+        try
+        {
+            return Convert.FromHexString(value).Length == SHA256.HashSizeInBytes;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    public static bool TryValidateAppConfig(
+        IReadOnlyDictionary<string, string> values,
+        out string? invalidKey,
+        out string? message)
+    {
+        foreach (var key in new[] { ClientIdKey, ClientSecretKey })
+        {
+            if (!HasValue(values, key))
+            {
+                invalidKey = key;
+                message = $"Missing {key}";
+                return false;
+            }
+        }
+
+        if (!TryNormalizeLoginUrl(Optional(values, LoginUrlKey, DefaultLoginUrl), out _))
+        {
+            invalidKey = LoginUrlKey;
+            message = "Salesforce login_url must be an approved Salesforce HTTPS origin.";
+            return false;
+        }
+
+        if (!TryNormalizeRedirectUri(Optional(values, RedirectUriKey, DefaultRedirectUri), out _))
+        {
+            invalidKey = RedirectUriKey;
+            message = $"Salesforce redirect_uri must use {DefaultCallbackPath}; HTTP is allowed only for loopback development.";
+            return false;
+        }
+
+        if (!TryNormalizeApiVersion(Optional(values, ApiVersionKey, DefaultApiVersion), out _))
+        {
+            invalidKey = ApiVersionKey;
+            message = "Salesforce api_version must use the vNN.N format.";
+            return false;
+        }
+
+        invalidKey = null;
+        message = null;
+        return true;
+    }
+
+    public static string ResolveLoginUrl(IReadOnlyDictionary<string, string> values) =>
+        NormalizeLoginUrl(Optional(values, LoginUrlKey, DefaultLoginUrl));
+
+    public static string ResolveRedirectUri(IReadOnlyDictionary<string, string> values) =>
+        NormalizeRedirectUri(Optional(values, RedirectUriKey, DefaultRedirectUri));
+
+    public static string CreateOAuthStartUrl(string flowReference) =>
+        OAuthCallbackPaths.CreateInternalStartPath(OAuthCallbackPaths.SalesforceProvider, flowReference);
+
+    public static string CreateOAuthStartUrl(
+        IReadOnlyDictionary<string, string> values,
+        string flowReference)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return CreateOAuthStartUrl(flowReference);
+    }
+
+    public static bool IsAllowedAuthorizationUrl(string? value) =>
+        OAuthCallbackPaths.IsAllowedProviderAuthorizationUrl(OAuthCallbackPaths.SalesforceProvider, value);
 
     public static string CreateAuthorizationUrl(
         IReadOnlyDictionary<string, string> values,
@@ -113,14 +370,16 @@ public static class SalesforceClientFactory
     {
         RequireConnectedAppConfig(values);
         var clientId = Required(values, ClientIdKey);
-        var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
+        var loginUrl = ResolveLoginUrl(values);
         var scope = Optional(values, OAuthScopeKey, DefaultOAuthScope);
 
         var query = new Dictionary<string, string>
         {
             ["response_type"] = "code",
             ["client_id"] = clientId,
-            ["redirect_uri"] = string.IsNullOrWhiteSpace(redirectUri) ? DefaultRedirectUri : redirectUri,
+            ["redirect_uri"] = string.IsNullOrWhiteSpace(redirectUri)
+                ? ResolveRedirectUri(values)
+                : NormalizeRedirectUri(redirectUri),
             ["scope"] = scope,
             ["state"] = state
         };
@@ -147,10 +406,10 @@ public static class SalesforceClientFactory
 
         var clientId = Required(values, ClientIdKey);
         var clientSecret = Required(values, ClientSecretKey);
-        var loginUrl = Optional(values, LoginUrlKey, DefaultLoginUrl);
+        var loginUrl = ResolveLoginUrl(values);
         var effectiveRedirectUri = string.IsNullOrWhiteSpace(redirectUri)
-            ? Optional(values, RedirectUriKey, DefaultRedirectUri)
-            : redirectUri;
+            ? ResolveRedirectUri(values)
+            : NormalizeRedirectUri(redirectUri);
 
         var form = new Dictionary<string, string>
         {
@@ -178,9 +437,12 @@ public static class SalesforceClientFactory
         var result = new Dictionary<string, string>
         {
             [AccessTokenKey] = token.AccessToken,
-            [InstanceUrlKey] = token.InstanceUrl,
-            [RedirectUriKey] = effectiveRedirectUri
+            [InstanceUrlKey] = token.InstanceUrl
         };
+        if (!string.IsNullOrWhiteSpace(token.IdentityUrl))
+        {
+            result[IdentityUrlKey] = token.IdentityUrl;
+        }
         if (!string.IsNullOrWhiteSpace(token.RefreshToken))
         {
             result[RefreshTokenKey] = token.RefreshToken;
@@ -201,26 +463,14 @@ public static class SalesforceClientFactory
 
     public static string AuthorizationEndpoint(string loginUrlOrEndpoint)
     {
-        var value = NormalizeLoginUrlOrEndpoint(loginUrlOrEndpoint);
-
-        if (value.EndsWith("/services/oauth2/authorize", StringComparison.OrdinalIgnoreCase))
-        {
-            return value;
-        }
-
-        return value.TrimEnd('/') + "/services/oauth2/authorize";
+        var value = NormalizeLoginUrl(loginUrlOrEndpoint);
+        return value + "/services/oauth2/authorize";
     }
 
     public static string TokenEndpoint(string loginUrlOrEndpoint)
     {
-        var value = NormalizeLoginUrlOrEndpoint(loginUrlOrEndpoint);
-
-        if (value.EndsWith("/services/oauth2/token", StringComparison.OrdinalIgnoreCase))
-        {
-            return value;
-        }
-
-        return value.TrimEnd('/') + "/services/oauth2/token";
+        var value = NormalizeLoginUrl(loginUrlOrEndpoint);
+        return value + "/services/oauth2/token";
     }
 
     public static string CreatePkceCodeVerifier() =>
@@ -238,35 +488,85 @@ public static class SalesforceClientFactory
 
     private static string NormalizeApiVersion(string value)
     {
-        var trimmed = value.Trim();
-        return trimmed.StartsWith('v') ? trimmed : "v" + trimmed;
+        if (TryNormalizeApiVersion(value, out var normalized)) return normalized;
+        throw new InvalidOperationException("Salesforce api_version must use the vNN.N format.");
     }
 
-    private static string NormalizeLoginUrlOrEndpoint(string loginUrlOrEndpoint)
+    private static bool TryNormalizeApiVersion(string value, out string normalized)
     {
-        if (string.IsNullOrWhiteSpace(loginUrlOrEndpoint))
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var version = value.Trim();
+        if (version.StartsWith('v') || version.StartsWith('V')) version = version[1..];
+        var parts = version.Split('.');
+        if (parts.Length != 2 ||
+            !int.TryParse(parts[0], out var major) || major <= 0 ||
+            !int.TryParse(parts[1], out var minor) || minor < 0)
         {
-            return DefaultLoginUrl;
+            return false;
         }
 
-        var value = loginUrlOrEndpoint.Trim();
-        if (value.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-            value.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        normalized = $"v{major}.{minor}";
+        return true;
+    }
+
+    private static string NormalizeLoginUrl(string value)
+    {
+        if (TryNormalizeLoginUrl(value, out var normalized)) return normalized;
+        throw new InvalidOperationException("Salesforce login_url must be an approved Salesforce HTTPS origin.");
+    }
+
+    private static bool TryNormalizeLoginUrl(string value, out string normalized)
+    {
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var candidate = value.Trim();
+        if (!candidate.Contains("://", StringComparison.Ordinal)) candidate = "https://" + candidate;
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) ||
+            uri.Scheme != Uri.UriSchemeHttps ||
+            string.IsNullOrWhiteSpace(uri.Host) ||
+            !IsAllowedLoginHost(uri.Host) ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment) ||
+            uri.AbsolutePath is not ("" or "/"))
         {
-            return value;
+            return false;
         }
 
-        if (value.StartsWith("//", StringComparison.Ordinal))
+        normalized = uri.GetLeftPart(UriPartial.Authority);
+        return true;
+    }
+
+    private static bool IsAllowedLoginHost(string host) =>
+        string.Equals(host, "login.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(host, "test.salesforce.com", StringComparison.OrdinalIgnoreCase) ||
+        host.EndsWith(".salesforce.com", StringComparison.OrdinalIgnoreCase) ||
+        host.EndsWith(".site.com", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeRedirectUri(string value)
+    {
+        if (TryNormalizeRedirectUri(value, out var normalized)) return normalized;
+        throw new InvalidOperationException(
+            $"Salesforce redirect_uri must use {DefaultCallbackPath}; HTTP is allowed only for loopback development.");
+    }
+
+    private static bool TryNormalizeRedirectUri(string value, out string normalized)
+    {
+        normalized = string.Empty;
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri) ||
+            string.IsNullOrWhiteSpace(uri.Host) ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment) ||
+            !string.Equals(uri.AbsolutePath, DefaultCallbackPath, StringComparison.Ordinal) ||
+            (uri.Scheme != Uri.UriSchemeHttps && !(uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)))
         {
-            return "https:" + value;
+            return false;
         }
 
-        if (value.StartsWith("/", StringComparison.Ordinal))
-        {
-            return DefaultLoginUrl.TrimEnd('/') + value;
-        }
-
-        return "https://" + value;
+        normalized = uri.AbsoluteUri;
+        return true;
     }
 
     private static string Required(IReadOnlyDictionary<string, string> values, string key)
@@ -289,7 +589,7 @@ public static class SalesforceClientFactory
             ? value.Trim()
             : fallback;
 
-    private static async Task<ForceClient> CreateOAuthForceClientAsync(
+    private static async Task<SalesforceClientSession> CreateOAuthSessionAsync(
         IReadOnlyDictionary<string, string> values,
         string apiVersion,
         CancellationToken cancellationToken = default)
@@ -317,12 +617,18 @@ public static class SalesforceClientFactory
                     "Salesforce refresh-token response did not include access_token and instance_url.");
             }
 
-            return new ForceClient(instanceUrl, token.AccessToken, apiVersion);
+            return new SalesforceClientSession(
+                new ForceClient(instanceUrl, token.AccessToken, apiVersion),
+                string.IsNullOrWhiteSpace(token.IdentityUrl)
+                    ? Optional(values, IdentityUrlKey)
+                    : token.IdentityUrl);
         }
 
         if (HasValue(values, AccessTokenKey) && HasValue(values, InstanceUrlKey))
         {
-            return new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion);
+            return new SalesforceClientSession(
+                new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion),
+                Optional(values, IdentityUrlKey));
         }
 
         if (HasValue(values, RefreshTokenKey))
@@ -330,7 +636,9 @@ public static class SalesforceClientFactory
             RequireConnectedAppConfig(values);
         }
 
-        return new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion);
+        return new SalesforceClientSession(
+            new ForceClient(Required(values, InstanceUrlKey), Required(values, AccessTokenKey), apiVersion),
+            Optional(values, IdentityUrlKey));
     }
 
     private static void RequireConnectedAppConfig(IReadOnlyDictionary<string, string> values)
@@ -389,6 +697,7 @@ public static class SalesforceClientFactory
         return new SalesforceTokenResponse(
             GetString(root, "access_token"),
             GetString(root, "instance_url"),
+            GetString(root, "id"),
             GetString(root, "refresh_token"),
             GetString(root, "issued_at"),
             GetString(root, "scope"));
@@ -436,6 +745,15 @@ public static class SalesforceClientFactory
     private static bool HasValue(IReadOnlyDictionary<string, string> values, string key) =>
         values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
 
+    private static readonly HashSet<string> AppOwnedKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ClientIdKey,
+        ClientSecretKey,
+        LoginUrlKey,
+        ApiVersionKey,
+        RedirectUriKey
+    };
+
     private static string QueryString(IReadOnlyDictionary<string, string> values) =>
         string.Join("&", values.Select(kv =>
             Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(kv.Value)));
@@ -449,7 +767,10 @@ public static class SalesforceClientFactory
     private sealed record SalesforceTokenResponse(
         string AccessToken,
         string InstanceUrl,
+        string IdentityUrl,
         string RefreshToken,
         string IssuedAt,
         string Scope);
 }
+
+public sealed record SalesforceClientSession(ForceClient Client, string? IdentityUrl);

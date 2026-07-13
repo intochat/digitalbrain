@@ -1,22 +1,7 @@
 namespace DigitalBrain.Core;
 
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbConnect")]
-public record DbConnect(string ConnectionName, string Provider, string ConnectionString) : Synapse(nameof(DbConnect), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbQuery")]
-public record DbQuery(string ConnectionName, string Query, string? Result = null) : Synapse(nameof(DbQuery), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.DbInspectSchema")]
-public record DbInspectSchema(
-    string ConnectionName,
-    string Provider,
-    string? ConnectionString = null,
-    string? SourcePath = null,
-    string? ClientId = null,
-    string? WorkspaceId = null) : Synapse(nameof(DbInspectSchema), DateTimeOffset.UtcNow);
+// Db schema model types (live for sqlite uploads inspection + ui graph mapper).
+// The command synapses + IDbSupportNeuron removed with DbSupportNeuron (P1.10).
 
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.DbSchemaInspected")]
@@ -85,9 +70,3 @@ public record DbIndex(
     [property: Id(4)] bool IsPartial = false,
     [property: Id(5)] string? Origin = null,
     [property: Id(6)] IReadOnlyDictionary<string, string?>? Metadata = null);
-
-[Alias("DigitalBrain.Core.IDbSupportNeuron")]
-public interface IDbSupportNeuron : INeuron, IHandle<DbConnect>, IHandle<DbQuery>, IHandle<DbInspectSchema>
-{
-    const string SingletonKey = "db-main";
-}

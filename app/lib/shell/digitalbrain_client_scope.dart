@@ -15,7 +15,8 @@ class DigitalBrainClientScope extends InheritedWidget {
   final DigitalBrainGatewayClient client;
 
   static DigitalBrainGatewayClient? of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<DigitalBrainClientScope>();
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<DigitalBrainClientScope>();
     return scope?.client;
   }
 

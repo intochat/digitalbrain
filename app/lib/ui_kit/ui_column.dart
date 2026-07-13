@@ -6,10 +6,11 @@ class UiKitColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final c in children) Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: c),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (final c in children)
+        Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: c),
+    ],
+  );
 }

@@ -1,6 +1,8 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
@@ -18,6 +20,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+    private const string OAuthEndpointPath = "/oauth";
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -68,11 +71,14 @@ public static class Extensions
                     //.AddSource("Microsoft.Orleans.Runtime")
                     .AddSource("Microsoft.Orleans.Application")
                     .AddSource("DigitalBrain.Neuron")
+                    .AddSource("DigitalBrain.Ino.Worker")
+                    .AddSource("DigitalBrain.Ino.Workflow")
+                    .AddSource("DigitalBrain.Ino.Outbox")
                     .AddAspNetCoreInstrumentation(options =>
                         options.Filter = context =>
                             !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                             && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
-                            && !context.Request.Path.StartsWithSegments("/otlp")
+                            && !context.Request.Path.StartsWithSegments(OAuthEndpointPath)
                     )
                     .AddHttpClientInstrumentation();
             });
@@ -116,7 +122,10 @@ public static class Extensions
         // internal-only probe port exists yet), so /health and /alive are also reachable from the public
         // FQDN once deployed - low risk since responses carry only up/down status and check names, no
         // secrets, but worth revisiting if a tighter internal-only probe path is ever added.
-        app.MapHealthChecks(HealthEndpointPath);
+        app.MapHealthChecks(HealthEndpointPath, new HealthCheckOptions
+        {
+            ResponseWriter = WriteSafeHealthResponseAsync
+        });
 
         app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
         {
@@ -124,5 +133,34 @@ public static class Extensions
         });
 
         return app;
+    }
+
+    private static Task WriteSafeHealthResponseAsync(HttpContext context, HealthReport report)
+    {
+        context.Response.ContentType = "application/json";
+        var payload = new Dictionary<string, object?>
+        {
+            ["status"] = report.Status.ToString()
+        };
+        if (report.Entries.TryGetValue("digitalbrain-runtime-state", out var runtimeState))
+        {
+            var safe = new Dictionary<string, object?>
+            {
+                ["status"] = runtimeState.Status.ToString()
+            };
+            foreach (var key in new[]
+                     {
+                         "backendKind",
+                         "namespace",
+                         "schemaVersion",
+                         "keyVersion"
+                     })
+                if (runtimeState.Data.TryGetValue(key, out var value)) safe[key] = value;
+            payload["runtimeState"] = safe;
+        }
+        return JsonSerializer.SerializeAsync(
+            context.Response.Body,
+            payload,
+            cancellationToken: context.RequestAborted);
     }
 }

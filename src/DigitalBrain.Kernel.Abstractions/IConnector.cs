@@ -18,6 +18,13 @@ public interface IConnector
     Task<ConnectionHealth> TestConnectionAsync(NeuronId user, CancellationToken cancellationToken = default);
 }
 
+public interface IOAuthStateProtector
+{
+    string Protect(NeuronId owner);
+
+    bool TryUnprotect(string state, out NeuronId owner);
+}
+
 [GenerateSerializer]
 [Alias("DigitalBrain.Kernel.Abstractions.ConnectorDescriptor")]
 public record ConnectorDescriptor(

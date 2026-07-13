@@ -58,7 +58,7 @@ public static class DigitalBrainChatClientRegistration
             .GetChatClient(deploymentId)
             .AsIChatClient();
 
-        return new ChatClientBuilder(azureClient).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build();
+        return DigitalBrainChatTelemetry.Wrap(azureClient);
     }
 
     private static IChatClient BuildOpenAi(DigitalBrainLlmRuntimeOptions options, string modelId)
@@ -83,9 +83,7 @@ public static class DigitalBrainChatClientRegistration
         }
 
         var client = new Anthropic.AnthropicClient { ApiKey = options.AnthropicApiKey };
-        return new ChatClientBuilder(client.AsIChatClient(modelId))
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
-            .Build();
+        return DigitalBrainChatTelemetry.Wrap(client.AsIChatClient(modelId));
     }
 
     // xAI has no dedicated SDK — Grok's API is OpenAI-API-compatible, so this reuses the official OpenAI
@@ -98,7 +96,10 @@ public static class DigitalBrainChatClientRegistration
                 $"Registered xai model '{modelId}' has no DigitalBrain:Llm:XaiApiKey configured.");
         }
 
-        return DigitalBrainChatClients.BuildOpenAiCompatible("https://api.x.ai/v1", modelId, options.XaiApiKey);
+        return DigitalBrainChatClients.BuildOpenAiCompatible(
+            "https://api.x.ai/v1",
+            modelId,
+            options.XaiApiKey);
     }
 
     private static IChatClient BuildGitHubModels(DigitalBrainLlmRuntimeOptions options, string modelId)
@@ -109,6 +110,9 @@ public static class DigitalBrainChatClientRegistration
                 $"Registered github-models model '{modelId}' has no DigitalBrain:Llm:GitHubModelsToken configured.");
         }
 
-        return DigitalBrainChatClients.BuildGitHubModels(options.GitHubModelsEndpoint, modelId, options.GitHubModelsToken);
+        return DigitalBrainChatClients.BuildGitHubModels(
+            options.GitHubModelsEndpoint,
+            modelId,
+            options.GitHubModelsToken);
     }
 }

@@ -2,10 +2,8 @@ namespace DigitalBrain.Core;
 
 // Self-evolution rails: every autonomous change to the running system is staged as a
 // SelfEvolutionProposal and only applied after an explicit SelfEvolutionDecision.
-// These records were introduced with SoftwareEngineeringClosedLoopNeuron's staging flow
-// (see StageSelfEvolutionProposalAsync) and are the wire vocabulary for the
-// propose -> approve -> apply -> rollback loop. Keep them additive: downstream journals
-// persist these synapses, so field removals/renames are wire-breaking.
+// Wire vocabulary for propose -> approve -> apply -> rollback loop (journaled, human-approved).
+// Keep additive: downstream journals persist these synapses.
 
 /// <summary>Blast radius of a proposed self-modification, from least to most disruptive.</summary>
 public enum SelfEvolutionRisk

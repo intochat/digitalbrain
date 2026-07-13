@@ -21,8 +21,8 @@ class _UiKitTextAreaState extends State<UiKitTextArea> {
 
   @override
   Widget build(BuildContext context) => FTextField.multiline(
-        control: FTextFieldControl.lifted(value: _value, onChange: _onChange),
-        hint: widget.placeholder,
-        minLines: 3,
-      );
+    control: FTextFieldControl.lifted(value: _value, onChange: _onChange),
+    hint: widget.placeholder,
+    minLines: 3,
+  );
 }

@@ -8,7 +8,12 @@ class UiNavItem {
 
 List<UiNavItem> parseNavItems(List rawItems) => rawItems
     .cast<Map>()
-    .map((m) => UiNavItem((m['label'] ?? '').toString(), (m['eventName'] ?? '').toString()))
+    .map(
+      (m) => UiNavItem(
+        (m['label'] ?? '').toString(),
+        (m['eventName'] ?? '').toString(),
+      ),
+    )
     .toList();
 
 void fireNav(
@@ -20,6 +25,11 @@ void fireNav(
 ) {
   onEvent('press', {
     'synapseType': 'ExperienceStep',
-    'props': {'pack': pack, 'experienceId': experienceId, 'eventName': eventName, ...capturedValues},
+    'props': {
+      'pack': pack,
+      'experienceId': experienceId,
+      'eventName': eventName,
+      ...capturedValues,
+    },
   });
 }

@@ -33,7 +33,6 @@
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.1-preview.1.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.1-preview.1.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="10.2.1-preview.1" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.0" />
     <PackageVersion Include="Microsoft.Orleans.Serialization" Version="10.2.1-preview.1" />
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.1-preview.1" />
     <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.1-preview.1" />
@@ -41,6 +40,7 @@
     <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.1-preview.1" />
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.0" />
     <!-- Extensions / hosting -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.7.0" />
@@ -64,6 +64,7 @@
     <!-- DefaultAzureCredential for the kernel's managed-identity storage path (Task 18) — was resolving
          transitively/undeclared before; pinned explicitly now. Version verified via nuget.org 2026-07-05 -->
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.28.0" />
     <!-- MCP / LLM integration -->
     <PackageVersion Include="ModelContextProtocol" Version="1.4.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
@@ -71,9 +72,8 @@
     <PackageVersion Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" Version="1.5.3" />
     <!-- Marketplace economics -->
     <PackageVersion Include="OpenAI" Version="2.12.0" />
-    <PackageVersion Include="Stripe.net" Version="50.0.0" />
     <!-- Context phase 2: vector store + document ingestion (latest verified) -->
-    <PackageVersion Include="Qdrant.Client" Version="1.18.1" />
+    <!-- Qdrant removed (P1.8 dead package, no code usage) -->
     <!-- Observability -->
     <!-- Azure Monitor OTEL exporter for App Insights (Milestone M6/Task 13) — version verified via nuget.org 2026-07-05 -->
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.5.0" />
@@ -94,11 +94,7 @@
     <!-- AppHost model tests and generated scenario-test support. -->
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
-    <!-- Telegram transport host (external process; only System.Net in the feature). -->
-    <PackageVersion Include="Telegram.BotAPI" Version="10.1.0" />
-    <!-- TUI -->
-    <PackageVersion Include="Spectre.Console" Version="0.57.0" />
-    <PackageVersion Include="Spectre.Console.Cli" Version="0.55.0" />
+    <!-- TUI (Spectre removed P1.8, dead no code usage) -->
     <!-- gRPC gateway co-hosted in the silo -->
     <PackageVersion Include="Grpc.AspNetCore" Version="2.71.0" />
     <PackageVersion Include="Grpc.AspNetCore.Web" Version="2.71.0" />

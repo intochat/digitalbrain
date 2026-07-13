@@ -26,15 +26,18 @@ class UiKitTabs extends StatelessWidget {
     return FTabs(
       onPress: (index) {
         if (index < parsed.length) {
-          fireNav(onEvent, pack, experienceId, parsed[index].eventName, scope?.values ?? const {});
+          fireNav(
+            onEvent,
+            pack,
+            experienceId,
+            parsed[index].eventName,
+            scope?.values ?? const {},
+          );
         }
       },
       children: [
         for (final item in parsed)
-          FTabEntry(
-            label: Text(item.label),
-            child: const SizedBox.shrink(),
-          ),
+          FTabEntry(label: Text(item.label), child: const SizedBox.shrink()),
       ],
     );
   }

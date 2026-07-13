@@ -9,8 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

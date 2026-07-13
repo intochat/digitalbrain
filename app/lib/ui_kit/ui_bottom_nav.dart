@@ -26,7 +26,13 @@ class UiKitBottomNav extends StatelessWidget {
     return FBottomNavigationBar(
       onChange: (index) {
         if (index < parsed.length) {
-          fireNav(onEvent, pack, experienceId, parsed[index].eventName, scope?.values ?? const {});
+          fireNav(
+            onEvent,
+            pack,
+            experienceId,
+            parsed[index].eventName,
+            scope?.values ?? const {},
+          );
         }
       },
       children: [

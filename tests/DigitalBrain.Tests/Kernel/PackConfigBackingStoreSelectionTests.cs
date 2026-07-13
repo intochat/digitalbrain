@@ -2,6 +2,7 @@ using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using DigitalBrain.Kernel.Config;
+using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -34,6 +35,7 @@ public class PackConfigBackingStoreSelectionTests
         // "pack-config" container (for the DataProtection key ring) as part of registration - a real client
         // would require a reachable storage account/Azurite just to construct the DI container.
         var packConfigBlobs = new NoNetworkBlobServiceClient();
+        builder.Services.AddSingleton<IRuntimeStateKeyRing>(new StableTestRuntimeStateKeyRing());
         builder.Services.AddPackConfigStore(packConfigBlobs);
 
         using var host = builder.Build();
@@ -47,6 +49,20 @@ public class PackConfigBackingStoreSelectionTests
         var backingStore = host.Services.GetRequiredService<IPackConfigBackingStore>();
 
         Assert.IsType<AzureBlobPackConfigBackingStore>(backingStore);
+    }
+
+    [Fact]
+    public void AspireHosted_WithoutStableIdentifierKey_FailsClosed()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddPackConfigStore(new NoNetworkBlobServiceClient());
+
+        using var host = builder.Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => host.Services.GetRequiredService<IPackConfigBackingStore>());
+
+        Assert.Contains(nameof(IRuntimeStateKeyRing), exception.Message);
     }
 
     // Azure SDK clients are designed for subclass-based test doubles: a protected parameterless constructor
@@ -73,4 +89,18 @@ public class PackConfigBackingStoreSelectionTests
     }
 
     private sealed class NoNetworkBlobClient : BlobClient;
+
+    private sealed class StableTestRuntimeStateKeyRing : IRuntimeStateKeyRing
+    {
+        private readonly byte[] _signingKey = Enumerable.Repeat((byte)0x5a, 32).ToArray();
+
+        public int ActiveKekVersion => 1;
+        public ReadOnlyMemory<byte> SigningKey => _signingKey;
+
+        public bool TryGetKek(int version, out ReadOnlyMemory<byte> key)
+        {
+            key = default;
+            return false;
+        }
+    }
 }

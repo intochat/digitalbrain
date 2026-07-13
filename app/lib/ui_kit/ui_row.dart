@@ -6,9 +6,10 @@ class UiKitRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final c in children) Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: c),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (final c in children)
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: c),
+    ],
+  );
 }

@@ -3,7 +3,12 @@ import 'package:forui/forui.dart';
 import 'ui_form_scope.dart';
 
 class UiKitSelect extends StatefulWidget {
-  const UiKitSelect({super.key, required this.name, required this.options, this.label = ''});
+  const UiKitSelect({
+    super.key,
+    required this.name,
+    required this.options,
+    this.label = '',
+  });
   final String name;
   final List<String> options;
   final String label;
@@ -36,11 +41,12 @@ class _UiKitSelectState extends State<UiKitSelect> {
 
   @override
   Widget build(BuildContext context) => FSelect<String>.rich(
-        control: FSelectControl.managed(controller: _ctrl),
-        hint: widget.label.isEmpty ? null : widget.label,
-        format: (s) => s,
-        children: [
-          for (final o in widget.options) FSelectItemMixin.item(title: Text(o), value: o),
-        ],
-      );
+    control: FSelectControl.managed(controller: _ctrl),
+    hint: widget.label.isEmpty ? null : widget.label,
+    format: (s) => s,
+    children: [
+      for (final o in widget.options)
+        FSelectItemMixin.item(title: Text(o), value: o),
+    ],
+  );
 }

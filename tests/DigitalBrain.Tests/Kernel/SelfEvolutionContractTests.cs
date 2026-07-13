@@ -3,9 +3,7 @@ using DigitalBrain.Core;
 namespace DigitalBrain.Tests.Kernel;
 
 // Pins the self-evolution rail vocabulary. SelfEvolutionProposal/SelfEvolutionDecision are
-// journaled wire contracts consumed by SoftwareEngineeringClosedLoopNeuron's staging flow
-// (see docs/architecture-trash-analysis-2026-07-06.md §0 — these types were once deleted as
-// "unused" while still referenced, breaking master). This test keeps the rail load-bearing.
+// journaled wire contracts for the propose/approve/apply rail. This test keeps the rail load-bearing.
 public class SelfEvolutionContractTests
 {
     [Fact]
@@ -20,7 +18,7 @@ public class SelfEvolutionContractTests
             Risk: SelfEvolutionRisk.KernelRestart,
             RequiresHumanApproval: true,
             RollbackPlan: "checkpoint-then-rolling-rollback",
-            Origin: "closedloop-neuron");
+            Origin: "foundry");
 
         Assert.Equal(nameof(SelfEvolutionProposal), proposal.Type);
         Assert.True(proposal.RequiresHumanApproval);

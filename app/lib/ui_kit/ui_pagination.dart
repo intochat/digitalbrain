@@ -32,7 +32,13 @@ class UiKitPagination extends StatelessWidget {
             child: FButton(
               variant: FButtonVariant.outline,
               mainAxisSize: MainAxisSize.min,
-              onPress: () => fireNav(onEvent, pack, experienceId, item.eventName, scope?.values ?? const {}),
+              onPress: () => fireNav(
+                onEvent,
+                pack,
+                experienceId,
+                item.eventName,
+                scope?.values ?? const {},
+              ),
               child: Text(item.label),
             ),
           ),

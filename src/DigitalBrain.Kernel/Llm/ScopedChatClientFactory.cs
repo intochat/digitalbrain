@@ -32,13 +32,18 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
                 return null;
             }
 
-            return DigitalBrainChatClients.BuildGitHubModels(options.GitHubModelsEndpoint, options.Model, apiKey);
+            return DigitalBrainChatClients.BuildGitHubModels(
+                options.GitHubModelsEndpoint,
+                options.Model,
+                apiKey);
         }
 
         if (string.IsNullOrWhiteSpace(provider) ||
             string.Equals(provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase))
         {
-            return DigitalBrainChatClients.BuildOllama(options.OllamaEndpoint, options.Model);
+            return DigitalBrainChatClients.BuildOllama(
+                options.OllamaEndpoint,
+                options.Model);
         }
 
         logger.LogWarning("Unsupported scoped LLM provider '{Provider}' requested — falling back to global client.", provider);
@@ -51,25 +56,36 @@ public sealed class ScopedChatClientFactory(IConfiguration config, ILogger<Scope
 internal static class DigitalBrainChatClients
 {
     public static IChatClient BuildOllama(string endpoint, string model) =>
-        new ChatClientBuilder(new OllamaSharp.OllamaApiClient(new Uri(endpoint), model))
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
-            .Build();
+        DigitalBrainChatTelemetry.Wrap(new OllamaSharp.OllamaApiClient(new Uri(endpoint), model));
 
     public static IChatClient BuildOpenAi(string model, string apiKey) =>
-        new ChatClientBuilder(new OpenAI.Chat.ChatClient(model, apiKey).AsIChatClient())
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
-            .Build();
+        DigitalBrainChatTelemetry.Wrap(new OpenAI.Chat.ChatClient(model, apiKey).AsIChatClient());
 
-    public static IChatClient BuildOpenAiCompatible(string endpoint, string model, string apiKey) =>
-        new ChatClientBuilder(
-                new OpenAI.OpenAIClient(
-                        new System.ClientModel.ApiKeyCredential(apiKey),
-                        new OpenAI.OpenAIClientOptions { Endpoint = new Uri(endpoint) })
-                    .GetChatClient(model)
-                    .AsIChatClient())
-            .UseOpenTelemetry(sourceName: "DigitalBrain.Neuron")
-            .Build();
+    public static IChatClient BuildOpenAiCompatible(
+        string endpoint,
+        string model,
+        string apiKey) =>
+        DigitalBrainChatTelemetry.Wrap(
+            new OpenAI.OpenAIClient(
+                    new System.ClientModel.ApiKeyCredential(apiKey),
+                    new OpenAI.OpenAIClientOptions { Endpoint = new Uri(endpoint) })
+                .GetChatClient(model)
+                .AsIChatClient());
 
-    public static IChatClient BuildGitHubModels(string endpoint, string model, string token) =>
+    public static IChatClient BuildGitHubModels(
+        string endpoint,
+        string model,
+        string token) =>
         BuildOpenAiCompatible(endpoint, model, token);
+}
+
+public static class DigitalBrainChatTelemetry
+{
+    public static IChatClient Wrap(IChatClient client, DigitalBrainChatPolicyOptions? policy = null) =>
+        new ChatClientBuilder(client)
+            .Use(inner => new BoundedNoRetryChatClient(inner, policy ?? DigitalBrainChatPolicyOptions.Default))
+            .UseOpenTelemetry(
+                sourceName: "DigitalBrain.Neuron",
+                configure: options => options.EnableSensitiveData = false)
+            .Build();
 }

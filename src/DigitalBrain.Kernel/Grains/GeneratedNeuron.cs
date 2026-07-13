@@ -82,10 +82,6 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         var surface = ConfigFormSurface.Build(embodied.PackName, required, Self.Value);
         await FireAsync(surface, cancellationToken);
-        if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
-        {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value), cancellationToken);
-        }
         Logger.LogInformation("GeneratedNeuron emitted config form for pack '{Pack}' ({FieldCount} fields).", embodied.PackName, required.Count);
     }
 
@@ -119,7 +115,6 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         {
             var normalized = NormalizePackOutput(embodied.PackName, output);
             await Broadcast(normalized, cancellationToken);
-            await BroadcastPackSurfaceAsync(normalized, embodied.PackName, cancellationToken);
         }
 
         Logger.LogInformation(
@@ -145,24 +140,6 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
         };
     }
 
-    private async Task BroadcastPackSurfaceAsync(Synapse output, string packName, CancellationToken cancellationToken)
-    {
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus is null)
-        {
-            return;
-        }
-
-        if (output is UiSurface surface)
-        {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, packName), cancellationToken);
-        }
-        else if (output is RfwCard card)
-        {
-            await bus.BroadcastAsync(card, cancellationToken);
-        }
-    }
-
     private async Task UseExperienceAsync(ExperienceUsed used, CancellationToken cancellationToken)
     {
         if (IsGmailInsightsExperience(used))
@@ -184,11 +161,6 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
                 var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, [new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live from embodied " + used.Pack })]);
                 var surf = new UiSurface(used.Pack, new Dictionary<string, object?> { [UiSurfaceKeys.Title] = used.Pack, ["pack"] = used.Pack, ["tree"] = winTree });
                 await FireAsync(surf, cancellationToken);
-                var b = ServiceProvider.GetService<HomeFeedBus>();
-                if (b is not null)
-                {
-                    await b.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value), cancellationToken);
-                }
             }
         }
 
@@ -227,11 +199,6 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
                 ["tree"] = winTree
             });
             await FireAsync(surf, cancellationToken);
-            var bus = ServiceProvider.GetService<HomeFeedBus>();
-            if (bus != null)
-            {
-                await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value), cancellationToken);
-            }
         }
     }
 
@@ -255,19 +222,6 @@ public class GeneratedNeuron(ILogger<GeneratedNeuron> logger, NeuronJournals jou
 
         var surface = BuildGmailInsightsSurface(used, summary, emails.Count, chartRequestId);
         await FireAsync(surface, cancellationToken);
-        if (ServiceProvider.GetService<HomeFeedBus>() is { } bus)
-        {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value), cancellationToken);
-        }
-
-        var chart = GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-" + chartRequestId);
-        await chart.FireAsync(new VisualizeDataRequest(
-            "Gmail last 100 emails by category",
-            System.Text.Json.JsonSerializer.Serialize(categoryRows),
-            "bar",
-            chartRequestId,
-            userId,
-            used.SessionId), cancellationToken);
     }
 
     private async Task<string> SummarizeGmailRowsAsync(IReadOnlyList<IReadOnlyDictionary<string, object?>> emails, CancellationToken cancellationToken)

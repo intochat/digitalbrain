@@ -37,7 +37,9 @@ class AdaptiveSideSheet extends StatelessWidget {
                 }
               },
               child: GlassMaterial(
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(24)),
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(24),
+                ),
                 tintOpacity: 0.10,
                 blurSigma: 24,
                 child: child,
@@ -49,4 +51,3 @@ class AdaptiveSideSheet extends StatelessWidget {
     );
   }
 }
-

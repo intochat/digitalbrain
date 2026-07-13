@@ -72,16 +72,11 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
 
         var preUpdateCheckpoint = await CreateCheckpointAsync(cancellationToken);
 
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
         var lineageCount = 0;
 
         for (int replica = 1; replica <= 3; replica++)
         {
             await FireAsync(SystemRollingSurfaces.CreateDrain(replica, version, preUpdateCheckpoint.SynapseId, Self.Value), cancellationToken);
-            if (bus is not null)
-            {
-                await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingDrainCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "draining", version })), cancellationToken);
-            }
 
             await FireAsync(new RestartResource("kernel", IsRollingUpdate: true, TargetVersion: version, Strategy: $"replica-{replica}-of-3"), cancellationToken);
 
@@ -92,27 +87,13 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
             var verifyPhase = verifyFailed ? "verify-failed" : "verified";
 
             await FireAsync(SystemRollingSurfaces.CreateVerify(replica, version, verifyPhase, lineageCount, Self.Value), cancellationToken);
-            if (bus is not null)
-            {
-                await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingVerifyCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = verifyPhase, version, lineageEvents = lineageCount })), cancellationToken);
-            }
 
             if (verifyFailed)
             {
                 await RestoreCheckpointAsync(preUpdateCheckpoint, cancellationToken);
                 await FireAsync(SystemRollingSurfaces.CreateRollback(replica, version, preUpdateCheckpoint.SynapseId, Self.Value), cancellationToken);
-                if (bus is not null)
-                {
-                    await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelRollingRollbackCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "rolledback", version })), cancellationToken);
-                }
                 return; // Abort: do not process further replicas, do not emit RollingComplete.
             }
-        }
-
-        var statusData = System.Text.Json.JsonSerializer.Serialize(new { process = KernelPack.Name, version, status = "complete", haReplicas = 3, checkpoint = preUpdateCheckpoint.SynapseId, lineageEvents = lineageCount });
-        if (bus is not null)
-        {
-            await bus.BroadcastAsync(new RfwCard("digitalbrain", "KernelUpdateStatusCard", statusData), cancellationToken);
         }
 
         await FireAsync(SystemRollingSurfaces.CreateComplete(version, preUpdateCheckpoint.SynapseId, lineageCount, Self.Value), cancellationToken);
@@ -122,15 +103,10 @@ public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, 
 [GrainType("digitalbrain.observability.v1")]
 public class ObservabilityNeuron(ILogger<ObservabilityNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IObservabilityNeuron
 {
-    public async Task HandleAsync(UiSurface surface, CancellationToken cancellationToken = default)
+    public Task HandleAsync(UiSurface surface, CancellationToken cancellationToken = default)
     {
         Logger.LogInformation("Observability surface {Kind} correlation={CorrelationId}", surface.Kind, surface.CorrelationId);
-
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus is not null)
-        {
-            await bus.BroadcastAsync(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value), cancellationToken);
-        }
+        return Task.CompletedTask;
     }
 
     public async Task HandleAsync(ClusterActivity activity, CancellationToken cancellationToken = default)

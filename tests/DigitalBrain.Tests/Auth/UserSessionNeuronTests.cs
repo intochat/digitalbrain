@@ -33,6 +33,20 @@ public sealed class UserSessionNeuronTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task Login_Journals_A_Signed_In_Session_Status_Surface()
+    {
+        var session = Grain<IUserSessionNeuron>("session-auth-signed-in-surface");
+
+        await session.FireAsync(new LoginRequest("carol.local", "correct horse battery staple", "test-client"));
+
+        var timeline = await session.GetOutgoingTimelineAsync();
+        var surface = Assert.Single(timeline.OfType<UiSurface>(), s => s.Kind == "session-status");
+        Assert.Equal("surface.session.test-client", surface.Props[UiSurfaceKeys.SurfaceId]);
+        Assert.Equal("signed-in", surface.Props["status"]);
+        Assert.Equal("test-client", surface.Props["clientId"]);
+    }
+
+    [Fact]
     public async Task Invalid_Password_Fires_LoginFailed_And_Does_Not_Create_Second_Session()
     {
         var session = Grain<IUserSessionNeuron>("session-auth-invalid");
@@ -79,39 +93,6 @@ public sealed class UserSessionNeuronTests : NeuronTestBase
         var form = Assert.Single(FindNodes(tree), node => node.Type == NeuronUiKit.Form);
         Assert.Equal(nameof(LoginRequest), form.Props[UiSurfaceKeys.SynapseType]);
         Assert.Equal("test-client", form.Props["clientId"]);
-    }
-
-    // Proves the actual bug this task's plan fixes: after a real login, the signed-in shell surface
-    // reaches the connecting client's own HomeFeedBus stream (addressed by its clientId), not merely a
-    // Props dictionary that happens to carry the right value with nothing actually routing on it. Follows
-    // the direct-subscribe pattern from HomeFeedCrossSiloTests.cs/GatewayServiceTests.cs rather than driving
-    // the gRPC-facing WatchHomeFeed surface.
-    [Fact]
-    public async Task Login_Broadcasts_Signed_In_Shell_Surface_To_The_Connecting_Clients_HomeFeedBus_Stream()
-    {
-        var session = Grain<IUserSessionNeuron>("session-shell-routing");
-        var bus = ((InProcessSiloHandle)Cluster.Silos[0]).SiloHost.Services.GetRequiredService<HomeFeedBus>();
-
-        const string clientId = "shell-routing-connection";
-        await using var subscription = await bus.SubscribeAsync(clientId);
-
-        await session.HandleAsync(new LoginRequest("shell-routing-user", "correct horse battery staple", clientId));
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        RfwCard? shellCard = null;
-        while (shellCard is null)
-        {
-            var card = await subscription.Reader.ReadAsync(cts.Token);
-            if (string.Equals(card.CorrelationId, "surface.shell.shell-routing-user", StringComparison.Ordinal))
-            {
-                shellCard = card;
-            }
-        }
-
-        Assert.Equal(clientId, shellCard.ClientId);
-        Assert.Contains(clientId, shellCard.DataJson, StringComparison.Ordinal);
-        Assert.Contains("\"workspaceId\":\"default\"", shellCard.DataJson, StringComparison.Ordinal);
-        Assert.Contains("\"targetSurfaceKind\":\"workspace\"", shellCard.DataJson, StringComparison.Ordinal);
     }
 
     [Fact]

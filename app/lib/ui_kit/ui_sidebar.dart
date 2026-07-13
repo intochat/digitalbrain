@@ -31,7 +31,10 @@ class UiKitSidebar extends StatelessWidget {
               FSidebarItem(
                 label: Text(item.label),
                 onPress: () => fireNav(
-                  onEvent, pack, experienceId, item.eventName,
+                  onEvent,
+                  pack,
+                  experienceId,
+                  item.eventName,
                   scope?.values ?? const {},
                 ),
               ),

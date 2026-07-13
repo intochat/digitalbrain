@@ -38,8 +38,6 @@ public sealed class LlmAttributeMapper<TModel> : IAttributeToFactoryMapper<LlmAt
 // Derives the key the same way every other consumer does — instantiate the model and read its own
 // Describe().ServiceKey — rather than reflecting for a separately-declared string member (nothing in
 // DigitalBrain.Core.Models declares one; DigitalBrainModelDescriptor.ServiceKey is the single source of truth).
-// Public (not internal): Voice2TextAttributeMapper<TModel> in DigitalBrain.Kernel reuses this exact
-// helper for [Voice2Text<TModel>], and there is no InternalsVisibleTo between the two assemblies.
 public static class LlmServiceKeys
 {
     public static string For(Type modelType)

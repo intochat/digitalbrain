@@ -44,8 +44,6 @@ public sealed class DigitalBrainOptions
 
     public int KernelReplicas { get; set; } = 3;
 
-    public bool EnableOrleansDashboard { get; set; } = true;
-    public int? OrleansDashboardPort { get; set; } = 8080;
     public bool EnableMcp { get; set; } = true;
 
     public DigitalBrainOptions WithLLM<TModel>() where TModel : LlmModel, new()
@@ -60,24 +58,6 @@ public sealed class DigitalBrainOptions
     {
         var model = new TModel();
         lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Default);
-        return this;
-    }
-
-    public DigitalBrainOptions WithVoice2Text<TModel>() where TModel : VoiceToTextModel, new()
-    {
-        var model = new TModel();
-        lastModelRegistration = ModelRegistry.Register(model.Describe(), DigitalBrainModelRole.Default);
-        return this;
-    }
-
-    public DigitalBrainOptions WithVectorDatabase(string provider, string id = "default")
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
-        ArgumentException.ThrowIfNullOrWhiteSpace(id);
-
-        lastModelRegistration = ModelRegistry.Register(
-            new DigitalBrainModelDescriptor(DigitalBrainCapabilityKind.VectorDatabase, provider, id, id, DigitalBrainModelCapabilities.FullyCapable),
-            DigitalBrainModelRole.Default);
         return this;
     }
 

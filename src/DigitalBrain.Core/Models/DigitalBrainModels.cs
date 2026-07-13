@@ -30,11 +30,3 @@ public abstract class EmbeddingModel : DigitalBrainModel
 {
     public sealed override DigitalBrainCapabilityKind Kind => DigitalBrainCapabilityKind.Embedding;
 }
-
-/// <summary>
-/// Typed voice-to-text marker for <see cref="DigitalBrainOptions.WithVoice2Text{TModel}"/>.
-/// </summary>
-public abstract class VoiceToTextModel : DigitalBrainModel
-{
-    public sealed override DigitalBrainCapabilityKind Kind => DigitalBrainCapabilityKind.VoiceToText;
-}

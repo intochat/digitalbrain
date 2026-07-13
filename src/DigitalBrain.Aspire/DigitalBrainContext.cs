@@ -22,21 +22,18 @@ public sealed class DigitalBrainContext
 
     public EndpointReference? OllamaEndpoint { get; init; }
     public EndpointReference? EmbeddingOllamaEndpoint { get; init; }
-    public EndpointReference? WhisperEndpoint { get; init; }
-
     public IResourceBuilder<ParameterResource>? AzureOpenAIEndpoint { get; init; }
     public IResourceBuilder<ParameterResource>? AzureOpenAIKey { get; init; }
     public IResourceBuilder<ParameterResource>? OpenAIApiKey { get; init; }
     public IResourceBuilder<ParameterResource>? AnthropicApiKey { get; init; }
     public IResourceBuilder<ParameterResource>? GitHubModelsToken { get; init; }
-    public IResourceBuilder<ParameterResource>? XaiApiKey { get; init; }
 
     public required IResourceBuilder<AzureBlobStorageResource> GrainBlobs { get; init; }
+    public required IResourceBuilder<AzureBlobStorageResource> ConversationStateBlobs { get; init; }
+    public required IResourceBuilder<AzureBlobStorageResource> SurfaceFeedStateBlobs { get; init; }
+    public required IResourceBuilder<AzureBlobStorageResource> SessionStateBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> JournalBlobs { get; init; }
-    public required IResourceBuilder<AzureBlobStorageResource> SyncBlobs { get; init; }
     public required IResourceBuilder<AzureTableStorageResource> ClusteringTable { get; init; }
 
-    public bool EnableOrleansDashboard { get; init; }
-    public int? OrleansDashboardPort { get; init; }
     public bool EnableMcp { get; init; }
 }

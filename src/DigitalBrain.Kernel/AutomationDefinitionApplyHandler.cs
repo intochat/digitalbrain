@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Ino;
 using DigitalBrain.Kernel.SelfEvolution;
 
 namespace DigitalBrain.Kernel;
@@ -32,13 +31,12 @@ public sealed class AutomationDefinitionApplyHandler(IGrainFactory grains) : ISe
         await automation.FireAsync(staged.Reaction, ct);
 
         // Capability registration is journal-only (CapabilityRegistered). Static classifier projection removed.
-        var cap = new InoIntentClassifier.Capability(
+        await automation.FireAsync(new CapabilityRegistered(
             staged.Reaction.Id,
             $"Automation: when {staged.Reaction.When} target {staged.Reaction.Target}",
-            new[] { proposal.Rationale ?? "" },
-            "automation");
-
-        await automation.FireAsync(new CapabilityRegistered(cap.Id, cap.Description, cap.Examples, cap.Tier, proposal.Origin), ct);
+            [proposal.Rationale ?? ""],
+            "automation",
+            proposal.Origin), ct);
 
         return new SelfEvolutionApplyResult(
             proposal.ProposalId,

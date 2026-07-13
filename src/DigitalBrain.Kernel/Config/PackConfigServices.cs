@@ -1,6 +1,7 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using DigitalBrain.Core.Config;
+using DigitalBrain.Kernel.Runtime;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace DigitalBrain.Kernel.Config;
@@ -34,9 +35,12 @@ public static class PackConfigServices
         // AzureComponent.AddClient registers an unkeyed null-sentinel for BlobServiceClient whenever ANY
         // keyed registration for that type exists anywhere in the app (Program.cs keys one for grain
         // storage) - so sp.GetService<BlobServiceClient>() always returns null in the real Aspire-hosted
-        // kernel, silently falling back to the in-memory backing store even in production.
-        services.AddSingleton<IPackConfigBackingStore>(_ => blobsForKeyRing is not null
-            ? new AzureBlobPackConfigBackingStore(blobsForKeyRing)
+        // kernel, silently falling back to the in-memory backing store even in production. The durable
+        // path also resolves the stable runtime-state key ring and fails closed when it is unavailable.
+        services.AddSingleton<IPackConfigBackingStore>(serviceProvider => blobsForKeyRing is not null
+            ? new AzureBlobPackConfigBackingStore(
+                blobsForKeyRing,
+                serviceProvider.GetRequiredService<IRuntimeStateKeyRing>())
             : new InMemoryPackConfigBackingStore());
 
         services.AddSingleton<IPackConfigStore, PackConfigStore>();

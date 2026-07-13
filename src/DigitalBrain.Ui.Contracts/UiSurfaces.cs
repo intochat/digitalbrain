@@ -97,7 +97,7 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
     }
 
     // Typed-tree sibling of ForExperienceHop: an experience hop whose payload is a UiWidgetTree of ui:* nodes.
-    // Markers live in Props; UiSurfaceRfwBridge merges them into the wire dataJson and keys correlation on surfaceId.
+    // Markers live in Props; the RFW bridge merges them into the wire dataJson and keys correlation on surfaceId.
     public static UiSurface ForExperienceHopTree(
         string pack,
         string experienceId,

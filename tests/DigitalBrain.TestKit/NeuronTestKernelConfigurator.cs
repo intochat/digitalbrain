@@ -1,6 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Ino;
-using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Db;
 using DigitalBrain.Kernel.Foundry;
@@ -31,7 +29,6 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
         siloBuilder
             .AddMemoryGrainStorageAsDefault()
             .AddMemoryStreams("Default")
-            .AddMemoryStreams("HomeFeed")
             .AddMemoryStreams("DigitalBrainTimeline")
             .AddMemoryGrainStorage("PubSubStore")
             .ConfigureServices(services =>
@@ -47,14 +44,8 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
-                services.AddSingleton<IInoCapabilityRecall, DigitalBrain.Ino.InoCapabilityRecall>();
-                services.AddSingleton<IInoToolProvider, DigitalBrain.Google.GmailInoToolProvider>();
-                services.AddSingleton<IInoToolProvider, DigitalBrain.Salesforce.SalesforceInoToolProvider>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
-                services.AddSingleton<IVectorStore, InMemoryVectorStore>();
-                services.AddSingleton<DocumentIngestor>();
                 services.AddSingleton<SqliteSchemaInspector>();
-                services.AddSingleton<HomeFeedBus>();
                 services.AddSingleton<SignalEgressBus>();
                 services.AddSignalEgressStreamSubscriber();
                 services.AddSingleton<IConfiguration>(

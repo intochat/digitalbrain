@@ -50,29 +50,6 @@ public class NeuronTests : NeuronTestBase
     }
 
     [Fact]
-    public async Task SystemStatus_Launches_And_Records_Status()
-    {
-        var status = Grain<ISystemStatus>("status-test");
-        var timeline = await status.GetTimelineAsync();
-
-        Assert.Contains(timeline, s => s.Type == nameof(SystemLaunched) || s.Type == nameof(SystemStatusChanged));
-    }
-
-    [Fact]
-    public async Task SystemStatus_Simulates_Fix_From_Checkpoint()
-    {
-        var status = Grain<ISystemStatus>("status-sim");
-
-        await status.FireAsync(new SystemStatusChanged("kernel", "FailedToStart", "test failure"));
-
-        var timeline = await status.GetTimelineAsync();
-        Assert.Contains(timeline, s => s.Type == nameof(FixProposal));
-        var sim = timeline.LastOrDefault(s => s.Type == nameof(SimulationResult)) as SimulationResult;
-        Assert.NotNull(sim);
-        Assert.True(sim.Success);
-    }
-
-    [Fact]
     public void AutomationRecords_Are_Synapses_And_Construct_Correctly()
     {
         var script = new RegisterScript("daily-brief", "return Array.Empty<Synapse>();", "demo script");

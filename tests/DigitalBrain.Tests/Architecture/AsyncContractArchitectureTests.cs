@@ -1,16 +1,13 @@
-extern alias McpProject;
 using System.Reflection;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
-using DigitalBrain.Ino;
-using DigitalBrain.Ino.Context;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Config;
+using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Ui.Contracts;
-using McpProject::DigitalBrain.Mcp;
 
 namespace DigitalBrain.Tests.Architecture;
 
@@ -20,20 +17,16 @@ public sealed class AsyncContractArchitectureTests
     [
         typeof(INeuron),
         typeof(IHandle<>),
-        typeof(IInoNeuron),
         typeof(IIngressNeuron),
-        typeof(IContextNeuron),
         typeof(IAutomationNeuron),
         typeof(IUserSessionNeuron),
-        typeof(IFlutterUiNeuron),
-        typeof(IGoogleAuthNeuron),
-        typeof(ISalesforceAuthNeuron),
+        typeof(IGmailReadToolGrain),
+        typeof(ISalesforceReadToolGrain),
         typeof(IConnector),
         typeof(IPackConfigStore),
         typeof(IPackConfigBackingStore),
         typeof(IGmailApiClientFactory),
-        typeof(ISalesforceApiClientFactory),
-        typeof(DigitalBrainMutationTools)
+        typeof(ISalesforceApiClientFactory)
     ];
 
     [Fact]
@@ -69,9 +62,8 @@ public sealed class AsyncContractArchitectureTests
         var productionAssemblies = new[]
         {
             typeof(Neuron).Assembly,
-            typeof(InoNeuron).Assembly,
-            typeof(IGoogleAuthNeuron).Assembly,
-            typeof(ISalesforceAuthNeuron).Assembly
+            typeof(GmailReadNeuron).Assembly,
+            typeof(SalesforceReadNeuron).Assembly
         }.Distinct().ToArray();
 
         var offenders = productionAssemblies

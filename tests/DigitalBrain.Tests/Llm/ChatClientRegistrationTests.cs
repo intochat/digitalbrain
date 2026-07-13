@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DigitalBrain.Core.Models;
 using DigitalBrain.Kernel.Llm;
 using Microsoft.Extensions.AI;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Tests.Llm;
 
+[Collection("chat-telemetry-environment")]
 public class ChatClientRegistrationTests
 {
     [Fact]
@@ -153,4 +155,62 @@ public class ChatClientRegistrationTests
 
         Assert.NotNull(sp.GetService<IChatClient>());
     }
+
+    [Fact]
+    public async Task ChatTelemetry_never_captures_message_content_even_when_the_standard_environment_variable_is_enabled()
+    {
+        const string environmentVariable = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT";
+        const string prompt = "telemetry-secret-prompt";
+        var previous = Environment.GetEnvironmentVariable(environmentVariable);
+
+        try
+        {
+            Environment.SetEnvironmentVariable(environmentVariable, "true");
+            var stopped = new List<Activity>();
+            using var listener = new ActivityListener
+            {
+                ShouldListenTo = static source => source.Name == "DigitalBrain.Neuron",
+                Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+                SampleUsingParentId = static (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
+                ActivityStopped = stopped.Add
+            };
+            ActivitySource.AddActivityListener(listener);
+            using var client = DigitalBrainChatTelemetry.Wrap(new EchoChatClient());
+
+            await client.GetResponseAsync(prompt);
+
+            var telemetry = string.Join('\n', stopped.SelectMany(static activity =>
+                activity.Tags.Select(static tag => $"{tag.Key}={tag.Value}")
+                    .Concat(activity.Events.SelectMany(static activityEvent => activityEvent.Tags.Select(tag =>
+                        $"{activityEvent.Name}:{tag.Key}={tag.Value}")))));
+            Assert.DoesNotContain(prompt, telemetry, StringComparison.Ordinal);
+            Assert.DoesNotContain("telemetry-response", telemetry, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(environmentVariable, previous);
+        }
+    }
+
+    private sealed class EchoChatClient : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "telemetry-response")));
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
 }
+
+[CollectionDefinition("chat-telemetry-environment", DisableParallelization = true)]
+public sealed class ChatTelemetryEnvironmentCollection;

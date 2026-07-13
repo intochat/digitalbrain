@@ -111,54 +111,93 @@ class UiSurfaceTreeRenderer {
     // Aliases and heuristics removed in prior step. One place per type.
     switch (type) {
       case 'neuron:menu':
-        return _buildNeuronMenu(props, childrenList, onEvent, rfwHost, onNavSelected, activeTarget);
+        return _buildNeuronMenu(
+          props,
+          childrenList,
+          onEvent,
+          rfwHost,
+          onNavSelected,
+          activeTarget,
+        );
       case 'neuron:menuitem':
-        return _buildNeuronMenuItem(props, onEvent, onNavSelected, activeTarget);
+        return _buildNeuronMenuItem(
+          props,
+          onEvent,
+          onNavSelected,
+          activeTarget,
+        );
       case 'neuron:actionbutton':
       case 'neuron:neuronbutton':
         final label = (props['label'] ?? props['text'] ?? '').toString();
         return FButton(
           onPress: () {
             onEvent('press', {'label': label, ...props});
-            final t = (props['targetSurfaceKind'] ?? props['target'])?.toString();
+            final t = (props['targetSurfaceKind'] ?? props['target'])
+                ?.toString();
             if (t != null && t.isNotEmpty) onNavSelected?.call(t);
           },
           child: Text(label),
         );
       case 'neuron:header':
-        final t = (props['title'] ?? props['text'] ?? props['label'] ?? '').toString();
+        final t = (props['title'] ?? props['text'] ?? props['label'] ?? '')
+            .toString();
         return FHeader(title: Text(t));
       case 'neuron:divider':
         return const FDivider();
       case 'forui:fsidebar':
-        return _buildNeuronMenu(props, childrenList, onEvent, rfwHost, onNavSelected, activeTarget);
+        return _buildNeuronMenu(
+          props,
+          childrenList,
+          onEvent,
+          rfwHost,
+          onNavSelected,
+          activeTarget,
+        );
       case 'forui:fscaffold':
-        return _buildForuiScaffold(props, childrenList, onEvent, rfwHost, onNavSelected, activeTarget);
+        return _buildForuiScaffold(
+          props,
+          childrenList,
+          onEvent,
+          rfwHost,
+          onNavSelected,
+          activeTarget,
+        );
       case 'forui:fautocomplete':
         return _buildForuiAutocomplete(props, onEvent);
       case 'forui:ftextfield':
         final label = (props['label'] ?? props['hint'] ?? '').toString();
-        final hint = (props['hint'] ?? props['placeholder'] ?? label).toString();
+        final hint = (props['hint'] ?? props['placeholder'] ?? label)
+            .toString();
         return FTextField(label: Text(label), hint: hint);
       case 'neuron:form':
       case 'forui:fform':
         return _NeuronForm(props: props, onEvent: onEvent);
       case 'forui:fselect':
         final itemsRaw = props['items'] ?? const <Object>[];
-        final items = itemsRaw is List ? itemsRaw.map((e) => e.toString()).toList() : <String>[];
+        final items = itemsRaw is List
+            ? itemsRaw.map((e) => e.toString()).toList()
+            : <String>[];
         final label = (props['label'] ?? 'Select').toString();
-        return FSelect(label: Text(label), items: {for (final i in items) i: i});
+        return FSelect(
+          label: Text(label),
+          items: {for (final i in items) i: i},
+        );
       case 'forui:fbutton':
         final label = (props['label'] ?? props['text'] ?? '').toString();
-        final variantStr = (props['variant'] ?? 'primary').toString().toLowerCase();
+        final variantStr = (props['variant'] ?? 'primary')
+            .toString()
+            .toLowerCase();
         var variant = FButtonVariant.primary;
         if (variantStr.contains('outline')) variant = FButtonVariant.outline;
-        if (variantStr.contains('destructive')) variant = FButtonVariant.destructive;
+        if (variantStr.contains('destructive')) {
+          variant = FButtonVariant.destructive;
+        }
         return FButton(
           variant: variant,
           onPress: () {
             onEvent('press', {'label': label, ...props});
-            final t = (props['targetSurfaceKind'] ?? props['target'])?.toString();
+            final t = (props['targetSurfaceKind'] ?? props['target'])
+                ?.toString();
             if (t != null && t.isNotEmpty) onNavSelected?.call(t);
           },
           child: Text(label),
@@ -243,7 +282,10 @@ class UiSurfaceTreeRenderer {
       return const SizedBox.shrink(); // legacy navItems removed - use children
     }
 
-    if (type == 'fcard' || type == 'card' || type == 'panel') {
+    if (type == 'fcard' ||
+        type == 'forui:fcard' ||
+        type == 'card' ||
+        type == 'panel') {
       final title = props['title']?.toString() ?? '';
       final sub =
           props['subtitle']?.toString() ?? props['summary']?.toString() ?? '';

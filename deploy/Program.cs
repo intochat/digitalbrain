@@ -15,9 +15,8 @@ using StorageInputs = Pulumi.AzureNative.Storage.Inputs;
 namespace DigitalBrain.Deploy;
 
 // Minimal Pulumi program for DigitalBrain / NeuroOS. Provisions only what the runtime actually uses:
-// a resource group, one StorageV2 account (Orleans Table clustering + Blob grain/journal), Azure OpenAI
-// (gpt-4o-mini "chat"), Log Analytics + App Insights, an ACA managed environment, a kernel container app
-// with an external Auto-transport ingress, and a Telegram transport container app (external /webhook ingress).
+// a resource group, one Storage account (Orleans Table clustering + Blob grain/journal), Azure OpenAI,
+// Log Analytics + App Insights, an ACA managed environment, the kernel, and the public one-replica MCP/UI edge.
 // Replaces the vendored DeploymentKit.
 internal static class Program
 {
@@ -29,23 +28,23 @@ internal static class Program
     private const string DefaultFrontendWwwHostname = "www.digitalbrain.tech";
     private const string DefaultFrontendStaticWebAppsHostname = "gentle-sand-0f4081803.7.azurestaticapps.net";
     private const string DefaultKernelCustomHostname = "api.digitalbrain.tech";
+    private const string DefaultMcpCustomHostname = "mcp.digitalbrain.tech";
+    private const string RequiredMcpAudience = "digitalbrain-v2";
+    private const string RequiredUiAudience = "digitalbrain-v2-ui";
 
-    // Images live in private Docker Hub repos under the owner's personal account. ACA authenticates the pull
+    // The image lives in a private Docker Hub repository. ACA authenticates the pull
     // via AppInputs.RegistryCredentialsArgs (server=docker.io) with a Docker Hub PAT stored as a Container App
-    // secret (DockerHubPasswordSecret below), since the repos are private.
-    private const string DockerHubUsername = "vhorbachov";
+    // secret (DockerHubPasswordSecret below), since the repository is private.
     private const string DockerHubPasswordSecret = "dockerhub-password";
-    private const string KernelImageRepository = "docker.io/vhorbachov/digitalbrain-kernel";
-    private const string TelegramImageRepository = "docker.io/vhorbachov/digitalbrain-telegram";
 
     // Container App secret names backing the NeuroOS runtime contract.
-    private const string StorageConnectionSecret = "digitalbrain-storage-connection";
     private const string OpenAiKeySecret = "digitalbrain-openai-key";
     private const string CheckpointKeySecret = "digitalbrain-checkpoint-key";
-
-    // Telegram transport secrets — bot token + shared internal service key.
-    private const string TelegramBotTokenSecret = "telegram-bot-token";
-    private const string InternalServiceKeySecret = "digitalbrain-internal-service-key";
+    private const string SessionSigningKeySecret = "digitalbrain-session-signing-key";
+    private const string RuntimeStateKekSecret = "digitalbrain-runtime-state-kek-v1";
+    private const string RuntimeStateSigningKeySecret = "digitalbrain-runtime-state-signing-key";
+    private const string GoogleClientSecret = "digitalbrain-google-client-secret";
+    private const string SalesforceClientSecret = "digitalbrain-salesforce-client-secret";
 
     // The environment + kernel app were previously created under DeploymentKit's "app-runtime" component. Alias to that old
     // parent URN so Pulumi re-parents them to the stack root in place instead of replacing the live resources.
@@ -57,6 +56,7 @@ internal static class Program
     private static IDictionary<string, object?> Provision()
     {
         var config = new Config();
+        var dockerHubUsername = RequiredSetting(config, "dockerHubUsername", "DIGITALBRAIN_DOCKERHUB_USERNAME");
         var imageTag = Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
             ?? config.Get("imageTag")
             ?? "latest";
@@ -80,41 +80,33 @@ internal static class Program
             "DIGITALBRAIN_KERNEL_HOSTNAME",
             "kernelHostname",
             DefaultKernelCustomHostname);
+        var mcpCustomEndpoint = ConfiguredHttpsOrigin(
+            config,
+            "DIGITALBRAIN_MCP_HOSTNAME",
+            "mcpHostname",
+            DefaultMcpCustomHostname);
 
-        // CI injects the AES checkpoint-encryption key as a secret env var (from a GitHub Actions secret) so it
-        // never lives in git; local runs can instead use `pulumi config set --secret checkpointKey ...`.
-        var checkpointKeyEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_CHECKPOINT_KEY");
-        var checkpointKey = config.GetSecret("checkpointKey")
-            ?? (string.IsNullOrEmpty(checkpointKeyEnv) ? null : Output.CreateSecret(checkpointKeyEnv))
-            ?? throw new System.InvalidOperationException(
-                "Checkpoint key required: set env DIGITALBRAIN_CHECKPOINT_KEY (CI secret) " +
-                "or `pulumi config set --secret digitalbrain-deploy:checkpointKey <base64-32-bytes>` (local).");
+        var sessionSigningKey = RequiredSecret(config, "sessionSigningKey", "DIGITALBRAIN_SESSION_SIGNING_KEY");
+        var runtimeStateKek = RequiredSecret(config, "runtimeStateKek", "DIGITALBRAIN_RUNTIME_STATE_KEK");
+        var runtimeStateSigningKey = RequiredSecret(config, "runtimeStateSigningKey", "DIGITALBRAIN_RUNTIME_STATE_SIGNING_KEY");
+        var googleClientId = RequiredSetting(config, "googleClientId", "DIGITALBRAIN_GOOGLE_CLIENT_ID");
+        var googleClientSecret = RequiredSecret(config, "googleClientSecret", "DIGITALBRAIN_GOOGLE_CLIENT_SECRET");
+        var googleRedirectUri = RequiredHttpsUri(config, "googleRedirectUri", "DIGITALBRAIN_GOOGLE_REDIRECT_URI");
+        var salesforceClientId = RequiredSetting(config, "salesforceClientId", "DIGITALBRAIN_SALESFORCE_CLIENT_ID");
+        var salesforceClientSecret = RequiredSecret(config, "salesforceClientSecret", "DIGITALBRAIN_SALESFORCE_CLIENT_SECRET");
+        var salesforceRedirectUri = RequiredHttpsUri(config, "salesforceRedirectUri", "DIGITALBRAIN_SALESFORCE_REDIRECT_URI");
+        var oidcIssuer = RequiredHttpsUri(config, "oidcIssuer", "DIGITALBRAIN_OIDC_ISSUER").TrimEnd('/');
+        var oidcAudience = RequiredSetting(config, "oidcAudience", "DIGITALBRAIN_OIDC_AUDIENCE");
+        var mcpAudience = RequiredSetting(config, "mcpAudience", "DIGITALBRAIN_MCP_AUDIENCE");
+        var uiAudience = RequiredSetting(config, "uiAudience", "DIGITALBRAIN_UI_AUDIENCE");
+        DemandExactSetting(mcpAudience, RequiredMcpAudience, "DIGITALBRAIN_MCP_AUDIENCE");
+        DemandExactSetting(uiAudience, RequiredUiAudience, "DIGITALBRAIN_UI_AUDIENCE");
+        DemandOAuthCallback(googleRedirectUri, kernelCustomEndpoint, "google", "DIGITALBRAIN_GOOGLE_REDIRECT_URI");
+        DemandOAuthCallback(salesforceRedirectUri, kernelCustomEndpoint, "salesforce", "DIGITALBRAIN_SALESFORCE_REDIRECT_URI");
+        var frontendOrigins = string.Join(',', frontendApexOrigin, frontendWwwOrigin, frontendStaticWebAppsOrigin);
 
-        // Telegram transport is optional in production. Do not emit empty ACA secrets; Container Apps rejects
-        // secrets whose value is empty. Set env DIGITALBRAIN_TELEGRAM_BOT_TOKEN / DIGITALBRAIN_INTERNAL_SERVICE_KEY
-        // in CI, or matching Pulumi secrets, to deploy the transport.
-        var telegramBotTokenEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_TELEGRAM_BOT_TOKEN");
-        var telegramBotToken = config.GetSecret("telegramBotToken")
-            ?? (string.IsNullOrWhiteSpace(telegramBotTokenEnv) ? null : Output.CreateSecret(telegramBotTokenEnv));
-        var internalServiceKeyEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_INTERNAL_SERVICE_KEY");
-        var internalServiceKey = config.GetSecret("internalServiceKey")
-            ?? (string.IsNullOrWhiteSpace(internalServiceKeyEnv) ? null : Output.CreateSecret(internalServiceKeyEnv));
-
-        if (telegramBotToken is not null && internalServiceKey is null)
-        {
-            throw new System.InvalidOperationException(
-                "Telegram deploy requires an internal service key: set env DIGITALBRAIN_INTERNAL_SERVICE_KEY " +
-                "or `pulumi config set --secret digitalbrain-deploy:internalServiceKey <value>`.");
-        }
-        // Docker Hub PAT (read scope is enough — ACA only pulls, never pushes) backing the private
-        // vhorbachov/digitalbrain-kernel and -telegram repos. Same CI-secret-or-local-config contract as
-        // checkpointKey above.
-        var dockerHubTokenEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_DOCKERHUB_TOKEN");
-        var dockerHubToken = config.GetSecret("dockerHubToken")
-            ?? (string.IsNullOrEmpty(dockerHubTokenEnv) ? null : Output.CreateSecret(dockerHubTokenEnv))
-            ?? throw new System.InvalidOperationException(
-                "Docker Hub token required: set env DIGITALBRAIN_DOCKERHUB_TOKEN (CI secret) " +
-                "or `pulumi config set --secret digitalbrain-deploy:dockerHubToken <PAT>` (local).");
+        var checkpointKey = RequiredSecret(config, "checkpointKey", "DIGITALBRAIN_CHECKPOINT_KEY");
+        var dockerHubToken = RequiredSecret(config, "dockerHubToken", "DIGITALBRAIN_DOCKERHUB_TOKEN");
 
         var resourceGroup = new ResourceGroup(ResourceGroupName, new ResourceGroupArgs
         {
@@ -132,7 +124,7 @@ internal static class Program
             Sku = new StorageInputs.SkuArgs { Name = Storage.SkuName.Standard_LRS },
             AccessTier = Storage.AccessTier.Hot,
             AllowBlobPublicAccess = false,
-            AllowSharedKeyAccess = true,
+            AllowSharedKeyAccess = false,
             EnableHttpsTrafficOnly = true,
             MinimumTlsVersion = Storage.MinimumTlsVersion.TLS1_2,
             NetworkRuleSet = new StorageInputs.NetworkRuleSetArgs
@@ -142,26 +134,6 @@ internal static class Program
             },
             Tags = StandardTags("storage-account")
         });
-
-        // Sync blob container (M11 checkpoint-based local<->cloud sync, Task 20): checkpoint backup/restore
-        // blobs land here, scoped to the same storage account as clustering/grainstate/journal above — no new
-        // storage account needed. PublicAccess.None matches the account-level AllowBlobPublicAccess = false.
-        var syncContainer = new Storage.BlobContainer("digitalbrain-sync", new Storage.BlobContainerArgs
-        {
-            ContainerName = "sync",
-            AccountName = storage.Name,
-            ResourceGroupName = resourceGroup.Name,
-            PublicAccess = Storage.PublicAccess.None
-        });
-
-        var storageKey = Storage.ListStorageAccountKeys.Invoke(new Storage.ListStorageAccountKeysInvokeArgs
-        {
-            ResourceGroupName = resourceGroup.Name,
-            AccountName = storage.Name
-        }).Apply(keys => keys.Keys[0].Value);
-
-        var storageConnectionString = Output.CreateSecret(Output.Tuple(storage.Name, storageKey).Apply(t =>
-            $"DefaultEndpointsProtocol=https;AccountName={t.Item1};AccountKey={t.Item2};EndpointSuffix=core.windows.net"));
 
         var openAi = new Cognitive.Account("digitalbrainopenaiprod", new Cognitive.AccountArgs
         {
@@ -248,8 +220,7 @@ internal static class Program
             Tags = StandardTags("container-apps-environment")
         }, AliasOldRuntimeParent());
 
-        var kernelImage = Output.Format($"{KernelImageRepository}:{imageTag}");
-        var telegramImage = Output.Format($"{TelegramImageRepository}:{imageTag}");
+        var kernelImage = Output.Format($"docker.io/{dockerHubUsername}/digitalbrain-kernel:{imageTag}");
 
         var kernelApp = new App.ContainerApp("digitalbrain-jobs", new App.ContainerAppArgs
         {
@@ -257,23 +228,26 @@ internal static class Program
             ResourceGroupName = resourceGroup.Name,
             Location = Region,
             ManagedEnvironmentId = containerEnvironment.Id,
-            // System-assigned identity backs the Storage Table/Blob Data Contributor role assignments below,
-            // letting Orleans clustering/grain-storage/journal authenticate via managed identity instead of
-            // the account key once DigitalBrain.Kernel's useManagedIdentity switch is live (Task 18, step 1/2).
+            // System-assigned identity backs all Storage data-plane access. Shared-key access is disabled on
+            // the account, so a missing role assignment fails closed instead of falling back to an account key.
             Identity = new AppInputs.ManagedServiceIdentityArgs { Type = App.ManagedServiceIdentityType.SystemAssigned },
             Configuration = new AppInputs.ConfigurationArgs
             {
                 Ingress = new AppInputs.IngressArgs
                 {
+                    AllowInsecure = false,
                     External = true,
                     TargetPort = 8080,
                     Transport = "Auto"
                 },
                 Secrets =
                 {
-                    new AppInputs.SecretArgs { Name = StorageConnectionSecret, Value = storageConnectionString },
                     new AppInputs.SecretArgs { Name = OpenAiKeySecret, Value = openAiKey },
                     new AppInputs.SecretArgs { Name = CheckpointKeySecret, Value = checkpointKey },
+                    new AppInputs.SecretArgs { Name = RuntimeStateKekSecret, Value = runtimeStateKek },
+                    new AppInputs.SecretArgs { Name = RuntimeStateSigningKeySecret, Value = runtimeStateSigningKey },
+                    new AppInputs.SecretArgs { Name = GoogleClientSecret, Value = googleClientSecret },
+                    new AppInputs.SecretArgs { Name = SalesforceClientSecret, Value = salesforceClientSecret },
                     new AppInputs.SecretArgs { Name = DockerHubPasswordSecret, Value = dockerHubToken }
                 },
                 Registries =
@@ -281,7 +255,7 @@ internal static class Program
                     new AppInputs.RegistryCredentialsArgs
                     {
                         Server = "docker.io",
-                        Username = DockerHubUsername,
+                        Username = dockerHubUsername,
                         PasswordSecretRef = DockerHubPasswordSecret
                     }
                 }
@@ -315,27 +289,29 @@ internal static class Program
                         Env =
                         {
                             new AppInputs.EnvironmentVarArgs { Name = "ASPNETCORE_ENVIRONMENT", Value = "Production" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Profile", Value = "Production" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__ForwardedHeaders__TrustAzureContainerAppsIngress", Value = "true" },
                             new AppInputs.EnvironmentVarArgs { Name = "DIGITALBRAIN_WEB_PORT", Value = "8080" },
                             new AppInputs.EnvironmentVarArgs { Name = "DIGITALBRAIN_ENV", Value = "cloud" },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__Provider", Value = "azureopenai" },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__Model", Value = ChatDeploymentName },
-                            new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__clustering", SecretRef = StorageConnectionSecret },
-                            new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__grainstate", SecretRef = StorageConnectionSecret },
-                            new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__journal", SecretRef = StorageConnectionSecret },
-                            // Task 21: CheckpointBackupTrigger's "sync" BlobContainerClient (KernelServices.AddCheckpointSync)
-                            // falls back to this connection string whenever useManagedIdentity is false. It's set here
-                            // unconditionally (same StorageConnectionSecret as clustering/grainstate/journal — one storage
-                            // account) so it's never null even before useManagedIdentity's real-identity branch actually
-                            // runs; once DigitalBrain__Storage__AccountName below flips useManagedIdentity on, this var is
-                            // simply unused by that branch (harmless to leave set).
-                            new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__sync", SecretRef = StorageConnectionSecret },
-                            // Read by DigitalBrain.Kernel/Program.cs to flip useManagedIdentity on. Never set in
-                            // Aspire/local config, so local dev + existing tests keep using the connection
-                            // strings above unchanged (shared-key access stays enabled until Task 18 step 5).
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Storage__AccountName", Value = storage.Name },
+                            new AppInputs.EnvironmentVarArgs { Name = "Orleans__ClusterId", Value = "digitalbrain" },
+                            new AppInputs.EnvironmentVarArgs { Name = "Orleans__ServiceId", Value = "digitalbrain" },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIEndpoint", Value = openAiEndpoint },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIKey", SecretRef = OpenAiKeySecret },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Checkpoint__Key", SecretRef = CheckpointKeySecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__State__ActiveKekVersion", Value = "1" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__State__Keks__1", SecretRef = RuntimeStateKekSecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__State__SigningKey", SecretRef = RuntimeStateSigningKeySecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Google__ClientId", Value = googleClientId },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Google__ClientSecret", SecretRef = GoogleClientSecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Google__RedirectUri", Value = googleRedirectUri },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Salesforce__ClientId", Value = salesforceClientId },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Salesforce__ClientSecret", SecretRef = SalesforceClientSecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Salesforce__RedirectUri", Value = salesforceRedirectUri },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Salesforce__LoginUrl", Value = "https://login.salesforce.com" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Salesforce__ApiVersion", Value = "v61.0" },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__0", Value = frontendApexOrigin },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__1", Value = frontendWwwOrigin },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Cors__AllowedOrigins__2", Value = frontendStaticWebAppsOrigin },
@@ -350,78 +326,51 @@ internal static class Program
             Tags = StandardTags("container-app-jobs")
         }, AliasOldRuntimeParent());
 
-        // Grant the kernel's system-assigned identity data-plane access to the storage account (Task 18,
-        // step 2) and to the OpenAI account (Task 19, step 1). GUIDs verified against Microsoft Learn's
-        // built-in-roles/storage.md and dotnet/ai/azure-ai-services-authentication.md sources, not trusted
-        // from memory. GrantKernelRole is generalized over the target scope (storage.Id vs openAi.Id) since
-        // both are just "system-assigned identity, one RBAC role, one resource scope" — no need for a second
-        // near-identical helper.
-        var kernelPrincipalId = kernelApp.Identity.Apply(identity => identity!.PrincipalId!);
-        GrantKernelRole("kernel-storage-table-contributor", "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3", storage.Id); // Storage Table Data Contributor
-        GrantKernelRole("kernel-storage-blob-contributor", "ba92f5b4-2d11-453d-a403-e96b0029c9fe", storage.Id); // Storage Blob Data Contributor
-        // Kernel identity isn't granted access until this deploys; the key-based path (openAiKey/OpenAiKeySecret
-        // above) stays wired unchanged so DigitalBrainChat.cs's key branch keeps working until a verified,
-        // separate follow-up deploy removes the key and flips DisableLocalAuth (Task 19 steps 2/4, out of scope here).
-        GrantKernelRole("kernel-openai-user", "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd", openAi.Id); // Cognitive Services OpenAI User
-
-        void GrantKernelRole(string resourceName, string roleDefinitionGuid, Input<string> scope) =>
-            _ = new Authorization.RoleAssignment(resourceName, new Authorization.RoleAssignmentArgs
-            {
-                PrincipalId = kernelPrincipalId,
-                PrincipalType = Authorization.PrincipalType.ServicePrincipal,
-                RoleDefinitionId = $"/providers/Microsoft.Authorization/roleDefinitions/{roleDefinitionGuid}",
-                Scope = scope
-            });
-
-        // The Telegram transport calls the kernel's gRPC gateway. The kernel app's external FQDN is reachable from
-        // within the same ACA environment, so we build the address from LatestRevisionFqdn. Must be HTTPS
-        // because ACA external ingress always terminates TLS. Same key the Aspire dev wiring sets:
-        // "DigitalBrain:GatewayAddress" (colon separator, mirrored in transport Program.cs).
-        var kernelGatewayAddress = kernelApp.LatestRevisionFqdn.Apply(fqdn => $"https://{fqdn}");
-
-        App.ContainerApp? telegramTransport = null;
-        if (telegramBotToken is not null)
+        var mcpImage = Output.Format($"docker.io/{dockerHubUsername}/digitalbrain-mcp:{imageTag}");
+        var mcpApp = new App.ContainerApp("digitalbrain-mcp", new App.ContainerAppArgs
         {
-            telegramTransport = new App.ContainerApp("digitalbrain-telegram", new App.ContainerAppArgs
+            ContainerAppName = "digitalbrain-mcp",
+            ResourceGroupName = resourceGroup.Name,
+            Location = Region,
+            ManagedEnvironmentId = containerEnvironment.Id,
+            Identity = new AppInputs.ManagedServiceIdentityArgs { Type = App.ManagedServiceIdentityType.SystemAssigned },
+            // MCP is the sole edge for Flutter runtime (authenticated gRPC UI transport only). Kernel FQDN is
+            // exposed solely for OAuth start/callbacks. Flutter web assets deployed to SWA reference only MCP_CUSTOM_HOSTNAME.
+            // Production fails closed on missing OIDC, keys, storage roles or MI. Single revision enforced.
+            Configuration = new AppInputs.ConfigurationArgs
             {
-                ContainerAppName = "digitalbrain-telegram",
-                ResourceGroupName = resourceGroup.Name,
-                Location = Region,
-                ManagedEnvironmentId = containerEnvironment.Id,
-                Configuration = new AppInputs.ConfigurationArgs
+                ActiveRevisionsMode = "Single",
+                Ingress = new AppInputs.IngressArgs
                 {
-                    // External ingress so Telegram's servers can POST to /webhook.
-                    Ingress = new AppInputs.IngressArgs
-                    {
-                        External = true,
-                        TargetPort = 8080,
-                        Transport = "Http"
-                    },
-                    Secrets =
+                    AllowInsecure = false,
+                    External = true,
+                    TargetPort = 8080,
+                    Transport = "Auto"
+                },
+                Secrets =
                 {
-                    new AppInputs.SecretArgs { Name = TelegramBotTokenSecret, Value = telegramBotToken },
-                    new AppInputs.SecretArgs { Name = InternalServiceKeySecret, Value = internalServiceKey! },
+                    new AppInputs.SecretArgs { Name = SessionSigningKeySecret, Value = sessionSigningKey },
                     new AppInputs.SecretArgs { Name = DockerHubPasswordSecret, Value = dockerHubToken }
                 },
-                    Registries =
+                Registries =
                 {
                     new AppInputs.RegistryCredentialsArgs
                     {
                         Server = "docker.io",
-                        Username = DockerHubUsername,
+                        Username = dockerHubUsername,
                         PasswordSecretRef = DockerHubPasswordSecret
                     }
                 }
-                },
-                Template = new AppInputs.TemplateArgs
-                {
-                    Containers =
+            },
+            Template = new AppInputs.TemplateArgs
+            {
+                Containers =
                 {
                     new AppInputs.ContainerArgs
                     {
-                        Name = "telegram",
-                        Image = telegramImage,
-                        Resources = new AppInputs.ContainerResourcesArgs { Cpu = 0.25, Memory = "0.5Gi" },
+                        Name = "mcp",
+                        Image = mcpImage,
+                        Resources = new AppInputs.ContainerResourcesArgs { Cpu = 1.0, Memory = "2Gi" },
                         Probes =
                         {
                             new AppInputs.ContainerAppProbeArgs
@@ -443,21 +392,55 @@ internal static class Program
                         {
                             new AppInputs.EnvironmentVarArgs { Name = "ASPNETCORE_ENVIRONMENT", Value = "Production" },
                             new AppInputs.EnvironmentVarArgs { Name = "ASPNETCORE_HTTP_PORTS", Value = "8080" },
-                            // Same keys read by transport Program.cs and set by WireTelegramTransport for dev parity.
-                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__GatewayAddress", Value = kernelGatewayAddress },
-                            new AppInputs.EnvironmentVarArgs { Name = "Telegram__BotToken", SecretRef = TelegramBotTokenSecret },
-                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__InternalServiceKey", SecretRef = InternalServiceKeySecret },
-                            new AppInputs.EnvironmentVarArgs { Name = "Telegram__PackName", Value = "DigitalBrain.Telegram.Responder" },
-                            new AppInputs.EnvironmentVarArgs { Name = "Telegram__ConfigScope", Value = "default" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DIGITALBRAIN_ENV", Value = "cloud" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Profile", Value = "Production" },
+                            new AppInputs.EnvironmentVarArgs { Name = "Aspire__Azure__Data__Tables__clustering__ServiceUri", Value = Output.Format($"https://{storage.Name}.table.core.windows.net") },
+                            new AppInputs.EnvironmentVarArgs { Name = "Orleans__Clustering__ProviderType", Value = "AzureTableStorage" },
+                            new AppInputs.EnvironmentVarArgs { Name = "Orleans__Clustering__ServiceKey", Value = "clustering" },
+                            new AppInputs.EnvironmentVarArgs { Name = "Orleans__ClusterId", Value = "digitalbrain" },
+                            new AppInputs.EnvironmentVarArgs { Name = "Orleans__ServiceId", Value = "digitalbrain" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Auth__SessionSigningKey", SecretRef = SessionSigningKeySecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__Ui__Oidc__Issuer", Value = oidcIssuer },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__Ui__Oidc__Audience", Value = oidcAudience },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__Ui__Oidc__AllowedGrants", Value = "brain.interact,brain.read,ui.action,gmail.read,salesforce.read" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__Mcp__Audience", Value = mcpAudience },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__Ui__Audience", Value = uiAudience },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__OAuth__InternalOrigin", Value = Output.Format($"https://{kernelApp.LatestRevisionFqdn}") },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__Mcp__AllowedOrigins", Value = frontendOrigins },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__Ui__AllowedOrigins", Value = frontendOrigins },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Runtime__ForwardedHeaders__TrustAzureContainerAppsIngress", Value = "true" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Google__RedirectUri", Value = googleRedirectUri },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Salesforce__RedirectUri", Value = salesforceRedirectUri },
                             new AppInputs.EnvironmentVarArgs { Name = "APPLICATIONINSIGHTS_CONNECTION_STRING", Value = appInsightsConnectionString }
                         }
                     }
                 },
-                    Scale = new AppInputs.ScaleArgs { MinReplicas = 1, MaxReplicas = 3 }
-                },
-                Tags = StandardTags("container-app-telegram")
+                // Runtime actions and authorization leases are deliberately single-owner. Do not autoscale
+                // until their stores and workers have a verified multi-replica coordination protocol.
+                Scale = new AppInputs.ScaleArgs { MinReplicas = 1, MaxReplicas = 1 },
+                TerminationGracePeriodSeconds = 60
+            },
+            Tags = StandardTags("container-app-mcp")
+        });
+
+        var kernelPrincipalId = kernelApp.Identity.Apply(identity => identity!.PrincipalId!);
+        var mcpPrincipalId = mcpApp.Identity.Apply(identity => identity!.PrincipalId!);
+        GrantRole("kernel-storage-table-contributor", kernelPrincipalId, "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3", storage.Id); // Storage Table Data Contributor
+        GrantRole("kernel-storage-blob-contributor", kernelPrincipalId, "ba92f5b4-2d11-453d-a403-e96b0029c9fe", storage.Id); // Storage Blob Data Contributor
+        GrantRole("mcp-storage-table-reader", mcpPrincipalId, "76199698-9eea-4c19-bc75-cec21354c6b6", storage.Id); // Storage Table Data Reader
+        // Kernel identity isn't granted access until this deploys; the key-based path (openAiKey/OpenAiKeySecret
+        // above) stays wired unchanged so DigitalBrainChat.cs's key branch keeps working until a verified,
+        // separate follow-up deploy removes the key and flips DisableLocalAuth (Task 19 steps 2/4, out of scope here).
+        GrantRole("kernel-openai-user", kernelPrincipalId, "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd", openAi.Id); // Cognitive Services OpenAI User
+
+        static void GrantRole(string resourceName, Input<string> principalId, string roleDefinitionGuid, Input<string> scope) =>
+            _ = new Authorization.RoleAssignment(resourceName, new Authorization.RoleAssignmentArgs
+            {
+                PrincipalId = principalId,
+                PrincipalType = Authorization.PrincipalType.ServicePrincipal,
+                RoleDefinitionId = $"/providers/Microsoft.Authorization/roleDefinitions/{roleDefinitionGuid}",
+                Scope = scope
             });
-        }
 
         return new Dictionary<string, object?>
         {
@@ -468,8 +451,9 @@ internal static class Program
             ["kernelApp"] = kernelApp.Name,
             ["kernelFqdn"] = kernelApp.LatestRevisionFqdn,
             ["kernelCustomEndpoint"] = kernelCustomEndpoint,
-            ["telegramApp"] = telegramTransport?.Name,
-            ["telegramFqdn"] = telegramTransport?.LatestRevisionFqdn,
+            ["mcpApp"] = mcpApp.Name,
+            ["mcpFqdn"] = mcpApp.LatestRevisionFqdn,
+            ["mcpCustomEndpoint"] = mcpCustomEndpoint,
             ["imageTag"] = imageTag,
             ["environment"] = EnvSuffix
         };
@@ -489,13 +473,76 @@ internal static class Program
         }
 
         var trimmed = configured.Trim().TrimEnd('/');
-        if (trimmed.StartsWith("https://", System.StringComparison.OrdinalIgnoreCase) ||
-            trimmed.StartsWith("http://", System.StringComparison.OrdinalIgnoreCase))
+        var candidate = trimmed.Contains("://", System.StringComparison.Ordinal)
+            ? trimmed
+            : $"https://{trimmed}";
+        if (!System.Uri.TryCreate(candidate, System.UriKind.Absolute, out var origin) ||
+            !string.Equals(origin.Scheme, System.Uri.UriSchemeHttps, System.StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(origin.Host) ||
+            origin.UserInfo.Length != 0 ||
+            origin.AbsolutePath is not ("" or "/") ||
+            origin.Query.Length != 0 ||
+            origin.Fragment.Length != 0)
         {
-            return trimmed;
+            throw new System.InvalidOperationException(
+                $"Production origin {envName} must be an HTTPS authority without credentials, path, query, or fragment.");
         }
 
-        return $"https://{trimmed}";
+        return origin.GetLeftPart(System.UriPartial.Authority);
+    }
+
+    private static string RequiredSetting(Config config, string configName, string envName)
+    {
+        var value = Environment.GetEnvironmentVariable(envName);
+        if (string.IsNullOrWhiteSpace(value)) value = config.Get(configName);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new System.InvalidOperationException(
+                $"Required production setting is missing: set {envName} or Pulumi config '{configName}'.");
+        }
+
+        return value.Trim();
+    }
+
+    private static string RequiredHttpsUri(Config config, string configName, string envName)
+    {
+        var value = RequiredSetting(config, configName, envName);
+        if (!System.Uri.TryCreate(value, System.UriKind.Absolute, out var uri) ||
+            !string.Equals(uri.Scheme, System.Uri.UriSchemeHttps, System.StringComparison.OrdinalIgnoreCase))
+        {
+            throw new System.InvalidOperationException(
+                $"Required production setting {envName} must be an absolute HTTPS URI.");
+        }
+
+        return value;
+    }
+
+    private static Output<string> RequiredSecret(Config config, string configName, string envName)
+    {
+        var value = Environment.GetEnvironmentVariable(envName);
+        if (!string.IsNullOrWhiteSpace(value)) return Output.CreateSecret(value);
+
+        var configured = config.GetSecret(configName);
+        if (configured is not null) return configured;
+
+        throw new System.InvalidOperationException(
+            $"Required production secret is missing: set {envName} or encrypted Pulumi config '{configName}'.");
+    }
+
+    private static void DemandExactSetting(string actual, string expected, string envName)
+    {
+        if (!string.Equals(actual, expected, System.StringComparison.Ordinal))
+            throw new System.InvalidOperationException($"Production setting {envName} must be '{expected}'.");
+    }
+
+    private static void DemandOAuthCallback(string actual, string kernelOrigin, string provider, string envName)
+    {
+        var expected = $"{kernelOrigin.TrimEnd('/')}/oauth/callback/{provider}";
+        if (!string.Equals(actual.TrimEnd('/'), expected, System.StringComparison.OrdinalIgnoreCase))
+        {
+            throw new System.InvalidOperationException(
+                $"Production setting {envName} must target the kernel's bounded OAuth callback '{expected}'.");
+        }
     }
 
     private static CustomResourceOptions AliasOldRuntimeParent() =>

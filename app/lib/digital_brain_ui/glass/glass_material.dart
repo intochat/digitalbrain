@@ -36,14 +36,15 @@ class GlassMaterial extends StatefulWidget {
   State<GlassMaterial> createState() => _GlassMaterialState();
 }
 
-class _GlassMaterialState extends State<GlassMaterial> with SingleTickerProviderStateMixin {
+class _GlassMaterialState extends State<GlassMaterial>
+    with SingleTickerProviderStateMixin {
   static ui.FragmentProgram? _shaderProgram;
   static bool _loadingShader = false;
+  static bool get _shadersEnabled => false;
 
   late final Ticker _ticker;
   double _elapsedTime = 0.0;
   Offset _mouseOffset = Offset.zero;
-  bool _isHovered = false;
 
   @override
   void initState() {
@@ -92,18 +93,13 @@ class _GlassMaterialState extends State<GlassMaterial> with SingleTickerProvider
       );
     }
 
-    final effectiveSigma = kIsWeb && MediaQuery.sizeOf(context).width < 600
-        ? 14.0
-        : widget.blurSigma;
-
-    final hasShader = false; // _shaderProgram != null;
+    final hasShader = _shaderProgram != null && _shadersEnabled;
 
     Widget body = DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: widget.tintOpacity),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(
+          alpha: widget.tintOpacity,
+        ),
         borderRadius: widget.effectiveBorderRadius,
       ),
       child: Stack(
@@ -152,7 +148,6 @@ class _GlassMaterialState extends State<GlassMaterial> with SingleTickerProvider
 
     return MouseRegion(
       onEnter: (event) {
-        _isHovered = true;
         _ticker.start();
         setState(() {
           _mouseOffset = event.localPosition;
@@ -164,7 +159,6 @@ class _GlassMaterialState extends State<GlassMaterial> with SingleTickerProvider
         });
       },
       onExit: (_) {
-        _isHovered = false;
         _ticker.stop();
         setState(() {
           _mouseOffset = Offset.zero;
@@ -206,10 +200,10 @@ class LiquidGlassShaderPainter extends CustomPainter {
     // uTime
     shader.setFloat(4, time);
     // uBrandColor (Normalized HSL/RGB)
-    shader.setFloat(5, brandColor.red / 255.0);
-    shader.setFloat(6, brandColor.green / 255.0);
-    shader.setFloat(7, brandColor.blue / 255.0);
-    shader.setFloat(8, brandColor.alpha / 255.0);
+    shader.setFloat(5, (brandColor.r * 255.0).round().clamp(0, 255) / 255.0);
+    shader.setFloat(6, (brandColor.g * 255.0).round().clamp(0, 255) / 255.0);
+    shader.setFloat(7, (brandColor.b * 255.0).round().clamp(0, 255) / 255.0);
+    shader.setFloat(8, (brandColor.a * 255.0).round().clamp(0, 255) / 255.0);
 
     final paint = Paint()..shader = shader;
     canvas.drawRect(Offset.zero & size, paint);

@@ -8,7 +8,9 @@ import 'package:vector_math/vector_math_64.dart' as vm;
 
 import 'cluster_layout.dart';
 import 'comet.dart';
-import 'domain_palette.dart';class BrainPainter extends CustomPainter {
+import 'domain_palette.dart';
+
+class BrainPainter extends CustomPainter {
   BrainPainter({
     required this.nodes,
     required this.edges,
@@ -179,14 +181,16 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
   void _drawStaticEdges(Canvas canvas, Map<String, _Projected> projected) {
     if (!showSynapses) return;
     // Filaments under the comets. Recent edges glow brighter so freshly-fired
-    // synapses remain visible after the comet linger has decayed. Fades completely 
+    // synapses remain visible after the comet linger has decayed. Fades completely
     // to 0.0 over 12s, keeping only active task paths and recent synapse trails visible.
     for (final e in edges) {
       final a = projected[e.fromId];
       final b = projected[e.toId];
       if (a == null || b == null) continue;
       final isSelected = identical(e, selectedEdge);
-      final isPartOfActiveCorrelation = activeCorrelations.contains(e.correlationId);
+      final isPartOfActiveCorrelation = activeCorrelations.contains(
+        e.correlationId,
+      );
       final family = colorForSynapseType(e.typeName);
       final ageSeconds = now.difference(e.at).inMilliseconds / 1000.0;
 
@@ -198,9 +202,11 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
         continue;
       }
 
-      final alpha = isSelected 
-          ? 0.65 
-          : (isPartOfActiveCorrelation ? 0.45 + 0.35 * recency : 0.65 * recency);
+      final alpha = isSelected
+          ? 0.65
+          : (isPartOfActiveCorrelation
+                ? 0.45 + 0.35 * recency
+                : 0.65 * recency);
       final width = isSelected ? 2.4 : (1.2 + 1.4 * recency);
       final color = (isSelected ? const Color(0xFFFFD166) : family).withValues(
         alpha: alpha,
@@ -229,8 +235,9 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
     final byId = {for (final n in nodes) n.id: n};
     final sorted = projected.entries.toList()
       ..sort((x, y) => y.value.depth.compareTo(x.value.depth));
-    
-    final double pulseValue = (DateTime.now().millisecondsSinceEpoch % 5000) / 5000.0;
+
+    final double pulseValue =
+        (DateTime.now().millisecondsSinceEpoch % 5000) / 5000.0;
     final double pulseFactor = 1.0 + 0.08 * sin(pulseValue * 2.0 * pi * 2.0);
 
     for (final entry in sorted) {
@@ -240,11 +247,14 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
       final bool isActive = n?.isActive ?? false;
 
       final radius =
-          (isSelected ? 14.0 : (isActive ? 12.0 : 10.0)) * (1.0 + 0.5 / max(0.1, p.depth / _focal));
-      
+          (isSelected ? 14.0 : (isActive ? 12.0 : 10.0)) *
+          (1.0 + 0.5 / max(0.1, p.depth / _focal));
+
       final base = isSelected
           ? const Color(0xFFFFD166)
-          : (isActive ? const Color(0xFFFF9F1C) : styleForDomain(n?.domain).color);
+          : (isActive
+                ? const Color(0xFFFF9F1C)
+                : styleForDomain(n?.domain).color);
 
       final strokeColor = isSelected
           ? const Color(0xFFFFD166)
@@ -255,7 +265,15 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
 
       // Active state pulsating volumetric glow (pulsates at breathing 1200ms rate)
       if (isActive) {
-        final double activePulse = 1.0 + 0.12 * sin((DateTime.now().millisecondsSinceEpoch % 1200) / 1200.0 * 2.0 * pi);
+        final double activePulse =
+            1.0 +
+            0.12 *
+                sin(
+                  (DateTime.now().millisecondsSinceEpoch % 1200) /
+                      1200.0 *
+                      2.0 *
+                      pi,
+                );
         canvas.drawCircle(
           p.screen,
           radius * 1.6 * activePulse,
@@ -271,13 +289,29 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
           ..color = adaptedColor
           ..strokeWidth = 1.2
           ..style = PaintingStyle.stroke;
-        
+
         canvas.drawCircle(p.screen, radius * pulseFactor, outlinePaint);
         canvas.drawCircle(p.screen, 2.0, Paint()..color = adaptedColor);
-        canvas.drawLine(Offset(p.screen.dx - radius * 1.3, p.screen.dy), Offset(p.screen.dx - radius * 0.9, p.screen.dy), outlinePaint);
-        canvas.drawLine(Offset(p.screen.dx + radius * 0.9, p.screen.dy), Offset(p.screen.dx + radius * 1.3, p.screen.dy), outlinePaint);
-        canvas.drawLine(Offset(p.screen.dx, p.screen.dy - radius * 1.3), Offset(p.screen.dx, p.screen.dy - radius * 0.9), outlinePaint);
-        canvas.drawLine(Offset(p.screen.dx, p.screen.dy + radius * 0.9), Offset(p.screen.dx, p.screen.dy + radius * 1.3), outlinePaint);
+        canvas.drawLine(
+          Offset(p.screen.dx - radius * 1.3, p.screen.dy),
+          Offset(p.screen.dx - radius * 0.9, p.screen.dy),
+          outlinePaint,
+        );
+        canvas.drawLine(
+          Offset(p.screen.dx + radius * 0.9, p.screen.dy),
+          Offset(p.screen.dx + radius * 1.3, p.screen.dy),
+          outlinePaint,
+        );
+        canvas.drawLine(
+          Offset(p.screen.dx, p.screen.dy - radius * 1.3),
+          Offset(p.screen.dx, p.screen.dy - radius * 0.9),
+          outlinePaint,
+        );
+        canvas.drawLine(
+          Offset(p.screen.dx, p.screen.dy + radius * 0.9),
+          Offset(p.screen.dx, p.screen.dy + radius * 1.3),
+          outlinePaint,
+        );
         continue;
       }
 
@@ -291,7 +325,9 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
         final cPaint = Paint()
           ..color = adaptedColor.withValues(alpha: finalOpacity)
           ..style = PaintingStyle.fill;
-        if (cinematicBlur > 1.0) cPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, cinematicBlur);
+        if (cinematicBlur > 1.0) {
+          cPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, cinematicBlur);
+        }
         canvas.drawCircle(p.screen, radius * finalScale * pulseFactor, cPaint);
         continue;
       }
@@ -309,11 +345,24 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
           ..strokeWidth = 1.2
           ..style = PaintingStyle.stroke;
         for (int i = 0; i < 8; i++) {
-          double startAngle = (i * 2.0 * pi / 8.0) + (pulseValue * 2.0 * pi * 0.18);
-          canvas.drawArc(Rect.fromCircle(center: p.screen, radius: radius * 1.25), startAngle, 0.35, false, dashPaint);
+          double startAngle =
+              (i * 2.0 * pi / 8.0) + (pulseValue * 2.0 * pi * 0.18);
+          canvas.drawArc(
+            Rect.fromCircle(center: p.screen, radius: radius * 1.25),
+            startAngle,
+            0.35,
+            false,
+            dashPaint,
+          );
         }
 
-        canvas.drawCircle(p.screen, radius * 0.65, Paint()..color = adaptedColor.withValues(alpha: 0.12)..style = PaintingStyle.fill);
+        canvas.drawCircle(
+          p.screen,
+          radius * 0.65,
+          Paint()
+            ..color = adaptedColor.withValues(alpha: 0.12)
+            ..style = PaintingStyle.fill,
+        );
 
         _drawBillboardedIcon(
           canvas,
@@ -331,19 +380,45 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
           ..color = adaptedColor.withValues(alpha: 0.28)
           ..strokeWidth = 0.8
           ..style = PaintingStyle.stroke;
-        canvas.drawOval(Rect.fromCenter(center: p.screen, width: radius * 2.2, height: radius * 0.65), ringPaint);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: p.screen,
+            width: radius * 2.2,
+            height: radius * 0.65,
+          ),
+          ringPaint,
+        );
 
         canvas.save();
         canvas.translate(p.screen.dx, p.screen.dy);
         canvas.rotate(pi / 3);
-        canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: radius * 2.2, height: radius * 0.65), ringPaint);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: radius * 2.2,
+            height: radius * 0.65,
+          ),
+          ringPaint,
+        );
 
-        final dotPaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+        final dotPaint = Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill;
         double t1 = pulseValue * 2.0 * pi * 1.8;
-        canvas.drawCircle(Offset(radius * 1.1 * cos(t1), radius * 0.325 * sin(t1)), 2.0, dotPaint);
+        canvas.drawCircle(
+          Offset(radius * 1.1 * cos(t1), radius * 0.325 * sin(t1)),
+          2.0,
+          dotPaint,
+        );
         canvas.restore();
 
-        canvas.drawCircle(p.screen, radius * 0.6, Paint()..color = adaptedColor.withValues(alpha: 0.1)..style = PaintingStyle.fill);
+        canvas.drawCircle(
+          p.screen,
+          radius * 0.6,
+          Paint()
+            ..color = adaptedColor.withValues(alpha: 0.1)
+            ..style = PaintingStyle.fill,
+        );
 
         _drawBillboardedIcon(
           canvas,
@@ -359,24 +434,43 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
       if (activeTab == 7) {
         for (int i = 0; i < 3; i++) {
           double phase = i * 2.0 * pi / 3.0;
-          double scaleBreathing = 1.0 + 0.16 * sin(pulseValue * 2.0 * pi * 1.0 + phase);
-          Offset offsetBreathing = p.screen + Offset(
-            2 * sin(pulseValue * 2.0 * pi * 0.8 + i),
-            2 * cos(pulseValue * 2.0 * pi * 0.8 + i),
-          );
+          double scaleBreathing =
+              1.0 + 0.16 * sin(pulseValue * 2.0 * pi * 1.0 + phase);
+          Offset offsetBreathing =
+              p.screen +
+              Offset(
+                2 * sin(pulseValue * 2.0 * pi * 0.8 + i),
+                2 * cos(pulseValue * 2.0 * pi * 0.8 + i),
+              );
           final gasPaint = Paint()
-            ..shader = RadialGradient(
-              colors: [
-                adaptedColor.withValues(alpha: 0.25),
-                adaptedColor.withValues(alpha: 0.04),
-                Colors.transparent,
-              ],
-            ).createShader(Rect.fromCircle(center: offsetBreathing, radius: radius * 1.7 * scaleBreathing))
+            ..shader =
+                RadialGradient(
+                  colors: [
+                    adaptedColor.withValues(alpha: 0.25),
+                    adaptedColor.withValues(alpha: 0.04),
+                    Colors.transparent,
+                  ],
+                ).createShader(
+                  Rect.fromCircle(
+                    center: offsetBreathing,
+                    radius: radius * 1.7 * scaleBreathing,
+                  ),
+                )
             ..style = PaintingStyle.fill;
-          canvas.drawCircle(offsetBreathing, radius * 1.7 * scaleBreathing, gasPaint);
+          canvas.drawCircle(
+            offsetBreathing,
+            radius * 1.7 * scaleBreathing,
+            gasPaint,
+          );
         }
 
-        canvas.drawCircle(p.screen, radius * 0.7 * pulseFactor, Paint()..color = adaptedColor.withValues(alpha: 0.18)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0));
+        canvas.drawCircle(
+          p.screen,
+          radius * 0.7 * pulseFactor,
+          Paint()
+            ..color = adaptedColor.withValues(alpha: 0.18)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
+        );
 
         _drawBillboardedIcon(
           canvas,
@@ -391,7 +485,10 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
       // Fallback representing other tabs with Monochrome filter integration
       if (replaceSpheresWithIcons) {
         final category = NeuronVectorLogo.resolveCategory(entry.key);
-        final painter = LogoPainter(category: category, overrideColor: adaptedColor);
+        final painter = LogoPainter(
+          category: category,
+          overrideColor: adaptedColor,
+        );
         canvas.save();
         canvas.translate(p.screen.dx - radius, p.screen.dy - radius);
         painter.paint(canvas, Size(radius * 2, radius * 2));
@@ -447,7 +544,6 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
     }
   }
 
-
   void _drawCorrelationRimGlow(
     Canvas canvas,
     Map<String, _Projected> projected,
@@ -502,7 +598,11 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant BrainPainter old) => true;
 
-  void _drawLayoutOverlay(Canvas canvas, Size size, Map<String, _Projected> projected) {
+  void _drawLayoutOverlay(
+    Canvas canvas,
+    Size size,
+    Map<String, _Projected> projected,
+  ) {
     if (activeLayout == 'split_work') {
       final double midX = size.width / 2.0;
       final linePaint = Paint()
@@ -513,7 +613,11 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
       const double gapHeight = 10.0;
       double y = 0.0;
       while (y < size.height) {
-        canvas.drawLine(Offset(midX, y), Offset(midX, y + dashHeight), linePaint);
+        canvas.drawLine(
+          Offset(midX, y),
+          Offset(midX, y + dashHeight),
+          linePaint,
+        );
         y += dashHeight + gapHeight;
       }
 
@@ -561,7 +665,8 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
     }
 
     if (selectedNeuronId == 'DigitalBrain.SDK.Diagram.DiagramExporterNeuron') {
-      final nodeProj = projected['DigitalBrain.SDK.Diagram.DiagramExporterNeuron'];
+      final nodeProj =
+          projected['DigitalBrain.SDK.Diagram.DiagramExporterNeuron'];
       if (nodeProj != null) {
         final origin = nodeProj.screen + const Offset(40, -40);
 
@@ -571,8 +676,14 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.0
           ..color = Colors.white.withValues(alpha: 0.15);
-        canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(8)), bgPaint);
-        canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(8)), borderPaint);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+          bgPaint,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+          borderPaint,
+        );
 
         final titlePainter = TextPainter(
           text: const TextSpan(
@@ -592,27 +703,83 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
         final double boxHeight = 24.0;
         final double yPos = origin.dy + 24.0;
 
-        final defaultRect = Rect.fromLTWH(origin.dx + 8, yPos, boxWidth, boxHeight);
+        final defaultRect = Rect.fromLTWH(
+          origin.dx + 8,
+          yPos,
+          boxWidth,
+          boxHeight,
+        );
         final isDefault = activeLayout == 'default';
-        canvas.drawRect(defaultRect, Paint()..color = isDefault ? DigitalBrainColors.indigo.withValues(alpha: 0.3) : const Color(0x33FFFFFF));
-        canvas.drawRect(defaultRect, Paint()..style = PaintingStyle.stroke..color = isDefault ? DigitalBrainColors.indigo : Colors.white24);
+        canvas.drawRect(
+          defaultRect,
+          Paint()
+            ..color = isDefault
+                ? DigitalBrainColors.indigo.withValues(alpha: 0.3)
+                : const Color(0x33FFFFFF),
+        );
+        canvas.drawRect(
+          defaultRect,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..color = isDefault ? DigitalBrainColors.indigo : Colors.white24,
+        );
 
-        final splitRect = Rect.fromLTWH(origin.dx + 44, yPos, boxWidth, boxHeight);
+        final splitRect = Rect.fromLTWH(
+          origin.dx + 44,
+          yPos,
+          boxWidth,
+          boxHeight,
+        );
         final isSplit = activeLayout == 'split_work';
-        canvas.drawRect(splitRect, Paint()..color = isSplit ? DigitalBrainColors.teal.withValues(alpha: 0.3) : const Color(0x33FFFFFF));
-        canvas.drawRect(splitRect, Paint()..style = PaintingStyle.stroke..color = isSplit ? DigitalBrainColors.teal : Colors.white24);
-        canvas.drawLine(Offset(splitRect.left + 15, splitRect.top), Offset(splitRect.left + 15, splitRect.bottom), Paint()..color = isSplit ? DigitalBrainColors.teal : Colors.white30);
+        canvas.drawRect(
+          splitRect,
+          Paint()
+            ..color = isSplit
+                ? DigitalBrainColors.teal.withValues(alpha: 0.3)
+                : const Color(0x33FFFFFF),
+        );
+        canvas.drawRect(
+          splitRect,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..color = isSplit ? DigitalBrainColors.teal : Colors.white24,
+        );
+        canvas.drawLine(
+          Offset(splitRect.left + 15, splitRect.top),
+          Offset(splitRect.left + 15, splitRect.bottom),
+          Paint()..color = isSplit ? DigitalBrainColors.teal : Colors.white30,
+        );
 
-        final fullRect = Rect.fromLTWH(origin.dx + 80, yPos, boxWidth, boxHeight);
+        final fullRect = Rect.fromLTWH(
+          origin.dx + 80,
+          yPos,
+          boxWidth,
+          boxHeight,
+        );
         final isFull = activeLayout == 'fullscreen';
-        canvas.drawRect(fullRect, Paint()..color = isFull ? DigitalBrainColors.rose.withValues(alpha: 0.3) : const Color(0x33FFFFFF));
-        canvas.drawRect(fullRect, Paint()..style = PaintingStyle.stroke..color = isFull ? DigitalBrainColors.rose : Colors.white24);
+        canvas.drawRect(
+          fullRect,
+          Paint()
+            ..color = isFull
+                ? DigitalBrainColors.rose.withValues(alpha: 0.3)
+                : const Color(0x33FFFFFF),
+        );
+        canvas.drawRect(
+          fullRect,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..color = isFull ? DigitalBrainColors.rose : Colors.white24,
+        );
 
         final labelPainter = TextPainter(
           text: TextSpan(
             text: 'ACTIVE: ${activeLayout.toUpperCase()}',
             style: TextStyle(
-              color: activeLayout == 'fullscreen' ? DigitalBrainColors.rose : (activeLayout == 'split_work' ? DigitalBrainColors.teal : DigitalBrainColors.indigoSoft),
+              color: activeLayout == 'fullscreen'
+                  ? DigitalBrainColors.rose
+                  : (activeLayout == 'split_work'
+                        ? DigitalBrainColors.teal
+                        : DigitalBrainColors.indigoSoft),
               fontSize: 8,
               fontWeight: FontWeight.bold,
             ),
@@ -622,36 +789,80 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
         labelPainter.paint(canvas, origin + const Offset(8, 54));
 
         final filamentPaint = Paint()
-          ..color = (activeLayout == 'fullscreen' ? DigitalBrainColors.rose : (activeLayout == 'split_work' ? DigitalBrainColors.teal : DigitalBrainColors.indigoSoft)).withValues(alpha: 0.35)
+          ..color =
+              (activeLayout == 'fullscreen'
+                      ? DigitalBrainColors.rose
+                      : (activeLayout == 'split_work'
+                            ? DigitalBrainColors.teal
+                            : DigitalBrainColors.indigoSoft))
+                  .withValues(alpha: 0.35)
           ..strokeWidth = 1.0;
-        canvas.drawLine(nodeProj.screen, origin + const Offset(0, 45), filamentPaint);
+        canvas.drawLine(
+          nodeProj.screen,
+          origin + const Offset(0, 45),
+          filamentPaint,
+        );
       }
     }
   }
 
   Color _adaptColor(Color c) {
     if (!isMonochrome) return c;
-    final double l = (0.299 * c.red + 0.587 * c.green + 0.114 * c.blue) / 255.0;
+    final double l = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
     final int gray = (l * 255.0).round();
-    return Color.fromARGB(c.alpha, gray, gray, (gray * 1.06).clamp(0, 255).round());
+    final alpha = (c.a * 255.0).round().clamp(0, 255);
+    return Color.fromARGB(
+      alpha,
+      gray,
+      gray,
+      (gray * 1.06).clamp(0, 255).round(),
+    );
   }
 
   IconData _getBrainIcon(String id) {
     final lower = id.toLowerCase();
-    if (lower.contains('gmail') || lower.contains('mail')) return Icons.mail;
-    if (lower.contains('ai') || lower.contains('creator')) return Icons.psychology;
-    if (lower.contains('travel')) return Icons.flight;
-    if (lower.contains('sqlite') || lower.contains('postgres') || lower.contains('db')) return Icons.dns;
-    if (lower.contains('taskmanager')) return Icons.task_alt;
-    if (lower.contains('identity') || lower.contains('license')) return Icons.admin_panel_settings;
-    if (lower.contains('word')) return Icons.description;
-    if (lower.contains('diagram')) return Icons.schema;
-    if (lower.contains('onboarding')) return Icons.handshake;
-    if (lower.contains('innolang') || lower.contains('interpreter')) return Icons.translate;
+    if (lower.contains('gmail') || lower.contains('mail')) {
+      return Icons.mail;
+    }
+    if (lower.contains('ai') || lower.contains('creator')) {
+      return Icons.psychology;
+    }
+    if (lower.contains('travel')) {
+      return Icons.flight;
+    }
+    if (lower.contains('sqlite') ||
+        lower.contains('postgres') ||
+        lower.contains('db')) {
+      return Icons.dns;
+    }
+    if (lower.contains('taskmanager')) {
+      return Icons.task_alt;
+    }
+    if (lower.contains('identity') || lower.contains('license')) {
+      return Icons.admin_panel_settings;
+    }
+    if (lower.contains('word')) {
+      return Icons.description;
+    }
+    if (lower.contains('diagram')) {
+      return Icons.schema;
+    }
+    if (lower.contains('onboarding')) {
+      return Icons.handshake;
+    }
+    if (lower.contains('innolang') || lower.contains('interpreter')) {
+      return Icons.translate;
+    }
     return Icons.cloud_outlined;
   }
 
-  void _drawBillboardedIcon(Canvas canvas, Offset center2d, IconData iconData, double size, Color color) {
+  void _drawBillboardedIcon(
+    Canvas canvas,
+    Offset center2d,
+    IconData iconData,
+    double size,
+    Color color,
+  ) {
     final iconPainter = TextPainter(
       text: TextSpan(
         text: String.fromCharCode(iconData.codePoint),
@@ -663,14 +874,13 @@ import 'domain_palette.dart';class BrainPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    
+
     iconPainter.paint(
       canvas,
       center2d - Offset(iconPainter.width / 2, iconPainter.height / 2),
     );
   }
 }
-
 
 class _Projected {
   _Projected(this.screen, this.depth);

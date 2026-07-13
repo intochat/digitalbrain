@@ -1,17 +1,44 @@
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire;
 using AnthropicModels = DigitalBrain.Core.Models.Anthropic;
 using GitHubModels = DigitalBrain.Core.Models.GitHub;
 using OllamaModels = DigitalBrain.Core.Models.Ollama;
 using OpenAIModels = DigitalBrain.Core.Models.OpenAI;
-using VoiceModels = DigitalBrain.Core.Models.Voice;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Integrations stay thin here: INO, Gmail, Salesforce, Flutter, and optional transports
-// are wired through the kernel rather than distributed through a marketplace.
+// This is the authoritative local/test composition. Publish and deploy must choose an explicit profile.
+var configuredProfile = builder.Configuration["DigitalBrain:Profile"];
+var profile = configuredProfile ?? (builder.ExecutionContext.IsRunMode
+    ? "Development"
+    : throw new InvalidOperationException("DigitalBrain:Profile must be configured for publish and deploy."));
+if (!IsKnownRuntimeProfile(profile))
+    throw new InvalidOperationException($"Unknown runtime profile '{profile}'.");
+var isRunMode = builder.ExecutionContext.IsRunMode;
+var sessionSigningKey = AddRuntimeSecret(builder, "runtime-session-signing-key", isRunMode);
+var runtimeStateKek = AddRuntimeSecret(builder, "runtime-state-kek-v1", isRunMode);
+var runtimeStateSigningKey = AddRuntimeSecret(builder, "runtime-state-signing-key", isRunMode);
+var enableDevFlutter = isRunMode && IsLocalUiProfile(profile);
+var uiOidcIssuer = builder.Configuration["DigitalBrain:Runtime:Ui:Oidc:Issuer"]?.Trim();
+var uiOidcAudience = builder.Configuration["DigitalBrain:Runtime:Ui:Oidc:Audience"]?.Trim();
+var hasAnyUiOidcConfiguration = !string.IsNullOrEmpty(uiOidcIssuer) || !string.IsNullOrEmpty(uiOidcAudience);
+if (enableDevFlutter && hasAnyUiOidcConfiguration &&
+    (string.IsNullOrEmpty(uiOidcIssuer) || string.IsNullOrEmpty(uiOidcAudience)))
+    throw new InvalidOperationException(
+        "DigitalBrain:Runtime:Ui:Oidc:Issuer and Audience must be configured together for the local browser UI.");
+var flutterWebPort = ParseOptionalPort(builder.Configuration["DigitalBrain:Runtime:Ui:WebPort"]);
+IResourceBuilder<ParameterResource>? uiBootstrapSecret = enableDevFlutter
+    ? builder.AddParameter(
+        "runtime-ui-bootstrap-secret",
+        () => builder.Configuration["Parameters:runtime-ui-bootstrap-secret"] ?? Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
+        secret: true)
+    : null;
 
-// Experiences emit UiSurface (AuthButtonSurface etc) for sdk/flutter_demo + Telegram skeleton.
+// Integrations stay thin here: INO, Gmail, and Salesforce are wired through the kernel;
+// Flutter is wired only to MCP's authenticated UI boundary.
+
+// Experiences emit UiSurface (AuthButtonSurface etc) for the Flutter runtime.
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
     // --- Ollama (local first, 3060 Ti / 8GB VRAM) ---
@@ -40,58 +67,76 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
     //     .WithLLM<GitHubModels.O4Mini>().AsReasoning()
     //     .WithEmbedding<GitHubModels.TextEmbedding3Small>();
 
-    // --- Local voice-to-text via Whisper with CPU fallback ---
-    options.WithVoice2Text<VoiceModels.WhisperLargeV3Turbo>();
 });
 
-// Service-to-service secret gating the secrets-returning GetPackConfig RPC. Shared (same value) between the
-// kernel and any internal transport that pulls pack config; NEVER injected into the Flutter client config, so a
-// browser/untrusted gRPC client on the same external ingress cannot present it. Auto-generated when absent.
-var internalServiceKey = builder.AddParameter(
-    "internal-service-key",
-    () => builder.Configuration["Parameters:internal-service-key"] ?? Guid.NewGuid().ToString("N"),
-    secret: true);
 var salesforceAppConfig = builder.AddSalesforceAppConfig();
 var googleAppConfig = builder.AddGoogleAppConfig();
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);  // Provides surfaces, journals, 3 replicas HA, and LLM wiring via the Aspire package.
-kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
+kernel.WithEnvironment("DigitalBrain__Profile", profile);
+kernel.WithEnvironment("DigitalBrain__Tools__Enabled", "true");
+kernel.WithEnvironment("DigitalBrain__Runtime__State__ActiveKekVersion", "1");
+kernel.WithEnvironment("DigitalBrain__Runtime__State__Keks__1", runtimeStateKek);
+kernel.WithEnvironment("DigitalBrain__Runtime__State__SigningKey", runtimeStateSigningKey);
+kernel.WithEnvironment("DigitalBrain__Runtime__StorageNamespace",
+    builder.Configuration["DigitalBrain:Runtime:StorageNamespace"] ?? DigitalBrainBuilderExtensions.DefaultRuntimeStorageNamespace);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
 kernel.WithGoogleAppConfig(googleAppConfig);
 
-// Default Windows Flutter thin client on local `aspire run` (P0 item 1+12).
-// Flutter is the thin local client for neuron-emitted surfaces.
-var flutter = ctx.AddDefaultDevFlutterClient(kernel)
-    ?? throw new InvalidOperationException(
-        "Flutter app path not resolved for default windows client. Ensure brain/app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
-
 if (ctx.EnableMcp)
 {
-#pragma warning disable ASPIREMCP001
     // Dedicated single-replica HTTP MCP resource; avoids stateful MCP sessions going through the replicated kernel proxy.
-    builder.AddProject<Projects.DigitalBrain_Mcp>("mcp")
+    // The local launch profile pins ports that collide with the AppHost's proxy model.
+    // Exclude it so Aspire owns randomized proxy and target ports in every isolated session.
+    var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp", launchProfileName: null)
         .WithReference(ctx.OrleansClient)
-        .WithReference(ctx.Llm)
-        .WithEnvironment("DIGITALBRAIN_MCP_TRANSPORT", "http")
+        .WithEnvironment("DigitalBrain__Runtime__OAuth__InternalOrigin", kernel.GetEndpoint("web"))
+        .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", sessionSigningKey)
+        .WithEnvironment("DigitalBrain__Profile", profile)
+        .WithEnvironment("DigitalBrain__Salesforce__RedirectUri", salesforceAppConfig.RedirectUri)
+        .WithEnvironment("DigitalBrain__Runtime__Mcp__Audience", "digitalbrain-v2")
+        .WithEnvironment("DigitalBrain__Runtime__Ui__Audience", "digitalbrain-v2-ui")
         .WithEndpoint(name: "http", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
-        .WithMcpServer(endpointName: "http");
-#pragma warning restore ASPIREMCP001
-}
+        .WithHttpsEndpoint(name: "https", env: "ASPNETCORE_HTTPS_PORTS", isProxied: true)
+        .AsHttp2Service()
+        .WithEndpoint("https", endpoint => endpoint.Transport = "http2")
+        .WithHttpHealthCheck(path: "/health", endpointName: "https")
+        .WithReplicas(1);
+    mcp.WaitFor(ctx.ConversationStateBlobs);
+    mcp.WaitFor(ctx.SurfaceFeedStateBlobs);
+    mcp.WaitFor(ctx.SessionStateBlobs);
+    mcp.WaitFor(kernel);
 
-if (IsEnabled("DIGITALBRAIN_ENABLE_TELEGRAM"))
-{
-    // Telegram transport: bridges Telegram updates to the kernel gateway over gRPC. It boots no-op without a
-    // token, so it is safe to make always-present in production. Kept behind DIGITALBRAIN_ENABLE_TELEGRAM here so the default product path is unchanged;
-    // to enable the experience without an AppHost restart, set DIGITALBRAIN_ENABLE_TELEGRAM=true (or drop this gate).
-    // The token is an optional secret parameter — supplied at startup (config/user-secrets/env: Parameters:telegram-bot-token)
-    // OR later via the in-app config flow. Empty default keeps it optional: no token -> transport boots no-op.
-    var telegramBotToken = builder.AddParameter(
-        "telegram-bot-token",
-        () => builder.Configuration["Parameters:telegram-bot-token"] ?? string.Empty,
-        secret: true);
-    var telegramTransport = builder.AddProject<Projects.DigitalBrain_Telegram_Transport>("telegram-bot");
-    ctx.WireTelegramTransport(telegramTransport, kernel, telegramBotToken, internalServiceKey);
+    if (uiBootstrapSecret is not null)
+    {
+        // This is a local, scope-limited exchange credential, not an access token. The MCP
+        // transport exchanges it for a short-lived session signed for the exact UI transport audience.
+        mcp.WithEnvironment("DigitalBrain__Runtime__Ui__BootstrapSecret", uiBootstrapSecret);
+
+        // The Flutter shell references only MCP's authenticated UI transport. It never receives
+        // a kernel, Orleans, LLM, legacy Gateway, or WatchHomeFeed reference.
+        var flutter = ctx.AddDefaultDevFlutterClient(mcp, uiBootstrapSecret, endpointName: "https")
+            ?? throw new InvalidOperationException(
+                "Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+
+        if (uiOidcIssuer is not null && uiOidcAudience is not null)
+        {
+            mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Issuer", uiOidcIssuer);
+            mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Audience", uiOidcAudience);
+            mcp.WithEnvironment(
+                "DigitalBrain__Runtime__Ui__Oidc__AllowedGrants",
+                "brain.read,ui.action,gmail.read,gmail.send,salesforce.read,salesforce.write");
+            var flutterWeb = ctx.AddDefaultDevFlutterWebClient(
+                    mcp,
+                    uiOidcIssuer,
+                    uiOidcAudience,
+                    endpointName: "https",
+                    port: flutterWebPort)
+                ?? throw new InvalidOperationException(
+                    "Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+        }
+    }
 }
 
 // LLM env vars (Provider/Model/OllamaEndpoint/AzureOpenAI*) are already wired from typed
@@ -101,6 +146,41 @@ if (IsEnabled("DIGITALBRAIN_ENABLE_TELEGRAM"))
 
 builder.Build().Run();
 
-static bool IsEnabled(string name) =>
-    string.Equals(Environment.GetEnvironmentVariable(name), "true", StringComparison.OrdinalIgnoreCase)
-    || string.Equals(Environment.GetEnvironmentVariable(name), "1", StringComparison.OrdinalIgnoreCase);
+static bool IsLocalUiProfile(string profile) =>
+    profile.Equals("Development", StringComparison.OrdinalIgnoreCase)
+    || profile.Equals("Test", StringComparison.OrdinalIgnoreCase);
+
+static bool IsKnownRuntimeProfile(string profile) =>
+    IsLocalUiProfile(profile)
+    || profile.Equals("Production", StringComparison.OrdinalIgnoreCase);
+
+static IResourceBuilder<ParameterResource> AddRuntimeSecret(
+    IDistributedApplicationBuilder builder,
+    string name,
+    bool generateLocalDefault) =>
+    generateLocalDefault
+        ? builder.AddParameter(name, CreateKeyDefault(), secret: true, persist: true)
+        : builder.AddParameter(name, secret: true);
+
+static int? ParseOptionalPort(string? configured)
+{
+    if (string.IsNullOrWhiteSpace(configured)) return null;
+    return int.TryParse(configured, out var port) && port is > 0 and <= 65535
+        ? port
+        : throw new InvalidOperationException(
+            "DigitalBrain:Runtime:Ui:WebPort must be between 1 and 65535.");
+}
+
+static GenerateParameterDefault CreateKeyDefault() => new()
+{
+    // Forty-four base64-alphabet characters decode to 33 bytes. Aspire persists the generated
+    // secret in Run mode so signed sessions and encrypted runtime state survive AppHost restarts.
+    MinLength = 44,
+    Lower = true,
+    Upper = true,
+    Numeric = true,
+    Special = false,
+    MinLower = 1,
+    MinUpper = 1,
+    MinNumeric = 1
+};

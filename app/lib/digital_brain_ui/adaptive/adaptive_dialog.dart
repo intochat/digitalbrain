@@ -23,7 +23,6 @@ class AdaptiveDialog extends StatelessWidget {
   final double heightFraction;
   final double cornerRadius;
 
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -52,4 +51,3 @@ class AdaptiveDialog extends StatelessWidget {
     );
   }
 }
-

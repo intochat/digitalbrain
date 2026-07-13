@@ -19,7 +19,5 @@ class UiKitFormScope extends InheritedNotifier<UiKitFormController> {
   }) : super(notifier: controller);
 
   static UiKitFormController? of(BuildContext context) =>
-      context
-          .dependOnInheritedWidgetOfExactType<UiKitFormScope>()
-          ?.notifier;
+      context.dependOnInheritedWidgetOfExactType<UiKitFormScope>()?.notifier;
 }

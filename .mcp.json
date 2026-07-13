@@ -1,37 +1,24 @@
 {
   "mcpServers": {
-    "digitalbrain": {
-      "command": "dotnet",
-      "args": [
-        "run",
-        "--no-build",
-        "--project",
-        "src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj",
-        "--no-launch-profile"
-      ],
-      "env": {
-        "DOTNET_ENVIRONMENT": "Development"
-      }
-    },
-    "digitalbrain-http": {
-      "type": "http",
-      "url": "http://localhost:5000/mcp"
-    },
     "codegraph": {
-      "command": "npx",
-      "args": ["-y", "@colbymchenry/codegraph", "serve", "--mcp"]
+      "command": "gcf-proxy",
+      "args": ["npx", "-y", "@colbymchenry/codegraph", "serve", "--mcp"]
     },
     "aspire": {
-      "command": "aspire",
-      "args": ["agent", "mcp"]
+      "command": "gcf-proxy",
+      "args": ["aspire", "agent", "mcp"]
     },
     "microsoft-learn": {
       "type": "http",
       "url": "https://learn.microsoft.com/api/mcp"
     },
     "context7": {
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
+      "command": "gcf-proxy",
+      "args": ["npx", "-y", "@upstash/context7-mcp@latest"]
+    },
+    "dart": {
+      "command": "gcf-proxy",
+      "args": ["dart", "mcp-server"]
     }
   }
 }
