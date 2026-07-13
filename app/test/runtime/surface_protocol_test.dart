@@ -23,8 +23,8 @@ void main() {
     );
 
     expect(envelope.protocolVersion, 2);
-    expect(envelope.tenantId, 'tenant-a');
-    expect(envelope.workspaceId, 'workspace-a');
+    expect(envelope.ownerId, 'owner-a');
+    expect(envelope.actorId, 'actor-a');
     expect(envelope.payload, isA<NativeSurfacePayload>());
     expect(envelope.actions.single.bindingId, 'refresh-binding');
     expect(envelope.actions.single.actionToken, 'signed-action-token');
@@ -169,7 +169,7 @@ void main() {
         messages: [
           {
             ...inoMessage(role: 'user', text: 'Hello', state: 'queued'),
-            'principalId': 'must-not-reach-renderer',
+            'actorId': 'must-not-reach-renderer',
           },
         ],
       ),
@@ -403,12 +403,12 @@ void main() {
         'accessToken',
         'refresh_token',
         'action-token',
-        'tenantId',
-        'workspace_id',
+        'ownerId',
+        'actor_id',
         'clientId',
         'grants',
-        'principal',
-        'principalId',
+        'actor',
+        'actorId',
         'secret',
         'session-id',
       ]) {

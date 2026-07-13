@@ -44,18 +44,15 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
     public async Task Conversation_reminder_hands_off_to_worker_reminder_and_completes_the_operation()
     {
         Interlocked.Exchange(ref _workflowCalls, 0);
-        var tenant = new TenantId("tenant");
-        var workspace = new WorkspaceId("workspace");
-        var principal = new PrincipalRef("principal", PrincipalKind.User);
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
         var identity = new ConversationIdentity(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             "conversation-reminder-handoff");
         var conversation = Grain<IConversationNeuron>(RuntimeStateKeys.Conversation(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             identity.ConversationId));
         var now = DateTimeOffset.UtcNow;
         var acceptedEventId = "accepted-reminder-handoff";
@@ -68,7 +65,7 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
             identity.ConversationId,
             2,
             "request-reminder-handoff",
-            RuntimeStateKeys.Conversation(tenant, workspace, principal, identity.ConversationId),
+            RuntimeStateKeys.Conversation(owner, actor, identity.ConversationId),
             new OperationFeedView(
                 "command-reminder-handoff",
                 string.Empty,
@@ -109,18 +106,15 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
     public async Task Outbox_dispatcher_leaves_a_noncanonical_surface_feed_payload_pending_without_reordering_later_phases()
     {
         Interlocked.Exchange(ref _workflowCalls, 0);
-        var tenant = new TenantId("tenant");
-        var workspace = new WorkspaceId("workspace");
-        var principal = new PrincipalRef("principal", PrincipalKind.User);
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
         var identity = new ConversationIdentity(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             "conversation-noncanonical-outbox");
         var conversationKey = RuntimeStateKeys.Conversation(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             identity.ConversationId);
         var conversation = Grain<IConversationNeuron>(conversationKey);
         var malformedOutboxId = "noncanonical-outbox";
@@ -159,21 +153,18 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
     public async Task Outbox_dispatcher_upgrades_the_exact_legacy_presentation_without_rebuilding_history()
     {
         Interlocked.Exchange(ref _workflowCalls, 0);
-        var tenant = new TenantId("tenant");
-        var workspace = new WorkspaceId("workspace");
-        var principal = new PrincipalRef("principal", PrincipalKind.User);
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
         var identity = new ConversationIdentity(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             "ino-" + new string('a', 64));
         var conversationKey = RuntimeStateKeys.Conversation(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             identity.ConversationId);
         var conversation = Grain<IConversationNeuron>(conversationKey);
-        var feed = Grain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(tenant, workspace, principal));
+        var feed = Grain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(owner, actor));
         var now = DateTimeOffset.UtcNow;
         var legacyProjectionId = "legacy-five-field-presentation";
         await SeedLegacyPresentationAsync(
@@ -275,21 +266,18 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
     public async Task Outbox_dispatcher_rejects_a_partial_legacy_presentation_upgrade()
     {
         Interlocked.Exchange(ref _workflowCalls, 0);
-        var tenant = new TenantId("tenant");
-        var workspace = new WorkspaceId("workspace");
-        var principal = new PrincipalRef("principal", PrincipalKind.User);
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
         var identity = new ConversationIdentity(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             "ino-" + new string('b', 64));
         var conversationKey = RuntimeStateKeys.Conversation(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             identity.ConversationId);
         var conversation = Grain<IConversationNeuron>(conversationKey);
-        var feed = Grain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(tenant, workspace, principal));
+        var feed = Grain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(owner, actor));
         var now = DateTimeOffset.UtcNow;
         var legacyProjectionId = "partial-legacy-presentation";
         await SeedLegacyPresentationAsync(
@@ -335,7 +323,7 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
     {
         var initialized = await feed.InitializeAsync(
             0,
-            new SurfaceFeedIdentity(identity.TenantId, identity.WorkspaceId, identity.Principal));
+            new SurfaceFeedIdentity(identity.OwnerId, identity.ActorId));
         var conversation = new InoConversationSnapshot(identity.ConversationId, 0, [], []);
         var payload = ConversationSurfacePayload.Build(conversation);
         var presentation = new Dictionary<string, object?>

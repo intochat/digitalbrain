@@ -49,7 +49,7 @@ void main() {
           isNot(contains('x-v2-session')),
         );
         expect(port.bootstrapOptions?.timeout, unaryRequestTimeout);
-        expect(session.identity.workspaceId, 'workspace-a');
+        expect(session.identity.ownerId, 'owner-a');
         expect(session.credentials.accessToken, 'access-token');
       },
     );
@@ -155,7 +155,7 @@ void main() {
         final call = await transport.watchSurfaceFeed(
           accessToken: 'signed-session',
           afterSequence: 7,
-          audience: FeedAudience.principal,
+          audience: FeedAudience.actor,
           clientCapabilities: const {'ui.payload.native', 'ui.protocol.v2'},
           maxBatchSize: 25,
         );
@@ -164,7 +164,7 @@ void main() {
         expect(port.watchRequest?.afterSequence.toInt(), 7);
         expect(
           port.watchRequest?.audience,
-          wire.FeedAudienceKind.FEED_AUDIENCE_KIND_PRINCIPAL,
+          wire.FeedAudienceKind.FEED_AUDIENCE_KIND_ACTOR,
         );
         expect(port.watchRequest?.clientCapabilities, [
           'ui.payload.native',
@@ -194,7 +194,7 @@ void main() {
 
       await transport.acknowledgeSurfaceFeed(
         accessToken: 'signed-session',
-        audience: FeedAudience.principal,
+        audience: FeedAudience.actor,
         sequence: 4,
       );
       final result = await transport.submitAction(
@@ -256,7 +256,7 @@ void main() {
 
       final acknowledgement = transport.acknowledgeSurfaceFeed(
         accessToken: 'signed-session',
-        audience: FeedAudience.principal,
+        audience: FeedAudience.actor,
         sequence: 4,
       );
       final expectation = expectLater(
@@ -288,7 +288,7 @@ void main() {
           transport.watchSurfaceFeed(
             accessToken: '',
             afterSequence: 0,
-            audience: FeedAudience.principal,
+            audience: FeedAudience.actor,
             clientCapabilities: const {},
             maxBatchSize: 1,
           ),
@@ -298,7 +298,7 @@ void main() {
           transport.submitAction(
             accessToken: 'signed-session',
             action: action,
-            input: const {'workspaceId': 'must-not-travel'},
+            input: const {'ownerId': 'must-not-travel'},
           ),
           throwsA(isA<ProtocolException>()),
         );
@@ -358,9 +358,8 @@ class _FakeGrpcClientPort implements GrpcClientPort {
       testNow.add(const Duration(days: 1)).millisecondsSinceEpoch,
     ),
     sessionId: 'session-a',
-    tenantId: 'tenant-a',
-    workspaceId: 'workspace-a',
-    principalId: 'principal-a',
+    ownerId: 'owner-a',
+    actorId: 'actor-a',
   );
 
   @override

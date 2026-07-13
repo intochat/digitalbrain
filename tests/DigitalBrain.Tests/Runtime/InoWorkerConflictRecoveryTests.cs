@@ -53,14 +53,12 @@ public sealed class InoWorkerConflictRecoveryTests : NeuronTestBase
         };
         ActivitySource.AddActivityListener(listener);
 
-        var tenant = new TenantId("tenant");
-        var workspace = new WorkspaceId("workspace");
-        var principal = new PrincipalRef("principal", PrincipalKind.User);
-        var identity = new ConversationIdentity(tenant, workspace, principal, "conversation-worker-conflict");
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
+        var identity = new ConversationIdentity(owner, actor, "conversation-worker-conflict");
         var conversation = Grain<IConversationNeuron>(RuntimeStateKeys.Conversation(
-            tenant,
-            workspace,
-            principal,
+            owner,
+            actor,
             identity.ConversationId));
         var now = DateTimeOffset.UtcNow;
         const string operationId = "operation-worker-conflict";
@@ -73,7 +71,7 @@ public sealed class InoWorkerConflictRecoveryTests : NeuronTestBase
             identity.ConversationId,
             2,
             "request-worker-conflict",
-            RuntimeStateKeys.Conversation(tenant, workspace, principal, identity.ConversationId),
+            RuntimeStateKeys.Conversation(owner, actor, identity.ConversationId),
             new OperationFeedView(
                 "command-worker-conflict",
                 string.Empty,

@@ -91,7 +91,7 @@ public static class UiSurfaceSamples
             }));
 
     public static UiSurface Workspace() =>
-        UiSurfaceLiveData.WorkspaceBoundary("anonymous", WorkspaceIds.Default, "workbench");
+        UiSurfaceLiveData.OwnerBoundary("anonymous", "workbench");
 
     public static UiSurface Timeline() => new(
         UiSurfaceKinds.Timeline,
@@ -243,7 +243,7 @@ public static class UiSurfaceLiveData
         var surfaces = new List<UiSurface>
         {
             ActivityGraphFromTimeline(graphTimeline, maxEvents),
-            WorkspaceBoundary(userId, WorkspaceIds.Default, sessionId),
+            OwnerBoundary(userId, sessionId),
             TaskManagerFromTasks(taskTimelines.SelectMany(t => t.Timeline).ToList(), maxEvents, userId, sessionId)
         };
 
@@ -349,14 +349,12 @@ public static class UiSurfaceLiveData
             .ToArray();
     }
 
-    public static UiSurface WorkspaceBoundary(
+    public static UiSurface OwnerBoundary(
         string userId = "anonymous",
-        string? workspaceId = null,
         string? clientId = null)
     {
         userId = EffectiveUserId(userId);
-        workspaceId = WorkspaceIds.Effective(workspaceId);
-        var vectorCollection = WorkspaceIds.VectorCollection(new UserId(userId), workspaceId);
+        var vectorCollection = OwnerCollections.VectorCollection(new UserId(userId));
         var sources = new[]
         {
             "Uploaded files",
@@ -367,7 +365,7 @@ public static class UiSurfaceLiveData
         var isolation = new Dictionary<string, object?>
         {
             ["userId"] = userId,
-            ["workspaceId"] = workspaceId,
+            ["ownerId"] = userId,
             ["clientId"] = clientId,
             ["packConfigScope"] = PackConfigScopes.ForUser(new UserId(userId)),
             ["vectorCollection"] = vectorCollection
@@ -377,8 +375,8 @@ public static class UiSurfaceLiveData
         [
             new("fcard", new Dictionary<string, object?>
             {
-                ["title"] = "Active workspace",
-                ["subtitle"] = workspaceId
+                ["title"] = "Active owner",
+                ["subtitle"] = userId
             }, new[]
             {
                 new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "User: " + userId }),
@@ -407,9 +405,9 @@ public static class UiSurfaceLiveData
                 props: new Dictionary<string, object?>
                 {
                     ["userId"] = userId,
-                    ["workspaceId"] = workspaceId,
+                    ["ownerId"] = userId,
                     ["clientId"] = clientId,
-                    ["activeWorkspace"] = workspaceId,
+                    ["activeOwner"] = userId,
                     ["contextSources"] = sources,
                     ["isolation"] = isolation,
                     ["tree"] = tree

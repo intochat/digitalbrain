@@ -140,9 +140,8 @@ class SessionReply extends $pb.GeneratedMessage {
     $fixnum.Int64? accessExpiresAtUnixMs,
     $fixnum.Int64? refreshExpiresAtUnixMs,
     $core.String? sessionId,
-    $core.String? tenantId,
-    $core.String? workspaceId,
-    $core.String? principalId,
+    $core.String? ownerId,
+    $core.String? actorId,
   }) {
     final result = create();
     if (accessToken != null) result.accessToken = accessToken;
@@ -152,9 +151,8 @@ class SessionReply extends $pb.GeneratedMessage {
     if (refreshExpiresAtUnixMs != null)
       result.refreshExpiresAtUnixMs = refreshExpiresAtUnixMs;
     if (sessionId != null) result.sessionId = sessionId;
-    if (tenantId != null) result.tenantId = tenantId;
-    if (workspaceId != null) result.workspaceId = workspaceId;
-    if (principalId != null) result.principalId = principalId;
+    if (ownerId != null) result.ownerId = ownerId;
+    if (actorId != null) result.actorId = actorId;
     return result;
   }
 
@@ -177,9 +175,8 @@ class SessionReply extends $pb.GeneratedMessage {
     ..aInt64(3, _omitFieldNames ? '' : 'accessExpiresAtUnixMs')
     ..aInt64(4, _omitFieldNames ? '' : 'refreshExpiresAtUnixMs')
     ..aOS(5, _omitFieldNames ? '' : 'sessionId')
-    ..aOS(6, _omitFieldNames ? '' : 'tenantId')
-    ..aOS(7, _omitFieldNames ? '' : 'workspaceId')
-    ..aOS(8, _omitFieldNames ? '' : 'principalId')
+    ..aOS(6, _omitFieldNames ? '' : 'ownerId')
+    ..aOS(7, _omitFieldNames ? '' : 'actorId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -247,31 +244,22 @@ class SessionReply extends $pb.GeneratedMessage {
   void clearSessionId() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.String get tenantId => $_getSZ(5);
+  $core.String get ownerId => $_getSZ(5);
   @$pb.TagNumber(6)
-  set tenantId($core.String value) => $_setString(5, value);
+  set ownerId($core.String value) => $_setString(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasTenantId() => $_has(5);
+  $core.bool hasOwnerId() => $_has(5);
   @$pb.TagNumber(6)
-  void clearTenantId() => $_clearField(6);
+  void clearOwnerId() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.String get workspaceId => $_getSZ(6);
+  $core.String get actorId => $_getSZ(6);
   @$pb.TagNumber(7)
-  set workspaceId($core.String value) => $_setString(6, value);
+  set actorId($core.String value) => $_setString(6, value);
   @$pb.TagNumber(7)
-  $core.bool hasWorkspaceId() => $_has(6);
+  $core.bool hasActorId() => $_has(6);
   @$pb.TagNumber(7)
-  void clearWorkspaceId() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get principalId => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set principalId($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasPrincipalId() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearPrincipalId() => $_clearField(8);
+  void clearActorId() => $_clearField(7);
 }
 
 class WatchSurfaceFeedRequest extends $pb.GeneratedMessage {

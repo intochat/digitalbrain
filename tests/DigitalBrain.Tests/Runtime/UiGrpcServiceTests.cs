@@ -62,7 +62,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
 
         var bootstrapped = await sessions.ValidateAccessAsync(bootstrap.AccessToken, SessionAudiences.Ui);
         Assert.NotNull(bootstrapped);
-        Assert.Equal(bootstrap.SessionId, bootstrapped.Context.SessionId);
+        Assert.Equal(bootstrap.SessionId, bootstrapped.Context.SessionId.Value);
 
         var refreshed = await service.RefreshSession(
             new RefreshSessionRequest { RefreshToken = bootstrap.RefreshToken },
@@ -77,7 +77,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             feedCancellation.Cancel);
         var watch = new WatchSurfaceFeedRequest
         {
-            Audience = FeedAudienceKind.Principal,
+            Audience = FeedAudienceKind.Actor,
             MaxBatchSize = 10
         };
         watch.ClientCapabilities.Add(ConversationSurfacePayload.RequiredCapabilities);
@@ -201,17 +201,14 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         var service = new UiGrpcService(
             new UiBootstrapAuthenticator(new UiBootstrapOptions(
                 BootstrapSecret,
-                new TenantId("tenant"),
-                new WorkspaceId("workspace"),
-                new PrincipalRef("principal", PrincipalKind.User),
+                new BrainOwnerId("owner"),
+                new ActorId("principal"),
                 TimeSpan.FromMinutes(15),
                 new HashSet<string>(["brain.read", "ui.action"], StringComparer.Ordinal))),
             new UiExternalIdentityAuthenticator(new UiExternalIdentityOptions(
                 false,
                 string.Empty,
                 string.Empty,
-                "tenant_id",
-                "workspace_id",
                 "sub",
                 "digitalbrain_grants",
                 new HashSet<string>(StringComparer.Ordinal),

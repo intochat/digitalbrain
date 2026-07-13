@@ -287,9 +287,8 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
     return SessionBundle(
       identity: SessionIdentity(
         sessionId: reply.sessionId,
-        tenantId: reply.tenantId,
-        workspaceId: reply.workspaceId,
-        principalId: reply.principalId,
+        ownerId: reply.ownerId,
+        actorId: reply.actorId,
       ),
       credentials: SessionCredentials(
         accessToken: reply.accessToken,
@@ -327,10 +326,8 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
 
   static wire.FeedAudienceKind _wireAudience(FeedAudience audience) =>
       switch (audience) {
-        FeedAudience.principal =>
-          wire.FeedAudienceKind.FEED_AUDIENCE_KIND_PRINCIPAL,
-        FeedAudience.workspace =>
-          wire.FeedAudienceKind.FEED_AUDIENCE_KIND_WORKSPACE,
+        FeedAudience.actor => wire.FeedAudienceKind.FEED_AUDIENCE_KIND_ACTOR,
+        FeedAudience.owner => wire.FeedAudienceKind.FEED_AUDIENCE_KIND_OWNER,
         FeedAudience.public => wire.FeedAudienceKind.FEED_AUDIENCE_KIND_PUBLIC,
       };
 
@@ -519,11 +516,10 @@ const Set<String> _forbiddenActionInputKeys = {
   'actiontoken',
   'authorization',
   'clientsecret',
-  'principalid',
+  'actorid',
+  'ownerid',
   'refreshtoken',
   'sessionid',
-  'tenantid',
-  'workspaceid',
 };
 
 void _validateActionInput(Object? value, [int depth = 0]) {

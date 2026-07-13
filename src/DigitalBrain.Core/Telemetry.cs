@@ -1,8 +1,9 @@
 using System.Collections.Concurrent;
+using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Core.Runtime;
 
-public sealed record TraceContext(string TraceId, string SpanId, TenantId TenantId, WorkspaceId WorkspaceId, string? CommandId = null, string? OperationId = null);
+public sealed record TraceContext(string TraceId, string SpanId, BrainOwnerId OwnerId, ActorId ActorId, string? CommandId = null, string? OperationId = null);
 public sealed record MetricPoint(string Name, double Value, IReadOnlyDictionary<string, string> Labels);
 
 public interface ITelemetrySink

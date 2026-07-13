@@ -62,9 +62,8 @@ public static class ConversationArchiveTransitions
         ValidateDescriptor(prior, state.Turns);
         var digest = Digest(prior?.Digest, removed);
         var scopeHash = RuntimeStateKeys.Conversation(
-            state.Identity.TenantId,
-            state.Identity.WorkspaceId,
-            state.Identity.Principal,
+            state.Identity.OwnerId,
+            state.Identity.ActorId,
             state.Identity.ConversationId);
         var segmentId = RuntimeStateKeys.ConversationArchiveSegment(
             scopeHash,

@@ -1,4 +1,5 @@
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using Orleans;
 
 namespace DigitalBrain.Kernel.Runtime;
@@ -7,9 +8,8 @@ public enum SessionRotationStatus { Rotated, Replay, Expired, Revoked, Rejected 
 
 [GenerateSerializer, Alias("digitalbrain.runtime.session-identity")]
 public sealed record SessionIdentity(
-    [property: Id(0)] TenantId TenantId,
-    [property: Id(1)] WorkspaceId WorkspaceId,
-    [property: Id(2)] PrincipalRef Principal);
+    [property: Id(0)] BrainOwnerId OwnerId,
+    [property: Id(1)] ActorId ActorId);
 
 [GenerateSerializer, Alias("digitalbrain.runtime.session-refresh-replay")]
 public sealed record SessionRefreshReplay(
@@ -229,8 +229,7 @@ public static class SessionTransitions
 
     private static void ValidateIdentity(SessionIdentity identity)
     {
-        if (string.IsNullOrWhiteSpace(identity.TenantId.Value) || string.IsNullOrWhiteSpace(identity.WorkspaceId.Value) ||
-            string.IsNullOrWhiteSpace(identity.Principal.Value))
+        if (string.IsNullOrWhiteSpace(identity.OwnerId.Value) || string.IsNullOrWhiteSpace(identity.ActorId.Value))
             throw new ArgumentException("A complete session identity is required.", nameof(identity));
     }
 

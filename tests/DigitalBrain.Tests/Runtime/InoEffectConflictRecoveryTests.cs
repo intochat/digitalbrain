@@ -53,11 +53,10 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
         };
         ActivitySource.AddActivityListener(listener);
 
-        var tenant = new TenantId("tenant");
-        var workspace = new WorkspaceId("workspace");
-        var principal = new PrincipalRef("principal", PrincipalKind.User);
-        var identity = new ConversationIdentity(tenant, workspace, principal, "conversation-effect-conflict");
-        var conversationKey = RuntimeStateKeys.Conversation(tenant, workspace, principal, identity.ConversationId);
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
+        var identity = new ConversationIdentity(owner, actor, "conversation-effect-conflict");
+        var conversationKey = RuntimeStateKeys.Conversation(owner, actor, identity.ConversationId);
         var conversation = Grain<IConversationNeuron>(conversationKey);
         var now = DateTimeOffset.UtcNow;
         const string operationId = "operation-effect-conflict";
@@ -112,14 +111,14 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
                 now.AddSeconds(1),
                 workflow,
                 new ConversationLeaseFence("workflow-setup", claimed.Attempt));
-            var actor = RequestScope.Id(identity.TenantId, identity.WorkspaceId, identity.Principal);
+            var actorScope = RequestScope.Id(identity.OwnerId, identity.ActorId);
             var approved = await conversation.DecideApprovalWithAssistantAsync(
                 approvalRequested.Revision,
                 operationId,
                 approvalId,
                 approved: true,
                 "decision-effect-conflict",
-                actor,
+                actorScope,
                 "Approval recorded.",
                 PhaseOutbox(
                     identity,

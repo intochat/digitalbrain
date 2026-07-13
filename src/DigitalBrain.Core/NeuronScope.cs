@@ -26,15 +26,10 @@ public static class PackConfigScopes
     public static string ForUser(UserId userId) => $"user:{userId.Value}";
 }
 
-public static class WorkspaceIds
+public static class OwnerCollections
 {
-    public const string Default = "default";
-
-    public static string Effective(string? workspaceId) =>
-        string.IsNullOrWhiteSpace(workspaceId) ? Default : workspaceId.Trim();
-
-    public static string VectorCollection(UserId userId, string? workspaceId, string collection = "documents") =>
-        $"user:{Safe(userId.Value)}:workspace:{Safe(Effective(workspaceId))}:{Safe(collection)}";
+    public static string VectorCollection(UserId userId, string collection = "documents") =>
+        $"owner:{Safe(userId.Value)}:{Safe(collection)}";
 
     private static string Safe(string value) =>
         new string(value

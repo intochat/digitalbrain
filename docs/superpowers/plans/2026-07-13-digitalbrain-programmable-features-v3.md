@@ -107,10 +107,12 @@ Task 2 evidence: strict Reqnroll first failed all four initial scenarios with mi
 - `BrainOwnerId`, `ActorId`, `ProviderConnectionId`, `SessionId`, `FeatureInstallationId`, `ReleaseDigest`, and `GrantRevision` are validated immutable IDs with stable Orleans field IDs where they cross grain boundaries.
 - `CapabilityRequest` carries owner, actor, installation, digest, input, logical key, capability ID/version, optional provider connection, bounded payload, deadline, correlation, and causation.
 
-- [ ] Add compile-time and serialization tests for the new identity/envelope API and tests proving old IDs are absent from internal contracts and Flutter DTOs.
-- [ ] Migrate one authority boundary at a time without aliases or migration state; run the owning suite after each cut.
-- [ ] Merge surviving dependency-light Core/Kernel.Abstractions types into Kernel.Contracts only when their last old-project caller is moved.
-- [ ] Commit `refactor: adopt owner-scoped platform contracts` after the exact root suite is green.
+- [x] Add compile-time and serialization tests for the new identity/envelope API and tests proving old IDs are absent from internal contracts and Flutter DTOs.
+- [x] Migrate one authority boundary at a time without aliases or migration state; run the owning suite after each cut.
+- [x] Merge surviving dependency-light Core/Kernel.Abstractions types into Kernel.Contracts only when their last old-project caller is moved.
+- [x] Commit `refactor: adopt owner-scoped platform contracts` after the exact root suite is green.
+
+Task 3 evidence: compile-first tests failed on the absent v3 identity and capability contracts, the added grant revision, and a distinct owner/actor workflow request. Runtime regressions exposed and closed getter-only JSON persistence and mismatched Flutter actor-scope encoding. The final contracts use validated immutable IDs, stable Orleans aliases/field IDs, detached 64-KiB capability payloads, and typed owner/actor authority through retained Core, Kernel, MCP, UI, integration, and Flutter boundaries; old partition identifiers are absent from exported internal contracts and runtime DTO sources. Shared payload policy rejects private owner/actor fields, and an independent review finding that a retained workflow collapsed both identities into one hash was fixed with an end-to-end distinct-identity regression. Focused verification passed 39 Integration Contract tests, 357 owning .NET tests, and 164 Flutter tests; the exact root suite passed 458 tests with no failures or skips, and the independent re-review reported no remaining Critical or Important issue.
 
 ### Task 4: Coherent Orleans family and ordinary persistence
 

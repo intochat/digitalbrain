@@ -38,8 +38,8 @@ public sealed class SemanticIntentModelTests
     [Fact]
     public async Task Resolve_intent_uses_separate_roles_json_schema_and_descriptor_only_grounding()
     {
-        const string tenantId = "tenant-secret-7dd3";
-        const string workspaceId = "workspace-secret-83b1";
+        var ownerId = new BrainOwnerId("owner-secret-7dd3");
+        var actorId = new ActorId("actor-secret-83b1");
         const string conversationId = "conversation-secret-a914";
         const string prompt = "Bring back item two from the earlier result.";
         var grounding = new GroundingDescriptor(
@@ -52,7 +52,7 @@ public sealed class SemanticIntentModelTests
         var grain = new ConversationModelGrain(chat);
 
         await grain.ResolveIntentAsync(
-            new SemanticIntentRequest(tenantId, workspaceId, conversationId, prompt, [grounding]));
+            new SemanticIntentRequest(ownerId, actorId, conversationId, prompt, [grounding]));
 
         Assert.Collection(
             chat.LastMessages,
@@ -64,8 +64,8 @@ public sealed class SemanticIntentModelTests
             });
 
         var modelInput = string.Join('\n', chat.LastMessages.Select(static message => message.Text));
-        Assert.DoesNotContain(tenantId, modelInput, StringComparison.Ordinal);
-        Assert.DoesNotContain(workspaceId, modelInput, StringComparison.Ordinal);
+        Assert.DoesNotContain(ownerId.Value, modelInput, StringComparison.Ordinal);
+        Assert.DoesNotContain(actorId.Value, modelInput, StringComparison.Ordinal);
         Assert.DoesNotContain(conversationId, modelInput, StringComparison.Ordinal);
 
         const string descriptorsMarker = "Available grounding descriptors: ";
@@ -195,7 +195,7 @@ public sealed class SemanticIntentModelTests
     }
 
     private static SemanticIntentRequest Request(string prompt) =>
-        new("tenant-not-for-model", "workspace-not-for-model", "conversation-not-for-model", prompt, []);
+        new(new("owner-not-for-model"), new("actor-not-for-model"), "conversation-not-for-model", prompt, []);
 
     private sealed class RecordingStructuredChatClient(string responseJson) : IChatClient
     {

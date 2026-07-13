@@ -2,7 +2,7 @@ import 'protocol/surface_protocol.dart';
 import 'runtime_errors.dart';
 import 'session_state.dart';
 
-enum FeedAudience { principal, workspace, public }
+enum FeedAudience { actor, owner, public }
 
 sealed class FeedEvent {
   const FeedEvent();
@@ -189,14 +189,14 @@ class FeedController {
     if (identity == null) {
       throw const ScopeViolation('Feed identity is not established.');
     }
-    if (envelope.tenantId != identity.tenantId ||
-        envelope.workspaceId != identity.workspaceId) {
-      throw const ScopeViolation('Surface is outside the signed workspace.');
+    if (envelope.ownerId != identity.ownerId ||
+        envelope.actorId != identity.actorId) {
+      throw const ScopeViolation('Surface is outside the signed identity.');
     }
     final audience = envelope.audience;
     final validAudience = switch (audience.kind) {
-      'principal' => audience.id == identity.principalId,
-      'workspace' => audience.id == identity.workspaceId,
+      'actor' => audience.id == identity.actorId,
+      'owner' => audience.id == identity.ownerId,
       'public' => audience.id.isEmpty,
       _ => false,
     };
@@ -213,7 +213,6 @@ class FeedController {
 
   static bool _sameScope(SessionIdentity left, SessionIdentity right) =>
       left.sessionId == right.sessionId &&
-      left.tenantId == right.tenantId &&
-      left.workspaceId == right.workspaceId &&
-      left.principalId == right.principalId;
+      left.ownerId == right.ownerId &&
+      left.actorId == right.actorId;
 }

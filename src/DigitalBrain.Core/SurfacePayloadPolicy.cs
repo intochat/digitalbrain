@@ -7,8 +7,8 @@ public static class SurfacePayloadPolicy
     private static readonly HashSet<string> ForbiddenKeys = new(StringComparer.Ordinal)
     {
         "accesstoken", "actiontoken", "authorization", "authorizationcode", "clientid", "clientsecret",
-        "codeverifier", "grants", "password", "principal", "principalid", "refreshtoken", "secret", "secretvalue",
-        "sessionid", "tenantid", "userid", "workspaceid"
+        "actorid", "codeverifier", "grants", "ownerid", "password", "principal", "principalid", "refreshtoken",
+        "secret", "secretvalue", "sessionid", "tenantid", "userid", "workspaceid"
     };
 
     public static void DemandSafe(JsonElement value, int depth = 0)

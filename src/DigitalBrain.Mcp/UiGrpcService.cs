@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.V2.Ui.Grpc;
 using Grpc.Core;
@@ -13,9 +14,8 @@ namespace DigitalBrain.Mcp;
 
 public sealed record UiBootstrapOptions(
     string Secret,
-    TenantId TenantId,
-    WorkspaceId WorkspaceId,
-    PrincipalRef Principal,
+    BrainOwnerId OwnerId,
+    ActorId ActorId,
     TimeSpan AccessLifetime,
     IReadOnlySet<string> Grants,
     bool Enabled = true)
@@ -29,20 +29,18 @@ public sealed record UiBootstrapOptions(
                 throw new InvalidOperationException("DigitalBrain:Runtime:Ui:BootstrapSecret is forbidden in Production.");
             return new(
                 string.Empty,
-                new TenantId("disabled"),
-                new WorkspaceId("disabled"),
-                new PrincipalRef("disabled", PrincipalKind.User),
+                new BrainOwnerId("disabled"),
+                new ActorId("disabled"),
                 TimeSpan.FromMinutes(15),
                 new HashSet<string>(StringComparer.Ordinal),
                 Enabled: false);
         }
-        var tenant = configuration["DigitalBrain:Runtime:Ui:TenantId"] ?? "local";
-        var workspace = configuration["DigitalBrain:Runtime:Ui:WorkspaceId"] ?? "default";
-        var principal = configuration["DigitalBrain:Runtime:Ui:PrincipalId"] ?? "flutter-ui";
-        if (string.IsNullOrWhiteSpace(tenant) || string.IsNullOrWhiteSpace(workspace) || string.IsNullOrWhiteSpace(principal) ||
-            tenant.Length > 256 || workspace.Length > 256 || principal.Length > 256)
+        var owner = configuration["DigitalBrain:Runtime:Ui:OwnerId"] ?? "local-owner";
+        var actor = configuration["DigitalBrain:Runtime:Ui:ActorId"] ?? "flutter-ui";
+        if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(actor) ||
+            owner.Length > 256 || actor.Length > 256)
             throw new InvalidOperationException("UI bootstrap identity configuration must be complete.");
-        return new(secret, new(tenant), new(workspace), new(principal, PrincipalKind.User), TimeSpan.FromMinutes(15),
+        return new(secret, new(owner), new(actor), TimeSpan.FromMinutes(15),
             new HashSet<string>(StringComparer.Ordinal)
             {
                 "brain.read", "ui.action", "gmail.read", "gmail.send", "salesforce.read", "salesforce.write"
@@ -74,10 +72,9 @@ public sealed class UiBootstrapAuthenticator(UiBootstrapOptions options)
         if (!options.Enabled || string.IsNullOrEmpty(options.Secret) || string.IsNullOrEmpty(suppliedSecret) ||
             !FixedTimeEquals(options.Secret, suppliedSecret)) return false;
         context = new RuntimeRequestContext(
-            options.TenantId,
-            options.WorkspaceId,
-            options.Principal,
-            $"runtime-ui-session-{Guid.NewGuid():N}",
+            options.OwnerId,
+            options.ActorId,
+            new SessionId($"runtime-ui-session-{Guid.NewGuid():N}"),
             AuthAssurance.Password,
             Guid.NewGuid().ToString("N"),
             null,
@@ -132,7 +129,7 @@ public sealed class UiGrpcService(
         using var activity = ActivitySource.StartActivity("v2.ui.session.bootstrap", ActivityKind.Internal);
         activity?.SetTag("db.v2.ui.outcome", "success");
         activity?.SetTag("db.v2.ui.authentication_kind", authenticationKind);
-        logger.LogInformation("UI bootstrap issued a workspace-scoped session.");
+        logger.LogInformation("UI bootstrap issued an owner-scoped session.");
         return ToReply(issued.Context, issued.Pair);
     }
 
@@ -183,8 +180,8 @@ public sealed class UiGrpcService(
         var authenticated = session.Context;
         if (request.AfterSequence < 0) throw new RpcException(new Status(StatusCode.InvalidArgument, "after_sequence cannot be negative."));
         var audienceKind = AudienceKind(request.Audience);
-        if (audienceKind != SurfaceAudienceKind.Principal)
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Only the authenticated principal feed is supported."));
+        if (audienceKind != SurfaceAudienceKind.Actor)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Only the authenticated actor feed is supported."));
         var capabilities = ValidateCapabilities(request.ClientCapabilities);
         var batchSize = Math.Clamp(request.MaxBatchSize <= 0 ? 50 : request.MaxBatchSize, 1, 100);
         logger.LogInformation("UI feed opened for {AudienceKind} audience.", audienceKind);
@@ -294,8 +291,8 @@ public sealed class UiGrpcService(
         var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
         if (request.Sequence < 0) throw new RpcException(new Status(StatusCode.InvalidArgument, "sequence cannot be negative."));
         var audienceKind = AudienceKind(request.Audience);
-        if (audienceKind != SurfaceAudienceKind.Principal)
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Only the authenticated principal feed is supported."));
+        if (audienceKind != SurfaceAudienceKind.Actor)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Only the authenticated actor feed is supported."));
         try
         {
             var acknowledged = await feed.AcknowledgeAsync(
@@ -331,7 +328,7 @@ public sealed class UiGrpcService(
         catch (JsonException) { throw new RpcException(new Status(StatusCode.InvalidArgument, "Action input must be valid JSON.")); }
         if (input.ValueKind != JsonValueKind.Object)
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Action input must be a JSON object."));
-        try { DemandSafeActionInput(input, depth: 0); }
+        try { SurfacePayloadPolicy.DemandSafe(input); }
         catch (ArgumentException) { throw new RpcException(new Status(StatusCode.InvalidArgument, "Action input contains a forbidden authority or credential field.")); }
 
         AuthorizedRuntimeAction authorized;
@@ -442,10 +439,9 @@ public sealed class UiGrpcService(
             cancellationToken).ConfigureAwait(false);
         if (validated is null || validated.AccessExpiresAt != session.ExpiresAt ||
             validated.SessionVersion != session.SessionVersion ||
-            validated.Context.TenantId != session.Context.TenantId ||
-            validated.Context.WorkspaceId != session.Context.WorkspaceId ||
-            validated.Context.Principal != session.Context.Principal ||
-            !string.Equals(validated.Context.SessionId, session.Context.SessionId, StringComparison.Ordinal))
+            validated.Context.OwnerId != session.Context.OwnerId ||
+            validated.Context.ActorId != session.Context.ActorId ||
+            validated.Context.SessionId != session.Context.SessionId)
             throw Unauthenticated();
     }
 
@@ -495,36 +491,10 @@ public sealed class UiGrpcService(
         return result;
     }
 
-    private static void DemandSafeActionInput(JsonElement value, int depth)
-    {
-        if (depth > 64) throw new ArgumentException("Action input is too deeply nested.");
-        if (value.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var property in value.EnumerateObject())
-            {
-                var normalized = new string(property.Name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
-                if (ForbiddenActionInputKeys.Contains(normalized))
-                    throw new ArgumentException("Forbidden action input field.");
-                DemandSafeActionInput(property.Value, depth + 1);
-            }
-        }
-        else if (value.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in value.EnumerateArray()) DemandSafeActionInput(item, depth + 1);
-        }
-    }
-
-    private static readonly HashSet<string> ForbiddenActionInputKeys = new(StringComparer.Ordinal)
-    {
-        "accesstoken", "actiontoken", "authorization", "authorizationcode", "clientid", "clientsecret",
-        "codeverifier", "grants", "password", "principal", "principalid", "refreshtoken", "secret",
-        "secretvalue", "sessionid", "tenantid", "userid", "workspaceid"
-    };
-
     private static SurfaceAudienceKind AudienceKind(FeedAudienceKind value) => (int)value switch
     {
-        0 => SurfaceAudienceKind.Principal,
-        1 => SurfaceAudienceKind.Workspace,
+        0 => SurfaceAudienceKind.Actor,
+        1 => SurfaceAudienceKind.Owner,
         2 => SurfaceAudienceKind.Public,
         _ => throw new RpcException(new Status(StatusCode.InvalidArgument, "Unknown feed audience."))
     };
@@ -535,10 +505,9 @@ public sealed class UiGrpcService(
         RefreshToken = pair.RefreshToken,
         AccessExpiresAtUnixMs = pair.AccessExpiresAt.ToUnixTimeMilliseconds(),
         RefreshExpiresAtUnixMs = pair.RefreshExpiresAt.ToUnixTimeMilliseconds(),
-        SessionId = authenticated.SessionId,
-        TenantId = authenticated.TenantId.Value,
-        WorkspaceId = authenticated.WorkspaceId.Value,
-        PrincipalId = PrincipalScope.Id(authenticated.Principal)
+        SessionId = authenticated.SessionId.Value,
+        OwnerId = authenticated.OwnerId.Value,
+        ActorId = ActorScope.Id(authenticated.ActorId)
     };
 
     private static void RecordDelivery(string eventKind, SurfaceAudienceKind audienceKind, int itemCount)

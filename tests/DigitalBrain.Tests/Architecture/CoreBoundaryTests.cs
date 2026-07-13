@@ -23,10 +23,11 @@ public class CoreBoundaryTests
     };
 
     [Fact]
-    public void Core_Does_Not_Reference_Other_DigitalBrain_Assemblies()
+    public void Core_References_Only_The_Generic_Platform_Contracts()
     {
         var digitalBrainReferences = CoreReferenceNames()
-            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal))
+            .Where(name => name.StartsWith("DigitalBrain.", StringComparison.Ordinal) &&
+                !string.Equals(name, "DigitalBrain.Kernel.Contracts", StringComparison.Ordinal))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 

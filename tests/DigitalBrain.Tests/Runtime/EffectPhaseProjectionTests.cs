@@ -48,9 +48,8 @@ public sealed class EffectPhaseProjectionTests
         var now = DateTimeOffset.Parse("2026-07-12T12:00:00Z");
         var conversationId = "ino-" + new string('a', 64);
         var state = SurfaceFeedTransitions.Initialize(SurfaceFeedState.Empty(), 0, new(
-            new TenantId("tenant"),
-            new WorkspaceId("workspace"),
-            new PrincipalRef("principal", PrincipalKind.User)));
+            new BrainOwnerId("owner"),
+            new ActorId("principal")));
         var phases = new[]
         {
             InoOperationPhase.Approved,

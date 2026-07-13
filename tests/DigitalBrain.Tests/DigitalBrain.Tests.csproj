@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
 
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
@@ -51,6 +52,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="DigitalBrain.Kernel.Contracts" />
     <Using Include="DigitalBrain.Ui.Contracts" />
     <Using Include="DigitalBrain.Ui.Runtime" />
   </ItemGroup>

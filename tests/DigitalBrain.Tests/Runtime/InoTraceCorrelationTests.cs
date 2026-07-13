@@ -51,11 +51,10 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
         };
         ActivitySource.AddActivityListener(listener);
 
-        var tenant = new TenantId("tenant");
-        var workspace = new WorkspaceId("workspace");
-        var principal = new PrincipalRef("principal", PrincipalKind.User);
-        var identity = new ConversationIdentity(tenant, workspace, principal, "conversation-trace-correlation");
-        var conversationGrainKey = RuntimeStateKeys.Conversation(tenant, workspace, principal, identity.ConversationId);
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
+        var identity = new ConversationIdentity(owner, actor, "conversation-trace-correlation");
+        var conversationGrainKey = RuntimeStateKeys.Conversation(owner, actor, identity.ConversationId);
         var conversation = Grain<IConversationNeuron>(conversationGrainKey);
         var now = DateTimeOffset.UtcNow;
         var operationId = "operation-trace-correlation";
@@ -106,7 +105,7 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
         Assert.Equal("workflow-trace-correlation", activity.GetTagItem("db.ino.workflow_id"));
         Assert.Equal("session-trace-correlation", activity.GetTagItem("db.ino.workflow_session_id"));
         Assert.Equal("safe.read", activity.GetTagItem("db.ino.tool_id"));
-        Assert.Equal(RequestScope.Id(tenant, workspace, principal), TraceWorkflowRunner.LastActorScope);
+        Assert.Equal(RequestScope.Id(owner, actor), TraceWorkflowRunner.LastActorScope);
         Assert.DoesNotContain(activity.TagObjects, tag =>
             tag.Key.Contains("prompt", StringComparison.OrdinalIgnoreCase) ||
             tag.Key.Contains("token", StringComparison.OrdinalIgnoreCase) ||

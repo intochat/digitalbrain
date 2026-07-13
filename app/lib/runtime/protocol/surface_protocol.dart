@@ -10,8 +10,7 @@ const int defaultMaximumSurfaceBytes = 1024 * 1024;
 /// Capabilities advertised during the runtime feed handshake.
 ///
 /// These values describe renderer support only. They are never authorization
-/// claims and the server must not derive tenant, workspace, or principal
-/// authority from them.
+/// claims and the server must not derive owner or actor authority from them.
 class ClientCapabilities {
   const ClientCapabilities({
     this.protocolVersions = const {digitalBrainUiProtocolVersion},
@@ -93,7 +92,7 @@ class SurfaceAudience {
   factory SurfaceAudience.fromJson(Object? value) {
     final json = _object(value, 'audience');
     final kind = _boundedString(json, 'kind', maxLength: 32);
-    if (kind != 'principal' && kind != 'workspace' && kind != 'public') {
+    if (kind != 'actor' && kind != 'owner' && kind != 'public') {
       throw FormatException('Unsupported surface audience kind "$kind".');
     }
     final id = _boundedString(
@@ -879,8 +878,8 @@ class SurfaceEnvelope {
     required this.surfaceSchemaVersion,
     required this.surfaceId,
     required this.revision,
-    required this.tenantId,
-    required this.workspaceId,
+    required this.ownerId,
+    required this.actorId,
     required this.audience,
     required this.feedSequence,
     required this.createdAt,
@@ -915,8 +914,8 @@ class SurfaceEnvelope {
   final int surfaceSchemaVersion;
   final String surfaceId;
   final int revision;
-  final String tenantId;
-  final String workspaceId;
+  final String ownerId;
+  final String actorId;
   final SurfaceAudience audience;
   final int feedSequence;
   final DateTime createdAt;
@@ -1004,8 +1003,8 @@ class SurfaceEnvelope {
       surfaceSchemaVersion: schemaVersion,
       surfaceId: surfaceId,
       revision: revision,
-      tenantId: _boundedString(json, 'tenantId', maxLength: 256),
-      workspaceId: _boundedString(json, 'workspaceId', maxLength: 256),
+      ownerId: _boundedString(json, 'ownerId', maxLength: 256),
+      actorId: _boundedString(json, 'actorId', maxLength: 256),
       audience: SurfaceAudience.fromJson(json['audience']),
       feedSequence: _positiveInt(json, 'feedSequence'),
       createdAt: _dateTime(json, 'createdAt'),
@@ -1030,8 +1029,8 @@ class SurfaceEnvelope {
     'surfaceSchemaVersion': surfaceSchemaVersion,
     'surfaceId': surfaceId,
     'revision': revision,
-    'tenantId': tenantId,
-    'workspaceId': workspaceId,
+    'ownerId': ownerId,
+    'actorId': actorId,
     'audience': audience.toJson(),
     'feedSequence': feedSequence,
     'createdAt': createdAt.toUtc().toIso8601String(),
@@ -1093,15 +1092,14 @@ const Set<String> _forbiddenPayloadKeys = {
   'codeverifier',
   'grants',
   'password',
-  'principal',
-  'principalid',
+  'actor',
+  'actorid',
   'refreshtoken',
   'secret',
   'secretvalue',
   'sessionid',
-  'tenantid',
+  'ownerid',
   'userid',
-  'workspaceid',
 };
 
 void _demandOnlyKeys(

@@ -36,7 +36,7 @@ public sealed class UiExternalIdentityTests
 
         var claimOnly = Configuration(new Dictionary<string, string?>
         {
-            ["DigitalBrain:Runtime:Ui:Oidc:TenantClaim"] = "custom_tenant"
+            ["DigitalBrain:Runtime:Ui:Oidc:SubjectClaim"] = "custom_subject"
         });
         Assert.Throws<InvalidOperationException>(() =>
             UiExternalIdentityOptions.FromConfiguration(claimOnly, RuntimeProfile.Development));
@@ -48,14 +48,13 @@ public sealed class UiExternalIdentityTests
         var development = Configuration(new Dictionary<string, string?>
         {
             ["DigitalBrain:Runtime:Ui:BootstrapSecret"] = "development-secret",
-            ["DigitalBrain:Runtime:Ui:TenantId"] = "tenant",
-            ["DigitalBrain:Runtime:Ui:WorkspaceId"] = "workspace",
-            ["DigitalBrain:Runtime:Ui:PrincipalId"] = "developer"
+            ["DigitalBrain:Runtime:Ui:OwnerId"] = "owner",
+            ["DigitalBrain:Runtime:Ui:ActorId"] = "developer"
         });
         var developmentOptions = UiBootstrapOptions.FromConfiguration(development, RuntimeProfile.Development);
         Assert.True(new UiBootstrapAuthenticator(developmentOptions)
             .TryAuthenticate("development-secret", out var developmentContext));
-        Assert.Equal("tenant", developmentContext.TenantId.Value);
+        Assert.Equal("owner", developmentContext.OwnerId.Value);
 
         var productionOptions = UiBootstrapOptions.FromConfiguration(
             Configuration(new Dictionary<string, string?>()),
@@ -94,41 +93,31 @@ public sealed class UiExternalIdentityTests
     {
         var options = ExternalOptions();
         var principal = Principal(
-            new("tenant_id", "tenant"),
-            new("workspace_id", "workspace"),
             new("sub", "subject"),
             new("digitalbrain_grants", "brain.read ui.action"));
 
         Assert.True(options.TryMapPrincipal(principal, out var context));
-        Assert.Equal("tenant", context.TenantId.Value);
-        Assert.Equal("workspace", context.WorkspaceId.Value);
-        Assert.Equal("subject", context.Principal.Value);
-        Assert.Equal(PrincipalKind.User, context.Principal.Kind);
+        Assert.Equal(BrainOwnerId.FromExternalIdentity(options.Issuer, "subject"), context.OwnerId);
+        Assert.Equal(ActorId.FromExternalIdentity(options.Issuer, "subject"), context.ActorId);
         Assert.Equal(AuthAssurance.Oidc, context.Assurance);
         Assert.Equal(["brain.read", "ui.action"], context.Grants.Order(StringComparer.Ordinal).ToArray());
 
         var unknownGrant = Principal(
-            new("tenant_id", "tenant"),
-            new("workspace_id", "workspace"),
             new("sub", "subject"),
             new("digitalbrain_grants", "brain.admin"));
         Assert.False(options.TryMapPrincipal(unknownGrant, out _));
 
-        var ambiguousTenant = Principal(
-            new("tenant_id", "tenant-a"),
-            new("tenant_id", "tenant-b"),
-            new("workspace_id", "workspace"),
-            new("sub", "subject"),
+        var ambiguousSubject = Principal(
+            new("sub", "subject-a"),
+            new("sub", "subject-b"),
             new("digitalbrain_grants", "brain.read"));
-        Assert.False(options.TryMapPrincipal(ambiguousTenant, out _));
+        Assert.False(options.TryMapPrincipal(ambiguousSubject, out _));
 
-        var repeatedTenant = Principal(
-            new("tenant_id", "tenant"),
-            new("tenant_id", "tenant"),
-            new("workspace_id", "workspace"),
+        var repeatedSubject = Principal(
+            new("sub", "subject"),
             new("sub", "subject"),
             new("digitalbrain_grants", "brain.read"));
-        Assert.False(options.TryMapPrincipal(repeatedTenant, out _));
+        Assert.False(options.TryMapPrincipal(repeatedSubject, out _));
 
         var multipleAuthenticatedIdentities = new ClaimsPrincipal([
             (ClaimsIdentity)principal.Identity!,
@@ -137,9 +126,7 @@ public sealed class UiExternalIdentityTests
         Assert.False(options.TryMapPrincipal(multipleAuthenticatedIdentities, out _));
 
         var normalizedIdentity = Principal(
-            new("tenant_id", "tenant "),
-            new("workspace_id", "workspace"),
-            new("sub", "subject"),
+            new("sub", "subject "),
             new("digitalbrain_grants", "brain.read"));
         Assert.False(options.TryMapPrincipal(normalizedIdentity, out _));
     }
@@ -153,7 +140,7 @@ public sealed class UiExternalIdentityTests
             UiExternalIdentityOptions.FromConfiguration(insecure, RuntimeProfile.Production));
 
         var overlapping = ExternalConfiguration();
-        overlapping["DigitalBrain:Runtime:Ui:Oidc:TenantClaim"] = "sub";
+        overlapping["DigitalBrain:Runtime:Ui:Oidc:SubjectClaim"] = "digitalbrain_grants";
         Assert.Throws<InvalidOperationException>(() =>
             UiExternalIdentityOptions.FromConfiguration(overlapping, RuntimeProfile.Production));
     }

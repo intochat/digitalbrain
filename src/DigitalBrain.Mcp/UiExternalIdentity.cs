@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using Grpc.Core;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -13,9 +14,7 @@ public sealed record UiExternalIdentityOptions(
     bool Enabled,
     string Issuer,
     string Audience,
-    string TenantClaim,
-    string WorkspaceClaim,
-    string PrincipalClaim,
+    string SubjectClaim,
     string GrantsClaim,
     IReadOnlySet<string> AllowedGrants,
     bool RequireHttpsMetadata)
@@ -44,12 +43,9 @@ public sealed record UiExternalIdentityOptions(
         if (!ValidBounded(audience, 512))
             throw new InvalidOperationException($"{SectionPath}:Audience is invalid.");
 
-        var tenantClaim = ClaimName(section["TenantClaim"], "tenant_id", "TenantClaim");
-        var workspaceClaim = ClaimName(section["WorkspaceClaim"], "workspace_id", "WorkspaceClaim");
-        var principalClaim = ClaimName(section["PrincipalClaim"], "sub", "PrincipalClaim");
+        var subjectClaim = ClaimName(section["SubjectClaim"], "sub", "SubjectClaim");
         var grantsClaim = ClaimName(section["GrantsClaim"], "digitalbrain_grants", "GrantsClaim");
-        if (new[] { tenantClaim, workspaceClaim, principalClaim, grantsClaim }
-                .Distinct(StringComparer.Ordinal).Count() != 4)
+        if (string.Equals(subjectClaim, grantsClaim, StringComparison.Ordinal))
             throw new InvalidOperationException($"{SectionPath} claim names must be distinct.");
 
         var grants = configuredGrants.ToHashSet(StringComparer.Ordinal);
@@ -59,9 +55,7 @@ public sealed record UiExternalIdentityOptions(
             true,
             issuer,
             audience,
-            tenantClaim,
-            workspaceClaim,
-            principalClaim,
+            subjectClaim,
             grantsClaim,
             grants,
             issuerUri.Scheme == Uri.UriSchemeHttps);
@@ -88,7 +82,7 @@ public sealed record UiExternalIdentityOptions(
             RequireExpirationTime = true,
             RequireAudience = true,
             ClockSkew = TimeSpan.FromMinutes(1),
-            NameClaimType = PrincipalClaim
+            NameClaimType = SubjectClaim
         };
     }
 
@@ -98,9 +92,7 @@ public sealed record UiExternalIdentityOptions(
         if (!Enabled || principal is null) return false;
         var identities = principal.Identities.Where(static identity => identity.IsAuthenticated).ToArray();
         if (identities.Length != 1 ||
-            !TryUniqueClaim(identities[0], TenantClaim, out var tenant) ||
-            !TryUniqueClaim(identities[0], WorkspaceClaim, out var workspace) ||
-            !TryUniqueClaim(identities[0], PrincipalClaim, out var principalId))
+            !TryUniqueClaim(identities[0], SubjectClaim, out var subject))
             return false;
 
         var assertedGrants = identities[0].FindAll(GrantsClaim)
@@ -114,10 +106,9 @@ public sealed record UiExternalIdentityOptions(
             return false;
 
         context = new RuntimeRequestContext(
-            new TenantId(tenant),
-            new WorkspaceId(workspace),
-            new PrincipalRef(principalId, PrincipalKind.User),
-            "external-oidc-bootstrap",
+            BrainOwnerId.FromExternalIdentity(Issuer, subject),
+            ActorId.FromExternalIdentity(Issuer, subject),
+            new SessionId("external-oidc-bootstrap"),
             AuthAssurance.Oidc,
             Guid.NewGuid().ToString("N"),
             null,
@@ -129,8 +120,6 @@ public sealed record UiExternalIdentityOptions(
         false,
         string.Empty,
         string.Empty,
-        "tenant_id",
-        "workspace_id",
         "sub",
         "digitalbrain_grants",
         new HashSet<string>(StringComparer.Ordinal),

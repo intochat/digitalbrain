@@ -30,7 +30,7 @@ public sealed class SurfaceEnvelopeWriter
         var missing = record.RequiredClientCapabilities.Where(required => !clientCapabilities.Contains(required)).ToArray();
         if (missing.Length > 0) throw new SurfaceCapabilityException(missing);
 
-        var wireActions = record.Audience.Kind == SurfaceAudienceKind.Principal
+        var wireActions = record.Audience.Kind == SurfaceAudienceKind.Actor
             ? record.Actions
                 .Where(binding => actionTokens.ContainsKey(binding.BindingId))
                 .Select(binding =>
@@ -56,8 +56,8 @@ public sealed class SurfaceEnvelopeWriter
             surfaceSchemaVersion = record.SurfaceSchemaVersion,
             surfaceId = record.SurfaceId,
             revision = record.Revision,
-            tenantId = record.TenantId.Value,
-            workspaceId = record.WorkspaceId.Value,
+            ownerId = record.OwnerId.Value,
+            actorId = ActorScope.Id(record.ActorId),
             audience = new { kind = record.Audience.Kind.ToString().ToLowerInvariant(), id = record.Audience.Id },
             feedSequence = record.Sequence,
             createdAt = record.CreatedAt.ToUniversalTime().ToString("O"),
@@ -73,14 +73,14 @@ public sealed class SurfaceEnvelopeWriter
 
     private static void DemandVisible(RequestContext recipient, StoredSurfaceRecord record)
     {
-        if (record.TenantId != recipient.TenantId || record.WorkspaceId != recipient.WorkspaceId)
+        if (record.OwnerId != recipient.OwnerId)
             throw new UnauthorizedAccessException("Surface scope denied.");
         var visible = record.Audience.Kind switch
         {
-            SurfaceAudienceKind.Principal =>
-                record.AudiencePrincipalKind == recipient.Principal.Kind &&
-                string.Equals(record.Audience.Id, PrincipalScope.Id(recipient.Principal), StringComparison.Ordinal),
-            SurfaceAudienceKind.Workspace => string.Equals(record.Audience.Id, recipient.WorkspaceId.Value, StringComparison.Ordinal),
+            SurfaceAudienceKind.Actor =>
+                record.ActorId == recipient.ActorId &&
+                string.Equals(record.Audience.Id, ActorScope.Id(recipient.ActorId), StringComparison.Ordinal),
+            SurfaceAudienceKind.Owner => string.Equals(record.Audience.Id, recipient.OwnerId.Value, StringComparison.Ordinal),
             SurfaceAudienceKind.Public => string.IsNullOrEmpty(record.Audience.Id),
             _ => false
         };

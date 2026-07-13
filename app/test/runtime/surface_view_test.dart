@@ -832,7 +832,7 @@ void main() {
     expect(find.byType(SelectableText), findsOneWidget);
   });
 
-  testWidgets('shows the principal-scoped Google connection action', (
+  testWidgets('shows the actor-scoped Google connection action', (
     tester,
   ) async {
     await tester.pumpWidget(

@@ -1,3 +1,5 @@
+using DigitalBrain.Kernel.Contracts;
+
 namespace DigitalBrain.Core;
 
 // Db schema model types (live for sqlite uploads inspection + ui graph mapper).
@@ -12,7 +14,7 @@ public record DbSchemaInspected(
     bool Succeeded = true,
     string? Error = null,
     string? ClientId = null,
-    string? WorkspaceId = null) : Synapse(nameof(DbSchemaInspected), DateTimeOffset.UtcNow);
+    BrainOwnerId? OwnerId = null) : Synapse(nameof(DbSchemaInspected), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.DbSchemaModel")]
@@ -23,7 +25,7 @@ public record DbSchemaModel(
     [property: Id(3)] string? SourcePath = null,
     [property: Id(4)] string? SessionId = null,
     [property: Id(5)] IReadOnlyDictionary<string, string?>? Metadata = null,
-    [property: Id(6)] string? WorkspaceId = null);
+    [property: Id(6)] BrainOwnerId? OwnerId = null);
 
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.DbTable")]

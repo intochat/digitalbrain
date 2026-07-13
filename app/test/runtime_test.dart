@@ -15,9 +15,8 @@ void main() {
 
         expect(transport.bootstrapSecret, 'local-bootstrap');
         expect(session.status, SessionStatus.authenticated);
-        expect(session.tenantId, 'tenant-a');
-        expect(session.workspaceId, 'workspace-a');
-        expect(session.principalId, 'principal-a');
+        expect(session.ownerId, 'owner-a');
+        expect(session.actorId, 'actor-a');
         expect(
           testSession().credentials.toString(),
           isNot(anyOf(contains('access-token'), contains('refresh-token'))),
@@ -27,9 +26,8 @@ void main() {
         expect(transport.logoutRefreshToken, 'refresh-token');
         expect(session.status, SessionStatus.signedOut);
         expect(session.sessionId, isNull);
-        expect(session.tenantId, isNull);
-        expect(session.workspaceId, isNull);
-        expect(session.principalId, isNull);
+        expect(session.ownerId, isNull);
+        expect(session.actorId, isNull);
       },
     );
 
@@ -53,9 +51,8 @@ void main() {
       expect(session.status, SessionStatus.authenticated);
       expect(session.isAuthenticated, isTrue);
       expect(session.sessionId, 'session-a');
-      expect(session.tenantId, 'tenant-a');
-      expect(session.workspaceId, 'workspace-a');
-      expect(session.principalId, 'principal-a');
+      expect(session.ownerId, 'owner-a');
+      expect(session.actorId, 'actor-a');
       expect(session.lastError, isA<TransportException>());
     });
 
@@ -83,13 +80,11 @@ void main() {
       },
     );
 
-    test('fails closed when refresh changes workspace identity', () async {
+    test('fails closed when refresh changes owner identity', () async {
       final first = testSession(
         accessExpiresAt: testNow.add(const Duration(seconds: 5)),
       );
-      final changed = testSession(
-        identity: testIdentity(workspace: 'workspace-b'),
-      );
+      final changed = testSession(identity: testIdentity(owner: 'owner-b'));
       final transport = _SessionTransport(first, refreshed: changed);
       final session = SessionController(now: () => testNow)..establish(first);
 
@@ -98,7 +93,7 @@ void main() {
         throwsA(isA<ProtocolException>()),
       );
       expect(session.status, SessionStatus.expired);
-      expect(session.workspaceId, isNull);
+      expect(session.ownerId, isNull);
     });
   });
 
@@ -166,13 +161,13 @@ void main() {
       },
     );
 
-    test('rejects wrong tenant, workspace, and principal without mutation', () {
+    test('rejects wrong owner, actor, and audience without mutation', () {
       final feed = FeedController()..bindIdentity(testIdentity());
 
       for (final surface in [
-        testSurface(tenant: 'tenant-b'),
-        testSurface(workspace: 'workspace-b'),
-        testSurface(audienceId: 'principal-b'),
+        testSurface(owner: 'owner-b'),
+        testSurface(actor: 'actor-b'),
+        testSurface(audienceId: 'actor-b'),
       ]) {
         expect(() => feed.accept(surface), throwsA(isA<ScopeViolation>()));
       }
@@ -181,18 +176,18 @@ void main() {
       expect(feed.surfaces, isEmpty);
     });
 
-    test('two workspace feeds cannot cross-deliver', () {
-      final workspaceA = FeedController()
-        ..bindIdentity(testIdentity(workspace: 'workspace-a'));
-      final workspaceB = FeedController()
-        ..bindIdentity(testIdentity(workspace: 'workspace-b'));
-      final surfaceA = testSurface(workspace: 'workspace-a');
-      final surfaceB = testSurface(workspace: 'workspace-b');
+    test('two owner feeds cannot cross-deliver', () {
+      final ownerA = FeedController()
+        ..bindIdentity(testIdentity(owner: 'owner-a'));
+      final ownerB = FeedController()
+        ..bindIdentity(testIdentity(owner: 'owner-b'));
+      final surfaceA = testSurface(owner: 'owner-a');
+      final surfaceB = testSurface(owner: 'owner-b');
 
-      expect(workspaceA.accept(surfaceA), isA<FeedSurface>());
-      expect(workspaceB.accept(surfaceB), isA<FeedSurface>());
-      expect(() => workspaceA.accept(surfaceB), throwsA(isA<ScopeViolation>()));
-      expect(() => workspaceB.accept(surfaceA), throwsA(isA<ScopeViolation>()));
+      expect(ownerA.accept(surfaceA), isA<FeedSurface>());
+      expect(ownerB.accept(surfaceB), isA<FeedSurface>());
+      expect(() => ownerA.accept(surfaceB), throwsA(isA<ScopeViolation>()));
+      expect(() => ownerB.accept(surfaceA), throwsA(isA<ScopeViolation>()));
     });
 
     test('invalid reset snapshot leaves the current feed untouched', () {
@@ -203,7 +198,7 @@ void main() {
       expect(
         () => feed.applyServerReset(
           const FeedResetEvent(reason: 'reset', resumeSequence: 3),
-          [testSurface(sequence: 2, workspace: 'workspace-b')],
+          [testSurface(sequence: 2, owner: 'owner-b')],
         ),
         throwsA(isA<ScopeViolation>()),
       );

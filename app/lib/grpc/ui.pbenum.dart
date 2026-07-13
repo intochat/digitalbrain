@@ -15,18 +15,16 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 class FeedAudienceKind extends $pb.ProtobufEnum {
-  static const FeedAudienceKind FEED_AUDIENCE_KIND_PRINCIPAL =
-      FeedAudienceKind._(
-          0, _omitEnumNames ? '' : 'FEED_AUDIENCE_KIND_PRINCIPAL');
-  static const FeedAudienceKind FEED_AUDIENCE_KIND_WORKSPACE =
-      FeedAudienceKind._(
-          1, _omitEnumNames ? '' : 'FEED_AUDIENCE_KIND_WORKSPACE');
+  static const FeedAudienceKind FEED_AUDIENCE_KIND_ACTOR =
+      FeedAudienceKind._(0, _omitEnumNames ? '' : 'FEED_AUDIENCE_KIND_ACTOR');
+  static const FeedAudienceKind FEED_AUDIENCE_KIND_OWNER =
+      FeedAudienceKind._(1, _omitEnumNames ? '' : 'FEED_AUDIENCE_KIND_OWNER');
   static const FeedAudienceKind FEED_AUDIENCE_KIND_PUBLIC =
       FeedAudienceKind._(2, _omitEnumNames ? '' : 'FEED_AUDIENCE_KIND_PUBLIC');
 
   static const $core.List<FeedAudienceKind> values = <FeedAudienceKind>[
-    FEED_AUDIENCE_KIND_PRINCIPAL,
-    FEED_AUDIENCE_KIND_WORKSPACE,
+    FEED_AUDIENCE_KIND_ACTOR,
+    FEED_AUDIENCE_KIND_OWNER,
     FEED_AUDIENCE_KIND_PUBLIC,
   ];
 

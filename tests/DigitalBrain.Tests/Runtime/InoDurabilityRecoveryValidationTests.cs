@@ -140,9 +140,8 @@ public sealed class InoDurabilityRecoveryValidationTests : NeuronTestBase
             InoOperationPhase.Failed);
         Assert.Equal("safe.read", terminalOutbox.Record.ToolId);
         var feed = Grain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(
-            context.TenantId,
-            context.WorkspaceId,
-            context.Principal));
+            context.OwnerId,
+            context.ActorId));
         var presentation = await WaitForProjectionAsync(feed, terminalOutbox.Entry.OutboxId, TimeSpan.FromSeconds(12));
 
         Assert.Contains(presentation.EventHistory, record =>
@@ -188,16 +187,14 @@ public sealed class InoDurabilityRecoveryValidationTests : NeuronTestBase
         Grain<IConversationNeuron>(ConversationKey(context));
 
     private static string ConversationKey(RuntimeRequestContext context) => RuntimeStateKeys.Conversation(
-        context.TenantId,
-        context.WorkspaceId,
-        context.Principal,
+        context.OwnerId,
+        context.ActorId,
         InoConversationIdentity.From(context));
 
     private static RuntimeRequestContext Context(string requestId) => new(
-        new TenantId("tenant"),
-        new WorkspaceId("workspace"),
-        new PrincipalRef("principal", PrincipalKind.User),
-        "session-" + requestId,
+        new BrainOwnerId("owner"),
+        new ActorId("principal"),
+        new SessionId("session-" + requestId),
         AuthAssurance.Oidc,
         requestId,
         null,

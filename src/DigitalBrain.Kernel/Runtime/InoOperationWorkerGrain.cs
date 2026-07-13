@@ -313,7 +313,9 @@ public sealed class InoOperationWorkerGrain(
                 requestId,
                 authorizationResume,
                 claimed.Workflow,
-                RequestScope.Id(state.Identity.TenantId, state.Identity.WorkspaceId, state.Identity.Principal)), deadline.Token);
+                RequestScope.Id(state.Identity.OwnerId, state.Identity.ActorId),
+                state.Identity.OwnerId,
+                state.Identity.ActorId), deadline.Token);
         }
         catch (OperationCanceledException)
         {
@@ -363,7 +365,7 @@ public sealed class InoOperationWorkerGrain(
         InoApprovedTool? approvedTool = null;
         if (requestedTool is { Access: InoToolAccess.Mutation })
         {
-            var actorScope = RequestScope.Id(identity.TenantId, identity.WorkspaceId, identity.Principal);
+            var actorScope = RequestScope.Id(identity.OwnerId, identity.ActorId);
             if (toolGateway.TryAuthorizeMutation(requestedTool, actorScope, out var authorized))
                 approvedTool = authorized;
         }
@@ -639,7 +641,7 @@ public sealed class InoOperationWorkerGrain(
         string provider,
         CancellationToken cancellationToken)
     {
-        var ownerScope = RequestScope.Id(identity.TenantId, identity.WorkspaceId, identity.Principal);
+        var ownerScope = RequestScope.Id(identity.OwnerId, identity.ActorId);
         return provider switch
         {
             OAuthCallbackPaths.GoogleProvider => grainFactory.GetGrain<IGmailReadToolGrain>(ownerScope)
@@ -727,7 +729,7 @@ public sealed class InoOperationWorkerGrain(
             return;
         }
 
-        var actorScope = RequestScope.Id(state.Identity.TenantId, state.Identity.WorkspaceId, state.Identity.Principal);
+        var actorScope = RequestScope.Id(state.Identity.OwnerId, state.Identity.ActorId);
         activity?.SetTag("db.ino.tool_id", effect.Kind);
         activity?.SetTag("db.ino.effect_id", effect.EffectId);
         InoToolEffectResult result;
@@ -1110,7 +1112,7 @@ public sealed class InoOperationWorkerGrain(
             identity.ConversationId,
             checked(state.Revision + 1),
             string.IsNullOrWhiteSpace(operation.RequestId) ? operation.OperationId : operation.RequestId,
-            RuntimeStateKeys.Conversation(identity.TenantId, identity.WorkspaceId, identity.Principal, identity.ConversationId),
+            RuntimeStateKeys.Conversation(identity.OwnerId, identity.ActorId, identity.ConversationId),
             new OperationFeedView(
                 operation.CommandId,
                 string.Empty,

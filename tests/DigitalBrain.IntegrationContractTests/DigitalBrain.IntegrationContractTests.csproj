@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google.Contracts\DigitalBrain.Integrations.Google.Contracts.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce.Contracts\DigitalBrain.Integrations.Salesforce.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Features.Sdk\DigitalBrain.Features.Sdk.csproj" />

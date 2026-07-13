@@ -72,11 +72,10 @@ public sealed class InoWorkflowFailureTests : NeuronTestBase
 
     private async Task<(ConversationOperation Operation, ConversationState State)> SubmitAndWaitForTransitionAsync(string suffix)
     {
-        var tenant = new TenantId("tenant");
-        var workspace = new WorkspaceId("workspace");
-        var principal = new PrincipalRef("principal", PrincipalKind.User);
-        var identity = new ConversationIdentity(tenant, workspace, principal, "conversation-" + suffix);
-        var conversationKey = RuntimeStateKeys.Conversation(tenant, workspace, principal, identity.ConversationId);
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
+        var identity = new ConversationIdentity(owner, actor, "conversation-" + suffix);
+        var conversationKey = RuntimeStateKeys.Conversation(owner, actor, identity.ConversationId);
         var conversation = Grain<IConversationNeuron>(conversationKey);
         var now = DateTimeOffset.UtcNow;
         var operationId = "operation-" + suffix;

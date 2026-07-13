@@ -219,9 +219,8 @@ public sealed class ConversationStateClient(
         var conversationId = context.ConversationId ?? InoConversationIdentity.From(context);
         DemandConversationId(conversationId);
         return cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
-            context.TenantId,
-            context.WorkspaceId,
-            context.Principal,
+            context.OwnerId,
+            context.ActorId,
             conversationId));
     }
 
@@ -229,7 +228,7 @@ public sealed class ConversationStateClient(
     {
         var conversationId = context.ConversationId ?? InoConversationIdentity.From(context);
         DemandConversationId(conversationId);
-        return new(context.TenantId, context.WorkspaceId, context.Principal, conversationId);
+        return new(context.OwnerId, context.ActorId, conversationId);
     }
 
     internal static string OperationId(RuntimeRequestContext context, string commandId)
@@ -321,7 +320,7 @@ public sealed class ConversationStateClient(
             conversationId: identity.ConversationId,
             conversationRevision: checked(state.Revision + 1),
             requestId,
-            RuntimeStateKeys.Conversation(identity.TenantId, identity.WorkspaceId, identity.Principal, identity.ConversationId),
+            RuntimeStateKeys.Conversation(identity.OwnerId, identity.ActorId, identity.ConversationId),
             new OperationFeedView(commandId, string.Empty, retryable, safeReason, approvalId, action, turns),
             toolId,
             effectId,

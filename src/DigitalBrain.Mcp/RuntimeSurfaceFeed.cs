@@ -39,7 +39,7 @@ public sealed class RuntimeSurfaceFeed(
         RuntimeRequestContext context,
         CancellationToken cancellationToken)
     {
-        DemandPrincipal(context);
+        DemandActor(context);
         var neuron = Feed(context);
         var state = await EnsureInitializedAsync(context, neuron, cancellationToken).ConfigureAwait(false);
         return ActiveConversationId(context, state);
@@ -49,7 +49,7 @@ public sealed class RuntimeSurfaceFeed(
         RuntimeRequestContext context,
         CancellationToken cancellationToken = default)
     {
-        DemandPrincipal(context);
+        DemandActor(context);
         var neuron = Feed(context);
         var state = await EnsureInitializedAsync(context, neuron, cancellationToken).ConfigureAwait(false);
         if (state.CurrentSurfaces.Length == 0)
@@ -57,9 +57,8 @@ public sealed class RuntimeSurfaceFeed(
         state = await RenewActionBindingsAsync(neuron, state, cancellationToken).ConfigureAwait(false);
         var conversationId = ActiveConversationId(context, state);
         var conversationGrainKey = RuntimeStateKeys.Conversation(
-            context.TenantId,
-            context.WorkspaceId,
-            context.Principal,
+            context.OwnerId,
+            context.ActorId,
             conversationId);
         var conversationState = await cluster.GetGrain<IConversationNeuron>(conversationGrainKey)
             .ReadAsync()
@@ -80,7 +79,7 @@ public sealed class RuntimeSurfaceFeed(
         long afterSequence,
         int limit)
     {
-        DemandPrincipal(context);
+        DemandActor(context);
         if (afterSequence < 0) throw new ArgumentOutOfRangeException(nameof(afterSequence));
         var bounded = Math.Clamp(limit, 1, 100);
         var history = state.EventHistory ?? [];
@@ -121,7 +120,7 @@ public sealed class RuntimeSurfaceFeed(
     {
         var neuron = Feed(context);
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-        var deliveryId = DeliveryId(context.SessionId, sequence);
+        var deliveryId = DeliveryId(context.SessionId.Value, sequence);
         await RetryConflictAsync(
             neuron,
             state,
@@ -140,7 +139,7 @@ public sealed class RuntimeSurfaceFeed(
     {
         var neuron = Feed(context);
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-        var deliveryId = DeliveryId(context.SessionId, sequence);
+        var deliveryId = DeliveryId(context.SessionId.Value, sequence);
         if (!state.DeliveryDedupe.Any(delivery =>
                 string.Equals(delivery.DeliveryId, deliveryId, StringComparison.Ordinal) &&
                 delivery.Sequence == sequence))
@@ -151,13 +150,13 @@ public sealed class RuntimeSurfaceFeed(
             state,
             current => neuron.AcknowledgeAsync(
                 current.Revision,
-                RuntimeStateKeys.Session(context.SessionId),
+                RuntimeStateKeys.Session(context.SessionId.Value),
                 sequence,
                 now.Add(CursorLifetime),
                 now),
             cancellationToken).ConfigureAwait(false);
         return state.Acknowledgements.First(cursor =>
-            string.Equals(cursor.SessionScopeHash, RuntimeStateKeys.Session(context.SessionId), StringComparison.Ordinal)).Sequence;
+            string.Equals(cursor.SessionScopeHash, RuntimeStateKeys.Session(context.SessionId.Value), StringComparison.Ordinal)).Sequence;
     }
 
     public async Task<AuthorizedRuntimeAction> AuthorizeActionAsync(
@@ -169,7 +168,7 @@ public sealed class RuntimeSurfaceFeed(
         JsonElement input,
         CancellationToken cancellationToken = default)
     {
-        DemandPrincipal(context);
+        DemandActor(context);
         var neuron = Feed(context);
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         var activeConversationId = ActiveConversationId(context, state);
@@ -184,9 +183,8 @@ public sealed class RuntimeSurfaceFeed(
                 context with { ConversationId = activeConversationId },
                 acceptedIdempotencyKey);
             var conversation = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
-                context.TenantId,
-                context.WorkspaceId,
-                context.Principal,
+                context.OwnerId,
+                context.ActorId,
                 activeConversationId));
             var conversationState = await conversation.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
             var existing = conversationState.Operations.FirstOrDefault(candidate =>
@@ -214,9 +212,8 @@ public sealed class RuntimeSurfaceFeed(
                 throw new ActionRejectedException(ActionRejection.PolicyDenied);
             var decisionId = StableIdempotencyKey(context, approvalDecision.ClientDecisionId);
             var conversation = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
-                context.TenantId,
-                context.WorkspaceId,
-                context.Principal,
+                context.OwnerId,
+                context.ActorId,
                 activeConversationId));
             var conversationState = await conversation.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
             var target = conversationState.Operations.FirstOrDefault(candidate =>
@@ -370,7 +367,7 @@ public sealed class RuntimeSurfaceFeed(
         CancellationToken cancellationToken)
     {
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-        var identity = new SurfaceFeedIdentity(context.TenantId, context.WorkspaceId, context.Principal);
+        var identity = new SurfaceFeedIdentity(context.OwnerId, context.ActorId);
         if (state.Identity is not null)
         {
             if (state.Identity != identity) throw new UnauthorizedAccessException("Surface-feed identity denied.");
@@ -419,9 +416,8 @@ public sealed class RuntimeSurfaceFeed(
 
     private ISurfaceFeedNeuron Feed(RuntimeRequestContext context) =>
         cluster.GetGrain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(
-            context.TenantId,
-            context.WorkspaceId,
-            context.Principal));
+            context.OwnerId,
+            context.ActorId));
 
     private async Task<SurfaceFeedState> RenewActionBindingsAsync(
         ISurfaceFeedNeuron neuron,
@@ -503,9 +499,9 @@ public sealed class RuntimeSurfaceFeed(
             .ToArray() : [];
         return new(
             surface.Sequence,
-            context.TenantId,
-            context.WorkspaceId,
-            new SurfaceAudience(SurfaceAudienceKind.Principal, PrincipalScope.Id(context.Principal)),
+            context.OwnerId,
+            context.ActorId,
+            new SurfaceAudience(SurfaceAudienceKind.Actor, ActorScope.Id(context.ActorId)),
             surface.SurfaceId,
             surface.SurfaceRevision,
             surface.ContentHash,
@@ -516,8 +512,7 @@ public sealed class RuntimeSurfaceFeed(
             presentation.CauseId,
             presentation.RequiredClientCapabilities,
             presentation.Payload,
-            actions,
-            AudiencePrincipalKind: context.Principal.Kind);
+            actions);
     }
 
     private static StoredActionBinding ToStoredBinding(SurfaceActionBinding binding) => new(
@@ -570,9 +565,8 @@ public sealed class RuntimeSurfaceFeed(
         CancellationToken cancellationToken)
     {
         var conversation = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
-            context.TenantId,
-            context.WorkspaceId,
-            context.Principal,
+            context.OwnerId,
+            context.ActorId,
             conversationId));
         var state = await conversation.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         var operation = state.Operations.FirstOrDefault(candidate =>
@@ -749,10 +743,10 @@ public sealed class RuntimeSurfaceFeed(
     private static string Hash(string value) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
-    private static void DemandPrincipal(RuntimeRequestContext context)
+    private static void DemandActor(RuntimeRequestContext context)
     {
-        if (context.Principal.Kind != PrincipalKind.User || string.IsNullOrWhiteSpace(context.SessionId))
-            throw new UnauthorizedAccessException("A principal session is required for the surface feed.");
+        if (string.IsNullOrWhiteSpace(context.ActorId.Value) || string.IsNullOrWhiteSpace(context.SessionId.Value))
+            throw new UnauthorizedAccessException("An actor session is required for the surface feed.");
     }
 
 }

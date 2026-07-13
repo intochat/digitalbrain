@@ -130,9 +130,8 @@ public sealed class InoConversationOutboxDispatcherGrain(
             !string.Equals(record.ConversationId, identity.ConversationId, StringComparison.Ordinal))
             throw new RuntimeStateIntegrityException("conversation outbox projection identity mismatch");
         var feed = grainFactory.GetGrain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(
-            identity.TenantId,
-            identity.WorkspaceId,
-            identity.Principal));
+            identity.OwnerId,
+            identity.ActorId));
         var state = await EnsureFeedAsync(feed, identity);
         if (!TargetsConversation(state, identity.ConversationId)) return false;
         var bindingIssuedAt = timeProvider.GetUtcNow();
@@ -160,7 +159,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
         ConversationIdentity identity)
     {
         var state = await feed.ReadAsync();
-        var expected = new SurfaceFeedIdentity(identity.TenantId, identity.WorkspaceId, identity.Principal);
+        var expected = new SurfaceFeedIdentity(identity.OwnerId, identity.ActorId);
         if (state.Identity is not null)
         {
             if (state.Identity != expected) throw new UnauthorizedAccessException("Surface-feed identity denied.");

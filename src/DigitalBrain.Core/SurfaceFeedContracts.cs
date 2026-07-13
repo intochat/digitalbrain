@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Core.Runtime;
 
@@ -18,8 +19,8 @@ public sealed record StoredActionBinding(
 /// </summary>
 public sealed record StoredSurfaceRecord(
     long Sequence,
-    TenantId TenantId,
-    WorkspaceId WorkspaceId,
+    BrainOwnerId OwnerId,
+    ActorId ActorId,
     SurfaceAudience Audience,
     string SurfaceId,
     int Revision,
@@ -35,5 +36,4 @@ public sealed record StoredSurfaceRecord(
     int ProtocolVersion = UiProtocol.ProtocolVersion,
     string SurfaceSchema = UiProtocol.SurfaceSchema,
     int SurfaceSchemaVersion = UiProtocol.SurfaceSchemaVersion,
-    int ActionSchemaVersion = UiProtocol.ActionSchemaVersion,
-    PrincipalKind? AudiencePrincipalKind = null);
+    int ActionSchemaVersion = UiProtocol.ActionSchemaVersion);

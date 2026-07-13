@@ -35,6 +35,7 @@
 
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
 
   </ItemGroup>
 

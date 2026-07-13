@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using Orleans;
 using Orleans.Concurrency;
 
@@ -23,10 +24,9 @@ public enum ConversationTurnKind { User = 0, Assistant = 1, Authorization = 2, A
 
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-identity")]
 public sealed record ConversationIdentity(
-    [property: Id(0)] TenantId TenantId,
-    [property: Id(1)] WorkspaceId WorkspaceId,
-    [property: Id(2)] PrincipalRef Principal,
-    [property: Id(3)] string ConversationId);
+    [property: Id(0)] BrainOwnerId OwnerId,
+    [property: Id(1)] ActorId ActorId,
+    [property: Id(2)] string ConversationId);
 
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-turn")]
 public sealed record ConversationTurn(
@@ -361,7 +361,7 @@ public static class ConversationTransitions
             commandId,
             operationId,
             state.Identity!.ConversationId,
-            RequestScope.Id(state.Identity.TenantId, state.Identity.WorkspaceId, state.Identity.Principal),
+            RequestScope.Id(state.Identity.OwnerId, state.Identity.ActorId),
             commandId,
             inputHash.ToLowerInvariant(),
             requestId,
@@ -616,7 +616,7 @@ public static class ConversationTransitions
         var approval = operation.Approval ?? throw new InvalidOperationException("The operation has no approval to decide.");
         var effect = operation.Effect ?? throw new RuntimeStateIntegrityException("The approval has no durable effect.");
         var expectedActor = state.Identity is { } identity
-            ? RequestScope.Id(identity.TenantId, identity.WorkspaceId, identity.Principal)
+            ? RequestScope.Id(identity.OwnerId, identity.ActorId)
             : throw new RuntimeStateIntegrityException("approval decisions require a conversation identity");
         if (!string.Equals(decidedBy, expectedActor, StringComparison.Ordinal))
             throw new InvalidOperationException("An approval decision must be bound to the conversation actor.");
@@ -962,7 +962,7 @@ public static class ConversationTransitions
                 inbox.CommandId,
                 inbox.OperationId,
                 identity.ConversationId,
-                RequestScope.Id(identity.TenantId, identity.WorkspaceId, identity.Principal),
+                RequestScope.Id(identity.OwnerId, identity.ActorId),
                 inbox.CommandId,
                 inbox.InputHash.ToLowerInvariant(),
                 requestId,
@@ -1011,7 +1011,7 @@ public static class ConversationTransitions
                 throw new RuntimeStateIntegrityException("conversation turn sequence is not monotonic");
         }
         var actorScope = state.Identity is { } identity
-            ? RequestScope.Id(identity.TenantId, identity.WorkspaceId, identity.Principal)
+            ? RequestScope.Id(identity.OwnerId, identity.ActorId)
             : null;
         foreach (var operation in state.Operations)
         {
@@ -1259,8 +1259,8 @@ public static class ConversationTransitions
 
     private static void ValidateIdentity(ConversationIdentity identity)
     {
-        if (string.IsNullOrWhiteSpace(identity.TenantId.Value) || string.IsNullOrWhiteSpace(identity.WorkspaceId.Value) ||
-            string.IsNullOrWhiteSpace(identity.Principal.Value) || string.IsNullOrWhiteSpace(identity.ConversationId) ||
+        if (string.IsNullOrWhiteSpace(identity.OwnerId.Value) || string.IsNullOrWhiteSpace(identity.ActorId.Value) ||
+            string.IsNullOrWhiteSpace(identity.ConversationId) ||
             identity.ConversationId.Length > 256)
             throw new ArgumentException("A complete bounded conversation identity is required.", nameof(identity));
     }
@@ -1282,7 +1282,7 @@ public static class ConversationTransitions
             if (command.SchemaVersion != 1 || command.AcceptedAt == default ||
                 !string.Equals(command.CommandId, command.IdempotencyKey, StringComparison.Ordinal) ||
                 state.Identity is null || !string.Equals(command.ConversationId, state.Identity.ConversationId, StringComparison.Ordinal) ||
-                !string.Equals(command.ActorScope, RequestScope.Id(state.Identity.TenantId, state.Identity.WorkspaceId, state.Identity.Principal), StringComparison.Ordinal))
+                !string.Equals(command.ActorScope, RequestScope.Id(state.Identity.OwnerId, state.Identity.ActorId), StringComparison.Ordinal))
                 throw new RuntimeStateIntegrityException("accepted command metadata is invalid");
             var operation = state.Operations.FirstOrDefault(candidate =>
                 string.Equals(candidate.OperationId, command.OperationId, StringComparison.Ordinal));

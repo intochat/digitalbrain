@@ -22,16 +22,16 @@ public class DbSchemaContractTests
             SourcePath: @"E:\budget.db",
             SessionId: "session-1",
             Metadata: new Dictionary<string, string?> { ["sqlite:version"] = "3.46.0" },
-            WorkspaceId: "finance");
+            OwnerId: new("owner-finance"));
 
-        var inspected = new DbSchemaInspected("budget", "sqlite", schema, ClientId: "session-1", WorkspaceId: "finance");
+        var inspected = new DbSchemaInspected("budget", "sqlite", schema, ClientId: "session-1", OwnerId: new("owner-finance"));
 
         Assert.True(inspected.Succeeded);
         Assert.Equal("sqlite", inspected.Provider);
         Assert.Equal(@"E:\budget.db", inspected.Schema!.SourcePath);
         Assert.Equal("session-1", inspected.Schema.SessionId);
-        Assert.Equal("finance", inspected.WorkspaceId);
-        Assert.Equal("finance", inspected.Schema.WorkspaceId);
+        Assert.Equal("owner-finance", inspected.OwnerId?.Value);
+        Assert.Equal("owner-finance", inspected.Schema.OwnerId?.Value);
         Assert.Equal("accounts", inspected.Schema.Tables.Single().Name);
     }
 }

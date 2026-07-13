@@ -1,26 +1,24 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Core.Runtime;
 
 public enum SurfaceAudienceKind
 {
-    Principal,
-    Workspace,
+    Actor,
+    Owner,
     Public
 }
 
 public sealed record SurfaceAudience(SurfaceAudienceKind Kind, string Id);
 
-public static class PrincipalScope
+public static class ActorScope
 {
-    public static string Id(PrincipalRef principal)
+    public static string Id(ActorId actorId)
     {
-        var canonical = JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            kind = (int)principal.Kind,
-            value = principal.Value
-        });
-        return $"p{(int)principal.Kind}-{Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant()}";
+        var canonical = Encoding.UTF8.GetBytes(actorId.Value);
+        return $"a-{Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant()}";
     }
 }

@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -84,12 +85,14 @@ public sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IA
         if (string.IsNullOrWhiteSpace(request.ActorScope)) return null;
         if (!IsActorScope(request.ActorScope))
             throw new ArgumentException("A valid actor scope is required for typed integration operations.", nameof(request));
+        if (request.OwnerId is not { } ownerId || request.ActorId is not { } actorId)
+            throw new ArgumentException("Owner and actor identities are required for typed integration operations.", nameof(request));
 
         var grains = services.GetRequiredService<IGrainFactory>();
         var model = grains.GetGrain<IConversationModelGrain>(request.ActorScope);
         var intent = await model.ResolveIntentAsync(new SemanticIntentRequest(
-            request.ActorScope,
-            request.ActorScope,
+            ownerId,
+            actorId,
             request.ConversationId,
             request.Prompt,
             []), cancellationToken).ConfigureAwait(false);

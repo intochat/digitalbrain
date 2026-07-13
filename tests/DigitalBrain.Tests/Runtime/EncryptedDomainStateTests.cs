@@ -96,7 +96,7 @@ public sealed class EncryptedDomainStateTests
     public void Conversation_transitions_are_idempotent_take_over_expired_leases_and_archive_without_losing_sequence()
     {
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         var first = ConversationTransitions.BeginOperation(
             state, state.Revision, "command-0", Hash("input-0"), "operation-0", "turn-0",
             "request-command-0", AcceptedOutbox("operation-0", Utc(0)), Utc(0));
@@ -220,7 +220,7 @@ public sealed class EncryptedDomainStateTests
     public void Conversation_outbox_stamps_monotonic_sequences_and_preserves_them_on_replay()
     {
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation-sequence"));
+            new("owner"), new("principal"), "conversation-sequence"));
         var first = ConversationTransitions.BeginOperation(
             state, state.Revision, "command-sequence-1", Hash("input-sequence-1"), "operation-sequence-1", "first",
             "request-sequence-1", AcceptedOutbox("operation-sequence-1", Utc(1)), Utc(1));
@@ -251,7 +251,7 @@ public sealed class EncryptedDomainStateTests
     public void Legacy_inbox_migrates_to_a_durable_receipt_and_replays_the_original_operation()
     {
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation-legacy-receipt"));
+            new("owner"), new("principal"), "conversation-legacy-receipt"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -284,7 +284,7 @@ public sealed class EncryptedDomainStateTests
     public void Accepted_command_receipt_survives_inbox_compaction_and_replays_the_original_operation()
     {
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation-idempotency"));
+            new("owner"), new("principal"), "conversation-idempotency"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -332,7 +332,7 @@ public sealed class EncryptedDomainStateTests
     public void Pending_outbox_is_bounded_without_discarding_undelivered_events()
     {
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation-outbox-cap"));
+            new("owner"), new("principal"), "conversation-outbox-cap"));
         for (var index = 0; index < ConversationTransitions.MaximumPendingOutboxEntries; index++)
         {
             state = ConversationTransitions.BeginOperation(
@@ -366,7 +366,7 @@ public sealed class EncryptedDomainStateTests
     {
         var now = Utc(0);
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -459,7 +459,7 @@ public sealed class EncryptedDomainStateTests
     {
         var now = Utc(0);
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -496,7 +496,7 @@ public sealed class EncryptedDomainStateTests
     {
         var now = Utc(0);
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -552,7 +552,7 @@ public sealed class EncryptedDomainStateTests
     {
         var now = Utc(0);
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -606,7 +606,7 @@ public sealed class EncryptedDomainStateTests
     {
         var now = Utc(0);
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -669,7 +669,7 @@ public sealed class EncryptedDomainStateTests
     {
         var now = Utc(0);
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -725,7 +725,7 @@ public sealed class EncryptedDomainStateTests
             decisionOutbox,
             now.AddSeconds(2)));
 
-        var actor = RequestScope.Id(requested.Identity!.TenantId, requested.Identity.WorkspaceId, requested.Identity.Principal);
+        var actor = RequestScope.Id(requested.Identity!.OwnerId, requested.Identity.ActorId);
         var decided = ConversationTransitions.DecideApprovalWithAssistant(
             requested,
             requested.Revision,
@@ -774,7 +774,7 @@ public sealed class EncryptedDomainStateTests
     {
         var now = Utc(0);
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -812,9 +812,8 @@ public sealed class EncryptedDomainStateTests
             now.AddSeconds(1),
             leaseFence: new ConversationLeaseFence("workflow-worker", workflowClaim.Operation!.Attempt));
         var actor = RequestScope.Id(
-            awaitingApproval.Identity!.TenantId,
-            awaitingApproval.Identity.WorkspaceId,
-            awaitingApproval.Identity.Principal);
+            awaitingApproval.Identity!.OwnerId,
+            awaitingApproval.Identity.ActorId);
         var approved = ConversationTransitions.DecideApprovalWithAssistant(
             awaitingApproval,
             awaitingApproval.Revision,
@@ -879,11 +878,10 @@ public sealed class EncryptedDomainStateTests
     public async Task Conversation_compaction_persists_a_retrievable_authenticated_segment_chain()
     {
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "archive-conversation"));
+            new("owner"), new("principal"), "archive-conversation"));
         var scope = RuntimeStateKeys.Conversation(
-            state.Identity!.TenantId,
-            state.Identity.WorkspaceId,
-            state.Identity.Principal,
+            state.Identity!.OwnerId,
+            state.Identity.ActorId,
             state.Identity.ConversationId);
         var segments = new Dictionary<string, ConversationArchiveSegment>(StringComparer.Ordinal);
         for (var index = 0; index < 220; index++)
@@ -941,7 +939,7 @@ public sealed class EncryptedDomainStateTests
     public void Conversation_rejects_noncanonical_authorization_continuations()
     {
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User), "conversation"));
+            new("owner"), new("principal"), "conversation"));
         state = ConversationTransitions.BeginOperation(
             state,
             state.Revision,
@@ -998,7 +996,7 @@ public sealed class EncryptedDomainStateTests
         var now = Utc(0);
         var tokenHash = Hash("token");
         var state = SurfaceFeedTransitions.Initialize(SurfaceFeedState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User)));
+            new("owner"), new("principal")));
         var binding = new SurfaceActionBinding(
             "binding",
             "surface",
@@ -1047,7 +1045,7 @@ public sealed class EncryptedDomainStateTests
     {
         var now = Utc(0);
         var state = SurfaceFeedTransitions.Initialize(SurfaceFeedState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User)));
+            new("owner"), new("principal")));
         foreach (var phase in new[] { "accepted", "running", "succeeded" })
         {
             var revision = state.LastSequence + 1;
@@ -1077,7 +1075,7 @@ public sealed class EncryptedDomainStateTests
     {
         var createdAt = Utc(0);
         var state = SurfaceFeedTransitions.Initialize(SurfaceFeedState.Empty(), 0, new(
-            new("tenant"), new("workspace"), new("principal", PrincipalKind.User)));
+            new("owner"), new("principal")));
         var expired = new SurfaceFeedProjection(
             "expired-projection",
             "expired-surface",
@@ -1174,7 +1172,7 @@ public sealed class EncryptedDomainStateTests
         state.Revision,
         "opaque-session",
         SessionAudiences.Mcp,
-        new(new("tenant"), new("workspace"), new("principal", PrincipalKind.User)),
+        new(new("owner"), new("principal")),
         AuthAssurance.Oidc,
         ["ui.read", "salesforce.read", "ui.read"],
         Hash("refresh-1"),

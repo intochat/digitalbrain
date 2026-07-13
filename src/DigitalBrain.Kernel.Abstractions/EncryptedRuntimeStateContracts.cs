@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using Orleans;
 
 namespace DigitalBrain.Kernel.Runtime;
@@ -37,15 +38,12 @@ public static class RuntimeStateKinds
 public static class RuntimeStateKeys
 {
     public static string Conversation(
-        TenantId tenant,
-        WorkspaceId workspace,
-        PrincipalRef principal,
+        BrainOwnerId owner,
+        ActorId actor,
         string conversationId) =>
         Hash(RuntimeStateKinds.Conversation,
-            tenant.Value,
-            workspace.Value,
-            ((int)principal.Kind).ToString(CultureInfo.InvariantCulture),
-            principal.Value,
+            owner.Value,
+            actor.Value,
             conversationId);
 
     public static string ConversationArchiveSegment(
@@ -67,14 +65,11 @@ public static class RuntimeStateKeys
     }
 
     public static string SurfaceFeed(
-        TenantId tenant,
-        WorkspaceId workspace,
-        PrincipalRef principal) =>
+        BrainOwnerId owner,
+        ActorId actor) =>
         Hash(RuntimeStateKinds.SurfaceFeed,
-            tenant.Value,
-            workspace.Value,
-            ((int)principal.Kind).ToString(CultureInfo.InvariantCulture),
-            principal.Value);
+            owner.Value,
+            actor.Value);
 
     public static string Session(string opaqueSessionId) =>
         Hash(RuntimeStateKinds.Session, opaqueSessionId);

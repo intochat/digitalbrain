@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
@@ -36,7 +37,7 @@ public sealed class RuntimeSessionAuthority(
         var refreshExpiresAt = now.Add(RefreshLifetime);
         var context = source with
         {
-            SessionId = sessionId,
+            SessionId = new SessionId(sessionId),
             CorrelationId = Guid.NewGuid().ToString("N")
         };
         var neuron = Session(sessionId);
@@ -44,7 +45,7 @@ public sealed class RuntimeSessionAuthority(
             0,
             sessionId,
             audience,
-            new SessionIdentity(context.TenantId, context.WorkspaceId, context.Principal),
+            new SessionIdentity(context.OwnerId, context.ActorId),
             context.Assurance,
             context.Grants.Order(StringComparer.Ordinal).ToArray(),
             Hash(refreshToken),
@@ -93,10 +94,9 @@ public sealed class RuntimeSessionAuthority(
 
         var identity = rotation.State.Identity!;
         var context = new RuntimeRequestContext(
-            identity.TenantId,
-            identity.WorkspaceId,
-            identity.Principal,
-            sessionId,
+            identity.OwnerId,
+            identity.ActorId,
+            new SessionId(sessionId),
             rotation.State.Assurance,
             Guid.NewGuid().ToString("N"),
             null,
@@ -145,10 +145,10 @@ public sealed class RuntimeSessionAuthority(
                 out var accessExpiresAt,
                 out var sessionVersion))
             return null;
-        var state = await Session(context.SessionId).ReadAsync()
+        var state = await Session(context.SessionId.Value).ReadAsync()
             .WaitAsync(cancellationToken).ConfigureAwait(false);
-        var expectedIdentity = new SessionIdentity(context.TenantId, context.WorkspaceId, context.Principal);
-        if (!MatchesSession(state, context.SessionId, expectedAudience) ||
+        var expectedIdentity = new SessionIdentity(context.OwnerId, context.ActorId);
+        if (!MatchesSession(state, context.SessionId.Value, expectedAudience) ||
             state.Identity != expectedIdentity || state.Assurance != context.Assurance ||
             !state.Grants.SequenceEqual(context.Grants.Order(StringComparer.Ordinal), StringComparer.Ordinal) ||
             !SessionTransitions.IsAccessValid(state, sessionVersion, timeProvider.GetUtcNow()))

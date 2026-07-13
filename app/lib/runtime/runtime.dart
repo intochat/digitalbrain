@@ -54,7 +54,7 @@ class RuntimeController extends ChangeNotifier {
     FeedController? feed,
     SurfaceEnvelopeDecoder? decoder,
     this.capabilities = const ClientCapabilities(supportsBinaryRfw: false),
-    this.audience = FeedAudience.principal,
+    this.audience = FeedAudience.actor,
     this.maxBatchSize = 50,
     this.reconnectPolicy = const ReconnectPolicy(),
     Delay? delay,

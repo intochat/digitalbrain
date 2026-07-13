@@ -1,15 +1,15 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using Orleans;
 
 namespace DigitalBrain.Kernel.Runtime;
 
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-feed-identity")]
 public sealed record SurfaceFeedIdentity(
-    [property: Id(0)] TenantId TenantId,
-    [property: Id(1)] WorkspaceId WorkspaceId,
-    [property: Id(2)] PrincipalRef Principal);
+    [property: Id(0)] BrainOwnerId OwnerId,
+    [property: Id(1)] ActorId ActorId);
 
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-action-binding")]
 public sealed record SurfaceActionBinding(
@@ -653,8 +653,7 @@ public static class SurfaceFeedTransitions
 
     private static void ValidateIdentity(SurfaceFeedIdentity identity)
     {
-        if (string.IsNullOrWhiteSpace(identity.TenantId.Value) || string.IsNullOrWhiteSpace(identity.WorkspaceId.Value) ||
-            string.IsNullOrWhiteSpace(identity.Principal.Value))
+        if (string.IsNullOrWhiteSpace(identity.OwnerId.Value) || string.IsNullOrWhiteSpace(identity.ActorId.Value))
             throw new ArgumentException("A complete surface-feed identity is required.", nameof(identity));
     }
 
@@ -684,9 +683,8 @@ public static class SurfaceFeedTransitions
         DemandId(bootstrap.CorrelationId, nameof(bootstrap.CorrelationId));
         var identity = state.Identity ?? throw new RuntimeStateIntegrityException("surface-feed identity is missing");
         var expectedConversationId = "ino-" + RequestScope.Id(
-            identity.TenantId,
-            identity.WorkspaceId,
-            identity.Principal);
+            identity.OwnerId,
+            identity.ActorId);
         if (!string.Equals(bootstrap.ConversationId, expectedConversationId, StringComparison.Ordinal))
             throw new ArgumentException("The home surface must target the feed identity's conversation.", nameof(bootstrap));
     }

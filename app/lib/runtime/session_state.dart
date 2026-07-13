@@ -14,15 +14,13 @@ enum SessionStatus {
 class SessionIdentity {
   const SessionIdentity({
     required this.sessionId,
-    required this.tenantId,
-    required this.workspaceId,
-    required this.principalId,
+    required this.ownerId,
+    required this.actorId,
   });
 
   final String sessionId;
-  final String tenantId;
-  final String workspaceId;
-  final String principalId;
+  final String ownerId;
+  final String actorId;
 
   @override
   String toString() => 'SessionIdentity([private])';
@@ -87,9 +85,8 @@ class SessionController {
 
   SessionIdentity? get identity => _bundle?.identity;
   String? get sessionId => identity?.sessionId;
-  String? get tenantId => identity?.tenantId;
-  String? get workspaceId => identity?.workspaceId;
-  String? get principalId => identity?.principalId;
+  String? get ownerId => identity?.ownerId;
+  String? get actorId => identity?.actorId;
   bool get isAuthenticated =>
       status == SessionStatus.authenticated && _bundle != null;
 
@@ -277,9 +274,8 @@ class SessionController {
     final identity = bundle.identity;
     final credentials = bundle.credentials;
     if (identity.sessionId.trim().isEmpty ||
-        identity.tenantId.trim().isEmpty ||
-        identity.workspaceId.trim().isEmpty ||
-        identity.principalId.trim().isEmpty ||
+        identity.ownerId.trim().isEmpty ||
+        identity.actorId.trim().isEmpty ||
         credentials.accessToken.trim().isEmpty ||
         credentials.refreshToken.trim().isEmpty) {
       throw const ProtocolException('Session response is incomplete.');
@@ -292,7 +288,6 @@ class SessionController {
 
   static bool _sameIdentity(SessionIdentity left, SessionIdentity right) =>
       left.sessionId == right.sessionId &&
-      left.tenantId == right.tenantId &&
-      left.workspaceId == right.workspaceId &&
-      left.principalId == right.principalId;
+      left.ownerId == right.ownerId &&
+      left.actorId == right.actorId;
 }

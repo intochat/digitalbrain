@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Abstractions;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.AI;
@@ -12,6 +13,24 @@ namespace DigitalBrain.Tests.Runtime;
 public sealed class TypedReadWorkflowRunnerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 13, 10, 30, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task ExecuteAsync_preserves_distinct_owner_and_actor_identity_for_semantic_intent()
+    {
+        var model = new RecordingConversationModelGrain(
+            new SemanticIntentProposal(SemanticProvider.Gmail, SemanticOperation.Overview));
+        var runner = Runner(
+            model,
+            new RecordingGmailGrain(),
+            new RecordingSalesforceGrain(),
+            new RecordingChatClient(),
+            new RecordingEffectPlanStore());
+
+        await runner.ExecuteAsync(Request("Summarize my inbox."));
+
+        Assert.Equal(new BrainOwnerId("owner-1"), model.LastIntentRequest?.OwnerId);
+        Assert.Equal(new ActorId("actor-1"), model.LastIntentRequest?.ActorId);
+    }
 
     [Fact]
     public async Task ExecuteAsync_lists_only_requested_gmail_metadata_with_an_explicit_relative_day_window()
@@ -333,7 +352,9 @@ public sealed class TypedReadWorkflowRunnerTests
         "request-1",
         authorizationResume,
         prior,
-        new string('b', 64));
+        new string('b', 64),
+        OwnerId: new BrainOwnerId("owner-1"),
+        ActorId: new ActorId("actor-1"));
 
     private static GmailMessageMetadata Message(
         string id,
@@ -361,10 +382,15 @@ public sealed class TypedReadWorkflowRunnerTests
         SemanticMutationProposal? mutation = null) : IConversationModelGrain
     {
         public int MutationCalls { get; private set; }
+        public SemanticIntentRequest? LastIntentRequest { get; private set; }
 
         public Task<SemanticIntentProposal> ResolveIntentAsync(
             SemanticIntentRequest request,
-            CancellationToken cancellationToken = default) => Task.FromResult(intent);
+            CancellationToken cancellationToken = default)
+        {
+            LastIntentRequest = request;
+            return Task.FromResult(intent);
+        }
 
         public Task<SemanticMutationProposal> ResolveMutationAsync(
             SemanticMutationRequest request,

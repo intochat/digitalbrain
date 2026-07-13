@@ -19,10 +19,9 @@ public sealed class RuntimeRequestAuthenticatorTests
     public void Mcp_tool_capability_is_required_and_never_synthesized()
     {
         var context = new DigitalBrain.Core.Runtime.RequestContext(
-            new("tenant"),
-            new("workspace"),
-            new("principal", PrincipalKind.User),
-            "session",
+            new("owner"),
+            new("principal"),
+            new("session"),
             AuthAssurance.Oidc,
             "correlation",
             "idempotency",
@@ -39,8 +38,6 @@ public sealed class RuntimeRequestAuthenticatorTests
     public async Task Mcp_accepts_framework_validated_external_identity_with_exact_scope()
     {
         var principal = new ClaimsPrincipal(new ClaimsIdentity([
-            new Claim("tenant_id", "tenant"),
-            new Claim("workspace_id", "workspace"),
             new Claim("sub", "principal"),
             new Claim("digitalbrain_grants", "brain.interact")
         ], "oidc"));
@@ -48,9 +45,8 @@ public sealed class RuntimeRequestAuthenticatorTests
         var result = await Authenticator().AuthenticateMcpAsync(context);
 
         Assert.NotNull(result);
-        Assert.Equal("tenant", result.TenantId.Value);
-        Assert.Equal("workspace", result.WorkspaceId.Value);
-        Assert.Equal("principal", result.Principal.Value);
+        Assert.Equal(BrainOwnerId.FromExternalIdentity("https://issuer.example/tenant", "principal"), result.OwnerId);
+        Assert.Equal(ActorId.FromExternalIdentity("https://issuer.example/tenant", "principal"), result.ActorId);
         Assert.Equal(AuthAssurance.Oidc, result.Assurance);
         Assert.Equal(["brain.interact"], result.Grants);
     }
@@ -59,8 +55,6 @@ public sealed class RuntimeRequestAuthenticatorTests
     public async Task Mcp_rejects_missing_malformed_and_unallowlisted_external_identity()
     {
         var validPrincipal = new ClaimsPrincipal(new ClaimsIdentity([
-            new Claim("tenant_id", "tenant"),
-            new Claim("workspace_id", "workspace"),
             new Claim("sub", "principal"),
             new Claim("digitalbrain_grants", "brain.interact")
         ], "oidc"));
@@ -70,8 +64,6 @@ public sealed class RuntimeRequestAuthenticatorTests
         Assert.Null(await authenticator.AuthenticateMcpAsync(HttpContext(validPrincipal, "Bearer  padded ")));
 
         var elevated = new ClaimsPrincipal(new ClaimsIdentity([
-            new Claim("tenant_id", "tenant"),
-            new Claim("workspace_id", "workspace"),
             new Claim("sub", "principal"),
             new Claim("digitalbrain_grants", "brain.admin")
         ], "oidc"));
@@ -85,8 +77,6 @@ public sealed class RuntimeRequestAuthenticatorTests
             true,
             "https://issuer.example/tenant",
             "digitalbrain-runtime",
-            "tenant_id",
-            "workspace_id",
             "sub",
             "digitalbrain_grants",
             new HashSet<string>(["brain.interact"], StringComparer.Ordinal),

@@ -39,7 +39,7 @@ public sealed class RuntimeSurfaceFeedTests
             RuntimeStateSchemas.Conversation,
             16,
             ConversationLifecycle.Active,
-            new ConversationIdentity(context.TenantId, context.WorkspaceId, context.Principal, conversationId),
+            new ConversationIdentity(context.OwnerId, context.ActorId, conversationId),
             existingTurns,
             [],
             [],
@@ -154,7 +154,7 @@ public sealed class RuntimeSurfaceFeedTests
         var state = SurfaceFeedTransitions.Initialize(
             SurfaceFeedState.Empty(),
             0,
-            new SurfaceFeedIdentity(context.TenantId, context.WorkspaceId, context.Principal));
+            new SurfaceFeedIdentity(context.OwnerId, context.ActorId));
         var expectedConversationId = InoConversationIdentity.From(context);
         var wrongConversationId = expectedConversationId[..^1] +
                                   (expectedConversationId[^1] == 'a' ? "b" : "a");
@@ -670,7 +670,7 @@ public sealed class RuntimeSurfaceFeedTests
         if (state.Identity is null)
             state = await feed.InitializeAsync(
                 state.Revision,
-                new SurfaceFeedIdentity(context.TenantId, context.WorkspaceId, context.Principal));
+                new SurfaceFeedIdentity(context.OwnerId, context.ActorId));
         var descriptors = ConversationSurfacePayload.Actions(conversation, now);
         var payload = ConversationSurfacePayload.Build(conversation);
         var revision = checked((state.CurrentSurfaces.FirstOrDefault(surface =>
@@ -717,10 +717,9 @@ public sealed class RuntimeSurfaceFeedTests
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
     private static RuntimeRequestContext Context() => new(
-        new TenantId("tenant"),
-        new WorkspaceId("workspace"),
-        new PrincipalRef("principal", PrincipalKind.User),
-        "session",
+        new BrainOwnerId("owner"),
+        new ActorId("principal"),
+        new SessionId("session"),
         AuthAssurance.Oidc,
         "correlation",
         null,
@@ -741,7 +740,7 @@ public sealed class RuntimeSurfaceFeedTests
         RuntimeStateSchemas.Conversation,
         revision,
         ConversationLifecycle.Active,
-        new ConversationIdentity(context.TenantId, context.WorkspaceId, context.Principal, conversationId),
+        new ConversationIdentity(context.OwnerId, context.ActorId, conversationId),
         [new ConversationTurn(1, "assistant", assistantText, now, "operation-1", ConversationTurnKind.Assistant, "operation-1")],
         [],
         [new ConversationOperation(
@@ -759,7 +758,7 @@ public sealed class RuntimeSurfaceFeedTests
         RuntimeStateSchemas.Conversation,
         2,
         ConversationLifecycle.Active,
-        new ConversationIdentity(context.TenantId, context.WorkspaceId, context.Principal, conversationId),
+        new ConversationIdentity(context.OwnerId, context.ActorId, conversationId),
         [],
         [],
         [

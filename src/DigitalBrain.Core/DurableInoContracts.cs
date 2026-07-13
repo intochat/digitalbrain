@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Core;
+using DigitalBrain.Kernel.Contracts;
 using Orleans;
 
 namespace DigitalBrain.Core.Runtime;
@@ -291,7 +292,9 @@ public sealed record InoWorkflowRequest(
     string RequestId,
     InoAuthorizationResume? AuthorizationResume = null,
     WorkflowReference? PriorWorkflow = null,
-    string? ActorScope = null);
+    string? ActorScope = null,
+    BrainOwnerId? OwnerId = null,
+    ActorId? ActorId = null);
 
 public enum InoToolAccess { Read, Mutation }
 

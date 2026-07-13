@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DigitalBrain.Core.Runtime;
 using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
 
@@ -8,14 +9,14 @@ public sealed class ContractsTests
     [Fact]
     public void Grain_ids_are_canonical_and_scoped()
     {
-        var first = GrainIds.Conversation(new("tenant"), new("workspace-a"), "conversation");
-        var second = GrainIds.Conversation(new("tenant"), new("workspace-b"), "conversation");
+        var first = GrainIds.Conversation(new("owner-a"), "conversation");
+        var second = GrainIds.Conversation(new("owner-b"), "conversation");
 
         Assert.NotEqual(first, second);
-        Assert.StartsWith(GrainIds.ScopePrefix(new("tenant"), new("workspace-a")), first, StringComparison.Ordinal);
+        Assert.StartsWith(GrainIds.ScopePrefix(new("owner-a")), first, StringComparison.Ordinal);
         Assert.NotEqual(
-            GrainIds.Aggregate(new("a:b"), new("c"), "same"),
-            GrainIds.Aggregate(new("a"), new("b:c"), "same"));
+            GrainIds.Aggregate(new("a:b"), "c:same"),
+            GrainIds.Aggregate(new("a"), "b:c:same"));
     }
 
     [Fact]
@@ -58,14 +59,14 @@ public sealed class ContractsTests
             bindingTokenHash));
         Assert.False(tokens.TryValidateActionCapability(
             token,
-            context with { SessionId = "other-session" },
+            context with { SessionId = new("other-session") },
             "ino.approval.decision",
             "workspace-home",
             7,
             bindingTokenHash));
         Assert.False(tokens.TryValidateActionCapability(
             token,
-            context with { WorkspaceId = new WorkspaceId("other-workspace") },
+            context with { OwnerId = new("other-owner") },
             "ino.approval.decision",
             "workspace-home",
             7,
@@ -95,23 +96,71 @@ public sealed class ContractsTests
         await telemetry.EmitAsync(new MetricPoint(
             "v2.outbox.age",
             1,
-            new Dictionary<string, string> { ["tenant"] = "private-tenant", ["outcome"] = "success" }));
+            new Dictionary<string, string>
+            {
+                ["owner"] = "private-owner",
+                ["actor"] = "private-actor",
+                ["outcome"] = "success"
+            }));
         await telemetry.EmitAsync(new MetricPoint(
             "v2.outbox.age",
             2,
-            new Dictionary<string, string> { ["workspace"] = "private-workspace", ["status"] = "retry" }));
+            new Dictionary<string, string> { ["ownerId"] = "private-owner", ["status"] = "retry" }));
 
         var point = Assert.Single(telemetry.Metrics);
-        Assert.DoesNotContain("tenant", point.Labels.Keys);
+        Assert.DoesNotContain("owner", point.Labels.Keys);
+        Assert.DoesNotContain("actor", point.Labels.Keys);
         Assert.Equal("success", point.Labels["outcome"]);
         Assert.Equal(1, telemetry.Dropped);
     }
 
+    [Theory]
+    [InlineData("ownerId")]
+    [InlineData("actor_id")]
+    public void Surface_payloads_reject_private_identity_fields(string field)
+    {
+        using var payload = JsonDocument.Parse($$"""{"{{field}}":"private"}""");
+
+        Assert.Throws<ArgumentException>(() => SurfacePayloadPolicy.DemandSafe(payload.RootElement));
+    }
+
+    [Fact]
+    public void Surface_envelope_uses_the_same_scoped_actor_as_the_session_reply()
+    {
+        var context = Context();
+        using var payload = JsonDocument.Parse("{\"kind\":\"native\",\"nativeKind\":\"message\",\"data\":{\"title\":\"Ready\",\"message\":\"Ready\"}}");
+        var record = new StoredSurfaceRecord(
+            1,
+            context.OwnerId,
+            context.ActorId,
+            new(SurfaceAudienceKind.Actor, ActorScope.Id(context.ActorId)),
+            "surface-1",
+            1,
+            new string('a', 64),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(5),
+            "correlation",
+            "event",
+            "event-1",
+            [],
+            payload.RootElement.Clone(),
+            []);
+
+        using var envelope = JsonDocument.Parse(new SurfaceEnvelopeWriter().Write(
+            context,
+            record,
+            new HashSet<string>(StringComparer.Ordinal),
+            new Dictionary<string, SurfaceActionToken>(StringComparer.Ordinal)));
+
+        Assert.Equal(context.OwnerId.Value, envelope.RootElement.GetProperty("ownerId").GetString());
+        Assert.Equal(ActorScope.Id(context.ActorId), envelope.RootElement.GetProperty("actorId").GetString());
+        Assert.NotEqual(context.ActorId.Value, envelope.RootElement.GetProperty("actorId").GetString());
+    }
+
     private static RuntimeRequestContext Context(params string[] grants) => new(
-        new("tenant"),
-        new("workspace"),
-        new("user", PrincipalKind.User),
-        "session",
+        new("owner"),
+        new("user"),
+        new("session"),
         AuthAssurance.Password,
         "correlation",
         "idempotency",

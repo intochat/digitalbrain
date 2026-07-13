@@ -1,4 +1,5 @@
 using Orleans;
+using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Kernel.Runtime;
 
@@ -129,10 +130,10 @@ public sealed record GroundingDescriptor(
     [property: Id(3)] bool HasContinuation,
     [property: Id(4)] int TurnDistance);
 
-[GenerateSerializer, Alias("digitalbrain.v2.semantic-intent-request")]
+[GenerateSerializer, Alias("digitalbrain.v3.semantic-intent-request")]
 public sealed record SemanticIntentRequest(
-    [property: Id(0)] string TenantId,
-    [property: Id(1)] string WorkspaceId,
+    [property: Id(0)] BrainOwnerId OwnerId,
+    [property: Id(1)] ActorId ActorId,
     [property: Id(2)] string ConversationId,
     [property: Id(3)] string Prompt,
     [property: Id(4)] IReadOnlyList<GroundingDescriptor> Groundings);

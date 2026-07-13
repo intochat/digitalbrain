@@ -2,42 +2,28 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Kernel.Contracts;
 using Orleans;
 
 namespace DigitalBrain.Core.Runtime;
 
-public enum PrincipalKind { User, Service, Operator }
 public enum AuthAssurance { None, Password, Oidc, MutualTls, OperatorBootstrap }
 
-[GenerateSerializer, Alias("digitalbrain.v2.tenant-id")]
-public readonly record struct TenantId([property: Id(0)] string Value)
-{
-    public override string ToString() => Value;
-}
-[GenerateSerializer, Alias("digitalbrain.v2.workspace-id")]
-public readonly record struct WorkspaceId([property: Id(0)] string Value)
-{
-    public override string ToString() => Value;
-}
-[GenerateSerializer, Alias("digitalbrain.v2.principal-ref")]
-public readonly record struct PrincipalRef([property: Id(0)] string Value, [property: Id(1)] PrincipalKind Kind);
-
-[GenerateSerializer, Alias("digitalbrain.v2.request-context")]
+[GenerateSerializer, Alias("digitalbrain.v3.request-context")]
 public sealed record RequestContext(
-    [property: Id(0)] TenantId TenantId,
-    [property: Id(1)] WorkspaceId WorkspaceId,
-    [property: Id(2)] PrincipalRef Principal,
-    [property: Id(3)] string SessionId,
-    [property: Id(4)] AuthAssurance Assurance,
-    [property: Id(5)] string CorrelationId,
-    [property: Id(6)] string? IdempotencyKey,
-    [property: Id(7)] IReadOnlySet<string> Grants,
-    [property: Id(8)] string? ConversationId = null);
+    [property: Id(0)] BrainOwnerId OwnerId,
+    [property: Id(1)] ActorId ActorId,
+    [property: Id(2)] SessionId SessionId,
+    [property: Id(3)] AuthAssurance Assurance,
+    [property: Id(4)] string CorrelationId,
+    [property: Id(5)] string? IdempotencyKey,
+    [property: Id(6)] IReadOnlySet<string> Grants,
+    [property: Id(7)] string? ConversationId = null);
 
 public static class SessionAudiences
 {
-    public const string Mcp = "digitalbrain-v2";
-    public const string Ui = "digitalbrain-v2-ui";
+    public const string Mcp = "digitalbrain-v3";
+    public const string Ui = "digitalbrain-v3-ui";
 
     public static string RequireFixedMcp(string? configuredAudience)
     {
@@ -50,19 +36,14 @@ public static class SessionAudiences
 
 public static class RequestScope
 {
-    public static string Id(RequestContext context) => Id(
-        context.TenantId,
-        context.WorkspaceId,
-        context.Principal);
+    public static string Id(RequestContext context) => Id(context.OwnerId, context.ActorId);
 
-    public static string Id(TenantId tenantId, WorkspaceId workspaceId, PrincipalRef principal)
+    public static string Id(BrainOwnerId ownerId, ActorId actorId)
     {
         var canonical = JsonSerializer.SerializeToUtf8Bytes(new
         {
-            tenant = tenantId.Value,
-            workspace = workspaceId.Value,
-            principalKind = (int)principal.Kind,
-            principal = principal.Value
+            owner = ownerId.Value,
+            actor = actorId.Value
         });
         return Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant();
     }
@@ -70,18 +51,17 @@ public static class RequestScope
 
 public static class GrainIds
 {
-    public static string Aggregate(TenantId tenant, WorkspaceId workspace, string aggregate) =>
-        ScopePrefix(tenant, workspace) + "aggregate/" + Segment(aggregate);
-    public static string Conversation(TenantId tenant, WorkspaceId workspace, string conversation) =>
-        ScopePrefix(tenant, workspace) + "conversation/" + Segment(conversation);
-    public static string Workflow(TenantId tenant, WorkspaceId workspace, string workflow) =>
-        ScopePrefix(tenant, workspace) + "workflow/" + Segment(workflow);
+    public static string Aggregate(BrainOwnerId owner, string aggregate) =>
+        ScopePrefix(owner) + "aggregate/" + Segment(aggregate);
+    public static string Conversation(BrainOwnerId owner, string conversation) =>
+        ScopePrefix(owner) + "conversation/" + Segment(conversation);
+    public static string Workflow(BrainOwnerId owner, string workflow) =>
+        ScopePrefix(owner) + "workflow/" + Segment(workflow);
 
-    public static string ScopePrefix(TenantId tenant, WorkspaceId workspace) =>
-        $"v2/{Segment(tenant.Value)}/{Segment(workspace.Value)}/";
+    public static string ScopePrefix(BrainOwnerId owner) => $"v3/{Segment(owner.Value)}/";
 
-    public static bool IsInScope(string? grainId, TenantId tenant, WorkspaceId workspace) =>
-        !string.IsNullOrWhiteSpace(grainId) && grainId.StartsWith(ScopePrefix(tenant, workspace), StringComparison.Ordinal);
+    public static bool IsInScope(string? grainId, BrainOwnerId owner) =>
+        !string.IsNullOrWhiteSpace(grainId) && grainId.StartsWith(ScopePrefix(owner), StringComparison.Ordinal);
 
     private static string Segment(string value)
     {
@@ -113,23 +93,21 @@ public sealed class SessionTokenService
         if (lifetime <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(lifetime));
         if (string.IsNullOrWhiteSpace(audience)) throw new ArgumentException("A non-empty session audience is required.", nameof(audience));
         if (sessionVersion < 1) throw new ArgumentOutOfRangeException(nameof(sessionVersion));
-        if (string.IsNullOrWhiteSpace(context.SessionId) || string.IsNullOrWhiteSpace(context.TenantId.Value) ||
-            string.IsNullOrWhiteSpace(context.WorkspaceId.Value) || string.IsNullOrWhiteSpace(context.Principal.Value))
+        if (string.IsNullOrWhiteSpace(context.SessionId.Value) || string.IsNullOrWhiteSpace(context.OwnerId.Value) ||
+            string.IsNullOrWhiteSpace(context.ActorId.Value))
             throw new ArgumentException("A complete request context is required.", nameof(context));
-        if (context.SessionId.Length > 256 || context.TenantId.Value.Length > 256 || context.WorkspaceId.Value.Length > 256 ||
-            context.Principal.Value.Length > 256 || audience.Length > 128 || context.Grants.Count > 64 ||
+        if (context.SessionId.Value.Length > 256 || context.OwnerId.Value.Length > 256 ||
+            context.ActorId.Value.Length > 256 || audience.Length > 128 || context.Grants.Count > 64 ||
             context.Grants.Any(static grant => string.IsNullOrWhiteSpace(grant) || grant.Length > 128))
             throw new ArgumentException("Session claims exceed the signed transport bound.", nameof(context));
 
         var now = _timeProvider.GetUtcNow();
         var claims = new SessionClaims(
             3,
-            context.SessionId,
+            context.SessionId.Value,
             sessionVersion,
-            context.TenantId.Value,
-            context.WorkspaceId.Value,
-            context.Principal.Value,
-            context.Principal.Kind,
+            context.OwnerId.Value,
+            context.ActorId.Value,
             context.Assurance,
             audience,
             context.Grants.Order(StringComparer.Ordinal).ToArray(),
@@ -189,7 +167,7 @@ public sealed class SessionTokenService
         var claims = new ActionCapabilityClaims(
             1,
             RequestScope.Id(context),
-            context.SessionId,
+            context.SessionId.Value,
             bindingId,
             surfaceId,
             surfaceRevision,
@@ -231,7 +209,7 @@ public sealed class SessionTokenService
         catch (Exception exception) when (exception is FormatException or JsonException or ArgumentException) { return false; }
         if (claims is null || claims.Version != 1 ||
             !string.Equals(claims.ScopeId, RequestScope.Id(context), StringComparison.Ordinal) ||
-            !string.Equals(claims.SessionId, context.SessionId, StringComparison.Ordinal) ||
+            !string.Equals(claims.SessionId, context.SessionId.Value, StringComparison.Ordinal) ||
             !string.Equals(claims.BindingId, bindingId, StringComparison.Ordinal) ||
             !string.Equals(claims.SurfaceId, surfaceId, StringComparison.Ordinal) ||
             claims.SurfaceRevision != surfaceRevision ||
@@ -274,12 +252,12 @@ public sealed class SessionTokenService
         try { claims = JsonSerializer.Deserialize<SessionClaims>(Base64UrlDecode(parts[1])); }
         catch (Exception ex) when (ex is FormatException or JsonException or ArgumentException) { return false; }
         if (claims is null || claims.Version != 3 || claims.SessionVersion < 1 || string.IsNullOrWhiteSpace(claims.SessionId) ||
-            string.IsNullOrWhiteSpace(claims.TenantId) || string.IsNullOrWhiteSpace(claims.WorkspaceId) ||
-            string.IsNullOrWhiteSpace(claims.PrincipalId) || string.IsNullOrWhiteSpace(claims.Audience) ||
-            claims.SessionId.Length > 256 || claims.TenantId.Length > 256 || claims.WorkspaceId.Length > 256 ||
-            claims.PrincipalId.Length > 256 || claims.Audience.Length > 128 || claims.Grants is null || claims.Grants.Length > 64 ||
+            string.IsNullOrWhiteSpace(claims.OwnerId) || string.IsNullOrWhiteSpace(claims.ActorId) ||
+            string.IsNullOrWhiteSpace(claims.Audience) ||
+            claims.SessionId.Length > 256 || claims.OwnerId.Length > 256 || claims.ActorId.Length > 256 ||
+            claims.Audience.Length > 128 || claims.Grants is null || claims.Grants.Length > 64 ||
             claims.Grants.Any(static grant => string.IsNullOrWhiteSpace(grant) || grant.Length > 128) ||
-            !Enum.IsDefined(claims.PrincipalKind) || !Enum.IsDefined(claims.Assurance) ||
+            !Enum.IsDefined(claims.Assurance) ||
             (expectedAudience is not null && !string.Equals(claims.Audience, expectedAudience, StringComparison.Ordinal))) return false;
         DateTimeOffset issuedAt;
         DateTimeOffset expiry;
@@ -295,10 +273,9 @@ public sealed class SessionTokenService
             .Where(static grant => !string.IsNullOrWhiteSpace(grant))
             .ToHashSet(StringComparer.Ordinal);
         context = new RequestContext(
-            new(claims.TenantId),
-            new(claims.WorkspaceId),
-            new(claims.PrincipalId, claims.PrincipalKind),
-            claims.SessionId,
+            new(claims.OwnerId),
+            new(claims.ActorId),
+            new(claims.SessionId),
             claims.Assurance,
             Guid.NewGuid().ToString("N"),
             null,
@@ -317,10 +294,9 @@ public sealed class SessionTokenService
         string? surfaceId,
         int surfaceRevision,
         string? bindingTokenHash) =>
-        !string.IsNullOrWhiteSpace(context.SessionId) && context.SessionId.Length <= 256 &&
-        !string.IsNullOrWhiteSpace(context.TenantId.Value) && context.TenantId.Value.Length <= 256 &&
-        !string.IsNullOrWhiteSpace(context.WorkspaceId.Value) && context.WorkspaceId.Value.Length <= 256 &&
-        !string.IsNullOrWhiteSpace(context.Principal.Value) && context.Principal.Value.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(context.SessionId.Value) && context.SessionId.Value.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(context.OwnerId.Value) && context.OwnerId.Value.Length <= 256 &&
+        !string.IsNullOrWhiteSpace(context.ActorId.Value) && context.ActorId.Value.Length <= 256 &&
         !string.IsNullOrWhiteSpace(bindingId) && bindingId.Length <= 256 &&
         !string.IsNullOrWhiteSpace(surfaceId) && surfaceId.Length <= 256 &&
         surfaceRevision > 0 && IsSha256Hash(bindingTokenHash);
@@ -356,10 +332,8 @@ public sealed class SessionTokenService
         int Version,
         string SessionId,
         long SessionVersion,
-        string TenantId,
-        string WorkspaceId,
-        string PrincipalId,
-        PrincipalKind PrincipalKind,
+        string OwnerId,
+        string ActorId,
         AuthAssurance Assurance,
         string Audience,
         string[] Grants,
