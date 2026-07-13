@@ -22,10 +22,12 @@
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+    <Project Path="hosts/DigitalBrain.FeatureBuilder/DigitalBrain.FeatureBuilder.csproj" />
     <Project Path="hosts/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
     <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DigitalBrain.E2ETests/DigitalBrain.E2ETests.csproj" />
     <Project Path="tests/DigitalBrain.IntegrationContractTests/DigitalBrain.IntegrationContractTests.csproj" />
     <Project Path="tests/DigitalBrain.Salesforce.Tests/DigitalBrain.Salesforce.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />

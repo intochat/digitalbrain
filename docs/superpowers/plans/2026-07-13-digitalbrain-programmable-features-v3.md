@@ -169,10 +169,12 @@ Task 5 evidence: the dispatcher validates the complete live grant coordinate on 
 - Input is one bounded source snapshot, offline allowlisted feed, output directory, and deadline.
 - Output is implementation assembly/private outputs, compiled-derived manifest, scenario result, source reference, SHA-256 digest, and no custom archive.
 
-- [ ] Test forbidden package, path traversal, oversize/count limits, undefined/pending/ambiguous steps, timeout, nondeterministic input, and successful Email Summarizer release.
-- [ ] Implement restore with no unrestricted network and a 10-second budget; compile plus BDD has a 60-second hard ceiling.
-- [ ] Verify deterministic digest and release generation under five seconds after build.
-- [ ] Commit `feat: build immutable feature releases`.
+- [x] Test forbidden package, path traversal, oversize/count limits, undefined/pending/ambiguous steps, timeout, nondeterministic input, and successful Email Summarizer release.
+- [x] Implement restore with no unrestricted network and a 10-second budget; compile plus BDD has a 60-second hard ceiling.
+- [x] Verify deterministic digest and release generation under five seconds after build.
+- [x] Commit `feat: build immutable feature releases`.
+
+Task 6 evidence: compile-first contract tests failed on the absent builder API, then adversarial reds proved source-item escape, host-dependent MSBuild conditions, exact-target property redirection, forged Reqnroll metadata, doc-string phantom scenarios, forbidden code hidden in scenario dependencies, and unbounded child-output risk before their fixes. The dependency-free transient builder now accepts one bounded UTF-8 snapshot, a local-feed-only restore, and a hard deadline; it positively constrains MSBuild authority, scans every emitted snapshot assembly before execution, derives the manifest from compiled metadata, requires compiled BDD tests to match document-aware source scenarios exactly, and publishes canonical content-addressed releases without a custom archive. Context7 was quota-blocked, so current restore/build and strict Reqnroll behavior was verified against official Microsoft and Reqnroll documentation. Final verification passed 66 Integration Contract tests, ten real builder E2Es, four Email Summarizer BDD scenarios, and the exact root suite at 512 passed with no failures or skips. The builder compiled with zero warnings, Aspire doctor passed all five checks, `git diff --check` was clean, and independent review plus three re-review cycles found no remaining Critical or Important issue.
 
 ### Task 7: Feature state machines and exactly two new grain types
 
