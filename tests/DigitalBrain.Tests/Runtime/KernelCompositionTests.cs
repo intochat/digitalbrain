@@ -1,4 +1,5 @@
 using DigitalBrain.Kernel;
+using DigitalBrain.Core.Runtime;
 using DigitalBrain.Core.Config;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel.Hosting;
@@ -76,6 +77,12 @@ public sealed class KernelCompositionTests
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IPackConfigStore));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IGmailApiClientFactory));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(ISalesforceApiClientFactory));
+        Assert.Contains(descriptors, descriptor =>
+            descriptor.ServiceType == typeof(IInoToolGateway) &&
+            descriptor.ImplementationType == typeof(ClosedInoToolGateway));
+        Assert.DoesNotContain(descriptors, descriptor =>
+            descriptor.ServiceType == typeof(IInoToolGateway) &&
+            descriptor.ImplementationType == typeof(PlanInoToolGateway));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IConnector) && Equals(descriptor.ServiceKey, "google"));
         Assert.Contains(descriptors, descriptor => descriptor.ServiceType == typeof(IConnector) && Equals(descriptor.ServiceKey, "salesforce"));
 

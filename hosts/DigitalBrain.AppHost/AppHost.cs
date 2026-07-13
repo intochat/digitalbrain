@@ -20,6 +20,14 @@ var sessionSigningKey = AddRuntimeSecret(builder, "runtime-session-signing-key",
 var runtimeStateKek = AddRuntimeSecret(builder, "runtime-state-kek-v1", isRunMode);
 var runtimeStateSigningKey = AddRuntimeSecret(builder, "runtime-state-signing-key", isRunMode);
 var enableDevFlutter = isRunMode && IsLocalUiProfile(profile);
+var uiOidcIssuer = builder.Configuration["DigitalBrain:Runtime:Ui:Oidc:Issuer"]?.Trim();
+var uiOidcAudience = builder.Configuration["DigitalBrain:Runtime:Ui:Oidc:Audience"]?.Trim();
+var hasAnyUiOidcConfiguration = !string.IsNullOrEmpty(uiOidcIssuer) || !string.IsNullOrEmpty(uiOidcAudience);
+if (enableDevFlutter && hasAnyUiOidcConfiguration &&
+    (string.IsNullOrEmpty(uiOidcIssuer) || string.IsNullOrEmpty(uiOidcAudience)))
+    throw new InvalidOperationException(
+        "DigitalBrain:Runtime:Ui:Oidc:Issuer and Audience must be configured together for the local browser UI.");
+var flutterWebPort = ParseOptionalPort(builder.Configuration["DigitalBrain:Runtime:Ui:WebPort"]);
 IResourceBuilder<ParameterResource>? uiBootstrapSecret = enableDevFlutter
     ? builder.AddParameter(
         "runtime-ui-bootstrap-secret",
@@ -67,6 +75,7 @@ var googleAppConfig = builder.AddGoogleAppConfig();
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
 ctx.WireKernelSilo(kernel);  // Provides surfaces, journals, 3 replicas HA, and LLM wiring via the Aspire package.
 kernel.WithEnvironment("DigitalBrain__Profile", profile);
+kernel.WithEnvironment("DigitalBrain__Tools__Enabled", "true");
 kernel.WithEnvironment("DigitalBrain__Runtime__State__ActiveKekVersion", "1");
 kernel.WithEnvironment("DigitalBrain__Runtime__State__Keks__1", runtimeStateKek);
 kernel.WithEnvironment("DigitalBrain__Runtime__State__SigningKey", runtimeStateSigningKey);
@@ -110,6 +119,23 @@ if (ctx.EnableMcp)
         var flutter = ctx.AddDefaultDevFlutterClient(mcp, uiBootstrapSecret, endpointName: "https")
             ?? throw new InvalidOperationException(
                 "Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+
+        if (uiOidcIssuer is not null && uiOidcAudience is not null)
+        {
+            mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Issuer", uiOidcIssuer);
+            mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Audience", uiOidcAudience);
+            mcp.WithEnvironment(
+                "DigitalBrain__Runtime__Ui__Oidc__AllowedGrants",
+                "brain.read,ui.action,gmail.read,gmail.send,salesforce.read,salesforce.write");
+            var flutterWeb = ctx.AddDefaultDevFlutterWebClient(
+                    mcp,
+                    uiOidcIssuer,
+                    uiOidcAudience,
+                    endpointName: "https",
+                    port: flutterWebPort)
+                ?? throw new InvalidOperationException(
+                    "Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+        }
     }
 }
 
@@ -135,6 +161,15 @@ static IResourceBuilder<ParameterResource> AddRuntimeSecret(
     generateLocalDefault
         ? builder.AddParameter(name, CreateKeyDefault(), secret: true, persist: true)
         : builder.AddParameter(name, secret: true);
+
+static int? ParseOptionalPort(string? configured)
+{
+    if (string.IsNullOrWhiteSpace(configured)) return null;
+    return int.TryParse(configured, out var port) && port is > 0 and <= 65535
+        ? port
+        : throw new InvalidOperationException(
+            "DigitalBrain:Runtime:Ui:WebPort must be between 1 and 65535.");
+}
 
 static GenerateParameterDefault CreateKeyDefault() => new()
 {

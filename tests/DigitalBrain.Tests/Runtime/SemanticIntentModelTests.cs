@@ -30,7 +30,8 @@ public sealed class SemanticIntentModelTests
           "aggregate": null,
           "timeRange": "previousWeek",
           "searchText": null,
-          "clarification": null
+          "clarification": null,
+          "relativeDays": null
         }
         """;
 
@@ -77,6 +78,8 @@ public sealed class SemanticIntentModelTests
         Assert.Contains("'list my last two emails'", systemText, StringComparison.Ordinal);
         Assert.Contains("\"limit\":2", systemText, StringComparison.Ordinal);
         Assert.Contains("\"timeRange\":\"none\"", systemText, StringComparison.Ordinal);
+        Assert.Contains("RelativeDays is only an explicitly requested rolling number of days", systemText, StringComparison.Ordinal);
+        Assert.Contains("\"relativeDays\":null", systemText, StringComparison.Ordinal);
         Assert.Contains("Provider None is valid only with Answer", systemText, StringComparison.Ordinal);
         Assert.Contains("'Find Acme.'", systemText, StringComparison.Ordinal);
         Assert.Contains("\"searchText\":\"Acme\"", systemText, StringComparison.Ordinal);
@@ -98,6 +101,7 @@ public sealed class SemanticIntentModelTests
         var schema = responseFormat.Schema.Value.GetRawText();
         Assert.Contains("\"provider\"", schema, StringComparison.Ordinal);
         Assert.Contains("\"operation\"", schema, StringComparison.Ordinal);
+        Assert.Contains("\"relativeDays\"", schema, StringComparison.Ordinal);
         Assert.DoesNotContain("tenantId", schema, StringComparison.Ordinal);
         Assert.DoesNotContain("workspaceId", schema, StringComparison.Ordinal);
     }
@@ -154,6 +158,40 @@ public sealed class SemanticIntentModelTests
             grain.ResolveIntentAsync(Request("Show my messages."), cancellation.Token));
 
         Assert.Equal(cancellation.Token, chat.LastCancellationToken);
+    }
+
+    [Fact]
+    public async Task Resolve_mutation_extracts_only_the_typed_gmail_fields_under_strict_guidance()
+    {
+        const string response = """
+            {
+              "kind": "gmailSend",
+              "recipient": "safe-recipient@example.com",
+              "subject": "Acceptance check",
+              "body": "Exact body",
+              "entity": null,
+              "recordId": null,
+              "field": null,
+              "newValue": null,
+              "clarification": null
+            }
+            """;
+        var chat = new RecordingStructuredChatClient(response);
+        var grain = new ConversationModelGrain(chat);
+
+        var proposal = await grain.ResolveMutationAsync(new SemanticMutationRequest(
+            new string('a', 64),
+            "conversation-not-for-model",
+            SemanticProvider.Gmail,
+            "Send the exact acceptance email."));
+
+        Assert.Equal(SemanticMutationKind.GmailSend, proposal.Kind);
+        Assert.Equal("safe-recipient@example.com", proposal.Recipient);
+        Assert.Equal("Acceptance check", proposal.Subject);
+        Assert.Equal("Exact body", proposal.Body);
+        Assert.Contains("never invent, infer", chat.LastMessages[0].Text, StringComparison.Ordinal);
+        Assert.Contains("bulk, multi-recipient", chat.LastMessages[0].Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("conversation-not-for-model", chat.LastMessages[0].Text, StringComparison.Ordinal);
     }
 
     private static SemanticIntentRequest Request(string prompt) =>

@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -6,6 +7,12 @@ using Google;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Http;
 using Google.Apis.Services;
+using Microsoft.Extensions.Logging.Abstractions;
+using GmailMutationTool = DigitalBrain.Kernel.Runtime.IGmailMutationToolGrain;
+using GmailSendRequest = DigitalBrain.Kernel.Runtime.GmailSendRequest;
+using GmailSendResult = DigitalBrain.Kernel.Runtime.GmailSendResult;
+using GmailSendStatus = DigitalBrain.Kernel.Runtime.GmailSendStatus;
+using RuntimeGmailTools = DigitalBrain.Kernel.Runtime.GmailTools;
 
 namespace DigitalBrain.Tests.Integrations;
 
@@ -95,15 +102,160 @@ public sealed class GoogleGmailApiClientTests
     }
 
     [Fact]
-    public void Gmail_client_contract_is_bounded_and_read_only()
+    public void Gmail_client_contract_has_only_bounded_typed_operations()
     {
         Assert.Equal(
             [nameof(IGmailApiClient.ListMessagesAsync), nameof(IGmailApiClient.ListThreadsAsync),
-             nameof(IGmailApiClient.ReadIncomingAtOffsetAsync), nameof(IGmailApiClient.ReadMailboxOverviewAsync)],
+             nameof(IGmailApiClient.ReadIncomingAtOffsetAsync), nameof(IGmailApiClient.ReadMailboxOverviewAsync),
+             nameof(IGmailApiClient.SendAsync)],
             typeof(IGmailApiClient).GetMethods().Select(static method => method.Name).Order().ToArray());
         Assert.DoesNotContain(typeof(IGmailApiClient).GetMethods(), candidate =>
-            candidate.Name.Contains("Send", StringComparison.OrdinalIgnoreCase) ||
             candidate.GetParameters().Any(parameter => parameter.Name is "query" or "messageId"));
+    }
+
+    [Theory]
+    [InlineData("", "Subject", "Body", "operation-123")]
+    [InlineData("recipient@example.com\r\nBcc: attacker@example.com", "Subject", "Body", "operation-123")]
+    [InlineData("recipient@example.com", "Subject\r\nBcc: attacker@example.com", "Body", "operation-123")]
+    [InlineData("recipient@example.com", "Subject", "", "operation-123")]
+    [InlineData("recipient@example.com", "Subject", "Body", "operation 123")]
+    [InlineData("recipient@example.com", "Subject", "Body", "operation:123")]
+    [InlineData("recipient@example.com", "Subject", "Body", ".operation-123")]
+    [InlineData("recipient@example.com", "Subject", "Body", "operation-123.")]
+    [InlineData("recipient@example.com", "Subject", "Body", "operation..123")]
+    [InlineData("recipient@example.com", "Subject", "Body", "operation-123\r\nBcc: attacker@example.com")]
+    public async Task Send_rejects_invalid_input_before_a_provider_call(
+        string recipient,
+        string subject,
+        string body,
+        string uniqueTag)
+    {
+        var handler = new RecordingHandler((_, _) => throw new InvalidOperationException("Provider must not be called."));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateClient(handler).SendAsync(
+            new GmailSendRequest(recipient, subject, body, uniqueTag)));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task Send_rejects_unbounded_fields_before_a_provider_call()
+    {
+        var handler = new RecordingHandler((_, _) => throw new InvalidOperationException("Provider must not be called."));
+        var client = CreateClient(handler);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => client.SendAsync(new GmailSendRequest(
+            "recipient@example.com",
+            new string('s', RuntimeGmailTools.MaximumSubjectLength + 1),
+            "Body",
+            "operation-123")));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.SendAsync(new GmailSendRequest(
+            "recipient@example.com",
+            "Subject",
+            new string('b', RuntimeGmailTools.MaximumBodyLength + 1),
+            "operation-123")));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.SendAsync(new GmailSendRequest(
+            new string('r', RuntimeGmailTools.MaximumRecipientLength + 1),
+            "Subject",
+            "Body",
+            "operation-123")));
+        await Assert.ThrowsAsync<ArgumentException>(() => client.SendAsync(new GmailSendRequest(
+            "recipient@example.com",
+            "Subject",
+            "Body",
+            new string('t', RuntimeGmailTools.MaximumUniqueTagLength + 1))));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task Gmail_grain_rejects_an_invalid_mutation_before_accessing_auth_or_provider_dependencies()
+    {
+        var grain = new GmailReadNeuron(
+            NullLogger<GmailReadNeuron>.Instance,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        Assert.IsAssignableFrom<GmailMutationTool>(grain);
+        var result = await grain.SendAsync(new GmailSendRequest(
+            "recipient@example.com\r\nBcc: attacker@example.com",
+            "Subject",
+            "Body",
+            "operation-123"));
+
+        Assert.Equal(GmailSendStatus.InvalidRequest, result.Status);
+        Assert.Null(result.MessageId);
+        Assert.Null(result.ThreadId);
+        Assert.Null(result.ConnectionUrl);
+    }
+
+    [Fact]
+    public async Task Send_reconciles_the_exact_unique_tag_without_posting_a_duplicate()
+    {
+        var handler = new RecordingHandler((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            return JsonResponse(new
+            {
+                messages = new[] { new { id = "existing-message", threadId = "existing-thread" } }
+            });
+        });
+
+        var result = await CreateClient(handler).SendAsync(new GmailSendRequest(
+            "recipient@example.com", "Subject", "Body", "operation-123"));
+
+        Assert.Equal(GmailSendStatus.AlreadyApplied, result.Status);
+        Assert.Equal("existing-message", result.MessageId);
+        Assert.Equal("existing-thread", result.ThreadId);
+        var request = Assert.Single(handler.Requests);
+        Assert.EndsWith("/gmail/v1/users/me/messages", request.AbsolutePath, StringComparison.Ordinal);
+        Assert.Contains("labelIds=SENT", DecodeQuery(request), StringComparison.Ordinal);
+        Assert.Contains(
+            "q=in:sent rfc822msgid:operation-123@digitalbrain.invalid",
+            DecodeQuery(request),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Send_posts_one_base64url_rfc2822_message_and_returns_only_safe_metadata()
+    {
+        var handler = new RecordingHandler((request, index) => index == 0
+            ? JsonResponse(new { messages = Array.Empty<object>() })
+            : JsonResponse(new
+            {
+                id = "sent-message",
+                threadId = "sent-thread",
+                snippet = "secret body must not escape",
+                raw = "secret token must not escape"
+            }));
+
+        var result = await CreateClient(handler).SendAsync(new GmailSendRequest(
+            "recipient@example.com", "Résumé", "Confidential body", "operation-123"));
+
+        Assert.Equal(GmailSendStatus.Applied, result.Status);
+        Assert.Equal("sent-message", result.MessageId);
+        Assert.Equal("sent-thread", result.ThreadId);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(HttpMethod.Get, handler.Methods[0]);
+        Assert.Equal(HttpMethod.Post, handler.Methods[1]);
+        Assert.EndsWith("/gmail/v1/users/me/messages/send", handler.Requests[1].AbsolutePath, StringComparison.Ordinal);
+
+        using var envelope = JsonDocument.Parse(handler.Bodies[1]!);
+        var raw = envelope.RootElement.GetProperty("raw").GetString();
+        Assert.NotNull(raw);
+        var rfc2822 = Encoding.UTF8.GetString(DecodeBase64Url(raw));
+        Assert.Contains("To: recipient@example.com\r\n", rfc2822, StringComparison.Ordinal);
+        Assert.Contains("Message-ID: <operation-123@digitalbrain.invalid>\r\n", rfc2822, StringComparison.Ordinal);
+        Assert.Contains("Content-Type: text/plain; charset=utf-8\r\n", rfc2822, StringComparison.Ordinal);
+        Assert.DoesNotContain("Confidential body", rfc2822, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret body must not escape", result.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("secret token must not escape", result.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(typeof(GmailSendResult).GetProperties(), property =>
+            property.Name.Contains("Body", StringComparison.OrdinalIgnoreCase) ||
+            property.Name.Contains("Raw", StringComparison.OrdinalIgnoreCase) ||
+            property.Name.Contains("Token", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -394,6 +546,13 @@ public sealed class GoogleGmailApiClientTests
     private static string DecodeQuery(Uri uri) =>
         Uri.UnescapeDataString(uri.Query.TrimStart('?').Replace('+', ' '));
 
+    private static byte[] DecodeBase64Url(string value)
+    {
+        var padded = value.Replace('-', '+').Replace('_', '/');
+        padded += new string('=', (4 - padded.Length % 4) % 4);
+        return Convert.FromBase64String(padded);
+    }
+
     private sealed class TestHttpClientFactory(HttpMessageHandler handler) : global::Google.Apis.Http.IHttpClientFactory
     {
         public ConfigurableHttpClient CreateHttpClient(CreateHttpClientArgs args) =>
@@ -404,14 +563,32 @@ public sealed class GoogleGmailApiClientTests
         Func<HttpRequestMessage, int, HttpResponseMessage> respond) : HttpMessageHandler
     {
         public List<Uri> Requests { get; } = [];
+        public List<HttpMethod> Methods { get; } = [];
+        public List<string?> Bodies { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             var index = Requests.Count;
             Requests.Add(request.RequestUri ?? throw new InvalidOperationException("A Gmail request URI is required."));
-            return Task.FromResult(respond(request, index));
+            Methods.Add(request.Method);
+            Bodies.Add(await ReadBodyAsync(request.Content, cancellationToken));
+            return respond(request, index);
+        }
+
+        private static async Task<string?> ReadBodyAsync(
+            HttpContent? content,
+            CancellationToken cancellationToken)
+        {
+            if (content is null) return null;
+            var bytes = await content.ReadAsByteArrayAsync(cancellationToken);
+            if (!content.Headers.ContentEncoding.Contains("gzip", StringComparer.OrdinalIgnoreCase))
+                return Encoding.UTF8.GetString(bytes);
+            await using var compressed = new MemoryStream(bytes);
+            await using var gzip = new GZipStream(compressed, CompressionMode.Decompress);
+            using var decoded = new StreamReader(gzip, Encoding.UTF8);
+            return await decoded.ReadToEndAsync(cancellationToken);
         }
     }
 

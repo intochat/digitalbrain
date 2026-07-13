@@ -205,6 +205,44 @@ void main() {
       },
     );
 
+    test(
+      'server reset accepts a complete legacy INO operation and acknowledges it',
+      () async {
+        final call = _FakeFeedCall.open();
+        final transport = _FakeUiTransport([call]);
+        final runtime = _runtime(transport);
+
+        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _eventually(() => runtime.status == RuntimeStatus.streaming);
+        call.add(
+          FeedResetEvent(
+            reason: 'retention-gap',
+            resumeSequence: 1,
+            snapshotJson: [
+              surfaceJsonString(
+                payload: inoConversationPayload(
+                  operation: const {'state': 'running', 'retryable': false},
+                ),
+              ),
+            ],
+          ),
+        );
+        await _eventually(() => transport.acknowledged.isNotEmpty);
+
+        final payload = runtime.latestSurface?.payload;
+        expect(runtime.status, RuntimeStatus.streaming);
+        expect(runtime.feed.lastSequence, 1);
+        expect(transport.acknowledged, [1]);
+        expect(payload, isA<InoConversationSurfacePayload>());
+        final operation = (payload! as InoConversationSurfacePayload).operation;
+        expect(operation?.operationId, isEmpty);
+        expect(operation?.phase, InoConversationOperationPhase.running);
+        expect(operation?.version, 0);
+
+        await runtime.stop();
+      },
+    );
+
     final invalidSurfaces = <String, String>{
       'invalid action target': surfaceJsonString(
         payload: inoConversationPayload(

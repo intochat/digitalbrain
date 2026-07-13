@@ -25,7 +25,7 @@ public sealed class GmailReadNeuron(
     IGmailApiClientFactory gmailApiClientFactory,
     IPackConfigStore store,
     [FromKeyedServices("google")] IConnector connector,
-    IOAuthStateProtector oauthStateProtector) : Grain, IGmailReadToolGrain, IGmailMetadataToolGrain
+    IOAuthStateProtector oauthStateProtector) : Grain, IGmailReadToolGrain, IGmailMetadataToolGrain, IGmailMutationToolGrain
 {
     private static readonly TimeSpan OAuthStartLifetime = TimeSpan.FromMinutes(5);
 
@@ -283,6 +283,61 @@ public sealed class GmailReadNeuron(
             cancellationToken);
     }
 
+    public async Task<GmailSendResult> SendAsync(
+        GmailSendRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!GmailSendRequestValidator.IsValid(request))
+            return new GmailSendResult(
+                GmailSendStatus.InvalidRequest,
+                SafeReason: "That Gmail message cannot be sent safely.");
+
+        var owner = new NeuronId(this.GetPrimaryKeyString());
+        var scope = new NeuronScope(new UserId(owner.Value), ThreadId: null);
+        var config = await connector.ValidateConfigAsync(cancellationToken: cancellationToken);
+        if (!config.IsValid)
+            return new GmailSendResult(
+                GmailSendStatus.ConfigurationMissing,
+                SafeReason: "Gmail application configuration is missing.");
+
+        var values = await GoogleClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
+        if (!GoogleClientFactory.HasUsableCredential(values))
+            return await BuildMutationConnectionResultAsync(owner, values, cancellationToken);
+
+        try
+        {
+            var client = await gmailApiClientFactory.CreateAsync(scope, cancellationToken);
+            return await client.SendAsync(request, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (GoogleApiException ex) when (ex.HttpStatusCode == HttpStatusCode.Forbidden)
+        {
+            return await BuildMutationConnectionResultAsync(
+                owner,
+                values,
+                cancellationToken,
+                "Google authorization does not include Gmail send permission. Reconnect Google and grant send access.");
+        }
+        catch (Exception ex) when (IsAuthorizationFailure(ex))
+        {
+            return await BuildMutationConnectionResultAsync(
+                owner,
+                values,
+                cancellationToken,
+                "Google authorization expired or was revoked. Reconnect Google to continue.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Principal-scoped Gmail send failed with {ExceptionType}.", ex.GetType().Name);
+            return new GmailSendResult(
+                GmailSendStatus.Unavailable,
+                SafeReason: "I couldn’t send that Gmail message right now. Please try again later.");
+        }
+    }
+
     private async Task<T> ExecuteMetadataReadAsync<T>(
         Func<IGmailApiClient, CancellationToken, Task<T>> operation,
         Func<GmailReadStatus, string?, string?, T> failure,
@@ -433,6 +488,24 @@ public sealed class GmailReadNeuron(
                 GmailReadStatus.Unavailable,
                 SafeReason: "Google connection is unavailable right now.");
         }
+    }
+
+    private async Task<GmailSendResult> BuildMutationConnectionResultAsync(
+        NeuronId owner,
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken,
+        string reason = "Connect your Google account to let INO send Gmail messages.")
+    {
+        var connection = await BuildConnectionResultAsync(owner, values, cancellationToken, reason);
+        return new GmailSendResult(
+            connection.Status switch
+            {
+                GmailReadStatus.NeedsAuth => GmailSendStatus.NeedsAuth,
+                GmailReadStatus.ConfigurationMissing => GmailSendStatus.ConfigurationMissing,
+                _ => GmailSendStatus.Unavailable
+            },
+            SafeReason: connection.SafeReason,
+            ConnectionUrl: connection.ConnectionUrl);
     }
 
     private static GmailReadResult InvalidConnectionRequest() => new(

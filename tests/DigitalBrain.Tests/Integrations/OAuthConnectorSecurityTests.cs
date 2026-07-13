@@ -13,6 +13,25 @@ namespace DigitalBrain.Tests.Integrations;
 public sealed class OAuthConnectorSecurityTests
 {
     [Fact]
+    public void Google_authorization_requests_only_readonly_and_send_gmail_scopes()
+    {
+        var url = GoogleClientFactory.CreateAuthorizationUrl(
+            GoogleAppConfig(),
+            GoogleClientFactory.DefaultRedirectUri,
+            "state-1");
+        var query = Uri.UnescapeDataString(new Uri(url).Query);
+
+        Assert.Equal(
+            [GoogleClientFactory.DefaultGmailScope, GoogleClientFactory.GmailSendScope],
+            new GoogleConnector(new FakePackConfigStore(), new FakeOAuthStateProtector()).Descriptor.Scopes);
+        Assert.Contains(GoogleClientFactory.DefaultGmailScope, query, StringComparison.Ordinal);
+        Assert.Contains(GoogleClientFactory.GmailSendScope, query, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://mail.google.com/", query, StringComparison.Ordinal);
+        Assert.DoesNotContain("gmail.modify", query, StringComparison.Ordinal);
+        Assert.DoesNotContain("gmail.compose", query, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Google_oauth_state_and_tokens_are_principal_scoped()
     {
         var store = new FakePackConfigStore();

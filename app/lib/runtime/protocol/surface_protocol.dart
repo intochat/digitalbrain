@@ -501,17 +501,35 @@ class InoConversationOperation {
       'action',
       'approvalId',
     }, 'payload.data.operation');
-    final operationId = _boundedString(json, 'operationId', maxLength: 128);
-    if (!RegExp(r'^[a-z][a-z0-9-]{2,127}$').hasMatch(operationId)) {
+    const metadataKeys = {'operationId', 'phase', 'version'};
+    final metadataCount = metadataKeys.where(json.containsKey).length;
+    final isLegacy = metadataCount == 0;
+    if (metadataCount != 0 && metadataCount != metadataKeys.length) {
       throw const FormatException(
-        'payload.data.operation.operationId has an invalid format.',
+        'payload.data.operation metadata must be complete.',
       );
     }
-    final version = json['version'];
-    if (version is! int || version < 1 || version > 9007199254740991) {
-      throw const FormatException(
-        'payload.data.operation.version must be a positive safe integer.',
-      );
+    final String operationId;
+    final int version;
+    if (isLegacy) {
+      operationId = '';
+      version = 0;
+    } else {
+      operationId = _boundedString(json, 'operationId', maxLength: 128);
+      if (!RegExp(r'^[a-z][a-z0-9-]{2,127}$').hasMatch(operationId)) {
+        throw const FormatException(
+          'payload.data.operation.operationId has an invalid format.',
+        );
+      }
+      final versionValue = json['version'];
+      if (versionValue is! int ||
+          versionValue < 1 ||
+          versionValue > 9007199254740991) {
+        throw const FormatException(
+          'payload.data.operation.version must be a positive safe integer.',
+        );
+      }
+      version = versionValue;
     }
     final retryable = json['retryable'];
     if (retryable is! bool) {
@@ -539,6 +557,11 @@ class InoConversationOperation {
     final state = InoConversationOperationState.fromWire(
       _boundedString(json, 'state', maxLength: 32),
     );
+    if (isLegacy && state == InoConversationOperationState.awaitingApproval) {
+      throw const FormatException(
+        'Legacy operations cannot carry approval authority.',
+      );
+    }
     final approvalValue = json['approvalId'];
     final String? approvalId;
     if (approvalValue == null) {
@@ -565,9 +588,11 @@ class InoConversationOperation {
         'payload.data.operation.approvalId is only valid while awaiting approval.',
       );
     }
-    final phase = InoConversationOperationPhase.fromWire(
-      _boundedString(json, 'phase', maxLength: 32),
-    );
+    final phase = isLegacy
+        ? _legacyOperationPhase(state)
+        : InoConversationOperationPhase.fromWire(
+            _boundedString(json, 'phase', maxLength: 32),
+          );
     if (phase == InoConversationOperationPhase.approved &&
         state != InoConversationOperationState.queued) {
       throw const FormatException(
@@ -598,9 +623,11 @@ class InoConversationOperation {
   }
 
   Map<String, Object?> toJson() => {
-    'operationId': operationId,
-    'phase': phase.wire,
-    'version': version,
+    if (version > 0) ...{
+      'operationId': operationId,
+      'phase': phase.wire,
+      'version': version,
+    },
     'state': state.wire,
     'retryable': retryable,
     'safeReason': ?safeReason,
@@ -608,6 +635,31 @@ class InoConversationOperation {
     'approvalId': ?approvalId,
   };
 }
+
+InoConversationOperationPhase _legacyOperationPhase(
+  InoConversationOperationState state,
+) => switch (state) {
+  InoConversationOperationState.queued =>
+    InoConversationOperationPhase.accepted,
+  InoConversationOperationState.responding =>
+    InoConversationOperationPhase.running,
+  InoConversationOperationState.running =>
+    InoConversationOperationPhase.running,
+  InoConversationOperationState.awaitingApproval => throw const FormatException(
+    'Legacy operations cannot carry approval authority.',
+  ),
+  InoConversationOperationState.awaitingAuthorization =>
+    InoConversationOperationPhase.awaitingAuthorization,
+  InoConversationOperationState.retryScheduled =>
+    InoConversationOperationPhase.retryScheduled,
+  InoConversationOperationState.succeeded =>
+    InoConversationOperationPhase.succeeded,
+  InoConversationOperationState.failed => InoConversationOperationPhase.failed,
+  InoConversationOperationState.outcomeUnknown =>
+    InoConversationOperationPhase.outcomeUnknown,
+  InoConversationOperationState.cancelled =>
+    InoConversationOperationPhase.cancelled,
+};
 
 class InoConversationAction {
   const InoConversationAction({

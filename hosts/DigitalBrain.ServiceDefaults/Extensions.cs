@@ -71,6 +71,9 @@ public static class Extensions
                     //.AddSource("Microsoft.Orleans.Runtime")
                     .AddSource("Microsoft.Orleans.Application")
                     .AddSource("DigitalBrain.Neuron")
+                    .AddSource("DigitalBrain.Ino.Worker")
+                    .AddSource("DigitalBrain.Ino.Workflow")
+                    .AddSource("DigitalBrain.Ino.Outbox")
                     .AddAspNetCoreInstrumentation(options =>
                         options.Filter = context =>
                             !context.Request.Path.StartsWithSegments(HealthEndpointPath)

@@ -64,15 +64,23 @@ public sealed class AddDigitalBrainExecutionModeTests
     public async Task TestProfile_DeclaresFlutterClientWiredOnlyToTransport()
     {
         const string salesforceCallback = "https://brain.example/oauth/callback/salesforce";
+        const string oidcIssuer = "https://identity.example";
+        const string oidcAudience = "digitalbrain-browser";
         var builder = await CreateAppHostBuilderAsync(
             "--DigitalBrain:Profile=Test",
-            $"--Parameters:salesforce-redirect-uri={salesforceCallback}");
+            $"--Parameters:salesforce-redirect-uri={salesforceCallback}",
+            $"--DigitalBrain:Runtime:Ui:Oidc:Issuer={oidcIssuer}",
+            $"--DigitalBrain:Runtime:Ui:Oidc:Audience={oidcAudience}",
+            "--DigitalBrain:Runtime:Ui:WebPort=5180");
 
         Assert.Equal("Test", builder.Configuration["DigitalBrain:Profile"]);
-        Assert.Contains(builder.Resources, r => r.Name == "kernel");
+        var kernel = Assert.Single(builder.Resources, r => r.Name == "kernel");
+        var kernelEnvironment = await EvaluateEnvironmentAsync(builder, kernel);
+        Assert.Equal("true", kernelEnvironment["DigitalBrain__Tools__Enabled"]);
 
         var mcp = Assert.Single(builder.Resources, r => r.Name == "mcp");
         var flutter = Assert.Single(builder.Resources, r => r.Name == "flutter-ui");
+        var flutterWeb = Assert.Single(builder.Resources, r => r.Name == "flutter-web");
         var bootstrapSecret = Assert.IsType<ParameterResource>(
             Assert.Single(builder.Resources, r => r.Name == "runtime-ui-bootstrap-secret"));
         Assert.True(bootstrapSecret.Secret);
@@ -146,6 +154,76 @@ public sealed class AddDigitalBrainExecutionModeTests
                 || pair.Key.Contains("DigitalBrainGateway", StringComparison.OrdinalIgnoreCase)
                 || pair.Value?.ToString()?.Contains("WatchHomeFeed", StringComparison.OrdinalIgnoreCase) == true
                 || pair.Value?.ToString()?.Contains("DigitalBrainGateway", StringComparison.OrdinalIgnoreCase) == true);
+
+        var webEndpoint = Assert.Single(
+            flutterWeb.Annotations.OfType<EndpointAnnotation>(),
+            endpoint => endpoint.Name == "http");
+        Assert.Equal("http", webEndpoint.UriScheme);
+        Assert.Equal(5180, webEndpoint.Port);
+        Assert.True(webEndpoint.IsProxied);
+        Assert.Contains(flutterWeb.Annotations.OfType<HealthCheckAnnotation>(), _ => true);
+        Assert.Contains(
+            flutterWeb.Annotations.OfType<WaitAnnotation>(),
+            annotation => ReferenceEquals(annotation.Resource, mcp) &&
+                          annotation.WaitType == WaitType.WaitUntilHealthy);
+
+        var webEnvironment = await EvaluateEnvironmentAsync(builder, flutterWeb);
+        Assert.DoesNotContain(FlutterAspireExtensions.BootstrapSecretEnvironmentVariable, webEnvironment.Keys);
+        Assert.DoesNotContain(
+            webEnvironment,
+            pair => ReferenceEquals(pair.Value, bootstrapSecret) ||
+                    pair.Key.Contains("secret", StringComparison.OrdinalIgnoreCase));
+
+        var webArgs = await EvaluateArgumentsAsync(builder, flutterWeb);
+        Assert.Contains("web-server", webArgs);
+        Assert.Contains("--web-port", webArgs);
+        Assert.Contains(
+            webArgs.OfType<EndpointReferenceExpression>(),
+            expression => expression.Property == EndpointProperty.TargetPort &&
+                          ReferenceEquals(expression.Endpoint.Resource, flutterWeb));
+        var referenceExpressions = webArgs.OfType<ReferenceExpression>().ToArray();
+        Assert.Contains(
+            referenceExpressions,
+            expression => expression.ValueExpression.Contains(
+                FlutterAspireExtensions.TransportEndpointEnvironmentVariable,
+                StringComparison.Ordinal));
+        Assert.Contains(
+            referenceExpressions,
+            expression => expression.ValueExpression.Contains(oidcIssuer, StringComparison.Ordinal));
+        Assert.Contains(
+            referenceExpressions,
+            expression => expression.ValueExpression.Contains(oidcAudience, StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            webArgs,
+            argument => argument.ToString()?.Contains(
+                FlutterAspireExtensions.BootstrapSecretEnvironmentVariable,
+                StringComparison.OrdinalIgnoreCase) == true ||
+                        argument.ToString()?.Contains(
+                            bootstrapSecret.Name,
+                            StringComparison.OrdinalIgnoreCase) == true);
+
+        var webRelationships = flutterWeb.Annotations.OfType<ResourceRelationshipAnnotation>().ToArray();
+        Assert.Contains(webRelationships, relationship => ReferenceEquals(relationship.Resource, mcp));
+        Assert.DoesNotContain(
+            webRelationships,
+            relationship => ReferenceEquals(relationship.Resource, bootstrapSecret));
+
+        Assert.Equal(oidcIssuer, mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__Issuer"]);
+        Assert.Equal(oidcAudience, mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__Audience"]);
+        Assert.Equal(
+            "brain.read,ui.action,gmail.read,gmail.send,salesforce.read,salesforce.write",
+            mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__AllowedGrants"]);
+    }
+
+    [Theory]
+    [InlineData("Issuer", "https://identity.example")]
+    [InlineData("Audience", "digitalbrain-browser")]
+    public async Task LocalProfile_RejectsPartialBrowserOidcConfiguration(string key, string value)
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            CreateAppHostBuilderAsync(
+                "--DigitalBrain:Profile=Test",
+                $"--DigitalBrain:Runtime:Ui:Oidc:{key}={value}"));
     }
 
     [Fact]
@@ -204,5 +282,22 @@ public sealed class AddDigitalBrainExecutionModeTests
         }
 
         return environment;
+    }
+
+    private static async Task<List<object>> EvaluateArgumentsAsync(
+        IDistributedApplicationTestingBuilder builder,
+        IResource resource)
+    {
+        var arguments = new List<object>();
+        var context = new CommandLineArgsCallbackContext(arguments, resource)
+        {
+            ExecutionContext = builder.ExecutionContext
+        };
+        foreach (var annotation in resource.Annotations.OfType<CommandLineArgsCallbackAnnotation>())
+        {
+            await annotation.Callback(context);
+        }
+
+        return arguments;
     }
 }

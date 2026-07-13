@@ -6,12 +6,14 @@ namespace DigitalBrain.Kernel.Runtime;
 
 public static class SalesforceTools
 {
+    public const string UpdateRecord = "salesforce.record.update";
     public const string DiscoverObjects = "salesforce.read.objects";
     public const string ReadRecords = "salesforce.read.records";
     public const string SearchRecords = "salesforce.read.search";
     public const string AggregateRecords = "salesforce.read.aggregate";
     public const string ContinueRecords = "salesforce.read.continue";
     public const string PreviewMutation = "salesforce.mutation.preview";
+    public const string ApplyMutation = "salesforce.mutation.apply";
     public const string ReadLatestAccount = "salesforce.account.read.latest";
     public const string ReadCurrentProfile = "salesforce.profile.read.current";
     public const string ReadRecentAccounts = "salesforce.accounts.read.recent";
@@ -97,6 +99,46 @@ public sealed record SalesforceAggregateRequest(
 public sealed record SalesforceContinuationRequest(
     [property: Id(0)] string Value);
 
+public enum SalesforceMutationStatus
+{
+    Prepared,
+    Applied,
+    AlreadyApplied,
+    Conflict,
+    VerificationFailed,
+    NeedsAuth,
+    ConfigurationMissing,
+    AccessDenied,
+    InvalidRequest,
+    Unavailable
+}
+
+[GenerateSerializer, Alias("digitalbrain.v2.salesforce-update-preview-request")]
+public sealed record SalesforceUpdatePreviewRequest(
+    [property: Id(0)] SalesforceSemanticEntity Entity,
+    [property: Id(1)] string RecordId,
+    [property: Id(2)] SalesforceSemanticField Field,
+    [property: Id(3)] string NewValue);
+
+[GenerateSerializer, Alias("digitalbrain.v2.salesforce-prepared-update")]
+public sealed record SalesforcePreparedUpdate(
+    [property: Id(0)] byte[] Payload);
+
+[GenerateSerializer, Alias("digitalbrain.v2.salesforce-mutation-preview-result")]
+public sealed record SalesforceMutationPreviewResult(
+    [property: Id(0)] SalesforceMutationStatus Status,
+    [property: Id(1)] string? OriginalValue = null,
+    [property: Id(2)] SalesforcePreparedUpdate? PreparedUpdate = null,
+    [property: Id(3)] string? SafeReason = null,
+    [property: Id(4)] string? CanonicalDesiredValue = null,
+    [property: Id(5)] string? ResolvedEntityLabel = null,
+    [property: Id(6)] string? ResolvedFieldLabel = null);
+
+[GenerateSerializer, Alias("digitalbrain.v2.salesforce-mutation-apply-result")]
+public sealed record SalesforceMutationApplyResult(
+    [property: Id(0)] SalesforceMutationStatus Status,
+    [property: Id(1)] string? SafeReason = null);
+
 [GenerateSerializer, Alias("digitalbrain.v2.salesforce-read-scope")]
 public sealed record SalesforceReadScope(
     [property: Id(0)] string PrincipalId,
@@ -175,5 +217,19 @@ public interface ISalesforceReadToolGrain : IGrainWithStringKey
     [Alias("ContinueRecordsAsync")]
     Task<SalesforceReadResult> ContinueRecordsAsync(
         SalesforceContinuationRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+[Alias("digitalbrain.v2.salesforce-mutation-tool-grain")]
+public interface ISalesforceMutationToolGrain : IGrainWithStringKey
+{
+    [Alias("PreviewUpdateAsync")]
+    Task<SalesforceMutationPreviewResult> PreviewUpdateAsync(
+        SalesforceUpdatePreviewRequest request,
+        CancellationToken cancellationToken = default);
+
+    [Alias("ApplyUpdateAsync")]
+    Task<SalesforceMutationApplyResult> ApplyUpdateAsync(
+        SalesforcePreparedUpdate preparedUpdate,
         CancellationToken cancellationToken = default);
 }

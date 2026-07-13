@@ -1,6 +1,7 @@
 extern alias McpProject;
 
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Runtime;
 using Grpc.Core;
 using UiGrpcService = McpProject::DigitalBrain.Mcp.UiGrpcService;
 
@@ -31,4 +32,30 @@ public sealed class UiGrpcServiceTests
             StatusCode.PermissionDenied,
             UiGrpcService.StatusForActionRejection(ActionRejection.Forged));
     }
+
+    [Fact]
+    public void Action_tokens_are_refreshed_only_when_the_binding_set_changes()
+    {
+        var issuedBinding = new SurfaceActionBinding(
+            ConversationSurfacePayload.SendBindingId,
+            ConversationSurfacePayload.HomeSurfaceId,
+            1,
+            ConversationSurfacePayload.SendActionType,
+            ConversationSurfacePayload.SendInputSchema,
+            "ui.action",
+            UiProtocol.ActionSchemaVersion,
+            new string('a', 64),
+            1,
+            0,
+            DateTimeOffset.UtcNow.AddMinutes(5),
+            null,
+            null);
+
+        Assert.False(UiGrpcService.ActionBindingsChanged([issuedBinding], [issuedBinding]));
+        Assert.True(UiGrpcService.ActionBindingsChanged(
+            [issuedBinding],
+            [issuedBinding with { SurfaceRevision = 2, TokenHash = new string('b', 64) }]));
+        Assert.True(UiGrpcService.ActionBindingsChanged([issuedBinding], []));
+    }
+
 }

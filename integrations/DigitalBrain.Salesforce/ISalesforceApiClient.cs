@@ -23,4 +23,18 @@ public interface ISalesforceApiClient
 
     Task<SalesforceReadPage> ContinueRecordsAsync(SalesforceContinuation continuation, CancellationToken ct) =>
         Task.FromException<SalesforceReadPage>(SalesforceReadException.Unsupported());
+
+    Task<SalesforceMutationPreviewResult> PreviewUpdateAsync(
+        SalesforceUpdatePreviewRequest request,
+        CancellationToken ct) =>
+        Task.FromResult(new SalesforceMutationPreviewResult(
+            SalesforceMutationStatus.Unavailable,
+            SafeReason: "Salesforce updates are unavailable right now."));
+
+    Task<SalesforceMutationApplyResult> ApplyUpdateAsync(
+        SalesforcePreparedUpdate preparedUpdate,
+        CancellationToken ct) =>
+        Task.FromResult(new SalesforceMutationApplyResult(
+            SalesforceMutationStatus.Unavailable,
+            "Salesforce updates are unavailable right now."));
 }

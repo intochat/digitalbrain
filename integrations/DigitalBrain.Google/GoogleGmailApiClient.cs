@@ -38,6 +38,35 @@ public sealed class GoogleGmailApiClient : IGmailApiClient
 
     internal GoogleGmailApiClient(GmailService service) => _service = service;
 
+    public async Task<GmailSendResult> SendAsync(
+        GmailSendRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        GmailSendRequestValidator.Validate(request);
+
+        var messageId = GmailSendRequestValidator.MessageId(request.UniqueTag);
+        var existingRequest = _service.Users.Messages.List("me");
+        existingRequest.LabelIds = new Repeatable<string>(["SENT"]);
+        existingRequest.Q = $"in:sent rfc822msgid:{messageId}";
+        existingRequest.MaxResults = 1;
+        existingRequest.Fields = "messages(id,threadId)";
+        var existing = await existingRequest.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+        var duplicate = existing.Messages?.FirstOrDefault();
+        if (duplicate is not null)
+            return new GmailSendResult(
+                GmailSendStatus.AlreadyApplied,
+                duplicate.Id,
+                duplicate.ThreadId);
+
+        var send = _service.Users.Messages.Send(new Message
+        {
+            Raw = Base64Url(Rfc2822(request, messageId))
+        }, "me");
+        send.Fields = "id,threadId";
+        var sent = await send.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+        return new GmailSendResult(GmailSendStatus.Applied, sent.Id, sent.ThreadId);
+    }
+
     public async Task<GmailLatestIncomingMessage> ReadIncomingAtOffsetAsync(
         GmailIncomingReadRequest request,
         CancellationToken cancellationToken = default)
@@ -357,6 +386,34 @@ public sealed class GoogleGmailApiClient : IGmailApiClient
             throw new ArgumentException("The Gmail recipient filter is invalid.", nameof(selection));
     }
 
+    private static byte[] Rfc2822(GmailSendRequest request, string messageId)
+    {
+        var normalizedBody = request.Body
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Replace("\n", "\r\n", StringComparison.Ordinal);
+        var encodedSubject = Convert.ToBase64String(Encoding.UTF8.GetBytes(request.Subject));
+        var encodedBody = Convert.ToBase64String(
+            Encoding.UTF8.GetBytes(normalizedBody),
+            Base64FormattingOptions.InsertLineBreaks);
+        var message = string.Join("\r\n",
+            $"To: {request.Recipient.Trim()}",
+            $"Subject: =?UTF-8?B?{encodedSubject}?=",
+            $"Message-ID: <{messageId}>",
+            "MIME-Version: 1.0",
+            "Content-Type: text/plain; charset=utf-8",
+            "Content-Transfer-Encoding: base64",
+            string.Empty,
+            encodedBody);
+        return Encoding.UTF8.GetBytes(message);
+    }
+
+    private static string Base64Url(byte[] value) =>
+        Convert.ToBase64String(value)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
     private static string? ProviderLabel(GmailMailboxScope mailbox) => mailbox switch
     {
         GmailMailboxScope.Inbox => "INBOX",
@@ -496,4 +553,58 @@ public sealed class GoogleGmailApiClient : IGmailApiClient
     }
 
     private sealed record GmailMetadataWindow(GmailMessageMetadata[] Messages, GmailResultCoverage Coverage);
+}
+
+internal static class GmailSendRequestValidator
+{
+    private const string MessageIdDomain = "digitalbrain.invalid";
+
+    public static void Validate(GmailSendRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var recipient = request.Recipient?.Trim();
+        if (string.IsNullOrWhiteSpace(recipient) ||
+            recipient.Length > GmailTools.MaximumRecipientLength ||
+            recipient.Any(char.IsControl) ||
+            !MailAddress.TryCreate(recipient, out var parsed) ||
+            !string.Equals(parsed.Address, recipient, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("The Gmail recipient is invalid.", nameof(request));
+
+        if (string.IsNullOrWhiteSpace(request.Subject) ||
+            request.Subject.Length > GmailTools.MaximumSubjectLength ||
+            request.Subject.Any(char.IsControl))
+            throw new ArgumentException("The Gmail subject is invalid.", nameof(request));
+
+        if (string.IsNullOrEmpty(request.Body) ||
+            request.Body.Length > GmailTools.MaximumBodyLength ||
+            request.Body.Any(static value => char.IsControl(value) && value is not '\r' and not '\n' and not '\t'))
+            throw new ArgumentException("The Gmail body is invalid.", nameof(request));
+
+        if (string.IsNullOrWhiteSpace(request.UniqueTag) ||
+            request.UniqueTag.Length > GmailTools.MaximumUniqueTagLength ||
+            !IsAsciiLetterOrDigit(request.UniqueTag[0]) ||
+            !IsAsciiLetterOrDigit(request.UniqueTag[^1]) ||
+            request.UniqueTag.Contains("..", StringComparison.Ordinal) ||
+            request.UniqueTag.Any(static value =>
+                !IsAsciiLetterOrDigit(value) && value is not '-' and not '_' and not '.'))
+            throw new ArgumentException("The Gmail unique tag is invalid.", nameof(request));
+    }
+
+    public static bool IsValid(GmailSendRequest request)
+    {
+        try
+        {
+            Validate(request);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    public static string MessageId(string uniqueTag) => $"{uniqueTag}@{MessageIdDomain}";
+
+    private static bool IsAsciiLetterOrDigit(char value) =>
+        value is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9');
 }

@@ -1,3 +1,5 @@
+using DigitalBrain.Kernel.Runtime;
+
 namespace DigitalBrain.Google;
 
 public enum GmailLatestIncomingState
@@ -98,6 +100,10 @@ public sealed record GmailThreadListResult(
 
 public interface IGmailApiClient
 {
+    Task<GmailSendResult> SendAsync(
+        GmailSendRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<GmailLatestIncomingMessage> ReadIncomingAtOffsetAsync(
         GmailIncomingReadRequest request,
         CancellationToken cancellationToken = default);

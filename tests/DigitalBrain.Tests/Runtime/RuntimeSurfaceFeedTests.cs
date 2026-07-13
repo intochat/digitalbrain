@@ -20,6 +20,49 @@ namespace DigitalBrain.Tests.Runtime;
 public sealed class RuntimeSurfaceFeedTests
 {
     [Fact]
+    public async Task BeginAsync_bounds_the_accepted_projection_to_the_latest_sixteen_turns()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var existingTurns = Enumerable.Range(1, 16)
+            .Select(index => new ConversationTurn(
+                index,
+                "assistant",
+                $"historical turn {index}",
+                now.AddMinutes(index),
+                $"operation-{index}",
+                ConversationTurnKind.Assistant,
+                $"historical-command-{index}"))
+            .ToArray();
+        var conversationNeuron = new FakeConversationNeuron(new ConversationState(
+            RuntimeStateSchemas.Conversation,
+            16,
+            ConversationLifecycle.Active,
+            new ConversationIdentity(context.TenantId, context.WorkspaceId, context.Principal, conversationId),
+            existingTurns,
+            [],
+            [],
+            [],
+            null,
+            null,
+            []));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var client = new ConversationStateClient(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            new MutableTimeProvider(now));
+
+        await client.BeginAsync(context, "new-command", "List the latest records.");
+
+        var accepted = Assert.Single(conversationNeuron.Current.Outbox);
+        Assert.True(OperationOutboxRecord.TryRead(accepted.PayloadUtf8, out var projection));
+        Assert.NotNull(projection);
+        Assert.Equal(16, projection.View!.Turns.Length);
+        Assert.Equal("historical-command-2", projection.View.Turns[0].CommandId);
+        Assert.Equal("new-command", projection.View.Turns[^1].CommandId);
+    }
+
+    [Fact]
     public async Task ReadPage_returns_each_ordered_phase_even_when_the_home_surface_is_replaced()
     {
         var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
@@ -125,7 +168,7 @@ public sealed class RuntimeSurfaceFeedTests
     }
 
     [Fact]
-    public async Task PrepareSessionAsync_renews_an_expired_durable_action_binding_without_projecting_a_new_surface()
+    public async Task PrepareSessionAsync_renews_an_expired_action_as_a_new_authoritative_surface_event()
     {
         var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
         var clock = new MutableTimeProvider(now);
@@ -154,8 +197,13 @@ public sealed class RuntimeSurfaceFeedTests
 
         Assert.True(renewedBinding.ExpiresAt > clock.UtcNow);
         Assert.True(renewed.State.Revision > initial.State.Revision);
-        Assert.Equal(initial.State.LastSequence, renewed.State.LastSequence);
-        Assert.Equal(initialSurface.SurfaceRevision, renewedSurface.SurfaceRevision);
+        Assert.Equal(initial.State.LastSequence + 1, renewed.State.LastSequence);
+        Assert.Equal(initialSurface.SurfaceRevision + 1, renewedSurface.SurfaceRevision);
+        Assert.NotEqual(initialSurface.ContentHash, renewedSurface.ContentHash);
+        Assert.Equal(initial.State.EventHistory, renewed.State.EventHistory[..^1]);
+        var delivered = Assert.Single(feed.ReadPage(context, renewed.State, initial.State.LastSequence, 100).Items);
+        Assert.Equal(renewedSurface.SurfaceRevision, delivered.Revision);
+        Assert.Equal(ConversationSurfacePayload.SendBindingId, Assert.Single(delivered.Actions).BindingId);
         Assert.True(renewed.ActionTokens.ContainsKey(ConversationSurfacePayload.SendBindingId));
 
         var authorized = await feed.AuthorizeActionAsync(
@@ -168,6 +216,215 @@ public sealed class RuntimeSurfaceFeedTests
             CancellationToken.None);
 
         Assert.Equal(ConversationSurfacePayload.SendActionType, authorized.Submission.ActionType);
+    }
+
+    [Fact]
+    public async Task PrepareSessionAsync_does_not_reissue_a_consumed_action_before_the_next_projection()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var clock = new MutableTimeProvider(now);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            clock,
+            ActionCapabilities(clock));
+        var initial = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var binding = Assert.Single(initial.State.ActionBindings);
+        surfaceFeedNeuron.Current = initial.State with
+        {
+            ActionBindings =
+            [
+                binding with
+                {
+                    Uses = binding.MaxUses,
+                    LastIdempotencyKey = "accepted-request",
+                    LastOperationId = "accepted-operation"
+                }
+            ]
+        };
+        clock.UtcNow = binding.ExpiresAt.AddSeconds(1);
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+
+        Assert.Equal(initial.State.LastSequence, prepared.State.LastSequence);
+        Assert.Equal(initial.State.EventHistory, prepared.State.EventHistory);
+        Assert.Empty(prepared.ActionTokens);
+    }
+
+    [Fact]
+    public async Task PrepareSessionAsync_replaces_legacy_conversation_lifecycle_bindings_with_an_authoritative_event()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var clock = new MutableTimeProvider(now);
+        var feed = new RuntimeSurfaceFeed(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            clock,
+            ActionCapabilities(clock));
+        var initial = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var surface = Assert.Single(initial.State.CurrentSurfaces);
+        var legacyExpiry = Assert.Single(initial.State.ActionBindings).ExpiresAt;
+        surfaceFeedNeuron.Current = initial.State with
+        {
+            ActionBindings =
+            [
+                new SurfaceActionBinding(
+                    "ino.new", surface.SurfaceId, surface.SurfaceRevision, "ino.conversation.new",
+                    "digitalbrain.ino.conversation-new.v1", "ui.action", 1, Hash("legacy-new"),
+                    1, 0, legacyExpiry, null, null),
+                new SurfaceActionBinding(
+                    "ino.delete", surface.SurfaceId, surface.SurfaceRevision, "ino.conversation.delete",
+                    "digitalbrain.ino.conversation-delete.v1", "ui.action", 1, Hash("legacy-delete"),
+                    1, 0, legacyExpiry, null, null)
+            ]
+        };
+
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+
+        var binding = Assert.Single(prepared.State.ActionBindings);
+        Assert.Equal(ConversationSurfacePayload.SendBindingId, binding.BindingId);
+        Assert.Equal(ConversationSurfacePayload.SendActionType, binding.ActionType);
+        Assert.True(prepared.ActionTokens.ContainsKey(ConversationSurfacePayload.SendBindingId));
+        Assert.Equal(initial.State.LastSequence + 1, prepared.State.LastSequence);
+        Assert.Equal(initial.State.EventHistory, prepared.State.EventHistory[..^1]);
+        Assert.Equal(surface.SurfaceRevision + 1, Assert.Single(prepared.State.CurrentSurfaces).SurfaceRevision);
+        var delivered = Assert.Single(feed.ReadPage(context, prepared.State, initial.State.LastSequence, 100).Items);
+        Assert.Equal(ConversationSurfacePayload.SendBindingId, Assert.Single(delivered.Actions).BindingId);
+        Assert.Equal(0, surfaceFeedNeuron.GenericProjectionCalls);
+    }
+
+    [Fact]
+    public async Task PrepareSessionAsync_recreates_missing_terminal_actions_as_an_authoritative_event()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var clock = new MutableTimeProvider(now);
+        var feed = new RuntimeSurfaceFeed(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            clock,
+            ActionCapabilities(clock));
+        var initial = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var surface = Assert.Single(initial.State.CurrentSurfaces);
+        surfaceFeedNeuron.Current = initial.State with { ActionBindings = [] };
+
+        var repaired = await feed.PrepareSessionAsync(context, CancellationToken.None);
+
+        var binding = Assert.Single(repaired.State.ActionBindings);
+        Assert.Equal(ConversationSurfacePayload.SendBindingId, binding.BindingId);
+        Assert.Contains(ConversationSurfacePayload.SendBindingId, repaired.ActionTokens.Keys);
+        Assert.Equal(initial.State.LastSequence + 1, repaired.State.LastSequence);
+        Assert.Equal(initial.State.EventHistory, repaired.State.EventHistory[..^1]);
+        Assert.Equal(surface.SurfaceRevision + 1, Assert.Single(repaired.State.CurrentSurfaces).SurfaceRevision);
+        var delivered = Assert.Single(feed.ReadPage(context, repaired.State, initial.State.LastSequence, 100).Items);
+        Assert.Equal(ConversationSurfacePayload.SendBindingId, Assert.Single(delivered.Actions).BindingId);
+        Assert.Equal(0, surfaceFeedNeuron.GenericProjectionCalls);
+    }
+
+    [Fact]
+    public async Task PrepareSessionAsync_upgrades_the_complete_v1_presentation_with_an_authoritative_event()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 13, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var clock = new MutableTimeProvider(now);
+        var feed = new RuntimeSurfaceFeed(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            clock,
+            ActionCapabilities(clock));
+        var initial = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var surface = Assert.Single(initial.State.CurrentSurfaces);
+        var presentation = JsonSerializer.Deserialize<SurfaceFeedPresentation>(surface.PayloadUtf8)!;
+        var v1Surface = surface with
+        {
+            PayloadUtf8 = JsonSerializer.SerializeToUtf8Bytes(presentation with
+            {
+                ConversationRevision = 13,
+                PresentationVersion = 1
+            })
+        };
+        surfaceFeedNeuron.Current = initial.State with
+        {
+            CurrentSurfaces = [v1Surface],
+            EventHistory = initial.State.EventHistory
+                .Select(record => record.Sequence == v1Surface.Sequence ? v1Surface : record)
+                .ToArray(),
+            ActionBindings = []
+        };
+
+        var repaired = await feed.PrepareSessionAsync(context, CancellationToken.None);
+
+        Assert.Equal(initial.State.LastSequence + 1, repaired.State.LastSequence);
+        var upgraded = JsonSerializer.Deserialize<SurfaceFeedPresentation>(
+            Assert.Single(repaired.State.CurrentSurfaces).PayloadUtf8);
+        Assert.NotNull(upgraded);
+        Assert.Equal(13, upgraded.ConversationRevision);
+        Assert.Equal(SurfaceFeedPresentation.CurrentVersion, upgraded.PresentationVersion);
+        Assert.Equal(ConversationSurfacePayload.SendBindingId, Assert.Single(repaired.State.ActionBindings).BindingId);
+    }
+
+    [Fact]
+    public void Presentation_compatibility_rejects_a_v1_record_with_extra_top_level_fields()
+    {
+        var conversationId = "ino-" + new string('a', 64);
+        var payload = ConversationSurfacePayload.Build(new InoConversationSnapshot(conversationId, 13, [], []));
+        var presentation = new SurfaceFeedPresentation(
+            "request-v1",
+            "conversation",
+            conversationId,
+            ConversationSurfacePayload.RequiredCapabilities,
+            payload,
+            ConversationRevision: 13,
+            PresentationVersion: 1);
+        var exact = JsonSerializer.SerializeToElement(presentation);
+        var extended = JsonSerializer.SerializeToElement(new Dictionary<string, object?>
+        {
+            [nameof(SurfaceFeedPresentation.CorrelationId)] = presentation.CorrelationId,
+            [nameof(SurfaceFeedPresentation.CauseKind)] = presentation.CauseKind,
+            [nameof(SurfaceFeedPresentation.CauseId)] = presentation.CauseId,
+            [nameof(SurfaceFeedPresentation.RequiredClientCapabilities)] = presentation.RequiredClientCapabilities,
+            [nameof(SurfaceFeedPresentation.Payload)] = presentation.Payload,
+            [nameof(SurfaceFeedPresentation.ConversationRevision)] = presentation.ConversationRevision,
+            [nameof(SurfaceFeedPresentation.PresentationVersion)] = presentation.PresentationVersion,
+            ["Unexpected"] = true
+        });
+
+        Assert.True(SurfaceFeedPresentationCompatibility.HasSupportedShape(exact, presentation));
+        Assert.False(SurfaceFeedPresentationCompatibility.HasSupportedShape(extended, presentation));
+    }
+
+    [Fact]
+    public async Task PrepareSessionAsync_activates_the_existing_conversation_for_durable_recovery()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 9, 0, 0, TimeSpan.Zero);
+        var context = Context();
+        var conversationId = InoConversationIdentity.From(context);
+        var conversationNeuron = new FakeConversationNeuron(
+            BuildConversationState(context, conversationId, revision: 1, assistantText: "Hello.", now));
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var clock = new MutableTimeProvider(now);
+        var feed = new RuntimeSurfaceFeed(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            clock,
+            ActionCapabilities(clock));
+
+        await feed.PrepareSessionAsync(context, CancellationToken.None);
+
+        Assert.Equal(1, conversationNeuron.ReadCalls);
     }
 
     [Fact]
@@ -456,6 +713,9 @@ public sealed class RuntimeSurfaceFeedTests
             now);
     }
 
+    private static string Hash(string value) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
     private static RuntimeRequestContext Context() => new(
         new TenantId("tenant"),
         new WorkspaceId("workspace"),
@@ -536,8 +796,13 @@ public sealed class RuntimeSurfaceFeedTests
     private sealed class FakeConversationNeuron(ConversationState initial) : IConversationNeuron
     {
         public ConversationState Current { get; set; } = initial;
+        public int ReadCalls { get; private set; }
 
-        public Task<ConversationState> ReadAsync() => Task.FromResult(Current);
+        public Task<ConversationState> ReadAsync()
+        {
+            ReadCalls++;
+            return Task.FromResult(Current);
+        }
 
         public Task<ConversationArchivePage> ReadArchiveAsync(ConversationArchiveCursor? cursor, int maximumTurns) =>
             throw new NotSupportedException();
@@ -545,8 +810,20 @@ public sealed class RuntimeSurfaceFeedTests
             throw new NotSupportedException();
         public Task<ConversationState> BeginOperationAsync(
             long expectedRevision, string commandId, string inputHash, string operationId, string userText, string requestId,
-            ConversationOutboxEntry acceptedOutbox, DateTimeOffset createdAt) =>
-            throw new NotSupportedException();
+            ConversationOutboxEntry acceptedOutbox, DateTimeOffset createdAt)
+        {
+            Current = ConversationTransitions.BeginOperation(
+                Current,
+                expectedRevision,
+                commandId,
+                inputHash,
+                operationId,
+                userText,
+                requestId,
+                acceptedOutbox,
+                createdAt);
+            return Task.FromResult(Current);
+        }
         public Task<ConversationClaim> TryClaimOperationAsync(
             long expectedRevision, string operationId, string leaseOwner, DateTimeOffset now, TimeSpan leaseDuration,
             ConversationOutboxEntry? runningOutbox = null) =>

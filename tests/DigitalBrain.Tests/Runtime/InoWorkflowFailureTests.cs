@@ -45,11 +45,17 @@ public sealed class InoWorkflowFailureTests : NeuronTestBase
     {
         _workflowRunner.SetFailure(new InvalidOperationException("provider failure"));
 
-        var operation = await SubmitAndWaitForTransitionAsync("workflow-failure");
+        var (operation, state) = await SubmitAndWaitForTransitionAsync("workflow-failure");
 
         Assert.Equal(ConversationOperationStatus.Failed, operation.Status);
         Assert.Equal(ConversationTerminalPolicy.NeverRetry, operation.TerminalPolicy);
         Assert.Equal(1, _workflowRunner.CallCount);
+        var terminal = state.Outbox
+            .Select(entry => OperationOutboxRecord.TryRead(entry.PayloadUtf8, out var record) ? record : null)
+            .Single(record => record?.Phase == InoOperationPhase.Failed)!;
+        var userTurn = Assert.Single(terminal.View!.Turns, turn =>
+            string.Equals(turn.CommandId, operation.CommandId, StringComparison.Ordinal));
+        Assert.Equal(InoConversationStates.Failed, userTurn.State);
     }
 
     [Fact]
@@ -57,14 +63,14 @@ public sealed class InoWorkflowFailureTests : NeuronTestBase
     {
         _workflowRunner.SetFailure(new OperationCanceledException("provider deadline"));
 
-        var operation = await SubmitAndWaitForTransitionAsync("workflow-deadline");
+        var (operation, _) = await SubmitAndWaitForTransitionAsync("workflow-deadline");
 
         Assert.Equal(ConversationOperationStatus.Failed, operation.Status);
         Assert.Equal(ConversationTerminalPolicy.NeverRetry, operation.TerminalPolicy);
         Assert.Equal(1, _workflowRunner.CallCount);
     }
 
-    private async Task<ConversationOperation> SubmitAndWaitForTransitionAsync(string suffix)
+    private async Task<(ConversationOperation Operation, ConversationState State)> SubmitAndWaitForTransitionAsync(string suffix)
     {
         var tenant = new TenantId("tenant");
         var workspace = new WorkspaceId("workspace");
@@ -101,7 +107,8 @@ public sealed class InoWorkflowFailureTests : NeuronTestBase
             now);
 
         await _workflowRunner.FirstCall.WaitAsync(TimeSpan.FromSeconds(10));
-        return await WaitForTransitionAsync(conversation, operationId, TimeSpan.FromSeconds(5));
+        var operation = await WaitForTransitionAsync(conversation, operationId, TimeSpan.FromSeconds(5));
+        return (operation, await conversation.ReadAsync());
     }
 
     private static async Task<ConversationOperation> WaitForTransitionAsync(

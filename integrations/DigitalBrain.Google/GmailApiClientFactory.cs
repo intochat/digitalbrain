@@ -17,7 +17,11 @@ public sealed class GmailApiClientFactory(IPackConfigStore store) : IGmailApiCli
         }
 
         var credential = GoogleCredentialFactory.FromRefreshToken(
-            clientId, clientSecret, refreshToken, GoogleClientFactory.DefaultGmailScope);
+            clientId,
+            clientSecret,
+            refreshToken,
+            GoogleClientFactory.DefaultGmailScope,
+            GoogleClientFactory.GmailSendScope);
 
         return new GoogleGmailApiClient(credential);
     }

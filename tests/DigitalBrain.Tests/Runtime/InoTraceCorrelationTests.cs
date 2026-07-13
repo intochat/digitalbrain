@@ -41,6 +41,7 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
     [Fact]
     public async Task Worker_trace_carries_durable_request_operation_grain_workflow_and_tool_correlation()
     {
+        TraceWorkflowRunner.LastActorScope = null;
         var completed = new ConcurrentQueue<Activity>();
         using var listener = new ActivityListener
         {
@@ -105,6 +106,7 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
         Assert.Equal("workflow-trace-correlation", activity.GetTagItem("db.ino.workflow_id"));
         Assert.Equal("session-trace-correlation", activity.GetTagItem("db.ino.workflow_session_id"));
         Assert.Equal("safe.read", activity.GetTagItem("db.ino.tool_id"));
+        Assert.Equal(RequestScope.Id(tenant, workspace, principal), TraceWorkflowRunner.LastActorScope);
         Assert.DoesNotContain(activity.TagObjects, tag =>
             tag.Key.Contains("prompt", StringComparison.OrdinalIgnoreCase) ||
             tag.Key.Contains("token", StringComparison.OrdinalIgnoreCase) ||
@@ -137,11 +139,17 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
 
     private sealed class TraceWorkflowRunner : IAgentWorkflowRunner
     {
+        public static string? LastActorScope { get; set; }
+
         public Task<InoWorkflowResult> ExecuteAsync(
             InoWorkflowRequest request,
-            CancellationToken cancellationToken = default) => Task.FromResult(new InoWorkflowResult(
-            "The configured read tool cannot run in this test.",
-            new WorkflowReference("test", "workflow-trace-correlation", "session-trace-correlation"),
-            new InoToolRequest("safe.read", InoToolAccess.Read, "status", "Read the safe status.")));
+            CancellationToken cancellationToken = default)
+        {
+            LastActorScope = request.ActorScope;
+            return Task.FromResult(new InoWorkflowResult(
+                "The configured read tool cannot run in this test.",
+                new WorkflowReference("test", "workflow-trace-correlation", "session-trace-correlation"),
+                new InoToolRequest("safe.read", InoToolAccess.Read, "status", "Read the safe status.")));
+        }
     }
 }

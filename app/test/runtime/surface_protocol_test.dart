@@ -97,6 +97,64 @@ void main() {
     }
   });
 
+  test('decodes only the complete safe legacy INO operation shape', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: const {
+            'state': 'responding',
+            'retryable': true,
+            'safeReason': 'The previous operation is still running.',
+          },
+        ),
+      ),
+    );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.operationId, isEmpty);
+    expect(operation.phase, InoConversationOperationPhase.running);
+    expect(operation.version, 0);
+    expect(operation.state, InoConversationOperationState.responding);
+    expect(operation.retryable, isTrue);
+    expect(operation.toJson(), {
+      'state': 'responding',
+      'retryable': true,
+      'safeReason': 'The previous operation is still running.',
+      'action': null,
+    });
+  });
+
+  test(
+    'rejects partial metadata and approval authority in legacy operations',
+    () {
+      final invalidOperations = <Map<String, Object?>>[
+        for (final metadata in const <Map<String, Object?>>[
+          {'operationId': 'operation-a'},
+          {'phase': 'running'},
+          {'version': 1},
+        ])
+          {'state': 'running', 'retryable': false, ...metadata},
+        {
+          'state': 'awaiting-approval',
+          'retryable': false,
+          'approvalId': 'approval-a',
+        },
+      ];
+
+      for (final operation in invalidOperations) {
+        expect(
+          () => const SurfaceEnvelopeDecoder().decode(
+            surfaceJsonString(
+              payload: inoConversationPayload(operation: operation),
+            ),
+          ),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
   test('rejects malformed or sensitive INO conversation data', () {
     final decoder = SurfaceEnvelopeDecoder(
       oauthStartOrigin: Uri.parse('https://brain.example:7443'),

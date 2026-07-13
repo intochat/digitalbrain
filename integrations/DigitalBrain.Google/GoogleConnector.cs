@@ -34,7 +34,7 @@ public class GoogleConnector : IConnector
         Id: "google",
         DisplayName: "Google",
         RequiredConfigKeys: new[] { GoogleClientFactory.ClientIdKey, GoogleClientFactory.ClientSecretKey, GoogleClientFactory.RedirectUriKey },
-        Scopes: new[] { GoogleClientFactory.DefaultGmailScope });
+        Scopes: [GoogleClientFactory.DefaultGmailScope, GoogleClientFactory.GmailSendScope]);
 
     public async Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null, CancellationToken cancellationToken = default)
     {
@@ -441,7 +441,12 @@ public class GoogleConnector : IConnector
                 return new ConnectionHealth(Healthy: false, Detail: "Missing client credentials for probe", Checked: DateTimeOffset.UtcNow);
             }
 
-            var cred = GoogleCredentialFactory.FromRefreshToken(cid, cs, rt, GoogleClientFactory.DefaultGmailScope);
+            var cred = GoogleCredentialFactory.FromRefreshToken(
+                cid,
+                cs,
+                rt,
+                GoogleClientFactory.DefaultGmailScope,
+                GoogleClientFactory.GmailSendScope);
             var service = new GmailService(new BaseClientService.Initializer
             {
                 HttpClientInitializer = cred,

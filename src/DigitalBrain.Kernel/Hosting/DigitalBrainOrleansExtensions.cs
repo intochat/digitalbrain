@@ -41,6 +41,7 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton(keyRing);
         builder.Services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
         builder.Services.AddSingleton(stateProtector);
+        builder.Services.AddSingleton<InoEffectPlanAuthority>();
         builder.Services.AddSingleton(new RuntimeStateHealthMetadata(
             requiresDurableStorage
                 ? useManagedIdentity ? "azure-blob-managed-identity" : "azure-blob-connection-string"
@@ -81,7 +82,11 @@ public static class DigitalBrainOrleansExtensions
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
                 services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
-                services.AddSingleton<IInoToolGateway, ClosedInoToolGateway>();
+                services.AddSingleton<IInoEffectPlanStore, InoEffectPlanStore>();
+                if (builder.Configuration.GetValue<bool>("DigitalBrain:Tools:Enabled"))
+                    services.AddSingleton<IInoToolGateway, PlanInoToolGateway>();
+                else
+                    services.AddSingleton<IInoToolGateway, ClosedInoToolGateway>();
             });
             siloBuilder.AddFoundry();
 

@@ -25,23 +25,41 @@ public sealed class InoOperationWorkerGrain(
     private static readonly TimeSpan WorkerDeadline = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan AuthorizationProbeDeadline = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ReminderDueTime = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan TimerInitialDelay = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan TimerRetryDelay = TimeSpan.FromSeconds(5);
     private const int MaximumWorkflowResultPersistenceAttempts = 8;
     private enum ResultPersistence { Persisted, Superseded, Contended }
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Ino.Worker");
     private IGrainReminder? _reminder;
+    private IGrainTimer? _timer;
 
     public async Task ScheduleAsync()
     {
         _reminder ??= await this.RegisterOrUpdateReminder(
             ReminderName,
-            TimeSpan.FromSeconds(1),
+            ReminderDueTime,
             ReminderPeriod);
+        EnsureTimer(TimerInitialDelay);
     }
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
         if (!string.Equals(reminderName, ReminderName, StringComparison.Ordinal)) return;
+        await ProcessScheduledAsync();
+    }
+
+    private async Task ReceiveTimerAsync(CancellationToken cancellationToken)
+    {
+        var timer = _timer;
+        _timer = null;
+        timer?.Dispose();
+        await ProcessScheduledAsync();
+    }
+
+    private async Task ProcessScheduledAsync()
+    {
 
         var (conversationGrainKey, operationId) = ParseWorkerKey(
             this.GetPrimaryKeyString() ?? throw new InvalidOperationException("Operation workers require a string key."));
@@ -57,9 +75,16 @@ public sealed class InoOperationWorkerGrain(
             await dispatcher.ScheduleAsync();
         var operation = state.Operations.FirstOrDefault(candidate =>
             string.Equals(candidate.OperationId, operationId, StringComparison.Ordinal));
-        if (operation is null || !HasOperationToWatch(operation))
+        if (operation is not null && HasOperationToWatch(operation))
+            EnsureTimer(TimerRetryDelay);
+        else
             await StopReminderAsync();
     }
+
+    private void EnsureTimer(TimeSpan dueTime) =>
+        _timer ??= this.RegisterGrainTimer(
+            ReceiveTimerAsync,
+            new GrainTimerCreationOptions(dueTime, Timeout.InfiniteTimeSpan) { KeepAlive = true });
 
     private async Task ExecuteScheduledAsync(string conversationGrainKey, string operationId)
     {
@@ -287,7 +312,8 @@ public sealed class InoOperationWorkerGrain(
                 history,
                 requestId,
                 authorizationResume,
-                claimed.Workflow), deadline.Token);
+                claimed.Workflow,
+                RequestScope.Id(state.Identity.TenantId, state.Identity.WorkspaceId, state.Identity.Principal)), deadline.Token);
         }
         catch (OperationCanceledException)
         {
@@ -301,11 +327,14 @@ public sealed class InoOperationWorkerGrain(
                 LeaseFence(claimed));
             return;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, "workflow-failed");
             activity?.SetTag("db.ino.outcome", "failed");
-            logger.LogWarning("INO model workflow {OperationId} failed before an external effect began.", operationId);
+            logger.LogWarning(
+                "INO model workflow {OperationId} failed with {ExceptionType} before an external effect began.",
+                operationId,
+                ex.GetType().Name);
             await RecordWorkflowFailureAsync(
                 conversation,
                 await conversation.ReadAsync(),
@@ -1059,10 +1088,12 @@ public sealed class InoOperationWorkerGrain(
             turn.IdempotencyKey,
             turn.Role,
             turn.Text,
-            state.Operations.FirstOrDefault(candidate =>
-                string.Equals(candidate.OperationId, turn.OperationId, StringComparison.Ordinal)) is { } turnOperation
-                ? StateFor(turnOperation.Status)
-                : InoConversationStates.Succeeded));
+            string.Equals(turn.OperationId, operationId, StringComparison.Ordinal)
+                ? StateFor(phase)
+                : state.Operations.FirstOrDefault(candidate =>
+                    string.Equals(candidate.OperationId, turn.OperationId, StringComparison.Ordinal)) is { } turnOperation
+                    ? StateFor(turnOperation.Status)
+                    : InoConversationStates.Succeeded));
         if (includeMessage)
             turns = turns.Append(new OperationFeedTurn(
                 operation.OperationId + ":" + phase.ToString().ToLowerInvariant() + ":" + version,
@@ -1179,6 +1210,8 @@ public sealed class InoOperationWorkerGrain(
 
     private async Task StopReminderAsync()
     {
+        _timer?.Dispose();
+        _timer = null;
         _reminder ??= await this.GetReminder(ReminderName);
         if (_reminder is null) return;
         await this.UnregisterReminder(_reminder);

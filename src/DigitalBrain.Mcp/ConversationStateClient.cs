@@ -91,6 +91,11 @@ public sealed class ConversationStateClient(
         var actor = RequestScope.Id(context);
         var neuron = Conversation(context);
         var state = await EnsureInitializedAsync(context, neuron, cancellationToken).ConfigureAwait(false);
+        if (approved)
+            InoMutationGrants.Demand(
+                state.Operations.FirstOrDefault(operation =>
+                    string.Equals(operation.OperationId, operationId, StringComparison.Ordinal))?.Effect?.Kind,
+                context.Grants);
         if (TryGetDecisionReceipt(state, operationId, approvalId, approved, decisionId, actor) is { } replay)
             return replay;
         var phase = approved ? InoOperationPhase.Approved : InoOperationPhase.Failed;
@@ -246,6 +251,7 @@ public sealed class ConversationStateClient(
             if (character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f'))
                 throw new ArgumentException("Conversation ids must be canonical scoped identifiers.", nameof(conversationId));
     }
+
 
     private static ConversationOutboxEntry CreateOutbox(
         string operationId,

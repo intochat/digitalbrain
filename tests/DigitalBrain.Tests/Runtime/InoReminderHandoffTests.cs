@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
@@ -26,7 +27,6 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
             .UseInMemoryReminderService()
             .AddMemoryGrainStorage(RuntimeStateStorageProviders.Conversations)
             .AddMemoryGrainStorage(RuntimeStateStorageProviders.SurfaceFeeds)
-            .Configure<ReminderOptions>(options => options.MinimumReminderPeriod = TimeSpan.FromSeconds(1))
             .Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(10))
             .ConfigureServices(services =>
             {
@@ -155,6 +155,293 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
         Assert.All(state.Outbox, entry => Assert.Null(entry.DispatchedAt));
     }
 
+    [Fact]
+    public async Task Outbox_dispatcher_upgrades_the_exact_legacy_presentation_without_rebuilding_history()
+    {
+        Interlocked.Exchange(ref _workflowCalls, 0);
+        var tenant = new TenantId("tenant");
+        var workspace = new WorkspaceId("workspace");
+        var principal = new PrincipalRef("principal", PrincipalKind.User);
+        var identity = new ConversationIdentity(
+            tenant,
+            workspace,
+            principal,
+            "ino-" + new string('a', 64));
+        var conversationKey = RuntimeStateKeys.Conversation(
+            tenant,
+            workspace,
+            principal,
+            identity.ConversationId);
+        var conversation = Grain<IConversationNeuron>(conversationKey);
+        var feed = Grain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(tenant, workspace, principal));
+        var now = DateTimeOffset.UtcNow;
+        var legacyProjectionId = "legacy-five-field-presentation";
+        await SeedLegacyPresentationAsync(
+            feed,
+            identity,
+            legacyProjectionId,
+            now,
+            includeConversationRevision: false,
+            includePresentationVersion: false);
+
+        var acceptedOutboxId = "accepted-legacy-presentation";
+        var initialized = await conversation.InitializeAsync(0, identity);
+        var begun = await BeginOperationAsync(
+            conversation,
+            conversationKey,
+            identity,
+            initialized,
+            acceptedOutboxId,
+            now);
+        var claim = await conversation.TryClaimOperationAsync(
+            begun.Revision,
+            "operation-legacy-presentation",
+            "test-worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        Assert.True(claim.Acquired);
+        var terminalOutboxId = "failed-legacy-presentation";
+        var terminalOccurredAt = now.Subtract(UiProtocol.ActionTokenLifetime).AddSeconds(-1);
+        var terminalProjection = OperationOutboxRecord.Create(
+            terminalOutboxId,
+            "operation-legacy-presentation",
+            InoOperationPhase.Failed,
+            claim.Operation!.Version + 1,
+            terminalOccurredAt,
+            identity.ConversationId,
+            claim.State.Revision + 1,
+            "request-legacy-presentation",
+            conversationKey,
+            new OperationFeedView(
+                "command-legacy-presentation",
+                string.Empty,
+                false,
+                "The workflow could not finish.",
+                null,
+                null,
+                [
+                    new OperationFeedTurn(
+                        "command-legacy-presentation",
+                        "user",
+                        "summarize the status",
+                        InoConversationStates.Failed),
+                    new OperationFeedTurn(
+                        "operation-legacy-presentation",
+                        "assistant",
+                        "I couldn't finish that response.",
+                        InoConversationStates.Failed)
+                ]));
+        await conversation.CompleteWithAssistantAsync(
+            claim.State.Revision,
+            "operation-legacy-presentation",
+            ConversationOperationStatus.Failed,
+            ConversationTerminalPolicy.NeverRetry,
+            "The workflow could not finish.",
+            "I couldn't finish that response.",
+            new ConversationOutboxEntry(
+                terminalOutboxId,
+                "surface-feed",
+                terminalProjection.ToPayloadUtf8(),
+                terminalOccurredAt,
+                null),
+            now,
+            leaseFence: new ConversationLeaseFence("test-worker", claim.Operation.Attempt));
+        await Grain<IInoConversationOutboxDispatcherGrain>(conversationKey).ScheduleAsync();
+
+        var projected = await WaitForSurfaceStateAsync(
+            feed,
+            state => state.AppliedProjectionIds.Contains(terminalOutboxId, StringComparer.Ordinal),
+            TimeSpan.FromSeconds(12));
+
+        Assert.Equal(legacyProjectionId, projected.EventHistory[0].ProjectionId);
+        Assert.Contains(projected.EventHistory, record =>
+            string.Equals(record.ProjectionId, acceptedOutboxId, StringComparison.Ordinal));
+        Assert.Contains(projected.EventHistory, record =>
+            string.Equals(record.ProjectionId, terminalOutboxId, StringComparison.Ordinal));
+        var current = Assert.Single(projected.CurrentSurfaces);
+        var presentation = JsonSerializer.Deserialize<SurfaceFeedPresentation>(current.PayloadUtf8);
+        Assert.NotNull(presentation);
+        Assert.Equal(SurfaceFeedPresentation.CurrentVersion, presentation.PresentationVersion);
+        Assert.Equal(identity.ConversationId, presentation.CauseId);
+        var sendBinding = Assert.Single(projected.ActionBindings, binding =>
+            string.Equals(binding.BindingId, ConversationSurfacePayload.SendBindingId, StringComparison.Ordinal));
+        Assert.True(sendBinding.ExpiresAt > DateTimeOffset.UtcNow);
+        var conversationState = await conversation.ReadAsync();
+        Assert.NotNull(conversationState.Outbox.Single(entry =>
+            string.Equals(entry.OutboxId, acceptedOutboxId, StringComparison.Ordinal)).DispatchedAt);
+    }
+
+    [Fact]
+    public async Task Outbox_dispatcher_rejects_a_partial_legacy_presentation_upgrade()
+    {
+        Interlocked.Exchange(ref _workflowCalls, 0);
+        var tenant = new TenantId("tenant");
+        var workspace = new WorkspaceId("workspace");
+        var principal = new PrincipalRef("principal", PrincipalKind.User);
+        var identity = new ConversationIdentity(
+            tenant,
+            workspace,
+            principal,
+            "ino-" + new string('b', 64));
+        var conversationKey = RuntimeStateKeys.Conversation(
+            tenant,
+            workspace,
+            principal,
+            identity.ConversationId);
+        var conversation = Grain<IConversationNeuron>(conversationKey);
+        var feed = Grain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(tenant, workspace, principal));
+        var now = DateTimeOffset.UtcNow;
+        var legacyProjectionId = "partial-legacy-presentation";
+        await SeedLegacyPresentationAsync(
+            feed,
+            identity,
+            legacyProjectionId,
+            now,
+            includeConversationRevision: true,
+            includePresentationVersion: false);
+
+        var acceptedOutboxId = "accepted-partial-legacy-presentation";
+        var initialized = await conversation.InitializeAsync(0, identity);
+        await BeginOperationAsync(
+            conversation,
+            conversationKey,
+            identity,
+            initialized,
+            acceptedOutboxId,
+            now);
+        await Grain<IInoConversationOutboxDispatcherGrain>(conversationKey).ScheduleAsync();
+
+        await WaitForOperationAsync(
+            conversation,
+            "operation-legacy-presentation",
+            ConversationOperationStatus.Succeeded,
+            TimeSpan.FromSeconds(12));
+        var conversationState = await conversation.ReadAsync();
+        var feedState = await feed.ReadAsync();
+
+        Assert.Null(conversationState.Outbox.Single(entry =>
+            string.Equals(entry.OutboxId, acceptedOutboxId, StringComparison.Ordinal)).DispatchedAt);
+        Assert.Equal([legacyProjectionId], feedState.AppliedProjectionIds);
+        Assert.Equal([legacyProjectionId], feedState.EventHistory.Select(record => record.ProjectionId));
+    }
+
+    private static async Task SeedLegacyPresentationAsync(
+        ISurfaceFeedNeuron feed,
+        ConversationIdentity identity,
+        string projectionId,
+        DateTimeOffset now,
+        bool includeConversationRevision,
+        bool includePresentationVersion)
+    {
+        var initialized = await feed.InitializeAsync(
+            0,
+            new SurfaceFeedIdentity(identity.TenantId, identity.WorkspaceId, identity.Principal));
+        var conversation = new InoConversationSnapshot(identity.ConversationId, 0, [], []);
+        var payload = ConversationSurfacePayload.Build(conversation);
+        var presentation = new Dictionary<string, object?>
+        {
+            [nameof(SurfaceFeedPresentation.CorrelationId)] = "request-legacy-presentation",
+            [nameof(SurfaceFeedPresentation.CauseKind)] = "conversation",
+            [nameof(SurfaceFeedPresentation.CauseId)] = identity.ConversationId,
+            [nameof(SurfaceFeedPresentation.RequiredClientCapabilities)] = ConversationSurfacePayload.RequiredCapabilities,
+            [nameof(SurfaceFeedPresentation.Payload)] = payload
+        };
+        if (includeConversationRevision)
+            presentation[nameof(SurfaceFeedPresentation.ConversationRevision)] = 0;
+        if (includePresentationVersion)
+            presentation[nameof(SurfaceFeedPresentation.PresentationVersion)] = SurfaceFeedPresentation.CurrentVersion;
+        StoredActionBinding[] descriptors =
+        [
+            new(
+                "ino.new",
+                "ino.conversation.new",
+                "digitalbrain.ino.empty-input.v1",
+                "ui.action",
+                1,
+                now.Add(UiProtocol.ActionTokenLifetime)),
+            new(
+                "ino.delete",
+                "ino.conversation.delete",
+                "digitalbrain.ino.empty-input.v1",
+                "ui.action",
+                1,
+                now.Add(UiProtocol.ActionTokenLifetime))
+        ];
+        await feed.ApplyProjectionAsync(
+            initialized.Revision,
+            new SurfaceFeedProjection(
+                projectionId,
+                ConversationSurfacePayload.HomeSurfaceId,
+                1,
+                SurfaceContentHash.Compute(payload, descriptors),
+                JsonSerializer.SerializeToUtf8Bytes(presentation),
+                now,
+                null,
+                descriptors.Select(descriptor => new SurfaceActionBinding(
+                    descriptor.BindingId,
+                    ConversationSurfacePayload.HomeSurfaceId,
+                    1,
+                    descriptor.ActionType,
+                    descriptor.InputSchemaRef,
+                    descriptor.RequiredGrant,
+                    descriptor.ActionSchemaVersion,
+                    new string('c', 64),
+                    descriptor.MaxUses,
+                    0,
+                    descriptor.ExpiresAt,
+                    null,
+                    null)).ToArray()),
+            now);
+    }
+
+    private static async Task<ConversationState> BeginOperationAsync(
+        IConversationNeuron conversation,
+        string conversationKey,
+        ConversationIdentity identity,
+        ConversationState initialized,
+        string acceptedOutboxId,
+        DateTimeOffset now,
+        DateTimeOffset? projectionOccurredAt = null)
+    {
+        var occurredAt = projectionOccurredAt ?? now;
+        var acceptedProjection = OperationOutboxRecord.Create(
+            acceptedOutboxId,
+            "operation-legacy-presentation",
+            InoOperationPhase.Accepted,
+            1,
+            occurredAt,
+            identity.ConversationId,
+            2,
+            "request-legacy-presentation",
+            conversationKey,
+            new OperationFeedView(
+                "command-legacy-presentation",
+                string.Empty,
+                false,
+                null,
+                null,
+                null,
+                [new OperationFeedTurn(
+                    "command-legacy-presentation",
+                    "user",
+                    "summarize the status",
+                    InoConversationStates.Queued)]));
+        return await conversation.BeginOperationAsync(
+            initialized.Revision,
+            "command-legacy-presentation",
+            new string('d', 64),
+            "operation-legacy-presentation",
+            "summarize the status",
+            "request-legacy-presentation",
+            new ConversationOutboxEntry(
+                acceptedOutboxId,
+                "surface-feed",
+                acceptedProjection.ToPayloadUtf8(),
+                now,
+                null),
+            now);
+    }
+
     private static async Task<ConversationOperation> WaitForOperationAsync(
         IConversationNeuron conversation,
         string operationId,
@@ -190,6 +477,22 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
         }
 
         throw new Xunit.Sdk.XunitException("The expected durable outbox state was not reached.");
+    }
+
+    private static async Task<SurfaceFeedState> WaitForSurfaceStateAsync(
+        ISurfaceFeedNeuron feed,
+        Func<SurfaceFeedState, bool> condition,
+        TimeSpan timeout)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < timeout)
+        {
+            var state = await feed.ReadAsync();
+            if (condition(state)) return state;
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+        }
+
+        throw new Xunit.Sdk.XunitException("The expected durable surface-feed state was not reached.");
     }
 
     private sealed class SucceedingWorkflowRunner : IAgentWorkflowRunner

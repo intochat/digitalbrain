@@ -265,7 +265,8 @@ public sealed class EncryptedRuntimeStateProtector
     private static void DemandKind(string aggregateKind)
     {
         if (aggregateKind is not (RuntimeStateKinds.Conversation or RuntimeStateKinds.ConversationArchive or
-            RuntimeStateKinds.SurfaceFeed or RuntimeStateKinds.Session or RuntimeStateKinds.SynapseJournal))
+            RuntimeStateKinds.SurfaceFeed or RuntimeStateKinds.Session or RuntimeStateKinds.SynapseJournal or
+            RuntimeStateKinds.InoEffectPlan))
             throw new ArgumentException("Unsupported encrypted runtime-state kind.", nameof(aggregateKind));
     }
 

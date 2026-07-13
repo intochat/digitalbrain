@@ -118,7 +118,8 @@ public sealed record SemanticIntentProposal(
     [property: Id(8)] SemanticAggregate? Aggregate = null,
     [property: Id(9)] SemanticTimeRange TimeRange = SemanticTimeRange.None,
     [property: Id(10)] string? SearchText = null,
-    [property: Id(11)] string? Clarification = null);
+    [property: Id(11)] string? Clarification = null,
+    [property: Id(12)] int? RelativeDays = null);
 
 [GenerateSerializer, Alias("digitalbrain.v2.grounding-descriptor")]
 public sealed record GroundingDescriptor(

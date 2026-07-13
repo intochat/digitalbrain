@@ -14,21 +14,39 @@ public sealed class InoConversationOutboxDispatcherGrain(
     TimeProvider timeProvider) : Grain, IInoConversationOutboxDispatcherGrain, IRemindable
 {
     private const string ReminderName = "ino.conversation-outbox-dispatcher.execute.v1";
-    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ReminderDueTime = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan TimerInitialDelay = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan TimerRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Ino.Outbox");
     private IGrainReminder? _reminder;
+    private IGrainTimer? _timer;
 
     public async Task ScheduleAsync()
     {
         _reminder ??= await this.RegisterOrUpdateReminder(
             ReminderName,
-            TimeSpan.FromSeconds(1),
+            ReminderDueTime,
             ReminderPeriod);
+        EnsureTimer(TimerInitialDelay);
     }
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
         if (!string.Equals(reminderName, ReminderName, StringComparison.Ordinal)) return;
+        await ProcessScheduledAsync();
+    }
+
+    private async Task ReceiveTimerAsync(CancellationToken cancellationToken)
+    {
+        var timer = _timer;
+        _timer = null;
+        timer?.Dispose();
+        await ProcessScheduledAsync();
+    }
+
+    private async Task ProcessScheduledAsync()
+    {
 
         var conversationGrainKey = this.GetPrimaryKeyString() ??
             throw new InvalidOperationException("Outbox dispatchers require a conversation string key.");
@@ -36,9 +54,16 @@ public sealed class InoConversationOutboxDispatcherGrain(
         await DispatchScheduledAsync(conversationGrainKey);
 
         var state = await grainFactory.GetGrain<IConversationNeuron>(conversationGrainKey).ReadAsync();
-        if (!state.Outbox.Any(entry => entry.DispatchedAt is null))
+        if (state.Outbox.Any(entry => entry.DispatchedAt is null))
+            EnsureTimer(TimerRetryDelay);
+        else
             await StopReminderAsync();
     }
+
+    private void EnsureTimer(TimeSpan dueTime) =>
+        _timer ??= this.RegisterGrainTimer(
+            ReceiveTimerAsync,
+            new GrainTimerCreationOptions(dueTime, Timeout.InfiniteTimeSpan) { KeepAlive = true });
 
     private async Task DispatchScheduledAsync(string conversationGrainKey)
     {
@@ -110,11 +135,12 @@ public sealed class InoConversationOutboxDispatcherGrain(
             identity.Principal));
         var state = await EnsureFeedAsync(feed, identity);
         if (!TargetsConversation(state, identity.ConversationId)) return false;
+        var bindingIssuedAt = timeProvider.GetUtcNow();
 
         for (var attempt = 0; attempt < 3; attempt++)
         {
             if (state.AppliedProjectionIds.Contains(entry.OutboxId, StringComparer.Ordinal)) return true;
-            var projection = CreateProjection(state, record);
+            var projection = CreateProjection(state, record, bindingIssuedAt);
             try
             {
                 await feed.ApplyProjectionAsync(state.Revision, projection, timeProvider.GetUtcNow());
@@ -159,11 +185,14 @@ public sealed class InoConversationOutboxDispatcherGrain(
         if (current is null) return true;
         try
         {
-            var presentation = JsonSerializer.Deserialize<SurfaceFeedPresentation>(current.PayloadUtf8);
+            using var document = JsonDocument.Parse(current.PayloadUtf8);
+            var root = document.RootElement;
+            var presentation = root.Deserialize<SurfaceFeedPresentation>();
             return presentation is not null &&
                    string.Equals(presentation.CauseKind, "conversation", StringComparison.Ordinal) &&
                    string.Equals(presentation.CauseId, conversationId, StringComparison.Ordinal) &&
-                   IsCanonicalPresentation(presentation);
+                   IsCanonicalConversationContent(presentation) &&
+                   SurfaceFeedPresentationCompatibility.HasSupportedShape(root, presentation);
         }
         catch (JsonException)
         {
@@ -171,10 +200,8 @@ public sealed class InoConversationOutboxDispatcherGrain(
         }
     }
 
-    private static bool IsCanonicalPresentation(SurfaceFeedPresentation presentation) =>
+    private static bool IsCanonicalConversationContent(SurfaceFeedPresentation presentation) =>
         !string.IsNullOrWhiteSpace(presentation.CorrelationId) &&
-        presentation.ConversationRevision >= 0 &&
-        presentation.PresentationVersion == SurfaceFeedPresentation.CurrentVersion &&
         presentation.RequiredClientCapabilities is not null &&
         presentation.RequiredClientCapabilities.SequenceEqual(ConversationSurfacePayload.RequiredCapabilities, StringComparer.Ordinal) &&
         presentation.Payload.ValueKind == JsonValueKind.Object &&
@@ -189,11 +216,12 @@ public sealed class InoConversationOutboxDispatcherGrain(
 
     private static SurfaceFeedProjection CreateProjection(
         SurfaceFeedState state,
-        OperationOutboxRecord record)
+        OperationOutboxRecord record,
+        DateTimeOffset bindingIssuedAt)
     {
         var conversation = record.ToSnapshot();
         var payload = ConversationSurfacePayload.Build(conversation);
-        var descriptors = ConversationSurfacePayload.Actions(conversation, record.OccurredAt);
+        var descriptors = ConversationSurfacePayload.Actions(conversation, bindingIssuedAt);
         var revision = checked((state.CurrentSurfaces.FirstOrDefault(surface =>
             string.Equals(surface.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal))?.SurfaceRevision ?? 0) + 1);
         var presentation = new SurfaceFeedPresentation(
@@ -234,6 +262,8 @@ public sealed class InoConversationOutboxDispatcherGrain(
 
     private async Task StopReminderAsync()
     {
+        _timer?.Dispose();
+        _timer = null;
         _reminder ??= await this.GetReminder(ReminderName);
         if (_reminder is null) return;
         await this.UnregisterReminder(_reminder);

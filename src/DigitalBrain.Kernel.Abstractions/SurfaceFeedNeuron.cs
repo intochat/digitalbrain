@@ -57,6 +57,61 @@ public sealed record SurfaceFeedPresentation(
     public const int CurrentVersion = 2;
 }
 
+public static class SurfaceFeedPresentationCompatibility
+{
+    // PersistedSurfacePresentation wrote this exact seven-field schema before the shared v2 contract existed.
+    private const int VersionOne = 1;
+    private static readonly string[] LegacyProperties =
+    [
+        nameof(SurfaceFeedPresentation.CorrelationId),
+        nameof(SurfaceFeedPresentation.CauseKind),
+        nameof(SurfaceFeedPresentation.CauseId),
+        nameof(SurfaceFeedPresentation.RequiredClientCapabilities),
+        nameof(SurfaceFeedPresentation.Payload)
+    ];
+
+    private static readonly string[] VersionedProperties =
+    [
+        .. LegacyProperties,
+        nameof(SurfaceFeedPresentation.ConversationRevision),
+        nameof(SurfaceFeedPresentation.PresentationVersion)
+    ];
+
+    public static bool HasSupportedShape(JsonElement root, SurfaceFeedPresentation presentation)
+    {
+        var hasRevision = root.TryGetProperty(
+            nameof(SurfaceFeedPresentation.ConversationRevision),
+            out var revision);
+        var hasVersion = root.TryGetProperty(
+            nameof(SurfaceFeedPresentation.PresentationVersion),
+            out var version);
+        if (hasRevision && hasVersion)
+        {
+            if (revision.ValueKind != JsonValueKind.Number ||
+                !revision.TryGetInt32(out var storedRevision) ||
+                storedRevision < 0 ||
+                storedRevision != presentation.ConversationRevision ||
+                version.ValueKind != JsonValueKind.Number ||
+                !version.TryGetInt32(out var storedVersion) ||
+                storedVersion != presentation.PresentationVersion)
+                return false;
+            return storedVersion == SurfaceFeedPresentation.CurrentVersion ||
+                   storedVersion == VersionOne && HasExactProperties(root, VersionedProperties);
+        }
+        if (hasRevision || hasVersion || presentation.ConversationRevision != 0 || presentation.PresentationVersion != 0)
+            return false;
+        return HasExactProperties(root, LegacyProperties);
+    }
+
+    private static bool HasExactProperties(JsonElement root, IReadOnlyCollection<string> expected)
+    {
+        var properties = root.EnumerateObject().Select(property => property.Name).ToArray();
+        return properties.Length == expected.Count &&
+               properties.Distinct(StringComparer.Ordinal).Count() == expected.Count &&
+               properties.ToHashSet(StringComparer.Ordinal).SetEquals(expected);
+    }
+}
+
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-feed-record")]
 public sealed record SurfaceFeedRecord(
     [property: Id(0)] long Sequence,
@@ -161,6 +216,8 @@ public interface ISurfaceFeedNeuron : IGrainWithStringKey
 
 public static class SurfaceFeedTransitions
 {
+    private const string LegacyNewConversationBindingId = "ino.new";
+    private const string LegacyDeleteConversationBindingId = "ino.delete";
     public const int MaximumCurrentSurfaces = 64;
     public const int MaximumActionBindings = 256;
     public const int MaximumProjectionDedupe = 512;
@@ -380,23 +437,121 @@ public static class SurfaceFeedTransitions
         DateTimeOffset now)
     {
         DemandMutable(state, expectedRevision);
-        var activeSurfaces = state.CurrentSurfaces
-            .Select(surface => (surface.SurfaceId, surface.SurfaceRevision))
-            .ToHashSet();
-        var nextExpiry = now.Add(UiProtocol.ActionTokenLifetime);
+        var surface = state.CurrentSurfaces.FirstOrDefault(candidate =>
+            string.Equals(candidate.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
+        if (surface is null ||
+            !TryReadConversationActions(surface, now, out var presentation, out var descriptors))
+            return state;
+
+        var currentBindings = state.ActionBindings.Where(binding =>
+            string.Equals(binding.SurfaceId, surface.SurfaceId, StringComparison.Ordinal) &&
+            binding.SurfaceRevision == surface.SurfaceRevision).ToArray();
         var renewalThreshold = now.Add(TimeSpan.FromTicks(UiProtocol.ActionTokenLifetime.Ticks / 2));
-        var bindings = state.ActionBindings.Select(binding =>
-            activeSurfaces.Contains((binding.SurfaceId, binding.SurfaceRevision)) &&
-            binding.Uses < binding.MaxUses &&
-            binding.ExpiresAt <= renewalThreshold
-                ? binding with { ExpiresAt = nextExpiry }
-                : binding).ToArray();
-        if (bindings.SequenceEqual(state.ActionBindings)) return state;
+        if (!RequiresActionAuthorityEvent(currentBindings, descriptors, renewalThreshold)) return state;
+
+        var surfaceRevision = checked(surface.SurfaceRevision + 1);
+        var sequence = checked(state.LastSequence + 1);
+        var bindings = CreateHomeBindings(descriptors, surfaceRevision);
+        var normalizedPresentation = presentation with
+        {
+            PresentationVersion = SurfaceFeedPresentation.CurrentVersion
+        };
+        var record = new SurfaceFeedRecord(
+            sequence,
+            $"surface-action-authority-{sequence}",
+            surface.SurfaceId,
+            surfaceRevision,
+            SurfaceContentHash.Compute(presentation.Payload, descriptors),
+            JsonSerializer.SerializeToUtf8Bytes(normalizedPresentation),
+            now,
+            surface.ExpiresAt);
         return ValidateAndCompact(state with
         {
             Revision = checked(state.Revision + 1),
-            ActionBindings = bindings
+            LastSequence = sequence,
+            CurrentSurfaces = state.CurrentSurfaces
+                .Where(candidate => !string.Equals(candidate.SurfaceId, surface.SurfaceId, StringComparison.Ordinal))
+                .Append(record).ToArray(),
+            EventHistory = state.EventHistory.Append(record).ToArray(),
+            ActionBindings = state.ActionBindings
+                .Where(binding => !string.Equals(binding.SurfaceId, surface.SurfaceId, StringComparison.Ordinal))
+                .Concat(bindings).ToArray()
         }, now);
+    }
+
+    private static bool TryReadConversationActions(
+        SurfaceFeedRecord surface,
+        DateTimeOffset now,
+        out SurfaceFeedPresentation presentation,
+        out IReadOnlyList<StoredActionBinding> descriptors)
+    {
+        presentation = null!;
+        descriptors = [];
+        try
+        {
+            using var document = JsonDocument.Parse(surface.PayloadUtf8);
+            var parsed = document.RootElement.Deserialize<SurfaceFeedPresentation>();
+            if (parsed is null ||
+                !SurfaceFeedPresentationCompatibility.HasSupportedShape(document.RootElement, parsed))
+                return false;
+            presentation = parsed;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(presentation.CorrelationId) ||
+            !string.Equals(presentation.CauseKind, "conversation", StringComparison.Ordinal) ||
+            !IsCanonicalConversationId(presentation.CauseId) ||
+            presentation.RequiredClientCapabilities is null ||
+            !presentation.RequiredClientCapabilities.SequenceEqual(
+                ConversationSurfacePayload.RequiredCapabilities,
+                StringComparer.Ordinal) ||
+            !ConversationSurfacePayload.TryActions(presentation.Payload, now, out descriptors))
+            return false;
+
+        return true;
+    }
+
+    private static bool RequiresActionAuthorityEvent(
+        IReadOnlyList<SurfaceActionBinding> currentBindings,
+        IReadOnlyList<StoredActionBinding> descriptors,
+        DateTimeOffset renewalThreshold)
+    {
+        if (currentBindings.Count == 0) return descriptors.Count > 0;
+        if (currentBindings.All(binding => binding.BindingId is
+                LegacyNewConversationBindingId or LegacyDeleteConversationBindingId))
+            return true;
+        if (currentBindings.Count != descriptors.Count ||
+            currentBindings.Any(binding =>
+                binding.Uses != 0 ||
+                binding.LastIdempotencyKey is not null ||
+                binding.LastOperationId is not null))
+            return false;
+
+        foreach (var descriptor in descriptors)
+        {
+            var binding = currentBindings.FirstOrDefault(candidate =>
+                string.Equals(candidate.BindingId, descriptor.BindingId, StringComparison.Ordinal));
+            if (binding is null ||
+                !string.Equals(binding.ActionType, descriptor.ActionType, StringComparison.Ordinal) ||
+                !string.Equals(binding.InputSchemaRef, descriptor.InputSchemaRef, StringComparison.Ordinal) ||
+                !string.Equals(binding.RequiredGrant, descriptor.RequiredGrant, StringComparison.Ordinal) ||
+                binding.ActionSchemaVersion != descriptor.ActionSchemaVersion ||
+                binding.MaxUses != descriptor.MaxUses)
+                return false;
+        }
+        return currentBindings.Any(binding => binding.ExpiresAt <= renewalThreshold);
+    }
+
+    private static bool IsCanonicalConversationId(string? value)
+    {
+        if (value is null || value.Length != 68 || !value.StartsWith("ino-", StringComparison.Ordinal))
+            return false;
+        foreach (var character in value.AsSpan(4))
+            if (character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f'))
+                return false;
+        return true;
     }
 
     public static SurfaceFeedState Rebuild(

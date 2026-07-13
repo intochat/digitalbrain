@@ -21,6 +21,7 @@ public static class RuntimeStateSchemas
     public const int SurfaceFeed = 1;
     public const int Session = 1;
     public const int SynapseJournal = 1;
+    public const int InoEffectPlan = 1;
 }
 
 public static class RuntimeStateKinds
@@ -30,6 +31,7 @@ public static class RuntimeStateKinds
     public const string SurfaceFeed = "surface-feed";
     public const string Session = "session";
     public const string SynapseJournal = "synapse-journal";
+    public const string InoEffectPlan = "ino-effect-plan";
 }
 
 public static class RuntimeStateKeys

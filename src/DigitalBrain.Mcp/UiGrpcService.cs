@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.V2.Ui.Grpc;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
@@ -42,7 +43,10 @@ public sealed record UiBootstrapOptions(
             tenant.Length > 256 || workspace.Length > 256 || principal.Length > 256)
             throw new InvalidOperationException("UI bootstrap identity configuration must be complete.");
         return new(secret, new(tenant), new(workspace), new(principal, PrincipalKind.User), TimeSpan.FromMinutes(15),
-            new HashSet<string>(StringComparer.Ordinal) { "brain.read", "ui.action", "gmail.read", "salesforce.read" });
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                "brain.read", "ui.action", "gmail.read", "gmail.send", "salesforce.read", "salesforce.write"
+            });
     }
 }
 
@@ -189,6 +193,7 @@ public sealed class UiGrpcService(
         var prepared = await feed.PrepareSessionAsync(authenticated, context.CancellationToken).ConfigureAwait(false);
         var state = prepared.State;
         var actionTokens = prepared.ActionTokens;
+        IReadOnlyList<SurfaceActionBinding> tokenBindings = state.ActionBindings;
         var nextActionRenewal = DateTimeOffset.UtcNow.Add(deliveryOptions.ActionTokenRenewalInterval);
         using var leaseCancellation = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
         var leaseRemaining = session.ExpiresAt - DateTimeOffset.UtcNow;
@@ -200,11 +205,13 @@ public sealed class UiGrpcService(
             {
                 await RevalidateAsync(session, leaseCancellation.Token).ConfigureAwait(false);
                 state = await feed.ReadAsync(authenticated, leaseCancellation.Token).ConfigureAwait(false);
-                if (DateTimeOffset.UtcNow >= nextActionRenewal)
+                if (DateTimeOffset.UtcNow >= nextActionRenewal ||
+                    ActionBindingsChanged(tokenBindings, state.ActionBindings))
                 {
                     prepared = await feed.PrepareSessionAsync(authenticated, leaseCancellation.Token).ConfigureAwait(false);
                     state = prepared.State;
                     actionTokens = prepared.ActionTokens;
+                    tokenBindings = state.ActionBindings;
                     nextActionRenewal = DateTimeOffset.UtcNow.Add(deliveryOptions.ActionTokenRenewalInterval);
                 }
                 var page = feed.ReadPage(
@@ -407,6 +414,11 @@ public sealed class UiGrpcService(
         ActionRejection.WrongRevision or ActionRejection.Unavailable => StatusCode.FailedPrecondition,
         _ => StatusCode.PermissionDenied
     };
+
+    internal static bool ActionBindingsChanged(
+        IReadOnlyList<SurfaceActionBinding> issuedBindings,
+        IReadOnlyList<SurfaceActionBinding> currentBindings) =>
+        !issuedBindings.SequenceEqual(currentBindings);
 
     private async Task<AuthenticatedSession> AuthenticateAsync(ServerCallContext context)
     {

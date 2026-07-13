@@ -6,6 +6,7 @@ namespace DigitalBrain.Kernel.Runtime;
 
 public static class GmailTools
 {
+    public const string Send = "gmail.send";
     public const string ReadMessages = "gmail.read.messages";
     public const string ReadMailboxOverview = "gmail.read.mailbox-overview";
     public const string ReadThreads = "gmail.read.threads";
@@ -16,6 +17,44 @@ public static class GmailTools
     public const int MaximumOffset = 4;
     public const int MaximumCandidateCount = 64;
     public const int MaximumPageCount = 4;
+    public const int MaximumRecipientLength = 320;
+    public const int MaximumSubjectLength = 256;
+    public const int MaximumBodyLength = 100_000;
+    public const int MaximumUniqueTagLength = 128;
+}
+
+public enum GmailSendStatus
+{
+    Applied,
+    AlreadyApplied,
+    NeedsAuth,
+    ConfigurationMissing,
+    InvalidRequest,
+    Unavailable
+}
+
+[GenerateSerializer, Alias("digitalbrain.v2.gmail-send-request")]
+public sealed record GmailSendRequest(
+    [property: Id(0)] string Recipient,
+    [property: Id(1)] string Subject,
+    [property: Id(2)] string Body,
+    [property: Id(3)] string UniqueTag);
+
+[GenerateSerializer, Alias("digitalbrain.v2.gmail-send-result")]
+public sealed record GmailSendResult(
+    [property: Id(0)] GmailSendStatus Status,
+    [property: Id(1)] string? MessageId = null,
+    [property: Id(2)] string? ThreadId = null,
+    [property: Id(3)] string? SafeReason = null,
+    [property: Id(4)] string? ConnectionUrl = null);
+
+[Alias("digitalbrain.v2.gmail-mutation-tool-grain")]
+public interface IGmailMutationToolGrain : IGrainWithStringKey
+{
+    [Alias("SendAsync")]
+    Task<GmailSendResult> SendAsync(
+        GmailSendRequest request,
+        CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer, Alias("digitalbrain.v2.gmail-read-request")]

@@ -13,9 +13,13 @@ public sealed class ConversationNeuron(
     IGrainFactory grainFactory) : Grain, IConversationNeuron, IRemindable
 {
     private const string OperationReminderName = "ino.operation-worker.v1";
-    private static readonly TimeSpan OperationReminderPeriod = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan OperationReminderDueTime = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan OperationReminderPeriod = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan OperationTimerInitialDelay = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan OperationTimerRetryDelay = TimeSpan.FromSeconds(5);
     private EncryptedPersistentState<ConversationState>? _state;
     private IGrainReminder? _operationReminder;
+    private IGrainTimer? _operationTimer;
 
     private EncryptedPersistentState<ConversationState> State => _state ??= new(
         persistentState,
@@ -124,6 +128,19 @@ public sealed class ConversationNeuron(
     public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
         if (!string.Equals(reminderName, OperationReminderName, StringComparison.Ordinal)) return;
+        await ProcessScheduledOperationsAsync();
+    }
+
+    private async Task ReceiveOperationTimerAsync(CancellationToken cancellationToken)
+    {
+        var timer = _operationTimer;
+        _operationTimer = null;
+        timer?.Dispose();
+        await ProcessScheduledOperationsAsync();
+    }
+
+    private async Task ProcessScheduledOperationsAsync()
+    {
         var state = await State.ReadAsync();
         var conversationKey = this.GetPrimaryKeyString() ?? throw new InvalidOperationException("Conversation grains require a string key.");
         foreach (var operation in state.Operations.Where(HasOperationToWatch).ToArray())
@@ -131,20 +148,32 @@ public sealed class ConversationNeuron(
             var worker = grainFactory.GetGrain<IInoOperationWorkerGrain>(conversationKey + "|" + operation.OperationId);
             await worker.ScheduleAsync();
         }
-        await StopOperationReminderIfIdleAsync(await State.ReadAsync());
+        var latest = await State.ReadAsync();
+        if (HasOperationToWatch(latest))
+            EnsureOperationTimer(OperationTimerRetryDelay);
+        else
+            await StopOperationReminderIfIdleAsync(latest);
     }
 
     private async Task EnsureOperationReminderAsync()
     {
         _operationReminder ??= await this.RegisterOrUpdateReminder(
             OperationReminderName,
-            TimeSpan.FromSeconds(1),
+            OperationReminderDueTime,
             OperationReminderPeriod);
+        EnsureOperationTimer(OperationTimerInitialDelay);
     }
+
+    private void EnsureOperationTimer(TimeSpan dueTime) =>
+        _operationTimer ??= this.RegisterGrainTimer(
+            ReceiveOperationTimerAsync,
+            new GrainTimerCreationOptions(dueTime, Timeout.InfiniteTimeSpan) { KeepAlive = true });
 
     private async Task StopOperationReminderIfIdleAsync(ConversationState state)
     {
         if (HasOperationToWatch(state)) return;
+        _operationTimer?.Dispose();
+        _operationTimer = null;
         _operationReminder ??= await this.GetReminder(OperationReminderName);
         if (_operationReminder is null) return;
         await this.UnregisterReminder(_operationReminder);

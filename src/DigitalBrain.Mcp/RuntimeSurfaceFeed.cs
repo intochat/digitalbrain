@@ -55,6 +55,21 @@ public sealed class RuntimeSurfaceFeed(
         if (state.CurrentSurfaces.Length == 0)
             state = await EnsureHomeSurfaceAsync(context, neuron, state, cancellationToken).ConfigureAwait(false);
         state = await RenewActionBindingsAsync(neuron, state, cancellationToken).ConfigureAwait(false);
+        var conversationId = ActiveConversationId(context, state);
+        var conversationGrainKey = RuntimeStateKeys.Conversation(
+            context.TenantId,
+            context.WorkspaceId,
+            context.Principal,
+            conversationId);
+        var conversationState = await cluster.GetGrain<IConversationNeuron>(conversationGrainKey)
+            .ReadAsync()
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (conversationState.Outbox.Any(entry => entry.DispatchedAt is null))
+            await cluster.GetGrain<IInoConversationOutboxDispatcherGrain>(conversationGrainKey)
+                .ScheduleAsync()
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
 
         return new(state, IssueActionCapabilities(context, state));
     }

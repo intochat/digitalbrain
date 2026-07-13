@@ -74,10 +74,55 @@ public static class ConversationSurfacePayload
 
     public static IReadOnlyList<StoredActionBinding> Actions(
         InoConversationSnapshot conversation,
+        DateTimeOffset now) => Actions(
+            conversation.CurrentOperation?.State,
+            conversation.CurrentOperation?.ApprovalId,
+            now);
+
+    public static bool TryActions(
+        JsonElement payload,
+        DateTimeOffset now,
+        out IReadOnlyList<StoredActionBinding> actions)
+    {
+        actions = [];
+        if (payload.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty("kind", out var kind) ||
+            kind.ValueKind != JsonValueKind.String ||
+            !string.Equals(kind.GetString(), "native", StringComparison.Ordinal) ||
+            !payload.TryGetProperty("nativeKind", out var nativeKind) ||
+            nativeKind.ValueKind != JsonValueKind.String ||
+            !string.Equals(nativeKind.GetString(), "inoConversation", StringComparison.Ordinal) ||
+            !payload.TryGetProperty("data", out var data) ||
+            data.ValueKind != JsonValueKind.Object)
+            return false;
+
+        if (!data.TryGetProperty("operation", out var operation) || operation.ValueKind == JsonValueKind.Null)
+        {
+            actions = Actions(null, null, now);
+            return true;
+        }
+        if (operation.ValueKind != JsonValueKind.Object ||
+            !operation.TryGetProperty("state", out var stateProperty) ||
+            stateProperty.ValueKind != JsonValueKind.String)
+            return false;
+
+        var state = stateProperty.GetString();
+        if (!IsKnownState(state)) return false;
+        string? approvalId = null;
+        if (operation.TryGetProperty("approvalId", out var approvalProperty) &&
+            approvalProperty.ValueKind == JsonValueKind.String)
+            approvalId = approvalProperty.GetString();
+        actions = Actions(state, approvalId, now);
+        return true;
+    }
+
+    private static IReadOnlyList<StoredActionBinding> Actions(
+        string? state,
+        string? approvalId,
         DateTimeOffset now)
     {
         var expiresAt = now.Add(UiProtocol.ActionTokenLifetime);
-        if (conversation.CurrentOperation is { State: InoConversationStates.AwaitingApproval, ApprovalId: { Length: > 0 } })
+        if (state == InoConversationStates.AwaitingApproval && !string.IsNullOrWhiteSpace(approvalId))
             return
             [
                 new(
@@ -88,7 +133,7 @@ public static class ConversationSurfacePayload
                     1,
                     expiresAt)
             ];
-        if (conversation.CurrentOperation is { } operation && InoConversationStates.IsActive(operation.State))
+        if (state is not null && InoConversationStates.IsActive(state))
             return [];
         return
         [
@@ -98,9 +143,22 @@ public static class ConversationSurfacePayload
                 SendInputSchema,
                 "ui.action",
                 1,
-                expiresAt)
+            expiresAt)
         ];
     }
+
+    private static bool IsKnownState(string? state) => state is
+        InoConversationStates.Idle or
+        InoConversationStates.Queued or
+        InoConversationStates.Running or
+        InoConversationStates.Responding or
+        InoConversationStates.AwaitingAuthorization or
+        InoConversationStates.AwaitingApproval or
+        InoConversationStates.RetryScheduled or
+        InoConversationStates.Succeeded or
+        InoConversationStates.Failed or
+        InoConversationStates.OutcomeUnknown or
+        InoConversationStates.Cancelled;
 
     private static string TurnKey(InoConversationTurn turn)
     {

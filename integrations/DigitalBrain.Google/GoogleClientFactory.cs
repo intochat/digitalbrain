@@ -46,6 +46,7 @@ public static class GoogleClientFactory
     public static readonly TimeSpan OAuthProcessingLifetime = TimeSpan.FromMinutes(3);
 
     public const string DefaultGmailScope = "https://www.googleapis.com/auth/gmail.readonly";
+    public const string GmailSendScope = "https://www.googleapis.com/auth/gmail.send";
     public const string TokenEndpoint = "https://oauth2.googleapis.com/token";
     public const string AuthEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
 
@@ -78,7 +79,7 @@ public static class GoogleClientFactory
             ? Optional(values, RedirectUriKey, DefaultRedirectUri)
             : redirectUri;
 
-        var scopes = new List<string> { DefaultGmailScope };
+        var scopes = new List<string> { DefaultGmailScope, GmailSendScope };
         if (additionalScopes.Length > 0)
         {
             scopes.AddRange(additionalScopes);

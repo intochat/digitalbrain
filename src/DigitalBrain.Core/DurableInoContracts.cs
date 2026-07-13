@@ -147,7 +147,7 @@ public sealed record OperationOutboxRecord(
             State = StateFor(phase),
             ApprovalId = approvalId ?? view.ApprovalId,
             Action = normalizedAction,
-            Turns = (view.Turns ?? []).Select(turn => turn with { }).ToArray()
+            Turns = (view.Turns ?? []).TakeLast(16).Select(turn => turn with { }).ToArray()
         };
         return new(eventId, operationId, phase, operationVersion, PhaseEventType, occurredAt)
         {
@@ -172,8 +172,25 @@ public sealed record OperationOutboxRecord(
         try
         {
             var candidate = JsonSerializer.Deserialize<OperationOutboxRecord>(payloadUtf8);
-            if (candidate is null || !candidate.IsCurrent()) return false;
-            record = candidate;
+            if (candidate is null) return false;
+            if (candidate.IsCurrent())
+            {
+                record = candidate;
+                return true;
+            }
+
+            // Rolling repair for records emitted before turn-window normalization was centralized.
+            // Every other canonical invariant must still pass before the record can be projected.
+            if (candidate.View is not { Turns.Length: > 16 } legacyView) return false;
+            var repaired = candidate with
+            {
+                View = legacyView with
+                {
+                    Turns = legacyView.Turns.TakeLast(16).Select(turn => turn with { }).ToArray()
+                }
+            };
+            if (!repaired.IsCurrent()) return false;
+            record = repaired;
             return true;
         }
         catch (JsonException)
@@ -273,7 +290,8 @@ public sealed record InoWorkflowRequest(
     IReadOnlyList<string> History,
     string RequestId,
     InoAuthorizationResume? AuthorizationResume = null,
-    WorkflowReference? PriorWorkflow = null);
+    WorkflowReference? PriorWorkflow = null,
+    string? ActorScope = null);
 
 public enum InoToolAccess { Read, Mutation }
 
@@ -304,7 +322,10 @@ public sealed record InoToolEffectRequest(
 
 public enum InoToolEffectDisposition { Succeeded, Failed, OutcomeUnknown }
 
-public sealed record InoToolEffectResult(InoToolEffectDisposition Disposition, string SafeResult);
+[GenerateSerializer, Alias("digitalbrain.runtime.ino-tool-effect-result")]
+public sealed record InoToolEffectResult(
+    [property: Id(0)] InoToolEffectDisposition Disposition,
+    [property: Id(1)] string SafeResult);
 
 public interface IInoToolGateway
 {

@@ -47,6 +47,30 @@ public sealed class ConversationModelGrain(IChatClient chat) : Grain, IConversat
         return new(text, "configured");
     }
 
+    public async Task<SemanticMutationProposal> ResolveMutationAsync(
+        SemanticMutationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.ActorScope) ||
+            string.IsNullOrWhiteSpace(request.ConversationId) ||
+            string.IsNullOrWhiteSpace(request.Prompt) ||
+            request.Prompt.Length > MaximumPromptLength ||
+            request.Provider is not (SemanticProvider.Gmail or SemanticProvider.Salesforce))
+            throw new ArgumentException("A bounded Gmail or Salesforce mutation request is required.", nameof(request));
+
+        var messages = new ChatMessage[]
+        {
+            new(ChatRole.System, MutationGuidance(request.Provider)),
+            new(ChatRole.User, request.Prompt)
+        };
+        var response = await chat.GetResponseAsync<SemanticMutationProposal>(
+            messages,
+            IntentJson,
+            useJsonSchemaResponseFormat: true,
+            cancellationToken: cancellationToken);
+        return response.Result ?? throw new InvalidOperationException("The mutation model returned no structured proposal.");
+    }
+
     private static string BuildPrompt(ConversationModelCompletionRequest request)
     {
         const string guidance =
@@ -73,23 +97,25 @@ public sealed class ConversationModelGrain(IChatClient chat) : Grain, IConversat
         "Use only the declared operation, reference, filter-operator, sort, aggregate, and time-range enum values. " +
         "Copy only constraints the user explicitly requested: never invent a filter, sort, time range, entity, or reference. " +
         "Limit is the requested result count (default 1); Ordinal is only an explicitly requested position. " +
+        "RelativeDays is only an explicitly requested rolling number of days such as 'in the past 7 days'; use an integer " +
+        "from 1 through 365 and otherwise null. Words such as latest or recent alone never imply RelativeDays. " +
         "Reference is None for a standalone request. Use LatestProviderResult, SameSender, or SameAccount only when the user " +
         "explicitly refers to an earlier result; LatestGmailSender is only for a cross-provider Gmail-to-Salesforce match. " +
         "A follow-up asking about one numbered item from an earlier result uses Limit 1, that one-based Ordinal, and " +
         "LatestProviderResult; do not repeat the whole prior list. Example: 'Who sent the second one?' is " +
         "{\"provider\":\"gmail\",\"operation\":\"list\",\"entity\":\"message\",\"limit\":1," +
         "\"ordinal\":2,\"reference\":\"latestProviderResult\",\"filters\":null,\"sorts\":null," +
-        "\"aggregate\":null,\"timeRange\":\"none\",\"searchText\":null,\"clarification\":null}. " +
+        "\"aggregate\":null,\"timeRange\":\"none\",\"searchText\":null,\"clarification\":null,\"relativeDays\":null}. " +
         "For Gmail, the words last, latest, recent, or most recent do not imply Yesterday, CurrentWeek, a sender reference, " +
         "or a date filter. Example: 'list my last two emails' is " +
         "{\"provider\":\"gmail\",\"operation\":\"list\",\"entity\":\"incoming\",\"limit\":2," +
         "\"ordinal\":null,\"reference\":\"none\",\"filters\":null,\"sorts\":null,\"aggregate\":null," +
-        "\"timeRange\":\"none\",\"searchText\":null,\"clarification\":null}. " +
+        "\"timeRange\":\"none\",\"searchText\":null,\"clarification\":null,\"relativeDays\":null}. " +
         "Provider None is valid only with Answer for ordinary conversation. A business-name record lookup is a Salesforce " +
         "Search. Example: 'Find Acme.' is " +
         "{\"provider\":\"salesforce\",\"operation\":\"search\",\"entity\":\"account\",\"limit\":10," +
         "\"ordinal\":null,\"reference\":\"none\",\"filters\":null,\"sorts\":null,\"aggregate\":null," +
-        "\"timeRange\":\"none\",\"searchText\":\"Acme\",\"clarification\":null}. " +
+        "\"timeRange\":\"none\",\"searchText\":\"Acme\",\"clarification\":null,\"relativeDays\":null}. " +
         "Entity and filter fields are short human semantic labels, never provider API identifiers. " +
         "Never emit Gmail query syntax, SOQL, SOSL, URLs, continuation tokens, record IDs, API object/field names, " +
         "HTTP methods, credentials, or mutation payloads. Use QueryLanguage or Delete for such unsafe requests so " +
@@ -98,6 +124,17 @@ public sealed class ConversationModelGrain(IChatClient chat) : Grain, IConversat
         "ambiguous. Use Answer only for ordinary conversation that needs no Gmail or Salesforce facts. " +
         "Grounding descriptors contain only trusted result-shape metadata; they do not contain provider values. " +
         "Available grounding descriptors: " + JsonSerializer.Serialize(groundings, IntentJson);
+
+    private static string MutationGuidance(SemanticProvider provider) =>
+        "Extract exactly one typed mutation proposal from the user's request as JSON. " +
+        "Copy values only when the user explicitly supplied them, preserving their text exactly; never invent, infer, " +
+        "look up, normalize, or translate a recipient, subject, body, entity, record id, field, or new value. " +
+        "Kind GmailSend is allowed only for one bare email recipient with an explicit subject and non-empty body. " +
+        "Kind SalesforceFieldUpdate is allowed only for one explicit entity, record id, field label, and new value. " +
+        "Use Clarify with a concise question when any required value is missing or ambiguous. Use Unsupported for delete, " +
+        "bulk, multi-recipient, multi-record, multi-field, attachment, or any other mutation. Populate only the fields for " +
+        "the selected kind and use null for all others. Never include credentials, tokens, URLs, API names, query language, " +
+        "HTTP details, or commentary. The classified provider is " + provider + ".";
 
     private static JsonSerializerOptions CreateIntentJson()
     {
