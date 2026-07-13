@@ -66,15 +66,6 @@ public readonly record struct UserId([property: Id(0)] string Value)
     public static UserId Anonymous => new("anonymous");
 }
 
-[GenerateSerializer]
-[Alias("DigitalBrain.Core.CapabilityRegistered")]
-public record CapabilityRegistered(
-    string Id,
-    string Description,
-    IReadOnlyList<string> Examples,
-    string Tier,
-    string? Origin = null) : Synapse(nameof(CapabilityRegistered), DateTimeOffset.UtcNow);
-
 [Alias("DigitalBrain.Core.IMetaOptimizerNeuron")]
 public interface IMetaOptimizerNeuron : INeuron, IHandle<NeuronTelemetry>, IHandle<WiringOptimizationProposed> { }
 

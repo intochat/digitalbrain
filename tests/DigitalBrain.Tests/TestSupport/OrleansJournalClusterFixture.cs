@@ -1,8 +1,6 @@
-using System.Collections.Concurrent;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Kernel;
-using DigitalBrain.Kernel.SelfEvolution;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -34,7 +32,6 @@ public sealed class OrleansJournalClusterFixture : IAsyncLifetime
                 {
                     services.AddScoped<NeuronJournals>();
                     services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
-                    services.AddSingleton<ISelfEvolutionApplyHandler, DurableRecordingApplyHandler>();
                 });
         });
 
@@ -45,30 +42,6 @@ public sealed class OrleansJournalClusterFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await Cluster.DisposeAsync();
-    }
-}
-
-internal sealed class DurableRecordingApplyHandler : ISelfEvolutionApplyHandler
-{
-    public const string ApplyViaId = "durable.apply";
-    private static readonly ConcurrentDictionary<string, int> Applied = new(StringComparer.Ordinal);
-
-    public string ApplyVia => ApplyViaId;
-    public SelfEvolutionRisk MaxRisk => SelfEvolutionRisk.KernelRestart;
-
-    public static int Count(string proposalId) => Applied.TryGetValue(proposalId, out var count) ? count : 0;
-
-    public static void Clear() => Applied.Clear();
-
-    public Task<SelfEvolutionApplyResult> ApplyAsync(SelfEvolutionProposal proposal, CancellationToken ct)
-    {
-        Applied.AddOrUpdate(proposal.ProposalId, 1, (_, count) => count + 1);
-        return Task.FromResult(new SelfEvolutionApplyResult(
-            proposal.ProposalId,
-            proposal.ApplyVia,
-            Succeeded: true,
-            Details: "applied",
-            RollbackCheckpointId: "durable-checkpoint"));
     }
 }
 

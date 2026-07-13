@@ -17,7 +17,6 @@ public sealed class AsyncContractArchitectureTests
     [
         typeof(INeuron),
         typeof(IHandle<>),
-        typeof(IAutomationNeuron),
         typeof(IGmailReadToolGrain),
         typeof(ISalesforceReadToolGrain),
         typeof(IConnector),

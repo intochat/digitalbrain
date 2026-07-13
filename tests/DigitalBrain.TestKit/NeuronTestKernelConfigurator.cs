@@ -1,9 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Llm;
-using DigitalBrain.Kernel.SelfEvolution;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.TestingHost;
@@ -35,17 +33,8 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddScoped<NeuronJournals>();
                 services.Configure<NeuronLifecycleOptions>(options => options.JournalActivationMarkers = true);
                 services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, AutomationRemovalApplyHandler>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
-                services.AddSingleton<IConfiguration>(
-                    new ConfigurationBuilder()
-                        .AddInMemoryCollection(new Dictionary<string, string?>
-                        {
-                            ["DigitalBrain:Automations:Enabled"] = "true"
-                        })
-                        .Build());
             });
     }
 }

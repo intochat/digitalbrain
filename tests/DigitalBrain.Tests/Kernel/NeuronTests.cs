@@ -49,19 +49,4 @@ public class NeuronTests : NeuronTestBase
         Assert.Equal(true, item["flag"]);
     }
 
-    [Fact]
-    public void AutomationRecords_Are_Synapses_And_Construct_Correctly()
-    {
-        var script = new RegisterScript("daily-brief", "return Array.Empty<Synapse>();", "demo script");
-        var reaction = new RegisterReaction("on-my-activate", "NeuronActivated", "daily-brief", "MyNeuron", Array.Empty<string>(), "default", null);
-        var app = new AutomationApp("my-app", "example app");
-
-        Assert.IsAssignableFrom<Synapse>(script);
-        Assert.Equal(nameof(RegisterScript), script.Type);
-        Assert.Equal("NeuronActivated", reaction.When);
-        Assert.Equal("MyNeuron", reaction.Target);
-        Assert.Equal("daily-brief", reaction.ScriptRef);
-        Assert.NotNull(app);
-    }
-
 }

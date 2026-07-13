@@ -6,7 +6,6 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
-using DigitalBrain.Kernel.SelfEvolution;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -74,8 +73,6 @@ public static class DigitalBrainOrleansExtensions
             siloBuilder.ConfigureServices(services =>
             {
                 services.AddScoped<NeuronJournals>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, AutomationRemovalApplyHandler>();
                 services.AddSingleton<IInoEffectPlanStore, InoEffectPlanStore>();
                 if (builder.Configuration.GetValue<bool>("DigitalBrain:Tools:Enabled"))
                     services.AddSingleton<IInoToolGateway, PlanInoToolGateway>();
