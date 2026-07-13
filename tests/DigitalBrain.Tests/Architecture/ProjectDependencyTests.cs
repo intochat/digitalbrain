@@ -21,7 +21,7 @@ public sealed class ProjectDependencyTests
     public void Tracked_projects_do_not_cross_independent_boundaries()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var projectPaths = GetTrackedProjectPaths(repositoryRoot);
+        var projectPaths = GetTrackedPaths(repositoryRoot, "*.csproj");
         var violations = projectPaths
             .SelectMany(projectPath => ReadProjectEdges(repositoryRoot, projectPath))
             .Where(ForbiddenEdges.Contains)
@@ -33,6 +33,34 @@ public sealed class ProjectDependencyTests
         Assert.True(
             violations.Length == 0,
             $"Forbidden project references:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [Fact]
+    public void Deployment_publishes_the_runtime_host_instead_of_the_kernel_library()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(repositoryRoot, ".github", "workflows", "deploy.yml"));
+
+        Assert.Contains(
+            "dotnet publish hosts/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj",
+            workflow,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "dotnet publish src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj",
+            workflow,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Kernel_hosting_does_not_register_browser_cors()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var hostingSource = string.Join(
+            Environment.NewLine,
+            GetTrackedPaths(repositoryRoot, "src/DigitalBrain.Kernel/Hosting/*.cs")
+                .Select(path => File.ReadAllText(Path.Combine(repositoryRoot, path))));
+
+        Assert.DoesNotContain("AddCors(", hostingSource, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()
@@ -47,7 +75,7 @@ public sealed class ProjectDependencyTests
             ?? throw new DirectoryNotFoundException("Could not locate the repository root.");
     }
 
-    private static string[] GetTrackedProjectPaths(string repositoryRoot)
+    private static string[] GetTrackedPaths(string repositoryRoot, string pattern)
     {
         var startInfo = new ProcessStartInfo("git")
         {
@@ -58,7 +86,7 @@ public sealed class ProjectDependencyTests
         };
         startInfo.ArgumentList.Add("ls-files");
         startInfo.ArgumentList.Add("--");
-        startInfo.ArgumentList.Add("*.csproj");
+        startInfo.ArgumentList.Add(pattern);
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start git.");
         var output = process.StandardOutput.ReadToEnd();

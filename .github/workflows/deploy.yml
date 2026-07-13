@@ -88,7 +88,7 @@ jobs:
 
       - name: Publish kernel image
         run: |
-          dotnet publish src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer \
+          dotnet publish hosts/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj -c Release /t:PublishContainer \
             -p:ContainerRegistry=docker.io \
             -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel \
             -p:ContainerImageTag="${TAG}"

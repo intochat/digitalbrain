@@ -185,15 +185,6 @@ public static class DigitalBrainOrleansExtensions
 
     public static IHostApplicationBuilder AddDigitalBrainClients(this IHostApplicationBuilder builder)
     {
-        var corsOrigins = builder.Configuration
-            .GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
-            ?? new[] { "https://digitalbrain.tech", "https://www.digitalbrain.tech" };
-
-        builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy
-            .WithOrigins(corsOrigins)
-            .AllowAnyMethod()
-            .AllowAnyHeader()));
-
         builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
         builder.Services.AddSingleton(new SchemaRegistry([
             new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true)]));

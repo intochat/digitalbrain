@@ -27,6 +27,16 @@ namespace DigitalBrain.RuntimeHost
             builder.AddServiceDefaults();
             builder.UseDigitalBrainOrleans();
             builder.AddDigitalBrainClients();
+
+            var corsOrigins = builder.Configuration
+                .GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
+                ?? new[] { "https://digitalbrain.tech", "https://www.digitalbrain.tech" };
+
+            builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy
+                .WithOrigins(corsOrigins)
+                .AllowAnyMethod()
+                .AllowAnyHeader()));
+
             builder.Services.AddDigitalBrainGoogle();
             builder.Services.AddDigitalBrainSalesforce();
             builder.Services.AddSingleton(TimeProvider.System);
