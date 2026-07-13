@@ -1,6 +1,5 @@
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
-using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
 using Microsoft.Extensions.AI;
@@ -38,9 +37,6 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                 services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationRemovalApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
-                services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
                 services.AddSingleton<IScopedChatClientFactory, NoOpScopedChatClientFactory>();
                 services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
                 services.AddSingleton<IConfiguration>(
@@ -51,7 +47,6 @@ public sealed class NeuronTestKernelConfigurator : ISiloConfigurator
                         })
                         .Build());
             });
-        siloBuilder.AddFoundry();
     }
 }
 

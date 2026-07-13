@@ -64,46 +64,4 @@ public class NeuronTests : NeuronTestBase
         Assert.NotNull(app);
     }
 
-    [Fact]
-    public async Task AutomationNeuron_Registers_And_Reacts_To_NeuronActivated()
-    {
-        var auto = Grain<IAutomationNeuron>("automation-main");
-        await auto.GetTimelineAsync();
-
-        await auto.FireAsync(new RegisterScript(
-            "act-script",
-            "return new[] { new Signal(\"AutomationFired\", new Dictionary<string, object?>()) };",
-            "demo"));
-        await auto.FireAsync(new RegisterReaction(
-            "act-reaction",
-            "NeuronActivated",
-            "act-script",
-            "act-test",
-            Array.Empty<string>(),
-            "default",
-            null));
-
-        await auto.FireAsync(new NeuronActivated(new NeuronId("act-test")));
-
-        var timeline = await auto.GetTimelineAsync();
-        Assert.Contains(timeline, s => s.Type == "AutomationFired" || s.Type == "ScriptRegistered");
-    }
-
-    [Fact]
-    public async Task DefineReactionAsync_Enables_InoStyle_WhenActivatedThenScript()
-    {
-        var auto = Grain<IAutomationNeuron>("automation-main");
-        await auto.GetTimelineAsync();
-
-        await auto.DefineReactionAsync(
-            "brief-on-activate",
-            "NeuronActivated",
-            "personal-assistant",
-            "return new[] { new Signal(\"DailyBriefGenerated\", new Dictionary<string, object?>()) };");
-
-        await auto.FireAsync(new NeuronActivated(new NeuronId("personal-assistant")));
-
-        var timeline = await auto.GetTimelineAsync();
-        Assert.Contains(timeline, s => s.Type == "DailyBriefGenerated");
-    }
 }

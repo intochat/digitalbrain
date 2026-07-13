@@ -8,7 +8,7 @@ public class NeuronTestBaseTests : NeuronTestBase
     [Fact]
     public async Task Grain_Resolves_And_Returns_A_Live_Timeline()
     {
-        var target = Grain<IGeneratedNeuron>("neuron-test-base-smoke"); // Demo removed as trash
+        var target = Grain<IProbeNeuron>("neuron-test-base-smoke");
         var timeline = await target.GetTimelineAsync();
         Assert.NotNull(timeline);
     }

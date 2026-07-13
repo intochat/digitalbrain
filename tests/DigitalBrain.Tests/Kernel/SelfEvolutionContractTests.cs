@@ -18,7 +18,7 @@ public class SelfEvolutionContractTests
             Risk: SelfEvolutionRisk.KernelRestart,
             RequiresHumanApproval: true,
             RollbackPlan: "checkpoint-then-rolling-rollback",
-            Origin: "foundry");
+            Origin: "ino");
 
         Assert.Equal(nameof(SelfEvolutionProposal), proposal.Type);
         Assert.True(proposal.RequiresHumanApproval);
@@ -33,7 +33,7 @@ public class SelfEvolutionContractTests
     {
         var rollback = new SelfEvolutionRollbackRequired(
             ProposalId: "p-1",
-            ApplyVia: SelfEvolutionApplyVia.FoundryDeploy,
+            ApplyVia: SelfEvolutionApplyVia.AutomationDefineReaction,
             CheckpointId: "checkpoint-1",
             Reason: "build failed");
 

@@ -78,9 +78,6 @@ public record CapabilityRegistered(
 [Alias("DigitalBrain.Core.IMetaOptimizerNeuron")]
 public interface IMetaOptimizerNeuron : INeuron, IHandle<NeuronTelemetry>, IHandle<WiringOptimizationProposed> { }
 
-[Alias("DigitalBrain.Core.IGeneratedNeuron")]
-public interface IGeneratedNeuron : INeuron { }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Core.LlmPrompt")]
 public record LlmPrompt(string Prompt, string? PreferredModel = null) : Synapse(nameof(LlmPrompt), DateTimeOffset.UtcNow);

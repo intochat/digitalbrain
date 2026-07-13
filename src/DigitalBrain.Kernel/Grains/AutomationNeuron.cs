@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Kernel.Foundry;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 
@@ -7,18 +6,12 @@ namespace DigitalBrain.Kernel;
 
 using DigitalBrain.Ui.Contracts;
 
-/// The reactive host for lightweight automations (reactions + scripts).
-/// Always subscribes to the global timeline so it can react to NeuronActivated,
-/// Signals, and other synapses without requiring static IHandle<> declarations.
-/// Definitions are stored purely in the durable journals (source of truth).
-/// "Apps" and reactions are hot: register -> immediately active for future matches.
 [GrainType("digitalbrain.automation.v1")]
 public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals journals)
     : Neuron(logger, journals), IAutomationNeuron
 {
     private Dictionary<string, string> _scripts = new(StringComparer.OrdinalIgnoreCase);
     private List<RegisterReaction> _reactions = [];
-    private Dictionary<string, int> _execCounts = new(StringComparer.OrdinalIgnoreCase);
 
     protected override bool ShouldSubscribeToTimeline => true;
 
@@ -26,7 +19,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
     {
         await RecordBroadcastReceivedAsync(item);
         EnsureProjections();
-        await TryExecuteMatchingAsync(item);
     }
 
     protected override async Task DispatchSynapse(Synapse synapse, CancellationToken cancellationToken = default)
@@ -34,7 +26,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         cancellationToken.ThrowIfCancellationRequested();
         EnsureProjections();
 
-        // Handle registrations first (they update our live view)
         switch (synapse)
         {
             case RegisterScript rs:
@@ -87,125 +78,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
                 await EmitAutomationsSurfaceAsync(cancellationToken);
                 return;
         }
-
-        await TryExecuteMatchingAsync(synapse, cancellationToken);
-    }
-
-    private async Task TryExecuteMatchingAsync(Synapse synapse, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var matches = _reactions.Where(r => IsMatch(r, synapse)).ToList();
-        if (matches.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var reaction in matches)
-        {
-            if (!_scripts.TryGetValue(reaction.ScriptRef, out var code) &&
-                !reaction.ScriptRef.StartsWith("inline:", StringComparison.OrdinalIgnoreCase))
-            {
-                Logger.LogWarning("Script ref '{Ref}' not found for reaction {ReactionId}", reaction.ScriptRef, reaction.Id);
-                continue;
-            }
-
-            code ??= reaction.ScriptRef;
-
-            Logger.LogInformation("Automation executing reaction {ReactionId} (when={When}) with script {ScriptRef}", reaction.Id, reaction.When, reaction.ScriptRef);
-
-            _execCounts[reaction.Id] = _execCounts.GetValueOrDefault(reaction.Id) + 1;
-
-            var caps = ServiceProvider.GetService<ICapabilityBroker>();
-            var outputs = await Foundry.ScriptRunner.ExecuteAsync(
-                code,
-                synapse,
-                Self,
-                s => FireAsync(StampCurrent(s), cancellationToken),
-                caps);
-
-            // Light declared-emits enforcement (plan Task 9)
-            if (reaction.DeclaredEmits != null && reaction.DeclaredEmits.Count > 0)
-            {
-                foreach (var o in outputs)
-                {
-                    if (!reaction.DeclaredEmits.Any(d => d == o.Type || d == "*"))
-                    {
-                        Logger.LogWarning("Reaction {Id} emitted undeclared type {Type} (declared: {Declared})", reaction.Id, o.Type, string.Join(",", reaction.DeclaredEmits));
-                    }
-                }
-            }
-
-            foreach (var output in outputs)
-            {
-                await FireAsync(StampCurrent(output), cancellationToken);
-            }
-
-            // Minimal run ledger entry (P1). Persisted via journal.
-            await FireAsync(StampCurrent(new AutomationRun(reaction.Id, null, _execCounts[reaction.Id], "completed", DateTimeOffset.UtcNow)), cancellationToken);
-
-            await EmitAutomationsSurfaceAsync(cancellationToken);
-        }
-    }
-
-    private static bool IsMatch(RegisterReaction r, Synapse s)
-    {
-        if (string.IsNullOrEmpty(r.When) || r.When == "*")
-        {
-            return TargetMatches(r.Target, s) && ScopeMatches(r.Scope, s);
-        }
-
-        if (r.When.Equals("NeuronActivated", StringComparison.OrdinalIgnoreCase) && s is NeuronActivated na)
-        {
-            return TargetMatches(r.Target, na) && ScopeMatches(r.Scope, na);
-        }
-
-        if (r.When.StartsWith("Signal:", StringComparison.OrdinalIgnoreCase) && s is Signal sig)
-        {
-            var wanted = r.When["Signal:".Length..];
-            return sig.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase) && TargetMatches(r.Target, s) && ScopeMatches(r.Scope, s);
-        }
-
-        if (r.When.Equals(s.Type, StringComparison.OrdinalIgnoreCase))
-        {
-            return TargetMatches(r.Target, s) && ScopeMatches(r.Scope, s);
-        }
-
-        return false;
-    }
-
-    private static bool TargetMatches(string? target, Synapse s)
-    {
-        if (string.IsNullOrWhiteSpace(target))
-        {
-            return true;
-        }
-
-        if (s is NeuronActivated na)
-        {
-            return na.Neuron.Value.Contains(target.Trim('*'), StringComparison.OrdinalIgnoreCase);
-        }
-
-        return true;
-    }
-
-    private static bool ScopeMatches(string scope, Synapse s)
-    {
-        if (string.IsNullOrWhiteSpace(scope) || scope == "default")
-        {
-            return true;
-        }
-        // Coordinate with NeuronScope: for activation, match user prefix of neuron id; for signals look for user in Props
-        if (s is NeuronActivated na && NeuronScope.TryParse(na.Neuron.Value, out var sc))
-        {
-            return string.Equals(sc.UserId.Value, scope, StringComparison.OrdinalIgnoreCase) || sc.UserId.Value == "default";
-        }
-
-        if (s is Signal sig && sig.Props != null && sig.Props.TryGetValue("userId", out var u) && u is string us)
-        {
-            return string.Equals(us, scope, StringComparison.OrdinalIgnoreCase);
-        }
-
-        return true; // default loose for compat
     }
 
     private void EnsureProjections()
@@ -215,7 +87,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
             return;
         }
 
-        // Replay from journals.
         foreach (var s in OutgoingJournal.Concat(IncomingJournal).OfType<RegisterScript>())
         {
             _scripts[s.Id] = s.Code;
@@ -257,13 +128,12 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
             }
         }
 
-        // counts stay zero on replay; execution increments live
     }
 
     public async Task<IReadOnlyList<string>> ListActiveScriptsAsync()
     {
         EnsureProjections();
-        await EmitAutomationsSurfaceAsync(); // refresh surface on query
+        await EmitAutomationsSurfaceAsync();
         return _scripts.Keys.ToList();
     }
 
@@ -276,9 +146,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
 
     public async Task DefineReactionAsync(string id, string when, string? target, string scriptCode, IReadOnlyList<string>? declaredEmits = null, CancellationToken cancellationToken = default)
     {
-        // Low-level / internal only. Public entry points (MCP define_reaction, Ino chat-to-automation, etc.)
-        // must stage a SelfEvolutionProposal first (see AutomationDefinitionApplyHandler and MCP tools).
-        // Direct calls bypass the approval rail and are only for trusted bootstrap or internal apply handlers.
         var scriptId = id + "-script";
         await FireAsync(new RegisterScript(scriptId, scriptCode, "defined-via-DefineReaction", Array.Empty<string>(), "default"), cancellationToken);
         await FireAsync(new RegisterReaction(id, when, scriptId, target ?? string.Empty, declaredEmits ?? Array.Empty<string>(), "default", null), cancellationToken);
@@ -306,7 +173,6 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         var usage = _reactions.GroupBy(r => r.ScriptRef).ToDictionary(g => g.Key, g => g.Count());
         foreach (var kv in _scripts)
         {
-            // Note: full RegisterScript metadata not stored separately; use defaults + usage
             entries.Add(new ScriptLibraryEntry(kv.Key, kv.Value, "shared library script", Array.Empty<string>(), usage.GetValueOrDefault(kv.Key)));
         }
         return Task.FromResult<IReadOnlyList<ScriptLibraryEntry>>(entries);
@@ -319,7 +185,7 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
         var now = DateTimeOffset.UtcNow;
 
         var reactionViews = _reactions
-            .Select(r => new ReactionView(r.Id, r.When, r.ScriptRef, r.Target, _execCounts.GetValueOrDefault(r.Id)))
+            .Select(r => new ReactionView(r.Id, r.When, r.ScriptRef, r.Target, 0))
             .ToList();
 
         var scriptViews = _scripts
@@ -332,10 +198,8 @@ public class AutomationNeuron(ILogger<AutomationNeuron> logger, NeuronJournals j
 
         await FireAsync(new AutomationSurface(reactionViews, scriptViews, now), cancellationToken);
 
-        // Visual graph foundation (data-only; future UI consumes + emits Register* back)
         await EmitAutomationGraphSurfaceAsync(reactionViews, scriptViews, now, cancellationToken);
 
-        // Also keep lightweight list for timeline consumers that expect ListSurface
         var reactionItems = _reactions.Any()
             ? _reactions.Select(r => $"{r.Id}: when {r.When} -> {r.ScriptRef}").ToList()
             : ["No active reactions. Define via MCP or synapses."];

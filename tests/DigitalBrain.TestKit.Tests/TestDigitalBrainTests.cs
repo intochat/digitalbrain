@@ -14,8 +14,7 @@ public class TestDigitalBrainTests : IAsyncLifetime
     public async Task FireAsync_Delivers_To_Self_Addressed_Grain()
     {
         // INeuron itself has many concrete grain implementors in DigitalBrain.Kernel, so Orleans
-        // can't resolve GetGrain<INeuron> to a single grain type. Using IGeneratedNeuron (Demo removed as trash).
-        var target = _brain.Grain<IGeneratedNeuron>("smoke-test-neuron");
+        var target = _brain.Grain<IProbeNeuron>("smoke-test-neuron");
         var timeline = await target.GetTimelineAsync();
         Assert.NotNull(timeline);
     }

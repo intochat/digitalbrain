@@ -6,7 +6,7 @@ namespace DigitalBrain.Kernel;
 public sealed class AutomationDefinitionApplyHandler(IGrainFactory grains) : ISelfEvolutionApplyHandler
 {
     public string ApplyVia => SelfEvolutionApplyVia.AutomationDefineReaction;
-    public SelfEvolutionRisk MaxRisk => SelfEvolutionRisk.InProcessCode;
+    public SelfEvolutionRisk MaxRisk => SelfEvolutionRisk.None;
 
     public async Task<SelfEvolutionApplyResult> ApplyAsync(SelfEvolutionProposal proposal, CancellationToken ct)
     {
@@ -52,7 +52,7 @@ public sealed class AutomationDefinitionApplyHandler(IGrainFactory grains) : ISe
 public sealed class AutomationRemovalApplyHandler(IGrainFactory grains) : ISelfEvolutionApplyHandler
 {
     public string ApplyVia => SelfEvolutionApplyVia.AutomationRemoveReaction;
-    public SelfEvolutionRisk MaxRisk => SelfEvolutionRisk.InProcessCode;
+    public SelfEvolutionRisk MaxRisk => SelfEvolutionRisk.None;
 
     public async Task<SelfEvolutionApplyResult> ApplyAsync(SelfEvolutionProposal proposal, CancellationToken ct)
     {

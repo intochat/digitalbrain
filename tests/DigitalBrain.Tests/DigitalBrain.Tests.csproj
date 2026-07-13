@@ -38,7 +38,6 @@
 
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Pack.Contracts\DigitalBrain.Pack.Contracts.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
     <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />

@@ -21,9 +21,6 @@
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.4.0" />
     <!-- Orleans (note: journaling features use specific preview) -->
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.6.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.0" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.0" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.0" />
@@ -103,10 +100,6 @@
     <PackageVersion Include="Grpc.Net.ClientFactory" Version="2.71.0" />
     <PackageVersion Include="Grpc.Tools" Version="2.71.0" />
     <PackageVersion Include="Google.Protobuf" Version="3.31.0" />
-    <!-- Roslyn 5.6.0 (bumped per dead-neuron-cleanup plan; unifies analysis + scripting, removes skew). -->
-    <PackageVersion Include="Microsoft.CodeAnalysis" Version="5.6.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="5.6.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.6.0" />
     <!-- Google Workspace ino (Gmail/Drive/Calendar) — versions verified via nuget.org 2026-07-01 -->
     <PackageVersion Include="Google.Apis.Gmail.v1" Version="1.74.0.4162" />
     <PackageVersion Include="Google.Apis.Drive.v3" Version="1.75.0.4192" />

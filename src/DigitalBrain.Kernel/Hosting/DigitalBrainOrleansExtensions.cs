@@ -4,7 +4,6 @@ using Azure.Storage.Blobs;
 using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
-using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.SelfEvolution;
@@ -77,16 +76,12 @@ public static class DigitalBrainOrleansExtensions
                 services.AddScoped<NeuronJournals>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationDefinitionApplyHandler>();
                 services.AddSingleton<ISelfEvolutionApplyHandler, AutomationRemovalApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryRunApplyHandler>();
-                services.AddSingleton<ISelfEvolutionApplyHandler, FoundryDeployApplyHandler>();
-                services.AddSingleton<ICapabilityBroker, CapabilityBroker>();
                 services.AddSingleton<IInoEffectPlanStore, InoEffectPlanStore>();
                 if (builder.Configuration.GetValue<bool>("DigitalBrain:Tools:Enabled"))
                     services.AddSingleton<IInoToolGateway, PlanInoToolGateway>();
                 else
                     services.AddSingleton<IInoToolGateway, ClosedInoToolGateway>();
             });
-            siloBuilder.AddFoundry();
 
             if (!requiresDurableStorage)
             {
