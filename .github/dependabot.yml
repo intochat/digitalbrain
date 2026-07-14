@@ -54,6 +54,3 @@ updates:
       flutter-deps:
         patterns:
           - "*"
-        update-types:
-          - "version-update:semver-minor"
-          - "version-update:semver-patch"

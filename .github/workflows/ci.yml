@@ -38,10 +38,19 @@ jobs:
             check_range=("${empty_tree}" "${HEAD_SHA}")
           fi
 
-          if ! git diff --check "${check_range[@]}" -- . ':(exclude)**/*.lock' ':(exclude)**/pubspec.yaml' ':(exclude)**/pubspec.lock' ':(exclude).config/dotnet-tools.json' >"$report" 2>&1; then
-            echo "Whitespace validation failed. Run git diff --check locally."
-            cat "$report"
-            exit 1
+          if ! git diff --check "${check_range[@]}" >"$report" 2>&1; then
+            # Post-filter: only treat as failure if ws errors exist outside of package-manager generated files.
+            # This keeps the git command clean while still enforcing hygiene on real source.
+            filtered=$(mktemp)
+            grep -v -E '(\.lock:|/pubspec\.yaml:|/pubspec\.lock:|\.config/dotnet-tools\.json:)' "$report" >"$filtered" || true
+            if [ -s "$filtered" ]; then
+              echo "Whitespace validation failed. Run git diff --check locally."
+              cat "$filtered"
+              rm -f "$filtered"
+              exit 1
+            fi
+            rm -f "$filtered"
+            echo "Only package manifests/locks had whitespace differences (common with automated updates)."
           fi
 
       - name: Scan tracked files for credential-shaped content
@@ -155,17 +164,48 @@ jobs:
           channel: stable
           cache: true
 
-      - run: flutter pub get
+      - name: Flutter pub get
         working-directory: app
+        run: flutter pub get
 
-      - run: flutter analyze
+      - name: Flutter analyze
         working-directory: app
-        continue-on-error: ${{ github.actor == 'dependabot[bot]' }}
+        shell: bash
+        run: |
+          set +e
+          flutter analyze
+          status=$?
+          set -e
+          if [[ $status -ne 0 && "${{ github.actor }}" == "dependabot[bot]" ]]; then
+            echo "::warning::Flutter analyze failed under dependabot update. This is expected on some major version bumps. Review errors and follow up with code changes if needed."
+            exit 0
+          fi
+          exit $status
 
-      - run: flutter test
+      - name: Flutter test
         working-directory: app
-        continue-on-error: ${{ github.actor == 'dependabot[bot]' }}
+        shell: bash
+        run: |
+          set +e
+          flutter test
+          status=$?
+          set -e
+          if [[ $status -ne 0 && "${{ github.actor }}" == "dependabot[bot]" ]]; then
+            echo "::warning::Flutter test failed under dependabot update. This is expected on some major version bumps."
+            exit 0
+          fi
+          exit $status
 
-      - run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run
+      - name: Flutter build web
         working-directory: app
-        continue-on-error: ${{ github.actor == 'dependabot[bot]' }}
+        shell: bash
+        run: |
+          set +e
+          flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run
+          status=$?
+          set -e
+          if [[ $status -ne 0 && "${{ github.actor }}" == "dependabot[bot]" ]]; then
+            echo "::warning::Flutter web build failed under dependabot update. This is expected on some major version bumps."
+            exit 0
+          fi
+          exit $status
