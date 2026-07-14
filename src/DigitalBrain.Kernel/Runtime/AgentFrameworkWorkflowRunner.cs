@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -11,6 +12,20 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
     private const string RunnerName = "agent-framework";
     private const int MaximumCapabilityMatches = 3;
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Ino.Workflow");
+    private static readonly HashSet<string> ConversationalPrompts = new(StringComparer.Ordinal)
+    {
+        "hi",
+        "hello",
+        "hey",
+        "hi there",
+        "hello there",
+        "thanks",
+        "thank you",
+        "help",
+        "what can you do",
+        "what can you help with",
+        "what do you do"
+    };
     public async Task<InoWorkflowResult> ExecuteAsync(InoWorkflowRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(request.OperationId);
@@ -37,7 +52,7 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
                 "A few capabilities could match this request. Please choose one and ask again.",
                 workflow,
                 Capability: resolution.Receipt),
-            CapabilityResolutionKind.Missing => await CreateMissingCapabilityResultAsync(workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
+            CapabilityResolutionKind.Missing => await CreateMissingCapabilityResultAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
             CapabilityResolutionKind.Match when !string.Equals(resolution.Receipt.CapabilityId, BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, StringComparison.Ordinal) =>
                 await AcknowledgeSelectedCapabilityAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
             _ => await RunGeneralAgentAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false)
@@ -56,14 +71,27 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
             workflow,
             Capability: receipt);
     }
-    private static Task<InoWorkflowResult> CreateMissingCapabilityResultAsync(
+    private async Task<InoWorkflowResult> CreateMissingCapabilityResultAsync(
+        InoWorkflowRequest request,
         WorkflowReference workflow,
         CapabilityResolutionReceipt receipt,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(new InoWorkflowResult(
-            "I don't have a capability for that request yet.",
+        CancellationToken cancellationToken)
+    {
+        if (IsConversationalPrompt(request.Prompt))
+            return await RunGeneralAgentAsync(request, workflow, receipt, cancellationToken).ConfigureAwait(false);
+        if (services.GetService<IFeatureGrainResolver>() is not { } resolver || request.OwnerId is not { } ownerId)
+            return new InoWorkflowResult("I don't have a capability for that request yet.", workflow, Capability: receipt);
+        var draft = await resolver.Hub(ownerId).CreateDraftAsync(
+            new CreateFeatureDraft(request.OperationId, request.Prompt, ResolveNow())).ConfigureAwait(false);
+        return new InoWorkflowResult(
+            "I don’t have a trusted capability for that yet. I created a Feature draft. Open Studio to define and verify its behavior?",
             workflow,
-            Capability: receipt));
+            Capability: receipt,
+            Proposal: new FeatureDraftReference(draft.ProposalId, "Open Studio", "/features/proposals/" + draft.ProposalId));
+    }
+    private DateTimeOffset ResolveNow() => services.GetService<TimeProvider>()?.GetUtcNow() ?? DateTimeOffset.UtcNow;
+    private static bool IsConversationalPrompt(string prompt) =>
+        ConversationalPrompts.Contains(prompt.Trim().TrimEnd('.', '!', '?').Trim().ToLowerInvariant());
     private async Task<InoWorkflowResult> RunGeneralAgentAsync(
         InoWorkflowRequest request,
         WorkflowReference workflow,

@@ -194,6 +194,7 @@ public sealed class FeatureEventEffectE2ETests
         }
 
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
+        public Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request) => throw new NotSupportedException();
         public Task<FeatureHubSnapshot> ReadAsync() => throw new NotSupportedException();
         public Task<FeatureApprovalSnapshot> ProposeAsync(FeatureReleaseProposal proposal, long expectedRevision) => throw new NotSupportedException();
         public Task<FeatureApprovalSnapshot> DecideAsync(FeatureApprovalDecision decision, long expectedRevision) => throw new NotSupportedException();

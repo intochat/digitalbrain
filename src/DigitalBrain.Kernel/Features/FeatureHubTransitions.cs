@@ -224,6 +224,33 @@ internal static class FeatureHubTransitions
             throw new FeatureLimitExceededException("An owner can have at most 100 feature installations.");
         return state with { Installations = [.. state.Installations, registration], Revision = checked(state.Revision + 1) };
     }
+    public static FeatureCreateDraftTransition CreateDraft(FeatureHubState state, string ownerScope, CreateFeatureDraft request)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerScope);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.OperationId);
+        if (request.OperationId.Length > FeatureLimits.DraftOperationIdCharacters || request.OperationId.Any(char.IsControl))
+            throw new ArgumentException("A bounded canonical operation id is required.", nameof(request));
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Goal);
+        if (request.Goal.Length > FeatureLimits.DraftGoalCharacters || request.Goal.Any(char.IsControl))
+            throw new ArgumentException("A bounded control-character-free feature draft goal is required.", nameof(request));
+        if (request.RequestedAt.Offset != TimeSpan.Zero)
+            throw new ArgumentException("Feature draft timestamps must be UTC.", nameof(request));
+        var drafts = state.Drafts ?? [];
+        var existing = drafts.FirstOrDefault(draft => string.Equals(draft.OperationId, request.OperationId, StringComparison.Ordinal));
+        if (existing is not null)
+        {
+            if (!string.Equals(existing.Goal, request.Goal, StringComparison.Ordinal))
+                throw new FeatureConcurrencyException("The operation id is already bound to a different feature draft goal.");
+            return new FeatureCreateDraftTransition(state, existing);
+        }
+        if (drafts.Length >= FeatureLimits.DraftsPerOwner)
+            throw new FeatureLimitExceededException("An owner can have at most 100 feature drafts.");
+        var draft = new FeatureDraftProposal(DraftProposalId(ownerScope, request.OperationId), request.OperationId, request.Goal, "draft", request.RequestedAt);
+        var nextState = state with { Drafts = [.. drafts, draft], Revision = checked(state.Revision + 1) };
+        return new FeatureCreateDraftTransition(nextState, draft);
+    }
     public static FeatureHubState BeginFanOut(FeatureHubState state, FeatureInput input)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -380,6 +407,8 @@ internal static class FeatureHubTransitions
         return values.Order(StringComparer.Ordinal).ToArray();
     }
     private static string ApprovalId(FeatureInstallationId installationId, ReleaseDigest release, long revision) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"digitalbrain.v3.feature-approval\0{installationId.Value}\0{release.Value}\0{revision}")));
+    private static string DraftProposalId(string ownerScope, string operationId) =>
+        "proposal-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(ownerScope + "\0" + operationId)))[..32];
     private static void DemandRevision(FeatureHubState state, long expectedRevision)
     {
         if (state.Revision != expectedRevision)

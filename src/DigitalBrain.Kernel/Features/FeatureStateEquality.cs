@@ -24,7 +24,8 @@ internal static class FeatureStateEquality
         Same(left.Releases, right.Releases) &&
         Same(left.Approvals, right.Approvals) &&
         Same(left.Authorities, right.Authorities) &&
-        left.Alerts.SequenceEqual(right.Alerts);
+        left.Alerts.SequenceEqual(right.Alerts) &&
+        (left.Drafts ?? []).SequenceEqual(right.Drafts ?? []);
     private static bool Same(IReadOnlyList<FeatureInstallationRegistration> left, IReadOnlyList<FeatureInstallationRegistration> right) =>
         left.Count == right.Count && left.Zip(right).All(pair =>
             pair.First.InstallationId == pair.Second.InstallationId && pair.First.Release == pair.Second.Release &&

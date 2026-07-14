@@ -3,6 +3,9 @@ namespace DigitalBrain.Kernel.Features;
 internal static class FeatureLimits
 {
     public const int InstallationsPerOwner = 100;
+    public const int DraftsPerOwner = 100;
+    public const int DraftGoalCharacters = 4096;
+    public const int DraftOperationIdCharacters = 256;
     public const int InboxEntries = 1_000;
     public const int StateUtf8Bytes = 64 * 1024;
     public const int IntentsPerRun = 32;
