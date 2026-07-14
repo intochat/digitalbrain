@@ -10,11 +10,6 @@ import 'package:digitalbrain_flutter/ui_kit/ui_text.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_text_field.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_button.dart';
 
-// Reproduces the real ui-gallery "inputs" hop layout directly from ui_kit widgets: a UiKitScreen
-// containing a UiKitSidebar (full-height nav rail) plus a heading, many panels, and a button. The
-// sidebar must not be stacked into the screen's vertical column (where it gets unbounded height and
-// blanks the view), and the many panels must scroll.
-
 void _noop(String name, Map<String, Object?> args) {}
 
 void main() {
@@ -61,12 +56,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    // "Inputs" renders both as the heading and as a sidebar nav item — proves the sidebar laid out too.
+
     expect(find.text('Inputs'), findsWidgets);
-    expect(find.text('Display'), findsWidgets); // sidebar nav item
-    expect(
-      find.text('Next: Display'),
-      findsOneWidget,
-    ); // the trailing button is built (scrollable content)
+    expect(find.text('Display'), findsWidgets);
+    expect(find.text('Next: Display'), findsOneWidget);
   });
 }

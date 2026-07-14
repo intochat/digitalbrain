@@ -1,7 +1,5 @@
 part of 'package:digitalbrain_flutter/rfw_host/digitalbrain_rfw_library.dart';
 
-// Data widgets (Table, Timeline, Progress, Telemetry, LlmSettings, GraphCanvas, etc.) will be moved here.
-
 Widget _timeline(BuildContext c, DataSource s) {
   final n = s.length(['items']);
   final rows = <Widget>[];

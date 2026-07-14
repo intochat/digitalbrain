@@ -1,9 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-// Accumulator for InoSourceCard chunks. BrainSceneScreen routes inbound
-// InoSourceCard envelopes here when their correlationId matches the editor's
-// current authoring correlation. The CodeEditor (or a TypewriterController
-// owned by the editor body) reads `accumulated` and types it.
 class InoSourceSubscription extends ChangeNotifier {
   String? _correlationId;
   final StringBuffer _buffer = StringBuffer();

@@ -17,8 +17,6 @@ class GlowIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Check cache first for all tiers: pre-warmed raster is infinitely faster
-    // than real-time software blur.
     final cached = _cache[spec];
     if (cached != null) {
       return RawImage(
@@ -43,10 +41,6 @@ class GlowIcon extends StatelessWidget {
     );
   }
 
-  // Pre-warm the raster cache for a batch of specs so frame-1 paints from
-  // cache; build() still delegates to CustomPaint when the cache misses.
-  // Sources dot-count + blur from the smooth-tier SDK helpers so the cached
-  // image stays consistent with build()'s smooth-only gate.
   static Future<void> prewarm(Iterable<GlowIconSpec> specs) async {
     final smoothDotCount = perf.glowPainterDotCount(perf.PerfTier.smooth);
     final smoothBlurSigma = perf.glowPainterBlurSigma(perf.PerfTier.smooth);

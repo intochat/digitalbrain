@@ -22,8 +22,6 @@ class _UiKitScreenState extends State<UiKitScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // A ui:Sidebar is a full-height nav rail — pull it out of the vertical flow so it isn't given
-    // unbounded height (which throws and blanks the screen) and lay it beside the scrollable content.
     Widget? sidebar;
     final flow = <Widget>[];
     for (final child in widget.children) {
@@ -34,7 +32,6 @@ class _UiKitScreenState extends State<UiKitScreen> {
       }
     }
 
-    // Scrollable so a hop with many components (e.g. the gallery) doesn't overflow the viewport.
     final content = SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(

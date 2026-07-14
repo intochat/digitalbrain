@@ -11,13 +11,8 @@ using OpInsights = Pulumi.AzureNative.OperationalInsights;
 using OpInsightsInputs = Pulumi.AzureNative.OperationalInsights.Inputs;
 using Storage = Pulumi.AzureNative.Storage;
 using StorageInputs = Pulumi.AzureNative.Storage.Inputs;
-
 namespace DigitalBrain.Deploy;
 
-// Minimal Pulumi program for DigitalBrain / NeuroOS. Provisions only what the runtime actually uses:
-// a resource group, one Storage account (Orleans Table clustering + Blob grain/journal), Azure OpenAI,
-// Log Analytics + App Insights, an ACA managed environment, the kernel, and the public one-replica MCP/UI edge.
-// Replaces the vendored DeploymentKit.
 internal static class Program
 {
     private const string Region = "westeurope";
@@ -31,13 +26,7 @@ internal static class Program
     private const string DefaultMcpCustomHostname = "mcp.digitalbrain.tech";
     private const string RequiredMcpAudience = "digitalbrain-v2";
     private const string RequiredUiAudience = "digitalbrain-v2-ui";
-
-    // The image lives in a private Docker Hub repository. ACA authenticates the pull
-    // via AppInputs.RegistryCredentialsArgs (server=docker.io) with a Docker Hub PAT stored as a Container App
-    // secret (DockerHubPasswordSecret below), since the repository is private.
     private const string DockerHubPasswordSecret = "dockerhub-password";
-
-    // Container App secret names backing the NeuroOS runtime contract.
     private const string OpenAiKeySecret = "digitalbrain-openai-key";
     private const string CheckpointKeySecret = "digitalbrain-checkpoint-key";
     private const string SessionSigningKeySecret = "digitalbrain-session-signing-key";
@@ -45,47 +34,19 @@ internal static class Program
     private const string RuntimeStateSigningKeySecret = "digitalbrain-runtime-state-signing-key";
     private const string GoogleClientSecret = "digitalbrain-google-client-secret";
     private const string SalesforceClientSecret = "digitalbrain-salesforce-client-secret";
-
-    // The environment + kernel app were previously created under DeploymentKit's "app-runtime" component. Alias to that old
-    // parent URN so Pulumi re-parents them to the stack root in place instead of replacing the live resources.
     private const string LegacyRuntimeComponentUrn =
-        "urn:pulumi:dev::digitalbrain-deploy::DeploymentKit:deploymentkit:DeploymentKitApp::digitalbrain-app-runtime-prod";
-
+            "urn:pulumi:dev::digitalbrain-deploy::DeploymentKit:deploymentkit:DeploymentKitApp::digitalbrain-app-runtime-prod";
     private static Task<int> Main() => Pulumi.Deployment.RunAsync(Provision);
-
     private static IDictionary<string, object?> Provision()
     {
         var config = new Config();
         var dockerHubUsername = RequiredSetting(config, "dockerHubUsername", "DIGITALBRAIN_DOCKERHUB_USERNAME");
-        var imageTag = Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
-            ?? config.Get("imageTag")
-            ?? "latest";
-        var frontendApexOrigin = ConfiguredHttpsOrigin(
-            config,
-            "DIGITALBRAIN_WEB_APEX_HOSTNAME",
-            "webApexHostname",
-            DefaultFrontendApexHostname);
-        var frontendWwwOrigin = ConfiguredHttpsOrigin(
-            config,
-            "DIGITALBRAIN_WEB_HOSTNAME",
-            "webHostname",
-            DefaultFrontendWwwHostname);
-        var frontendStaticWebAppsOrigin = ConfiguredHttpsOrigin(
-            config,
-            "DIGITALBRAIN_STATIC_WEB_APPS_HOSTNAME",
-            "staticWebAppsHostname",
-            DefaultFrontendStaticWebAppsHostname);
-        var kernelCustomEndpoint = ConfiguredHttpsOrigin(
-            config,
-            "DIGITALBRAIN_KERNEL_HOSTNAME",
-            "kernelHostname",
-            DefaultKernelCustomHostname);
-        var mcpCustomEndpoint = ConfiguredHttpsOrigin(
-            config,
-            "DIGITALBRAIN_MCP_HOSTNAME",
-            "mcpHostname",
-            DefaultMcpCustomHostname);
-
+        var imageTag = Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG") ?? config.Get("imageTag") ?? "latest";
+        var frontendApexOrigin = ConfiguredHttpsOrigin(config, "DIGITALBRAIN_WEB_APEX_HOSTNAME", "webApexHostname", DefaultFrontendApexHostname);
+        var frontendWwwOrigin = ConfiguredHttpsOrigin(config, "DIGITALBRAIN_WEB_HOSTNAME", "webHostname", DefaultFrontendWwwHostname);
+        var frontendStaticWebAppsOrigin = ConfiguredHttpsOrigin(config, "DIGITALBRAIN_STATIC_WEB_APPS_HOSTNAME", "staticWebAppsHostname", DefaultFrontendStaticWebAppsHostname);
+        var kernelCustomEndpoint = ConfiguredHttpsOrigin(config, "DIGITALBRAIN_KERNEL_HOSTNAME", "kernelHostname", DefaultKernelCustomHostname);
+        var mcpCustomEndpoint = ConfiguredHttpsOrigin(config, "DIGITALBRAIN_MCP_HOSTNAME", "mcpHostname", DefaultMcpCustomHostname);
         var sessionSigningKey = RequiredSecret(config, "sessionSigningKey", "DIGITALBRAIN_SESSION_SIGNING_KEY");
         var runtimeStateKek = RequiredSecret(config, "runtimeStateKek", "DIGITALBRAIN_RUNTIME_STATE_KEK");
         var runtimeStateSigningKey = RequiredSecret(config, "runtimeStateSigningKey", "DIGITALBRAIN_RUNTIME_STATE_SIGNING_KEY");
@@ -104,17 +65,9 @@ internal static class Program
         DemandOAuthCallback(googleRedirectUri, kernelCustomEndpoint, "google", "DIGITALBRAIN_GOOGLE_REDIRECT_URI");
         DemandOAuthCallback(salesforceRedirectUri, kernelCustomEndpoint, "salesforce", "DIGITALBRAIN_SALESFORCE_REDIRECT_URI");
         var frontendOrigins = string.Join(',', frontendApexOrigin, frontendWwwOrigin, frontendStaticWebAppsOrigin);
-
         var checkpointKey = RequiredSecret(config, "checkpointKey", "DIGITALBRAIN_CHECKPOINT_KEY");
         var dockerHubToken = RequiredSecret(config, "dockerHubToken", "DIGITALBRAIN_DOCKERHUB_TOKEN");
-
-        var resourceGroup = new ResourceGroup(ResourceGroupName, new ResourceGroupArgs
-        {
-            ResourceGroupName = ResourceGroupName,
-            Location = Region,
-            Tags = StandardTags("resource-group")
-        });
-
+        var resourceGroup = new ResourceGroup(ResourceGroupName, new ResourceGroupArgs { ResourceGroupName = ResourceGroupName, Location = Region, Tags = StandardTags("resource-group") });
         var storage = new Storage.StorageAccount("digitalbrainstprod", new Storage.StorageAccountArgs
         {
             AccountName = "digitalbrainstprod",
@@ -127,14 +80,9 @@ internal static class Program
             AllowSharedKeyAccess = false,
             EnableHttpsTrafficOnly = true,
             MinimumTlsVersion = Storage.MinimumTlsVersion.TLS1_2,
-            NetworkRuleSet = new StorageInputs.NetworkRuleSetArgs
-            {
-                Bypass = Storage.Bypass.AzureServices,
-                DefaultAction = Storage.DefaultAction.Allow
-            },
+            NetworkRuleSet = new StorageInputs.NetworkRuleSetArgs { Bypass = Storage.Bypass.AzureServices, DefaultAction = Storage.DefaultAction.Allow },
             Tags = StandardTags("storage-account")
         });
-
         var openAi = new Cognitive.Account("digitalbrainopenaiprod", new Cognitive.AccountArgs
         {
             AccountName = "digitalbrainopenaiprod",
@@ -144,13 +92,9 @@ internal static class Program
             Sku = new CognitiveInputs.SkuArgs { Name = "S0" },
             Identity = new CognitiveInputs.IdentityArgs { Type = Cognitive.ResourceIdentityType.SystemAssigned },
             Properties = new CognitiveInputs.AccountPropertiesArgs
-            {
-                CustomSubDomainName = "digitalbrainopenaiprod",
-                PublicNetworkAccess = Cognitive.PublicNetworkAccess.Enabled
-            },
+            { CustomSubDomainName = "digitalbrainopenaiprod", PublicNetworkAccess = Cognitive.PublicNetworkAccess.Enabled },
             Tags = StandardTags("azure-openai")
         });
-
         var chatDeployment = new Cognitive.Deployment(ChatDeploymentName, new Cognitive.DeploymentArgs
         {
             DeploymentName = ChatDeploymentName,
@@ -158,23 +102,10 @@ internal static class Program
             ResourceGroupName = resourceGroup.Name,
             Sku = new CognitiveInputs.SkuArgs { Name = "GlobalStandard", Capacity = 10 },
             Properties = new CognitiveInputs.DeploymentPropertiesArgs
-            {
-                Model = new CognitiveInputs.DeploymentModelArgs
-                {
-                    Format = "OpenAI",
-                    Name = "gpt-4o-mini",
-                    Version = "2024-07-18"
-                }
-            }
+            { Model = new CognitiveInputs.DeploymentModelArgs { Format = "OpenAI", Name = "gpt-4o-mini", Version = "2024-07-18" } }
         });
-
         var openAiEndpoint = openAi.Properties.Apply(p => p.Endpoint ?? string.Empty);
-        var openAiKey = Output.CreateSecret(Cognitive.ListAccountKeys.Invoke(new Cognitive.ListAccountKeysInvokeArgs
-        {
-            ResourceGroupName = resourceGroup.Name,
-            AccountName = openAi.Name
-        }).Apply(keys => keys.Key1 ?? string.Empty));
-
+        var openAiKey = Output.CreateSecret(Cognitive.ListAccountKeys.Invoke(new Cognitive.ListAccountKeysInvokeArgs { ResourceGroupName = resourceGroup.Name, AccountName = openAi.Name }).Apply(keys => keys.Key1 ?? string.Empty));
         var workspace = new OpInsights.Workspace("digitalbrain-log-prod", new OpInsights.WorkspaceArgs
         {
             WorkspaceName = "digitalbrain-log-prod",
@@ -184,7 +115,6 @@ internal static class Program
             RetentionInDays = 90,
             Tags = StandardTags("log-analytics")
         });
-
         var appInsights = new AppInsights.Component("digitalbrain-ai-prod", new AppInsights.ComponentArgs
         {
             ResourceName = "digitalbrain-ai-prod",
@@ -196,13 +126,7 @@ internal static class Program
             Tags = StandardTags("application-insights")
         });
         var appInsightsConnectionString = appInsights.ConnectionString;
-
-        var workspaceSharedKey = Output.CreateSecret(OpInsights.GetSharedKeys.Invoke(new OpInsights.GetSharedKeysInvokeArgs
-        {
-            ResourceGroupName = resourceGroup.Name,
-            WorkspaceName = workspace.Name
-        }).Apply(k => k.PrimarySharedKey ?? string.Empty));
-
+        var workspaceSharedKey = Output.CreateSecret(OpInsights.GetSharedKeys.Invoke(new OpInsights.GetSharedKeysInvokeArgs { ResourceGroupName = resourceGroup.Name, WorkspaceName = workspace.Name }).Apply(k => k.PrimarySharedKey ?? string.Empty));
         var containerEnvironment = new App.ManagedEnvironment("digitalbrain-cae-prod", new App.ManagedEnvironmentArgs
         {
             EnvironmentName = "digitalbrain-cae-prod",
@@ -211,35 +135,21 @@ internal static class Program
             AppLogsConfiguration = new AppInputs.AppLogsConfigurationArgs
             {
                 Destination = "log-analytics",
-                LogAnalyticsConfiguration = new AppInputs.LogAnalyticsConfigurationArgs
-                {
-                    CustomerId = workspace.CustomerId,
-                    SharedKey = workspaceSharedKey
-                }
+                LogAnalyticsConfiguration = new AppInputs.LogAnalyticsConfigurationArgs { CustomerId = workspace.CustomerId, SharedKey = workspaceSharedKey }
             },
             Tags = StandardTags("container-apps-environment")
         }, AliasOldRuntimeParent());
-
         var kernelImage = Output.Format($"docker.io/{dockerHubUsername}/digitalbrain-kernel:{imageTag}");
-
         var kernelApp = new App.ContainerApp("digitalbrain-jobs", new App.ContainerAppArgs
         {
             ContainerAppName = "digitalbrain-jobs",
             ResourceGroupName = resourceGroup.Name,
             Location = Region,
             ManagedEnvironmentId = containerEnvironment.Id,
-            // System-assigned identity backs all Storage data-plane access. Shared-key access is disabled on
-            // the account, so a missing role assignment fails closed instead of falling back to an account key.
             Identity = new AppInputs.ManagedServiceIdentityArgs { Type = App.ManagedServiceIdentityType.SystemAssigned },
             Configuration = new AppInputs.ConfigurationArgs
             {
-                Ingress = new AppInputs.IngressArgs
-                {
-                    AllowInsecure = false,
-                    External = true,
-                    TargetPort = 8080,
-                    Transport = "Auto"
-                },
+                Ingress = new AppInputs.IngressArgs { AllowInsecure = false, External = true, TargetPort = 8080, Transport = "Auto" },
                 Secrets =
                 {
                     new AppInputs.SecretArgs { Name = OpenAiKeySecret, Value = openAiKey },
@@ -253,11 +163,7 @@ internal static class Program
                 Registries =
                 {
                     new AppInputs.RegistryCredentialsArgs
-                    {
-                        Server = "docker.io",
-                        Username = dockerHubUsername,
-                        PasswordSecretRef = DockerHubPasswordSecret
-                    }
+                    { Server = "docker.io", Username = dockerHubUsername, PasswordSecretRef = DockerHubPasswordSecret }
                 }
             },
             Template = new AppInputs.TemplateArgs
@@ -320,12 +226,10 @@ internal static class Program
                     }
                 },
                 Scale = new AppInputs.ScaleArgs { MinReplicas = 2, MaxReplicas = 5 },
-                // Give Orleans time to drain (deactivate grains, finish in-flight requests) on scale-in/redeploy before ACA SIGKILLs the pod.
                 TerminationGracePeriodSeconds = 90
             },
             Tags = StandardTags("container-app-jobs")
         }, AliasOldRuntimeParent());
-
         var mcpImage = Output.Format($"docker.io/{dockerHubUsername}/digitalbrain-mcp:{imageTag}");
         var mcpApp = new App.ContainerApp("digitalbrain-mcp", new App.ContainerAppArgs
         {
@@ -334,19 +238,10 @@ internal static class Program
             Location = Region,
             ManagedEnvironmentId = containerEnvironment.Id,
             Identity = new AppInputs.ManagedServiceIdentityArgs { Type = App.ManagedServiceIdentityType.SystemAssigned },
-            // MCP is the sole edge for Flutter runtime (authenticated gRPC UI transport only). Kernel FQDN is
-            // exposed solely for OAuth start/callbacks. Flutter web assets deployed to SWA reference only MCP_CUSTOM_HOSTNAME.
-            // Production fails closed on missing OIDC, keys, storage roles or MI. Single revision enforced.
             Configuration = new AppInputs.ConfigurationArgs
             {
                 ActiveRevisionsMode = "Single",
-                Ingress = new AppInputs.IngressArgs
-                {
-                    AllowInsecure = false,
-                    External = true,
-                    TargetPort = 8080,
-                    Transport = "Auto"
-                },
+                Ingress = new AppInputs.IngressArgs { AllowInsecure = false, External = true, TargetPort = 8080, Transport = "Auto" },
                 Secrets =
                 {
                     new AppInputs.SecretArgs { Name = SessionSigningKeySecret, Value = sessionSigningKey },
@@ -355,11 +250,7 @@ internal static class Program
                 Registries =
                 {
                     new AppInputs.RegistryCredentialsArgs
-                    {
-                        Server = "docker.io",
-                        Username = dockerHubUsername,
-                        PasswordSecretRef = DockerHubPasswordSecret
-                    }
+                    { Server = "docker.io", Username = dockerHubUsername, PasswordSecretRef = DockerHubPasswordSecret }
                 }
             },
             Template = new AppInputs.TemplateArgs
@@ -415,24 +306,17 @@ internal static class Program
                         }
                     }
                 },
-                // Runtime actions and authorization leases are deliberately single-owner. Do not autoscale
-                // until their stores and workers have a verified multi-replica coordination protocol.
                 Scale = new AppInputs.ScaleArgs { MinReplicas = 1, MaxReplicas = 1 },
                 TerminationGracePeriodSeconds = 60
             },
             Tags = StandardTags("container-app-mcp")
         });
-
         var kernelPrincipalId = kernelApp.Identity.Apply(identity => identity!.PrincipalId!);
         var mcpPrincipalId = mcpApp.Identity.Apply(identity => identity!.PrincipalId!);
-        GrantRole("kernel-storage-table-contributor", kernelPrincipalId, "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3", storage.Id); // Storage Table Data Contributor
-        GrantRole("kernel-storage-blob-contributor", kernelPrincipalId, "ba92f5b4-2d11-453d-a403-e96b0029c9fe", storage.Id); // Storage Blob Data Contributor
-        GrantRole("mcp-storage-table-reader", mcpPrincipalId, "76199698-9eea-4c19-bc75-cec21354c6b6", storage.Id); // Storage Table Data Reader
-        // Kernel identity isn't granted access until this deploys; the key-based path (openAiKey/OpenAiKeySecret
-        // above) stays wired unchanged so DigitalBrainChat.cs's key branch keeps working until a verified,
-        // separate follow-up deploy removes the key and flips DisableLocalAuth (Task 19 steps 2/4, out of scope here).
-        GrantRole("kernel-openai-user", kernelPrincipalId, "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd", openAi.Id); // Cognitive Services OpenAI User
-
+        GrantRole("kernel-storage-table-contributor", kernelPrincipalId, "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3", storage.Id);
+        GrantRole("kernel-storage-blob-contributor", kernelPrincipalId, "ba92f5b4-2d11-453d-a403-e96b0029c9fe", storage.Id);
+        GrantRole("mcp-storage-table-reader", mcpPrincipalId, "76199698-9eea-4c19-bc75-cec21354c6b6", storage.Id);
+        GrantRole("kernel-openai-user", kernelPrincipalId, "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd", openAi.Id);
         static void GrantRole(string resourceName, Input<string> principalId, string roleDefinitionGuid, Input<string> scope) =>
             _ = new Authorization.RoleAssignment(resourceName, new Authorization.RoleAssignmentArgs
             {
@@ -441,7 +325,6 @@ internal static class Program
                 RoleDefinitionId = $"/providers/Microsoft.Authorization/roleDefinitions/{roleDefinitionGuid}",
                 Scope = scope
             });
-
         return new Dictionary<string, object?>
         {
             ["resourceGroup"] = resourceGroup.Name,
@@ -458,7 +341,6 @@ internal static class Program
             ["environment"] = EnvSuffix
         };
     }
-
     private static string ConfiguredHttpsOrigin(Config config, string envName, string configName, string defaultHostname)
     {
         var configured = Environment.GetEnvironmentVariable(envName);
@@ -466,16 +348,12 @@ internal static class Program
         {
             configured = config.Get(configName);
         }
-
         if (string.IsNullOrWhiteSpace(configured))
         {
             configured = defaultHostname;
         }
-
         var trimmed = configured.Trim().TrimEnd('/');
-        var candidate = trimmed.Contains("://", System.StringComparison.Ordinal)
-            ? trimmed
-            : $"https://{trimmed}";
+        var candidate = trimmed.Contains("://", System.StringComparison.Ordinal) ? trimmed : $"https://{trimmed}";
         if (!System.Uri.TryCreate(candidate, System.UriKind.Absolute, out var origin) ||
             !string.Equals(origin.Scheme, System.Uri.UriSchemeHttps, System.StringComparison.OrdinalIgnoreCase) ||
             string.IsNullOrWhiteSpace(origin.Host) ||
@@ -484,70 +362,53 @@ internal static class Program
             origin.Query.Length != 0 ||
             origin.Fragment.Length != 0)
         {
-            throw new System.InvalidOperationException(
-                $"Production origin {envName} must be an HTTPS authority without credentials, path, query, or fragment.");
+            throw new System.InvalidOperationException($"Production origin {envName} must be an HTTPS authority without credentials, path, query, or fragment.");
         }
-
         return origin.GetLeftPart(System.UriPartial.Authority);
     }
-
     private static string RequiredSetting(Config config, string configName, string envName)
     {
         var value = Environment.GetEnvironmentVariable(envName);
         if (string.IsNullOrWhiteSpace(value)) value = config.Get(configName);
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new System.InvalidOperationException(
-                $"Required production setting is missing: set {envName} or Pulumi config '{configName}'.");
+            throw new System.InvalidOperationException($"Required production setting is missing: set {envName} or Pulumi config '{configName}'.");
         }
-
         return value.Trim();
     }
-
     private static string RequiredHttpsUri(Config config, string configName, string envName)
     {
         var value = RequiredSetting(config, configName, envName);
         if (!System.Uri.TryCreate(value, System.UriKind.Absolute, out var uri) ||
             !string.Equals(uri.Scheme, System.Uri.UriSchemeHttps, System.StringComparison.OrdinalIgnoreCase))
         {
-            throw new System.InvalidOperationException(
-                $"Required production setting {envName} must be an absolute HTTPS URI.");
+            throw new System.InvalidOperationException($"Required production setting {envName} must be an absolute HTTPS URI.");
         }
-
         return value;
     }
-
     private static Output<string> RequiredSecret(Config config, string configName, string envName)
     {
         var value = Environment.GetEnvironmentVariable(envName);
         if (!string.IsNullOrWhiteSpace(value)) return Output.CreateSecret(value);
-
         var configured = config.GetSecret(configName);
         if (configured is not null) return configured;
-
-        throw new System.InvalidOperationException(
-            $"Required production secret is missing: set {envName} or encrypted Pulumi config '{configName}'.");
+        throw new System.InvalidOperationException($"Required production secret is missing: set {envName} or encrypted Pulumi config '{configName}'.");
     }
-
     private static void DemandExactSetting(string actual, string expected, string envName)
     {
         if (!string.Equals(actual, expected, System.StringComparison.Ordinal))
             throw new System.InvalidOperationException($"Production setting {envName} must be '{expected}'.");
     }
-
     private static void DemandOAuthCallback(string actual, string kernelOrigin, string provider, string envName)
     {
         var expected = $"{kernelOrigin.TrimEnd('/')}/oauth/callback/{provider}";
         if (!string.Equals(actual.TrimEnd('/'), expected, System.StringComparison.OrdinalIgnoreCase))
         {
-            throw new System.InvalidOperationException(
-                $"Production setting {envName} must target the kernel's bounded OAuth callback '{expected}'.");
+            throw new System.InvalidOperationException($"Production setting {envName} must target the kernel's bounded OAuth callback '{expected}'.");
         }
     }
-
     private static CustomResourceOptions AliasOldRuntimeParent() =>
         new() { Aliases = { new Alias { ParentUrn = LegacyRuntimeComponentUrn } } };
-
     private static InputMap<string> StandardTags(string resourceType) => new Dictionary<string, string>
     {
         ["Environment"] = EnvSuffix,

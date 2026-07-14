@@ -14,13 +14,13 @@ dotnet build
 dotnet test --logger "console;verbosity=minimal"
 ```
 
-- After `git clean -fdx`, `dotnet build` (or `aspire run`) auto-initializes the CodeGraph index via MSBuild target.
+- After `git clean -fdx`, `dotnet build` (or `aspire start`) auto-initializes the CodeGraph index via MSBuild target.
 - Use the `codegraph` MCP server for architecture queries.
 
 Full stack:
 
 ```sh
-aspire run
+aspire start
 ```
 
 See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, iteration speed rules (MCP-first, parallel Context7, bg tests + polling, metrics + retro, self-evolution for WoW proposals), and pre-change ritual (Context7 + Aspire MCP + CodeGraph + todo).
@@ -35,8 +35,8 @@ The root test command is expected to run every test with zero skips:
 dotnet test --logger "console;verbosity=minimal"
 ```
 
-- **Real-stack E2E** (`tests/DigitalBrain.Tests/E2E`) boots the full Aspire AppHost + Orleans silo and drives it over real gRPC/gRPC-Web.
-- **AppHost execution-mode tests** (`tests/DigitalBrain.Tests/Aspire/AddDigitalBrainExecutionModeTests.cs`) inspect the declared Aspire resource graph without calling `BuildAsync`/`StartAsync`.
+- **Real-stack E2E** (`tests/DigitalBrain.E2ETests`) boots the full Aspire AppHost + Orleans silo and drives it over real gRPC/gRPC-Web.
+- **AppHost model tests** (`tests/DigitalBrain.AppHostTests`) inspect the declared Aspire resource graph without starting it.
 
 Do not keep a separate `aspire run` / `aspire start` session alive while running the full root test suite; the E2E fixture owns its AppHost lifecycle.
 
@@ -52,22 +52,19 @@ Use the CodeGraph MCP (see .mcp.json and CLAUDE.md) as the primary tool for arch
 ## Target Dependency Direction
 
 ```text
-DigitalBrain.Core
-        ^
-DigitalBrain.Kernel.Abstractions
-        ^
-        +----------------+----------------+
-        ^                ^                ^
-DigitalBrain.Kernel  DigitalBrain.Google  DigitalBrain.Salesforce
-        ^                ^                ^
-        +--------- DigitalBrain.RuntimeHost --------+
-                           ^
-             DigitalBrain.AppHost resource graph
-
-DigitalBrain.Mcp -> DigitalBrain.Kernel.Abstractions
+Provider Contracts       Feature SDK       Kernel Contracts
+       ^                      ^                  ^
+       |                      |                  |
+Provider Integrations    Feature releases    Kernel runtime
+       ^                      ^                  ^
+       +---------- RuntimeHost authority -------+
+                              ^
+                    MCP/UI + FeatureHost
+                              ^
+                 AppHost resource composition
 ```
 
-The final names may be simplified after deletion, but dependency direction must remain inward. `DigitalBrain.RuntimeHost` is the only process project allowed to compose the runtime with concrete providers. `DigitalBrain.AppHost` models resources and references the RuntimeHost executable without owning its service registrations.
+Dependencies point inward toward the three contract seams. `DigitalBrain.RuntimeHost` is the only process project allowed to compose the kernel with concrete providers. `DigitalBrain.AppHost` models resources and references process projects without owning their service registrations.
 
 No external mutation may bypass `InoEffectPlanAuthority`, durable approval evidence, idempotency, lease/fence checks, and outcome verification.
 
@@ -79,7 +76,7 @@ No external mutation may bypass `InoEffectPlanAuthority`, durable approval evide
 - **Aspire MCP + CLI** for fast inspection/restarts/logs/traces (prefer over full runs). Use resource-targeted restarts.
 - Tests: `dotnet test --logger "console;verbosity=minimal"` from root only. No --filter. Launch bg + poll with MCP logs.
 - After every change: build + above test + `aspire doctor` + MCP health. Log cycle time + 5-steps retro.
-- Delete trash (especially docs/plans). Only living docs: this README + CLAUDE.md.
+- Delete superseded documentation. Keep this README and CLAUDE.md current; retain an active approved spec or implementation plan only while its work remains open.
 - Relative paths. Self-explanatory names. No vacuous summaries.
 - Self-evolution is non-negotiable for mutations. Use rail to propose WoW improvements.
 - Minimal/isolated starts when possible; pre-build for MCP; parallel Context7 + MCP.

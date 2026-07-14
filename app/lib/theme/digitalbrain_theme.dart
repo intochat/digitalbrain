@@ -37,30 +37,28 @@ class DigitalBrainColors {
     stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
   );
 
-  static const ink = Color(0xFFF5F5F7); // Primary platinum white
-  static const inkMid = Color(0xFFE5E5E5); // Silver chrome body text
-  static const inkLow = Color(0xFF86868B); // Slate grey captions
-  static const inkFade = Color(0x24FFFFFF); // Faded
-  static const hairline = Color(0x0CFFFFFF); // 5% white keyline catch
-  static const hairlineStrong = Color(0x16FFFFFF); // 9% white keyline catch
+  static const ink = Color(0xFFF5F5F7);
+  static const inkMid = Color(0xFFE5E5E5);
+  static const inkLow = Color(0xFF86868B);
+  static const inkFade = Color(0x24FFFFFF);
+  static const hairline = Color(0x0CFFFFFF);
+  static const hairlineStrong = Color(0x16FFFFFF);
 
-  static const indigo = Color(0xFFE5E5E5); // Silver chrome
-  static const indigoSoft = Color(0xFFF5F5F7); // Platinum white
-  static const indigoDeep = Color(0xFF27272A); // Dark charcoal obsidian
-  static const lavender = Color(0xFFD4D4D8); // Light silver
+  static const indigo = Color(0xFFE5E5E5);
+  static const indigoSoft = Color(0xFFF5F5F7);
+  static const indigoDeep = Color(0xFF27272A);
+  static const lavender = Color(0xFFD4D4D8);
 
-  static const gold = Color(0xFFF5F5F7); // Spatial silver
+  static const gold = Color(0xFFF5F5F7);
   static const goldSoft = Color(0xFFE5E5E5);
 
-  static const teal = Color(0xFF27272A); // Charcoal obsidian
-  static const tealSoft = Color(0xFFE5E5E5); // Silver
+  static const teal = Color(0xFF27272A);
+  static const tealSoft = Color(0xFFE5E5E5);
 
-  static const violet = Color(0xFF86868B); // Slate grey
-  static const violetSoft = Color(0xFFE5E5E5); // Silver chrome
+  static const violet = Color(0xFF86868B);
+  static const violetSoft = Color(0xFFE5E5E5);
 
-  static const rose = Color(
-    0xFFFF9500,
-  ); // Precise Apple Hardware Amber indicator
+  static const rose = Color(0xFFFF9500);
 }
 
 class DigitalBrainTypography {

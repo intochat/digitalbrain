@@ -14,8 +14,8 @@ double glowPainterBlurSigma(PerfTier tier) => switch (tier) {
 
 bool rimGlowEnabled(PerfTier tier) => tier != PerfTier.red;
 
-// Gates SynapseStreamFeed.publish only (called from _LiveScreenState._onTick);
-// animation pumps continue at display refresh rate.
+
+
 int sceneTickMinIntervalMs(PerfTier tier) => switch (tier) {
   PerfTier.smooth => 33,
   PerfTier.strained => 125,

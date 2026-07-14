@@ -11,7 +11,6 @@ class UiKitList extends StatelessWidget {
     required this.onEvent,
   });
 
-  // Each entry is a raw child prop-map from the RFW node tree (keyed by 'props').
   final List<Map<String, Object?>> tileDescriptors;
   final RemoteEventHandler onEvent;
 

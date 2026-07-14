@@ -15,6 +15,32 @@ void main() {
       const ClientCapabilities().names,
       contains('ui.native.ino-conversation'),
     );
+    expect(
+      const ClientCapabilities().names,
+      contains('ui.native.feature-approval'),
+    );
+  });
+
+  test('decodes an exact-digest Feature approval surface', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(payload: featureApprovalPayload()),
+    );
+
+    final payload = envelope.payload as FeatureApprovalSurfacePayload;
+    expect(payload.installationId, 'email-summarizer');
+    expect(payload.approvalId, hasLength(64));
+    expect(payload.releaseDigest, hasLength(64));
+    expect(payload.revision, 7);
+    expect(payload.addedCapabilities, ['gmail.message.read.v1']);
+    expect(payload.capabilityBindings.single.provider, 'google');
+    expect(
+      payload.capabilityBindings.single.providerConnectionId,
+      'google-primary',
+    );
+    expect(
+      payload.capabilityBindings.single.constraints['maximumMessages'],
+      20,
+    );
   });
 
   test('decodes a complete SurfaceEnvelope and typed action binding', () {
@@ -23,8 +49,8 @@ void main() {
     );
 
     expect(envelope.protocolVersion, 2);
-    expect(envelope.tenantId, 'tenant-a');
-    expect(envelope.workspaceId, 'workspace-a');
+    expect(envelope.ownerId, 'owner-a');
+    expect(envelope.actorId, 'actor-a');
     expect(envelope.payload, isA<NativeSurfacePayload>());
     expect(envelope.actions.single.bindingId, 'refresh-binding');
     expect(envelope.actions.single.actionToken, 'signed-action-token');
@@ -169,7 +195,7 @@ void main() {
         messages: [
           {
             ...inoMessage(role: 'user', text: 'Hello', state: 'queued'),
-            'principalId': 'must-not-reach-renderer',
+            'actorId': 'must-not-reach-renderer',
           },
         ],
       ),
@@ -403,12 +429,12 @@ void main() {
         'accessToken',
         'refresh_token',
         'action-token',
-        'tenantId',
-        'workspace_id',
+        'ownerId',
+        'actor_id',
         'clientId',
         'grants',
-        'principal',
-        'principalId',
+        'actor',
+        'actorId',
         'secret',
         'session-id',
       ]) {

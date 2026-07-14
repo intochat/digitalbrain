@@ -29,8 +29,6 @@ Future<void> main() async {
   }
   Bloc.observer = TelemetryBlocObserver();
 
-  // The kernel does not implement the perf RPCs yet. Keep local perf probing
-  // active, but do not spam the gateway with unimplemented calls.
   final perfGateway = PerfGatewayClient(
     pushSamples: (samples) => samples.drain<void>(),
     watchHints: (_) => const Stream<PerfTierHint>.empty(),

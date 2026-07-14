@@ -4,9 +4,3 @@ config:
   digitalbrain-deploy:imageTag: v4
   digitalbrain-deploy:mcpAudience: digitalbrain-v2
   digitalbrain-deploy:uiAudience: digitalbrain-v2-ui
-
-# Production evaluation intentionally fails unless the remaining identity and OAuth inputs are supplied
-# through the deploy workflow or encrypted Pulumi config. Never commit their values here:
-# sessionSigningKey, runtimeStateKek, runtimeStateSigningKey, googleClientId, googleClientSecret,
-# googleRedirectUri, salesforceClientId, salesforceClientSecret, salesforceRedirectUri, oidcIssuer,
-# oidcAudience, checkpointKey, and dockerHubToken.

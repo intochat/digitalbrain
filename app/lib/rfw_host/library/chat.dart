@@ -1,7 +1,5 @@
 part of 'package:digitalbrain_flutter/rfw_host/digitalbrain_rfw_library.dart';
 
-// Chat specific widgets (PromptInput, StateEditor, Synapse*, etc.) will be moved here.
-
 Widget _synapseStream(BuildContext c, DataSource s) {
   final cid = _str(s, 'correlationId');
   final h = _d(s, 'height', 40);

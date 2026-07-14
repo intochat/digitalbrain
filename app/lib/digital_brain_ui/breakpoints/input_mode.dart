@@ -2,13 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 
-/// Input modality currently in use.
 enum InputMode { touch, pointer, stylus }
 
-/// Publishes the current [InputMode]. Resolution priority:
-///   1. Most-recent pointer event kind (touch, mouse, stylus) if observed,
-///   2. else platform-conventional default
-///      (iOS/Android/Fuchsia = touch, desktop = pointer).
 class InputModeScope extends StatefulWidget {
   const InputModeScope({required this.child, super.key});
 

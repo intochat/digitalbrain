@@ -1,17 +1,17 @@
-// src/clients/flutter/tool/check_ui_imports.dart
-//
-// Dart program (NOT a flutter_test) that walks lib/digital_brain_ui/**
-// and fails (exit 1) if any file imports from forbidden areas of the app.
-//
-// Run: `dart run tool/check_ui_imports.dart`
+
+
+
+
+
+
 
 import 'dart:io';
 
 const _allowedPrefixes = <String>[
   'dart:',
   'package:flutter/',
-  'package:material/', // 3.41 standalone
-  'package:cupertino/', // 3.41 standalone
+  'package:material/',
+  'package:cupertino/',
   'package:meta/',
   'package:vector_math/',
   'package:digital_brain_sdk_flutter/',
@@ -46,12 +46,12 @@ Future<int> main(List<String> args) async {
       final match = RegExp("import\\s+['\"](.+?)['\"]").firstMatch(line);
       if (match == null) continue;
       final uri = match.group(1)!;
-      // Relative imports inside digital_brain_ui are fine
-      // (both './foo.dart' and bare 'foo.dart' — no scheme, no package: prefix).
+
+
       if (!uri.contains(':')) continue;
-      // Same-package import into digital_brain_ui is fine.
+
       if (uri.startsWith('package:digitalbrain_flutter/digital_brain_ui/')) continue;
-      // Allowed external prefixes.
+
       final allowed = _allowedPrefixes.any(uri.startsWith);
       final forbidden = _forbiddenAppDirs.any(uri.startsWith);
       if (forbidden || !allowed) {

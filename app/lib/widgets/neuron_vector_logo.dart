@@ -30,8 +30,7 @@ class NeuronVectorLogo extends StatelessWidget {
       iconColor = SimpleIconColors.gmail;
     } else if (normalized.contains('github') || normalized.contains('issue')) {
       iconData = SimpleIcons.github;
-      iconColor = Colors
-          .white; // SimpleIconColors.github is black, which might not be visible in dark mode
+      iconColor = Colors.white;
     } else if (normalized.contains('stripe')) {
       iconData = SimpleIcons.stripe;
       iconColor = SimpleIconColors.stripe;
@@ -57,7 +56,7 @@ class NeuronVectorLogo extends StatelessWidget {
     } else if (normalized.contains('salesforce') ||
         normalized.contains('crm')) {
       iconData = Icons.cloud_queue;
-      iconColor = const Color(0xFF00A1E0); // Salesforce blue
+      iconColor = const Color(0xFF00A1E0);
     } else if (normalized.contains('travel') ||
         normalized.contains('tripadvisor')) {
       iconData = SimpleIcons.tripadvisor;
@@ -605,7 +604,6 @@ class LogoPainter extends CustomPainter {
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.fill;
 
-    // Hexagon path
     final hexPath = Path();
     final angle = math.pi / 3;
     final r = w * 0.48;

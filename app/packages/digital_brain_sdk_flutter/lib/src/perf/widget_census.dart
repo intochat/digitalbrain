@@ -16,7 +16,7 @@ class WidgetCensusSnapshot {
 class WidgetCensus {
   static Type? glowIconType;
 
-  // Iterative DFS — avoids per-frame cost of Element.toStringDeep.
+
   static WidgetCensusSnapshot capture(WidgetsBinding binding) {
     final root = binding.rootElement;
     if (root == null) return WidgetCensusSnapshot.empty;
@@ -26,8 +26,8 @@ class WidgetCensus {
     while (stack.isNotEmpty) {
       final e = stack.removeLast();
       widgetCount++;
-      // Matched by exact type pointer comparison if registered;
-      // otherwise, falls back to string comparison (avoids direct import dependency).
+
+
       final type = e.widget.runtimeType;
       if (glowIconType != null) {
         if (type == glowIconType) {

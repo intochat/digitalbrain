@@ -1,34 +1,23 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
-using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
-
+using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 namespace DigitalBrain.Mcp;
 
-public sealed class ConversationStateClient(
-    IClusterClient cluster,
-    TimeProvider timeProvider)
+public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider timeProvider)
 {
     private const string FeedOutboxKind = "surface-feed";
-
-    public async Task<InoConversationSnapshot> ReadAsync(
-        RuntimeRequestContext context,
-        CancellationToken cancellationToken = default)
+    public async Task<InoConversationSnapshot> ReadAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default)
     {
         context = await ResolveContextAsync(context, cancellationToken).ConfigureAwait(false);
         var state = await ReadStateAsync(context, cancellationToken).ConfigureAwait(false);
         return ToSnapshot(context, state);
     }
-
-    public async Task<InoConversationSnapshot> BeginAsync(
-        RuntimeRequestContext context,
-        string commandId,
-        string prompt,
-        CancellationToken cancellationToken = default)
+    public async Task<InoConversationSnapshot> BeginAsync(RuntimeRequestContext context, string commandId, string prompt, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(commandId) || commandId.Length > 256)
             throw new ArgumentException("A bounded command id is required.", nameof(commandId));
@@ -57,11 +46,7 @@ public sealed class ConversationStateClient(
                     context.CorrelationId,
                     null,
                     false,
-                    ToFeedTurns(current).Append(new OperationFeedTurn(
-                        commandId,
-                        "user",
-                        normalizedPrompt,
-                        InoConversationStates.Queued)).ToArray());
+                    ToFeedTurns(current).Append(new OperationFeedTurn(commandId, "user", normalizedPrompt, InoConversationStates.Queued)).ToArray());
                 return neuron.BeginOperationAsync(
                     current.Revision,
                     commandId,
@@ -75,7 +60,6 @@ public sealed class ConversationStateClient(
             cancellationToken).ConfigureAwait(false);
         return ToSnapshot(context, state);
     }
-
     public async Task<OperationReceipt> DecideApprovalAsync(
         RuntimeRequestContext context,
         string operationId,
@@ -84,15 +68,14 @@ public sealed class ConversationStateClient(
         string decisionId,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(operationId) || string.IsNullOrWhiteSpace(approvalId) ||
-            string.IsNullOrWhiteSpace(decisionId))
+        if (string.IsNullOrWhiteSpace(operationId) || string.IsNullOrWhiteSpace(approvalId) || string.IsNullOrWhiteSpace(decisionId))
             throw new ArgumentException("A bounded approval decision identity is required.");
         context = await ResolveContextAsync(context, cancellationToken).ConfigureAwait(false);
         var actor = RequestScope.Id(context);
         var neuron = Conversation(context);
         var state = await EnsureInitializedAsync(context, neuron, cancellationToken).ConfigureAwait(false);
         if (approved)
-            InoMutationGrants.Demand(
+            ExternalEffectGrants.Demand(
                 state.Operations.FirstOrDefault(operation =>
                     string.Equals(operation.OperationId, operationId, StringComparison.Ordinal))?.Effect?.Kind,
                 context.Grants);
@@ -124,11 +107,7 @@ public sealed class ConversationStateClient(
                     operation.RequestId,
                     approved ? null : assistantText,
                     false,
-                    ToFeedTurns(current).Append(new OperationFeedTurn(
-                        decisionId,
-                        "assistant",
-                        assistantText,
-                        phase == InoOperationPhase.Approved ? InoConversationStates.Queued : InoConversationStates.Failed)).ToArray(),
+                    ToFeedTurns(current).Append(new OperationFeedTurn(decisionId, "assistant", assistantText, phase == InoOperationPhase.Approved ? InoConversationStates.Queued : InoConversationStates.Failed)).ToArray(),
                     approvalId: approved ? null : approvalId,
                     effectId: operation.Effect?.EffectId,
                     workflow: operation.Workflow);
@@ -147,29 +126,19 @@ public sealed class ConversationStateClient(
         return TryGetDecisionReceipt(state, operationId, approvalId, approved, decisionId, actor)
             ?? throw new RuntimeStateIntegrityException("approval decision was not durably recorded");
     }
-
-    internal Task<RuntimeRequestContext> ResolveContextAsync(
-        RuntimeRequestContext context,
-        CancellationToken cancellationToken)
+    internal Task<RuntimeRequestContext> ResolveContextAsync(RuntimeRequestContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var conversationId = context.ConversationId ?? InoConversationIdentity.From(context);
         DemandConversationId(conversationId);
         return Task.FromResult(context with { ConversationId = conversationId });
     }
-
-    private async Task<ConversationState> ReadStateAsync(
-        RuntimeRequestContext context,
-        CancellationToken cancellationToken)
+    private async Task<ConversationState> ReadStateAsync(RuntimeRequestContext context, CancellationToken cancellationToken)
     {
         var state = await Conversation(context).ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         return state.Identity is null ? ConversationState.Empty() : state;
     }
-
-    private async Task<ConversationState> EnsureInitializedAsync(
-        RuntimeRequestContext context,
-        IConversationNeuron neuron,
-        CancellationToken cancellationToken)
+    private async Task<ConversationState> EnsureInitializedAsync(RuntimeRequestContext context, IConversationNeuron neuron, CancellationToken cancellationToken)
     {
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         var identity = Identity(context);
@@ -181,8 +150,7 @@ public sealed class ConversationStateClient(
         }
         try
         {
-            return await neuron.InitializeAsync(state.Revision, identity)
-                .WaitAsync(cancellationToken).ConfigureAwait(false);
+            return await neuron.InitializeAsync(state.Revision, identity).WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (RuntimeStateConflictException)
         {
@@ -192,12 +160,7 @@ public sealed class ConversationStateClient(
             return state;
         }
     }
-
-    private static async Task<TResult> RetryConflictAsync<TResult>(
-        IConversationNeuron neuron,
-        ConversationState initial,
-        Func<ConversationState, Task<TResult>> update,
-        CancellationToken cancellationToken)
+    private static async Task<TResult> RetryConflictAsync<TResult>(IConversationNeuron neuron, ConversationState initial, Func<ConversationState, Task<TResult>> update, CancellationToken cancellationToken)
     {
         var state = initial;
         for (var attempt = 0; attempt < 3; attempt++)
@@ -213,65 +176,36 @@ public sealed class ConversationStateClient(
         }
         throw new InvalidOperationException("Conversation revision retry exhausted.");
     }
-
     internal IConversationNeuron Conversation(RuntimeRequestContext context)
     {
         var conversationId = context.ConversationId ?? InoConversationIdentity.From(context);
         DemandConversationId(conversationId);
-        return cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
-            context.TenantId,
-            context.WorkspaceId,
-            context.Principal,
-            conversationId));
+        return cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(context.OwnerId, context.ActorId, conversationId));
     }
-
     private static ConversationIdentity Identity(RuntimeRequestContext context)
     {
         var conversationId = context.ConversationId ?? InoConversationIdentity.From(context);
         DemandConversationId(conversationId);
-        return new(context.TenantId, context.WorkspaceId, context.Principal, conversationId);
+        return new(context.OwnerId, context.ActorId, conversationId);
     }
-
     internal static string OperationId(RuntimeRequestContext context, string commandId)
     {
         var defaultConversationId = InoConversationIdentity.From(context);
-        var conversationScope = context.ConversationId is { } conversationId &&
-                                !string.Equals(conversationId, defaultConversationId, StringComparison.Ordinal)
+        var conversationScope = context.ConversationId is { } conversationId && !string.Equals(conversationId, defaultConversationId, StringComparison.Ordinal)
             ? "\0" + conversationId
             : string.Empty;
         return "runtime-op-" + Hash(RequestScope.Id(context) + conversationScope + "\0" + commandId);
     }
-
     internal static void DemandConversationId(string? conversationId)
     {
-        if (conversationId is null || conversationId.Length != 68 ||
-            !conversationId.StartsWith("ino-", StringComparison.Ordinal))
+        if (conversationId is null || conversationId.Length != 68 || !conversationId.StartsWith("ino-", StringComparison.Ordinal))
             throw new ArgumentException("Conversation ids must be canonical scoped identifiers.", nameof(conversationId));
         foreach (var character in conversationId.AsSpan(4))
             if (character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f'))
                 throw new ArgumentException("Conversation ids must be canonical scoped identifiers.", nameof(conversationId));
     }
-
-
-    private static ConversationOutboxEntry CreateOutbox(
-        string operationId,
-        InoOperationPhase phase,
-        long version,
-        OperationOutboxRecord projection,
-        DateTimeOffset now) => new(
-        $"operation:{operationId}:phase:{phase.ToString().ToLowerInvariant()}:v:{version}",
-        FeedOutboxKind,
-        projection.ToPayloadUtf8(),
-        now,
-        null);
-
-    private static OperationReceipt? TryGetDecisionReceipt(
-        ConversationState state,
-        string operationId,
-        string approvalId,
-        bool approved,
-        string decisionId,
-        string actor)
+    private static ConversationOutboxEntry CreateOutbox(string operationId, InoOperationPhase phase, long version, OperationOutboxRecord projection, DateTimeOffset now) => new($"operation:{operationId}:phase:{phase.ToString().ToLowerInvariant()}:v:{version}", FeedOutboxKind, projection.ToPayloadUtf8(), now, null);
+    private static OperationReceipt? TryGetDecisionReceipt(ConversationState state, string operationId, string approvalId, bool approved, string decisionId, string actor)
     {
         var operation = state.Operations.FirstOrDefault(candidate =>
             string.Equals(candidate.OperationId, operationId, StringComparison.Ordinal));
@@ -285,13 +219,8 @@ public sealed class ConversationStateClient(
             !string.Equals(approval.DecidedBy, actor, StringComparison.Ordinal) ||
             approval.State != (approved ? "approved" : "rejected"))
             throw new InvalidOperationException("An approval decision cannot be changed.");
-        return new(
-            operation.OperationId,
-            decisionId,
-            approved ? InoOperationPhase.Approved : InoOperationPhase.Failed,
-            operation.Version);
+        return new(operation.OperationId, decisionId, approved ? InoOperationPhase.Approved : InoOperationPhase.Failed, operation.Version);
     }
-
     private static OperationOutboxRecord CreateProjection(
         RuntimeRequestContext context,
         ConversationState state,
@@ -321,22 +250,18 @@ public sealed class ConversationStateClient(
             conversationId: identity.ConversationId,
             conversationRevision: checked(state.Revision + 1),
             requestId,
-            RuntimeStateKeys.Conversation(identity.TenantId, identity.WorkspaceId, identity.Principal, identity.ConversationId),
+            RuntimeStateKeys.Conversation(identity.OwnerId, identity.ActorId, identity.ConversationId),
             new OperationFeedView(commandId, string.Empty, retryable, safeReason, approvalId, action, turns),
             toolId,
             effectId,
             approvalId,
             workflow);
     }
-
-    internal static InoConversationSnapshot ToSnapshot(
-        RuntimeRequestContext context,
-        ConversationState state)
+    internal static InoConversationSnapshot ToSnapshot(RuntimeRequestContext context, ConversationState state)
     {
         if (state.Identity is null)
             return new(context.ConversationId ?? InoConversationIdentity.From(context), 0, [], []);
-        var projections = state.Outbox
-            .Where(entry => string.Equals(entry.Kind, FeedOutboxKind, StringComparison.Ordinal))
+        var projections = state.Outbox.Where(entry => string.Equals(entry.Kind, FeedOutboxKind, StringComparison.Ordinal))
             .Select(TryReadProjection)
             .Where(projection => projection is not null)
             .Cast<OperationOutboxRecord>()
@@ -349,8 +274,7 @@ public sealed class ConversationStateClient(
         {
             projections.TryGetValue(operation.OperationId, out var projection);
             var userText = state.Turns.LastOrDefault(turn =>
-                turn.Kind == ConversationTurnKind.User &&
-                string.Equals(turn.OperationId, operation.OperationId, StringComparison.Ordinal))?.Text ?? string.Empty;
+                turn.Kind == ConversationTurnKind.User && string.Equals(turn.OperationId, operation.OperationId, StringComparison.Ordinal))?.Text ?? string.Empty;
             var action = operation.Status == ConversationOperationStatus.AwaitingAuthorization &&
                          projection is { Phase: InoOperationPhase.AwaitingAuthorization } currentProjection &&
                          currentProjection.OperationVersion == operation.Version
@@ -380,10 +304,8 @@ public sealed class ConversationStateClient(
             ?? InoConversationStates.Succeeded)).ToArray();
         return new(state.Identity.ConversationId, checked((int)Math.Min(state.Revision, int.MaxValue)), turns, operations);
     }
-
     private static OperationOutboxRecord? TryReadProjection(ConversationOutboxEntry entry) =>
         OperationOutboxRecord.TryRead(entry.PayloadUtf8, out var projection) ? projection : null;
-
     private static OperationFeedTurn[] ToFeedTurns(ConversationState state) =>
         state.Turns.Select(turn => new OperationFeedTurn(
             turn.IdempotencyKey,
@@ -393,7 +315,6 @@ public sealed class ConversationStateClient(
                 string.Equals(operation.OperationId, turn.OperationId, StringComparison.Ordinal)) is { } operation
                 ? LegacyState(operation.Status)
                 : InoConversationStates.Succeeded)).ToArray();
-
     private static string LegacyState(ConversationOperationStatus status) => status switch
     {
         ConversationOperationStatus.Pending => InoConversationStates.Queued,
@@ -406,8 +327,6 @@ public sealed class ConversationStateClient(
         ConversationOperationStatus.Cancelled => InoConversationStates.Cancelled,
         _ => InoConversationStates.Failed
     };
-
     private static string Hash(string value) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
-
 }
