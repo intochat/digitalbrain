@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DigitalBrain.Kernel.Capabilities;
 using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel.Runtime;
@@ -27,6 +28,8 @@ public sealed record CapabilityParameterRequest
 
 public sealed class CapabilityParameterModel(IChatClient chatClient, ICapabilityCatalog catalog) : ICapabilityParameterModel
 {
+    private static readonly JsonElement ExtractionSchema = CreateExtractionSchema();
+
     public async Task<RetainedInoCapabilityPayload> ExtractAsync(CapabilityParameterRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -34,15 +37,30 @@ public sealed class CapabilityParameterModel(IChatClient chatClient, ICapability
                 string.Equals(candidate.Id, request.CapabilityId, StringComparison.Ordinal))
             ?? throw new ArgumentException($"Unknown capability '{request.CapabilityId}'.", nameof(request));
 
-        var response = await chatClient.GetResponseAsync<RetainedInoCapabilityPayload>(
-            new ChatMessage(ChatRole.User, BuildExtractionGuidance(descriptor, request.Prompt)),
-            cancellationToken: cancellationToken);
+        var response = await chatClient.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, BuildExtractionGuidance(descriptor, request.Prompt))],
+            new ChatOptions
+            {
+                ResponseFormat = ChatResponseFormat.ForJsonSchema(
+                    ExtractionSchema,
+                    "retained_capability_payload",
+                    "The server-selected capability id with the arguments extracted from the user's request.")
+            },
+            cancellationToken);
 
-        var extracted = response.Result;
+        var extracted = JsonSerializer.Deserialize<RetainedInoCapabilityPayload>(response.Text, JsonSerializerOptions.Web)
+            ?? throw new InvalidOperationException("The extraction model returned no payload.");
         if (!string.Equals(extracted.ToolId, request.CapabilityId, StringComparison.Ordinal))
             throw new InvalidOperationException("The extraction model changed the selected capability.");
 
         return new RetainedInoCapabilityPayload(request.CapabilityId, extracted.Arguments);
+    }
+
+    private static JsonElement CreateExtractionSchema()
+    {
+        using var document = JsonDocument.Parse(
+            """{"type":"object","properties":{"toolId":{"type":"string"},"arguments":{"type":"object"}},"required":["toolId","arguments"]}""");
+        return document.RootElement.Clone();
     }
 
     private static string BuildExtractionGuidance(CapabilityDescriptor descriptor, string prompt) => $$"""

@@ -258,8 +258,22 @@ internal sealed class InoOperationWorkerGrain(
         activity?.SetTag("db.ino.workflow_session_id", result.Workflow.SessionId);
         if (result.ToolRequest is { } requestedTool)
             activity?.SetTag("db.ino.tool_id", requestedTool.ToolId);
+        if (result.Capability is { } capabilityReceipt)
+        {
+            activity?.SetTag("db.ino.capability_kind", CapabilityKindTag(capabilityReceipt.Kind));
+            if (!string.IsNullOrWhiteSpace(capabilityReceipt.CapabilityId))
+                activity?.SetTag("db.ino.capability_id", capabilityReceipt.CapabilityId);
+        }
+        if (result.Proposal is { } draftProposal)
+            activity?.SetTag("db.ino.proposal_id", draftProposal.ProposalId);
         await PersistWorkflowResultAsync(conversation, state.Identity, claimed, result, activity);
     }
+    private static string CapabilityKindTag(CapabilityResolutionKind kind) => kind switch
+    {
+        CapabilityResolutionKind.Match => "match",
+        CapabilityResolutionKind.Ambiguous => "ambiguous",
+        _ => "missing"
+    };
     private async Task PersistWorkflowResultAsync(IConversationNeuron conversation, ConversationIdentity identity, ConversationOperation claimed, InoWorkflowResult result, Activity? activity)
     {
         var leaseFence = LeaseFence(claimed);

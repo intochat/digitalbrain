@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DigitalBrain.Integrations.Google;
 using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Integrations.Salesforce;
@@ -46,6 +47,25 @@ public sealed class CapabilityParameterModelTests
         Assert.Equal("is:unread", payload.Arguments.GetProperty("query").GetString());
     }
 
+    [Fact]
+    public async Task ExtractAsync_requests_a_json_schema_without_boolean_subschemas()
+    {
+        var chat = new StaticJsonChatClient("{\"toolId\":\"" + GoogleCapabilityIds.GmailMessageRead + "\",\"arguments\":{}}");
+        var model = new CapabilityParameterModel(chat, Catalog());
+
+        await model.ExtractAsync(new CapabilityParameterRequest(
+            GoogleCapabilityIds.GmailMessageRead,
+            "show unread mail"));
+
+        var format = Assert.IsType<ChatResponseFormatJson>(chat.LastOptions?.ResponseFormat);
+        Assert.NotNull(format.Schema);
+        var argumentsSchema = format.Schema.Value.GetProperty("properties").GetProperty("arguments");
+        Assert.Equal(JsonValueKind.Object, argumentsSchema.ValueKind);
+        Assert.Equal("object", argumentsSchema.GetProperty("type").GetString());
+        var required = format.Schema.Value.GetProperty("required").EnumerateArray().Select(entry => entry.GetString()).ToArray();
+        Assert.Equal(["toolId", "arguments"], required);
+    }
+
     private static BuiltInCapabilityCatalog Catalog() =>
         new([new GoogleCapabilityDescriptorSource(), new SalesforceCapabilityDescriptorSource()]);
 
@@ -54,11 +74,16 @@ public sealed class CapabilityParameterModelTests
 
     private sealed class StaticJsonChatClient(string json) : IChatClient
     {
+        public ChatOptions? LastOptions { get; private set; }
+
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, json)));
+            CancellationToken cancellationToken = default)
+        {
+            LastOptions = options;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, json)));
+        }
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
             IEnumerable<ChatMessage> messages,
