@@ -5,15 +5,14 @@ using Orleans.Runtime;
 namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.runtime.conversation-archive.v1")]
-public sealed class ConversationArchiveNeuron(
+internal sealed class ConversationArchiveNeuron(
     [PersistentState("conversation-archive", RuntimeStateStorageProviders.Conversations)]
     IPersistentState<EncryptedRuntimeStateEnvelope> persistentState,
     EncryptedRuntimeStateProtector protector) : Grain, IConversationArchiveNeuron
 {
     private EncryptedPersistentState<ConversationArchiveState>? _state;
 
-    private string SegmentId => this.GetPrimaryKeyString()
-        ?? throw new InvalidOperationException("Conversation archive grains require a string key.");
+    private string SegmentId => this.GetPrimaryKeyString() ?? throw new InvalidOperationException("Conversation archive grains require a string key.");
 
     private EncryptedPersistentState<ConversationArchiveState> State => _state ??= new(
         persistentState,
@@ -45,11 +44,7 @@ public sealed class ConversationArchiveNeuron(
                 throw new RuntimeStateIntegrityException("immutable conversation archive segment changed");
             return current.Segment;
         }
-        var persisted = await State.UpdateAsync(current.Revision, state => state with
-        {
-            Revision = checked(state.Revision + 1),
-            Segment = segment
-        });
+        var persisted = await State.UpdateAsync(current.Revision, state => state with { Revision = checked(state.Revision + 1), Segment = segment });
         return persisted.Segment!;
     }
 }

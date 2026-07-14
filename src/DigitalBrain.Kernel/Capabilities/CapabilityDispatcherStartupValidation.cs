@@ -2,7 +2,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Kernel.Capabilities;
 
-public sealed class CapabilityDispatcherStartupValidation(ICapabilityDispatcher dispatcher) : IHostedService
+internal sealed class CapabilityDispatcherStartupValidation(ICapabilityDispatcher dispatcher) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {

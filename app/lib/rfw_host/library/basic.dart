@@ -2,7 +2,7 @@ part of 'package:digitalbrain_flutter/rfw_host/digitalbrain_rfw_library.dart';
 
 Widget _panel(BuildContext c, DataSource s) {
   final pad = _d(s, 'padding', 0);
-  final r = _d(s, 'radius', 24); // Apple default radius of 24
+  final r = _d(s, 'radius', 24);
   final onTap = s.voidHandler(['onTap']);
   Widget w = GlassBorder(
     borderRadius: BorderRadius.circular(r),

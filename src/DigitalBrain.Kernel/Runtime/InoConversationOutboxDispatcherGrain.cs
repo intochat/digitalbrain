@@ -1,17 +1,15 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using Orleans;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Kernel.Runtime;
 
 [GrainType("digitalbrain.runtime.ino-conversation-outbox-dispatcher.v1")]
-public sealed class InoConversationOutboxDispatcherGrain(
-    IGrainFactory grainFactory,
-    TimeProvider timeProvider) : Grain, IInoConversationOutboxDispatcherGrain, IRemindable
+internal sealed class InoConversationOutboxDispatcherGrain(IGrainFactory grainFactory, TimeProvider timeProvider) : Grain, IInoConversationOutboxDispatcherGrain, IRemindable
 {
     private const string ReminderName = "ino.conversation-outbox-dispatcher.execute.v1";
     private static readonly TimeSpan ReminderDueTime = TimeSpan.FromMinutes(1);
@@ -24,10 +22,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
 
     public async Task ScheduleAsync()
     {
-        _reminder ??= await this.RegisterOrUpdateReminder(
-            ReminderName,
-            ReminderDueTime,
-            ReminderPeriod);
+        _reminder ??= await this.RegisterOrUpdateReminder(ReminderName, ReminderDueTime, ReminderPeriod);
         EnsureTimer(TimerInitialDelay);
     }
 
@@ -48,8 +43,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
     private async Task ProcessScheduledAsync()
     {
 
-        var conversationGrainKey = this.GetPrimaryKeyString() ??
-            throw new InvalidOperationException("Outbox dispatchers require a conversation string key.");
+        var conversationGrainKey = this.GetPrimaryKeyString() ?? throw new InvalidOperationException("Outbox dispatchers require a conversation string key.");
         RuntimeStateKeys.DemandScopeHash(conversationGrainKey);
         await DispatchScheduledAsync(conversationGrainKey);
 
@@ -61,9 +55,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
     }
 
     private void EnsureTimer(TimeSpan dueTime) =>
-        _timer ??= this.RegisterGrainTimer(
-            ReceiveTimerAsync,
-            new GrainTimerCreationOptions(dueTime, Timeout.InfiniteTimeSpan) { KeepAlive = true });
+        _timer ??= this.RegisterGrainTimer(ReceiveTimerAsync, new GrainTimerCreationOptions(dueTime, Timeout.InfiniteTimeSpan) { KeepAlive = true });
 
     private async Task DispatchScheduledAsync(string conversationGrainKey)
     {
@@ -72,8 +64,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
         var state = await conversation.ReadAsync();
         if (state.Identity is null || state.Lifecycle == ConversationLifecycle.Tombstoned) return;
 
-        foreach (var entry in state.Outbox
-                     .Where(entry => entry.DispatchedAt is null)
+        foreach (var entry in state.Outbox.Where(entry => entry.DispatchedAt is null)
                      .OrderBy(entry => entry.Sequence == 0 ? 0 : 1)
                      .ThenBy(entry => entry.Sequence)
                      .ThenBy(entry => entry.CreatedAt)
@@ -103,10 +94,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
             {
                 try
                 {
-                    state = await conversation.MarkOutboxDispatchedAsync(
-                        state.Revision,
-                        entry.OutboxId,
-                        timeProvider.GetUtcNow());
+                    state = await conversation.MarkOutboxDispatchedAsync(state.Revision, entry.OutboxId, timeProvider.GetUtcNow());
                     activity?.SetTag("db.ino.outcome", "dispatched");
                     break;
                 }
@@ -129,9 +117,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
         if (!string.Equals(record.EventId, entry.OutboxId, StringComparison.Ordinal) ||
             !string.Equals(record.ConversationId, identity.ConversationId, StringComparison.Ordinal))
             throw new RuntimeStateIntegrityException("conversation outbox projection identity mismatch");
-        var feed = grainFactory.GetGrain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(
-            identity.OwnerId,
-            identity.ActorId));
+        var feed = grainFactory.GetGrain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(identity.OwnerId, identity.ActorId));
         var state = await EnsureFeedAsync(feed, identity);
         if (!TargetsConversation(state, identity.ConversationId)) return false;
         var bindingIssuedAt = timeProvider.GetUtcNow();
@@ -154,9 +140,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
         throw new InvalidOperationException("Surface-feed projection revision retry exhausted.");
     }
 
-    private static async Task<SurfaceFeedState> EnsureFeedAsync(
-        ISurfaceFeedNeuron feed,
-        ConversationIdentity identity)
+    private static async Task<SurfaceFeedState> EnsureFeedAsync(ISurfaceFeedNeuron feed, ConversationIdentity identity)
     {
         var state = await feed.ReadAsync();
         var expected = new SurfaceFeedIdentity(identity.OwnerId, identity.ActorId);
@@ -187,8 +171,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
             using var document = JsonDocument.Parse(current.PayloadUtf8);
             var root = document.RootElement;
             var presentation = root.Deserialize<SurfaceFeedPresentation>();
-            return presentation is not null &&
-                   string.Equals(presentation.CauseKind, "conversation", StringComparison.Ordinal) &&
+            return presentation is not null && string.Equals(presentation.CauseKind, "conversation", StringComparison.Ordinal) &&
                    string.Equals(presentation.CauseId, conversationId, StringComparison.Ordinal) &&
                    IsCanonicalConversationContent(presentation) &&
                    SurfaceFeedPresentationCompatibility.HasSupportedShape(root, presentation);
@@ -200,8 +183,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
     }
 
     private static bool IsCanonicalConversationContent(SurfaceFeedPresentation presentation) =>
-        !string.IsNullOrWhiteSpace(presentation.CorrelationId) &&
-        presentation.RequiredClientCapabilities is not null &&
+        !string.IsNullOrWhiteSpace(presentation.CorrelationId) && presentation.RequiredClientCapabilities is not null &&
         presentation.RequiredClientCapabilities.SequenceEqual(ConversationSurfacePayload.RequiredCapabilities, StringComparer.Ordinal) &&
         presentation.Payload.ValueKind == JsonValueKind.Object &&
         presentation.Payload.TryGetProperty("kind", out var kind) &&
@@ -213,10 +195,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
         presentation.Payload.TryGetProperty("data", out var data) &&
         data.ValueKind == JsonValueKind.Object;
 
-    private static SurfaceFeedProjection CreateProjection(
-        SurfaceFeedState state,
-        OperationOutboxRecord record,
-        DateTimeOffset bindingIssuedAt)
+    private static SurfaceFeedProjection CreateProjection(SurfaceFeedState state, OperationOutboxRecord record, DateTimeOffset bindingIssuedAt)
     {
         var conversation = record.ToSnapshot();
         var payload = ConversationSurfacePayload.Build(conversation);
@@ -242,9 +221,7 @@ public sealed class InoConversationOutboxDispatcherGrain(
             CreateBindings(descriptors, revision));
     }
 
-    private static SurfaceActionBinding[] CreateBindings(
-        IReadOnlyList<StoredActionBinding> descriptors,
-        int surfaceRevision) => descriptors.Select(descriptor => new SurfaceActionBinding(
+    private static SurfaceActionBinding[] CreateBindings(IReadOnlyList<StoredActionBinding> descriptors, int surfaceRevision) => descriptors.Select(descriptor => new SurfaceActionBinding(
             descriptor.BindingId,
             ConversationSurfacePayload.HomeSurfaceId,
             surfaceRevision,

@@ -3,67 +3,36 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Kernel.Memory;
 
-public enum MemoryWriteStatus
+internal enum MemoryWriteStatus
 {
     Created,
     AlreadyPresent,
     CapacityReached
 }
 
-public sealed record MemoryFactSnapshot(
-    string FactId,
-    string Text,
-    IReadOnlyList<string> Tags,
-    ActorId SourceActor,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt,
-    string ETag);
+internal sealed record MemoryFactSnapshot(string FactId, string Text, IReadOnlyList<string> Tags, ActorId SourceActor, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string ETag);
 
-public sealed record MemoryAuditRecord(
-    BrainOwnerId OwnerId,
-    ActorId ActorId,
-    string Operation,
-    string? FactId,
-    string Outcome,
-    string CorrelationId);
+internal sealed record MemoryAuditRecord(BrainOwnerId OwnerId, ActorId ActorId, string Operation, string? FactId, string Outcome, string CorrelationId);
 
-public interface IMemoryAuditSink
+internal interface IMemoryAuditSink
 {
     ValueTask WriteAsync(MemoryAuditRecord record, CancellationToken cancellationToken = default);
 }
 
-public interface IMemoryFactStore
+internal interface IMemoryFactStore
 {
-    Task<IReadOnlyList<MemoryFactSnapshot>> ListAsync(
-        BrainOwnerId ownerId,
-        int maximumCount,
-        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MemoryFactSnapshot>> ListAsync(BrainOwnerId ownerId, int maximumCount, CancellationToken cancellationToken = default);
 
-    Task<MemoryFactSnapshot?> FindAsync(
-        BrainOwnerId ownerId,
-        string factId,
-        CancellationToken cancellationToken = default);
+    Task<MemoryFactSnapshot?> FindAsync(BrainOwnerId ownerId, string factId, CancellationToken cancellationToken = default);
 
-    Task<MemoryWriteStatus> CreateAsync(
-        BrainOwnerId ownerId,
-        MemoryFactSnapshot fact,
-        int capacity,
-        CancellationToken cancellationToken = default);
+    Task<MemoryWriteStatus> CreateAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, int capacity, CancellationToken cancellationToken = default);
 
-    Task<MemoryFactSnapshot> ReplaceAsync(
-        BrainOwnerId ownerId,
-        MemoryFactSnapshot fact,
-        string expectedETag,
-        CancellationToken cancellationToken = default);
+    Task<MemoryFactSnapshot> ReplaceAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, string expectedETag, CancellationToken cancellationToken = default);
 
-    Task<bool> DeleteAsync(
-        BrainOwnerId ownerId,
-        string factId,
-        string expectedETag,
-        CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(BrainOwnerId ownerId, string factId, string expectedETag, CancellationToken cancellationToken = default);
 }
 
-public sealed class MemoryConflictException : InvalidOperationException
+internal sealed class MemoryConflictException : InvalidOperationException
 {
     public MemoryConflictException()
         : base("The Memory fact changed before the operation completed.")
@@ -71,7 +40,7 @@ public sealed class MemoryConflictException : InvalidOperationException
     }
 }
 
-public sealed class MemoryNotFoundException : KeyNotFoundException
+internal sealed class MemoryNotFoundException : KeyNotFoundException
 {
     public MemoryNotFoundException(string factId)
         : base($"Memory fact '{factId}' was not found.")

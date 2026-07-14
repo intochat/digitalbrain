@@ -20,34 +20,22 @@ internal static class FeatureManifestDeriver
     {
         var project = snapshot.Files.Single(file =>
             file.Path.Equals(projectPath, StringComparison.OrdinalIgnoreCase));
-        var assemblyName = FeatureBuildSource.ParseXml(project.Path, project.Content)
-            .Descendants("AssemblyName")
-            .Select(static element => element.Value)
+        var assemblyName = FeatureBuildSource.ParseXml(project.Path, project.Content).Descendants("AssemblyName").Select(static element => element.Value)
             .LastOrDefault();
-        return (string.IsNullOrWhiteSpace(assemblyName)
-            ? Path.GetFileNameWithoutExtension(projectPath)
-            : assemblyName) + ".dll";
+        return (string.IsNullOrWhiteSpace(assemblyName) ? Path.GetFileNameWithoutExtension(projectPath) : assemblyName) + ".dll";
     }
 
     internal static FeatureManifest Derive(string buildOutputDirectory, string implementationAssembly)
     {
-        var assemblyPaths = Directory.EnumerateFiles(
-                buildOutputDirectory,
-                "*.dll",
-                SearchOption.TopDirectoryOnly)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+        var assemblyPaths = Directory.EnumerateFiles(buildOutputDirectory, "*.dll", SearchOption.TopDirectoryOnly).Order(StringComparer.Ordinal).ToArray();
         var implementationPath = Path.Combine(buildOutputDirectory, implementationAssembly);
         if (!assemblyPaths.Contains(implementationPath, StringComparer.OrdinalIgnoreCase))
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.CompilationFailed,
-                $"Implementation assembly '{implementationAssembly}' is missing.");
+            throw new FeatureBuildException(FeatureBuildFailure.CompilationFailed, $"Implementation assembly '{implementationAssembly}' is missing.");
         }
 
         var analyses = assemblyPaths.Select(path => Analyze(path)).ToArray();
-        var localAssemblies = analyses
-            .Select(static analysis => analysis.AssemblyName)
+        var localAssemblies = analyses.Select(static analysis => analysis.AssemblyName)
             .ToHashSet(StringComparer.Ordinal);
         foreach (var analysis in analyses)
         {
@@ -55,22 +43,16 @@ internal static class FeatureManifestDeriver
         }
 
         var implementation = analyses.Single(analysis =>
-            analysis.AssemblyName.Equals(
-                Path.GetFileNameWithoutExtension(implementationAssembly),
-                StringComparison.Ordinal));
+            analysis.AssemblyName.Equals(Path.GetFileNameWithoutExtension(implementationAssembly), StringComparison.Ordinal));
         var featureTypes = analyses.SelectMany(static analysis => analysis.FeatureTypes).ToArray();
         if (featureTypes.Length != 1 || implementation.FeatureTypes.Length != 1)
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.InvalidSource,
-                "A Feature implementation assembly must contain exactly one direct IFeature implementation.");
+            throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, "A Feature implementation assembly must contain exactly one direct IFeature implementation.");
         }
 
         return new FeatureManifest(
             implementationAssembly,
-            implementation.SdkVersion ?? throw new FeatureBuildException(
-                FeatureBuildFailure.InvalidSource,
-                "The implementation must reference DigitalBrain.Features.Sdk."),
+            implementation.SdkVersion ?? throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, "The implementation must reference DigitalBrain.Features.Sdk."),
             featureTypes,
             analyses.SelectMany(static analysis => analysis.Capabilities)
                 .Distinct(StringComparer.Ordinal)
@@ -82,25 +64,16 @@ internal static class FeatureManifestDeriver
                 .ToArray());
     }
 
-    internal static int ValidateScenarioAssembly(
-        string assemblyPath,
-        string implementationAssembly,
-        int sourceScenarioCount)
+    internal static int ValidateScenarioAssembly(string assemblyPath, string implementationAssembly, int sourceScenarioCount)
     {
         var analysis = Analyze(assemblyPath, allowReqnrollGeneratedState: true);
         string[] requiredReferences =
-        [
-            Path.GetFileNameWithoutExtension(implementationAssembly),
-            "DigitalBrain.Features.Testing",
-            "Reqnroll"
-        ];
+        [Path.GetFileNameWithoutExtension(implementationAssembly), "DigitalBrain.Features.Testing", "Reqnroll"];
         var missing = requiredReferences.FirstOrDefault(required =>
             !analysis.AssemblyReferences.Contains(required, StringComparer.Ordinal));
         if (missing is not null)
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.InvalidSource,
-                $"The scenario assembly must reference '{missing}'.");
+            throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, $"The scenario assembly must reference '{missing}'.");
         }
 
         using var stream = File.OpenRead(assemblyPath);
@@ -111,8 +84,7 @@ internal static class FeatureManifestDeriver
         foreach (var handle in reader.MethodDefinitions)
         {
             var method = reader.GetMethodDefinition(handle);
-            var attributes = method.GetCustomAttributes()
-                .Select(attributeHandle => reader.GetCustomAttribute(attributeHandle))
+            var attributes = method.GetCustomAttributes().Select(attributeHandle => reader.GetCustomAttribute(attributeHandle))
                 .ToArray();
             if (attributes.Any(attribute => IsTestAttribute(reader, attribute)))
             {
@@ -128,9 +100,7 @@ internal static class FeatureManifestDeriver
 
         if (bddMethods == 0 || testMethods != bddMethods || bddMethods != sourceScenarioCount)
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.InvalidSource,
-                $"The scenario assembly must contain exactly the {sourceScenarioCount} source scenarios and no other tests.");
+            throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, $"The scenario assembly must contain exactly the {sourceScenarioCount} source scenarios and no other tests.");
         }
 
         return bddMethods;
@@ -145,34 +115,22 @@ internal static class FeatureManifestDeriver
         using var peReader = new PEReader(stream, PEStreamOptions.LeaveOpen);
         if (!peReader.HasMetadata)
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.CompilationFailed,
-                $"Build output '{Path.GetFileName(path)}' is not a managed assembly.");
+            throw new FeatureBuildException(FeatureBuildFailure.CompilationFailed, $"Build output '{Path.GetFileName(path)}' is not a managed assembly.");
         }
 
         var reader = peReader.GetMetadataReader();
         RejectForbiddenMetadata(reader, allowReqnrollGeneratedState);
-        return new AssemblyAnalysis(
-            reader.GetString(reader.GetAssemblyDefinition().Name),
-            FeatureTypes(reader),
-            Capabilities(reader),
-            AssemblyReferences(reader),
-            TrySdkVersion(reader));
+        return new AssemblyAnalysis(reader.GetString(reader.GetAssemblyDefinition().Name), FeatureTypes(reader), Capabilities(reader), AssemblyReferences(reader), TrySdkVersion(reader));
     }
 
-    private static string[] FeatureTypes(MetadataReader reader) => reader.TypeDefinitions
-        .Select(handle => (Handle: handle, Definition: reader.GetTypeDefinition(handle)))
-        .Where(item => item.Definition.GetInterfaceImplementations()
-            .Select(handle => reader.GetInterfaceImplementation(handle).Interface)
-            .Any(handle => TypeName(reader, handle).Equals(
-                "DigitalBrain.Features.Sdk.IFeature",
-                StringComparison.Ordinal)))
+    private static string[] FeatureTypes(MetadataReader reader) => reader.TypeDefinitions.Select(handle => (Handle: handle, Definition: reader.GetTypeDefinition(handle)))
+        .Where(item => item.Definition.GetInterfaceImplementations().Select(handle => reader.GetInterfaceImplementation(handle).Interface)
+            .Any(handle => TypeName(reader, handle).Equals("DigitalBrain.Features.Sdk.IFeature", StringComparison.Ordinal)))
         .Select(item => TypeName(reader, item.Handle))
         .Order(StringComparer.Ordinal)
         .ToArray();
 
-    private static string[] Capabilities(MetadataReader reader) => reader.MemberReferences
-        .Select(handle => reader.GetMemberReference(handle).Parent)
+    private static string[] Capabilities(MetadataReader reader) => reader.MemberReferences.Select(handle => reader.GetMemberReference(handle).Parent)
         .Select(handle => TypeName(reader, handle))
         .Where(CapabilityByContract.ContainsKey)
         .Select(type => CapabilityByContract[type])
@@ -180,18 +138,14 @@ internal static class FeatureManifestDeriver
         .Order(StringComparer.Ordinal)
         .ToArray();
 
-    private static string[] AssemblyReferences(MetadataReader reader) => reader.AssemblyReferences
-        .Select(handle => reader.GetString(reader.GetAssemblyReference(handle).Name))
+    private static string[] AssemblyReferences(MetadataReader reader) => reader.AssemblyReferences.Select(handle => reader.GetString(reader.GetAssemblyReference(handle).Name))
         .Order(StringComparer.Ordinal)
         .ToArray();
 
-    private static void ValidateAssemblyReferences(
-        IEnumerable<string> references,
-        IReadOnlySet<string> localAssemblies)
+    private static void ValidateAssemblyReferences(IEnumerable<string> references, IReadOnlySet<string> localAssemblies)
     {
         var forbidden = references.FirstOrDefault(reference =>
-            !reference.StartsWith("System.", StringComparison.Ordinal) &&
-            !reference.Equals("System", StringComparison.Ordinal) &&
+            !reference.StartsWith("System.", StringComparison.Ordinal) && !reference.Equals("System", StringComparison.Ordinal) &&
             !reference.Equals("netstandard", StringComparison.Ordinal) &&
             !localAssemblies.Contains(reference) &&
             !reference.Equals("DigitalBrain.Features.Sdk", StringComparison.Ordinal) &&
@@ -199,9 +153,7 @@ internal static class FeatureManifestDeriver
               reference.EndsWith(".Contracts", StringComparison.Ordinal)));
         if (forbidden is not null)
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.InvalidSource,
-                $"Assembly reference '{forbidden}' is not allowed in Feature implementations.");
+            throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, $"Assembly reference '{forbidden}' is not allowed in Feature implementations.");
         }
     }
 
@@ -210,9 +162,7 @@ internal static class FeatureManifestDeriver
         foreach (var handle in reader.AssemblyReferences)
         {
             var reference = reader.GetAssemblyReference(handle);
-            if (reader.GetString(reference.Name).Equals(
-                    "DigitalBrain.Features.Sdk",
-                    StringComparison.Ordinal))
+            if (reader.GetString(reference.Name).Equals("DigitalBrain.Features.Sdk", StringComparison.Ordinal))
             {
                 return reference.Version.ToString();
             }
@@ -221,15 +171,12 @@ internal static class FeatureManifestDeriver
         return null;
     }
 
-    private static void RejectForbiddenMetadata(
-        MetadataReader reader,
-        bool allowReqnrollGeneratedState)
+    private static void RejectForbiddenMetadata(MetadataReader reader, bool allowReqnrollGeneratedState)
     {
         foreach (var handle in reader.TypeReferences)
         {
             var type = TypeName(reader, handle);
-            if (type.StartsWith("System.IO.", StringComparison.Ordinal) ||
-                type.StartsWith("System.Net.", StringComparison.Ordinal) ||
+            if (type.StartsWith("System.IO.", StringComparison.Ordinal) || type.StartsWith("System.Net.", StringComparison.Ordinal) ||
                 type.StartsWith("System.Runtime.Loader.", StringComparison.Ordinal) ||
                 type.StartsWith("System.Runtime.InteropServices.", StringComparison.Ordinal) ||
                 type is
@@ -248,17 +195,14 @@ internal static class FeatureManifestDeriver
             var reference = reader.GetMemberReference(handle);
             var type = TypeName(reader, reference.Parent);
             var member = reader.GetString(reference.Name);
-            if ((type is "System.DateTime" or "System.DateTimeOffset" &&
-                 member is "get_Now" or "get_UtcNow") ||
+            if ((type is "System.DateTime" or "System.DateTimeOffset" && member is "get_Now" or "get_UtcNow") ||
                 (type == "System.Guid" && member == "NewGuid") ||
                 (type == "System.Threading.Tasks.Task" && member == "Delay") ||
                 (type.StartsWith("System.Reflection.", StringComparison.Ordinal) &&
                  !(type.EndsWith("Attribute", StringComparison.Ordinal) && member == ".ctor")) ||
                 (type == "System.Type" && member is not ("GetTypeFromHandle" or "get_Assembly")))
             {
-                var displayMember = member.StartsWith("get_", StringComparison.Ordinal)
-                    ? member[4..]
-                    : member;
+                var displayMember = member.StartsWith("get_", StringComparison.Ordinal) ? member[4..] : member;
                 throw Nondeterministic($"{type}.{displayMember}");
             }
         }
@@ -266,9 +210,7 @@ internal static class FeatureManifestDeriver
         RejectMutableStaticsAndNativeMethods(reader, allowReqnrollGeneratedState);
     }
 
-    private static void RejectMutableStaticsAndNativeMethods(
-        MetadataReader reader,
-        bool allowReqnrollGeneratedState)
+    private static void RejectMutableStaticsAndNativeMethods(MetadataReader reader, bool allowReqnrollGeneratedState)
     {
         foreach (var handle in reader.TypeDefinitions)
         {
@@ -276,12 +218,10 @@ internal static class FeatureManifestDeriver
             foreach (var fieldHandle in definition.GetFields())
             {
                 var field = reader.GetFieldDefinition(fieldHandle);
-                if ((field.Attributes & FieldAttributes.Static) != 0 &&
-                    (field.Attributes & (FieldAttributes.Literal | FieldAttributes.InitOnly)) == 0 &&
+                if ((field.Attributes & FieldAttributes.Static) != 0 && (field.Attributes & (FieldAttributes.Literal | FieldAttributes.InitOnly)) == 0 &&
                     !(allowReqnrollGeneratedState && IsReqnrollGeneratedType(reader, handle)))
                 {
-                    throw Nondeterministic(
-                        $"mutable static field {TypeName(reader, handle)}.{reader.GetString(field.Name)}");
+                    throw Nondeterministic($"mutable static field {TypeName(reader, handle)}.{reader.GetString(field.Name)}");
                 }
             }
 
@@ -297,9 +237,7 @@ internal static class FeatureManifestDeriver
     }
 
     private static FeatureBuildException Nondeterministic(string input) =>
-        new(
-            FeatureBuildFailure.NondeterministicInput,
-            $"Nondeterministic or authority-bearing input '{input}' is forbidden in Feature implementations.");
+        new(FeatureBuildFailure.NondeterministicInput, $"Nondeterministic or authority-bearing input '{input}' is forbidden in Feature implementations.");
 
     private static string TypeName(MetadataReader reader, EntityHandle handle) => handle.Kind switch
     {
@@ -326,8 +264,7 @@ internal static class FeatureManifestDeriver
     private static bool IsTestAttribute(MetadataReader reader, CustomAttribute attribute)
     {
         var name = AttributeTypeName(reader, attribute);
-        return name.EndsWith("FactAttribute", StringComparison.Ordinal) ||
-            name.EndsWith("TheoryAttribute", StringComparison.Ordinal);
+        return name.EndsWith("FactAttribute", StringComparison.Ordinal) || name.EndsWith("TheoryAttribute", StringComparison.Ordinal);
     }
 
     private static bool IsFeatureTitleTrait(MetadataReader reader, CustomAttribute attribute)
@@ -338,8 +275,7 @@ internal static class FeatureManifestDeriver
         }
 
         var value = reader.GetBlobReader(attribute.Value);
-        return value.ReadUInt16() == 1 &&
-            value.ReadSerializedString()?.Equals("FeatureTitle", StringComparison.Ordinal) == true;
+        return value.ReadUInt16() == 1 && value.ReadSerializedString()?.Equals("FeatureTitle", StringComparison.Ordinal) == true;
     }
 
     private static bool IsReqnrollGeneratedType(MetadataReader reader, TypeDefinitionHandle handle)
@@ -348,16 +284,13 @@ internal static class FeatureManifestDeriver
         foreach (var attributeHandle in definition.GetCustomAttributes())
         {
             var attribute = reader.GetCustomAttribute(attributeHandle);
-            if (!AttributeTypeName(reader, attribute).Equals(
-                    "System.CodeDom.Compiler.GeneratedCodeAttribute",
-                    StringComparison.Ordinal))
+            if (!AttributeTypeName(reader, attribute).Equals("System.CodeDom.Compiler.GeneratedCodeAttribute", StringComparison.Ordinal))
             {
                 continue;
             }
 
             var value = reader.GetBlobReader(attribute.Value);
-            if (value.ReadUInt16() == 1 &&
-                value.ReadSerializedString()?.Equals("Reqnroll", StringComparison.Ordinal) == true)
+            if (value.ReadUInt16() == 1 && value.ReadSerializedString()?.Equals("Reqnroll", StringComparison.Ordinal) == true)
             {
                 return true;
             }
@@ -369,21 +302,12 @@ internal static class FeatureManifestDeriver
     private static string AttributeTypeName(MetadataReader reader, CustomAttribute attribute) =>
         attribute.Constructor.Kind switch
         {
-            HandleKind.MemberReference => TypeName(
-                reader,
-                reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor).Parent),
-            HandleKind.MethodDefinition => TypeName(
-                reader,
-                reader.GetMethodDefinition((MethodDefinitionHandle)attribute.Constructor).GetDeclaringType()),
+            HandleKind.MemberReference => TypeName(reader, reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor).Parent),
+            HandleKind.MethodDefinition => TypeName(reader, reader.GetMethodDefinition((MethodDefinitionHandle)attribute.Constructor).GetDeclaringType()),
             _ => string.Empty
         };
 
-    private sealed record AssemblyAnalysis(
-        string AssemblyName,
-        string[] FeatureTypes,
-        string[] Capabilities,
-        string[] AssemblyReferences,
-        string? SdkVersion);
+    private sealed record AssemblyAnalysis(string AssemblyName, string[] FeatureTypes, string[] Capabilities, string[] AssemblyReferences, string? SdkVersion);
 }
 
 internal static class FeatureScenarioResultReader
@@ -396,18 +320,12 @@ internal static class FeatureScenarioResultReader
         }
 
         var document = XDocument.Load(path, LoadOptions.None);
-        var counters = document.Descendants()
-            .SingleOrDefault(static element => element.Name.LocalName == "Counters")
+        var counters = document.Descendants().SingleOrDefault(static element => element.Name.LocalName == "Counters")
             ?? throw Invalid("The scenario result does not contain counters.");
-        var result = new FeatureScenarioResult(
-            Counter(counters, "total"),
-            Counter(counters, "passed"),
-            Counter(counters, "failed"),
-            Counter(counters, "notExecuted"));
+        var result = new FeatureScenarioResult(Counter(counters, "total"), Counter(counters, "passed"), Counter(counters, "failed"), Counter(counters, "notExecuted"));
         if (result.Total != expectedScenarioCount)
         {
-            throw Invalid(
-                $"The test runner reported {result.Total} tests for {expectedScenarioCount} compiled BDD scenarios.");
+            throw Invalid($"The test runner reported {result.Total} tests for {expectedScenarioCount} compiled BDD scenarios.");
         }
 
         return result;

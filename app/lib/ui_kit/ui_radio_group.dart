@@ -18,7 +18,6 @@ class UiKitRadioGroup extends StatefulWidget {
 }
 
 class _UiKitRadioGroupState extends State<UiKitRadioGroup> {
-  // Tracks the currently selected option; null = nothing selected yet.
   String? _selected;
 
   void _onSelect(String option, bool selected) {

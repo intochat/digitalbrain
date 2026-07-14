@@ -5,10 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import '../../theme/digitalbrain_theme.dart';
 
-/// Highly premium GlassMaterial widget that loads a frosted liquid glass
-/// fragment shader, tracks real-time cursor offsets inside a MouseRegion,
-/// executes an animation loop for light reflections, and renders backdrop blur.
-/// Falls back cleanly to BackdropFilter blur elsewhere.
 class GlassMaterial extends StatefulWidget {
   const GlassMaterial({
     required this.child,
@@ -69,9 +65,7 @@ class _GlassMaterialState extends State<GlassMaterial>
           _shaderProgram = program;
         });
       }
-    } catch (_) {
-      // Fail silently and rely on the premium CPU backdrop-filter fallback
-    }
+    } catch (_) {}
   }
 
   @override
@@ -105,7 +99,7 @@ class _GlassMaterialState extends State<GlassMaterial>
       child: Stack(
         children: [
           widget.child,
-          // Specular top-light gradient (the "liquid" hint fallback if no shader)
+
           if (!hasShader)
             Positioned.fill(
               child: IgnorePointer(
@@ -191,15 +185,14 @@ class LiquidGlassShaderPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // uSize
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
-    // uMouse
+
     shader.setFloat(2, mouseOffset.dx);
     shader.setFloat(3, mouseOffset.dy);
-    // uTime
+
     shader.setFloat(4, time);
-    // uBrandColor (Normalized HSL/RGB)
+
     shader.setFloat(5, (brandColor.r * 255.0).round().clamp(0, 255) / 255.0);
     shader.setFloat(6, (brandColor.g * 255.0).round().clamp(0, 255) / 255.0);
     shader.setFloat(7, (brandColor.b * 255.0).round().clamp(0, 255) / 255.0);

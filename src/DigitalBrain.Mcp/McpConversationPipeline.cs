@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts.Runtime;
 
 namespace DigitalBrain.Mcp;
 
@@ -8,10 +8,6 @@ public sealed class McpInoCommandHandler(ConversationStateClient conversations)
 {
     public const string CommandType = "ino.interact";
 
-    /// <summary>
-    /// Persists an INO command and returns its durable receipt. This deliberately stops at the Orleans
-    /// acceptance boundary; a grain reminder owns all subsequent execution.
-    /// </summary>
     public async Task<OperationReceipt> AcceptAsync(CommandEnvelope command)
     {
         if (!string.Equals(command.Type, CommandType, StringComparison.Ordinal))
@@ -23,11 +19,7 @@ public sealed class McpInoCommandHandler(ConversationStateClient conversations)
         activity?.SetTag("db.ino.command_type", command.Type);
         activity?.SetTag("db.ino.request_id", command.Context.CorrelationId);
 
-        var snapshot = await conversations.BeginAsync(
-            command.Context,
-            command.CommandId,
-            prompt,
-            CancellationToken.None).ConfigureAwait(false);
+        var snapshot = await conversations.BeginAsync(command.Context, command.CommandId, prompt, CancellationToken.None).ConfigureAwait(false);
         var operation = snapshot.Operations.Single(operation =>
             string.Equals(operation.CommandId, command.CommandId, StringComparison.Ordinal));
         var phase = string.Equals(operation.State, InoConversationStates.Queued, StringComparison.Ordinal)

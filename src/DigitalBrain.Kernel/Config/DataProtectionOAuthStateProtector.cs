@@ -1,12 +1,11 @@
 using System.Security.Cryptography;
 using System.Text.Json;
-using DigitalBrain.Core;
-using DigitalBrain.Kernel.Abstractions;
+using DigitalBrain.Kernel.Contracts;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace DigitalBrain.Kernel.Config;
 
-public sealed class DataProtectionOAuthStateProtector : IOAuthStateProtector
+internal sealed class DataProtectionOAuthStateProtector : IOAuthStateProtector
 {
     public static readonly TimeSpan DefaultLifetime = TimeSpan.FromMinutes(10);
     private readonly ITimeLimitedDataProtector _protector;
@@ -28,9 +27,7 @@ public sealed class DataProtectionOAuthStateProtector : IOAuthStateProtector
         if (string.IsNullOrWhiteSpace(owner.Value) || owner.Value.Length > 256)
             throw new ArgumentException("A bounded OAuth owner is required.", nameof(owner));
 
-        return _protector.Protect(JsonSerializer.Serialize(new StatePayload(
-            owner.Value,
-            Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))), _lifetime);
+        return _protector.Protect(JsonSerializer.Serialize(new StatePayload(owner.Value, Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))), _lifetime);
     }
 
     public bool TryUnprotect(string state, out NeuronId owner)

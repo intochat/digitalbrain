@@ -1,6 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.AppHost;
 
@@ -16,45 +16,27 @@ internal static class GoogleAspireExtensions
     private const string GoogleOAuthWebServerGuideUrl = "https://developers.google.com/identity/protocols/oauth2/web-server";
     private const string GoogleOAuthVerificationHelpUrl = "https://support.google.com/cloud/answer/15549945";
 
-    public static GoogleAppConfigParameters AddGoogleAppConfig(
-        this IDistributedApplicationBuilder builder)
+    public static GoogleAppConfigParameters AddGoogleAppConfig(this IDistributedApplicationBuilder builder)
     {
         var defaultRedirectUri = ResolveRedirectUri(builder);
 
-        var clientId = builder.AddParameter(ClientIdParameterName, secret: true)
-            .WithDescription(
-                GoogleOAuthParameterDescription("OAuth client ID", defaultRedirectUri),
-                enableMarkdown: true);
+        var clientId = builder.AddParameter(ClientIdParameterName, secret: true).WithDescription(GoogleOAuthParameterDescription("OAuth client ID", defaultRedirectUri), enableMarkdown: true);
 
-        var clientSecret = builder.AddParameter(ClientSecretParameterName, secret: true)
-            .WithDescription(
-                GoogleOAuthParameterDescription("OAuth client secret", defaultRedirectUri),
-                enableMarkdown: true);
+        var clientSecret = builder.AddParameter(ClientSecretParameterName, secret: true).WithDescription(GoogleOAuthParameterDescription("OAuth client secret", defaultRedirectUri), enableMarkdown: true);
 
-        var redirectUri = builder.AddParameter(RedirectUriParameterName, defaultRedirectUri, publishValueAsDefault: true)
-            .WithDescription(
-                GoogleRedirectUriDescription(defaultRedirectUri),
-                enableMarkdown: true);
+        var redirectUri = builder.AddParameter(RedirectUriParameterName, defaultRedirectUri, publishValueAsDefault: true).WithDescription(GoogleRedirectUriDescription(defaultRedirectUri), enableMarkdown: true);
 
-        return new GoogleAppConfigParameters(
-            clientId,
-            clientSecret,
-            redirectUri);
+        return new GoogleAppConfigParameters(clientId, clientSecret, redirectUri);
     }
 
-    public static IResourceBuilder<T> WithGoogleAppConfig<T>(
-        this IResourceBuilder<T> resource,
-        GoogleAppConfigParameters parameters)
+    public static IResourceBuilder<T> WithGoogleAppConfig<T>(this IResourceBuilder<T> resource, GoogleAppConfigParameters parameters)
         where T : IResourceWithEnvironment =>
-        resource
-            .WithEnvironment("DigitalBrain__Google__ClientId", parameters.ClientId)
-            .WithEnvironment("DigitalBrain__Google__ClientSecret", parameters.ClientSecret)
+        resource.WithEnvironment("DigitalBrain__Google__ClientId", parameters.ClientId).WithEnvironment("DigitalBrain__Google__ClientSecret", parameters.ClientSecret)
             .WithEnvironment("DigitalBrain__Google__RedirectUri", parameters.RedirectUri);
 
     private static string ResolveRedirectUri(IDistributedApplicationBuilder builder)
     {
-        var configured = builder.Configuration["DigitalBrain:Google:RedirectUri"]
-            ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_GOOGLE_REDIRECT_URI");
+        var configured = builder.Configuration["DigitalBrain:Google:RedirectUri"] ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_GOOGLE_REDIRECT_URI");
 
         return string.IsNullOrWhiteSpace(configured)
             ? $"http://localhost:{DigitalBrainBuilderExtensions.KernelWebPort(builder)}{DefaultCallbackPath}"
@@ -75,7 +57,4 @@ internal static class GoogleAspireExtensions
         $"Use a separate OAuth client per environment when possible so local, staging, and production credentials do not share tokens. See [Google app audience rules]({GoogleOAuthVerificationHelpUrl}).";
 }
 
-internal sealed record GoogleAppConfigParameters(
-    IResourceBuilder<ParameterResource> ClientId,
-    IResourceBuilder<ParameterResource> ClientSecret,
-    IResourceBuilder<ParameterResource> RedirectUri);
+internal sealed record GoogleAppConfigParameters(IResourceBuilder<ParameterResource> ClientId, IResourceBuilder<ParameterResource> ClientSecret, IResourceBuilder<ParameterResource> RedirectUri);

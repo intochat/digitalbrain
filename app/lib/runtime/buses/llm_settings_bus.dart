@@ -1,8 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-// Side-channel bus for the LlmSettingsPanel widget. Safely transfers updated
-// LLM parameters (model, temperature, max attempts) and visual preferences
-// (replaceSpheresWithIcons, showSynapses) across RFW boundaries to the host screen.
 class LlmSettingsBus extends ChangeNotifier {
   LlmSettingsBus._();
   static final LlmSettingsBus instance = LlmSettingsBus._();

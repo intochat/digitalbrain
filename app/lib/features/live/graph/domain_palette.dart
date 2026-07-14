@@ -55,14 +55,13 @@ final Map<String, DomainStyle> domainPalette = {
 DomainStyle styleForDomain(String? domain) =>
     domainPalette[domain ?? 'system'] ?? domainPalette['system']!;
 
-// Family palette used by comets and static edges (Task 8 + Task 7 fallback).
 const Color _periwinkle = Color(0xFF7C8AFF);
 const Color _mint = Color(0xFF6EE7A8);
 const Color _gold = Color(0xFFE8C56A);
 const Color _softBlue = Color(0xFF9CB3FF);
 const Color _magenta = Color(0xFFF4B8E4);
 const Color _neutral = Color(0xFFB6BEFF);
-const Color _broadcastColor = Color(0xFFFF4081); // Neon Pink / Magenta
+const Color _broadcastColor = Color(0xFFFF4081);
 
 Color colorForSynapseType(String typeFullName) {
   final s = typeFullName;
@@ -96,9 +95,6 @@ Color colorForSynapseType(String typeFullName) {
   return _neutral;
 }
 
-// Short label derivation from a neuron's type full name:
-//   "DigitalBrain.Domains.Ai.Llm.Gpt5MiniNeuron" -> "Gpt5Mini"
-//   "gateway"                                -> "gateway"
 String shortNeuronLabel(String typeFullName) {
   if (typeFullName.isEmpty) return '?';
   final dot = typeFullName.lastIndexOf('.');

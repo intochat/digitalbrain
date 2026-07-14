@@ -3,9 +3,7 @@ using Reqnroll;
 namespace DigitalBrain.Features.Testing;
 
 [Binding]
-public sealed class FeatureScenarioSteps(
-    FeatureScenarioContext scenario,
-    GeneratedFeatureScenario generatedScenario)
+public sealed class FeatureScenarioSteps(FeatureScenarioContext scenario, GeneratedFeatureScenario generatedScenario)
 {
     [Given("a clean Feature scenario")]
     public void GivenACleanFeatureScenario()
@@ -16,9 +14,7 @@ public sealed class FeatureScenarioSteps(
     [Then("the Feature execution succeeds")]
     public void ThenTheFeatureExecutionSucceeds()
     {
-        Require(
-            scenario.LastResult?.Status == FeatureExecutionStatus.Succeeded,
-            $"Expected a successful Feature execution, but was {scenario.LastResult?.Status}.");
+        Require(scenario.LastResult?.Status == FeatureExecutionStatus.Succeeded, $"Expected a successful Feature execution, but was {scenario.LastResult?.Status}.");
     }
 
     [Then("the Feature execution is identified as a duplicate")]
@@ -53,16 +49,12 @@ public sealed class FeatureScenarioSteps(
     public void ThenTheGeneratedDuplicateGateSucceeds()
     {
         Require(
-            generatedScenario.FirstResult?.Status == FeatureExecutionStatus.Succeeded &&
-            generatedScenario.FirstResult.Duplicate == false,
+            generatedScenario.FirstResult?.Status == FeatureExecutionStatus.Succeeded && generatedScenario.FirstResult.Duplicate == false,
             "Expected the first generated delivery to succeed as original work.");
         Require(
-            generatedScenario.SecondResult?.Status == FeatureExecutionStatus.Succeeded &&
-            generatedScenario.SecondResult.Duplicate,
+            generatedScenario.SecondResult?.Status == FeatureExecutionStatus.Succeeded && generatedScenario.SecondResult.Duplicate,
             "Expected the second generated delivery to succeed as a duplicate.");
-        Require(
-            generatedScenario.HandlerExecutionCount == 1,
-            $"Expected one handler execution, but observed {generatedScenario.HandlerExecutionCount}.");
+        Require(generatedScenario.HandlerExecutionCount == 1, $"Expected one handler execution, but observed {generatedScenario.HandlerExecutionCount}.");
     }
 
     private static void Require(bool condition, string message)

@@ -20,21 +20,21 @@ dependencies:
   openid_client: ^0.4.10+1
   http: ^1.3.0
   clock: ^1.1.2
-  # Attach Excel/SQLite files by picker and OS drag/drop.
+
   cross_file: ^0.3.5+2
   desktop_drop: ^0.7.1
-  # Pinned to 8.x (latest compatible) — markdraw ^0.2.0 constrains file_picker to ^8.0.0.
+
   file_picker: ^8.3.7
   google_fonts: ^6.2.1
   url_launcher: ^6.3.0
-  # Server-driven UI: render Creator-emitted widget documents at runtime
-  # over a fixed, DigitalBrain-themed widget dictionary (no client rebuild).
+
+
   rfw: ^1.0.0
   graphic: ^2.7.0
-  forui: ^0.21.3  # pinned; 0.22+ requires Flutter >=3.44 per Context7 lookup. See ui-kit plan.
-  # Widget-canvas redesign palette + window manager (docs/redesign).
-  # Panel chrome is hand-rolled (generic Dart shell, 01-ARCHITECTURE Decision 3)
-  # rather than a low-trust floating-panel package; persistence via prefs.
+  forui: ^0.21.3
+
+
+
   lottie: ^3.3.3
   flutter_earth_globe: ^2.2.1
   shared_preferences: ^2.5.5

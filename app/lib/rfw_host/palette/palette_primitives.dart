@@ -1,12 +1,3 @@
-// Tier-1 widget-canvas palette primitives (docs/redesign/03-WIDGET-PALETTE.md).
-//
-// These are the new host-owned RFW widgets the redesign adds on top of the
-// existing 92-widget dictionary. Each reads Theme.of(context) / DigitalBrainColors
-// so server-emitted (.ino `rfw:`) surfaces inherit the visual language, takes all
-// variable inputs from RFW `data`, and fires user actions as RFW `event`s.
-// Registering them is the one batched binary rebuild (Tier 1); after that every
-// arrangement is pure Tier-2 data.
-
 import 'dart:async';
 import 'dart:convert';
 
@@ -23,7 +14,6 @@ import 'package:rfw/rfw.dart';
 
 import 'package:digitalbrain_flutter/theme/digitalbrain_theme.dart';
 
-// ── DataSource readers (local copies so the palette stays self-contained) ──
 double _d(DataSource s, String k, double def) =>
     s.v<double>([k]) ?? s.v<int>([k])?.toDouble() ?? def;
 String _s(DataSource s, String k, [String def = '']) => s.v<String>([k]) ?? def;
@@ -36,9 +26,6 @@ double _dp(DataSource s, List<Object> p, double def) =>
 String _sp(DataSource s, List<Object> p, [String def = '']) =>
     s.v<String>(p) ?? def;
 
-// ─────────────────────────────────────────────────────────────────────────
-// LottiePlayer
-// ─────────────────────────────────────────────────────────────────────────
 Widget lottiePlayer(BuildContext context, DataSource source) {
   return _LottiePlayer(
     src: _s(source, 'src'),
@@ -97,9 +84,6 @@ class _LottiePlayerState extends State<_LottiePlayer>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// AnalogClock — self-driving 1s ticker; no data round-trips for the tick.
-// ─────────────────────────────────────────────────────────────────────────
 Widget analogClock(BuildContext context, DataSource source) {
   return _AnalogClock(
     showSeconds: _b(source, 'showSeconds', true),
@@ -159,10 +143,6 @@ class _AnalogClockState extends State<_AnalogClock> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// CountdownClock — the reminder primitive: hands run BACKWARD toward zero.
-// Drift-free remaining = duration - (now - startedAt). Fires `onZero` once.
-// ─────────────────────────────────────────────────────────────────────────
 Widget countdownClock(BuildContext context, DataSource source) {
   return _CountdownClock(
     durationSeconds: _i(source, 'durationSeconds', 600),
@@ -300,9 +280,6 @@ class _CountdownClockState extends State<_CountdownClock>
   }
 }
 
-// Shared painter for AnalogClock + CountdownClock. `backward` reverses the
-// hand sweep so the countdown visibly unwinds; `progress` (0..1) draws the
-// remaining-time ring.
 class _ClockPainter extends CustomPainter {
   _ClockPainter({
     required this.time,
@@ -398,10 +375,6 @@ class _ClockPainter extends CustomPainter {
       old.time != time || old.progress != progress || old.accent != accent;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// EarthGlobe — GPU/shader 3D globe (needs `--wasm` on web). Points + animated
-// dashed connection arcs come straight from RFW data.
-// ─────────────────────────────────────────────────────────────────────────
 Widget earthGlobe(BuildContext context, DataSource source) {
   final points = <GlobePoint>[];
   final pointCount = source.length(['points']);
@@ -429,10 +402,6 @@ Widget earthGlobe(BuildContext context, DataSource source) {
     );
   }
 
-  // Slice-0 gate (docs/redesign/05-ROADMAP.md): the shader-based 3D globe paints
-  // nothing under the web `--wasm`/skwasm renderer (Lottie + clocks are fine).
-  // On web fall back to a flat animated route map that consumes the same
-  // points/arcs data; the real globe ships on flutter-windows.
   if (kIsWeb) {
     return _EarthGlobeFlat(points: points, arcs: arcs);
   }
@@ -482,8 +451,6 @@ class _EarthGlobe extends StatefulWidget {
 }
 
 class _EarthGlobeState extends State<_EarthGlobe> {
-  // 1x1 deep-ocean-blue PNG stretched as an equirectangular surface — keeps the
-  // primitive asset-free; a domain can ship a real texture later via Tier-2.
   static final ImageProvider _surface = MemoryImage(
     base64Decode(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -559,9 +526,6 @@ class _EarthGlobeState extends State<_EarthGlobe> {
   }
 }
 
-// Web fallback for [_EarthGlobe]: the GPU globe is blank under skwasm, so on web
-// the same points/arcs render as a flat equirectangular route map with an
-// animated dashed great-circle-style arc. Desktop keeps the real 3D globe.
 class _EarthGlobeFlat extends StatefulWidget {
   const _EarthGlobeFlat({required this.points, required this.arcs});
 
@@ -621,7 +585,6 @@ class _FlatRoutePainter extends CustomPainter {
   final Color accent;
   final Color active;
 
-  // Equirectangular projection into a 2:1 map letterboxed inside [size].
   Rect _mapRect(Size size) {
     final w = size.width;
     final h = size.height;
@@ -657,7 +620,6 @@ class _FlatRoutePainter extends CustomPainter {
     canvas.save();
     canvas.clipRRect(rr);
 
-    // Faint lat/lng graticule.
     final grid = Paint()
       ..color = DigitalBrainColors.hairline
       ..strokeWidth = 1;
@@ -673,7 +635,7 @@ class _FlatRoutePainter extends CustomPainter {
     for (final a in arcs) {
       final from = _project(r, a.fromLat, a.fromLng);
       final to = _project(r, a.toLat, a.toLng);
-      // Bow the path upward to suggest a great-circle flight track.
+
       final mid = Offset(
         (from.dx + to.dx) / 2,
         (from.dy + to.dy) / 2 - (to - from).distance * 0.22,
@@ -696,7 +658,7 @@ class _FlatRoutePainter extends CustomPainter {
     for (var i = 0; i < points.length; i++) {
       final p = points[i];
       final c = _project(r, p.lat, p.lng);
-      // First and last endpoints get the amber "active" marker.
+
       final isEndpoint = i == 0 || i == points.length - 1;
       canvas.drawCircle(
         c,
@@ -733,7 +695,7 @@ class _FlatRoutePainter extends CustomPainter {
     const gap = 6.0;
     final span = dash + gap;
     for (final metric in path.computeMetrics()) {
-      var d = -((phase * span) % span); // march the dashes along the track
+      var d = -((phase * span) % span);
       while (d < metric.length) {
         final start = d.clamp(0.0, metric.length);
         final end = (d + dash).clamp(0.0, metric.length);
@@ -750,11 +712,6 @@ class _FlatRoutePainter extends CustomPainter {
       old.phase != phase || old.points != points || old.arcs != arcs;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// FloatingWindow — lets a surface DECLARE a preferred panel frame. The canvas
-// shell normally draws the chrome; this primitive exists for standalone use
-// and to honor a neuron-declared title / lock state (V4-5).
-// ─────────────────────────────────────────────────────────────────────────
 Widget floatingWindow(BuildContext context, DataSource source) {
   final lock = _s(source, 'lockState', 'idle');
   final lockColor = switch (lock) {

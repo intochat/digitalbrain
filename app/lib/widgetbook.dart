@@ -1,13 +1,5 @@
-// Design-time catalog of the Tier-1 widget-canvas palette (docs/redesign/01:
-// "Widgetbook catalogs the palette; RFW is the engine"). Each use-case renders a
-// palette primitive through the real RFW runtime host from a tiny inline RFW
-// document — the exact path the shipped app uses — so the catalog shows what the
-// kernel-emitted surfaces actually render to. Manual directories, no codegen.
-//
-// Run with:  flutter run -t lib/widgetbook.dart
 import 'package:flutter/material.dart';
-// Dev-only catalog entrypoint; widgetbook is intentionally a dev_dependency.
-// ignore: depend_on_referenced_packages
+
 import 'package:widgetbook/widgetbook.dart';
 
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
@@ -68,8 +60,6 @@ class PaletteWidgetbook extends StatelessWidget {
   String _doc(String widget) => 'import digitalbrain;\nwidget root = $widget;';
 }
 
-/// Renders one inline RFW document through the runtime host, centred on the
-/// canvas background so themed primitives read against the real surface colour.
 class _RfwStage extends StatefulWidget {
   const _RfwStage({required this.source});
 

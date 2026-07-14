@@ -139,10 +139,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
 
     public void SetTime(DateTimeOffset utcNow) => _clock.Set(utcNow);
 
-    public async Task<FeatureScenarioResult> ExecuteAsync(
-        IFeature feature,
-        FeatureInput input,
-        CancellationToken cancellationToken = default)
+    public async Task<FeatureScenarioResult> ExecuteAsync(IFeature feature, FeatureInput input, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(feature);
         ArgumentNullException.ThrowIfNull(input);
@@ -156,16 +153,12 @@ public sealed class FeatureScenarioContext : IFeatureContext
         {
             if (_completedInputs.Contains(input.InputId))
             {
-                return SetLast(new FeatureScenarioResult(
-                    FeatureExecutionStatus.Succeeded,
-                    null,
-                    duplicate: true));
+                return SetLast(new FeatureScenarioResult(FeatureExecutionStatus.Succeeded, null, duplicate: true));
             }
 
             if (!_activeInputs.TryGetValue(input.InputId, out active))
             {
-                completion = new TaskCompletionSource<FeatureScenarioResult>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
+                completion = new TaskCompletionSource<FeatureScenarioResult>(TaskCreationOptions.RunContinuationsAsynchronously);
                 active = completion.Task;
                 _activeInputs.Add(input.InputId, active);
                 predecessor = _executionTail;
@@ -188,10 +181,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
 
             if (observed.Status == FeatureExecutionStatus.Succeeded)
             {
-                return SetLast(new FeatureScenarioResult(
-                    FeatureExecutionStatus.Succeeded,
-                    null,
-                    duplicate: true));
+                return SetLast(new FeatureScenarioResult(FeatureExecutionStatus.Succeeded, null, duplicate: true));
             }
 
             return await ExecuteAsync(feature, input, cancellationToken);
@@ -213,10 +203,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
                 _completedInputs.Add(input.InputId);
             }
 
-            executionResult = new FeatureScenarioResult(
-                FeatureExecutionStatus.Succeeded,
-                null,
-                duplicate: false);
+            executionResult = new FeatureScenarioResult(FeatureExecutionStatus.Succeeded, null, duplicate: false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -225,17 +212,11 @@ public sealed class FeatureScenarioContext : IFeatureContext
         }
         catch (FeatureCapabilityDeniedException exception)
         {
-            executionResult = new FeatureScenarioResult(
-                FeatureExecutionStatus.Denied,
-                exception.CapabilityId,
-                duplicate: false);
+            executionResult = new FeatureScenarioResult(FeatureExecutionStatus.Denied, exception.CapabilityId, duplicate: false);
         }
         catch (Exception exception)
         {
-            executionResult = new FeatureScenarioResult(
-                FeatureExecutionStatus.Failed,
-                exception.Message,
-                duplicate: false);
+            executionResult = new FeatureScenarioResult(FeatureExecutionStatus.Failed, exception.Message, duplicate: false);
         }
         finally
         {
@@ -303,9 +284,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
 
     private sealed class ScenarioGmailReader(FeatureScenarioContext owner) : IGmailMessageReader
     {
-        public Task<GmailMessage> ReadAsync(
-            GmailMessageReadRequest request,
-            CancellationToken cancellationToken = default)
+        public Task<GmailMessage> ReadAsync(GmailMessageReadRequest request, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             owner._currentBudget.Value?.CapabilityRead();
@@ -329,9 +308,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
 
     private sealed class ScenarioModelWorkflow(FeatureScenarioContext owner) : IModelWorkflow
     {
-        public Task<ModelResponse> CompleteAsync(
-            ModelRequest request,
-            CancellationToken cancellationToken = default)
+        public Task<ModelResponse> CompleteAsync(ModelRequest request, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ArgumentNullException.ThrowIfNull(request);
@@ -342,8 +319,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
                 owner._modelRequests.Add(request);
                 if (!owner._modelResponses.TryGetValue(ModelRequestKey.From(request), out var response))
                 {
-                    throw new InvalidOperationException(
-                        $"No model response configured for {request.WorkflowId}.");
+                    throw new InvalidOperationException($"No model response configured for {request.WorkflowId}.");
                 }
 
                 return Task.FromResult(response);
@@ -353,9 +329,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
 
     private sealed class ScenarioMemoryRecall(FeatureScenarioContext owner) : IMemoryRecall
     {
-        public Task<IReadOnlyList<MemoryFact>> RecallAsync(
-            MemoryRecallRequest request,
-            CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<MemoryFact>> RecallAsync(MemoryRecallRequest request, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ArgumentNullException.ThrowIfNull(request);
@@ -544,10 +518,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
         }
     }
 
-    private readonly record struct ModelRequestKey(
-        string WorkflowId,
-        string Prompt,
-        string LogicalOperationKey)
+    private readonly record struct ModelRequestKey(string WorkflowId, string Prompt, string LogicalOperationKey)
     {
         public static ModelRequestKey From(ModelRequest request) =>
             new(request.WorkflowId, request.Prompt, request.LogicalOperationKey);
@@ -562,8 +533,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
         {
             if (Interlocked.Increment(ref _capabilityReads) > 20)
             {
-                throw new InvalidOperationException(
-                    "A Feature run cannot perform more than 20 capability reads.");
+                throw new InvalidOperationException("A Feature run cannot perform more than 20 capability reads.");
             }
         }
 
@@ -571,8 +541,7 @@ public sealed class FeatureScenarioContext : IFeatureContext
         {
             if (Interlocked.Increment(ref _modelCalls) > 4)
             {
-                throw new InvalidOperationException(
-                    "A Feature run cannot perform more than 4 model calls.");
+                throw new InvalidOperationException("A Feature run cannot perform more than 4 model calls.");
             }
         }
     }

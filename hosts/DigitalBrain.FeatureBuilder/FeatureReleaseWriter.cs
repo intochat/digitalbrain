@@ -46,13 +46,7 @@ public sealed class FeatureReleaseWriter
         if (Directory.Exists(releaseDirectory))
         {
             VerifyExisting(releaseDirectory, entries, digest);
-            return new FeatureRelease(
-                digest,
-                sourceReference,
-                releaseDirectory,
-                manifest,
-                scenarios,
-                stopwatch.Elapsed);
+            return new FeatureRelease(digest, sourceReference, releaseDirectory, manifest, scenarios, stopwatch.Elapsed);
         }
 
         var staging = Path.Combine(outputDirectory, $".{digest}.{Guid.NewGuid():N}.tmp");
@@ -61,18 +55,12 @@ public sealed class FeatureReleaseWriter
             foreach (var entry in entries)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var destination = Path.Combine(
-                    staging,
-                    entry.Path.Replace('/', Path.DirectorySeparatorChar));
+                var destination = Path.Combine(staging, entry.Path.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 await File.WriteAllBytesAsync(destination, entry.Content, cancellationToken);
             }
 
-            await File.WriteAllTextAsync(
-                Path.Combine(staging, "digest.txt"),
-                digest,
-                new UTF8Encoding(false),
-                cancellationToken);
+            await File.WriteAllTextAsync(Path.Combine(staging, "digest.txt"), digest, new UTF8Encoding(false), cancellationToken);
             try
             {
                 Directory.Move(staging, releaseDirectory);
@@ -90,37 +78,20 @@ public sealed class FeatureReleaseWriter
             }
         }
 
-        return new FeatureRelease(
-            digest,
-            sourceReference,
-            releaseDirectory,
-            manifest,
-            scenarios,
-            stopwatch.Elapsed);
+        return new FeatureRelease(digest, sourceReference, releaseDirectory, manifest, scenarios, stopwatch.Elapsed);
     }
 
     internal static string ComputeSourceReference(FeatureSourceSnapshot snapshot)
     {
-        var entries = snapshot.Files
-            .Select(static file => new ReleaseEntry(
-                "files/" + file.Path,
-                Encoding.UTF8.GetBytes(file.Content)))
-            .Append(new ReleaseEntry(
-                "entries/implementation",
-                Encoding.UTF8.GetBytes(snapshot.ImplementationProjectPath)))
-            .Append(new ReleaseEntry(
-                "entries/scenarios",
-                Encoding.UTF8.GetBytes(snapshot.ScenarioProjectPath)))
+        var entries = snapshot.Files.Select(static file => new ReleaseEntry("files/" + file.Path, Encoding.UTF8.GetBytes(file.Content)))
+            .Append(new ReleaseEntry("entries/implementation", Encoding.UTF8.GetBytes(snapshot.ImplementationProjectPath)))
+            .Append(new ReleaseEntry("entries/scenarios", Encoding.UTF8.GetBytes(snapshot.ScenarioProjectPath)))
             .OrderBy(static entry => entry.Path, StringComparer.Ordinal)
             .ToArray();
         return "sha256:" + ComputeDigest(entries);
     }
 
-    private static ReleaseEntry[] BuildEntries(
-        string sourceReference,
-        string buildOutputDirectory,
-        FeatureManifest manifest,
-        FeatureScenarioResult scenarios)
+    private static ReleaseEntry[] BuildEntries(string sourceReference, string buildOutputDirectory, FeatureManifest manifest, FeatureScenarioResult scenarios)
     {
         var sharedAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -128,29 +99,19 @@ public sealed class FeatureReleaseWriter
             "DigitalBrain.Integrations.Google.Contracts.dll",
             "DigitalBrain.Integrations.Salesforce.Contracts.dll"
         };
-        var outputEntries = Directory.EnumerateFiles(buildOutputDirectory, "*", SearchOption.TopDirectoryOnly)
-            .Where(path =>
+        var outputEntries = Directory.EnumerateFiles(buildOutputDirectory, "*", SearchOption.TopDirectoryOnly).Where(path =>
             {
                 var name = Path.GetFileName(path);
                 var extension = Path.GetExtension(path);
-                return (extension.Equals(".dll", StringComparison.OrdinalIgnoreCase) &&
-                        !sharedAssemblies.Contains(name)) ||
-                    name.Equals(
-                        Path.ChangeExtension(manifest.ImplementationAssembly, ".deps.json"),
-                        StringComparison.OrdinalIgnoreCase);
+                return (extension.Equals(".dll", StringComparison.OrdinalIgnoreCase) && !sharedAssemblies.Contains(name)) ||
+                    name.Equals(Path.ChangeExtension(manifest.ImplementationAssembly, ".deps.json"), StringComparison.OrdinalIgnoreCase);
             })
-            .Select(path => new ReleaseEntry(
-                "implementation/" + Path.GetFileName(path),
-                File.ReadAllBytes(path)))
+            .Select(path => new ReleaseEntry("implementation/" + Path.GetFileName(path), File.ReadAllBytes(path)))
             .ToList();
         if (!outputEntries.Any(entry =>
-                entry.Path.Equals(
-                    "implementation/" + manifest.ImplementationAssembly,
-                    StringComparison.Ordinal)))
+                entry.Path.Equals("implementation/" + manifest.ImplementationAssembly, StringComparison.Ordinal)))
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.CompilationFailed,
-                "The implementation assembly was not emitted.");
+            throw new FeatureBuildException(FeatureBuildFailure.CompilationFailed, "The implementation assembly was not emitted.");
         }
 
         outputEntries.Add(new ReleaseEntry("manifest.json", ManifestJson(manifest)));
@@ -198,10 +159,7 @@ public sealed class FeatureReleaseWriter
         return stream.ToArray();
     }
 
-    private static void WriteArray(
-        Utf8JsonWriter writer,
-        string name,
-        IReadOnlyList<string> values)
+    private static void WriteArray(Utf8JsonWriter writer, string name, IReadOnlyList<string> values)
     {
         writer.WriteStartArray(name);
         foreach (var value in values.Order(StringComparer.Ordinal))
@@ -230,47 +188,33 @@ public sealed class FeatureReleaseWriter
         return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
 
-    private static void VerifyExisting(
-        string releaseDirectory,
-        IReadOnlyList<ReleaseEntry> entries,
-        string digest)
+    private static void VerifyExisting(string releaseDirectory, IReadOnlyList<ReleaseEntry> entries, string digest)
     {
-        var expectedPaths = entries
-            .Select(static entry => entry.Path)
+        var expectedPaths = entries.Select(static entry => entry.Path)
             .Append("digest.txt")
             .Order(StringComparer.Ordinal)
             .ToArray();
-        var actualPaths = Directory.EnumerateFiles(releaseDirectory, "*", SearchOption.AllDirectories)
-            .Select(path => Path.GetRelativePath(releaseDirectory, path).Replace('\\', '/'))
+        var actualPaths = Directory.EnumerateFiles(releaseDirectory, "*", SearchOption.AllDirectories).Select(path => Path.GetRelativePath(releaseDirectory, path).Replace('\\', '/'))
             .Order(StringComparer.Ordinal)
             .ToArray();
         if (!expectedPaths.SequenceEqual(actualPaths, StringComparer.Ordinal))
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.ReleaseConflict,
-                $"Existing release '{digest}' has unexpected files.");
+            throw new FeatureBuildException(FeatureBuildFailure.ReleaseConflict, $"Existing release '{digest}' has unexpected files.");
         }
 
         foreach (var entry in entries)
         {
-            var path = Path.Combine(
-                releaseDirectory,
-                entry.Path.Replace('/', Path.DirectorySeparatorChar));
+            var path = Path.Combine(releaseDirectory, entry.Path.Replace('/', Path.DirectorySeparatorChar));
             if (!File.Exists(path) || !File.ReadAllBytes(path).AsSpan().SequenceEqual(entry.Content))
             {
-                throw new FeatureBuildException(
-                    FeatureBuildFailure.ReleaseConflict,
-                    $"Existing release '{digest}' does not match its content address.");
+                throw new FeatureBuildException(FeatureBuildFailure.ReleaseConflict, $"Existing release '{digest}' does not match its content address.");
             }
         }
 
         var digestPath = Path.Combine(releaseDirectory, "digest.txt");
-        if (!File.Exists(digestPath) ||
-            !string.Equals(File.ReadAllText(digestPath), digest, StringComparison.Ordinal))
+        if (!File.Exists(digestPath) || !string.Equals(File.ReadAllText(digestPath), digest, StringComparison.Ordinal))
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.ReleaseConflict,
-                $"Existing release '{digest}' has an invalid digest marker.");
+            throw new FeatureBuildException(FeatureBuildFailure.ReleaseConflict, $"Existing release '{digest}' has an invalid digest marker.");
         }
     }
 

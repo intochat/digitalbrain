@@ -6,23 +6,20 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Kernel.Memory;
 
-public static class MemoryCapabilityIds
+internal static class MemoryCapabilityIds
 {
     public const string Recall = "memory.recall";
     public const string Remember = "memory.remember";
     public const int Version = 1;
 }
 
-public sealed class MemoryRecallCapabilityHandler(MemoryService memory) : ICapabilityHandler
+internal sealed class MemoryRecallCapabilityHandler(MemoryService memory) : ICapabilityHandler
 {
     public string CapabilityId => MemoryCapabilityIds.Recall;
     public int CapabilityVersion => MemoryCapabilityIds.Version;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.Query;
 
-    public async Task<JsonElement> ExecuteAsync(
-        CapabilityRequest request,
-        CapabilityGrant grant,
-        CancellationToken cancellationToken = default)
+    public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         MemoryCapabilityPayload.Validate(request, grant, CapabilityId);
         var payload = MemoryCapabilityPayload.Read<RecallPayload>(request.Payload);
@@ -47,29 +44,20 @@ public sealed class MemoryRecallCapabilityHandler(MemoryService memory) : ICapab
     private sealed record RecallPayload(string Query, IReadOnlyList<string>? Tags, int? Limit);
 }
 
-public sealed class MemoryRememberCapabilityHandler(
-    MemoryService memory,
-    TimeProvider timeProvider) : ICapabilityHandler
+internal sealed class MemoryRememberCapabilityHandler(MemoryService memory, TimeProvider timeProvider) : ICapabilityHandler
 {
     public string CapabilityId => MemoryCapabilityIds.Remember;
     public int CapabilityVersion => MemoryCapabilityIds.Version;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.InternalWrite;
 
-    public async Task<JsonElement> ExecuteAsync(
-        CapabilityRequest request,
-        CapabilityGrant grant,
-        CancellationToken cancellationToken = default)
+    public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         MemoryCapabilityPayload.Validate(request, grant, CapabilityId);
         var payload = MemoryCapabilityPayload.Read<RememberPayload>(request.Payload);
         var status = await memory.RememberAsync(
             request.OwnerId,
             request.ActorId,
-            new MemoryRememberIntent(
-                request.LogicalOperationKey,
-                payload.FactId,
-                payload.Text,
-                payload.Tags ?? []),
+            new MemoryRememberIntent(request.LogicalOperationKey, payload.FactId, payload.Text, payload.Tags ?? []),
             request.CorrelationId,
             timeProvider.GetUtcNow(),
             cancellationToken);
@@ -81,18 +69,13 @@ public sealed class MemoryRememberCapabilityHandler(
 
 internal static class MemoryCapabilityPayload
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        MaxDepth = 16,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
-    };
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { MaxDepth = 16, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
 
     internal static T Read<T>(JsonElement payload)
     {
         try
         {
-            return payload.Deserialize<T>(JsonOptions)
-                ?? throw new ArgumentException("A Memory capability payload is required.", nameof(payload));
+            return payload.Deserialize<T>(JsonOptions) ?? throw new ArgumentException("A Memory capability payload is required.", nameof(payload));
         }
         catch (JsonException exception)
         {
@@ -104,9 +87,7 @@ internal static class MemoryCapabilityPayload
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(grant);
-        if (request.OwnerId != grant.OwnerId ||
-            request.InstallationId != grant.InstallationId ||
-            request.ReleaseDigest != grant.ReleaseDigest ||
+        if (request.OwnerId != grant.OwnerId || request.InstallationId != grant.InstallationId || request.ReleaseDigest != grant.ReleaseDigest ||
             !string.Equals(request.CapabilityId, capabilityId, StringComparison.Ordinal) ||
             !string.Equals(grant.CapabilityId, capabilityId, StringComparison.Ordinal) ||
             request.CapabilityVersion != MemoryCapabilityIds.Version ||

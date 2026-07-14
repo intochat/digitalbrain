@@ -8,9 +8,6 @@ enum SessionStatus {
   expired,
 }
 
-/// Server-derived runtime identity. None of these values are accepted from a
-/// Flutter request body; they arrive only in a successful signed-session
-/// response and are used here as a client-side isolation check.
 class SessionIdentity {
   const SessionIdentity({
     required this.sessionId,
@@ -26,10 +23,6 @@ class SessionIdentity {
   String toString() => 'SessionIdentity([private])';
 }
 
-/// Opaque, in-memory-only credentials returned by the runtime session service.
-///
-/// Deliberately has a redacted [toString] so an exception, debugger message,
-/// or test failure cannot accidentally print either token.
 class SessionCredentials {
   const SessionCredentials({
     required this.accessToken,
@@ -143,9 +136,6 @@ class SessionController {
     }
   }
 
-  /// Returns a non-expiring-soon access token, rotating the opaque refresh
-  /// token first when necessary. The refresh token never leaves this method
-  /// except as a typed transport argument.
   Future<String> accessToken(
     SessionTransport transport, {
     Duration refreshSkew = const Duration(seconds: 30),
@@ -167,8 +157,6 @@ class SessionController {
     return refreshAccessToken(transport);
   }
 
-  /// Forces one-use refresh rotation after the server rejects an access
-  /// session, even when the local expiry clock still considers it current.
   Future<String> refreshAccessToken(SessionTransport transport) async {
     final refreshInFlight = _currentRefresh;
     if (refreshInFlight != null) return refreshInFlight;

@@ -1,53 +1,39 @@
 using System.Net;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
 
 namespace DigitalBrain.Mcp;
 
 public sealed record AuthorizationFlowProxyOptions(Uri InternalOrigin)
 {
-    public static AuthorizationFlowProxyOptions FromConfiguration(
-        IConfiguration configuration,
-        RuntimeProfile profile)
+    public static AuthorizationFlowProxyOptions FromConfiguration(IConfiguration configuration, RuntimeProfile profile)
     {
         var configured = configuration["DigitalBrain:Runtime:OAuth:InternalOrigin"];
-        if (!Uri.TryCreate(configured, UriKind.Absolute, out var origin) || origin.Host.Length == 0 ||
-            origin.UserInfo.Length != 0 || origin.Query.Length != 0 || origin.Fragment.Length != 0 ||
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out var origin) || origin.Host.Length == 0 || origin.UserInfo.Length != 0 || origin.Query.Length != 0 || origin.Fragment.Length != 0 ||
             origin.AbsolutePath is not ("" or "/") ||
             profile == RuntimeProfile.Production && origin.Scheme != Uri.UriSchemeHttps ||
-            profile != RuntimeProfile.Production &&
-            origin.Scheme != Uri.UriSchemeHttp && origin.Scheme != Uri.UriSchemeHttps)
+            profile != RuntimeProfile.Production && origin.Scheme != Uri.UriSchemeHttp && origin.Scheme != Uri.UriSchemeHttps)
             throw new InvalidOperationException("DigitalBrain:Runtime:OAuth:InternalOrigin must be a trusted runtime origin.");
         return new(origin);
     }
 }
 
-public sealed class AuthorizationFlowStartProxy(
-    HttpClient client,
-    AuthorizationFlowProxyOptions options)
+public sealed class AuthorizationFlowStartProxy(HttpClient client, AuthorizationFlowProxyOptions options)
 {
-    public async Task<IResult> StartAsync(
-        string provider,
-        HttpRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IResult> StartAsync(string provider, HttpRequest request, CancellationToken cancellationToken)
     {
         SetBrowserResponseHeaders(request.HttpContext.Response);
         var target = (request.Path.Value ?? string.Empty) + (request.QueryString.Value ?? string.Empty);
         if (!OAuthCallbackPaths.TryParseInternalStartPath(target, provider, out var flowReference))
             return Results.BadRequest();
 
-        var internalTarget = new Uri(
-            options.InternalOrigin,
-            $"/oauth/start/{provider}?f={Uri.EscapeDataString(flowReference)}");
+        var internalTarget = new Uri(options.InternalOrigin, $"/oauth/start/{provider}?f={Uri.EscapeDataString(flowReference)}");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(15));
         HttpResponseMessage response;
         try
         {
-            response = await client.GetAsync(
-                internalTarget,
-                HttpCompletionOption.ResponseHeadersRead,
-                deadline.Token).ConfigureAwait(false);
+            response = await client.GetAsync(internalTarget, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

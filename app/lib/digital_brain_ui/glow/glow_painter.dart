@@ -5,10 +5,6 @@ import 'package:flutter/material.dart';
 
 import 'glow_icon_spec.dart';
 
-/// Paper-heatmap technique: saveLayer → N semi-transparent dots with
-/// MaskFilter.blur(BlurStyle.normal, σ) and BlendMode.plus → additive
-/// accumulation builds a glowing silhouette; density drives brightness.
-/// Source: flutterawesome.com/paper-heatmap-logo-a-flutter-demo-that-glows/
 class GlowPainter extends CustomPainter {
   GlowPainter(this.spec, {this.dotCount = 36, this.blurSigma = 3.2});
   final GlowIconSpec spec;

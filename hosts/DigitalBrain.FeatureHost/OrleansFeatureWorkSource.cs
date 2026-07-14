@@ -3,7 +3,7 @@ using Orleans;
 
 namespace DigitalBrain.FeatureHost;
 
-public sealed class OrleansFeatureWorkSource : IFeatureWorkSource
+internal sealed class OrleansFeatureWorkSource : IFeatureWorkSource
 {
     private static readonly TimeSpan EmptyPollDelay = TimeSpan.FromSeconds(1);
     private readonly IFeatureArtifactCatalog _artifacts;
@@ -11,10 +11,7 @@ public sealed class OrleansFeatureWorkSource : IFeatureWorkSource
     private readonly IClusterClient _cluster;
     private int _cursor;
 
-    public OrleansFeatureWorkSource(
-        IFeatureArtifactCatalog artifacts,
-        FeatureReleaseManager releases,
-        IClusterClient cluster)
+    public OrleansFeatureWorkSource(IFeatureArtifactCatalog artifacts, FeatureReleaseManager releases, IClusterClient cluster)
     {
         _artifacts = artifacts ?? throw new ArgumentNullException(nameof(artifacts));
         _releases = releases ?? throw new ArgumentNullException(nameof(releases));
@@ -27,17 +24,13 @@ public sealed class OrleansFeatureWorkSource : IFeatureWorkSource
         {
             var active = await _artifacts.ReadActiveAsync(cancellationToken);
             await _releases.LoadActiveAsync(
-                active.Select(item => new FeatureActiveInstallation(
-                    item.OwnerId,
-                    item.InstallationId,
-                    item.Release)).ToArray(),
+                active.Select(item => new FeatureActiveInstallation(item.OwnerId, item.InstallationId, item.Release)).ToArray(),
                 cancellationToken);
             for (var offset = 0; offset < active.Count; offset++)
             {
                 var index = Math.Abs(Interlocked.Increment(ref _cursor) + offset) % active.Count;
                 var candidate = active[index];
-                var grain = _cluster.GetGrain<IFeatureInstallationGrain>(
-                    FeatureGrainIds.Installation(candidate.OwnerId, candidate.InstallationId));
+                var grain = _cluster.GetGrain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(candidate.OwnerId, candidate.InstallationId));
                 var snapshot = await grain.ReadAsync();
                 if (snapshot.Paused || snapshot.Inbox.Length == 0 || snapshot.ActiveRelease != candidate.Release.Digest)
                     continue;

@@ -1,4 +1,4 @@
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using Grpc.AspNetCore.Web;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -10,11 +10,7 @@ public static class UiHostingExtensions
 {
     public const string CorsPolicy = "digitalbrain-runtime-ui-grpc-web";
 
-    public static IServiceCollection AddUiTransport(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        IHostEnvironment environment,
-        RuntimeProfile profile)
+    public static IServiceCollection AddUiTransport(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment, RuntimeProfile profile)
     {
         services.AddGrpc(options =>
         {
@@ -28,14 +24,10 @@ public static class UiHostingExtensions
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
             options.ForwardLimit = 1;
             var trustContainerAppsIngress = profile == RuntimeProfile.Production &&
-                string.Equals(
-                    configuration["DigitalBrain:Runtime:ForwardedHeaders:TrustAzureContainerAppsIngress"],
-                    "true",
-                    StringComparison.OrdinalIgnoreCase);
+                string.Equals(configuration["DigitalBrain:Runtime:ForwardedHeaders:TrustAzureContainerAppsIngress"], "true", StringComparison.OrdinalIgnoreCase);
             if (trustContainerAppsIngress)
             {
-                // ACA ingress addresses can change. Microsoft documents clearing these lists for
-                // Container Apps; the target port remains behind the managed ingress boundary.
+
                 options.KnownIPNetworks.Clear();
                 options.KnownProxies.Clear();
             }
@@ -49,9 +41,7 @@ public static class UiHostingExtensions
         services.AddSingleton<UiExternalIdentityAuthenticator>();
         var authentication = services.AddAuthentication();
         if (externalIdentity.Enabled)
-            authentication.AddJwtBearer(
-                UiExternalIdentityOptions.AuthenticationScheme,
-                externalIdentity.Configure);
+            authentication.AddJwtBearer(UiExternalIdentityOptions.AuthenticationScheme, externalIdentity.Configure);
         var defaultDelivery = UiDeliveryOptions.Default;
         var renewal = TimeSpan.TryParse(configuration["DigitalBrain:Runtime:Ui:ActionTokenRenewalInterval"], out var configuredRenewal)
             ? configuredRenewal
@@ -73,38 +63,30 @@ public static class UiHostingExtensions
         app.UseAuthentication();
         app.UseGrpcWeb(new GrpcWebOptions { DefaultEnabled = false });
         app.UseCors();
-        app.MapGrpcService<UiGrpcService>()
-            .EnableGrpcWeb()
-            .RequireCors(CorsPolicy);
+        app.MapGrpcService<UiGrpcService>().EnableGrpcWeb().RequireCors(CorsPolicy);
         return app;
     }
 
     private static void ConfigureCors(CorsPolicyBuilder policy, IConfiguration configuration, RuntimeProfile profile)
     {
-        var origins = (configuration["DigitalBrain:Runtime:Ui:AllowedOrigins"] ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var origins = (configuration["DigitalBrain:Runtime:Ui:AllowedOrigins"] ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (origins.Length > 0)
             policy.WithOrigins(origins);
         else if (profile != RuntimeProfile.Production)
             policy.AllowAnyOrigin();
         else
             policy.WithOrigins("https://invalid.digitalbrain.local");
-        policy.AllowAnyMethod()
-            .AllowAnyHeader()
-            .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
+        policy.AllowAnyMethod().AllowAnyHeader().WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
     }
 
 }
 
-public sealed class UiTransportHealthCheck(
-    RuntimeSurfaceFeed feed,
-    SurfaceEnvelopeWriter envelopeWriter,
-    UiGrpcService service) : IHealthCheck
+public sealed class UiTransportHealthCheck(RuntimeSurfaceFeed feed, SurfaceEnvelopeWriter envelopeWriter, UiGrpcService service) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Constructor resolution eagerly opens/validates the durable feed and the complete transport graph.
+
         _ = feed;
         _ = envelopeWriter;
         _ = service;

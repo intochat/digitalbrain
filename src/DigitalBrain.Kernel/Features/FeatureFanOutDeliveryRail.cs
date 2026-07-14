@@ -3,23 +3,15 @@ using Orleans;
 
 namespace DigitalBrain.Kernel.Features;
 
-public sealed record FeatureDeliveryAttempt(
-    FeatureInstallationId InstallationId,
-    FeatureAppendStatus? Status);
+internal sealed record FeatureDeliveryAttempt(FeatureInstallationId InstallationId, FeatureAppendStatus? Status);
 
-public sealed class FeatureFanOutDeliveryRail(IFeatureGrainResolver grains)
+internal sealed class FeatureFanOutDeliveryRail(IFeatureGrainResolver grains)
 {
-    public Task<FeatureDeliveryAttempt[]> DispatchAsync(
-        BrainOwnerId ownerId,
-        FeatureFanOutState batch) =>
-        Task.WhenAll(batch.Deliveries
-            .Where(delivery => !delivery.Delivered)
+    public Task<FeatureDeliveryAttempt[]> DispatchAsync(BrainOwnerId ownerId, FeatureFanOutState batch) =>
+        Task.WhenAll(batch.Deliveries.Where(delivery => !delivery.Delivered)
             .Select(delivery => DeliverAsync(ownerId, delivery.InstallationId, batch.Input)));
 
-    private async Task<FeatureDeliveryAttempt> DeliverAsync(
-        BrainOwnerId ownerId,
-        FeatureInstallationId installationId,
-        FeatureInput input)
+    private async Task<FeatureDeliveryAttempt> DeliverAsync(BrainOwnerId ownerId, FeatureInstallationId installationId, FeatureInput input)
     {
         try
         {
@@ -33,13 +25,11 @@ public sealed class FeatureFanOutDeliveryRail(IFeatureGrainResolver grains)
     }
 }
 
-public sealed class OrleansFeatureGrainResolver(IGrainFactory grainFactory) : IFeatureGrainResolver
+internal sealed class OrleansFeatureGrainResolver(IGrainFactory grainFactory) : IFeatureGrainResolver
 {
     public IFeatureHubGrain Hub(BrainOwnerId ownerId) =>
         grainFactory.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
 
-    public IFeatureInstallationGrain Installation(
-        BrainOwnerId ownerId,
-        FeatureInstallationId installationId) =>
+    public IFeatureInstallationGrain Installation(BrainOwnerId ownerId, FeatureInstallationId installationId) =>
         grainFactory.GetGrain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(ownerId, installationId));
 }

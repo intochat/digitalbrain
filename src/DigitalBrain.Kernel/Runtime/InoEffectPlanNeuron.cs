@@ -1,4 +1,4 @@
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Capabilities;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -7,7 +7,7 @@ using Orleans.Runtime;
 namespace DigitalBrain.Kernel.Runtime;
 
 [GrainType("digitalbrain.runtime.ino-effect-plan.v1")]
-public sealed class InoEffectPlanNeuron(
+internal sealed class InoEffectPlanNeuron(
     [PersistentState("ino-effect-plan", RuntimeStateStorageProviders.Conversations)]
     IPersistentState<EncryptedRuntimeStateEnvelope> persistentState,
     EncryptedRuntimeStateProtector protector,
@@ -22,8 +22,7 @@ public sealed class InoEffectPlanNeuron(
     private EncryptedPersistentState<InoEffectPlanState>? _state;
     private IGrainReminder? _expiryReminder;
 
-    private string PlanId => this.GetPrimaryKeyString()
-        ?? throw new InvalidOperationException("INO effect plan grains require a string key.");
+    private string PlanId => this.GetPrimaryKeyString() ?? throw new InvalidOperationException("INO effect plan grains require a string key.");
 
     private EncryptedPersistentState<InoEffectPlanState> State => _state ??= new(
         persistentState,
@@ -53,8 +52,7 @@ public sealed class InoEffectPlanNeuron(
         }
         catch (PersistedStateWriteOutcomeUnknownException)
         {
-            // The encrypted plan may already be durable. Keep the durable reminder so either state is scrubbed
-            // at expiry or an empty activation removes the otherwise harmless reminder.
+
             throw;
         }
         catch
@@ -81,14 +79,7 @@ public sealed class InoEffectPlanNeuron(
             !string.Equals(plan.OperationId, operationId, StringComparison.Ordinal) ||
             !string.Equals(plan.ToolId, toolId, StringComparison.Ordinal) ||
             !InoEffectPlanAuthority.MatchesSummary(plan.SafeSummary, summaryDigest) ||
-            !authority.ValidateExecutionProof(
-                executionProof,
-                PlanId,
-                actorScope,
-                operationId,
-                toolId,
-                effectId,
-                providerIdempotencyKey))
+            !authority.ValidateExecutionProof(executionProof, PlanId, actorScope, operationId, toolId, effectId, providerIdempotencyKey))
             throw new RuntimeStateIntegrityException("effect plan execution binding is invalid");
         if (current.Completion is { } completed)
             return new InoToolEffectResult(completed.Disposition, completed.SafeResult);
@@ -96,9 +87,7 @@ public sealed class InoEffectPlanNeuron(
         InoToolEffectResult result;
         if (plan.ExpiresAt <= timeProvider.GetUtcNow())
         {
-            result = new InoToolEffectResult(
-                InoToolEffectDisposition.Failed,
-                "This approval expired before execution. No external action was performed.");
+            result = new InoToolEffectResult(InoToolEffectDisposition.Failed, "This approval expired before execution. No external action was performed.");
         }
         else
         {
@@ -108,19 +97,12 @@ public sealed class InoEffectPlanNeuron(
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                result = new InoToolEffectResult(
-                    InoToolEffectDisposition.OutcomeUnknown,
-                    "The approved external action timed out before its result could be confirmed.");
+                result = new InoToolEffectResult(InoToolEffectDisposition.OutcomeUnknown, "The approved external action timed out before its result could be confirmed.");
             }
             catch (Exception ex)
             {
-                logger.LogWarning(
-                    "INO effect plan {PlanId} failed with {ExceptionType} after execution began.",
-                    PlanId,
-                    ex.GetType().Name);
-                result = new InoToolEffectResult(
-                    InoToolEffectDisposition.OutcomeUnknown,
-                    "The approved external action could not be confirmed. Review it before trying again.");
+                logger.LogWarning("INO effect plan {PlanId} failed with {ExceptionType} after execution began.", PlanId, ex.GetType().Name);
+                result = new InoToolEffectResult(InoToolEffectDisposition.OutcomeUnknown, "The approved external action could not be confirmed. Review it before trying again.");
             }
         }
 
@@ -150,19 +132,12 @@ public sealed class InoEffectPlanNeuron(
         }
         if (plan.ExpiresAt > timeProvider.GetUtcNow())
         {
-            _expiryReminder = await this.RegisterOrUpdateReminder(
-                ExpiryReminderName,
-                ReminderDueTime(plan.ExpiresAt),
-                ExpiryReminderPeriod);
+            _expiryReminder = await this.RegisterOrUpdateReminder(ExpiryReminderName, ReminderDueTime(plan.ExpiresAt), ExpiryReminderPeriod);
             return;
         }
         await State.UpdateAsync(
             current.Revision,
-            state => InoEffectPlanTransitions.Complete(
-                state,
-                new InoEffectPlanCompletion(
-                    InoToolEffectDisposition.Failed,
-                    "This approval expired. No external action was performed.")));
+            state => InoEffectPlanTransitions.Complete(state, new InoEffectPlanCompletion(InoToolEffectDisposition.Failed, "This approval expired. No external action was performed.")));
         await StopExpiryReminderAsync();
     }
 
@@ -173,10 +148,7 @@ public sealed class InoEffectPlanNeuron(
     }
 
     private async Task EnsureExpiryReminderAsync(DateTimeOffset expiresAt) =>
-        _expiryReminder ??= await this.RegisterOrUpdateReminder(
-            ExpiryReminderName,
-            ReminderDueTime(expiresAt),
-            ExpiryReminderPeriod);
+        _expiryReminder ??= await this.RegisterOrUpdateReminder(ExpiryReminderName, ReminderDueTime(expiresAt), ExpiryReminderPeriod);
 
     private async Task TryStopExpiryReminderAsync()
     {
@@ -186,10 +158,7 @@ public sealed class InoEffectPlanNeuron(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(
-                "INO effect plan {PlanId} could not remove its expiry reminder after durable completion: {ExceptionType}.",
-                PlanId,
-                ex.GetType().Name);
+            logger.LogWarning("INO effect plan {PlanId} could not remove its expiry reminder after durable completion: {ExceptionType}.", PlanId, ex.GetType().Name);
         }
     }
 
@@ -201,9 +170,7 @@ public sealed class InoEffectPlanNeuron(
         _expiryReminder = null;
     }
 
-    private Task<InoToolEffectResult> ExecuteRegisteredEffectAsync(
-        InoEffectPlan plan,
-        CancellationToken cancellationToken) =>
+    private Task<InoToolEffectResult> ExecuteRegisteredEffectAsync(InoEffectPlan plan, CancellationToken cancellationToken) =>
         _handlers.TryGetValue(plan.ToolId, out var handler)
             ? handler.ApplyAsync(plan.ActorScope, plan.PayloadUtf8, cancellationToken)
             : throw new RuntimeStateIntegrityException("effect plan tool is not registered");

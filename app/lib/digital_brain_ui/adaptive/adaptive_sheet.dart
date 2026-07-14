@@ -2,12 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// Bottom sheet that adapts to the platform.
-/// On iOS / macOS → [CupertinoPopupSurface] (native vibrancy material).
-/// Everywhere else → Material-style container with a grab-handle pill.
-///
-/// [fullBleed] removes the top scrim gap; pass `true` for medium@compact weight.
-/// Scrim-tap calls [onDismiss]; tap inside the sheet body does NOT dismiss.
 class AdaptiveSheet extends StatelessWidget {
   const AdaptiveSheet({
     required this.child,
@@ -45,7 +39,6 @@ class AdaptiveSheet extends StatelessWidget {
         child: GestureDetector(
           onTap: () {},
           onVerticalDragEnd: (d) {
-            // Flick-down dismiss: positive primaryVelocity = downward fling.
             if (d.primaryVelocity != null && d.primaryVelocity! > 300) {
               onDismiss();
             }

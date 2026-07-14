@@ -17,9 +17,7 @@ public sealed class SalesforceRecordReference
 
 public sealed class SalesforceRecordReadRequest
 {
-    public SalesforceRecordReadRequest(
-        SalesforceRecordReference record,
-        IReadOnlyList<string> fields)
+    public SalesforceRecordReadRequest(SalesforceRecordReference record, IReadOnlyList<string> fields)
     {
         Record = record ?? throw new ArgumentNullException(nameof(record));
         Fields = ContractGuard.FieldNames(fields, nameof(fields), requireItems: true);
@@ -31,9 +29,7 @@ public sealed class SalesforceRecordReadRequest
 
 public sealed class SalesforceRecord
 {
-    public SalesforceRecord(
-        SalesforceRecordReference reference,
-        IReadOnlyDictionary<string, JsonElement> fields)
+    public SalesforceRecord(SalesforceRecordReference reference, IReadOnlyDictionary<string, JsonElement> fields)
     {
         Reference = reference ?? throw new ArgumentNullException(nameof(reference));
         Fields = ContractGuard.Fields(fields, nameof(fields));
@@ -45,18 +41,12 @@ public sealed class SalesforceRecord
 
 public interface ISalesforceRecordReader
 {
-    Task<SalesforceRecord> ReadAsync(
-        SalesforceRecordReadRequest request,
-        CancellationToken cancellationToken = default);
+    Task<SalesforceRecord> ReadAsync(SalesforceRecordReadRequest request, CancellationToken cancellationToken = default);
 }
 
 public sealed class SalesforceUpdateProposalRequest
 {
-    public SalesforceUpdateProposalRequest(
-        SalesforceRecordReference record,
-        string field,
-        JsonElement newValue,
-        string logicalOperationKey)
+    public SalesforceUpdateProposalRequest(SalesforceRecordReference record, string field, JsonElement newValue, string logicalOperationKey)
     {
         Record = record ?? throw new ArgumentNullException(nameof(record));
         Field = ContractGuard.Required(field, nameof(field), 255);
@@ -72,11 +62,7 @@ public sealed class SalesforceUpdateProposalRequest
 
 public sealed class SalesforceUpdateProposal
 {
-    public SalesforceUpdateProposal(
-        SalesforceRecordReference record,
-        string field,
-        JsonElement newValue,
-        string logicalOperationKey)
+    public SalesforceUpdateProposal(SalesforceRecordReference record, string field, JsonElement newValue, string logicalOperationKey)
     {
         Record = record ?? throw new ArgumentNullException(nameof(record));
         Field = ContractGuard.Required(field, nameof(field), 255);
@@ -92,9 +78,7 @@ public sealed class SalesforceUpdateProposal
 
 public interface ISalesforceUpdateProposer
 {
-    Task<SalesforceUpdateProposal> ProposeAsync(
-        SalesforceUpdateProposalRequest request,
-        CancellationToken cancellationToken = default);
+    Task<SalesforceUpdateProposal> ProposeAsync(SalesforceUpdateProposalRequest request, CancellationToken cancellationToken = default);
 }
 
 internal static class ContractGuard
@@ -133,10 +117,7 @@ internal static class ContractGuard
         return value;
     }
 
-    internal static IReadOnlyList<string> FieldNames(
-        IReadOnlyList<string> values,
-        string parameterName,
-        bool requireItems)
+    internal static IReadOnlyList<string> FieldNames(IReadOnlyList<string> values, string parameterName, bool requireItems)
     {
         ArgumentNullException.ThrowIfNull(values, parameterName);
         if ((requireItems && values.Count == 0) || values.Count > MaximumFieldCount)
@@ -160,9 +141,7 @@ internal static class ContractGuard
         return Array.AsReadOnly(copy);
     }
 
-    internal static IReadOnlyDictionary<string, JsonElement> Fields(
-        IReadOnlyDictionary<string, JsonElement> values,
-        string parameterName)
+    internal static IReadOnlyDictionary<string, JsonElement> Fields(IReadOnlyDictionary<string, JsonElement> values, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(values, parameterName);
         if (values.Count > MaximumFieldCount)
@@ -181,13 +160,9 @@ internal static class ContractGuard
 
     internal static JsonElement Json(JsonElement value, string parameterName)
     {
-        if (value.ValueKind == JsonValueKind.Undefined ||
-            value.GetRawText().Length > MaximumJsonLength ||
-            Depth(value) > MaximumJsonDepth)
+        if (value.ValueKind == JsonValueKind.Undefined || value.GetRawText().Length > MaximumJsonLength || Depth(value) > MaximumJsonDepth)
         {
-            throw new ArgumentException(
-                $"JSON must be defined, at most {MaximumJsonLength} characters, and at most {MaximumJsonDepth} levels deep.",
-                parameterName);
+            throw new ArgumentException($"JSON must be defined, at most {MaximumJsonLength} characters, and at most {MaximumJsonDepth} levels deep.", parameterName);
         }
 
         return value.Clone();

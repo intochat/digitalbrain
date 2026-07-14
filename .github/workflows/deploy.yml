@@ -1,6 +1,6 @@
 name: deploy
 
-# Deployment is release-gated: publish a GitHub Release to build the images and run Pulumi.
+
 on:
   release:
     types: [published]
@@ -67,11 +67,11 @@ jobs:
       - run: flutter test
         working-directory: app
 
-      # Served at the custom domain root, so base href is "/". Flutter's default
-      # hash URL strategy resolves routes client-side without a custom 404.html.
-      # --no-tree-shake-icons: the app uses non-constant IconData, which blocks icon tree-shaking.
-      # Flutter distribution is wired EXCLUSIVELY to the authenticated MCP UI transport (gRPC over HTTPS with x-v2-audience + session).
-      # Kernel is used only for OAuth callbacks; no direct kernel references allowed in the bundle (enforced by smoke tests).
+
+
+
+
+
       - run: |
           mcp_endpoint="https://${MCP_CUSTOM_HOSTNAME}"
           flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run \
@@ -112,8 +112,8 @@ jobs:
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
           DIGITALBRAIN_IMAGE_TAG: "${{ env.TAG }}"
-          # AES checkpoint-encryption key, injected from a repo secret (never committed). The program reads
-          # DIGITALBRAIN_CHECKPOINT_KEY and fails the deploy if absent (kernel fail-fasts in Production without it).
+
+
           DIGITALBRAIN_CHECKPOINT_KEY: ${{ secrets.CHECKPOINT_KEY }}
           DIGITALBRAIN_SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
           DIGITALBRAIN_RUNTIME_STATE_KEK: ${{ secrets.RUNTIME_STATE_KEK }}
@@ -128,16 +128,16 @@ jobs:
           DIGITALBRAIN_OIDC_AUDIENCE: ${{ vars.DIGITALBRAIN_OIDC_AUDIENCE }}
           DIGITALBRAIN_MCP_AUDIENCE: ${{ vars.DIGITALBRAIN_MCP_AUDIENCE }}
           DIGITALBRAIN_UI_AUDIENCE: ${{ vars.DIGITALBRAIN_UI_AUDIENCE }}
-          # Docker Hub PAT so ACA can authenticate pulling the private runtime images (see
-          # deploy/Program.cs's RegistryCredentialsArgs wiring).
+
+
           DIGITALBRAIN_DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           DIGITALBRAIN_DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
           DIGITALBRAIN_WEB_HOSTNAME: ${{ env.WEB_CUSTOM_HOSTNAME }}
           DIGITALBRAIN_WEB_APEX_HOSTNAME: ${{ env.WEB_APEX_HOSTNAME }}
           DIGITALBRAIN_KERNEL_HOSTNAME: ${{ env.KERNEL_CUSTOM_HOSTNAME }}
           DIGITALBRAIN_MCP_HOSTNAME: ${{ env.MCP_CUSTOM_HOSTNAME }}
-          # azblob://pulumi-state backend needs the storage account; the OIDC login above provides Azure AD auth
-          # (the deploy identity needs Storage Blob Data Contributor on this account).
+
+
           AZURE_STORAGE_ACCOUNT: digitalbrainstprod
         with:
           command: up
@@ -206,7 +206,7 @@ jobs:
             fi
           }
 
-          # The kernel hostname remains only for its existing OAuth start/callback routes.
+
           ensure_container_app_hostname digitalbrain-jobs "${KERNEL_CUSTOM_HOSTNAME}"
           ensure_container_app_hostname digitalbrain-mcp "${MCP_CUSTOM_HOSTNAME}"
 

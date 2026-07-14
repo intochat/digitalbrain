@@ -1,7 +1,7 @@
 using DigitalBrain.AppHost;
-using DigitalBrain.Core.Models;
-using AzureOpenAIModels = DigitalBrain.Core.Models.AzureOpenAI;
-using OllamaModels = DigitalBrain.Core.Models.Ollama;
+using DigitalBrain.Kernel.Contracts.Models;
+using AzureOpenAIModels = DigitalBrain.Kernel.Contracts.Models.AzureOpenAI;
+using OllamaModels = DigitalBrain.Kernel.Contracts.Models.Ollama;
 
 namespace DigitalBrain.AppHostTests;
 

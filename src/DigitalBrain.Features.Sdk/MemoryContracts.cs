@@ -4,9 +4,7 @@ namespace DigitalBrain.Features.Sdk;
 
 public interface IMemoryRecall
 {
-    Task<IReadOnlyList<MemoryFact>> RecallAsync(
-        MemoryRecallRequest request,
-        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MemoryFact>> RecallAsync(MemoryRecallRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IMemoryRemember
@@ -35,11 +33,7 @@ public sealed class MemoryRecallRequest
 
 public sealed class MemoryFact
 {
-    public MemoryFact(
-        string factId,
-        string text,
-        IReadOnlyList<string> tags,
-        DateTimeOffset updatedAt)
+    public MemoryFact(string factId, string text, IReadOnlyList<string> tags, DateTimeOffset updatedAt)
     {
         FactId = FeatureContractGuard.MemoryFactId(factId, nameof(factId));
         Text = FeatureContractGuard.Utf8(text, nameof(text), 2_048);
@@ -55,16 +49,9 @@ public sealed class MemoryFact
 
 public sealed class MemoryRememberIntent
 {
-    public MemoryRememberIntent(
-        string logicalOperationKey,
-        string factId,
-        string text,
-        IReadOnlyList<string> tags)
+    public MemoryRememberIntent(string logicalOperationKey, string factId, string text, IReadOnlyList<string> tags)
     {
-        LogicalOperationKey = FeatureContractGuard.Required(
-            logicalOperationKey,
-            nameof(logicalOperationKey),
-            256);
+        LogicalOperationKey = FeatureContractGuard.Required(logicalOperationKey, nameof(logicalOperationKey), 256);
         FactId = FeatureContractGuard.MemoryFactId(factId, nameof(factId));
         Text = FeatureContractGuard.Utf8(text, nameof(text), 2_048);
         Tags = FeatureContractGuard.Tags(tags, nameof(tags));

@@ -20,32 +20,20 @@ public sealed class FeatureBuildPipeline
         _releaseWriter = releaseWriter ?? throw new ArgumentNullException(nameof(releaseWriter));
     }
 
-    public async Task<FeatureRelease> BuildAsync(
-        FeatureBuildRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<FeatureRelease> BuildAsync(FeatureBuildRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateDeadline(request.Deadline);
         FeatureBuildSource.Validate(request.Source);
         cancellationToken.ThrowIfCancellationRequested();
-        var workspace = Path.Combine(
-            Path.GetTempPath(),
-            "digitalbrain-feature-builds",
-            Guid.NewGuid().ToString("N"));
+        var workspace = Path.Combine(Path.GetTempPath(), "digitalbrain-feature-builds", Guid.NewGuid().ToString("N"));
         try
         {
             await FeatureBuildSource.MaterializeAsync(workspace, request.Source, cancellationToken);
-            var nugetConfig = await FeatureBuildSource.WriteNuGetConfigAsync(
-                workspace,
-                request.OfflineFeedDirectory,
-                cancellationToken);
+            var nugetConfig = await FeatureBuildSource.WriteNuGetConfigAsync(workspace, request.OfflineFeedDirectory, cancellationToken);
             var packagesDirectory = Path.Combine(workspace, ".packages");
-            var implementationProject = FeatureBuildSource.LocalPath(
-                workspace,
-                request.Source.ImplementationProjectPath);
-            var scenarioProject = FeatureBuildSource.LocalPath(
-                workspace,
-                request.Source.ScenarioProjectPath);
+            var implementationProject = FeatureBuildSource.LocalPath(workspace, request.Source.ImplementationProjectPath);
+            var scenarioProject = FeatureBuildSource.LocalPath(workspace, request.Source.ScenarioProjectPath);
             var process = new FeatureBuildProcess(_timeProvider);
             await process.RunAsync(
                 workspace,
@@ -66,9 +54,7 @@ public sealed class FeatureBuildPipeline
                 "--verbosity",
                 "quiet");
 
-            var compileDeadline = Minimum(
-                request.Deadline,
-                _timeProvider.GetUtcNow().Add(CompileAndScenarioTimeout));
+            var compileDeadline = Minimum(request.Deadline, _timeProvider.GetUtcNow().Add(CompileAndScenarioTimeout));
             var buildOutput = Path.Combine(workspace, "build", "implementation");
             await process.RunAsync(
                 workspace,
@@ -94,12 +80,8 @@ public sealed class FeatureBuildPipeline
                 "--verbosity",
                 "quiet");
 
-            var implementationAssembly = FeatureManifestDeriver.AssemblyName(
-                request.Source,
-                request.Source.ImplementationProjectPath);
-            var manifest = FeatureManifestDeriver.Derive(
-                buildOutput,
-                implementationAssembly);
+            var implementationAssembly = FeatureManifestDeriver.AssemblyName(request.Source, request.Source.ImplementationProjectPath);
+            var manifest = FeatureManifestDeriver.Derive(buildOutput, implementationAssembly);
             await process.RunAsync(
                 workspace,
                 compileDeadline,
@@ -121,23 +103,10 @@ public sealed class FeatureBuildPipeline
                 "--nologo",
                 "--verbosity",
                 "quiet");
-            var scenarioAssembly = FeatureManifestDeriver.AssemblyName(
-                request.Source,
-                request.Source.ScenarioProjectPath);
-            var scenarioAssemblyPath = Path.Combine(
-                Path.GetDirectoryName(scenarioProject)!,
-                "bin",
-                "Release",
-                "net11.0",
-                scenarioAssembly);
-            var expectedScenarioCount = FeatureManifestDeriver.ValidateScenarioAssembly(
-                scenarioAssemblyPath,
-                implementationAssembly,
-                FeatureBuildSource.ExpectedScenarioCount(request.Source));
-            ValidateScenarioDependencies(
-                request.Source,
-                Path.GetDirectoryName(scenarioAssemblyPath)!,
-                scenarioAssembly);
+            var scenarioAssembly = FeatureManifestDeriver.AssemblyName(request.Source, request.Source.ScenarioProjectPath);
+            var scenarioAssemblyPath = Path.Combine(Path.GetDirectoryName(scenarioProject)!, "bin", "Release", "net11.0", scenarioAssembly);
+            var expectedScenarioCount = FeatureManifestDeriver.ValidateScenarioAssembly(scenarioAssemblyPath, implementationAssembly, FeatureBuildSource.ExpectedScenarioCount(request.Source));
+            ValidateScenarioDependencies(request.Source, Path.GetDirectoryName(scenarioAssemblyPath)!, scenarioAssembly);
             var resultsDirectory = Path.Combine(workspace, "build", "results");
             Directory.CreateDirectory(resultsDirectory);
             await process.RunAsync(
@@ -167,15 +136,10 @@ public sealed class FeatureBuildPipeline
                 "--verbosity",
                 "quiet");
 
-            var scenarios = FeatureScenarioResultReader.Read(
-                Path.Combine(resultsDirectory, "scenarios.trx"),
-                expectedScenarioCount);
-            if (scenarios.Total == 0 || scenarios.Failed != 0 || scenarios.Skipped != 0 ||
-                scenarios.Passed != scenarios.Total)
+            var scenarios = FeatureScenarioResultReader.Read(Path.Combine(resultsDirectory, "scenarios.trx"), expectedScenarioCount);
+            if (scenarios.Total == 0 || scenarios.Failed != 0 || scenarios.Skipped != 0 || scenarios.Passed != scenarios.Total)
             {
-                throw new FeatureBuildException(
-                    FeatureBuildFailure.ScenarioFailed,
-                    "Feature scenarios must contain at least one test and pass with no failures or skips.");
+                throw new FeatureBuildException(FeatureBuildFailure.ScenarioFailed, "Feature scenarios must contain at least one test and pass with no failures or skips.");
             }
 
             var sourceReference = FeatureReleaseWriter.ComputeSourceReference(request.Source);
@@ -189,13 +153,7 @@ public sealed class FeatureBuildPipeline
             releaseCancellation.CancelAfter(remaining);
             try
             {
-                return await _releaseWriter.WriteAsync(
-                    request.OutputDirectory,
-                    sourceReference,
-                    buildOutput,
-                    manifest,
-                    scenarios,
-                    releaseCancellation.Token);
+                return await _releaseWriter.WriteAsync(request.OutputDirectory, sourceReference, buildOutput, manifest, scenarios, releaseCancellation.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -211,13 +169,9 @@ public sealed class FeatureBuildPipeline
         }
     }
 
-    private static void ValidateScenarioDependencies(
-        FeatureSourceSnapshot source,
-        string outputDirectory,
-        string scenarioAssembly)
+    private static void ValidateScenarioDependencies(FeatureSourceSnapshot source, string outputDirectory, string scenarioAssembly)
     {
-        foreach (var project in source.Files
-                     .Where(static file => file.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
+        foreach (var project in source.Files.Where(static file => file.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
         {
             var assembly = FeatureManifestDeriver.AssemblyName(source, project.Path);
             if (assembly.Equals(scenarioAssembly, StringComparison.OrdinalIgnoreCase))
@@ -243,9 +197,7 @@ public sealed class FeatureBuildPipeline
 
         if (remaining > MaximumRequestDuration)
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.InvalidSource,
-                $"A Feature build deadline cannot exceed {MaximumRequestDuration.TotalSeconds:0} seconds.");
+            throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, $"A Feature build deadline cannot exceed {MaximumRequestDuration.TotalSeconds:0} seconds.");
         }
     }
 

@@ -7,10 +7,6 @@ const int digitalBrainSurfaceSchemaVersion = 2;
 const int digitalBrainActionSchemaVersion = 1;
 const int defaultMaximumSurfaceBytes = 1024 * 1024;
 
-/// Capabilities advertised during the runtime feed handshake.
-///
-/// These values describe renderer support only. They are never authorization
-/// claims and the server must not derive owner or actor authority from them.
 class ClientCapabilities {
   const ClientCapabilities({
     this.protocolVersions = const {digitalBrainUiProtocolVersion},
@@ -367,7 +363,10 @@ class FeatureApprovalSurfacePayload extends SurfacePayload {
     }, 'payload.data');
     final revision = data['revision'];
     final bindings = data['capabilityBindings'];
-    if (revision is! int || revision < 1 || bindings is! List || bindings.length > 32) {
+    if (revision is! int ||
+        revision < 1 ||
+        bindings is! List ||
+        bindings.length > 32) {
       throw const FormatException('Feature approval data is not bounded.');
     }
     return FeatureApprovalSurfacePayload(
@@ -401,7 +400,9 @@ class FeatureApprovalSurfacePayload extends SurfacePayload {
       'requestedCapabilities': requestedCapabilities,
       'addedCapabilities': addedCapabilities,
       'removedCapabilities': removedCapabilities,
-      'capabilityBindings': capabilityBindings.map((binding) => binding.toJson()).toList(),
+      'capabilityBindings': capabilityBindings
+          .map((binding) => binding.toJson())
+          .toList(),
       'revision': revision,
     },
   };
@@ -1279,12 +1280,14 @@ List<String> _boundedStringList(Map<String, Object?> json, String key) {
   if (value is! List || value.length > 64) {
     throw FormatException('$key must be a bounded array.');
   }
-  return List.unmodifiable(value.map((item) {
-    if (item is! String || item.isEmpty || item.length > 256) {
-      throw FormatException('$key contains an invalid identifier.');
-    }
-    return item;
-  }));
+  return List.unmodifiable(
+    value.map((item) {
+      if (item is! String || item.isEmpty || item.length > 256) {
+        throw FormatException('$key contains an invalid identifier.');
+      }
+      return item;
+    }),
+  );
 }
 
 Map<String, Object?> _safeObject(

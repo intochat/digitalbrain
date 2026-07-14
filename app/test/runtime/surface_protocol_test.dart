@@ -37,7 +37,10 @@ void main() {
       payload.capabilityBindings.single.providerConnectionId,
       'google-primary',
     );
-    expect(payload.capabilityBindings.single.constraints['maximumMessages'], 20);
+    expect(
+      payload.capabilityBindings.single.constraints['maximumMessages'],
+      20,
+    );
   });
 
   test('decodes a complete SurfaceEnvelope and typed action binding', () {

@@ -204,20 +204,31 @@ class _SurfaceViewState extends State<SurfaceView> {
                   const SizedBox(height: 16),
                   _approvalField('Installation', payload.installationId),
                   _approvalField('Release digest', payload.releaseDigest),
-                  _approvalField('Source', '${payload.sourceKind} · ${payload.sourceReference}'),
+                  _approvalField(
+                    'Source',
+                    '${payload.sourceKind} · ${payload.sourceReference}',
+                  ),
                   _approvalField('Revision', payload.revision.toString()),
-                  _approvalList('Requested capabilities', payload.requestedCapabilities),
+                  _approvalList(
+                    'Requested capabilities',
+                    payload.requestedCapabilities,
+                  ),
                   _approvalList('Added', payload.addedCapabilities),
                   _approvalList('Removed', payload.removedCapabilities),
                   const SizedBox(height: 8),
-                  Text('Capability bindings', style: theme.textTheme.titleMedium),
+                  Text(
+                    'Capability bindings',
+                    style: theme.textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 8),
                   for (final binding in payload.capabilityBindings)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          border: Border.all(color: theme.colorScheme.outlineVariant),
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Padding(
@@ -225,12 +236,18 @@ class _SurfaceViewState extends State<SurfaceView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${binding.capabilityId} v${binding.capabilityVersion}'),
+                              Text(
+                                '${binding.capabilityId} v${binding.capabilityVersion}',
+                              ),
                               if (binding.provider != null)
                                 Text('Provider: ${binding.provider}'),
                               if (binding.providerConnectionId != null)
-                                Text('Connection: ${binding.providerConnectionId}'),
-                              Text('Constraints: ${jsonEncode(binding.constraints)}'),
+                                Text(
+                                  'Connection: ${binding.providerConnectionId}',
+                                ),
+                              Text(
+                                'Constraints: ${jsonEncode(binding.constraints)}',
+                              ),
                             ],
                           ),
                         ),
@@ -242,17 +259,28 @@ class _SurfaceViewState extends State<SurfaceView> {
                     children: [
                       OutlinedButton(
                         key: featureApprovalRejectKey,
-                        onPressed: action == null || _submitting || !widget.actionEnabled
+                        onPressed:
+                            action == null ||
+                                _submitting ||
+                                !widget.actionEnabled
                             ? null
-                            : () => _submitFeatureDecision(action, payload, false),
+                            : () => _submitFeatureDecision(
+                                action,
+                                payload,
+                                false,
+                              ),
                         child: const Text('Reject'),
                       ),
                       const SizedBox(width: 12),
                       FilledButton(
                         key: featureApprovalApproveKey,
-                        onPressed: action == null || _submitting || !widget.actionEnabled
+                        onPressed:
+                            action == null ||
+                                _submitting ||
+                                !widget.actionEnabled
                             ? null
-                            : () => _submitFeatureDecision(action, payload, true),
+                            : () =>
+                                  _submitFeatureDecision(action, payload, true),
                         child: const Text('Approve'),
                       ),
                     ],

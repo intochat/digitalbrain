@@ -5,12 +5,9 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Kernel.Features;
 
-public static class FeatureInstallationTransitions
+internal static class FeatureInstallationTransitions
 {
-    public static FeatureAppendTransition Append(
-        FeatureInstallationState state,
-        FeatureInput input,
-        DateTimeOffset now)
+    public static FeatureAppendTransition Append(FeatureInstallationState state, FeatureInput input, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(state);
         ValidateInput(input);
@@ -36,31 +33,14 @@ public static class FeatureInstallationTransitions
 
         if (state.Inbox.Length >= FeatureLimits.InboxEntries)
         {
-            return new(
-                state with
-                {
-                    Paused = true,
-                    PauseReason = "feature inbox full",
-                    Revision = checked(state.Revision + 1)
-                },
-                FeatureAppendStatus.Full);
+            return new(state with { Paused = true, PauseReason = "feature inbox full", Revision = checked(state.Revision + 1) }, FeatureAppendStatus.Full);
         }
 
         var entry = new FeatureInboxEntry(input, 0, now, false, null);
-        return new(
-            state with
-            {
-                Inbox = [.. state.Inbox, entry],
-                Revision = checked(state.Revision + 1)
-            },
-            FeatureAppendStatus.Accepted);
+        return new(state with { Inbox = [.. state.Inbox, entry], Revision = checked(state.Revision + 1) }, FeatureAppendStatus.Accepted);
     }
 
-    public static FeatureClaimTransition Claim(
-        FeatureInstallationState state,
-        string hostId,
-        DateTimeOffset now,
-        TimeSpan leaseDuration)
+    public static FeatureClaimTransition Claim(FeatureInstallationState state, string hostId, DateTimeOffset now, TimeSpan leaseDuration)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentException.ThrowIfNullOrWhiteSpace(hostId);
@@ -76,13 +56,7 @@ public static class FeatureInstallationTransitions
             entry => !entry.Parked && entry.NotBefore <= now);
         if (index < 0)
         {
-            return state.Lease is null
-                ? new(state, null)
-                : new(state with
-                {
-                    Lease = null,
-                    Revision = checked(state.Revision + 1)
-                }, null);
+            return state.Lease is null ? new(state, null) : new(state with { Lease = null, Revision = checked(state.Revision + 1) }, null);
         }
 
         var entries = state.Inbox.ToArray();
@@ -107,24 +81,11 @@ public static class FeatureInstallationTransitions
         var fence = new FeatureLeaseFence(entry.Input.InputId, fenceNumber);
         var expires = now.Add(leaseDuration);
         var lease = new FeatureLease(hostId, fence, expires, attempt);
-        var next = state with
-        {
-            Inbox = entries,
-            Lease = lease,
-            NextFence = fenceNumber,
-            Revision = checked(state.Revision + 1)
-        };
-        return new(
-            next,
-            new FeatureRunClaim(entry.Input, fence, state.ActiveRelease, state.StateJson, expires, attempt));
+        var next = state with { Inbox = entries, Lease = lease, NextFence = fenceNumber, Revision = checked(state.Revision + 1) };
+        return new(next, new FeatureRunClaim(entry.Input, fence, state.ActiveRelease, state.StateJson, expires, attempt));
     }
 
-    public static FeatureInstallationState Fail(
-        FeatureInstallationState state,
-        FeatureLeaseFence fence,
-        DateTimeOffset now,
-        DateTimeOffset retryAt,
-        string safeFailure)
+    public static FeatureInstallationState Fail(FeatureInstallationState state, FeatureLeaseFence fence, DateTimeOffset now, DateTimeOffset retryAt, string safeFailure)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(fence);
@@ -141,25 +102,11 @@ public static class FeatureInstallationTransitions
 
         var entries = state.Inbox.ToArray();
         var parked = lease.Attempt >= FeatureLimits.AttemptsPerInput;
-        entries[index] = entries[index] with
-        {
-            NotBefore = retryAt,
-            Parked = parked,
-            LastFailure = Bound(safeFailure, 256)
-        };
-        return state with
-        {
-            Inbox = entries,
-            Lease = null,
-            Paused = state.Paused || parked,
-            Revision = checked(state.Revision + 1)
-        };
+        entries[index] = entries[index] with { NotBefore = retryAt, Parked = parked, LastFailure = Bound(safeFailure, 256) };
+        return state with { Inbox = entries, Lease = null, Paused = state.Paused || parked, Revision = checked(state.Revision + 1) };
     }
 
-    public static FeatureCommitTransition Commit(
-        FeatureInstallationState state,
-        FeatureRunCommit commit,
-        DateTimeOffset now)
+    public static FeatureCommitTransition Commit(FeatureInstallationState state, FeatureRunCommit commit, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(commit);
@@ -198,24 +145,14 @@ public static class FeatureInstallationTransitions
             ArgumentNullException.ThrowIfNull(intent);
             ArgumentException.ThrowIfNullOrWhiteSpace(intent.LogicalOperationKey);
             ValidateJson(intent.PayloadJson, nameof(intent.PayloadJson), FeatureLimits.StateUtf8Bytes);
-            return new PersistedFeatureIntent(
-                FeatureIntentKeys.Create(state.InstallationId, commit.Fence.InputId, intent.LogicalOperationKey),
-                intent.Kind,
-                intent.PayloadJson,
-                null);
+            return new PersistedFeatureIntent(FeatureIntentKeys.Create(state.InstallationId, commit.Fence.InputId, intent.LogicalOperationKey), intent.Kind, intent.PayloadJson, null);
         }).ToArray();
         if (persistedIntents.Select(intent => intent.OperationKey).Distinct(StringComparer.Ordinal).Count() != persistedIntents.Length)
             throw new ArgumentException("Intent logical operation keys must be unique within a run.", nameof(commit));
 
         var retainedIntents = RetainIntentLedger(state.Intents, persistedIntents);
 
-        var completion = new FeatureCompletion(
-            commit.Fence.InputId,
-            commit.Fence.Fence,
-            commit.ResultJson,
-            now,
-            commitDigest,
-            InputDigest(leasedInput.Input));
+        var completion = new FeatureCompletion(commit.Fence.InputId, commit.Fence.Fence, commit.ResultJson, now, commitDigest, InputDigest(leasedInput.Input));
         var completions = state.Completions.Length == FeatureLimits.InboxEntries
             ? [.. state.Completions.Skip(1), completion]
             : state.Completions.Append(completion).ToArray();
@@ -232,10 +169,7 @@ public static class FeatureInstallationTransitions
             completion);
     }
 
-    public static FeatureAppendTransition RecordScheduleOccurrence(
-        FeatureInstallationState state,
-        FeatureScheduleOccurrence occurrence,
-        DateTimeOffset now)
+    public static FeatureAppendTransition RecordScheduleOccurrence(FeatureInstallationState state, FeatureScheduleOccurrence occurrence, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(occurrence);
@@ -256,30 +190,20 @@ public static class FeatureInstallationTransitions
             var existing = state.Schedules[existingIndex];
             if (occurrence.ScheduledFor < existing.LastOccurrenceAt)
                 throw new FeatureConcurrencyException("Schedule occurrences cannot move backward.");
-            if (occurrence.ScheduledFor == existing.LastOccurrenceAt &&
-                occurrence.NextOccurrenceAt != existing.NextOccurrenceAt)
+            if (occurrence.ScheduledFor == existing.LastOccurrenceAt && occurrence.NextOccurrenceAt != existing.NextOccurrenceAt)
                 throw new FeatureConcurrencyException("A duplicate schedule occurrence has conflicting next-occurrence data.");
         }
 
         var inputId = ScheduledInputId(state.InstallationId, occurrence.ScheduleId, occurrence.ScheduledFor);
         var appended = Append(
             state,
-            new FeatureInput(
-                inputId,
-                $"schedule.{occurrence.ScheduleId}",
-                occurrence.PayloadJson,
-                occurrence.ScheduledFor,
-                occurrence.CorrelationId,
-                occurrence.TraceId),
+            new FeatureInput(inputId, $"schedule.{occurrence.ScheduleId}", occurrence.PayloadJson, occurrence.ScheduledFor, occurrence.CorrelationId, occurrence.TraceId),
             now);
         if (appended.Status is not FeatureAppendStatus.Accepted and not FeatureAppendStatus.Duplicate)
             return appended;
 
         var schedules = appended.State.Schedules.ToArray();
-        var cursor = new FeatureScheduleCursor(
-            occurrence.ScheduleId,
-            occurrence.ScheduledFor,
-            occurrence.NextOccurrenceAt);
+        var cursor = new FeatureScheduleCursor(occurrence.ScheduleId, occurrence.ScheduledFor, occurrence.NextOccurrenceAt);
         if (existingIndex >= 0)
             schedules[existingIndex] = cursor;
         else
@@ -300,10 +224,7 @@ public static class FeatureInstallationTransitions
         return state.Intents.Where(intent => intent.AppliedAt is null).ToArray();
     }
 
-    public static FeatureInstallationState ApplyIntent(
-        FeatureInstallationState state,
-        string operationKey,
-        DateTimeOffset appliedAt)
+    public static FeatureInstallationState ApplyIntent(FeatureInstallationState state, string operationKey, DateTimeOffset appliedAt)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentException.ThrowIfNullOrWhiteSpace(operationKey);
@@ -324,12 +245,7 @@ public static class FeatureInstallationTransitions
         var bounded = Bound(reason, 256);
         if (state.Paused && Same(state.PauseReason ?? string.Empty, bounded))
             return state;
-        return state with
-        {
-            Paused = true,
-            PauseReason = bounded,
-            Revision = checked(state.Revision + 1)
-        };
+        return state with { Paused = true, PauseReason = bounded, Revision = checked(state.Revision + 1) };
     }
 
     public static FeatureInstallationState Resume(FeatureInstallationState state)
@@ -337,31 +253,16 @@ public static class FeatureInstallationTransitions
         ArgumentNullException.ThrowIfNull(state);
         if (!state.Paused)
             return state;
-        var inbox = state.Inbox.Select(entry => entry.Parked
-            ? entry with { Parked = false, Attempts = 0, LastFailure = null }
-            : entry).ToArray();
-        return state with
-        {
-            Paused = false,
-            PauseReason = null,
-            Inbox = inbox,
-            Revision = checked(state.Revision + 1)
-        };
+        var inbox = state.Inbox.Select(entry => entry.Parked ? entry with { Parked = false, Attempts = 0, LastFailure = null } : entry).ToArray();
+        return state with { Paused = false, PauseReason = null, Inbox = inbox, Revision = checked(state.Revision + 1) };
     }
 
-    public static FeatureInstallationState SwitchRelease(
-        FeatureInstallationState state,
-        ReleaseDigest release)
+    public static FeatureInstallationState SwitchRelease(FeatureInstallationState state, ReleaseDigest release)
     {
         ArgumentNullException.ThrowIfNull(state);
         if (state.ActiveRelease == release)
             return state;
-        return state with
-        {
-            ActiveRelease = release,
-            PreviousRelease = state.ActiveRelease,
-            Revision = checked(state.Revision + 1)
-        };
+        return state with { ActiveRelease = release, PreviousRelease = state.ActiveRelease, Revision = checked(state.Revision + 1) };
     }
 
     public static FeatureInstallationState Rollback(FeatureInstallationState state)
@@ -369,19 +270,12 @@ public static class FeatureInstallationTransitions
         ArgumentNullException.ThrowIfNull(state);
         if (state.PreviousRelease is not { } previous)
             return state;
-        return state with
-        {
-            ActiveRelease = previous,
-            PreviousRelease = null,
-            Revision = checked(state.Revision + 1)
-        };
+        return state with { ActiveRelease = previous, PreviousRelease = null, Revision = checked(state.Revision + 1) };
     }
 
     private static FeatureLease RequireLease(FeatureInstallationState state, FeatureLeaseFence fence)
     {
-        if (state.Lease is not { } lease ||
-            !Same(lease.Fence.InputId, fence.InputId) ||
-            lease.Fence.Fence != fence.Fence)
+        if (state.Lease is not { } lease || !Same(lease.Fence.InputId, fence.InputId) || lease.Fence.Fence != fence.Fence)
             throw new FeatureConcurrencyException("The feature lease fence is stale.");
         return lease;
     }
@@ -417,8 +311,7 @@ public static class FeatureInstallationTransitions
     private static void ValidateIdentifier(string value, string parameterName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
-        if (value.Length > 256 || value.Any(char.IsControl) ||
-            !string.Equals(value, value.Trim(), StringComparison.Ordinal))
+        if (value.Length > 256 || value.Any(char.IsControl) || !string.Equals(value, value.Trim(), StringComparison.Ordinal))
             throw new ArgumentException("A bounded canonical identifier is required.", parameterName);
     }
 
@@ -437,10 +330,7 @@ public static class FeatureInstallationTransitions
         }
     }
 
-    private static string ScheduledInputId(
-        FeatureInstallationId installationId,
-        string scheduleId,
-        DateTimeOffset scheduledFor)
+    private static string ScheduledInputId(FeatureInstallationId installationId, string scheduleId, DateTimeOffset scheduledFor)
     {
         var canonical = $"{installationId.Value.Length}:{installationId.Value}{scheduleId.Length}:{scheduleId}{scheduledFor.UtcTicks}";
         return "schedule-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
@@ -462,22 +352,18 @@ public static class FeatureInstallationTransitions
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
     }
 
-    private static PersistedFeatureIntent[] RetainIntentLedger(
-        IReadOnlyList<PersistedFeatureIntent> existing,
-        IReadOnlyList<PersistedFeatureIntent> appended)
+    private static PersistedFeatureIntent[] RetainIntentLedger(IReadOnlyList<PersistedFeatureIntent> existing, IReadOnlyList<PersistedFeatureIntent> appended)
     {
         var pending = existing.Where(intent => intent.AppliedAt is null).ToArray();
         var requiredCount = checked(pending.Length + appended.Count);
         var requiredBytes = pending.Sum(IntentBytes) + appended.Sum(IntentBytes);
-        if (requiredCount > FeatureLimits.IntentLedgerEntries ||
-            requiredBytes > FeatureLimits.IntentLedgerUtf8Bytes)
+        if (requiredCount > FeatureLimits.IntentLedgerEntries || requiredBytes > FeatureLimits.IntentLedgerUtf8Bytes)
             throw new FeatureLimitExceededException("Pending feature intents exceed the durable intent ledger capacity.");
 
         var remainingCount = FeatureLimits.IntentLedgerEntries - requiredCount;
         var remainingBytes = FeatureLimits.IntentLedgerUtf8Bytes - requiredBytes;
         var applied = new List<PersistedFeatureIntent>();
-        foreach (var intent in existing
-            .Where(intent => intent.AppliedAt is not null)
+        foreach (var intent in existing.Where(intent => intent.AppliedAt is not null)
             .OrderByDescending(intent => intent.AppliedAt))
         {
             var bytes = IntentBytes(intent);

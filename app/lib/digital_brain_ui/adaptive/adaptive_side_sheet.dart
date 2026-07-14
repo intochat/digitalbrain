@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../glass/glass_material.dart';
 
-/// Material 3 doesn't ship a SideSheet. This renders a right-docked panel with
-/// a left-edge scrim that swipes shut on compact/medium.
 class AdaptiveSideSheet extends StatelessWidget {
   const AdaptiveSideSheet({
     required this.child,

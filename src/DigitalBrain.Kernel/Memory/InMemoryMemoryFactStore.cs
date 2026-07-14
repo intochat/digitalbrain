@@ -2,15 +2,12 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Kernel.Memory;
 
-public sealed class InMemoryMemoryFactStore : IMemoryFactStore
+internal sealed class InMemoryMemoryFactStore : IMemoryFactStore
 {
     private readonly object _gate = new();
     private readonly Dictionary<BrainOwnerId, Dictionary<string, StoredFact>> _owners = [];
 
-    public Task<IReadOnlyList<MemoryFactSnapshot>> ListAsync(
-        BrainOwnerId ownerId,
-        int maximumCount,
-        CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<MemoryFactSnapshot>> ListAsync(BrainOwnerId ownerId, int maximumCount, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumCount, 1);
@@ -18,8 +15,7 @@ public sealed class InMemoryMemoryFactStore : IMemoryFactStore
         {
             IReadOnlyList<MemoryFactSnapshot> result = !_owners.TryGetValue(ownerId, out var facts)
                 ? []
-                : facts.Values
-                    .OrderBy(fact => fact.Value.FactId, StringComparer.Ordinal)
+                : facts.Values.OrderBy(fact => fact.Value.FactId, StringComparer.Ordinal)
                     .Take(maximumCount)
                     .Select(fact => fact.Snapshot())
                     .ToArray();
@@ -27,27 +23,18 @@ public sealed class InMemoryMemoryFactStore : IMemoryFactStore
         }
     }
 
-    public Task<MemoryFactSnapshot?> FindAsync(
-        BrainOwnerId ownerId,
-        string factId,
-        CancellationToken cancellationToken = default)
+    public Task<MemoryFactSnapshot?> FindAsync(BrainOwnerId ownerId, string factId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         factId = MemoryValues.FactId(factId, nameof(factId));
         lock (_gate)
         {
-            var result = _owners.TryGetValue(ownerId, out var facts) && facts.TryGetValue(factId, out var fact)
-                ? fact.Snapshot()
-                : null;
+            var result = _owners.TryGetValue(ownerId, out var facts) && facts.TryGetValue(factId, out var fact) ? fact.Snapshot() : null;
             return Task.FromResult(result);
         }
     }
 
-    public Task<MemoryWriteStatus> CreateAsync(
-        BrainOwnerId ownerId,
-        MemoryFactSnapshot fact,
-        int capacity,
-        CancellationToken cancellationToken = default)
+    public Task<MemoryWriteStatus> CreateAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, int capacity, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         MemoryValues.FactId(fact.FactId, nameof(fact));
@@ -71,11 +58,7 @@ public sealed class InMemoryMemoryFactStore : IMemoryFactStore
         }
     }
 
-    public Task<MemoryFactSnapshot> ReplaceAsync(
-        BrainOwnerId ownerId,
-        MemoryFactSnapshot fact,
-        string expectedETag,
-        CancellationToken cancellationToken = default)
+    public Task<MemoryFactSnapshot> ReplaceAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, string expectedETag, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         MemoryValues.FactId(fact.FactId, nameof(fact));
@@ -92,11 +75,7 @@ public sealed class InMemoryMemoryFactStore : IMemoryFactStore
         }
     }
 
-    public Task<bool> DeleteAsync(
-        BrainOwnerId ownerId,
-        string factId,
-        string expectedETag,
-        CancellationToken cancellationToken = default)
+    public Task<bool> DeleteAsync(BrainOwnerId ownerId, string factId, string expectedETag, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         factId = MemoryValues.FactId(factId, nameof(factId));
@@ -114,16 +93,11 @@ public sealed class InMemoryMemoryFactStore : IMemoryFactStore
     }
 
     private static bool SameContent(MemoryFactSnapshot left, MemoryFactSnapshot right) =>
-        string.Equals(left.Text, right.Text, StringComparison.Ordinal) &&
-        left.Tags.SequenceEqual(right.Tags, StringComparer.Ordinal) &&
+        string.Equals(left.Text, right.Text, StringComparison.Ordinal) && left.Tags.SequenceEqual(right.Tags, StringComparer.Ordinal) &&
         left.SourceActor == right.SourceActor;
 
     private sealed record StoredFact(MemoryFactSnapshot Value, long Version)
     {
-        internal MemoryFactSnapshot Snapshot() => Value with
-        {
-            Tags = Value.Tags.ToArray(),
-            ETag = Version.ToString(System.Globalization.CultureInfo.InvariantCulture)
-        };
+        internal MemoryFactSnapshot Snapshot() => Value with { Tags = Value.Tags.ToArray(), ETag = Version.ToString(System.Globalization.CultureInfo.InvariantCulture) };
     }
 }

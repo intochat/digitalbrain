@@ -13,7 +13,6 @@ typedef ExternalIdentityTokenSourceFactory =
       ExternalIdentityConfiguration configuration,
     );
 
-/// Owns the non-visual lifecycle of a runtime shell session.
 class RuntimeSessionOwner extends ChangeNotifier {
   RuntimeSessionOwner({
     RuntimeConfiguration? configuration,
@@ -162,7 +161,6 @@ class RuntimeSessionOwner extends ChangeNotifier {
       try {
         await controller.stop();
       } catch (_) {
-        // Shutdown is best-effort after the shell has left the widget tree.
       } finally {
         controller.dispose();
       }

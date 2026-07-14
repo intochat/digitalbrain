@@ -4,8 +4,6 @@ import '../breakpoints/input_mode.dart';
 import '../breakpoints/window_size.dart';
 import '../breakpoints/window_size_scope.dart';
 
-/// Spacing tokens used by every adaptive surface and overlay.
-/// Tighter on compact+touch, looser on large+pointer.
 class AdaptiveSpacing {
   const AdaptiveSpacing._({
     required this.xs,
@@ -31,8 +29,6 @@ class AdaptiveSpacing {
   }
 }
 
-/// VisualDensity per (WindowSize, InputMode). Replaces the blanket
-/// `VisualDensity.adaptivePlatformDensity` in buildDigitalBrainTheme.
 VisualDensity adaptiveVisualDensity(BuildContext context) {
   final size = WindowSizeContext.of(context);
   final mode = InputModeContext.of(context);

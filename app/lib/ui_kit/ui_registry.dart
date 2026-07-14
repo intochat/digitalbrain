@@ -40,9 +40,6 @@ import 'ui_toast.dart';
 import 'ui_tooltip.dart';
 import 'ui_link.dart';
 
-// Maps a ui:* node (type already lower-cased by the tree renderer) to its ForUI cover widget.
-// [buildChild] recurses back into the tree renderer for container children (ui:Screen, ui:Panel).
-// Returns SizedBox.shrink() for unknown types — Task 6 expects a non-null Widget.
 Widget buildUiNode(
   String type,
   Map<String, Object?> props,
@@ -81,7 +78,7 @@ Widget buildUiNode(
         eventName: s('eventName'),
         icon: s('icon'),
         eventProps: _buttonEventProps(props),
-        // synapseType lets config-form buttons emit ConfigurationProvided instead of the default ExperienceStep.
+
         synapseType: props['synapseType']?.toString().isNotEmpty == true
             ? props['synapseType']!.toString()
             : 'ExperienceStep',
@@ -94,7 +91,6 @@ Widget buildUiNode(
     case 'ui:textarea':
       return UiKitTextArea(name: s('name'), placeholder: s('placeholder'));
     case 'ui:select':
-      // Backend emits 'items'; older surfaces may use 'options'. Prefer 'items'.
       final selectOptions = optList('items').isNotEmpty
           ? optList('items')
           : optList('options');

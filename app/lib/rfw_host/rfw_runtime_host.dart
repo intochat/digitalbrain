@@ -6,9 +6,6 @@ import 'package:rfw/rfw.dart';
 import 'package:digitalbrain_flutter/rfw_host/digitalbrain_rfw_library.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_registry.dart';
 
-/// One process-wide RFW runtime: the host-owned `digitalbrain` dictionary plus
-/// per-key parsed document libraries. Parse failures are captured per key so a
-/// bad document degrades to an error string instead of taking down the host.
 class RfwRuntimeHost {
   RfwRuntimeHost() {
     _runtime.update(
@@ -21,12 +18,9 @@ class RfwRuntimeHost {
   final Set<String> _loaded = <String>{};
   final Map<String, String> _parseErrors = <String, String>{};
 
-  /// Parse `source` once under library name `['doc', key]`. Idempotent.
   void ensureLoaded(String key, String source) {
     if (_loaded.contains(key) || _parseErrors.containsKey(key)) return;
-    // Normalize CRLF / CR to LF before parsing. The RFW parser rejects U+000D
-    // (carriage return) — networked sources sometimes carry CRLF line endings
-    // that the parser would reject at column 16 of line 1.
+
     final normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     try {
       _runtime.update(LibraryName(['doc', key]), parseLibraryFile(normalized));
@@ -38,7 +32,6 @@ class RfwRuntimeHost {
 
   String? parseError(String key) => _parseErrors[key];
 
-  /// Check if a document key has already been successfully loaded.
   bool isLoaded(String key) => _loaded.contains(key);
 
   Widget render(
@@ -64,15 +57,9 @@ class RfwRuntimeHost {
   }
 }
 
-/// Support for UiSurface-driven widget trees. This is the mechanism that makes the entire UI (main shell chrome,
-/// navigation, layouts, widgets) come from neurons via streamed UiSurfaces.
-/// Neurons (or packs) emit trees; the host only renders.
 class UiSurfaceTreeRenderer {
   const UiSurfaceTreeRenderer();
 
-  /// Renders a node from a neuron-provided tree (from UiSurface props['tree'] or the surface itself).
-  /// onNavSelected receives the target kind when a nav item or link is activated.
-  /// onEvent receives ('press'|'select'|'action', args) for buttons, list items, and declared actions so
   Widget build(
     Map<String, Object?> node,
     RemoteEventHandler onEvent, {
@@ -89,7 +76,6 @@ class UiSurfaceTreeRenderer {
     final childrenList =
         (node['Children'] ?? node['children'] ?? const []) as List;
 
-    // ui:* nodes delegated to registry (buildChild recurses for containers).
     if (type.startsWith('ui:')) {
       return buildUiNode(
         type,
@@ -106,8 +92,6 @@ class UiSurfaceTreeRenderer {
       );
     }
 
-    // Simplified dispatch using switch on canonical (lowercased) kit names from Core.
-    // Aliases and heuristics removed in prior step. One place per type.
     switch (type) {
       case 'neuron:menu':
         return _buildNeuronMenu(
@@ -202,7 +186,6 @@ class UiSurfaceTreeRenderer {
           child: Text(label),
         );
       default:
-        // fall through to rfw / app-shell / raw handling below
         break;
     }
 
@@ -278,7 +261,7 @@ class UiSurfaceTreeRenderer {
           props,
         );
       }
-      return const SizedBox.shrink(); // legacy navItems removed - use children
+      return const SizedBox.shrink();
     }
 
     if (type == 'fcard' ||
@@ -401,7 +384,6 @@ class UiSurfaceTreeRenderer {
       );
     }
 
-    // Recursive default (layout container)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: childrenList
@@ -604,8 +586,6 @@ class UiSurfaceTreeRenderer {
     final hint = (props['hint'] ?? props['placeholder'] ?? 'Search buddies')
         .toString();
 
-    // ForUI based buddy/pack search (using FTextField + FTappable results from kit tree).
-    // Typing not fully live (tree driven); selection fires synapse event.
     return _ForuiBuddySearch(
       hint: hint,
       suggestions: suggestions,
@@ -614,11 +594,8 @@ class UiSurfaceTreeRenderer {
   }
 }
 
-// Simple navigator key for theme access in renderer when no context.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// Local ForUI search widget for autocomplete in dynamic trees.
-/// Uses FTextField + results as FTappable FCard. Query select sends event for neuron/synapse handling.
 class _ForuiBuddySearch extends StatefulWidget {
   const _ForuiBuddySearch({
     required this.hint,
@@ -702,7 +679,7 @@ class _NeuronFormState extends State<_NeuronForm> {
       final name = (field['name'] ?? '').toString();
       if (name.isEmpty) continue;
       names.add(name);
-      // Seed the controller with the field's pre-filled value the first time we see it.
+
       _controllers.putIfAbsent(
         name,
         () => TextEditingController(text: (field['value'] ?? '').toString()),

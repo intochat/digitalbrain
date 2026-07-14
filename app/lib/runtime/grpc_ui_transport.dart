@@ -12,8 +12,6 @@ import 'runtime.dart';
 
 const Duration unaryRequestTimeout = Duration(seconds: 10);
 
-/// Small generated-client seam used by transport tests. Production always
-/// uses [_GeneratedGrpcClientPort].
 abstract interface class GrpcClientPort {
   GrpcUnaryResponse<wire.SessionReply> bootstrapSession(
     wire.BootstrapSessionRequest request,
@@ -71,8 +69,7 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
         'DigitalBrain transport requires an HTTPS endpoint.',
       );
     }
-    // grpc-dart's optional timeline profiler includes call metadata. UI call
-    // metadata contains the signed session, so it must stay disabled.
+
     isTimelineLoggingEnabled = false;
     final port = endpoint.hasPort ? endpoint.port : 443;
     final channel = GrpcOrGrpcWebClientChannel.toSingleEndpoint(
@@ -255,9 +252,7 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
     for (final response in pending) {
       try {
         await response.cancel();
-      } catch (_) {
-        // Channel shutdown below is the final cancellation boundary.
-      }
+      } catch (_) {}
     }
     await _close();
   }

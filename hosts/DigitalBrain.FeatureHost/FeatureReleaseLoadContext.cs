@@ -3,19 +3,15 @@ using System.Runtime.Loader;
 
 namespace DigitalBrain.FeatureHost;
 
-public sealed class FeatureReleaseLoadContext : AssemblyLoadContext
+internal sealed class FeatureReleaseLoadContext : AssemblyLoadContext
 {
     private static readonly HashSet<string> TrustedPlatformAssemblies = GetTrustedPlatformAssemblies();
     private readonly AssemblyDependencyResolver _resolver;
     private readonly string _implementationDirectory;
     private readonly IReadOnlyDictionary<string, Assembly> _sharedAssemblies;
 
-    public FeatureReleaseLoadContext(
-        string implementationAssemblyPath,
-        IEnumerable<Assembly> sharedAssemblies)
-        : base(
-            $"digitalbrain-feature-{Path.GetFileNameWithoutExtension(implementationAssemblyPath)}-{Guid.NewGuid():N}",
-            isCollectible: true)
+    public FeatureReleaseLoadContext(string implementationAssemblyPath, IEnumerable<Assembly> sharedAssemblies)
+        : base($"digitalbrain-feature-{Path.GetFileNameWithoutExtension(implementationAssemblyPath)}-{Guid.NewGuid():N}", isCollectible: true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(implementationAssemblyPath);
         ArgumentNullException.ThrowIfNull(sharedAssemblies);
@@ -26,8 +22,7 @@ public sealed class FeatureReleaseLoadContext : AssemblyLoadContext
             ?? throw new ArgumentException("The implementation assembly requires a parent directory.", nameof(implementationAssemblyPath));
         _resolver = new AssemblyDependencyResolver(fullPath);
         _sharedAssemblies = sharedAssemblies.ToDictionary(
-            assembly => assembly.GetName().Name
-                ?? throw new ArgumentException("Shared assemblies require a simple name.", nameof(sharedAssemblies)),
+            assembly => assembly.GetName().Name ?? throw new ArgumentException("Shared assemblies require a simple name.", nameof(sharedAssemblies)),
             StringComparer.OrdinalIgnoreCase);
         if (_sharedAssemblies.Values.Any(assembly => GetLoadContext(assembly) != Default))
             throw new ArgumentException("Shared Feature assemblies must be loaded in the default context.", nameof(sharedAssemblies));
@@ -43,8 +38,7 @@ public sealed class FeatureReleaseLoadContext : AssemblyLoadContext
         if (path is null && TrustedPlatformAssemblies.Contains(assemblyName.Name))
             return null;
         if (path is null)
-            throw new FileNotFoundException(
-                $"Feature dependency '{assemblyName.Name}' is neither private nor explicitly shared.");
+            throw new FileNotFoundException($"Feature dependency '{assemblyName.Name}' is neither private nor explicitly shared.");
         return LoadFromAssemblyPath(ContainedPath(path));
     }
 
@@ -58,8 +52,7 @@ public sealed class FeatureReleaseLoadContext : AssemblyLoadContext
     {
         var fullPath = Path.GetFullPath(path);
         var relative = Path.GetRelativePath(_implementationDirectory, fullPath);
-        if (Path.IsPathRooted(relative) ||
-            relative.Equals("..", StringComparison.Ordinal) ||
+        if (Path.IsPathRooted(relative) || relative.Equals("..", StringComparison.Ordinal) ||
             relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             throw new FileLoadException("Feature dependencies must resolve within the immutable release directory.", fullPath);
         return fullPath;
@@ -71,11 +64,7 @@ public sealed class FeatureReleaseLoadContext : AssemblyLoadContext
         var runtimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location);
         return paths is null
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            : paths.Split(Path.PathSeparator)
-                .Where(path => string.Equals(
-                    Path.GetDirectoryName(path),
-                    runtimeDirectory,
-                    StringComparison.OrdinalIgnoreCase))
+            : paths.Split(Path.PathSeparator).Where(path => string.Equals(Path.GetDirectoryName(path), runtimeDirectory, StringComparison.OrdinalIgnoreCase))
                 .Select(Path.GetFileNameWithoutExtension)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase)!;

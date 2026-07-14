@@ -68,7 +68,7 @@ jobs:
           fi
 
           while IFS= read -r -d '' tracked; do
-            filename=${tracked##*/}
+            filename=${tracked
             case "$filename" in
               .env|.env.*)
                 case "$filename" in

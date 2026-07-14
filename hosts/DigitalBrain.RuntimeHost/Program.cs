@@ -1,18 +1,15 @@
-using DigitalBrain.Core;
-using DigitalBrain.Google;
-using DigitalBrain.Kernel;
-using DigitalBrain.Kernel.Abstractions;
-using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Integrations.Google;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Hosting;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.RuntimeHost;
-using DigitalBrain.Salesforce;
+using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Orleans;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddDigitalBrainRuntimeHost();
@@ -30,31 +27,21 @@ namespace DigitalBrain.RuntimeHost
             builder.UseDigitalBrainOrleans();
             builder.AddDigitalBrainClients();
 
-            var corsOrigins = builder.Configuration
-                .GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
+            var corsOrigins = builder.Configuration.GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
                 ?? new[] { "https://digitalbrain.tech", "https://www.digitalbrain.tech" };
 
-            builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy
-                .WithOrigins(corsOrigins)
-                .AllowAnyMethod()
-                .AllowAnyHeader()));
+            builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy.WithOrigins(corsOrigins).AllowAnyMethod().AllowAnyHeader()));
 
             builder.Services.AddDigitalBrainGoogle();
             builder.Services.AddDigitalBrainSalesforce();
             builder.Services.AddSingleton(TimeProvider.System);
-            builder.Services.AddHealthChecks()
-                .AddAsyncCheck("google-connector", static _ => Task.FromResult(
-                    HealthCheckResult.Healthy("Google connector is registered")))
-                .AddAsyncCheck("salesforce-connector", static _ => Task.FromResult(
-                    HealthCheckResult.Healthy("Salesforce connector is registered")));
+            builder.Services.AddHealthChecks().AddAsyncCheck("google-connector", static _ => Task.FromResult(HealthCheckResult.Healthy("Google connector is registered")))
+                .AddAsyncCheck("salesforce-connector", static _ => Task.FromResult(HealthCheckResult.Healthy("Salesforce connector is registered")));
             builder.Services.Configure<ForwardedHeadersOptions>(options =>
             {
                 options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
                 options.ForwardLimit = 1;
-                if (builder.Environment.IsProduction() && string.Equals(
-                        builder.Configuration["DigitalBrain:Runtime:ForwardedHeaders:TrustAzureContainerAppsIngress"],
-                        "true",
-                        StringComparison.OrdinalIgnoreCase))
+                if (builder.Environment.IsProduction() && string.Equals(builder.Configuration["DigitalBrain:Runtime:ForwardedHeaders:TrustAzureContainerAppsIngress"], "true", StringComparison.OrdinalIgnoreCase))
                 {
                     options.KnownIPNetworks.Clear();
                     options.KnownProxies.Clear();
@@ -80,11 +67,7 @@ namespace DigitalBrain.RuntimeHost
 
         private static void MapFeatureCapabilities(WebApplication app)
         {
-            app.MapPost("/internal/features/capabilities/execute", async (
-                HttpContext httpContext,
-                CapabilityRequest request,
-                ICapabilityDispatcher dispatcher,
-                CancellationToken cancellationToken) =>
+            app.MapPost("/internal/features/capabilities/execute", async (HttpContext httpContext, CapabilityRequest request, ICapabilityDispatcher dispatcher, CancellationToken cancellationToken) =>
             {
                 if (!httpContext.Items.ContainsKey(FeatureCapabilityTransportBoundary.AuthenticatedItem))
                     return Results.StatusCode(StatusCodes.Status403Forbidden);
@@ -108,10 +91,7 @@ namespace DigitalBrain.RuntimeHost
             return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedHash, suppliedHash);
         }
 
-        public sealed class FeatureCapabilityTransportBoundary(
-            RequestDelegate next,
-            IConfiguration configuration,
-            TimeProvider timeProvider)
+        public sealed class FeatureCapabilityTransportBoundary(RequestDelegate next, IConfiguration configuration, TimeProvider timeProvider)
         {
             internal const string AuthenticatedItem = "digitalbrain.feature-capability.authenticated";
             private const int RequestsPerMinute = 240;
@@ -189,12 +169,10 @@ namespace DigitalBrain.RuntimeHost
                 {
                     var webPort = Environment.GetEnvironmentVariable("DIGITALBRAIN_WEB_PORT");
                     var hasWebEndpoint = int.TryParse(webPort, out var webEndpointPort);
-                    var grpcPorts = (Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS") ?? string.Empty)
-                        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    var grpcPorts = (Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     foreach (var grpcPort in grpcPorts)
                     {
-                        if (int.TryParse(grpcPort, out var grpcEndpointPort) &&
-                            (!hasWebEndpoint || grpcEndpointPort != webEndpointPort))
+                        if (int.TryParse(grpcPort, out var grpcEndpointPort) && (!hasWebEndpoint || grpcEndpointPort != webEndpointPort))
                         {
                             options.ListenAnyIP(grpcEndpointPort, listen => listen.Protocols = HttpProtocols.Http2);
                         }
@@ -232,10 +210,7 @@ namespace DigitalBrain.RuntimeHost
 
         private static void MapConnectorOAuthCallbacks(WebApplication app)
         {
-            app.MapGet("/oauth/start/{provider}", async (
-                string provider,
-                HttpRequest request,
-                IServiceProvider services) =>
+            app.MapGet("/oauth/start/{provider}", async (string provider, HttpRequest request, IServiceProvider services) =>
             {
                 SetOAuthResponseHeaders(request.HttpContext.Response);
                 var target = (request.Path.Value ?? string.Empty) + (request.QueryString.Value ?? string.Empty);
@@ -247,32 +222,18 @@ namespace DigitalBrain.RuntimeHost
                 if (!protector.TryUnprotect(flowReference, out var owner))
                     return Results.StatusCode(StatusCodes.Status400BadRequest);
 
-                var cluster = services.GetRequiredService<IClusterClient>();
+                var connector = services.GetRequiredKeyedService<IConnector>(provider);
                 using var startDeadline = CreateServerOperationDeadline(services);
-                if (string.Equals(provider, OAuthCallbackPaths.GoogleProvider, StringComparison.Ordinal))
-                {
-                    var googleResult = await cluster
-                        .GetGrain<IGmailReadToolGrain>(owner.Value)
-                        .BeginAuthorizationAsync(flowReference, startDeadline.Token);
-                    return googleResult.Status == GmailReadStatus.NeedsAuth &&
-                           GoogleClientFactory.IsAllowedAuthorizationUrl(googleResult.ConnectionUrl)
-                        ? Results.Redirect(googleResult.ConnectionUrl!, permanent: false, preserveMethod: false)
-                        : Results.StatusCode(StatusCodes.Status400BadRequest);
-                }
-
-                var salesforceResult = await cluster
-                    .GetGrain<ISalesforceReadToolGrain>(owner.Value)
-                    .BeginAuthorizationAsync(flowReference, startDeadline.Token);
-                return salesforceResult.Status == SalesforceReadStatus.NeedsAuth &&
-                       SalesforceClientFactory.IsAllowedAuthorizationUrl(salesforceResult.ConnectionUrl)
-                    ? Results.Redirect(salesforceResult.ConnectionUrl!, permanent: false, preserveMethod: false)
+                var challenge = await connector.BeginAuthAsync(owner, cancellationToken: startDeadline.Token);
+                var allowed = string.Equals(provider, OAuthCallbackPaths.GoogleProvider, StringComparison.Ordinal)
+                    ? GoogleClientFactory.IsAllowedAuthorizationUrl(challenge.UrlOrForm)
+                    : SalesforceClientFactory.IsAllowedAuthorizationUrl(challenge.UrlOrForm);
+                return !challenge.IsForm && allowed
+                    ? Results.Redirect(challenge.UrlOrForm, permanent: false, preserveMethod: false)
                     : Results.StatusCode(StatusCodes.Status400BadRequest);
             });
 
-            app.MapGet("/oauth/callback/{provider}", async (
-                string provider,
-                HttpRequest request,
-                IServiceProvider services) =>
+            app.MapGet("/oauth/callback/{provider}", async (string provider, HttpRequest request, IServiceProvider services) =>
             {
                 SetOAuthResponseHeaders(request.HttpContext.Response);
                 if (!OAuthCallbackPaths.IsSupportedProvider(provider)) return Results.NotFound();
@@ -282,39 +243,9 @@ namespace DigitalBrain.RuntimeHost
                     State: request.Query["state"].FirstOrDefault() ?? string.Empty,
                     Error: request.Query["error"].FirstOrDefault(),
                     ErrorDescription: request.Query["error_description"].FirstOrDefault());
-                AuthResult result;
-                if (string.Equals(provider, OAuthCallbackPaths.SalesforceProvider, StringComparison.Ordinal))
-                {
-                    var protector = services.GetRequiredService<IOAuthStateProtector>();
-                    if (!protector.TryUnprotect(callback.State, out var owner))
-                    {
-                        result = new AuthResult(false, "invalid-state");
-                    }
-                    else
-                    {
-                        var cluster = services.GetRequiredService<IClusterClient>();
-                        using var completionDeadline = CreateServerOperationDeadline(services);
-                        result = await cluster
-                            .GetGrain<ISalesforceReadToolGrain>(owner.Value)
-                            .CompleteAuthorizationAsync(callback, completionDeadline.Token);
-                    }
-                }
-                else
-                {
-                    var protector = services.GetRequiredService<IOAuthStateProtector>();
-                    if (!protector.TryUnprotect(callback.State, out var owner))
-                    {
-                        result = new AuthResult(false, "invalid-state");
-                    }
-                    else
-                    {
-                        var cluster = services.GetRequiredService<IClusterClient>();
-                        using var completionDeadline = CreateServerOperationDeadline(services);
-                        result = await cluster
-                            .GetGrain<IGmailReadToolGrain>(owner.Value)
-                            .CompleteAuthorizationAsync(callback, completionDeadline.Token);
-                    }
-                }
+                var connector = services.GetRequiredKeyedService<IConnector>(provider);
+                using var completionDeadline = CreateServerOperationDeadline(services);
+                var result = await connector.CompleteAuthAsync(callback, completionDeadline.Token);
 
                 var title = result.Success ? "Connection complete" : "Connection not completed";
                 var message = result.Success
@@ -353,11 +284,7 @@ namespace DigitalBrain.RuntimeHost
         private sealed record FeatureCapabilityResponse(string Kind, System.Text.Json.JsonElement Payload);
     }
 
-    public sealed class OAuthTransportBoundary(
-        RequestDelegate next,
-        IHostEnvironment environment,
-        TimeProvider timeProvider,
-        ILogger<OAuthTransportBoundary> logger)
+    public sealed class OAuthTransportBoundary(RequestDelegate next, IHostEnvironment environment, TimeProvider timeProvider, ILogger<OAuthTransportBoundary> logger)
     {
         private const int RequestsPerMinute = 120;
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(2);

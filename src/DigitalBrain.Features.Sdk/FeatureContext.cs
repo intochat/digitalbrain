@@ -39,9 +39,7 @@ public sealed class FeatureState
 
 public interface IModelWorkflow
 {
-    Task<ModelResponse> CompleteAsync(
-        ModelRequest request,
-        CancellationToken cancellationToken = default);
+    Task<ModelResponse> CompleteAsync(ModelRequest request, CancellationToken cancellationToken = default);
 }
 
 public sealed class ModelRequest
@@ -50,10 +48,7 @@ public sealed class ModelRequest
     {
         WorkflowId = FeatureContractGuard.Required(workflowId, nameof(workflowId), 128);
         Prompt = FeatureContractGuard.Utf8(prompt, nameof(prompt), 32_768);
-        LogicalOperationKey = FeatureContractGuard.Required(
-            logicalOperationKey,
-            nameof(logicalOperationKey),
-            256);
+        LogicalOperationKey = FeatureContractGuard.Required(logicalOperationKey, nameof(logicalOperationKey), 256);
     }
 
     public string WorkflowId { get; }
@@ -82,10 +77,7 @@ public sealed class TextSurfaceIntent
 {
     public TextSurfaceIntent(string logicalOperationKey, string title, string text)
     {
-        LogicalOperationKey = FeatureContractGuard.Required(
-            logicalOperationKey,
-            nameof(logicalOperationKey),
-            256);
+        LogicalOperationKey = FeatureContractGuard.Required(logicalOperationKey, nameof(logicalOperationKey), 256);
         Title = FeatureContractGuard.Required(title, nameof(title), 256);
         Text = FeatureContractGuard.Utf8(text, nameof(text), 65_536);
     }
@@ -99,10 +91,7 @@ public sealed class EventIntent
 {
     public EventIntent(string logicalOperationKey, string schemaId, string json)
     {
-        LogicalOperationKey = FeatureContractGuard.Required(
-            logicalOperationKey,
-            nameof(logicalOperationKey),
-            256);
+        LogicalOperationKey = FeatureContractGuard.Required(logicalOperationKey, nameof(logicalOperationKey), 256);
         SchemaId = FeatureContractGuard.Required(schemaId, nameof(schemaId), 256);
         Json = FeatureContractGuard.Json(json, nameof(json), 65_536);
     }
@@ -114,20 +103,11 @@ public sealed class EventIntent
 
 public sealed class ExternalEffectIntent
 {
-    public ExternalEffectIntent(
-        string logicalOperationKey,
-        string capabilityId,
-        string? providerConnectionId,
-        string json)
+    public ExternalEffectIntent(string logicalOperationKey, string capabilityId, string? providerConnectionId, string json)
     {
-        LogicalOperationKey = FeatureContractGuard.Required(
-            logicalOperationKey,
-            nameof(logicalOperationKey),
-            256);
+        LogicalOperationKey = FeatureContractGuard.Required(logicalOperationKey, nameof(logicalOperationKey), 256);
         CapabilityId = FeatureContractGuard.Required(capabilityId, nameof(capabilityId), 256);
-        ProviderConnectionId = providerConnectionId is null
-            ? null
-            : FeatureContractGuard.Required(providerConnectionId, nameof(providerConnectionId), 256);
+        ProviderConnectionId = providerConnectionId is null ? null : FeatureContractGuard.Required(providerConnectionId, nameof(providerConnectionId), 256);
         Json = FeatureContractGuard.Json(json, nameof(json), 65_536);
     }
 

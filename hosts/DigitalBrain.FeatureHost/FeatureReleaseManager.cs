@@ -11,29 +11,24 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.FeatureHost;
 
-public sealed record FeatureReleaseDescriptor(ReleaseDigest Digest, string ReleaseDirectory);
+internal sealed record FeatureReleaseDescriptor(ReleaseDigest Digest, string ReleaseDirectory);
 
-public sealed record FeatureActiveInstallation(
-    BrainOwnerId OwnerId,
-    FeatureInstallationId InstallationId,
-    FeatureReleaseDescriptor Release)
+internal sealed record FeatureActiveInstallation(BrainOwnerId OwnerId, FeatureInstallationId InstallationId, FeatureReleaseDescriptor Release)
 {
     private static readonly BrainOwnerId DefaultOwner = new("test-owner");
 
-    public FeatureActiveInstallation(
-        FeatureInstallationId installationId,
-        FeatureReleaseDescriptor release)
+    public FeatureActiveInstallation(FeatureInstallationId installationId, FeatureReleaseDescriptor release)
         : this(DefaultOwner, installationId, release)
     {
     }
 }
 
-public interface IFeatureHostRecycle
+internal interface IFeatureHostRecycle
 {
     void RequestRecycle();
 }
 
-public sealed class FeatureReleaseValidationException : Exception
+internal sealed class FeatureReleaseValidationException : Exception
 {
     public FeatureReleaseValidationException(string message)
         : base(message)
@@ -46,7 +41,7 @@ public sealed class FeatureReleaseValidationException : Exception
     }
 }
 
-public sealed class FeatureReleaseUnavailableException : Exception
+internal sealed class FeatureReleaseUnavailableException : Exception
 {
     public FeatureReleaseUnavailableException(FeatureInstallationId installationId, ReleaseDigest release)
         : base($"Feature release '{release}' is not active for installation '{installationId}'.")
@@ -54,7 +49,7 @@ public sealed class FeatureReleaseUnavailableException : Exception
     }
 }
 
-public sealed class FeatureReleaseLease : IDisposable, IAsyncDisposable
+internal sealed class FeatureReleaseLease : IDisposable, IAsyncDisposable
 {
     private ReleaseSlot? _slot;
     private IFeature? _feature;
@@ -126,7 +121,7 @@ public sealed class FeatureReleaseLease : IDisposable, IAsyncDisposable
     }
 }
 
-public sealed class FeatureReleaseManager : IAsyncDisposable
+internal sealed class FeatureReleaseManager : IAsyncDisposable
 {
     private const int MaximumReleaseFiles = 256;
     private const long MaximumReleaseBytes = 67_108_864;
@@ -134,11 +129,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
     private static readonly TimeSpan MaximumStagingDuration = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan MaximumStagingDisposal = TimeSpan.FromSeconds(5);
     private static readonly Assembly[] SharedAssemblies =
-    [
-        typeof(IFeature).Assembly,
-        typeof(IGmailMessageReader).Assembly,
-        typeof(ISalesforceRecordReader).Assembly
-    ];
+    [typeof(IFeature).Assembly, typeof(IGmailMessageReader).Assembly, typeof(ISalesforceRecordReader).Assembly];
     private readonly IServiceProvider _services;
     private readonly IFeatureHostRecycle _recycle;
     private readonly SemaphoreSlim _mutation = new(1, 1);
@@ -150,34 +141,20 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
     private long _snapshotSequence;
     private bool _disposed;
 
-    public FeatureReleaseManager(
-        IServiceProvider services,
-        IFeatureHostRecycle recycle,
-        string? cacheDirectory = null)
+    public FeatureReleaseManager(IServiceProvider services, IFeatureHostRecycle recycle, string? cacheDirectory = null)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _recycle = recycle ?? throw new ArgumentNullException(nameof(recycle));
-        _cacheRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(
-            cacheDirectory ?? Path.Combine(
-                Path.GetTempPath(),
-                "digitalbrain-feature-host",
-                Guid.NewGuid().ToString("N"))));
+        _cacheRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(cacheDirectory ?? Path.Combine(Path.GetTempPath(), "digitalbrain-feature-host", Guid.NewGuid().ToString("N"))));
         Directory.CreateDirectory(_cacheRoot);
         if (File.GetAttributes(_cacheRoot).HasFlag(FileAttributes.ReparsePoint))
             throw new ArgumentException("The Feature cache directory cannot be a filesystem link.", nameof(cacheDirectory));
     }
 
-    public async Task ActivateAsync(
-        FeatureInstallationId installationId,
-        FeatureReleaseDescriptor release,
-        CancellationToken cancellationToken = default) =>
+    public async Task ActivateAsync(FeatureInstallationId installationId, FeatureReleaseDescriptor release, CancellationToken cancellationToken = default) =>
         await ActivateAsync(new BrainOwnerId("test-owner"), installationId, release, cancellationToken);
 
-    public async Task ActivateAsync(
-        BrainOwnerId ownerId,
-        FeatureInstallationId installationId,
-        FeatureReleaseDescriptor release,
-        CancellationToken cancellationToken = default)
+    public async Task ActivateAsync(BrainOwnerId ownerId, FeatureInstallationId installationId, FeatureReleaseDescriptor release, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(release);
         var identity = new FeatureReleaseIdentity(ownerId, installationId);
@@ -220,47 +197,31 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
             await RetireAsync(retirement);
     }
 
-    public async Task LoadActiveAsync(
-        IReadOnlyList<FeatureActiveInstallation> installations,
-        CancellationToken cancellationToken = default)
+    public async Task LoadActiveAsync(IReadOnlyList<FeatureActiveInstallation> installations, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(installations);
         var unique = new HashSet<FeatureReleaseIdentity>();
         foreach (var installation in installations)
         {
-            if (installation is null || !unique.Add(new FeatureReleaseIdentity(
-                    installation.OwnerId,
-                    installation.InstallationId)))
+            if (installation is null || !unique.Add(new FeatureReleaseIdentity(installation.OwnerId, installation.InstallationId)))
                 throw new ArgumentException("Active installations must be non-null and unique.", nameof(installations));
             ArgumentNullException.ThrowIfNull(installation.Release);
         }
 
         foreach (var installation in installations)
-            await ActivateAsync(
-                installation.OwnerId,
-                installation.InstallationId,
-                installation.Release,
-                cancellationToken);
+            await ActivateAsync(installation.OwnerId, installation.InstallationId, installation.Release, cancellationToken);
     }
 
     public FeatureReleaseLease Acquire(FeatureInstallationId installationId) =>
         Acquire(new BrainOwnerId("test-owner"), installationId, expectedDigest: null);
 
-    public FeatureReleaseLease Acquire(
-        FeatureInstallationId installationId,
-        ReleaseDigest expectedDigest) =>
+    public FeatureReleaseLease Acquire(FeatureInstallationId installationId, ReleaseDigest expectedDigest) =>
         Acquire(new BrainOwnerId("test-owner"), installationId, (ReleaseDigest?)expectedDigest);
 
-    public FeatureReleaseLease Acquire(
-        BrainOwnerId ownerId,
-        FeatureInstallationId installationId,
-        ReleaseDigest expectedDigest) =>
+    public FeatureReleaseLease Acquire(BrainOwnerId ownerId, FeatureInstallationId installationId, ReleaseDigest expectedDigest) =>
         Acquire(ownerId, installationId, (ReleaseDigest?)expectedDigest);
 
-    private FeatureReleaseLease Acquire(
-        BrainOwnerId ownerId,
-        FeatureInstallationId installationId,
-        ReleaseDigest? expectedDigest)
+    private FeatureReleaseLease Acquire(BrainOwnerId ownerId, FeatureInstallationId installationId, ReleaseDigest? expectedDigest)
     {
         ReleaseSlot slot;
         lock (_gate)
@@ -290,14 +251,10 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
     public ReleaseDigest? GetActiveDigest(BrainOwnerId ownerId, FeatureInstallationId installationId)
     {
         lock (_gate)
-            return _installations.TryGetValue(new FeatureReleaseIdentity(ownerId, installationId), out var slot)
-                ? slot.Digest
-                : null;
+            return _installations.TryGetValue(new FeatureReleaseIdentity(ownerId, installationId), out var slot) ? slot.Digest : null;
     }
 
-    private readonly record struct FeatureReleaseIdentity(
-        BrainOwnerId OwnerId,
-        FeatureInstallationId InstallationId);
+    private readonly record struct FeatureReleaseIdentity(BrainOwnerId OwnerId, FeatureInstallationId InstallationId);
 
     public async ValueTask DisposeAsync()
     {
@@ -321,7 +278,6 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         {
             _mutation.Release();
         }
-
 
         foreach (var release in releases)
             await RetireAsync(release);
@@ -350,20 +306,15 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         var directory = SnapshotRelease(release);
         try
         {
-            var manifest = ReadDocument<FeatureManifestDocument>(
-                Path.Combine(directory, "manifest.json"),
-                "manifest");
-            var scenarios = ReadDocument<FeatureScenarioDocument>(
-                Path.Combine(directory, "scenarios.json"),
-                "scenario result");
+            var manifest = ReadDocument<FeatureManifestDocument>(Path.Combine(directory, "manifest.json"), "manifest");
+            var scenarios = ReadDocument<FeatureScenarioDocument>(Path.Combine(directory, "scenarios.json"), "scenario result");
 
             if (manifest.FeatureTypes is null || manifest.FeatureTypes.Count != 1)
                 throw new FeatureReleaseValidationException("A release must declare exactly one Feature type.");
             var sdkVersion = typeof(IFeature).Assembly.GetName().Version?.ToString();
             if (!string.Equals(manifest.SdkVersion, sdkVersion, StringComparison.Ordinal))
                 throw new FeatureReleaseValidationException("The release targets an incompatible Feature SDK version.");
-            if (scenarios.Total <= 0 || scenarios.Passed != scenarios.Total ||
-                scenarios.Failed != 0 || scenarios.Skipped != 0)
+            if (scenarios.Total <= 0 || scenarios.Passed != scenarios.Total || scenarios.Failed != 0 || scenarios.Skipped != 0)
                 throw new FeatureReleaseValidationException("All compiled Feature scenarios must pass before loading.");
             if (string.IsNullOrWhiteSpace(manifest.ImplementationAssembly) ||
                 !manifest.ImplementationAssembly.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ||
@@ -373,18 +324,12 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
             if (!File.Exists(implementationPath))
                 throw new FeatureReleaseValidationException("The implementation assembly is missing.");
 
-            return LoadImplementationBounded(
-                release.Digest,
-                directory,
-                implementationPath,
-                manifest.FeatureTypes[0]);
+            return LoadImplementationBounded(release.Digest, directory, implementationPath, manifest.FeatureTypes[0]);
         }
         catch (FeatureStagingTimeoutException exception)
         {
             RequestRecycle();
-            throw new FeatureReleaseValidationException(
-                "Feature staging exceeded its deadline and requires host recycling.",
-                exception);
+            throw new FeatureReleaseValidationException("Feature staging exceeded its deadline and requires host recycling.", exception);
         }
         catch (FeatureStagingException exception)
         {
@@ -393,9 +338,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
                 RequestRecycle();
             else
                 TryDeleteDirectory(directory);
-            throw new FeatureReleaseValidationException(
-                "The Feature implementation could not be staged.",
-                exception.Failure);
+            throw new FeatureReleaseValidationException("The Feature implementation could not be staged.", exception.Failure);
         }
         catch
         {
@@ -404,11 +347,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         }
     }
 
-    private ReleaseSlot LoadImplementationBounded(
-        ReleaseDigest digest,
-        string directory,
-        string implementationPath,
-        string featureTypeName)
+    private ReleaseSlot LoadImplementationBounded(ReleaseDigest digest, string directory, string implementationPath, string featureTypeName)
     {
         var staging = Task.Run(() =>
             LoadImplementation(digest, directory, implementationPath, featureTypeName));
@@ -432,21 +371,15 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private ReleaseSlot LoadImplementation(
-        ReleaseDigest digest,
-        string directory,
-        string implementationPath,
-        string featureTypeName)
+    private ReleaseSlot LoadImplementation(ReleaseDigest digest, string directory, string implementationPath, string featureTypeName)
     {
         var context = new FeatureReleaseLoadContext(implementationPath, SharedAssemblies);
         try
         {
             var assembly = context.LoadFromAssemblyPath(implementationPath);
-            var featureTypes = assembly.GetTypes()
-                .Where(type => !type.IsAbstract && typeof(IFeature).IsAssignableFrom(type))
+            var featureTypes = assembly.GetTypes().Where(type => !type.IsAbstract && typeof(IFeature).IsAssignableFrom(type))
                 .ToArray();
-            var featureType = featureTypes.Length == 1 &&
-                string.Equals(featureTypes[0].FullName, featureTypeName, StringComparison.Ordinal)
+            var featureType = featureTypes.Length == 1 && string.Equals(featureTypes[0].FullName, featureTypeName, StringComparison.Ordinal)
                 ? featureTypes[0]
                 : throw new FeatureReleaseValidationException("The compiled Feature type does not match the manifest.");
             ValidateConstructor(featureType);
@@ -467,18 +400,15 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         foreach (var parameter in constructors[0].GetParameters())
         {
             if (!SharedAssemblies.Contains(parameter.ParameterType.Assembly))
-                throw new FeatureReleaseValidationException(
-                    $"Feature dependency '{parameter.ParameterType.FullName}' is not a shared contract.");
+                throw new FeatureReleaseValidationException($"Feature dependency '{parameter.ParameterType.FullName}' is not a shared contract.");
         }
     }
 
     private IFeature CreateFeature(Type featureType)
     {
         var constructor = featureType.GetConstructors().Single();
-        var arguments = constructor.GetParameters()
-            .Select(parameter => _services.GetService(parameter.ParameterType)
-                ?? throw new FeatureReleaseValidationException(
-                    $"Feature dependency '{parameter.ParameterType.FullName}' is unavailable."))
+        var arguments = constructor.GetParameters().Select(parameter => _services.GetService(parameter.ParameterType)
+                ?? throw new FeatureReleaseValidationException($"Feature dependency '{parameter.ParameterType.FullName}' is unavailable."))
             .ToArray();
         return (IFeature)constructor.Invoke(arguments);
     }
@@ -489,9 +419,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         var source = Path.TrimEndingDirectorySeparator(Path.GetFullPath(release.ReleaseDirectory));
         if (!Directory.Exists(source) || File.GetAttributes(source).HasFlag(FileAttributes.ReparsePoint))
             throw new FeatureReleaseValidationException("The release directory is unavailable or linked.");
-        var snapshot = Path.Combine(
-            _cacheRoot,
-            $"{release.Digest.Value}-{Interlocked.Increment(ref _snapshotSequence):D8}");
+        var snapshot = Path.Combine(_cacheRoot, $"{release.Digest.Value}-{Interlocked.Increment(ref _snapshotSequence):D8}");
         var staging = snapshot + ".tmp";
         try
         {
@@ -546,13 +474,10 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         }
 
         var digestPath = Path.Combine(directory, "digest.txt");
-        if (!File.Exists(digestPath) ||
-            !string.Equals(File.ReadAllText(digestPath), release.Digest.Value, StringComparison.Ordinal))
+        if (!File.Exists(digestPath) || !string.Equals(File.ReadAllText(digestPath), release.Digest.Value, StringComparison.Ordinal))
             throw new FeatureReleaseValidationException("The release digest marker does not match.");
         var actualDigest = ComputeDigest(directory, files.Where(path =>
-            !string.Equals(path, digestPath, OperatingSystem.IsWindows()
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal)));
+            !string.Equals(path, digestPath, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)));
         if (!string.Equals(actualDigest, release.Digest.Value, StringComparison.Ordinal))
             throw new FeatureReleaseValidationException("The release content digest does not match.");
         return directory;
@@ -588,9 +513,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
     {
         try
         {
-            return JsonSerializer.Deserialize<T>(
-                File.ReadAllBytes(path),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            return JsonSerializer.Deserialize<T>(File.ReadAllBytes(path), new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 ?? throw new FeatureReleaseValidationException($"The Feature {name} is empty.");
         }
         catch (FeatureReleaseValidationException)
@@ -611,8 +534,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
                      path => Path.GetRelativePath(directory, path).Replace('\\', '/'),
                      StringComparer.Ordinal))
         {
-            var relativePath = Encoding.UTF8.GetBytes(
-                Path.GetRelativePath(directory, path).Replace('\\', '/'));
+            var relativePath = Encoding.UTF8.GetBytes(Path.GetRelativePath(directory, path).Replace('\\', '/'));
             var content = File.ReadAllBytes(path);
             BinaryPrimitives.WriteInt64BigEndian(length, relativePath.Length);
             hash.AppendData(length);
@@ -743,8 +665,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         [MethodImpl(MethodImplOptions.NoInlining)]
         public WeakReference BeginUnload()
         {
-            var context = Interlocked.Exchange(ref _context, null)
-                ?? throw new InvalidOperationException("The staging context was already detached.");
+            var context = Interlocked.Exchange(ref _context, null) ?? throw new InvalidOperationException("The staging context was already detached.");
             var reference = new WeakReference(context, trackResurrection: true);
             context.Unload();
             return reference;
@@ -766,11 +687,7 @@ internal sealed class ReleaseSlot
     private int _inFlight;
     private bool _canUnload = true;
 
-    internal ReleaseSlot(
-        ReleaseDigest digest,
-        string snapshotDirectory,
-        FeatureReleaseLoadContext context,
-        Type featureType)
+    internal ReleaseSlot(ReleaseDigest digest, string snapshotDirectory, FeatureReleaseLoadContext context, Type featureType)
     {
         Digest = digest;
         SnapshotDirectory = snapshotDirectory;

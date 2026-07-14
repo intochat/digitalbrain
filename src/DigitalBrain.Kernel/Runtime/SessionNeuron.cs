@@ -1,4 +1,4 @@
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using Orleans.Runtime;
@@ -6,7 +6,7 @@ using Orleans.Runtime;
 namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.runtime.session.v1")]
-public sealed class SessionNeuron(
+internal sealed class SessionNeuron(
     [PersistentState("session", RuntimeStateStorageProviders.Sessions)]
     IPersistentState<EncryptedRuntimeStateEnvelope> persistentState,
     EncryptedRuntimeStateProtector protector) : Grain, ISessionNeuron
@@ -34,32 +34,12 @@ public sealed class SessionNeuron(
         string[] grants,
         string refreshTokenHash,
         DateTimeOffset refreshExpiresAt) =>
-        State.UpdateAsync(expectedRevision, current => SessionTransitions.Initialize(
-            current,
-            expectedRevision,
-            opaqueSessionId,
-            audience,
-            identity,
-            assurance,
-            grants,
-            refreshTokenHash,
-            refreshExpiresAt));
+        State.UpdateAsync(expectedRevision, current => SessionTransitions.Initialize(current, expectedRevision, opaqueSessionId, audience, identity, assurance, grants, refreshTokenHash, refreshExpiresAt));
 
-    public Task<SessionRotation> RotateRefreshAsync(
-        long expectedRevision,
-        string presentedRefreshHash,
-        string replacementRefreshHash,
-        DateTimeOffset replacementExpiresAt,
-        DateTimeOffset now) =>
+    public Task<SessionRotation> RotateRefreshAsync(long expectedRevision, string presentedRefreshHash, string replacementRefreshHash, DateTimeOffset replacementExpiresAt, DateTimeOffset now) =>
         State.UpdateAsync(expectedRevision, current =>
         {
-            var result = SessionTransitions.RotateRefresh(
-                current,
-                expectedRevision,
-                presentedRefreshHash,
-                replacementRefreshHash,
-                replacementExpiresAt,
-                now);
+            var result = SessionTransitions.RotateRefresh(current, expectedRevision, presentedRefreshHash, replacementRefreshHash, replacementExpiresAt, now);
             return (result.State, result);
         });
 

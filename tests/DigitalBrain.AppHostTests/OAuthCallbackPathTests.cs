@@ -1,5 +1,5 @@
 using DigitalBrain.AppHost;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.AppHostTests;
 

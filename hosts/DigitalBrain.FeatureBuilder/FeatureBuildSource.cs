@@ -24,14 +24,7 @@ internal static class FeatureBuildSource
     };
 
     private static readonly HashSet<string> TestOnlyPackages = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "DigitalBrain.Features.Testing",
-        "Microsoft.NET.Test.Sdk",
-        "Reqnroll",
-        "Reqnroll.xUnit",
-        "xunit",
-        "xunit.runner.visualstudio"
-    };
+    { "DigitalBrain.Features.Testing", "Microsoft.NET.Test.Sdk", "Reqnroll", "Reqnroll.xUnit", "xunit", "xunit.runner.visualstudio" };
 
     private static readonly HashSet<string> AllowedProperties = new(StringComparer.Ordinal)
     {
@@ -64,17 +57,7 @@ internal static class FeatureBuildSource
         "ReqnrollFeatureFile"
     };
 
-    private static readonly HashSet<string> AllowedItemAttributes = new(StringComparer.Ordinal)
-    {
-        "CopyToOutputDirectory",
-        "Include",
-        "Link",
-        "Pack",
-        "PackagePath",
-        "Remove",
-        "Update",
-        "Version"
-    };
+    private static readonly HashSet<string> AllowedItemAttributes = new(StringComparer.Ordinal) { "CopyToOutputDirectory", "Include", "Link", "Pack", "PackagePath", "Remove", "Update", "Version" };
 
     internal static void Validate(FeatureSourceSnapshot snapshot)
     {
@@ -87,13 +70,8 @@ internal static class FeatureBuildSource
             throw Invalid($"Source build target '{executableTarget}' is forbidden.");
         }
 
-        var centralVersions = files
-            .Where(static pair => pair.Key.EndsWith(".props", StringComparison.OrdinalIgnoreCase))
-            .SelectMany(pair => ParseXml(pair.Key, pair.Value.Content)
-                .Descendants("PackageVersion")
-                .Select(element => (
-                    Id: RequiredAttribute(element, "Include", pair.Key),
-                    Version: RequiredAttribute(element, "Version", pair.Key))))
+        var centralVersions = files.Where(static pair => pair.Key.EndsWith(".props", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(pair => ParseXml(pair.Key, pair.Value.Content).Descendants("PackageVersion").Select(element => (Id: RequiredAttribute(element, "Include", pair.Key), Version: RequiredAttribute(element, "Version", pair.Key))))
             .GroupBy(static item => item.Id, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 static group => group.Key,
@@ -120,10 +98,7 @@ internal static class FeatureBuildSource
         ValidateScenarioProject(snapshot, files);
     }
 
-    internal static async Task MaterializeAsync(
-        string workspace,
-        FeatureSourceSnapshot snapshot,
-        CancellationToken cancellationToken)
+    internal static async Task MaterializeAsync(string workspace, FeatureSourceSnapshot snapshot, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(workspace);
         foreach (var file in snapshot.Files.OrderBy(static file => file.Path, StringComparer.Ordinal))
@@ -131,33 +106,18 @@ internal static class FeatureBuildSource
             cancellationToken.ThrowIfCancellationRequested();
             var destination = LocalPath(workspace, file.Path);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            await File.WriteAllTextAsync(
-                destination,
-                file.Content,
-                new UTF8Encoding(false),
-                cancellationToken);
+            await File.WriteAllTextAsync(destination, file.Content, new UTF8Encoding(false), cancellationToken);
         }
     }
 
-    internal static async Task<string> WriteNuGetConfigAsync(
-        string workspace,
-        string feed,
-        CancellationToken cancellationToken)
+    internal static async Task<string> WriteNuGetConfigAsync(string workspace, string feed, CancellationToken cancellationToken)
     {
         var path = Path.Combine(workspace, "NuGet.Config");
         var document = new XDocument(
             new XElement("configuration",
-                new XElement("packageSources",
-                    new XElement("clear"),
-                    new XElement("add",
-                        new XAttribute("key", "offline"),
-                        new XAttribute("value", feed))),
+                new XElement("packageSources", new XElement("clear"), new XElement("add", new XAttribute("key", "offline"), new XAttribute("value", feed))),
                 new XElement("auditSources", new XElement("clear"))));
-        await File.WriteAllTextAsync(
-            path,
-            document.ToString(SaveOptions.DisableFormatting),
-            new UTF8Encoding(false),
-            cancellationToken);
+        await File.WriteAllTextAsync(path, document.ToString(SaveOptions.DisableFormatting), new UTF8Encoding(false), cancellationToken);
         return path;
     }
 
@@ -169,20 +129,12 @@ internal static class FeatureBuildSource
         try
         {
             using var stringReader = new StringReader(content);
-            using var reader = XmlReader.Create(stringReader, new XmlReaderSettings
-            {
-                DtdProcessing = DtdProcessing.Prohibit,
-                IgnoreWhitespace = true,
-                XmlResolver = null
-            });
+            using var reader = XmlReader.Create(stringReader, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, IgnoreWhitespace = true, XmlResolver = null });
             return XDocument.Load(reader, LoadOptions.None);
         }
         catch (XmlException exception)
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.InvalidSource,
-                $"'{path}' is not valid bounded XML.",
-                exception);
+            throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, $"'{path}' is not valid bounded XML.", exception);
         }
     }
 
@@ -192,18 +144,14 @@ internal static class FeatureBuildSource
         var scenarioProject = snapshot.Files.Single(file =>
             file.Path.Equals(snapshot.ScenarioProjectPath, StringComparison.OrdinalIgnoreCase));
         var project = ParseXml(scenarioProject.Path, scenarioProject.Content);
-        var includesGeneratedDuplicate = project.Descendants("Import")
-            .Select(import => import.Attribute("Project")?.Value.Replace('\\', '/'))
+        var includesGeneratedDuplicate = project.Descendants("Import").Select(import => import.Attribute("Project")?.Value.Replace('\\', '/'))
             .Any(import =>
-                import is not null &&
-                TryResolveVirtualPath(scenarioProject.Path, import, out var resolved) &&
+                import is not null && TryResolveVirtualPath(scenarioProject.Path, import, out var resolved) &&
                 resolved.Equals(TestingTargetsPath, StringComparison.OrdinalIgnoreCase));
         var featureFiles = snapshot.Files.Where(file =>
             file.Path.EndsWith(".feature", StringComparison.OrdinalIgnoreCase) &&
             (file.Path.StartsWith(scenarioDirectory + "/", StringComparison.OrdinalIgnoreCase) ||
-             includesGeneratedDuplicate && file.Path.Equals(
-                 "src/DigitalBrain.Features.Testing/GeneratedDuplicateInput.feature",
-                 StringComparison.OrdinalIgnoreCase)));
+             includesGeneratedDuplicate && file.Path.Equals("src/DigitalBrain.Features.Testing/GeneratedDuplicateInput.feature", StringComparison.OrdinalIgnoreCase)));
         var count = 0;
         foreach (var file in featureFiles)
         {
@@ -221,8 +169,7 @@ internal static class FeatureBuildSource
                     continue;
                 }
 
-                if (value.StartsWith("\"\"\"", StringComparison.Ordinal) ||
-                    value.StartsWith("```", StringComparison.Ordinal))
+                if (value.StartsWith("\"\"\"", StringComparison.Ordinal) || value.StartsWith("```", StringComparison.Ordinal))
                 {
                     docStringDelimiter = value[..3];
                     continue;
@@ -311,16 +258,14 @@ internal static class FeatureBuildSource
             throw Invalid($"Project '{path}' must use Microsoft.NET.Sdk.");
         }
 
-        var targetFramework = document.Descendants("TargetFramework")
-            .Select(static element => element.Value)
+        var targetFramework = document.Descendants("TargetFramework").Select(static element => element.Value)
             .LastOrDefault();
         if (!string.Equals(targetFramework, "net11.0", StringComparison.Ordinal))
         {
             throw Invalid($"Project '{path}' must target net11.0 exactly.");
         }
 
-        if (document.Descendants("AllowUnsafeBlocks")
-            .Any(static element => string.Equals(element.Value, "true", StringComparison.OrdinalIgnoreCase)))
+        if (document.Descendants("AllowUnsafeBlocks").Any(static element => string.Equals(element.Value, "true", StringComparison.OrdinalIgnoreCase)))
         {
             throw Invalid($"Project '{path}' cannot enable unsafe code.");
         }
@@ -328,34 +273,21 @@ internal static class FeatureBuildSource
 
     private static void ValidateBuildAuthority(string path, XDocument document)
     {
-        var forbiddenProperty = document.Descendants("PropertyGroup")
-            .Elements()
-            .FirstOrDefault(element => !AllowedProperties.Contains(element.Name.LocalName));
-        var forbiddenPropertyAttribute = document.Descendants("PropertyGroup")
-            .Elements()
-            .SelectMany(element => element.Attributes().Select(attribute => (element, attribute)))
+        var forbiddenProperty = document.Descendants("PropertyGroup").Elements().FirstOrDefault(element => !AllowedProperties.Contains(element.Name.LocalName));
+        var forbiddenPropertyAttribute = document.Descendants("PropertyGroup").Elements().SelectMany(element => element.Attributes().Select(attribute => (element, attribute)))
             .FirstOrDefault(pair => !IsApprovedPropertyAttribute(path, pair.element, pair.attribute));
-        var forbiddenGroupAttribute = document.Descendants()
-            .Where(element => element.Name.LocalName is "PropertyGroup" or "ItemGroup")
+        var forbiddenGroupAttribute = document.Descendants().Where(element => element.Name.LocalName is "PropertyGroup" or "ItemGroup")
             .SelectMany(static element => element.Attributes())
             .FirstOrDefault();
-        var forbiddenImportAttribute = document.Descendants("Import")
-            .SelectMany(static element => element.Attributes())
+        var forbiddenImportAttribute = document.Descendants("Import").SelectMany(static element => element.Attributes())
             .FirstOrDefault(attribute => !attribute.Name.LocalName.Equals("Project", StringComparison.Ordinal));
-        var forbiddenItem = document.Descendants("ItemGroup")
-            .Elements()
-            .FirstOrDefault(element =>
-                !AllowedItems.Contains(element.Name.LocalName) ||
-                element.Elements().Any() ||
+        var forbiddenItem = document.Descendants("ItemGroup").Elements().FirstOrDefault(element =>
+                !AllowedItems.Contains(element.Name.LocalName) || element.Elements().Any() ||
                 element.Attributes().Any(attribute =>
                     !AllowedItemAttributes.Contains(attribute.Name.LocalName)));
-        var forbiddenRemoval = document.Descendants()
-            .FirstOrDefault(element =>
-                element.Attribute("Remove") is not null &&
-                !IsApprovedTestingFeatureRemoval(path, element));
-        if (document.Descendants("Exec").Any() ||
-            document.Descendants("UsingTask").Any() ||
-            document.Descendants("Analyzer").Any() ||
+        var forbiddenRemoval = document.Descendants().FirstOrDefault(element =>
+                element.Attribute("Remove") is not null && !IsApprovedTestingFeatureRemoval(path, element));
+        if (document.Descendants("Exec").Any() || document.Descendants("UsingTask").Any() || document.Descendants("Analyzer").Any() ||
             document.Descendants("Reference").Any() ||
             document.Descendants("PackageDownload").Any() ||
             document.Descendants("DotNetCliToolReference").Any() ||
@@ -391,39 +323,26 @@ internal static class FeatureBuildSource
         }
     }
 
-    private static bool IsApprovedPropertyAttribute(
-        string path,
-        XElement property,
-        XAttribute attribute) =>
+    private static bool IsApprovedPropertyAttribute(string path, XElement property, XAttribute attribute) =>
         path.Equals("Directory.Build.props", StringComparison.OrdinalIgnoreCase) &&
         attribute.Name.LocalName.Equals("Condition", StringComparison.Ordinal) &&
         property.Name.LocalName is "SkipFlutterBuild" or "SkipDeployBuild" or "EnforceCodeStyleInBuild" &&
         attribute.Value.Equals($"'$({property.Name.LocalName})' == ''", StringComparison.Ordinal);
 
     private static bool IsApprovedTestingFeatureRemoval(string path, XElement element) =>
-        path.Equals(
-            "src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj",
-            StringComparison.OrdinalIgnoreCase) &&
+        path.Equals("src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj", StringComparison.OrdinalIgnoreCase) &&
         element.Name.LocalName.Equals("ReqnrollFeatureFile", StringComparison.Ordinal) &&
         element.Attributes().Count() == 1 &&
-        element.Attribute("Remove")?.Value.Equals(
-            "GeneratedDuplicateInput.feature",
-            StringComparison.Ordinal) == true;
+        element.Attribute("Remove")?.Value.Equals("GeneratedDuplicateInput.feature", StringComparison.Ordinal) == true;
 
-    private static void ValidateImports(
-        string sourcePath,
-        XDocument document,
-        IReadOnlyDictionary<string, FeatureSourceFile> files)
+    private static void ValidateImports(string sourcePath, XDocument document, IReadOnlyDictionary<string, FeatureSourceFile> files)
     {
         foreach (var import in document.Descendants("Import"))
         {
             var project = RequiredAttribute(import, "Project", sourcePath).Replace('\\', '/');
             var resolvedImport = TryResolveVirtualPath(sourcePath, project, out var resolved);
-            var approvedTestingTarget = resolvedImport &&
-                resolved.Equals(TestingTargetsPath, StringComparison.OrdinalIgnoreCase);
-            if (project.Contains("$(", StringComparison.Ordinal) ||
-                !resolvedImport ||
-                !files.ContainsKey(resolved) ||
+            var approvedTestingTarget = resolvedImport && resolved.Equals(TestingTargetsPath, StringComparison.OrdinalIgnoreCase);
+            if (project.Contains("$(", StringComparison.Ordinal) || !resolvedImport || !files.ContainsKey(resolved) ||
                 project.EndsWith(".targets", StringComparison.OrdinalIgnoreCase) && !approvedTestingTarget)
             {
                 throw Invalid($"Import '{project}' in '{sourcePath}' is outside the source snapshot.");
@@ -431,17 +350,12 @@ internal static class FeatureBuildSource
         }
     }
 
-    private static void ValidateProjectReferences(
-        string sourcePath,
-        XDocument document,
-        IReadOnlyDictionary<string, FeatureSourceFile> files,
-        FeatureSourceSnapshot snapshot)
+    private static void ValidateProjectReferences(string sourcePath, XDocument document, IReadOnlyDictionary<string, FeatureSourceFile> files, FeatureSourceSnapshot snapshot)
     {
         foreach (var reference in document.Descendants("ProjectReference"))
         {
             var include = RequiredAttribute(reference, "Include", sourcePath).Replace('\\', '/');
-            if (include.Contains("$(", StringComparison.Ordinal) ||
-                !TryResolveVirtualPath(sourcePath, include, out var resolved) ||
+            if (include.Contains("$(", StringComparison.Ordinal) || !TryResolveVirtualPath(sourcePath, include, out var resolved) ||
                 !files.ContainsKey(resolved))
             {
                 throw Invalid($"Project reference '{include}' in '{sourcePath}' is outside the source snapshot.");
@@ -461,42 +375,27 @@ internal static class FeatureBuildSource
             return true;
         }
 
-        return path.Equals(
-                "src/DigitalBrain.Features.Sdk/DigitalBrain.Features.Sdk.csproj",
-                StringComparison.OrdinalIgnoreCase) ||
-            path.Equals(
-                "src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj",
-                StringComparison.OrdinalIgnoreCase) ||
-            path.Equals(
-                "integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj",
-                StringComparison.OrdinalIgnoreCase) ||
+        return path.Equals("src/DigitalBrain.Features.Sdk/DigitalBrain.Features.Sdk.csproj", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj", StringComparison.OrdinalIgnoreCase) ||
             path.Equals(
                 "integrations/DigitalBrain.Integrations.Salesforce.Contracts/DigitalBrain.Integrations.Salesforce.Contracts.csproj",
                 StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void ValidatePackages(
-        string sourcePath,
-        XDocument document,
-        IReadOnlyDictionary<string, string> centralVersions,
-        FeatureSourceSnapshot snapshot)
+    private static void ValidatePackages(string sourcePath, XDocument document, IReadOnlyDictionary<string, string> centralVersions, FeatureSourceSnapshot snapshot)
     {
         foreach (var package in document.Descendants("PackageReference"))
         {
             var id = RequiredAttribute(package, "Include", sourcePath);
             if (!AllowedPackages.Contains(id))
             {
-                throw new FeatureBuildException(
-                    FeatureBuildFailure.ForbiddenPackage,
-                    $"Package '{id}' is not allowed in Feature builds.");
+                throw new FeatureBuildException(FeatureBuildFailure.ForbiddenPackage, $"Package '{id}' is not allowed in Feature builds.");
             }
 
-            if (string.Equals(sourcePath, snapshot.ImplementationProjectPath, StringComparison.OrdinalIgnoreCase) &&
-                TestOnlyPackages.Contains(id))
+            if (string.Equals(sourcePath, snapshot.ImplementationProjectPath, StringComparison.OrdinalIgnoreCase) && TestOnlyPackages.Contains(id))
             {
-                throw new FeatureBuildException(
-                    FeatureBuildFailure.ForbiddenPackage,
-                    $"Test package '{id}' is not allowed in a Feature implementation.");
+                throw new FeatureBuildException(FeatureBuildFailure.ForbiddenPackage, $"Test package '{id}' is not allowed in a Feature implementation.");
             }
 
             var version = package.Attribute("Version")?.Value;
@@ -525,20 +424,10 @@ internal static class FeatureBuildSource
             part.Length > 0 && part.All(char.IsAsciiDigit));
     }
 
-    private static void ValidateItemPaths(
-        string sourcePath,
-        XDocument document,
-        IReadOnlyDictionary<string, FeatureSourceFile> files)
+    private static void ValidateItemPaths(string sourcePath, XDocument document, IReadOnlyDictionary<string, FeatureSourceFile> files)
     {
         string[] itemNames =
-        [
-            "Compile",
-            "EmbeddedResource",
-            "Content",
-            "None",
-            "AdditionalFiles",
-            "ReqnrollFeatureFile"
-        ];
+        ["Compile", "EmbeddedResource", "Content", "None", "AdditionalFiles", "ReqnrollFeatureFile"];
         foreach (var item in itemNames.SelectMany(name => document.Descendants(name)))
         {
             var value = item.Attribute("Include")?.Value ?? item.Attribute("Update")?.Value;
@@ -548,8 +437,7 @@ internal static class FeatureBuildSource
             }
 
             var normalized = value.Replace('\\', '/');
-            if (normalized.Contains("$(", StringComparison.Ordinal) ||
-                normalized.IndexOfAny(['*', '?', ';']) >= 0 ||
+            if (normalized.Contains("$(", StringComparison.Ordinal) || normalized.IndexOfAny(['*', '?', ';']) >= 0 ||
                 !TryResolveVirtualPath(sourcePath, normalized, out var resolved) ||
                 !files.ContainsKey(resolved))
             {
@@ -558,9 +446,7 @@ internal static class FeatureBuildSource
 
             var link = item.Attribute("Link")?.Value;
             if (link is not null &&
-                (link.Contains("$(", StringComparison.Ordinal) ||
-                 link.Contains("%(", StringComparison.Ordinal) ||
-                 !IsCanonicalRelativePath(link)))
+                (link.Contains("$(", StringComparison.Ordinal) || link.Contains("%(", StringComparison.Ordinal) || !IsCanonicalRelativePath(link)))
             {
                 throw Invalid($"Item link path '{link}' in '{sourcePath}' is outside the build output.");
             }
@@ -586,14 +472,11 @@ internal static class FeatureBuildSource
         }
     }
 
-    private static void ValidateScenarioProject(
-        FeatureSourceSnapshot snapshot,
-        IReadOnlyDictionary<string, FeatureSourceFile> files)
+    private static void ValidateScenarioProject(FeatureSourceSnapshot snapshot, IReadOnlyDictionary<string, FeatureSourceFile> files)
     {
         var scenarioFile = files[snapshot.ScenarioProjectPath];
         var scenarioProject = ParseXml(scenarioFile.Path, scenarioFile.Content);
-        var referencesImplementation = scenarioProject.Descendants("ProjectReference")
-            .Select(reference => RequiredAttribute(reference, "Include", scenarioFile.Path).Replace('\\', '/'))
+        var referencesImplementation = scenarioProject.Descendants("ProjectReference").Select(reference => RequiredAttribute(reference, "Include", scenarioFile.Path).Replace('\\', '/'))
             .Any(reference =>
                 TryResolveVirtualPath(scenarioFile.Path, reference, out var resolved) &&
                 resolved.Equals(snapshot.ImplementationProjectPath, StringComparison.OrdinalIgnoreCase));
@@ -602,16 +485,10 @@ internal static class FeatureBuildSource
             throw Invalid("The scenario project must reference the implementation project directly.");
         }
 
-        var projectReferences = scenarioProject.Descendants("ProjectReference")
-            .Select(reference => RequiredAttribute(reference, "Include", scenarioFile.Path).Replace('\\', '/'))
-            .Select(reference => TryResolveVirtualPath(scenarioFile.Path, reference, out var resolved)
-                ? resolved
-                : string.Empty);
-        var packageReferences = scenarioProject.Descendants("PackageReference")
-            .Select(reference => RequiredAttribute(reference, "Include", scenarioFile.Path));
-        if (!projectReferences.Any(path => path.Equals(
-                "src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj",
-                StringComparison.OrdinalIgnoreCase)) &&
+        var projectReferences = scenarioProject.Descendants("ProjectReference").Select(reference => RequiredAttribute(reference, "Include", scenarioFile.Path).Replace('\\', '/'))
+            .Select(reference => TryResolveVirtualPath(scenarioFile.Path, reference, out var resolved) ? resolved : string.Empty);
+        var packageReferences = scenarioProject.Descendants("PackageReference").Select(reference => RequiredAttribute(reference, "Include", scenarioFile.Path));
+        if (!projectReferences.Any(path => path.Equals("src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj", StringComparison.OrdinalIgnoreCase)) &&
             !packageReferences.Any(id => id.Equals("DigitalBrain.Features.Testing", StringComparison.OrdinalIgnoreCase)))
         {
             throw Invalid("The scenario project must use DigitalBrain.Features.Testing.");
@@ -637,10 +514,7 @@ internal static class FeatureBuildSource
         {
             using var json = JsonDocument.Parse(config.Content);
             var runtime = json.RootElement.GetProperty("runtime");
-            if (!string.Equals(
-                    runtime.GetProperty("missingOrPendingStepsOutcome").GetString(),
-                    "Error",
-                    StringComparison.Ordinal) ||
+            if (!string.Equals(runtime.GetProperty("missingOrPendingStepsOutcome").GetString(), "Error", StringComparison.Ordinal) ||
                 runtime.GetProperty("stopAtFirstError").GetBoolean())
             {
                 throw Invalid("Reqnroll must fail missing or pending steps and report every step error.");
@@ -648,10 +522,7 @@ internal static class FeatureBuildSource
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            throw new FeatureBuildException(
-                FeatureBuildFailure.InvalidSource,
-                "The scenario project has invalid strict Reqnroll configuration.",
-                exception);
+            throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, "The scenario project has invalid strict Reqnroll configuration.", exception);
         }
     }
 

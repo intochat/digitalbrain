@@ -2,8 +2,8 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Capabilities;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -12,10 +12,11 @@ using Orleans.Runtime;
 namespace DigitalBrain.Kernel.Runtime;
 
 [GrainType("digitalbrain.runtime.ino-operation-worker.v1")]
-public sealed class InoOperationWorkerGrain(
+internal sealed class InoOperationWorkerGrain(
     IGrainFactory grainFactory,
     IAgentWorkflowRunner workflowRunner,
     IInoEffectExecutor effectExecutor,
+    IEnumerable<IExternalAuthorizationResolver> authorizationResolvers,
     TimeProvider timeProvider,
     ILogger<InoOperationWorkerGrain> logger) : Grain, IInoOperationWorkerGrain, IRemindable
 {
@@ -33,15 +34,14 @@ public sealed class InoOperationWorkerGrain(
     private const int MaximumWorkflowResultPersistenceAttempts = 8;
     private enum ResultPersistence { Persisted, Superseded, Contended }
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Ino.Worker");
+    private readonly IReadOnlyDictionary<string, IExternalAuthorizationResolver> _authorizationResolvers =
+        authorizationResolvers.ToDictionary(static resolver => resolver.Provider, StringComparer.Ordinal);
     private IGrainReminder? _reminder;
     private IGrainTimer? _timer;
 
     public async Task ScheduleAsync()
     {
-        _reminder ??= await this.RegisterOrUpdateReminder(
-            ReminderName,
-            ReminderDueTime,
-            ReminderPeriod);
+        _reminder ??= await this.RegisterOrUpdateReminder(ReminderName, ReminderDueTime, ReminderPeriod);
         EnsureTimer(TimerInitialDelay);
     }
 
@@ -62,12 +62,9 @@ public sealed class InoOperationWorkerGrain(
     private async Task ProcessScheduledAsync()
     {
 
-        var (conversationGrainKey, operationId) = ParseWorkerKey(
-            this.GetPrimaryKeyString() ?? throw new InvalidOperationException("Operation workers require a string key."));
+        var (conversationGrainKey, operationId) = ParseWorkerKey(this.GetPrimaryKeyString() ?? throw new InvalidOperationException("Operation workers require a string key."));
         var dispatcher = grainFactory.GetGrain<IInoConversationOutboxDispatcherGrain>(conversationGrainKey);
 
-        // The conversation reminder hands off only to this worker. Scheduling the dispatcher here keeps the
-        // durable outbox live without recreating a conversation → dispatcher → conversation wait cycle.
         await dispatcher.ScheduleAsync();
         await ExecuteScheduledAsync(conversationGrainKey, operationId);
 
@@ -83,9 +80,7 @@ public sealed class InoOperationWorkerGrain(
     }
 
     private void EnsureTimer(TimeSpan dueTime) =>
-        _timer ??= this.RegisterGrainTimer(
-            ReceiveTimerAsync,
-            new GrainTimerCreationOptions(dueTime, Timeout.InfiniteTimeSpan) { KeepAlive = true });
+        _timer ??= this.RegisterGrainTimer(ReceiveTimerAsync, new GrainTimerCreationOptions(dueTime, Timeout.InfiniteTimeSpan) { KeepAlive = true });
 
     private async Task ExecuteScheduledAsync(string conversationGrainKey, string operationId)
     {
@@ -103,13 +98,7 @@ public sealed class InoOperationWorkerGrain(
         if (operation.Status == ConversationOperationStatus.AwaitingAuthorization ||
             operation.Status == ConversationOperationStatus.Running && operation.SuspendedInvocation is not null)
         {
-            await ResumeAuthorizationAsync(
-                conversation,
-                conversationGrainKey,
-                initial,
-                operation,
-                leaseOwner,
-                now);
+            await ResumeAuthorizationAsync(conversation, conversationGrainKey, initial, operation, leaseOwner, now);
             return;
         }
         if (operation.Status == ConversationOperationStatus.Running)
@@ -119,13 +108,7 @@ public sealed class InoOperationWorkerGrain(
                 ConversationClaim recovery;
                 try
                 {
-                    recovery = await conversation.TryClaimOperationAsync(
-                        initial.Revision,
-                        operationId,
-                        leaseOwner,
-                        now,
-                        LeaseDuration,
-                        CreateRunningOutbox(initial, operation, now));
+                    recovery = await conversation.TryClaimOperationAsync(initial.Revision, operationId, leaseOwner, now, LeaseDuration, CreateRunningOutbox(initial, operation, now));
                 }
                 catch (RuntimeStateConflictException)
                 {
@@ -138,17 +121,10 @@ public sealed class InoOperationWorkerGrain(
                     await PersistEffectResultAsync(
                         conversation,
                         recovery.Operation,
-                        new InoToolEffectResult(
-                            InoToolEffectDisposition.OutcomeUnknown,
-                            "The previous external action could not be confirmed. Review it before trying again."),
+                        new InoToolEffectResult(InoToolEffectDisposition.OutcomeUnknown, "The previous external action could not be confirmed. Review it before trying again."),
                         activity: null);
                 else
-                    await ScheduleLeaseInterruptionRecoveryAsync(
-                        conversation,
-                        recovery.State,
-                        recovery.Operation,
-                        "INO is recovering an interrupted model run.",
-                        leaseFence);
+                    await ScheduleLeaseInterruptionRecoveryAsync(conversation, recovery.State, recovery.Operation, "INO is recovering an interrupted model run.", leaseFence);
             }
             return;
         }
@@ -157,13 +133,7 @@ public sealed class InoOperationWorkerGrain(
         ConversationClaim claim;
         try
         {
-            claim = await conversation.TryClaimOperationAsync(
-                initial.Revision,
-                operationId,
-                leaseOwner,
-                now,
-                LeaseDuration,
-                CreateRunningOutbox(initial, operation, now));
+            claim = await conversation.TryClaimOperationAsync(initial.Revision, operationId, leaseOwner, now, LeaseDuration, CreateRunningOutbox(initial, operation, now));
         }
         catch (RuntimeStateConflictException)
         {
@@ -171,12 +141,7 @@ public sealed class InoOperationWorkerGrain(
         }
         if (!claim.Acquired || claim.Operation is null) return;
 
-        await ExecuteClaimedAsync(
-            conversation,
-            conversationGrainKey,
-            claim.State,
-            claim.Operation,
-            authorizationResume: null);
+        await ExecuteClaimedAsync(conversation, conversationGrainKey, claim.State, claim.Operation, authorizationResume: null);
     }
 
     private async Task ResumeAuthorizationAsync(
@@ -197,24 +162,14 @@ public sealed class InoOperationWorkerGrain(
         {
             var expiredClaim = await TryClaimAuthorizationAsync(conversation, state, operation, invocation, leaseOwner, now);
             if (expiredClaim is null || expiredClaim.Operation is null) return;
-            await RecordAuthorizationFailureAsync(
-                conversation,
-                expiredClaim.State,
-                expiredClaim.Operation,
-                AuthorizationExpired,
-                LeaseFence(expiredClaim.Operation));
+            await RecordAuthorizationFailureAsync(conversation, expiredClaim.State, expiredClaim.Operation, AuthorizationExpired, LeaseFence(expiredClaim.Operation));
             return;
         }
         if (state.Identity is null)
         {
             var identityClaim = await TryClaimAuthorizationAsync(conversation, state, operation, invocation, leaseOwner, now);
             if (identityClaim is null || identityClaim.Operation is null) return;
-            await RecordUnknownAsync(
-                conversation,
-                identityClaim.State,
-                identityClaim.Operation,
-                SafeFailure,
-                LeaseFence(identityClaim.Operation));
+            await RecordUnknownAsync(conversation, identityClaim.State, identityClaim.Operation, SafeFailure, LeaseFence(identityClaim.Operation));
             return;
         }
 
@@ -226,7 +181,7 @@ public sealed class InoOperationWorkerGrain(
         }
         catch (OperationCanceledException)
         {
-            // Readiness is unknown; leave the durable suspension intact for the next reminder tick.
+
             return;
         }
         catch (Exception)
@@ -239,12 +194,7 @@ public sealed class InoOperationWorkerGrain(
         {
             var failedClaim = await TryClaimAuthorizationAsync(conversation, state, operation, invocation, leaseOwner, now);
             if (failedClaim is null || failedClaim.Operation is null) return;
-            await RecordAuthorizationFailureAsync(
-                conversation,
-                failedClaim.State,
-                failedClaim.Operation,
-                AuthorizationFailed,
-                LeaseFence(failedClaim.Operation));
+            await RecordAuthorizationFailureAsync(conversation, failedClaim.State, failedClaim.Operation, AuthorizationFailed, LeaseFence(failedClaim.Operation));
             return;
         }
 
@@ -256,11 +206,7 @@ public sealed class InoOperationWorkerGrain(
             conversationGrainKey,
             claim.State,
             claim.Operation,
-            new InoAuthorizationResume(
-                invocation.Provider,
-                invocation.ToolId,
-                invocation.AuthorizationAttemptId,
-                invocation.AuthorizationExpiresAt));
+            new InoAuthorizationResume(invocation.Provider, invocation.ToolId, invocation.AuthorizationAttemptId, invocation.AuthorizationExpiresAt));
     }
 
     private async Task ExecuteClaimedAsync(
@@ -275,9 +221,7 @@ public sealed class InoOperationWorkerGrain(
         using var activity = ActivitySource.StartActivity("ino.operation.execute", ActivityKind.Internal);
         activity?.SetTag("db.ino.operation_id", operationId);
         activity?.SetTag("db.ino.conversation_grain", conversationGrainKey);
-        var requestId = string.IsNullOrWhiteSpace(claimed.RequestId)
-            ? claimed.CommandId
-            : claimed.RequestId;
+        var requestId = string.IsNullOrWhiteSpace(claimed.RequestId) ? claimed.CommandId : claimed.RequestId;
         activity?.SetTag("db.ino.request_id", requestId);
         if (claimed.Effect?.State == "applying")
         {
@@ -288,17 +232,11 @@ public sealed class InoOperationWorkerGrain(
             turn.Kind == ConversationTurnKind.User && string.Equals(turn.OperationId, operationId, StringComparison.Ordinal))?.Text;
         if (string.IsNullOrWhiteSpace(prompt) || state.Identity is null)
         {
-            await RecordUnknownAsync(
-                conversation,
-                state,
-                claimed,
-                "The accepted request could not be recovered safely.",
-                LeaseFence(claimed));
+            await RecordUnknownAsync(conversation, state, claimed, "The accepted request could not be recovered safely.", LeaseFence(claimed));
             return;
         }
 
-        var history = state.Turns
-            .Where(turn => !string.Equals(turn.OperationId, operationId, StringComparison.Ordinal))
+        var history = state.Turns.Where(turn => !string.Equals(turn.OperationId, operationId, StringComparison.Ordinal))
             .TakeLast(12)
             .Select(turn => turn.Role + ": " + turn.Text)
             .ToArray();
@@ -334,16 +272,8 @@ public sealed class InoOperationWorkerGrain(
         {
             activity?.SetStatus(ActivityStatusCode.Error, "workflow-failed");
             activity?.SetTag("db.ino.outcome", "failed");
-            logger.LogWarning(
-                "INO model workflow {OperationId} failed with {ExceptionType} before an external effect began.",
-                operationId,
-                ex.GetType().Name);
-            await RecordWorkflowFailureAsync(
-                conversation,
-                await conversation.ReadAsync(),
-                claimed,
-                "INO couldn’t complete this request. Send it again.",
-                LeaseFence(claimed));
+            logger.LogWarning("INO model workflow {OperationId} failed with {ExceptionType} before an external effect began.", operationId, ex.GetType().Name);
+            await RecordWorkflowFailureAsync(conversation, await conversation.ReadAsync(), claimed, "INO couldn’t complete this request. Send it again.", LeaseFence(claimed));
             return;
         }
 
@@ -354,12 +284,7 @@ public sealed class InoOperationWorkerGrain(
         await PersistWorkflowResultAsync(conversation, state.Identity, claimed, result, activity);
     }
 
-    private async Task PersistWorkflowResultAsync(
-        IConversationNeuron conversation,
-        ConversationIdentity identity,
-        ConversationOperation claimed,
-        InoWorkflowResult result,
-        Activity? activity)
+    private async Task PersistWorkflowResultAsync(IConversationNeuron conversation, ConversationIdentity identity, ConversationOperation claimed, InoWorkflowResult result, Activity? activity)
     {
         var leaseFence = LeaseFence(claimed);
         var requestedTool = result.ToolRequest;
@@ -382,20 +307,13 @@ public sealed class InoOperationWorkerGrain(
 
             try
             {
-                var outcome = await PersistWorkflowResultTransitionAsync(
-                    conversation,
-                    state,
-                    current,
-                    leaseFence,
-                    result,
-                    requestedTool,
-                    approvedTool);
+                var outcome = await PersistWorkflowResultTransitionAsync(conversation, state, current, leaseFence, result, requestedTool, approvedTool);
                 activity?.SetTag("db.ino.outcome", outcome);
                 return;
             }
             catch (RuntimeStateConflictException)
             {
-                // An outbox or feed delivery write advanced only the revision. Re-read and apply this exact result.
+
             }
             catch (ArgumentException)
             {
@@ -446,9 +364,7 @@ public sealed class InoOperationWorkerGrain(
                     action: new ToolAction(
                         "openUrl",
                         authorization.Provider == OAuthCallbackPaths.GoogleProvider ? "Connect Google" : "Connect Salesforce",
-                        OAuthCallbackPaths.CreateInternalStartPath(
-                            authorization.Provider,
-                            authorization.AuthorizationFlowReference)),
+                        OAuthCallbackPaths.CreateInternalStartPath(authorization.Provider, authorization.AuthorizationFlowReference)),
                     toolId: authorization.ToolId),
                 now,
                 leaseFence);
@@ -476,20 +392,11 @@ public sealed class InoOperationWorkerGrain(
 
             var effectId = StableIdentifier("effect", current.OperationId, approvedTool.ToolId, approvedTool.Scope);
             var approvalId = StableIdentifier("approval", current.OperationId, effectId);
-            var summary = string.IsNullOrWhiteSpace(approvedTool.SafeSummary)
-                ? "a typed workspace change"
-                : approvedTool.SafeSummary.Trim();
+            var summary = string.IsNullOrWhiteSpace(approvedTool.SafeSummary) ? "a typed workspace change" : approvedTool.SafeSummary.Trim();
             if (summary.Length > 512) summary = summary[..512];
             var text = "Approval is required before INO can perform " + summary + ".";
             var approval = new ApprovalRecord(approvalId, current.OperationId, effectId, "requested", 1, now);
-            var effect = new EffectRecord(
-                effectId,
-                current.OperationId,
-                approvedTool.ToolId,
-                approvedTool.Scope,
-                "awaiting-approval",
-                effectId,
-                1);
+            var effect = new EffectRecord(effectId, current.OperationId, approvedTool.ToolId, approvedTool.Scope, "awaiting-approval", effectId, 1);
             await conversation.RequestApprovalWithAssistantAsync(
                 state.Revision,
                 current.OperationId,
@@ -584,12 +491,7 @@ public sealed class InoOperationWorkerGrain(
             workflow,
             leaseFence);
 
-    private async Task PersistWorkflowResultOutcomeUnknownAsync(
-        IConversationNeuron conversation,
-        ConversationOperation claimed,
-        WorkflowReference workflow,
-        ConversationLeaseFence leaseFence,
-        Activity? activity)
+    private async Task PersistWorkflowResultOutcomeUnknownAsync(IConversationNeuron conversation, ConversationOperation claimed, WorkflowReference workflow, ConversationLeaseFence leaseFence, Activity? activity)
     {
         for (var attempt = 0; attempt < MaximumWorkflowResultPersistenceAttempts; attempt++)
         {
@@ -619,7 +521,7 @@ public sealed class InoOperationWorkerGrain(
             }
             catch (RuntimeStateConflictException)
             {
-                // Continue with the same result and the original lease fence; never invoke the model again.
+
             }
         }
 
@@ -628,31 +530,17 @@ public sealed class InoOperationWorkerGrain(
         logger.LogWarning("INO workflow result for operation {OperationId} could not be recorded after bounded reconciliation.", claimed.OperationId);
     }
 
-    private static ConversationOperation? LeaseOwnedRunningOperation(
-        ConversationState state,
-        string operationId,
-        ConversationLeaseFence leaseFence) => state.Operations.FirstOrDefault(candidate =>
+    private static ConversationOperation? LeaseOwnedRunningOperation(ConversationState state, string operationId, ConversationLeaseFence leaseFence) => state.Operations.FirstOrDefault(candidate =>
             string.Equals(candidate.OperationId, operationId, StringComparison.Ordinal) &&
             candidate.Status == ConversationOperationStatus.Running &&
             string.Equals(candidate.LeaseOwner, leaseFence.LeaseOwner, StringComparison.Ordinal) &&
             candidate.Attempt == leaseFence.Attempt);
 
-    private Task<ExternalAuthorizationResolution> ResolveAuthorizationAsync(
-        ConversationIdentity identity,
-        string provider,
-        CancellationToken cancellationToken)
+    private Task<ExternalAuthorizationResolution> ResolveAuthorizationAsync(ConversationIdentity identity, string provider, CancellationToken cancellationToken)
     {
-        var ownerScope = RequestScope.Id(identity.OwnerId, identity.ActorId);
-        return provider switch
-        {
-            OAuthCallbackPaths.GoogleProvider => grainFactory.GetGrain<IGmailReadToolGrain>(ownerScope)
-                .ResolveAuthorizationAsync(cancellationToken),
-            OAuthCallbackPaths.SalesforceProvider => grainFactory.GetGrain<ISalesforceReadToolGrain>(ownerScope)
-                .ResolveAuthorizationAsync(cancellationToken),
-            _ => Task.FromResult(new ExternalAuthorizationResolution(
-                ExternalAuthorizationResolutionState.Failed,
-                "authorization-provider-unsupported"))
-        };
+        return _authorizationResolvers.TryGetValue(provider, out var resolver)
+            ? resolver.ResolveAsync(identity.OwnerId, identity.ActorId, cancellationToken)
+            : Task.FromResult(new ExternalAuthorizationResolution(ExternalAuthorizationResolutionState.Failed, "authorization-provider-unsupported"));
     }
 
     private async Task<ConversationClaim?> TryClaimAuthorizationAsync(
@@ -665,14 +553,7 @@ public sealed class InoOperationWorkerGrain(
     {
         try
         {
-            var claim = await conversation.TryClaimAuthorizationAsync(
-                state.Revision,
-                operation.OperationId,
-                invocation.AuthorizationAttemptId,
-                leaseOwner,
-                now,
-                LeaseDuration,
-                CreateRunningOutbox(state, operation, now));
+            var claim = await conversation.TryClaimAuthorizationAsync(state.Revision, operation.OperationId, invocation.AuthorizationAttemptId, leaseOwner, now, LeaseDuration, CreateRunningOutbox(state, operation, now));
             return claim.Acquired && claim.Operation is not null ? claim : null;
         }
         catch (RuntimeStateConflictException)
@@ -681,12 +562,7 @@ public sealed class InoOperationWorkerGrain(
         }
     }
 
-    private async Task RecordAuthorizationFailureAsync(
-        IConversationNeuron conversation,
-        ConversationState state,
-        ConversationOperation operation,
-        string safeReason,
-        ConversationLeaseFence leaseFence)
+    private async Task RecordAuthorizationFailureAsync(IConversationNeuron conversation, ConversationState state, ConversationOperation operation, string safeReason, ConversationLeaseFence leaseFence)
     {
         var current = state.Operations.FirstOrDefault(candidate =>
             string.Equals(candidate.OperationId, operation.OperationId, StringComparison.Ordinal));
@@ -712,21 +588,12 @@ public sealed class InoOperationWorkerGrain(
         }
     }
 
-    private async Task ExecuteApprovedEffectAsync(
-        IConversationNeuron conversation,
-        ConversationState state,
-        ConversationOperation claimed,
-        Activity? activity)
+    private async Task ExecuteApprovedEffectAsync(IConversationNeuron conversation, ConversationState state, ConversationOperation claimed, Activity? activity)
     {
         var effect = claimed.Effect;
         if (effect is null || effect.State != "applying" || state.Identity is null)
         {
-            await RecordEffectFailureAsync(
-                conversation,
-                state,
-                claimed,
-                "The approved action could not be prepared safely. No external action was performed.",
-                LeaseFence(claimed));
+            await RecordEffectFailureAsync(conversation, state, claimed, "The approved action could not be prepared safely. No external action was performed.", LeaseFence(claimed));
             return;
         }
 
@@ -737,28 +604,16 @@ public sealed class InoOperationWorkerGrain(
         try
         {
             using var deadline = new CancellationTokenSource(WorkerDeadline);
-            result = await effectExecutor.ExecuteAsync(
-                new InoToolEffectRequest(
-                    claimed.OperationId,
-                    effect.EffectId,
-                    effect.Kind,
-                    effect.Scope,
-                    actorScope,
-                    effect.ProviderIdempotencyKey),
-                deadline.Token);
+            result = await effectExecutor.ExecuteAsync(new InoToolEffectRequest(claimed.OperationId, effect.EffectId, effect.Kind, effect.Scope, actorScope, effect.ProviderIdempotencyKey), deadline.Token);
         }
         catch (OperationCanceledException)
         {
-            result = new InoToolEffectResult(
-                InoToolEffectDisposition.OutcomeUnknown,
-                "The approved external action timed out before its result could be confirmed.");
+            result = new InoToolEffectResult(InoToolEffectDisposition.OutcomeUnknown, "The approved external action timed out before its result could be confirmed.");
         }
         catch (Exception)
         {
             logger.LogWarning("INO effect {EffectId} reached an uncertain outcome.", effect.EffectId);
-            result = new InoToolEffectResult(
-                InoToolEffectDisposition.OutcomeUnknown,
-                "The approved external action could not be confirmed. Review it before trying again.");
+            result = new InoToolEffectResult(InoToolEffectDisposition.OutcomeUnknown, "The approved external action could not be confirmed. Review it before trying again.");
         }
 
         await PersistEffectResultAsync(conversation, claimed, result, activity);
@@ -827,15 +682,11 @@ public sealed class InoOperationWorkerGrain(
         }
         catch (RuntimeStateConflictException)
         {
-            // The authoritative state changed concurrently; a later reminder reads it again.
+
         }
     }
 
-    private async Task PersistEffectResultAsync(
-        IConversationNeuron conversation,
-        ConversationOperation claimed,
-        InoToolEffectResult result,
-        Activity? activity)
+    private async Task PersistEffectResultAsync(IConversationNeuron conversation, ConversationOperation claimed, InoToolEffectResult result, Activity? activity)
     {
         var persistence = await TryPersistEffectResultAsync(conversation, claimed, result);
         if (persistence == ResultPersistence.Persisted)
@@ -849,9 +700,7 @@ public sealed class InoOperationWorkerGrain(
             return;
         }
 
-        var unknown = new InoToolEffectResult(
-            InoToolEffectDisposition.OutcomeUnknown,
-            "The approved external action could not be recorded safely. Review it before trying again.");
+        var unknown = new InoToolEffectResult(InoToolEffectDisposition.OutcomeUnknown, "The approved external action could not be recorded safely. Review it before trying again.");
         persistence = await TryPersistEffectResultAsync(conversation, claimed, unknown);
         if (persistence == ResultPersistence.Persisted)
         {
@@ -869,10 +718,7 @@ public sealed class InoOperationWorkerGrain(
         logger.LogWarning("INO effect result for operation {OperationId} could not be recorded after bounded reconciliation.", claimed.OperationId);
     }
 
-    private async Task<ResultPersistence> TryPersistEffectResultAsync(
-        IConversationNeuron conversation,
-        ConversationOperation claimed,
-        InoToolEffectResult result)
+    private async Task<ResultPersistence> TryPersistEffectResultAsync(IConversationNeuron conversation, ConversationOperation claimed, InoToolEffectResult result)
     {
         var leaseFence = LeaseFence(claimed);
         var terminalStatus = result.Disposition switch
@@ -931,17 +777,14 @@ public sealed class InoOperationWorkerGrain(
             }
             catch (RuntimeStateConflictException)
             {
-                // Re-read and persist the exact observed provider result. The gateway is never invoked again.
+
             }
         }
 
         return ResultPersistence.Contended;
     }
 
-    private static ConversationOperation? LeaseOwnedApplyingEffect(
-        ConversationState state,
-        string operationId,
-        ConversationLeaseFence leaseFence) => state.Operations.FirstOrDefault(candidate =>
+    private static ConversationOperation? LeaseOwnedApplyingEffect(ConversationState state, string operationId, ConversationLeaseFence leaseFence) => state.Operations.FirstOrDefault(candidate =>
             string.Equals(candidate.OperationId, operationId, StringComparison.Ordinal) &&
             candidate.Status == ConversationOperationStatus.Running &&
             candidate.Effect is { State: "applying" } &&
@@ -967,12 +810,7 @@ public sealed class InoOperationWorkerGrain(
         if (current is null || IsTerminal(current.Status) || current.Effect is not null) return;
         if (current.Attempt >= 3)
         {
-            await RecordWorkflowFailureAsync(
-                conversation,
-                state,
-                claimed,
-                "INO could not complete this request after safe retries. Please send it again.",
-                leaseFence);
+            await RecordWorkflowFailureAsync(conversation, state, claimed, "INO could not complete this request after safe retries. Please send it again.", leaseFence);
             return;
         }
         var now = timeProvider.GetUtcNow();
@@ -997,7 +835,7 @@ public sealed class InoOperationWorkerGrain(
         }
         catch (RuntimeStateConflictException)
         {
-            // A concurrent writer is now authoritative.
+
         }
     }
 
@@ -1033,7 +871,7 @@ public sealed class InoOperationWorkerGrain(
             }
             catch (RuntimeStateConflictException)
             {
-                // Re-read and persist the same safe terminal result; never rerun the model.
+
             }
         }
 
@@ -1067,7 +905,7 @@ public sealed class InoOperationWorkerGrain(
         }
         catch (RuntimeStateConflictException)
         {
-            // A concurrent terminal write won. The next durable read is authoritative.
+
         }
     }
 
@@ -1098,11 +936,7 @@ public sealed class InoOperationWorkerGrain(
                     ? StateFor(turnOperation.Status)
                     : InoConversationStates.Succeeded));
         if (includeMessage)
-            turns = turns.Append(new OperationFeedTurn(
-                operation.OperationId + ":" + phase.ToString().ToLowerInvariant() + ":" + version,
-                "assistant",
-                text,
-                StateFor(phase)));
+            turns = turns.Append(new OperationFeedTurn(operation.OperationId + ":" + phase.ToString().ToLowerInvariant() + ":" + version, "assistant", text, StateFor(phase)));
         var eventId = $"operation:{operationId}:phase:{phase.ToString().ToLowerInvariant()}:v:{version}";
         var record = OperationOutboxRecord.Create(
             eventId,
@@ -1129,25 +963,11 @@ public sealed class InoOperationWorkerGrain(
         return new(eventId, "surface-feed", record.ToPayloadUtf8(), now, null);
     }
 
-    private static ConversationOutboxEntry CreateRunningOutbox(
-        ConversationState state,
-        ConversationOperation operation,
-        DateTimeOffset now)
+    private static ConversationOutboxEntry CreateRunningOutbox(ConversationState state, ConversationOperation operation, DateTimeOffset now)
     {
         var effect = operation.Effect;
-        var phase = effect is { State: "approved" or "applying" }
-            ? InoOperationPhase.ApplyingEffect
-            : InoOperationPhase.Running;
-        return CreateOutbox(
-            state,
-            operation,
-            operation.OperationId,
-            phase,
-            checked(operation.Version + 1),
-            string.Empty,
-            now,
-            toolId: effect?.Kind,
-            effectId: effect?.EffectId);
+        var phase = effect is { State: "approved" or "applying" } ? InoOperationPhase.ApplyingEffect : InoOperationPhase.Running;
+        return CreateOutbox(state, operation, operation.OperationId, phase, checked(operation.Version + 1), string.Empty, now, toolId: effect?.Kind, effectId: effect?.EffectId);
     }
 
     private static ConversationOperation RequiredOperation(ConversationState state, string operationId) =>
@@ -1180,9 +1000,7 @@ public sealed class InoOperationWorkerGrain(
     };
 
     private static ConversationLeaseFence LeaseFence(ConversationOperation operation) =>
-        new(
-            operation.LeaseOwner ?? throw new InvalidOperationException("An executing operation requires a lease owner."),
-            operation.Attempt);
+        new(operation.LeaseOwner ?? throw new InvalidOperationException("An executing operation requires a lease owner."), operation.Attempt);
 
     private static string StableIdentifier(string prefix, params string[] values)
     {

@@ -12,13 +12,7 @@ public sealed class GmailMessageReadRequest
 
 public sealed class GmailMessage
 {
-    public GmailMessage(
-        string messageId,
-        string? threadId,
-        DateTimeOffset receivedAt,
-        string? senderAddress,
-        string? subject,
-        string plainTextBody)
+    public GmailMessage(string messageId, string? threadId, DateTimeOffset receivedAt, string? senderAddress, string? subject, string plainTextBody)
     {
         MessageId = ContractGuard.Required(messageId, nameof(messageId), 512);
         ThreadId = ContractGuard.Optional(threadId, nameof(threadId), 512);
@@ -38,9 +32,7 @@ public sealed class GmailMessage
 
 public interface IGmailMessageReader
 {
-    Task<GmailMessage> ReadAsync(
-        GmailMessageReadRequest request,
-        CancellationToken cancellationToken = default);
+    Task<GmailMessage> ReadAsync(GmailMessageReadRequest request, CancellationToken cancellationToken = default);
 }
 
 public sealed class GmailMailboxReadRequest
@@ -57,12 +49,7 @@ public sealed class GmailMailboxReadRequest
 
 public sealed class GmailMessageSummary
 {
-    public GmailMessageSummary(
-        string messageId,
-        string? threadId,
-        DateTimeOffset receivedAt,
-        string? senderAddress,
-        string? subject)
+    public GmailMessageSummary(string messageId, string? threadId, DateTimeOffset receivedAt, string? senderAddress, string? subject)
     {
         MessageId = ContractGuard.Required(messageId, nameof(messageId), 512);
         ThreadId = ContractGuard.Optional(threadId, nameof(threadId), 512);
@@ -80,9 +67,7 @@ public sealed class GmailMessageSummary
 
 public sealed class GmailMailboxPage
 {
-    public GmailMailboxPage(
-        IReadOnlyList<GmailMessageSummary> messages,
-        string? continuationToken = null)
+    public GmailMailboxPage(IReadOnlyList<GmailMessageSummary> messages, string? continuationToken = null)
     {
         Messages = ContractGuard.Copy(messages, nameof(messages), 100);
         ContinuationToken = ContractGuard.Optional(continuationToken, nameof(continuationToken), 4_096);
@@ -94,18 +79,12 @@ public sealed class GmailMailboxPage
 
 public interface IGmailMailboxReader
 {
-    Task<GmailMailboxPage> ReadAsync(
-        GmailMailboxReadRequest request,
-        CancellationToken cancellationToken = default);
+    Task<GmailMailboxPage> ReadAsync(GmailMailboxReadRequest request, CancellationToken cancellationToken = default);
 }
 
 public sealed class GmailSendProposalRequest
 {
-    public GmailSendProposalRequest(
-        string recipient,
-        string subject,
-        string body,
-        string logicalOperationKey)
+    public GmailSendProposalRequest(string recipient, string subject, string body, string logicalOperationKey)
     {
         Recipient = ContractGuard.Required(recipient, nameof(recipient), 320);
         Subject = ContractGuard.Bounded(subject, nameof(subject), 998);
@@ -121,11 +100,7 @@ public sealed class GmailSendProposalRequest
 
 public sealed class GmailSendProposal
 {
-    public GmailSendProposal(
-        string recipient,
-        string subject,
-        string body,
-        string logicalOperationKey)
+    public GmailSendProposal(string recipient, string subject, string body, string logicalOperationKey)
     {
         Recipient = ContractGuard.Required(recipient, nameof(recipient), 320);
         Subject = ContractGuard.Bounded(subject, nameof(subject), 998);
@@ -141,9 +116,7 @@ public sealed class GmailSendProposal
 
 public interface IGmailSendProposer
 {
-    Task<GmailSendProposal> ProposeAsync(
-        GmailSendProposalRequest request,
-        CancellationToken cancellationToken = default);
+    Task<GmailSendProposal> ProposeAsync(GmailSendProposalRequest request, CancellationToken cancellationToken = default);
 }
 
 internal static class ContractGuard

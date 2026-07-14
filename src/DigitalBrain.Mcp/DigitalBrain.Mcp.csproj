@@ -8,15 +8,13 @@
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerRepository>digitalbrain-mcp</ContainerRepository>
-    <!-- noble-chiseled not yet published for .NET 11 preview; use the ASP.NET preview base -->
+
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
     <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
     <ContainerRuntimeIdentifier>linux-x64</ContainerRuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
 
     <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
@@ -30,12 +28,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- MCP Server -->
+
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
 
-    <!-- Orleans Client -->
+
     <PackageReference Include="Aspire.Azure.Data.Tables" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" />
     <PackageReference Include="Aspire.StackExchange.Redis" />
@@ -54,4 +52,3 @@
   </ItemGroup>
 
 </Project>
-

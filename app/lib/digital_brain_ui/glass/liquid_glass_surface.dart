@@ -60,8 +60,7 @@ class _LiquidGlassSurfaceState extends State<LiquidGlassSurface>
       }
       return;
     }
-    // Re-trigger the morph when morphFrom changes (e.g. user closed and
-    // re-opened the surface from a different origin point).
+
     if (widget.morphFrom != old.morphFrom) {
       WidgetsBinding.instance.addPostFrameCallback(_kickOff);
     }
@@ -105,7 +104,6 @@ class _LiquidGlassSurfaceState extends State<LiquidGlassSurface>
             final top = _lerp(clampedOrigin.dy - _kSeedRadius, 0, t);
             final radius = _lerp(_kSeedRadius, widget.cornerRadius, t);
 
-            // Child fades in over the latter half (450..800 ms / 800 ms = 0.5625..1.0).
             final childOpacity = ((_ctrl.value - 0.5625) / (1.0 - 0.5625))
                 .clamp(0.0, 1.0);
 

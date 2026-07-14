@@ -58,10 +58,7 @@ public static class FeatureGrainIds
 }
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-installation-registration")]
-public sealed record FeatureInstallationRegistration(
-    [property: Id(0)] FeatureInstallationId InstallationId,
-    [property: Id(1)] ReleaseDigest Release,
-    [property: Id(2)] string[] Subscriptions);
+public sealed record FeatureInstallationRegistration([property: Id(0)] FeatureInstallationId InstallationId, [property: Id(1)] ReleaseDigest Release, [property: Id(2)] string[] Subscriptions);
 
 [Alias("digitalbrain.v3.feature-source-kind")]
 public enum FeatureSourceKind
@@ -93,11 +90,7 @@ public sealed record FeatureGrantSpec(
     [property: Id(4)] string? Provider = null);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-approval-decision")]
-public sealed record FeatureApprovalDecision(
-    [property: Id(0)] string ApprovalId,
-    [property: Id(1)] ReleaseDigest Release,
-    [property: Id(2)] bool Approved,
-    [property: Id(3)] string DecisionId);
+public sealed record FeatureApprovalDecision([property: Id(0)] string ApprovalId, [property: Id(1)] ReleaseDigest Release, [property: Id(2)] bool Approved, [property: Id(3)] string DecisionId);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-grant-request")]
 public sealed record FeatureGrantRequest(
@@ -175,9 +168,7 @@ public sealed record FeatureInput(
     [property: Id(6)] string? CausationId = null);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease-fence")]
-public sealed record FeatureLeaseFence(
-    [property: Id(0)] string InputId,
-    [property: Id(1)] long Fence);
+public sealed record FeatureLeaseFence([property: Id(0)] string InputId, [property: Id(1)] long Fence);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-run-claim")]
 public sealed record FeatureRunClaim(
@@ -198,17 +189,11 @@ public enum FeatureIntentKind
 }
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-intent")]
-public sealed record FeatureIntent(
-    [property: Id(0)] string LogicalOperationKey,
-    [property: Id(1)] FeatureIntentKind Kind,
-    [property: Id(2)] string PayloadJson);
+public sealed record FeatureIntent([property: Id(0)] string LogicalOperationKey, [property: Id(1)] FeatureIntentKind Kind, [property: Id(2)] string PayloadJson);
 
 public static class FeatureIntentKeys
 {
-    public static string Create(
-        FeatureInstallationId installationId,
-        string inputId,
-        string logicalOperationKey)
+    public static string Create(FeatureInstallationId installationId, string inputId, string logicalOperationKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(installationId.Value);
         ArgumentException.ThrowIfNullOrWhiteSpace(inputId);
@@ -218,9 +203,7 @@ public static class FeatureIntentKeys
 }
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-resource-usage")]
-public sealed record FeatureResourceUsage(
-    [property: Id(0)] int Reads,
-    [property: Id(1)] int ModelCalls);
+public sealed record FeatureResourceUsage([property: Id(0)] int Reads, [property: Id(1)] int ModelCalls);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-run-commit")]
 public sealed record FeatureRunCommit(
@@ -265,10 +248,7 @@ public sealed record FeatureIntentStatus(
     [property: Id(3)] DateTimeOffset? AppliedAt);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-schedule-status")]
-public sealed record FeatureScheduleStatus(
-    [property: Id(0)] string ScheduleId,
-    [property: Id(1)] DateTimeOffset LastOccurrenceAt,
-    [property: Id(2)] DateTimeOffset NextOccurrenceAt);
+public sealed record FeatureScheduleStatus([property: Id(0)] string ScheduleId, [property: Id(1)] DateTimeOffset LastOccurrenceAt, [property: Id(2)] DateTimeOffset NextOccurrenceAt);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease-status")]
 public sealed record FeatureLeaseStatus(
@@ -294,10 +274,7 @@ public sealed record FeatureInstallationSnapshot(
     [property: Id(12)] FeatureParkedInput[] Parked);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-parked-input")]
-public sealed record FeatureParkedInput(
-    [property: Id(0)] FeatureInput Input,
-    [property: Id(1)] int Attempts,
-    [property: Id(2)] string? SafeFailure);
+public sealed record FeatureParkedInput([property: Id(0)] FeatureInput Input, [property: Id(1)] int Attempts, [property: Id(2)] string? SafeFailure);
 
 [Alias("digitalbrain.v3.feature-failure-disposition")]
 public enum FeatureFailureDisposition
@@ -307,10 +284,7 @@ public enum FeatureFailureDisposition
 }
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-fanout-result")]
-public sealed record FeatureFanOutResult(
-    [property: Id(0)] string InputId,
-    [property: Id(1)] int Delivered,
-    [property: Id(2)] int Pending);
+public sealed record FeatureFanOutResult([property: Id(0)] string InputId, [property: Id(1)] int Delivered, [property: Id(2)] int Pending);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-backpressure-alert")]
 public sealed record FeatureBackpressureAlert(

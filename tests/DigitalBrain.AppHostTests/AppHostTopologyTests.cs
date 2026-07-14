@@ -5,12 +5,6 @@ using DigitalBrain.AppHost;
 
 namespace DigitalBrain.AppHostTests;
 
-// Real, executed coverage for the builder.ExecutionContext.IsRunMode branching added to
-// AddDigitalBrain (storage emulator + Ollama container vs. AddConnectionString("llm")
-// placeholder). Uses DistributedApplicationTestingBuilder.CreateAsync against the real
-// DigitalBrain.AppHost entry point.
-// but deliberately stops after CreateAsync — never calling BuildAsync/StartAsync — so it only
-// inspects the declared resource graph. No Docker, no Orleans, no container start.
 public sealed class AppHostTopologyTests
 {
     private static async Task<IDistributedApplicationTestingBuilder> CreateAppHostBuilderAsync(params string[] args)
@@ -30,7 +24,7 @@ public sealed class AppHostTopologyTests
     [Fact]
     public async Task RunMode_CreatesEmulatedStorageAndOllamaContainer()
     {
-        // Default args == run mode, matching every `dotnet run`/`aspire run` invocation today.
+
         var builder = await CreateAppHostBuilderAsync();
 
         Assert.True(builder.ExecutionContext.IsRunMode);
@@ -124,7 +118,6 @@ public sealed class AppHostTopologyTests
         var embed = Assert.Single(builder.Resources, r => r.Name == "embed");
         Assert.Equal("OllamaModelResource", embed.GetType().Name);
 
-        // Development run mode automatically starts the authenticated Flutter shell.
         Assert.Contains(builder.Resources, r => r.Name == "flutter-ui");
     }
 
@@ -185,8 +178,8 @@ public sealed class AppHostTopologyTests
         Assert.DoesNotContain("DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK", flutterEnvironment.Keys);
 
         var mcpEnvironment = await EvaluateEnvironmentAsync(builder, mcp);
-        Assert.Equal(DigitalBrain.Core.Runtime.SessionAudiences.Mcp, mcpEnvironment["DigitalBrain__Runtime__Mcp__Audience"]);
-        Assert.Equal(DigitalBrain.Core.Runtime.SessionAudiences.Ui, mcpEnvironment["DigitalBrain__Runtime__Ui__Audience"]);
+        Assert.Equal(DigitalBrain.Kernel.Contracts.Runtime.SessionAudiences.Mcp, mcpEnvironment["DigitalBrain__Runtime__Mcp__Audience"]);
+        Assert.Equal(DigitalBrain.Kernel.Contracts.Runtime.SessionAudiences.Ui, mcpEnvironment["DigitalBrain__Runtime__Ui__Audience"]);
         Assert.Equal("6291456", mcpEnvironment["DigitalBrain__Runtime__Mcp__MaxBodyBytes"]);
         Assert.Equal("6291456", mcpEnvironment["DigitalBrain__Runtime__Transport__MaxBodyBytes"]);
         Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__Runtime__Ui__BootstrapSecret"]);
@@ -317,7 +310,7 @@ public sealed class AppHostTopologyTests
     [Fact]
     public async Task PublishMode_SkipsEmulatorAndOllamaContainer_UsesConnectionStringPlaceholder()
     {
-        // `aspire publish`'s equivalent: no containers should ever be started for this.
+
         var builder = await CreateAppHostBuilderAsync(
             "--publisher",
             "manifest",
@@ -334,7 +327,6 @@ public sealed class AppHostTopologyTests
         var llm = Assert.Single(builder.Resources, r => r.Name == "llm");
         Assert.Equal("ConnectionStringParameterResource", llm.GetType().Name);
 
-        // No local Ollama container in publish mode, so no "embed" model resource either (see Task 15).
         Assert.DoesNotContain(builder.Resources, r => r.Name == "embed");
 
         Assert.DoesNotContain(builder.Resources, r => r.Name == "flutter-ui");

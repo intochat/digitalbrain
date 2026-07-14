@@ -1,12 +1,11 @@
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
-using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Memory;
 using DigitalBrain.Kernel.Features;
@@ -18,7 +17,7 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Kernel.Hosting;
 
-public static class DigitalBrainOrleansExtensions
+internal static class DigitalBrainOrleansExtensions
 {
     public static IHostApplicationBuilder UseDigitalBrainOrleans(this IHostApplicationBuilder builder)
     {
@@ -27,11 +26,8 @@ public static class DigitalBrainOrleansExtensions
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
         var useManagedIdentity = !string.IsNullOrWhiteSpace(storageAccountName);
         var runtimeStorageNamespace = RuntimeStateNamespace.Resolve(builder.Configuration);
-        var keyRing = RuntimeStateKeyConfiguration.Load(
-            builder.Configuration,
-            requireConfiguredKeys: requiresDurableStorage,
-            production: builder.Environment.IsProduction());
-        var stateProtector = new EncryptedRuntimeStateProtector(keyRing, SynapseJson.CreateOptions());
+        var keyRing = RuntimeStateKeyConfiguration.Load(builder.Configuration, requireConfiguredKeys: requiresDurableStorage, production: builder.Environment.IsProduction());
+        var stateProtector = new EncryptedRuntimeStateProtector(keyRing);
 
         builder.Services.AddSingleton(keyRing);
         builder.Services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
@@ -39,24 +35,17 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton<InoEffectPlanAuthority>();
         builder.Services.AddSingleton<IFeatureGrainResolver, OrleansFeatureGrainResolver>();
         builder.Services.AddSingleton(new RuntimeStateHealthMetadata(
-            requiresDurableStorage
-                ? useManagedIdentity ? "azure-blob-managed-identity" : "azure-blob-connection-string"
-                : "memory",
+            requiresDurableStorage ? useManagedIdentity ? "azure-blob-managed-identity" : "azure-blob-connection-string" : "memory",
             runtimeStorageNamespace,
             RuntimeStateSchemas.Envelope,
             keyRing.ActiveKekVersion));
-        builder.Services.AddHealthChecks()
-            .AddCheck<RuntimeStateHealthCheck>("digitalbrain-runtime-state");
+        builder.Services.AddHealthChecks().AddCheck<RuntimeStateHealthCheck>("digitalbrain-runtime-state");
 
         var storageCredential = useManagedIdentity ? new DefaultAzureCredential() : null;
         var storageTableServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.table.core.windows.net") : null;
         var storageBlobServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.blob.core.windows.net") : null;
-        var clusteringConnection = requiresDurableStorage && !useManagedIdentity
-            ? RequireConnectionString(builder.Configuration, "clustering")
-            : null;
-        var grainStateConnection = requiresDurableStorage && !useManagedIdentity
-            ? RequireConnectionString(builder.Configuration, "grainstate")
-            : null;
+        var clusteringConnection = requiresDurableStorage && !useManagedIdentity ? RequireConnectionString(builder.Configuration, "clustering") : null;
+        var grainStateConnection = requiresDurableStorage && !useManagedIdentity ? RequireConnectionString(builder.Configuration, "grainstate") : null;
         var runtimeBlobOptions = new BlobClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
         var runtimeStateBlobs = requiresDurableStorage
             ? useManagedIdentity
@@ -132,10 +121,7 @@ public static class DigitalBrainOrleansExtensions
         return builder;
     }
 
-    private static void ConfigureRuntimeStateStorage(
-        ISiloBuilder siloBuilder,
-        BlobServiceClient blobs,
-        string storageNamespace)
+    private static void ConfigureRuntimeStateStorage(ISiloBuilder siloBuilder, BlobServiceClient blobs, string storageNamespace)
     {
         Add(RuntimeStateStorageProviders.Conversations);
         Add(RuntimeStateStorageProviders.SurfaceFeeds);
@@ -162,15 +148,12 @@ public static class DigitalBrainOrleansExtensions
         var value = configuration.GetConnectionString(name);
         return !string.IsNullOrWhiteSpace(value)
             ? value
-            : throw new InvalidOperationException(
-                $"ConnectionStrings:{name} is required for hosted or Production Orleans storage.");
+            : throw new InvalidOperationException($"ConnectionStrings:{name} is required for hosted or Production Orleans storage.");
     }
 
     public static IHostApplicationBuilder AddDigitalBrainClients(this IHostApplicationBuilder builder)
     {
         builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
-        builder.Services.AddSingleton(new SchemaRegistry([
-            new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true)]));
         var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted(builder.Configuration);
 
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
@@ -207,26 +190,17 @@ public static class DigitalBrainOrleansExtensions
         if (useManagedIdentity)
         {
             var tableOptions = new TableClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
-            memoryTable = new TableClient(
-                storageTableServiceUri!,
-                AzureTableMemoryFactStore.FactsTableName,
-                storageCredential!,
-                tableOptions);
+            memoryTable = new TableClient(storageTableServiceUri!, AzureTableMemoryFactStore.FactsTableName, storageCredential!, tableOptions);
         }
-        builder.Services.AddDigitalBrainMemory(
-            builder.Configuration,
-            memoryTable,
-            builder.Environment.IsEnvironment("Testing") ||
-            builder.Configuration.GetValue<bool>("DigitalBrain:TestMode"));
+        builder.Services.AddDigitalBrainMemory(builder.Configuration, memoryTable, builder.Environment.IsEnvironment("Testing") || builder.Configuration.GetValue<bool>("DigitalBrain:TestMode"));
         builder.Services.AddSingleton<CapabilityGrantValidator>();
-        builder.Services.AddSingleton<RetainedInoCapabilityGrantSource>();
         builder.Services.AddSingleton<FeatureCapabilityGrantSource>();
-        builder.Services.AddSingleton<ICapabilityGrantSource, RuntimeCapabilityGrantSource>();
+        builder.Services.AddSingleton<ICapabilityGrantSource>(services => services.GetRequiredService<FeatureCapabilityGrantSource>());
         builder.Services.AddSingleton<ICapabilityDispatcher, CapabilityDispatcher>();
         builder.Services.AddHostedService<CapabilityDispatcherStartupValidation>();
         builder.Services.AddSingleton<IAgentWorkflowRunner, AgentFrameworkWorkflowRunner>();
 
-        BlobServiceClient? packConfigBlobs = null;
+        BlobServiceClient? integrationConfigBlobs = null;
         if (isAspireHosted)
         {
             var blobOptions = new BlobClientOptions();
@@ -234,19 +208,19 @@ public static class DigitalBrainOrleansExtensions
 
             if (useManagedIdentity)
             {
-                packConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions);
+                integrationConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions);
             }
             else
             {
                 var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
                 if (!string.IsNullOrEmpty(grainStateConnStr))
                 {
-                    packConfigBlobs = new BlobServiceClient(grainStateConnStr, blobOptions);
+                    integrationConfigBlobs = new BlobServiceClient(grainStateConnStr, blobOptions);
                 }
             }
         }
-        builder.Services.AddPackConfigStore(packConfigBlobs);
-        builder.Services.AddSingleton<DigitalBrain.Kernel.Abstractions.IOAuthStateProtector, DataProtectionOAuthStateProtector>();
+        builder.Services.AddIntegrationConfigStore(integrationConfigBlobs);
+        builder.Services.AddSingleton<DigitalBrain.Kernel.Contracts.IOAuthStateProtector, DataProtectionOAuthStateProtector>();
 
         return builder;
     }

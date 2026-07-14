@@ -12,7 +12,6 @@
     <ProjectReference Include="..\..\src\DigitalBrain.Features.Sdk\DigitalBrain.Features.Sdk.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Features.Testing\DigitalBrain.Features.Testing.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
     <ProjectReference Include="..\..\features\EmailSummarizer\DigitalBrain.Features.EmailSummarizer.csproj" />
   </ItemGroup>
   <ItemGroup>

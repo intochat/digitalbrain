@@ -4,7 +4,7 @@ using Orleans;
 namespace DigitalBrain.Kernel.Features;
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-hub-state")]
-public sealed record FeatureHubState(
+internal sealed record FeatureHubState(
     [property: Id(0)] FeatureInstallationRegistration[] Installations,
     [property: Id(1)] long Revision,
     [property: Id(2)] FeatureFanOutState[] FanOuts,
@@ -17,7 +17,7 @@ public sealed record FeatureHubState(
 }
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-approval-state")]
-public sealed record FeatureApprovalState(
+internal sealed record FeatureApprovalState(
     [property: Id(0)] string ApprovalId,
     [property: Id(1)] FeatureInstallationId InstallationId,
     [property: Id(2)] FeatureReleaseMetadata Release,
@@ -30,7 +30,7 @@ public sealed record FeatureApprovalState(
     [property: Id(9)] FeatureGrantState[] Grants);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-grant-state")]
-public sealed record FeatureGrantState(
+internal sealed record FeatureGrantState(
     [property: Id(0)] string CapabilityId,
     [property: Id(1)] int CapabilityVersion,
     [property: Id(2)] ProviderConnectionId? ProviderConnectionId,
@@ -38,7 +38,7 @@ public sealed record FeatureGrantState(
     [property: Id(4)] string? Provider);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-installation-authority-state")]
-public sealed record FeatureInstallationAuthorityState(
+internal sealed record FeatureInstallationAuthorityState(
     [property: Id(0)] FeatureInstallationId InstallationId,
     [property: Id(1)] ActorId ActorId,
     [property: Id(2)] ReleaseDigest? ActiveRelease,
@@ -54,17 +54,13 @@ public sealed record FeatureInstallationAuthorityState(
     [property: Id(12)] string? PauseReason);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-fanout-delivery-state")]
-public sealed record FeatureFanOutDeliveryState(
-    [property: Id(0)] FeatureInstallationId InstallationId,
-    [property: Id(1)] bool Delivered);
+internal sealed record FeatureFanOutDeliveryState([property: Id(0)] FeatureInstallationId InstallationId, [property: Id(1)] bool Delivered);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-fanout-state")]
-public sealed record FeatureFanOutState(
-    [property: Id(0)] FeatureInput Input,
-    [property: Id(1)] FeatureFanOutDeliveryState[] Deliveries);
+internal sealed record FeatureFanOutState([property: Id(0)] FeatureInput Input, [property: Id(1)] FeatureFanOutDeliveryState[] Deliveries);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-inbox-entry")]
-public sealed record FeatureInboxEntry(
+internal sealed record FeatureInboxEntry(
     [property: Id(0)] FeatureInput Input,
     [property: Id(1)] int Attempts,
     [property: Id(2)] DateTimeOffset NotBefore,
@@ -72,14 +68,14 @@ public sealed record FeatureInboxEntry(
     [property: Id(4)] string? LastFailure);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease")]
-public sealed record FeatureLease(
+internal sealed record FeatureLease(
     [property: Id(0)] string HostId,
     [property: Id(1)] FeatureLeaseFence Fence,
     [property: Id(2)] DateTimeOffset ExpiresAt,
     [property: Id(3)] int Attempt);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-completion")]
-public sealed record FeatureCompletion(
+internal sealed record FeatureCompletion(
     [property: Id(0)] string InputId,
     [property: Id(1)] long Fence,
     [property: Id(2)] string ResultJson,
@@ -88,20 +84,17 @@ public sealed record FeatureCompletion(
     [property: Id(5)] string InputDigest);
 
 [GenerateSerializer, Alias("digitalbrain.v3.persisted-feature-intent")]
-public sealed record PersistedFeatureIntent(
+internal sealed record PersistedFeatureIntent(
     [property: Id(0)] string OperationKey,
     [property: Id(1)] FeatureIntentKind Kind,
     [property: Id(2)] string PayloadJson,
     [property: Id(3)] DateTimeOffset? AppliedAt);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-schedule-cursor")]
-public sealed record FeatureScheduleCursor(
-    [property: Id(0)] string ScheduleId,
-    [property: Id(1)] DateTimeOffset LastOccurrenceAt,
-    [property: Id(2)] DateTimeOffset NextOccurrenceAt);
+internal sealed record FeatureScheduleCursor([property: Id(0)] string ScheduleId, [property: Id(1)] DateTimeOffset LastOccurrenceAt, [property: Id(2)] DateTimeOffset NextOccurrenceAt);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-installation-state")]
-public sealed record FeatureInstallationState(
+internal sealed record FeatureInstallationState(
     [property: Id(0)] FeatureInstallationId InstallationId,
     [property: Id(1)] ReleaseDigest ActiveRelease,
     [property: Id(2)] ReleaseDigest? PreviousRelease,
@@ -116,14 +109,12 @@ public sealed record FeatureInstallationState(
     [property: Id(11)] string? PauseReason,
     [property: Id(12)] FeatureScheduleCursor[] Schedules)
 {
-    public static FeatureInstallationState Create(
-        ReleaseDigest release,
-        FeatureInstallationId? installationId = null) =>
+    public static FeatureInstallationState Create(ReleaseDigest release, FeatureInstallationId? installationId = null) =>
         new(installationId ?? new FeatureInstallationId("unbound"), release, null, "{}", false, [], null, [], [], 0, 0, null, []);
 }
 
-public sealed record FeatureAppendTransition(FeatureInstallationState State, FeatureAppendStatus Status);
+internal sealed record FeatureAppendTransition(FeatureInstallationState State, FeatureAppendStatus Status);
 
-public sealed record FeatureClaimTransition(FeatureInstallationState State, FeatureRunClaim? Claim);
+internal sealed record FeatureClaimTransition(FeatureInstallationState State, FeatureRunClaim? Claim);
 
-public sealed record FeatureCommitTransition(FeatureInstallationState State, FeatureCompletion Completion);
+internal sealed record FeatureCommitTransition(FeatureInstallationState State, FeatureCompletion Completion);

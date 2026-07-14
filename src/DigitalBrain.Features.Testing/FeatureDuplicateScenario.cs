@@ -23,10 +23,8 @@ public sealed class GeneratedFeatureScenario(FeatureScenarioContext scenario)
 
     public async Task ExecuteTwiceAsync(CancellationToken cancellationToken = default)
     {
-        var feature = _feature ?? throw new InvalidOperationException(
-            "Configure the generated Feature scenario before executing it.");
-        var input = _input ?? throw new InvalidOperationException(
-            "Configure the generated Feature input before executing it.");
+        var feature = _feature ?? throw new InvalidOperationException("Configure the generated Feature scenario before executing it.");
+        var input = _input ?? throw new InvalidOperationException("Configure the generated Feature input before executing it.");
         FirstResult = await scenario.ExecuteAsync(feature, input, cancellationToken);
         SecondResult = await scenario.ExecuteAsync(feature, input, cancellationToken);
     }
@@ -36,10 +34,7 @@ public sealed class GeneratedFeatureScenario(FeatureScenarioContext scenario)
         private int _executionCount;
         public int ExecutionCount => Volatile.Read(ref _executionCount);
 
-        public Task HandleAsync(
-            FeatureInput input,
-            IFeatureContext context,
-            CancellationToken cancellationToken = default)
+        public Task HandleAsync(FeatureInput input, IFeatureContext context, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref _executionCount);
             return inner.HandleAsync(input, context, cancellationToken);

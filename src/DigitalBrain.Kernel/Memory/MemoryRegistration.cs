@@ -8,13 +8,9 @@ using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Kernel.Memory;
 
-public static class MemoryRegistration
+internal static class MemoryRegistration
 {
-    public static IServiceCollection AddDigitalBrainMemory(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        TableClient? tableClient = null,
-        bool allowInMemory = false)
+    public static IServiceCollection AddDigitalBrainMemory(this IServiceCollection services, IConfiguration configuration, TableClient? tableClient = null, bool allowInMemory = false)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -28,8 +24,7 @@ public static class MemoryRegistration
         if (tableClient is null)
         {
             if (!allowInMemory && !configuration.GetValue<bool>("DigitalBrain:TestMode"))
-                throw new InvalidOperationException(
-                    "ConnectionStrings:memoryfacts or an explicit memoryfacts TableClient is required.");
+                throw new InvalidOperationException("ConnectionStrings:memoryfacts or an explicit memoryfacts TableClient is required.");
             services.AddSingleton<IMemoryFactStore, InMemoryMemoryFactStore>();
         }
         else

@@ -1,4 +1,4 @@
-using DigitalBrain.Core.Models;
+using DigitalBrain.Kernel.Contracts.Models;
 
 namespace DigitalBrain.AppHost;
 
@@ -33,14 +33,10 @@ internal sealed class DigitalBrainOptions
     }
 
     public string ResolvedLlmProvider =>
-        !llmProviderOverridden && ModelRegistry.DefaultLlm is { } defaultLlm
-            ? defaultLlm.Model.Provider
-            : llmProvider;
+        !llmProviderOverridden && ModelRegistry.DefaultLlm is { } defaultLlm ? defaultLlm.Model.Provider : llmProvider;
 
     public string? ResolvedLlmModel =>
-        !llmModelOverridden && ModelRegistry.DefaultLlm is { } defaultLlm
-            ? defaultLlm.Model.Id
-            : llmModel;
+        !llmModelOverridden && ModelRegistry.DefaultLlm is { } defaultLlm ? defaultLlm.Model.Id : llmModel;
 
     public int KernelReplicas { get; set; } = 3;
 

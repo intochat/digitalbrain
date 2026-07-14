@@ -9,11 +9,10 @@
     <ProjectReference Include="..\..\hosts\DigitalBrain.FeatureBuilder\DigitalBrain.FeatureBuilder.csproj" />
     <ProjectReference Include="..\..\hosts\DigitalBrain.FeatureHost\DigitalBrain.FeatureHost.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google.Contracts\DigitalBrain.Integrations.Google.Contracts.csproj" />
-    <ProjectReference Include="..\..\integrations\DigitalBrain.Google\DigitalBrain.Google.csproj" />
-    <ProjectReference Include="..\..\integrations\DigitalBrain.Salesforce\DigitalBrain.Salesforce.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google\DigitalBrain.Integrations.Google.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce\DigitalBrain.Integrations.Salesforce.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Abstractions\DigitalBrain.Kernel.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

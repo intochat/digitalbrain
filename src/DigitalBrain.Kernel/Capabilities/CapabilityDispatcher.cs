@@ -2,18 +2,14 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Kernel.Capabilities;
 
-public sealed class CapabilityDispatcher : ICapabilityDispatcher
+internal sealed class CapabilityDispatcher : ICapabilityDispatcher
 {
     private readonly IReadOnlyDictionary<string, ICapabilityHandler> _handlers;
     private readonly ICapabilityGrantSource _grants;
     private readonly TimeProvider _timeProvider;
     private readonly CapabilityGrantValidator _validator;
 
-    public CapabilityDispatcher(
-        IEnumerable<ICapabilityHandler> handlers,
-        ICapabilityGrantSource grants,
-        TimeProvider timeProvider,
-        CapabilityGrantValidator? validator = null)
+    public CapabilityDispatcher(IEnumerable<ICapabilityHandler> handlers, ICapabilityGrantSource grants, TimeProvider timeProvider, CapabilityGrantValidator? validator = null)
     {
         ArgumentNullException.ThrowIfNull(handlers);
         _grants = grants ?? throw new ArgumentNullException(nameof(grants));
@@ -31,14 +27,11 @@ public sealed class CapabilityDispatcher : ICapabilityDispatcher
         _handlers = registered;
     }
 
-    public async Task<CapabilityDispatchResult> ExecuteAsync(
-        CapabilityRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<CapabilityDispatchResult> ExecuteAsync(CapabilityRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_handlers.TryGetValue(request.CapabilityId, out var handler) ||
-            handler.CapabilityVersion != request.CapabilityVersion)
+        if (!_handlers.TryGetValue(request.CapabilityId, out var handler) || handler.CapabilityVersion != request.CapabilityVersion)
             throw new CapabilityDeniedException();
 
         var grant = await _grants.ReadAsync(request, cancellationToken).ConfigureAwait(false);
@@ -48,9 +41,7 @@ public sealed class CapabilityDispatcher : ICapabilityDispatcher
         try
         {
             var execution = handler.ExecuteAsync(request, grant!, deadline.Token);
-            var payload = await execution
-                .WaitAsync(remaining, _timeProvider, cancellationToken)
-                .ConfigureAwait(false);
+            var payload = await execution.WaitAsync(remaining, _timeProvider, cancellationToken).ConfigureAwait(false);
             return new CapabilityDispatchResult(handler.OperationKind, payload);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested)

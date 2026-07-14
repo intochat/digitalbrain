@@ -1,15 +1,15 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <!-- 
-      Pinned versions captured 2026-06-21 after applying Elon's 5-step algorithm.
-      - Deleted blanket "always latest" and Version="*".
-      - Pins chosen from actual resolved versions in current working restore (Aspire 13.4.6 and stable Orleans 10.2.1).
-      - Update intentionally via Dependabot/renovate or manual PR after validation, not on every restore.
-    -->
+
+
+
+
+
+
   </PropertyGroup>
   <ItemGroup>
-    <!-- Aspire hosting -->
+
     <PackageVersion Include="Aspire.Hosting" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.4.6" />
@@ -17,10 +17,10 @@
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.4.6" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.4.6" />
-    <!-- Community Toolkit (Ollama) -->
+
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.4.0" />
-    <!-- Orleans -->
+
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
@@ -34,20 +34,20 @@
     <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.1" />
-    <!-- Extensions / hosting -->
+
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.7.0" />
-    <!-- LLM abstraction (IChatClient) -->
+
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
-    <!-- Official anthropics/anthropic-sdk-csharp — first-party AsIChatClient() (Task 7 real Anthropic provider) -->
+
     <PackageVersion Include="Anthropic" Version="12.35.1" />
-    <!-- Agent orchestration (ChatClientAgent) for Ino's generic chat path -->
-    <!-- Young, fast-moving upstream (Microsoft Agent Framework, evaluation-grade as of this writing): re-verify ChatClientAgent/AIAgent.RunAsync/ChatClientAgentRunOptions via Context7 before bumping; treat as potentially breaking, not a routine version bump. -->
+
+
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
-    <!-- For Ino integration AI config (IConfigurationSection binding) -->
+
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
@@ -56,28 +56,28 @@
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.9" />
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.1.0" />
-    <!-- DefaultAzureCredential for the kernel's managed-identity storage path (Task 18) — was resolving
-         transitively/undeclared before; pinned explicitly now. Version verified via nuget.org 2026-07-05 -->
+
+
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.28.0" />
-    <!-- MCP / LLM integration -->
+
     <PackageVersion Include="ModelContextProtocol" Version="1.4.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
-    <!-- DataProtection Azure Blob key persistence (cluster-wide shared key ring) -->
+
     <PackageVersion Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" Version="1.5.3" />
-    <!-- Marketplace economics -->
+
     <PackageVersion Include="OpenAI" Version="2.12.0" />
-    <!-- Context phase 2: vector store + document ingestion (latest verified) -->
-    <!-- Qdrant removed (P1.8 dead package, no code usage) -->
-    <!-- Observability -->
-    <!-- Azure Monitor OTEL exporter for App Insights (Milestone M6/Task 13) — version verified via nuget.org 2026-07-05 -->
+
+
+
+
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.5.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
-    <!-- Testing -->
+
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
@@ -86,11 +86,11 @@
     <PackageVersion Include="Reqnroll.xUnit" Version="3.3.4" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <!-- AppHost model tests and generated scenario-test support. -->
+
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
-    <!-- TUI (Spectre removed P1.8, dead no code usage) -->
-    <!-- gRPC gateway co-hosted in the silo -->
+
+
     <PackageVersion Include="Grpc.AspNetCore" Version="2.71.0" />
     <PackageVersion Include="Grpc.AspNetCore.Web" Version="2.71.0" />
     <PackageVersion Include="Grpc.Net.Client" Version="2.71.0" />
@@ -98,12 +98,12 @@
     <PackageVersion Include="Grpc.Net.ClientFactory" Version="2.71.0" />
     <PackageVersion Include="Grpc.Tools" Version="2.71.0" />
     <PackageVersion Include="Google.Protobuf" Version="3.31.0" />
-    <!-- Google Workspace ino (Gmail/Drive/Calendar) — versions verified via nuget.org 2026-07-01 -->
+
     <PackageVersion Include="Google.Apis.Gmail.v1" Version="1.74.0.4162" />
     <PackageVersion Include="Google.Apis.Drive.v3" Version="1.75.0.4192" />
     <PackageVersion Include="Google.Apis.Calendar.v3" Version="1.75.0.4182" />
     <PackageVersion Include="Google.Apis.Auth" Version="1.75.0" />
-    <!-- Salesforce CRM ino — Force.com Toolkit REST client; version verified via nuget.org 2026-07-03 -->
+
     <PackageVersion Include="DeveloperForce.Force" Version="2.1.0" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>

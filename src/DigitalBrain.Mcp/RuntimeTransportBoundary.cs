@@ -2,18 +2,13 @@ using Microsoft.AspNetCore.Http.Features;
 
 namespace DigitalBrain.Mcp;
 
-public sealed record RuntimeTransportBoundaryOptions(
-    int MaximumBodyBytes,
-    int MaximumConcurrentRequests,
-    int RequestsPerMinute,
-    TimeSpan RequestTimeout)
+public sealed record RuntimeTransportBoundaryOptions(int MaximumBodyBytes, int MaximumConcurrentRequests, int RequestsPerMinute, TimeSpan RequestTimeout)
 {
     public static RuntimeTransportBoundaryOptions FromConfiguration(IConfiguration configuration) => new(
         ReadPositive(configuration, "DigitalBrain:Runtime:Transport:MaxBodyBytes", 2 * 1024 * 1024),
         ReadPositive(configuration, "DigitalBrain:Runtime:Transport:MaxConcurrentRequests", 32),
         ReadPositive(configuration, "DigitalBrain:Runtime:Transport:RequestsPerMinute", 600),
-        TimeSpan.TryParse(configuration["DigitalBrain:Runtime:Transport:RequestTimeout"], out var timeout) &&
-        timeout > TimeSpan.Zero && timeout <= TimeSpan.FromMinutes(5)
+        TimeSpan.TryParse(configuration["DigitalBrain:Runtime:Transport:RequestTimeout"], out var timeout) && timeout > TimeSpan.Zero && timeout <= TimeSpan.FromMinutes(5)
             ? timeout
             : TimeSpan.FromMinutes(2));
 
@@ -21,15 +16,9 @@ public sealed record RuntimeTransportBoundaryOptions(
         int.TryParse(configuration[key], out var value) && value > 0 ? value : fallback;
 }
 
-public sealed class RuntimeTransportBoundary(
-    RequestDelegate next,
-    RuntimeTransportBoundaryOptions options,
-    TimeProvider timeProvider,
-    ILogger<RuntimeTransportBoundary> logger)
+public sealed class RuntimeTransportBoundary(RequestDelegate next, RuntimeTransportBoundaryOptions options, TimeProvider timeProvider, ILogger<RuntimeTransportBoundary> logger)
 {
-    private readonly SemaphoreSlim _concurrency = new(
-        options.MaximumConcurrentRequests,
-        options.MaximumConcurrentRequests);
+    private readonly SemaphoreSlim _concurrency = new(options.MaximumConcurrentRequests, options.MaximumConcurrentRequests);
     private readonly object _rateGate = new();
     private DateTimeOffset _windowStartedAt = timeProvider.GetUtcNow();
     private int _windowCount;
@@ -59,9 +48,7 @@ public sealed class RuntimeTransportBoundary(
             return;
         }
 
-        using var timeout = IsLongLivedFeed(context.Request.Path)
-            ? null
-            : CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+        using var timeout = IsLongLivedFeed(context.Request.Path) ? null : CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
         if (timeout is not null)
         {
             timeout.CancelAfter(options.RequestTimeout);
@@ -81,9 +68,7 @@ public sealed class RuntimeTransportBoundary(
         }
         catch (Exception exception)
         {
-            logger.LogError(
-                "Runtime transport request failed with {ExceptionType}.",
-                exception.GetType().Name);
+            logger.LogError("Runtime transport request failed with {ExceptionType}.", exception.GetType().Name);
             if (!context.Response.HasStarted)
             {
                 context.Response.Clear();
@@ -115,8 +100,7 @@ public sealed class RuntimeTransportBoundary(
     }
 
     private static bool IsRuntimePath(PathString path) =>
-        path.StartsWithSegments("/mcp") ||
-        path.StartsWithSegments("/digitalbrain.v2.ui.DigitalBrainV2Ui") ||
+        path.StartsWithSegments("/mcp") || path.StartsWithSegments("/digitalbrain.v2.ui.DigitalBrainV2Ui") ||
         path.StartsWithSegments("/oauth/start");
 
     private static bool IsLongLivedFeed(PathString path) =>

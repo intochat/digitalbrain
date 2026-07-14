@@ -6,9 +6,7 @@ using SdkInput = DigitalBrain.Features.Sdk.FeatureInput;
 
 namespace DigitalBrain.FeatureHost;
 
-public sealed record FeatureWorkItem(
-    FeatureInstallationId InstallationId,
-    IFeatureInstallationGrain Installation)
+internal sealed record FeatureWorkItem(FeatureInstallationId InstallationId, IFeatureInstallationGrain Installation)
 {
     public BrainOwnerId OwnerId { get; init; } = new("test-owner");
     public ActorId ActorId { get; init; } = new("test-actor");
@@ -17,41 +15,31 @@ public sealed record FeatureWorkItem(
         new Dictionary<string, ProviderConnectionId>(StringComparer.Ordinal);
 }
 
-public interface IFeatureWorkSource
+internal interface IFeatureWorkSource
 {
     ValueTask<FeatureWorkItem> TakeAsync(CancellationToken cancellationToken = default);
 }
 
-public interface IFeatureRunContextFactory
+internal interface IFeatureRunContextFactory
 {
-    ValueTask<IFeatureRunContext> CreateAsync(
-        FeatureWorkItem work,
-        FeatureRunClaim claim,
-        CancellationToken cancellationToken = default);
+    ValueTask<IFeatureRunContext> CreateAsync(FeatureWorkItem work, FeatureRunClaim claim, CancellationToken cancellationToken = default);
 }
 
-public interface IFeatureRunContext : IAsyncDisposable
+internal interface IFeatureRunContext : IAsyncDisposable
 {
     IFeatureContext Context { get; }
     IDisposable Activate();
-    ValueTask<FeatureRunCommit> SealAsync(
-        FeatureLeaseFence fence,
-        CancellationToken cancellationToken = default);
+    ValueTask<FeatureRunCommit> SealAsync(FeatureLeaseFence fence, CancellationToken cancellationToken = default);
 }
 
-public sealed class FeatureExecutionOptions
+internal sealed class FeatureExecutionOptions
 {
     public static readonly TimeSpan MaximumHandlerDeadline = TimeSpan.FromSeconds(60);
 
-    public FeatureExecutionOptions(
-        string hostId,
-        TimeSpan handlerDeadline,
-        TimeSpan persistenceDeadline,
-        TimeSpan retryDelay)
+    public FeatureExecutionOptions(string hostId, TimeSpan handlerDeadline, TimeSpan persistenceDeadline, TimeSpan retryDelay)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostId);
-        if (hostId.Length > 256 || hostId.Any(char.IsControl) ||
-            !string.Equals(hostId, hostId.Trim(), StringComparison.Ordinal))
+        if (hostId.Length > 256 || hostId.Any(char.IsControl) || !string.Equals(hostId, hostId.Trim(), StringComparison.Ordinal))
             throw new ArgumentException("A bounded canonical host identifier is required.", nameof(hostId));
         if (handlerDeadline <= TimeSpan.Zero || handlerDeadline > MaximumHandlerDeadline)
             throw new ArgumentOutOfRangeException(nameof(handlerDeadline));
@@ -71,7 +59,7 @@ public sealed class FeatureExecutionOptions
     public TimeSpan RetryDelay { get; }
 }
 
-public sealed class FeatureExecutionWorker : BackgroundService
+internal sealed class FeatureExecutionWorker : BackgroundService
 {
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromSeconds(60);
     private readonly FeatureReleaseManager _releases;
@@ -144,10 +132,7 @@ public sealed class FeatureExecutionWorker : BackgroundService
         }
     }
 
-    private async Task ExecuteClaimAsync(
-        FeatureWorkItem work,
-        FeatureRunClaim claim,
-        CancellationToken stoppingToken)
+    private async Task ExecuteClaimAsync(FeatureWorkItem work, FeatureRunClaim claim, CancellationToken stoppingToken)
     {
         FeatureReleaseLease? lease = null;
         IFeatureRunContext? runContext = null;
@@ -157,9 +142,7 @@ public sealed class FeatureExecutionWorker : BackgroundService
         {
             var reserve = _options.PersistenceDeadline + _options.PersistenceDeadline;
             var available = claim.LeaseExpiresAt - _timeProvider.GetUtcNow() - reserve;
-            var executionBudget = available < _options.HandlerDeadline
-                ? available
-                : _options.HandlerDeadline;
+            var executionBudget = available < _options.HandlerDeadline ? available : _options.HandlerDeadline;
             if (executionBudget <= TimeSpan.Zero)
             {
                 await FailAsync(work, claim, "feature lease budget insufficient", stoppingToken);
@@ -232,10 +215,7 @@ public sealed class FeatureExecutionWorker : BackgroundService
                 var sealBudget = executionEnds - _timeProvider.GetUtcNow();
                 if (sealBudget <= TimeSpan.Zero)
                     throw new TimeoutException();
-                commit = await runContext
-                    .SealAsync(claim.Fence, deadline.Token)
-                    .AsTask()
-                    .WaitAsync(sealBudget, stoppingToken);
+                commit = await runContext.SealAsync(claim.Fence, deadline.Token).AsTask().WaitAsync(sealBudget, stoppingToken);
             }
             catch (TimeoutException)
             {
@@ -250,9 +230,7 @@ public sealed class FeatureExecutionWorker : BackgroundService
             if (commitBudget > _options.PersistenceDeadline)
                 commitBudget = _options.PersistenceDeadline;
             commitStarted = true;
-            await work.Installation
-                .CommitAsync(commit)
-                .WaitAsync(commitBudget, stoppingToken);
+            await work.Installation.CommitAsync(commit).WaitAsync(commitBudget, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -281,8 +259,7 @@ public sealed class FeatureExecutionWorker : BackgroundService
             }
             else
             {
-                var contextDisposed = runContext is null ||
-                    await TryDisposeAsync(runContext, _options.PersistenceDeadline);
+                var contextDisposed = runContext is null || await TryDisposeAsync(runContext, _options.PersistenceDeadline);
                 if (!contextDisposed)
                 {
                     lease?.Abandon();
@@ -296,19 +273,11 @@ public sealed class FeatureExecutionWorker : BackgroundService
         }
     }
 
-    private async Task FailAsync(
-        FeatureWorkItem work,
-        FeatureRunClaim claim,
-        string safeFailure,
-        CancellationToken stoppingToken)
+    private async Task FailAsync(FeatureWorkItem work, FeatureRunClaim claim, string safeFailure, CancellationToken stoppingToken)
     {
         try
         {
-            await work.Installation.FailAsync(
-                    claim.Fence,
-                    _timeProvider.GetUtcNow() + _options.RetryDelay,
-                    safeFailure)
-                .WaitAsync(_options.PersistenceDeadline, stoppingToken);
+            await work.Installation.FailAsync(claim.Fence, _timeProvider.GetUtcNow() + _options.RetryDelay, safeFailure).WaitAsync(_options.PersistenceDeadline, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -327,11 +296,7 @@ public sealed class FeatureExecutionWorker : BackgroundService
         var facts = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var property in document.RootElement.EnumerateObject())
         {
-            if (!facts.TryAdd(
-                    property.Name,
-                    property.Value.ValueKind == JsonValueKind.String
-                        ? property.Value.GetString()!
-                        : property.Value.GetRawText()))
+            if (!facts.TryAdd(property.Name, property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString()! : property.Value.GetRawText()))
                 throw new ArgumentException("Feature input facts must be unique.", nameof(input));
         }
 

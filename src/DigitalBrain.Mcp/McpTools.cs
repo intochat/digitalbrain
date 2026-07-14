@@ -1,17 +1,14 @@
 using System.ComponentModel;
 using System.Text.Json;
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Contracts;
 using Microsoft.AspNetCore.Http;
 using ModelContextProtocol.Server;
-using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
+using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 
 namespace DigitalBrain.Mcp;
 
-public sealed class McpAuthority(
-    IHttpContextAccessor http,
-    RuntimeRequestAuthenticator authentication,
-    IConfiguration configuration)
+public sealed class McpAuthority(IHttpContextAccessor http, RuntimeRequestAuthenticator authentication, IConfiguration configuration)
 {
     public async Task<RuntimeRequestContext> RequireContextAsync(CancellationToken cancellationToken = default)
     {
@@ -31,31 +28,15 @@ public sealed class McpAuthority(
 }
 
 [McpServerToolType]
-public sealed class McpConversationTools(
-    McpAuthority authority,
-    McpInoCommandHandler conversation,
-    FeatureBuildEndpoint builds,
-    FeatureLifecycleRail features)
+public sealed class McpConversationTools(McpAuthority authority, McpInoCommandHandler conversation, FeatureBuildEndpoint builds, FeatureLifecycleRail features)
 {
     [McpServerTool(Name = "ino_interact"), Description("Durably accept an authenticated, idempotent INO interaction for the current workspace.")]
-    public async Task<object> InoInteractAsync(
-        string commandId,
-        string prompt,
-        CancellationToken cancellationToken = default)
+    public async Task<object> InoInteractAsync(string commandId, string prompt, CancellationToken cancellationToken = default)
     {
         var context = await authority.RequireContextAsync(cancellationToken).ConfigureAwait(false);
         McpAuthority.DemandGrant(context, "brain.interact");
-        var commandContext = context with
-        {
-            IdempotencyKey = commandId
-        };
-        var receipt = await conversation.AcceptAsync(
-            new CommandEnvelope(
-                McpInoCommandHandler.CommandType,
-                2,
-                commandId,
-                commandContext,
-                JsonSerializer.SerializeToElement(new { prompt }))).ConfigureAwait(false);
+        var commandContext = context with { IdempotencyKey = commandId };
+        var receipt = await conversation.AcceptAsync(new CommandEnvelope(McpInoCommandHandler.CommandType, 2, commandId, commandContext, JsonSerializer.SerializeToElement(new { prompt }))).ConfigureAwait(false);
         return new
         {
             commandId,
@@ -74,11 +55,7 @@ public sealed class McpConversationTools(
         CancellationToken cancellationToken = default)
     {
         var context = await FeatureContextAsync(cancellationToken);
-        var artifact = await builds.BuildAsync(new FeatureBuildSubmission(
-            implementationProjectPath,
-            scenarioProjectPath,
-            files,
-            sourceKind), cancellationToken);
+        var artifact = await builds.BuildAsync(new FeatureBuildSubmission(implementationProjectPath, scenarioProjectPath, files, sourceKind), cancellationToken);
         return new
         {
             ownerId = context.OwnerId.Value,
@@ -104,89 +81,42 @@ public sealed class McpConversationTools(
             context,
             new FeatureReleaseProposal(
                 new FeatureInstallationId(installationId),
-                new FeatureReleaseMetadata(
-                    new ReleaseDigest(releaseDigest),
-                    sourceReference,
-                    sourceKind,
-                    requestedCapabilities,
-                    dependencies),
+                new FeatureReleaseMetadata(new ReleaseDigest(releaseDigest), sourceReference, sourceKind, requestedCapabilities, dependencies),
                 grants),
             expectedRevision,
             cancellationToken);
     }
 
     [McpServerTool(Name = "feature_decide"), Description("Approve or reject one exact Feature digest and grant set.")]
-    public async Task<object> DecideFeatureAsync(
-        string approvalId,
-        string releaseDigest,
-        bool approved,
-        string decisionId,
-        long expectedRevision,
-        CancellationToken cancellationToken = default)
+    public async Task<object> DecideFeatureAsync(string approvalId, string releaseDigest, bool approved, string decisionId, long expectedRevision, CancellationToken cancellationToken = default)
     {
         var context = await FeatureContextAsync(cancellationToken);
-        return await features.DecideAsync(
-            context,
-            new FeatureApprovalDecision(
-                approvalId,
-                new ReleaseDigest(releaseDigest),
-                approved,
-                decisionId),
-            expectedRevision,
-            cancellationToken);
+        return await features.DecideAsync(context, new FeatureApprovalDecision(approvalId, new ReleaseDigest(releaseDigest), approved, decisionId), expectedRevision, cancellationToken);
     }
 
     [McpServerTool(Name = "feature_grant"), Description("Stage the exact grants already bound by an approved Feature digest.")]
-    public async Task<object> GrantFeatureAsync(
-        string installationId,
-        string releaseDigest,
-        FeatureGrantSpec[] grants,
-        long expectedRevision,
-        CancellationToken cancellationToken = default)
+    public async Task<object> GrantFeatureAsync(string installationId, string releaseDigest, FeatureGrantSpec[] grants, long expectedRevision, CancellationToken cancellationToken = default)
     {
         var context = await FeatureContextAsync(cancellationToken);
-        return await features.GrantAsync(
-            context,
-            new FeatureInstallationId(installationId),
-            new ReleaseDigest(releaseDigest),
-            grants,
-            expectedRevision,
-            cancellationToken);
+        return await features.GrantAsync(context, new FeatureInstallationId(installationId), new ReleaseDigest(releaseDigest), grants, expectedRevision, cancellationToken);
     }
 
     [McpServerTool(Name = "feature_install"), Description("Install or update an approved Feature release and publish it for hot loading.")]
-    public async Task<object> InstallFeatureAsync(
-        string installationId,
-        string releaseDigest,
-        string[] subscriptions,
-        long expectedRevision,
-        CancellationToken cancellationToken = default)
+    public async Task<object> InstallFeatureAsync(string installationId, string releaseDigest, string[] subscriptions, long expectedRevision, CancellationToken cancellationToken = default)
     {
         var context = await FeatureContextAsync(cancellationToken);
         return await features.InstallAsync(
             context,
-            new FeatureInstallationRegistration(
-                new FeatureInstallationId(installationId),
-                new ReleaseDigest(releaseDigest),
-                subscriptions),
+            new FeatureInstallationRegistration(new FeatureInstallationId(installationId), new ReleaseDigest(releaseDigest), subscriptions),
             expectedRevision,
             cancellationToken);
     }
 
     [McpServerTool(Name = "feature_pause"), Description("Pause one Feature installation so the next claim and capability operation are denied.")]
-    public async Task<object> PauseFeatureAsync(
-        string installationId,
-        string reason,
-        long expectedRevision,
-        CancellationToken cancellationToken = default)
+    public async Task<object> PauseFeatureAsync(string installationId, string reason, long expectedRevision, CancellationToken cancellationToken = default)
     {
         var context = await FeatureContextAsync(cancellationToken);
-        await features.PauseAsync(
-            context,
-            new FeatureInstallationId(installationId),
-            reason,
-            expectedRevision,
-            cancellationToken);
+        await features.PauseAsync(context, new FeatureInstallationId(installationId), reason, expectedRevision, cancellationToken);
         return new { installationId, paused = true };
     }
 
@@ -202,43 +132,25 @@ public sealed class McpConversationTools(
         var context = await FeatureContextAsync(cancellationToken);
         await features.RevokeAsync(
             context,
-            new FeatureGrantRevocation(
-                new FeatureInstallationId(installationId),
-                new ReleaseDigest(releaseDigest),
-                capabilityId,
-                capabilityVersion),
+            new FeatureGrantRevocation(new FeatureInstallationId(installationId), new ReleaseDigest(releaseDigest), capabilityId, capabilityVersion),
             expectedRevision,
             cancellationToken);
         return new { installationId, releaseDigest, capabilityId, capabilityVersion, revoked = true };
     }
 
     [McpServerTool(Name = "feature_resume"), Description("Resume one paused Feature installation.")]
-    public async Task<object> ResumeFeatureAsync(
-        string installationId,
-        long expectedRevision,
-        CancellationToken cancellationToken = default)
+    public async Task<object> ResumeFeatureAsync(string installationId, long expectedRevision, CancellationToken cancellationToken = default)
     {
         var context = await FeatureContextAsync(cancellationToken);
-        await features.ResumeAsync(
-            context,
-            new FeatureInstallationId(installationId),
-            expectedRevision,
-            cancellationToken);
+        await features.ResumeAsync(context, new FeatureInstallationId(installationId), expectedRevision, cancellationToken);
         return new { installationId, paused = false };
     }
 
     [McpServerTool(Name = "feature_rollback"), Description("Roll one Feature installation back to its retained previous release.")]
-    public async Task<object> RollbackFeatureAsync(
-        string installationId,
-        long expectedRevision,
-        CancellationToken cancellationToken = default)
+    public async Task<object> RollbackFeatureAsync(string installationId, long expectedRevision, CancellationToken cancellationToken = default)
     {
         var context = await FeatureContextAsync(cancellationToken);
-        return await features.RollbackAsync(
-            context,
-            new FeatureInstallationId(installationId),
-            expectedRevision,
-            cancellationToken);
+        return await features.RollbackAsync(context, new FeatureInstallationId(installationId), expectedRevision, cancellationToken);
     }
 
     [McpServerTool(Name = "feature_inspect"), Description("Inspect Feature approvals, grants, installations, runtime state, and parked inputs.")]

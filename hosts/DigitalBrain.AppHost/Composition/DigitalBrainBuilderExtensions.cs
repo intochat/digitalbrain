@@ -2,7 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
-using DigitalBrain.Core.Models;
+using DigitalBrain.Kernel.Contracts.Models;
 
 namespace DigitalBrain.AppHost;
 
@@ -14,10 +14,7 @@ internal static class DigitalBrainBuilderExtensions
     private const string SurfaceFeedStateProvider = "runtime-surface-feeds";
     private const string SessionStateProvider = "runtime-sessions";
 
-    public static DigitalBrainContext AddDigitalBrain(
-        this IDistributedApplicationBuilder builder,
-        [ResourceName] string name = "digitalbrain",
-        Action<DigitalBrainOptions>? configure = null)
+    public static DigitalBrainContext AddDigitalBrain(this IDistributedApplicationBuilder builder, [ResourceName] string name = "digitalbrain", Action<DigitalBrainOptions>? configure = null)
     {
         var options = new DigitalBrainOptions();
         configure?.Invoke(options);
@@ -27,9 +24,7 @@ internal static class DigitalBrainBuilderExtensions
         }
 
         var llmProvider = options.ResolvedLlmProvider;
-        var llmModel = options.ResolvedLlmModel ?? (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase)
-            ? "gpt-4o-mini"
-            : "llama3.1:8b");
+        var llmModel = options.ResolvedLlmModel ?? (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase) ? "gpt-4o-mini" : "llama3.1:8b");
 
         IResourceBuilder<ParameterResource>? azureOpenAIEndpoint = null;
         IResourceBuilder<ParameterResource>? azureOpenAIKey = null;
@@ -60,23 +55,14 @@ internal static class DigitalBrainBuilderExtensions
         }
 
         var isRunMode = builder.ExecutionContext.IsRunMode;
-        var runtimeStorageNamespace = ResolveRuntimeStorageNamespace(
-            builder.Configuration["DigitalBrain:Runtime:StorageNamespace"]);
+        var runtimeStorageNamespace = ResolveRuntimeStorageNamespace(builder.Configuration["DigitalBrain:Runtime:StorageNamespace"]);
 
-        // No publish-mode else branch needed here (unlike Ollama below): AddAzureStorage already
-        // produces a valid real-Azure resource on its own — RunAsEmulator() is purely a run-mode add-on.
-        // The legacy local emulator used the generic "storage" resource name and therefore
-        // retained an anonymous-volume container. A distinct run-mode identity forces a safe
-        // one-time replacement while leaving that rollback container untouched. Publish keeps
-        // the stable Azure resource identity.
         var storage = builder.AddAzureStorage(isRunMode ? "runtime-storage" : "storage");
         if (isRunMode)
         {
             storage.RunAsEmulator(azurite =>
             {
-                azurite
-                    .WithDataVolume($"{name}-{runtimeStorageNamespace}-azurite-data")
-                    .WithLifetime(ContainerLifetime.Persistent);
+                azurite.WithDataVolume($"{name}-{runtimeStorageNamespace}-azurite-data").WithLifetime(ContainerLifetime.Persistent);
             });
         }
         var clusteringTable = storage.AddTables("clustering");
@@ -87,24 +73,19 @@ internal static class DigitalBrainBuilderExtensions
         var surfaceFeedStateBlobs = storage.AddBlobs("surfacefeedstate");
         var sessionStateBlobs = storage.AddBlobs("sessionstate");
 
-        var orleans = builder.AddOrleans("kernel")
-            .WithClustering(clusteringTable)
-            .WithGrainStorage("Default", grainBlobs)
-            .WithGrainStorage(ConversationStateProvider, conversationStateBlobs)
+        var orleans = builder.AddOrleans("kernel").WithClustering(clusteringTable).WithGrainStorage("Default", grainBlobs).WithGrainStorage(ConversationStateProvider, conversationStateBlobs)
             .WithGrainStorage(SurfaceFeedStateProvider, surfaceFeedStateBlobs)
             .WithGrainStorage(SessionStateProvider, sessionStateBlobs)
             .WithReminders(clusteringTable);
 
         if (isRunMode)
         {
-            // Persistent Azurite keeps Orleans membership rows; use a fresh local cluster id so
-            // stale active silos from killed/restarted replicas do not block the next startup.
+
             orleans.WithClusterId(ResolveLocalClusterId());
         }
 
         var defaultLlm = options.ModelRegistry.DefaultLlm?.Model;
-        var defaultOllamaLlm = defaultLlm is not null &&
-            string.Equals(defaultLlm.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase)
+        var defaultOllamaLlm = defaultLlm is not null && string.Equals(defaultLlm.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase)
                 ? defaultLlm.Id
                 : "llama3.1:8b";
         var defaultEmbedding = options.ModelRegistry.DefaultEmbedding?.Model;
@@ -118,18 +99,10 @@ internal static class DigitalBrainBuilderExtensions
         EndpointReference? embeddingOllamaEndpoint = null;
         if (isRunMode)
         {
-            var ollama = builder.AddOllama("ollama")
-                .WithGPUSupport()
-                .WithDataVolume()
-                .WithLifetime(ContainerLifetime.Persistent)
-                .WithOpenWebUI(webui => webui.WithLifetime(ContainerLifetime.Persistent).WithDataVolume());
+            var ollama = builder.AddOllama("ollama").WithGPUSupport().WithDataVolume().WithLifetime(ContainerLifetime.Persistent).WithOpenWebUI(webui => webui.WithLifetime(ContainerLifetime.Persistent).WithDataVolume());
             llm = ollama.AddModel("llm", defaultOllamaLlm);
             embeddingModel = ollama.AddModel("embed", defaultOllamaEmbedding);
 
-            // Pre-pull every other distinct Ollama LLM tag in the registry (e.g. Llama31_8B, registered
-            // .AsReasoning() for Ino's tool-calling path) into this same container. Without this, a model
-            // the registry points Ino at would never actually exist in the running container, and the first
-            // real chat call to it would fail with a "model not found" error from Ollama.
             var pulledOllamaModelIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { defaultOllamaLlm };
             foreach (var entry in options.ModelRegistry.Registrations)
             {
@@ -143,8 +116,7 @@ internal static class DigitalBrainBuilderExtensions
             }
 
             ollamaEndpoint = ollama.GetEndpoint("http");
-            // Same container as the LLM resource: Ollama serves every pulled model from one endpoint,
-            // selected by model name in the request, not by a per-model endpoint.
+
             embeddingOllamaEndpoint = ollamaEndpoint;
         }
         else
@@ -182,35 +154,19 @@ internal static class DigitalBrainBuilderExtensions
         };
     }
 
-    /// <summary>
-    /// Wires a kernel project with the core kernel features out of the box:
-    /// dynamic UI surfaces, clustering, LLM, and replica count for HA.
-    /// </summary>
     public static IResourceBuilder<ProjectResource> ConfigureServer(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
-        kernel = kernel
-            .WithReference(ctx.Orleans)
-            .WithReference(ctx.ClusteringTable)
-            .WithReference(ctx.MemoryFacts)
-            .WithReference(ctx.FeatureArtifacts)
+        kernel = kernel.WithReference(ctx.Orleans).WithReference(ctx.ClusteringTable).WithReference(ctx.MemoryFacts).WithReference(ctx.FeatureArtifacts)
             .WithReference(ctx.GrainBlobs)
             .WithReference(ctx.ConversationStateBlobs)
             .WithReference(ctx.SurfaceFeedStateBlobs)
             .WithReference(ctx.SessionStateBlobs)
             .WithReference(ctx.Llm)
             .WithEndpoint(name: "grpc", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
-            .WithEndpoint(
-                name: "web",
-                scheme: "http",
-                port: KernelWebPort(ctx.ApplicationBuilder),
-                env: "DIGITALBRAIN_WEB_PORT",
-                isProxied: true)
+            .WithEndpoint(name: "web", scheme: "http", port: KernelWebPort(ctx.ApplicationBuilder), env: "DIGITALBRAIN_WEB_PORT", isProxied: true)
             .WithExternalHttpEndpoints()
             .WithReplicas(ctx.KernelReplicas);
 
-        // Ensure storage emulator (Azurite) resources are healthy before launching kernel process.
-        // This sequences Azurite ahead of silo initialization and its health probe.
-        // LLM waits already present below; storage waits complement the WithReference calls.
         kernel.WaitFor(ctx.ClusteringTable);
         kernel.WaitFor(ctx.MemoryFacts);
         kernel.WaitFor(ctx.FeatureArtifacts);
@@ -270,10 +226,8 @@ internal static class DigitalBrainBuilderExtensions
     private static ReferenceExpression HttpUrl(EndpointReference endpoint, string pathSuffix = "") =>
         ReferenceExpression.Create($"http://{endpoint.Property(EndpointProperty.Host)}:{endpoint.Property(EndpointProperty.Port)}{pathSuffix}");
 
-    // Aspire resource names must be lowercase alphanumeric plus hyphens; Ollama tags routinely carry ':' and
-    // '.' (e.g. "llama3.1:8b"), so normalize the same way DigitalBrainModelDescriptor.ServiceKey does.
     private static string OllamaModelResourceName(string modelId) =>
-        modelId.Replace(':', '-').Replace('.', '-').ToLowerInvariant();
+            modelId.Replace(':', '-').Replace('.', '-').ToLowerInvariant();
 
     private static void WithModelRegistry(this IResourceBuilder<ProjectResource> kernel, DigitalBrainContext ctx)
     {
@@ -308,14 +262,9 @@ internal static class DigitalBrainBuilderExtensions
         }
     }
 
-    private static void WithOptionalEnvironment(
-        this IResourceBuilder<ProjectResource> resource,
-        string configurationKey,
-        string environmentKey,
-        string targetKey)
+    private static void WithOptionalEnvironment(this IResourceBuilder<ProjectResource> resource, string configurationKey, string environmentKey, string targetKey)
     {
-        var value = resource.ApplicationBuilder.Configuration[configurationKey]
-            ?? Environment.GetEnvironmentVariable(environmentKey);
+        var value = resource.ApplicationBuilder.Configuration[configurationKey] ?? Environment.GetEnvironmentVariable(environmentKey);
         if (!string.IsNullOrWhiteSpace(value))
         {
             resource.WithEnvironment(targetKey, value);
@@ -324,19 +273,14 @@ internal static class DigitalBrainBuilderExtensions
 
     public static int KernelWebPort(IDistributedApplicationBuilder builder)
     {
-        var configured = builder.Configuration["DigitalBrain:Kernel:WebPort"]
-            ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_KERNEL_WEB_PORT");
+        var configured = builder.Configuration["DigitalBrain:Kernel:WebPort"] ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_KERNEL_WEB_PORT");
 
-        return int.TryParse(configured, out var port) && port > 0
-            ? port
-            : DefaultKernelWebPort;
+        return int.TryParse(configured, out var port) && port > 0 ? port : DefaultKernelWebPort;
     }
 
     internal static string ResolveRuntimeStorageNamespace(string? configured)
     {
-        var value = string.IsNullOrWhiteSpace(configured)
-            ? DefaultRuntimeStorageNamespace
-            : configured.Trim().ToLowerInvariant();
+        var value = string.IsNullOrWhiteSpace(configured) ? DefaultRuntimeStorageNamespace : configured.Trim().ToLowerInvariant();
 
         if (value.Length > 48 || !char.IsAsciiLetterOrDigit(value[0]) ||
             value.Any(static character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_' and not '.'))
@@ -356,8 +300,7 @@ internal static class DigitalBrainBuilderExtensions
 
         return getEnvironmentVariable("DIGITALBRAIN_CLUSTER_ID")
             ?? getEnvironmentVariable("DigitalBrain__ClusterId")
-            ?? getEnvironmentVariable("Orleans__ClusterId")
-            ?? $"digitalbrain-dev-{Guid.NewGuid():N}";
+            ?? getEnvironmentVariable("Orleans__ClusterId") ?? $"digitalbrain-dev-{Guid.NewGuid():N}";
     }
 
 }

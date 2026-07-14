@@ -18,10 +18,7 @@ public sealed class EmailSummarizerFeature : IFeature
         _gmail = gmail;
     }
 
-    public async Task HandleAsync(
-        FeatureInput input,
-        IFeatureContext context,
-        CancellationToken cancellationToken = default)
+    public async Task HandleAsync(FeatureInput input, IFeatureContext context, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(context);
@@ -45,13 +42,8 @@ public sealed class EmailSummarizerFeature : IFeature
 
         var body = TruncateUtf8(message.PlainTextBody, remainingBytes);
         var prompt = prefix + body;
-        var response = await context.Models.CompleteAsync(
-            new ModelRequest(WorkflowId, prompt, ModelOperationKey),
-            cancellationToken);
-        context.Intents.AddTextSurface(new TextSurfaceIntent(
-            SurfaceOperationKey,
-            "Email summary",
-            response.Text));
+        var response = await context.Models.CompleteAsync(new ModelRequest(WorkflowId, prompt, ModelOperationKey), cancellationToken);
+        context.Intents.AddTextSurface(new TextSurfaceIntent(SurfaceOperationKey, "Email summary", response.Text));
     }
 
     private static string TruncateUtf8(string value, int maximumBytes)

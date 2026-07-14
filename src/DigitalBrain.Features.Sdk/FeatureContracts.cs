@@ -6,19 +6,12 @@ namespace DigitalBrain.Features.Sdk;
 
 public interface IFeature
 {
-    Task HandleAsync(
-        FeatureInput input,
-        IFeatureContext context,
-        CancellationToken cancellationToken = default);
+    Task HandleAsync(FeatureInput input, IFeatureContext context, CancellationToken cancellationToken = default);
 }
 
 public sealed class FeatureInput
 {
-    public FeatureInput(
-        string inputId,
-        string kind,
-        DateTimeOffset occurredAt,
-        IReadOnlyDictionary<string, string> facts)
+    public FeatureInput(string inputId, string kind, DateTimeOffset occurredAt, IReadOnlyDictionary<string, string> facts)
     {
         InputId = FeatureContractGuard.Required(inputId, nameof(inputId), 256);
         Kind = FeatureContractGuard.Required(kind, nameof(kind), 128);
@@ -67,9 +60,7 @@ internal static class FeatureContractGuard
         return value;
     }
 
-    internal static IReadOnlyDictionary<string, string> Facts(
-        IReadOnlyDictionary<string, string> facts,
-        string parameterName)
+    internal static IReadOnlyDictionary<string, string> Facts(IReadOnlyDictionary<string, string> facts, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(facts, parameterName);
         if (facts.Count > 32)
@@ -80,26 +71,18 @@ internal static class FeatureContractGuard
         var copy = new Dictionary<string, string>(facts.Count, StringComparer.Ordinal);
         foreach (var fact in facts)
         {
-            copy.Add(
-                Required(fact.Key, parameterName, 128),
-                Utf8(fact.Value, parameterName, 4_096));
+            copy.Add(Required(fact.Key, parameterName, 128), Utf8(fact.Value, parameterName, 4_096));
         }
 
         return new ReadOnlyDictionary<string, string>(copy);
     }
 
-    internal static IReadOnlyList<string> Strings(
-        IReadOnlyList<string> values,
-        string parameterName,
-        int maximumCount,
-        int maximumLength)
+    internal static IReadOnlyList<string> Strings(IReadOnlyList<string> values, string parameterName, int maximumCount, int maximumLength)
     {
         ArgumentNullException.ThrowIfNull(values, parameterName);
         if (values.Count > maximumCount)
         {
-            throw new ArgumentException(
-                $"Values cannot contain more than {maximumCount} entries.",
-                parameterName);
+            throw new ArgumentException($"Values cannot contain more than {maximumCount} entries.", parameterName);
         }
 
         var copy = new string[values.Count];
@@ -153,9 +136,7 @@ internal static class FeatureContractGuard
         ArgumentNullException.ThrowIfNull(value, parameterName);
         if (Encoding.UTF8.GetByteCount(value) > maximumBytes)
         {
-            throw new ArgumentException(
-                $"Value must contain at most {maximumBytes} UTF-8 bytes.",
-                parameterName);
+            throw new ArgumentException($"Value must contain at most {maximumBytes} UTF-8 bytes.", parameterName);
         }
 
         return value;

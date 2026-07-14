@@ -2,14 +2,12 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Kernel.Capabilities;
 
-public interface ICapabilityGrantSource
+internal interface ICapabilityGrantSource
 {
-    ValueTask<CapabilityGrant?> ReadAsync(
-        CapabilityRequest request,
-        CancellationToken cancellationToken = default);
+    ValueTask<CapabilityGrant?> ReadAsync(CapabilityRequest request, CancellationToken cancellationToken = default);
 }
 
-public sealed class CapabilityGrantValidator
+internal sealed class CapabilityGrantValidator
 {
     public static readonly TimeSpan MaximumDeadline = TimeSpan.FromSeconds(60);
 

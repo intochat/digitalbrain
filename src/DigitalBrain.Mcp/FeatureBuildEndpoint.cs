@@ -12,25 +12,15 @@ namespace DigitalBrain.Mcp;
 
 public sealed record FeatureSourceInput(string Path, string Content);
 
-public sealed record FeatureBuildSubmission(
-    string ImplementationProjectPath,
-    string ScenarioProjectPath,
-    IReadOnlyList<FeatureSourceInput> Files,
-    FeatureSourceKind SourceKind);
+public sealed record FeatureBuildSubmission(string ImplementationProjectPath, string ScenarioProjectPath, IReadOnlyList<FeatureSourceInput> Files, FeatureSourceKind SourceKind);
 
-public sealed record FeatureBuildArtifact(
-    FeatureReleaseMetadata Release,
-    FeatureScenarioResult Scenarios);
+public sealed record FeatureBuildArtifact(FeatureReleaseMetadata Release, FeatureScenarioResult Scenarios);
 
-public sealed class FeatureBuildEndpoint(
-    FeatureArtifactPublisher artifacts,
-    TimeProvider timeProvider)
+public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, TimeProvider timeProvider)
 {
     private const int MaximumProcessOutputCharacters = 65_536;
 
-    public async Task<FeatureBuildArtifact> BuildAsync(
-        FeatureBuildSubmission submission,
-        CancellationToken cancellationToken = default)
+    public async Task<FeatureBuildArtifact> BuildAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(submission);
         ArgumentNullException.ThrowIfNull(submission.Files);
@@ -47,9 +37,7 @@ public sealed class FeatureBuildEndpoint(
             var request = new BuilderCommand(
                 source.ImplementationProjectPath,
                 source.ScenarioProjectPath,
-                source.Files.Select(file => new BuilderFile(
-                    file.Path,
-                    Convert.ToBase64String(Encoding.UTF8.GetBytes(file.Content)))).ToArray(),
+                source.Files.Select(file => new BuilderFile(file.Path, Convert.ToBase64String(Encoding.UTF8.GetBytes(file.Content)))).ToArray(),
                 PackageFeed(),
                 output,
                 timeProvider.GetUtcNow().Add(FeatureBuildPipeline.MaximumRequestDuration));
@@ -72,9 +60,7 @@ public sealed class FeatureBuildEndpoint(
         }
     }
 
-    private static async Task<BuilderRelease> RunBuilderAsync(
-        string requestPath,
-        CancellationToken cancellationToken)
+    private static async Task<BuilderRelease> RunBuilderAsync(string requestPath, CancellationToken cancellationToken)
     {
         var start = new ProcessStartInfo
         {
@@ -114,13 +100,8 @@ public sealed class FeatureBuildEndpoint(
         var output = await outputTask;
         var error = await errorTask;
         if (process.ExitCode != 0)
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
-                ? "FeatureBuilder rejected the source."
-                : error.Trim());
-        return JsonSerializer.Deserialize<BuilderRelease>(output, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        }) ?? throw new InvalidDataException("FeatureBuilder returned no release.");
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? "FeatureBuilder rejected the source." : error.Trim());
+        return JsonSerializer.Deserialize<BuilderRelease>(output, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? throw new InvalidDataException("FeatureBuilder returned no release.");
     }
 
     private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken)
@@ -140,17 +121,11 @@ public sealed class FeatureBuildEndpoint(
     private static string PackageFeed()
     {
         var configured = Environment.GetEnvironmentVariable("DigitalBrain__FeatureBuilder__OfflineFeed");
-        var path = Path.GetFullPath(string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(AppContext.BaseDirectory, "feature-packages")
-            : configured);
-        return Directory.Exists(path)
-            ? path
-            : throw new DirectoryNotFoundException("The FeatureBuilder offline package feed is unavailable.");
+        var path = Path.GetFullPath(string.IsNullOrWhiteSpace(configured) ? Path.Combine(AppContext.BaseDirectory, "feature-packages") : configured);
+        return Directory.Exists(path) ? path : throw new DirectoryNotFoundException("The FeatureBuilder offline package feed is unavailable.");
     }
 
-    private static StringComparison PathComparison => OperatingSystem.IsWindows()
-        ? StringComparison.OrdinalIgnoreCase
-        : StringComparison.Ordinal;
+    private static StringComparison PathComparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
     private sealed record BuilderCommand(
         string ImplementationProjectPath,
@@ -162,16 +137,10 @@ public sealed class FeatureBuildEndpoint(
 
     private sealed record BuilderFile(string Path, string ContentBase64);
 
-    private sealed record BuilderRelease(
-        string Digest,
-        string SourceReference,
-        string ReleaseDirectory,
-        FeatureManifest Manifest,
-        FeatureScenarioResult Scenarios);
+    private sealed record BuilderRelease(string Digest, string SourceReference, string ReleaseDirectory, FeatureManifest Manifest, FeatureScenarioResult Scenarios);
 }
 
-public sealed class FeatureArtifactPublisher(
-    [FromKeyedServices("features")] BlobServiceClient blobs)
+public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] BlobServiceClient blobs)
 {
     private const string ContainerName = "feature-releases";
     private const int MaximumReleaseFiles = 256;
@@ -179,10 +148,7 @@ public sealed class FeatureArtifactPublisher(
     private const int MaximumMetadataBytes = 65_536;
     private readonly BlobContainerClient container = blobs.GetBlobContainerClient(ContainerName);
 
-    public async Task PublishReleaseAsync(
-        FeatureReleaseMetadata metadata,
-        string releaseDirectory,
-        CancellationToken cancellationToken = default)
+    public async Task PublishReleaseAsync(FeatureReleaseMetadata metadata, string releaseDirectory, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(metadata);
         if (!Enum.IsDefined(metadata.SourceKind))
@@ -212,15 +178,9 @@ public sealed class FeatureArtifactPublisher(
             var relative = Path.GetRelativePath(root, path).Replace('\\', '/');
             if (relative.StartsWith("../", StringComparison.Ordinal) || relative.Contains("/../", StringComparison.Ordinal))
                 throw new InvalidDataException("A Feature release path escaped its root.");
-            await UploadImmutableAsync(
-                container.GetBlobClient($"releases/{digest.Value}/{relative}"),
-                path,
-                cancellationToken);
+            await UploadImmutableAsync(container.GetBlobClient($"releases/{digest.Value}/{relative}"), path, cancellationToken);
         }
-        await UploadImmutableAsync(
-            container.GetBlobClient($"metadata/{digest.Value}.json"),
-            JsonSerializer.SerializeToUtf8Bytes(metadata),
-            cancellationToken);
+        await UploadImmutableAsync(container.GetBlobClient($"metadata/{digest.Value}.json"), JsonSerializer.SerializeToUtf8Bytes(metadata), cancellationToken);
     }
 
     private static string[] ReleaseFiles(string root)
@@ -243,9 +203,7 @@ public sealed class FeatureArtifactPublisher(
         return files.ToArray();
     }
 
-    public async Task<FeatureReleaseMetadata> DemandReleaseAsync(
-        ReleaseDigest digest,
-        CancellationToken cancellationToken = default)
+    public async Task<FeatureReleaseMetadata> DemandReleaseAsync(ReleaseDigest digest, CancellationToken cancellationToken = default)
     {
         var marker = container.GetBlobClient($"releases/{digest.Value}/digest.txt");
         if (!(await marker.ExistsAsync(cancellationToken)).Value)
@@ -253,10 +211,7 @@ public sealed class FeatureArtifactPublisher(
         var content = Encoding.UTF8.GetString(await DownloadBoundedAsync(marker, 128, cancellationToken));
         if (!string.Equals(content, digest.Value, StringComparison.Ordinal))
             throw new InvalidDataException("The published Feature release digest marker is invalid.");
-        var metadataBytes = await DownloadBoundedAsync(
-            container.GetBlobClient($"metadata/{digest.Value}.json"),
-            MaximumMetadataBytes,
-            cancellationToken);
+        var metadataBytes = await DownloadBoundedAsync(container.GetBlobClient($"metadata/{digest.Value}.json"), MaximumMetadataBytes, cancellationToken);
         var metadata = JsonSerializer.Deserialize<FeatureReleaseMetadata>(metadataBytes)
             ?? throw new InvalidDataException("The published Feature release metadata is invalid.");
         if (metadata.Digest != digest)
@@ -264,10 +219,7 @@ public sealed class FeatureArtifactPublisher(
         return metadata;
     }
 
-    public async Task PublishActiveAsync(
-        BrainOwnerId ownerId,
-        FeatureAuthoritySnapshot authority,
-        CancellationToken cancellationToken = default)
+    public async Task PublishActiveAsync(BrainOwnerId ownerId, FeatureAuthoritySnapshot authority, CancellationToken cancellationToken = default)
     {
         if (authority.ActiveRelease is not { } release || authority.ActiveGrantRevision is not { } revision)
             throw new InvalidOperationException("Only an active Feature authority can be published.");
@@ -290,24 +242,14 @@ public sealed class FeatureArtifactPublisher(
             providerConnections = connections
         });
         await container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
-        await container.GetBlobClient($"active/{Segment(ownerId.Value)}/{Segment(authority.InstallationId.Value)}.json")
-            .UploadAsync(new BinaryData(manifest), overwrite: true, cancellationToken);
+        await container.GetBlobClient($"active/{Segment(ownerId.Value)}/{Segment(authority.InstallationId.Value)}.json").UploadAsync(new BinaryData(manifest), overwrite: true, cancellationToken);
     }
 
-    private static async Task UploadImmutableAsync(
-        BlobClient blob,
-        string sourcePath,
-        CancellationToken cancellationToken)
+    private static async Task UploadImmutableAsync(BlobClient blob, string sourcePath, CancellationToken cancellationToken)
     {
         try
         {
-            await using var source = new FileStream(
-                sourcePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                81_920,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81_920, FileOptions.Asynchronous | FileOptions.SequentialScan);
             await blob.UploadAsync(source, overwrite: false, cancellationToken);
         }
         catch (RequestFailedException exception) when (exception.Status == 409)
@@ -316,20 +258,11 @@ public sealed class FeatureArtifactPublisher(
         }
     }
 
-    private static async Task UploadImmutableAsync(
-        BlobClient blob,
-        byte[] content,
-        CancellationToken cancellationToken)
+    private static async Task UploadImmutableAsync(BlobClient blob, byte[] content, CancellationToken cancellationToken)
     {
         try
         {
-            await blob.UploadAsync(
-                new BinaryData(content),
-                new BlobUploadOptions
-                {
-                    Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All }
-                },
-                cancellationToken);
+            await blob.UploadAsync(new BinaryData(content), new BlobUploadOptions { Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All } }, cancellationToken);
         }
         catch (RequestFailedException exception) when (exception.Status is 409 or 412)
         {
@@ -339,18 +272,12 @@ public sealed class FeatureArtifactPublisher(
         }
     }
 
-    private static async Task<byte[]> DownloadBoundedAsync(
-        BlobClient blob,
-        int maximumBytes,
-        CancellationToken cancellationToken)
+    private static async Task<byte[]> DownloadBoundedAsync(BlobClient blob, int maximumBytes, CancellationToken cancellationToken)
     {
         var properties = (await blob.GetPropertiesAsync(cancellationToken: cancellationToken)).Value;
         if (properties.ContentLength < 0 || properties.ContentLength > maximumBytes)
             throw new InvalidDataException("A Feature release metadata blob exceeds its bound.");
-        var options = new BlobDownloadOptions
-        {
-            Conditions = new BlobRequestConditions { IfMatch = properties.ETag }
-        };
+        var options = new BlobDownloadOptions { Conditions = new BlobRequestConditions { IfMatch = properties.ETag } };
         using var response = (await blob.DownloadStreamingAsync(options, cancellationToken)).Value;
         using var output = new MemoryStream(checked((int)properties.ContentLength));
         var buffer = new byte[4096];
@@ -364,20 +291,14 @@ public sealed class FeatureArtifactPublisher(
         }
     }
 
-    private static async Task VerifyExistingAsync(
-        BlobClient blob,
-        string sourcePath,
-        CancellationToken cancellationToken)
+    private static async Task VerifyExistingAsync(BlobClient blob, string sourcePath, CancellationToken cancellationToken)
     {
         var properties = (await blob.GetPropertiesAsync(cancellationToken: cancellationToken)).Value;
         var info = new FileInfo(sourcePath);
         if (properties.ContentLength != info.Length)
             throw new InvalidDataException("An immutable Feature release blob has conflicting content.");
         await using var local = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81_920, true);
-        var options = new BlobDownloadOptions
-        {
-            Conditions = new BlobRequestConditions { IfMatch = properties.ETag }
-        };
+        var options = new BlobDownloadOptions { Conditions = new BlobRequestConditions { IfMatch = properties.ETag } };
         using var remote = (await blob.DownloadStreamingAsync(options, cancellationToken)).Value;
         var left = new byte[81_920];
         var right = new byte[81_920];
@@ -392,8 +313,5 @@ public sealed class FeatureArtifactPublisher(
     }
 
     private static string Segment(string value) =>
-        Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+        Convert.ToBase64String(Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

@@ -5,7 +5,7 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.Kernel.Memory;
 
-public sealed class AzureTableMemoryFactStore : IMemoryFactStore
+internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
 {
     public const string FactsTableName = "memoryfacts";
     private const int MaximumConflictAttempts = 8;
@@ -21,19 +21,13 @@ public sealed class AzureTableMemoryFactStore : IMemoryFactStore
 
     public string TableName => _table.Name;
 
-    public async Task<IReadOnlyList<MemoryFactSnapshot>> ListAsync(
-        BrainOwnerId ownerId,
-        int maximumCount,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MemoryFactSnapshot>> ListAsync(BrainOwnerId ownerId, int maximumCount, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumCount, 1);
         var partition = Partition(ownerId);
         var filter = TableClient.CreateQueryFilter($"PartitionKey eq {partition} and RowKey ne {MemoryValues.CapacityRowKey}");
         var facts = new List<MemoryFactSnapshot>(Math.Min(maximumCount, MemoryService.MaximumFactsPerOwner));
-        await foreach (var entity in _table.QueryAsync<MemoryFactEntity>(
-                           filter,
-                           maxPerPage: Math.Min(maximumCount, 1_000),
-                           cancellationToken: cancellationToken))
+        await foreach (var entity in _table.QueryAsync<MemoryFactEntity>(filter, maxPerPage: Math.Min(maximumCount, 1_000), cancellationToken: cancellationToken))
         {
             facts.Add(ToSnapshot(entity));
             if (facts.Count >= maximumCount)
@@ -42,23 +36,13 @@ public sealed class AzureTableMemoryFactStore : IMemoryFactStore
         return facts;
     }
 
-    public async Task<MemoryFactSnapshot?> FindAsync(
-        BrainOwnerId ownerId,
-        string factId,
-        CancellationToken cancellationToken = default)
+    public async Task<MemoryFactSnapshot?> FindAsync(BrainOwnerId ownerId, string factId, CancellationToken cancellationToken = default)
     {
-        var response = await _table.GetEntityIfExistsAsync<MemoryFactEntity>(
-            Partition(ownerId),
-            MemoryValues.FactId(factId, nameof(factId)),
-            cancellationToken: cancellationToken);
+        var response = await _table.GetEntityIfExistsAsync<MemoryFactEntity>(Partition(ownerId), MemoryValues.FactId(factId, nameof(factId)), cancellationToken: cancellationToken);
         return response.HasValue ? ToSnapshot(response.Value!) : null;
     }
 
-    public async Task<MemoryWriteStatus> CreateAsync(
-        BrainOwnerId ownerId,
-        MemoryFactSnapshot fact,
-        int capacity,
-        CancellationToken cancellationToken = default)
+    public async Task<MemoryWriteStatus> CreateAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, int capacity, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
         var partition = Partition(ownerId);
@@ -67,21 +51,14 @@ public sealed class AzureTableMemoryFactStore : IMemoryFactStore
         {
             var existing = await FindAsync(ownerId, fact.FactId, cancellationToken);
             if (existing is not null)
-                return SameContent(existing, fact)
-                    ? MemoryWriteStatus.AlreadyPresent
-                    : throw new MemoryConflictException();
+                return SameContent(existing, fact) ? MemoryWriteStatus.AlreadyPresent : throw new MemoryConflictException();
 
-            var metadata = await _table.GetEntityIfExistsAsync<MemoryCapacityEntity>(
-                partition,
-                MemoryValues.CapacityRowKey,
-                cancellationToken: cancellationToken);
+            var metadata = await _table.GetEntityIfExistsAsync<MemoryCapacityEntity>(partition, MemoryValues.CapacityRowKey, cancellationToken: cancellationToken);
             var metadataValue = metadata.HasValue ? metadata.Value! : null;
             if (metadataValue is not null && metadataValue.Count >= capacity)
                 return MemoryWriteStatus.CapacityReached;
 
-            var counter = metadataValue is not null
-                ? metadataValue with { Count = metadataValue.Count + 1 }
-                : new MemoryCapacityEntity(partition, 1);
+            var counter = metadataValue is not null ? metadataValue with { Count = metadataValue.Count + 1 } : new MemoryCapacityEntity(partition, 1);
             var actions = metadataValue is not null
                 ? new[]
                 {
@@ -105,20 +82,12 @@ public sealed class AzureTableMemoryFactStore : IMemoryFactStore
         throw new MemoryConflictException();
     }
 
-    public async Task<MemoryFactSnapshot> ReplaceAsync(
-        BrainOwnerId ownerId,
-        MemoryFactSnapshot fact,
-        string expectedETag,
-        CancellationToken cancellationToken = default)
+    public async Task<MemoryFactSnapshot> ReplaceAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, string expectedETag, CancellationToken cancellationToken = default)
     {
         var partition = Partition(ownerId);
         try
         {
-            var response = await _table.UpdateEntityAsync(
-                ToEntity(partition, fact),
-                new ETag(MemoryValues.ETag(expectedETag)),
-                TableUpdateMode.Replace,
-                cancellationToken);
+            var response = await _table.UpdateEntityAsync(ToEntity(partition, fact), new ETag(MemoryValues.ETag(expectedETag)), TableUpdateMode.Replace, cancellationToken);
             var updatedETag = response.Headers.ETag?.ToString()
                 ?? throw new InvalidOperationException("The Memory replacement response did not include an ETag.");
             return fact with { Tags = fact.Tags.ToArray(), ETag = updatedETag };
@@ -133,30 +102,20 @@ public sealed class AzureTableMemoryFactStore : IMemoryFactStore
         }
     }
 
-    public async Task<bool> DeleteAsync(
-        BrainOwnerId ownerId,
-        string factId,
-        string expectedETag,
-        CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(BrainOwnerId ownerId, string factId, string expectedETag, CancellationToken cancellationToken = default)
     {
         var partition = Partition(ownerId);
         factId = MemoryValues.FactId(factId, nameof(factId));
         expectedETag = MemoryValues.ETag(expectedETag);
         for (var attempt = 0; attempt < MaximumConflictAttempts; attempt++)
         {
-            var fact = await _table.GetEntityIfExistsAsync<MemoryFactEntity>(
-                partition,
-                factId,
-                cancellationToken: cancellationToken);
+            var fact = await _table.GetEntityIfExistsAsync<MemoryFactEntity>(partition, factId, cancellationToken: cancellationToken);
             if (!fact.HasValue)
                 return false;
             var factValue = fact.Value!;
             if (!string.Equals(factValue.ETag.ToString(), expectedETag, StringComparison.Ordinal))
                 throw new MemoryConflictException();
-            var metadata = await _table.GetEntityIfExistsAsync<MemoryCapacityEntity>(
-                partition,
-                MemoryValues.CapacityRowKey,
-                cancellationToken: cancellationToken);
+            var metadata = await _table.GetEntityIfExistsAsync<MemoryCapacityEntity>(partition, MemoryValues.CapacityRowKey, cancellationToken: cancellationToken);
             var metadataValue = metadata.HasValue ? metadata.Value! : null;
             if (metadataValue is null || metadataValue.Count <= 0)
                 throw new InvalidOperationException("Memory capacity metadata is inconsistent.");
@@ -165,14 +124,8 @@ public sealed class AzureTableMemoryFactStore : IMemoryFactStore
             {
                 await _table.SubmitTransactionAsync(
                     [
-                        new TableTransactionAction(
-                            TableTransactionActionType.UpdateReplace,
-                            counter,
-                            metadataValue.ETag),
-                        new TableTransactionAction(
-                            TableTransactionActionType.Delete,
-                            factValue,
-                            new ETag(expectedETag))
+                        new TableTransactionAction(TableTransactionActionType.UpdateReplace, counter, metadataValue.ETag),
+                        new TableTransactionAction(TableTransactionActionType.Delete, factValue, new ETag(expectedETag))
                     ],
                     cancellationToken);
                 return true;
@@ -218,8 +171,7 @@ public sealed class AzureTableMemoryFactStore : IMemoryFactStore
     }
 
     private static bool SameContent(MemoryFactSnapshot left, MemoryFactSnapshot right) =>
-        string.Equals(left.Text, right.Text, StringComparison.Ordinal) &&
-        left.Tags.SequenceEqual(right.Tags, StringComparer.Ordinal) &&
+        string.Equals(left.Text, right.Text, StringComparison.Ordinal) && left.Tags.SequenceEqual(right.Tags, StringComparer.Ordinal) &&
         left.SourceActor == right.SourceActor;
 
     private sealed class MemoryFactEntity : ITableEntity

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../glass/glass_material.dart';
 
-/// A premium, glassmorphic debug indicator designed like a high-end HUD widget.
-/// Shows the real-time active neuron catalog count and historical synapse edge events
-/// currently registered in the live memory.
 class DebugBrainStats extends StatefulWidget {
   const DebugBrainStats({
     required this.neuronCount,
@@ -58,7 +55,6 @@ class _DebugBrainStatsState extends State<DebugBrainStats>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Glowing Live Pulse Dot
             AnimatedBuilder(
               animation: _pulseAnimation,
               builder: (context, child) {
@@ -67,7 +63,7 @@ class _DebugBrainStatsState extends State<DebugBrainStats>
                   height: 6,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF10E5B2), // Emerald-Teal accent
+                    color: const Color(0xFF10E5B2),
                     boxShadow: [
                       BoxShadow(
                         color: const Color(
@@ -82,7 +78,7 @@ class _DebugBrainStatsState extends State<DebugBrainStats>
               },
             ),
             const SizedBox(width: 8),
-            // Header Text
+
             Text(
               'LIVE MATRIX · ',
               style: TextStyle(
@@ -93,7 +89,7 @@ class _DebugBrainStatsState extends State<DebugBrainStats>
                 letterSpacing: 1.0,
               ),
             ),
-            // Neuron count
+
             Text(
               'N:',
               style: TextStyle(
@@ -108,20 +104,20 @@ class _DebugBrainStatsState extends State<DebugBrainStats>
               '${widget.neuronCount}',
               style: const TextStyle(
                 fontFamily: 'Outfit',
-                color: Color(0xFF5A81FF), // Soft Indigo/Blue
+                color: Color(0xFF5A81FF),
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(width: 8),
-            // Divider pipe
+
             Container(
               width: 1,
               height: 10,
               color: Colors.white.withValues(alpha: 0.1),
             ),
             const SizedBox(width: 8),
-            // Synapse count
+
             Text(
               'S:',
               style: TextStyle(
@@ -136,7 +132,7 @@ class _DebugBrainStatsState extends State<DebugBrainStats>
               '${widget.synapseCount}',
               style: const TextStyle(
                 fontFamily: 'Outfit',
-                color: Color(0xFFFF5A93), // Premium Rose
+                color: Color(0xFFFF5A93),
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),

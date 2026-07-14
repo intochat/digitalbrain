@@ -11,10 +11,7 @@ import 'package:digitalbrain_flutter/ui_kit/ui_panel.dart';
 import 'package:digitalbrain_flutter/widgets/neuron_vector_logo.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
-  builder: (_, w) => FTheme(
-    data: FThemes.neutral.light.touch,
-    child: w!,
-  ),
+  builder: (_, w) => FTheme(data: FThemes.neutral.light.touch, child: w!),
   home: Scaffold(body: child),
 );
 
@@ -41,7 +38,9 @@ void main() {
   });
 
   group('UiKitScreen', () {
-    testWidgets('wraps children in UiKitFormScope and lays them out', (tester) async {
+    testWidgets('wraps children in UiKitFormScope and lays them out', (
+      tester,
+    ) async {
       UiKitFormController? capturedController;
 
       await tester.pumpWidget(
@@ -76,14 +75,15 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          builder: (_, w) => FTheme(
-            data: FThemes.neutral.light.touch,
-            child: w!,
-          ),
+          builder: (_, w) =>
+              FTheme(data: FThemes.neutral.light.touch, child: w!),
           home: Scaffold(
             body: UiKitFormScope(
               controller: controller,
-              child: const UiKitTextField(name: 'email', placeholder: 'you@example.com'),
+              child: const UiKitTextField(
+                name: 'email',
+                placeholder: 'you@example.com',
+              ),
             ),
           ),
         ),
@@ -98,8 +98,9 @@ void main() {
   });
 
   group('UiKitButton', () {
-    testWidgets('fires onEvent with correct payload including scope values',
-        (tester) async {
+    testWidgets('fires onEvent with correct payload including scope values', (
+      tester,
+    ) async {
       final controller = UiKitFormController();
       controller.set('email', 'alice@example.com');
 
@@ -108,10 +109,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          builder: (_, w) => FTheme(
-            data: FThemes.neutral.light.touch,
-            child: w!,
-          ),
+          builder: (_, w) =>
+              FTheme(data: FThemes.neutral.light.touch, child: w!),
           home: Scaffold(
             body: UiKitFormScope(
               controller: controller,
@@ -213,11 +212,7 @@ void main() {
   group('UiKitPanel', () {
     testWidgets('renders children', (tester) async {
       await tester.pumpWidget(
-        _wrap(
-          const UiKitPanel(
-            children: [Text('panel content')],
-          ),
-        ),
+        _wrap(const UiKitPanel(children: [Text('panel content')])),
       );
       expect(find.text('panel content'), findsOneWidget);
     });

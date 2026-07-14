@@ -32,8 +32,7 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
             throw new FeatureBuildException(failure, "The .NET build process could not start.");
         }
 
-        using var outputCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            stageCancellation.Token);
+        using var outputCancellation = CancellationTokenSource.CreateLinkedTokenSource(stageCancellation.Token);
         var outputTask = ReadBoundedAsync(process.StandardOutput, outputCancellation.Token);
         var errorTask = ReadBoundedAsync(process.StandardError, outputCancellation.Token);
         try
@@ -57,9 +56,7 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         var error = await errorTask;
         if (process.ExitCode != 0)
         {
-            throw new FeatureBuildException(
-                failure,
-                BoundedFailure(arguments[0], process.ExitCode, output, error));
+            throw new FeatureBuildException(failure, BoundedFailure(arguments[0], process.ExitCode, output, error));
         }
     }
 
@@ -115,26 +112,16 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         startInfo.Environment["NUGET_XMLDOC_MODE"] = "skip";
     }
 
-    private static void PopulateWindowsEnvironment(
-        ProcessStartInfo startInfo,
-        string home,
-        string? systemRoot)
+    private static void PopulateWindowsEnvironment(ProcessStartInfo startInfo, string home, string? systemRoot)
     {
         var homeRoot = Path.GetPathRoot(home)!;
         startInfo.Environment["HOMEDRIVE"] = homeRoot.TrimEnd(Path.DirectorySeparatorChar);
         startInfo.Environment["HOMEPATH"] = home[homeRoot.Length..].Insert(0, "\\");
-        startInfo.Environment["ProgramFiles"] = Environment.GetFolderPath(
-            Environment.SpecialFolder.ProgramFiles);
-        startInfo.Environment["ProgramFiles(x86)"] = Environment.GetFolderPath(
-            Environment.SpecialFolder.ProgramFilesX86);
-        startInfo.Environment["ProgramData"] = Environment.GetFolderPath(
-            Environment.SpecialFolder.CommonApplicationData);
-        startInfo.Environment["ALLUSERSPROFILE"] = Environment.GetFolderPath(
-            Environment.SpecialFolder.CommonApplicationData);
-        startInfo.Environment["ComSpec"] = Path.Combine(
-            systemRoot ?? "C:\\Windows",
-            "System32",
-            "cmd.exe");
+        startInfo.Environment["ProgramFiles"] = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        startInfo.Environment["ProgramFiles(x86)"] = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        startInfo.Environment["ProgramData"] = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        startInfo.Environment["ALLUSERSPROFILE"] = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        startInfo.Environment["ComSpec"] = Path.Combine(systemRoot ?? "C:\\Windows", "System32", "cmd.exe");
     }
 
     private static void Add(ProcessStartInfo startInfo, string name, string? value)
@@ -165,10 +152,7 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
 
         if (OperatingSystem.IsWindows())
         {
-            var installed = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "dotnet",
-                "dotnet.exe");
+            var installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe");
             if (File.Exists(installed))
             {
                 return installed;
@@ -176,8 +160,7 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         }
 
         var executable = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
-        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-                     .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
             var candidate = Path.Combine(directory, executable);
             if (File.Exists(candidate))
@@ -186,9 +169,7 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
             }
         }
 
-        throw new FeatureBuildException(
-            FeatureBuildFailure.InvalidSource,
-            "The .NET SDK host could not be resolved.");
+        throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, "The .NET SDK host could not be resolved.");
     }
 
     private static void Kill(Process process)
@@ -200,17 +181,12 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
                 process.Kill(true);
             }
         }
-        catch (Exception exception) when (exception is
-            InvalidOperationException or
-            Win32Exception or
-            NotSupportedException)
+        catch (Exception exception) when (exception is InvalidOperationException or Win32Exception or NotSupportedException)
         {
         }
     }
 
-    private static async Task<string> ReadBoundedAsync(
-        StreamReader reader,
-        CancellationToken cancellationToken)
+    private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken)
     {
         var captured = new StringBuilder(MaximumCapturedCharacters);
         var buffer = new char[4_096];
@@ -236,8 +212,7 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
             return captured.ToString();
         }
         catch (Exception exception) when (
-            cancellationToken.IsCancellationRequested &&
-            exception is IOException or ObjectDisposedException)
+            cancellationToken.IsCancellationRequested && exception is IOException or ObjectDisposedException)
         {
             return captured.ToString();
         }
@@ -245,8 +220,7 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
 
     private static string BoundedFailure(string stage, int exitCode, string output, string error)
     {
-        var detail = string.Join(Environment.NewLine, new[] { output, error }
-                .Where(static value => !string.IsNullOrWhiteSpace(value)))
+        var detail = string.Join(Environment.NewLine, new[] { output, error }.Where(static value => !string.IsNullOrWhiteSpace(value)))
             .Trim();
         return $"dotnet {stage} exited with code {exitCode}.{Environment.NewLine}{detail}";
     }

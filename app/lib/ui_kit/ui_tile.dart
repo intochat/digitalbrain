@@ -60,7 +60,7 @@ class UiKitTile extends StatelessWidget {
             onEvent: onEvent!,
             capturedValues: UiKitFormScope.of(context)?.values ?? const {},
           );
-    // FTile requires a group context for layout constraints; wrap standalone tiles in FTileGroup.
+
     return FTileGroup(children: [tile]);
   }
 }

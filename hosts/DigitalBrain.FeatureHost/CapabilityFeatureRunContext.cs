@@ -9,27 +9,17 @@ using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.FeatureHost;
 
-public interface IFeatureCapabilityClient
+internal interface IFeatureCapabilityClient
 {
     Task<JsonElement> ExecuteAsync(CapabilityRequest request, CancellationToken cancellationToken = default);
 }
 
-public sealed class CapabilityFeatureRunContextFactory(
-    IFeatureCapabilityClient capabilities,
-    TimeProvider timeProvider) : IFeatureRunContextFactory
+internal sealed class CapabilityFeatureRunContextFactory(IFeatureCapabilityClient capabilities, TimeProvider timeProvider) : IFeatureRunContextFactory
 {
-    public ValueTask<IFeatureRunContext> CreateAsync(
-        FeatureWorkItem work,
-        FeatureRunClaim claim,
-        CancellationToken cancellationToken = default)
+    public ValueTask<IFeatureRunContext> CreateAsync(FeatureWorkItem work, FeatureRunClaim claim, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult<IFeatureRunContext>(new CapabilityFeatureRunContext(
-            work,
-            claim,
-            capabilities,
-            timeProvider,
-            cancellationToken));
+        return ValueTask.FromResult<IFeatureRunContext>(new CapabilityFeatureRunContext(work, claim, capabilities, timeProvider, cancellationToken));
     }
 }
 
@@ -63,12 +53,7 @@ internal sealed class CapabilityFeatureRunContext :
     private bool _sealed;
     private bool _disposed;
 
-    internal CapabilityFeatureRunContext(
-        FeatureWorkItem work,
-        FeatureRunClaim claim,
-        IFeatureCapabilityClient capabilities,
-        TimeProvider timeProvider,
-        CancellationToken runCancellation)
+    internal CapabilityFeatureRunContext(FeatureWorkItem work, FeatureRunClaim claim, IFeatureCapabilityClient capabilities, TimeProvider timeProvider, CancellationToken runCancellation)
     {
         _work = work;
         _claim = claim;
@@ -130,9 +115,7 @@ internal sealed class CapabilityFeatureRunContext :
         }
     }
 
-    public async Task<IReadOnlyList<MemoryFact>> RecallAsync(
-        MemoryRecallRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MemoryFact>> RecallAsync(MemoryRecallRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var payload = await ExecuteAsync(
@@ -154,9 +137,7 @@ internal sealed class CapabilityFeatureRunContext :
             JsonSerializer.Serialize(new { intent.FactId, intent.Text, intent.Tags }, FeatureJson.Options)));
     }
 
-    public async Task<ModelResponse> CompleteAsync(
-        ModelRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<ModelResponse> CompleteAsync(ModelRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var payload = await ExecuteAsync(
@@ -172,10 +153,7 @@ internal sealed class CapabilityFeatureRunContext :
     public void AddTextSurface(TextSurfaceIntent intent)
     {
         ArgumentNullException.ThrowIfNull(intent);
-        AddIntent(new FeatureIntent(
-            intent.LogicalOperationKey,
-            FeatureIntentKind.TextSurface,
-            JsonSerializer.Serialize(new { intent.Title, intent.Text }, FeatureJson.Options)));
+        AddIntent(new FeatureIntent(intent.LogicalOperationKey, FeatureIntentKind.TextSurface, JsonSerializer.Serialize(new { intent.Title, intent.Text }, FeatureJson.Options)));
     }
 
     public void EmitEvent(EventIntent intent)
@@ -193,27 +171,17 @@ internal sealed class CapabilityFeatureRunContext :
         AddIntent(new FeatureIntent(
             intent.LogicalOperationKey,
             FeatureIntentKind.ExternalEffect,
-            JsonSerializer.Serialize(new
-            {
-                intent.CapabilityId,
-                intent.ProviderConnectionId,
-                payload = JsonElement.Parse(intent.Json)
-            }, FeatureJson.Options)));
+            JsonSerializer.Serialize(new { intent.CapabilityId, intent.ProviderConnectionId, payload = JsonElement.Parse(intent.Json) }, FeatureJson.Options)));
     }
 
-    public async ValueTask<FeatureRunCommit> SealAsync(
-        FeatureLeaseFence fence,
-        CancellationToken cancellationToken = default)
+    public async ValueTask<FeatureRunCommit> SealAsync(FeatureLeaseFence fence, CancellationToken cancellationToken = default)
     {
         Task? drain;
         lock (_gate)
         {
             ThrowIfClosed();
             _sealed = true;
-            drain = _inFlight == 0
-                ? null
-                : (_drained ??= new TaskCompletionSource(
-                    TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+            drain = _inFlight == 0 ? null : (_drained ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
         }
         await _runLifetime.CancelAsync();
         if (drain is not null)
@@ -242,10 +210,7 @@ internal sealed class CapabilityFeatureRunContext :
             if (_disposed) return;
             _disposed = true;
             _sealed = true;
-            drain = _inFlight == 0
-                ? null
-                : (_drained ??= new TaskCompletionSource(
-                    TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+            drain = _inFlight == 0 ? null : (_drained ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
         }
         await _runLifetime.CancelAsync();
         if (drain is not null)
@@ -253,12 +218,7 @@ internal sealed class CapabilityFeatureRunContext :
         _runLifetime.Dispose();
     }
 
-    internal async Task<T> QueryAsync<T>(
-        string capabilityId,
-        string? provider,
-        string logicalOperationKey,
-        object payload,
-        CancellationToken cancellationToken)
+    internal async Task<T> QueryAsync<T>(string capabilityId, string? provider, string logicalOperationKey, object payload, CancellationToken cancellationToken)
     {
         var result = await ExecuteAsync(
             capabilityId,
@@ -267,27 +227,23 @@ internal sealed class CapabilityFeatureRunContext :
             JsonSerializer.SerializeToElement(payload, payload.GetType(), FeatureJson.Options),
             modelCall: false,
             cancellationToken);
-        return result.Deserialize<T>(FeatureJson.Options)
-            ?? throw new InvalidOperationException("The capability returned no result.");
+        return result.Deserialize<T>(FeatureJson.Options) ?? throw new InvalidOperationException("The capability returned no result.");
     }
 
-    internal void AddExternalProposal(string capabilityId, string provider, string operationKey, object payload)
+    internal async Task PrepareExternalProposalAsync(string capabilityId, string provider, string operationKey, object payload, CancellationToken cancellationToken)
     {
-        _work.ProviderConnections.TryGetValue(provider, out var connection);
-        ProposeExternalEffect(new ExternalEffectIntent(
-            operationKey,
+        var prepared = await ExecuteAsync(
             capabilityId,
-            connection == default ? null : connection.Value,
-            JsonSerializer.Serialize(payload, payload.GetType(), FeatureJson.Options)));
+            provider,
+            operationKey,
+            JsonSerializer.SerializeToElement(payload, payload.GetType(), FeatureJson.Options),
+            modelCall: false,
+            cancellationToken);
+        _work.ProviderConnections.TryGetValue(provider, out var connection);
+        ProposeExternalEffect(new ExternalEffectIntent(operationKey, capabilityId, connection == default ? null : connection.Value, prepared.GetRawText()));
     }
 
-    private async Task<JsonElement> ExecuteAsync(
-        string capabilityId,
-        string? provider,
-        string logicalOperationKey,
-        JsonElement payload,
-        bool modelCall,
-        CancellationToken cancellationToken)
+    private async Task<JsonElement> ExecuteAsync(string capabilityId, string? provider, string logicalOperationKey, JsonElement payload, bool modelCall, CancellationToken cancellationToken)
     {
         CancellationToken lifetimeToken;
         lock (_gate)
@@ -313,9 +269,7 @@ internal sealed class CapabilityFeatureRunContext :
         {
             _work.ProviderConnections.TryGetValue(provider ?? string.Empty, out var connection);
             var now = _timeProvider.GetUtcNow();
-            var deadline = _claim.LeaseExpiresAt < now.AddSeconds(30)
-                ? _claim.LeaseExpiresAt
-                : now.AddSeconds(30);
+            var deadline = _claim.LeaseExpiresAt < now.AddSeconds(30) ? _claim.LeaseExpiresAt : now.AddSeconds(30);
             return await _capabilities.ExecuteAsync(new CapabilityRequest(
                 _work.OwnerId,
                 _work.ActorId,
@@ -350,21 +304,13 @@ internal sealed class CapabilityFeatureRunContext :
             ThrowIfClosed();
             if (_intents.Count >= MaximumIntents)
                 throw new InvalidOperationException("A feature run cannot buffer more than 32 intents.");
-            if (_intents.Any(existing => string.Equals(
-                    existing.LogicalOperationKey,
-                    intent.LogicalOperationKey,
-                    StringComparison.Ordinal)))
+            if (_intents.Any(existing => string.Equals(existing.LogicalOperationKey, intent.LogicalOperationKey, StringComparison.Ordinal)))
                 throw new InvalidOperationException("Feature intent operation keys must be unique within a run.");
             _intents.Add(intent);
         }
     }
 
-    private FeatureRunCommit Commit(FeatureLeaseFence fence) => new(
-        fence,
-        _stateJson,
-        _intents.ToArray(),
-        new FeatureResourceUsage(_reads, _modelCalls),
-        "{}");
+    private FeatureRunCommit Commit(FeatureLeaseFence fence) => new(fence, _stateJson, _intents.ToArray(), new FeatureResourceUsage(_reads, _modelCalls), "{}");
 
     private void ThrowIfClosed()
     {
@@ -376,11 +322,7 @@ internal sealed class CapabilityFeatureRunContext :
 
 internal static class FeatureJson
 {
-    internal static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
-    {
-        MaxDepth = 16,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
-    };
+    internal static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { MaxDepth = 16, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
 }
 
 internal sealed class FeatureRunScope : IDisposable
@@ -395,8 +337,7 @@ internal sealed class FeatureRunScope : IDisposable
         CurrentContext.Value = current;
     }
 
-    internal static CapabilityFeatureRunContext Current => CurrentContext.Value
-        ?? throw new InvalidOperationException("A feature contract was used outside an active feature run.");
+    internal static CapabilityFeatureRunContext Current => CurrentContext.Value ?? throw new InvalidOperationException("A feature contract was used outside an active feature run.");
 
     internal static FeatureRunScope Enter(CapabilityFeatureRunContext current) => new(current);
 
@@ -408,83 +349,40 @@ internal sealed class FeatureRunScope : IDisposable
     }
 }
 
-public sealed class FeatureGmailMessageReader : IGmailMessageReader
+internal sealed class FeatureGmailMessageReader : IGmailMessageReader
 {
-    public Task<GmailMessage> ReadAsync(
-        GmailMessageReadRequest request,
-        CancellationToken cancellationToken = default) =>
-        FeatureRunScope.Current.QueryAsync<GmailMessage>(
-            GoogleCapabilityIds.GmailMessageRead,
-            "google",
-            FeatureRunScope.Current.Next("gmail-message-read"),
-            request,
-            cancellationToken);
+    public Task<GmailMessage> ReadAsync(GmailMessageReadRequest request, CancellationToken cancellationToken = default) =>
+        FeatureRunScope.Current.QueryAsync<GmailMessage>(GoogleCapabilityIds.GmailMessageRead, "google", FeatureRunScope.Current.Next("gmail-message-read"), request, cancellationToken);
 }
 
-public sealed class FeatureGmailMailboxReader : IGmailMailboxReader
+internal sealed class FeatureGmailMailboxReader : IGmailMailboxReader
 {
-    public Task<GmailMailboxPage> ReadAsync(
-        GmailMailboxReadRequest request,
-        CancellationToken cancellationToken = default) =>
-        FeatureRunScope.Current.QueryAsync<GmailMailboxPage>(
-            GoogleCapabilityIds.GmailMailboxRead,
-            "google",
-            FeatureRunScope.Current.Next("gmail-mailbox-read"),
-            request,
-            cancellationToken);
+    public Task<GmailMailboxPage> ReadAsync(GmailMailboxReadRequest request, CancellationToken cancellationToken = default) =>
+        FeatureRunScope.Current.QueryAsync<GmailMailboxPage>(GoogleCapabilityIds.GmailMailboxRead, "google", FeatureRunScope.Current.Next("gmail-mailbox-read"), request, cancellationToken);
 }
 
-public sealed class FeatureGmailSendProposer : IGmailSendProposer
+internal sealed class FeatureGmailSendProposer : IGmailSendProposer
 {
-    public Task<GmailSendProposal> ProposeAsync(
-        GmailSendProposalRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<GmailSendProposal> ProposeAsync(GmailSendProposalRequest request, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var proposal = new GmailSendProposal(
-            request.Recipient,
-            request.Subject,
-            request.Body,
-            request.LogicalOperationKey);
-        FeatureRunScope.Current.AddExternalProposal(
-            GoogleCapabilityIds.GmailSendPropose,
-            "google",
-            request.LogicalOperationKey,
-            proposal);
-        return Task.FromResult(proposal);
+        var proposal = new GmailSendProposal(request.Recipient, request.Subject, request.Body, request.LogicalOperationKey);
+        await FeatureRunScope.Current.PrepareExternalProposalAsync(GoogleCapabilityIds.GmailSendPropose, "google", request.LogicalOperationKey, request, cancellationToken);
+        return proposal;
     }
 }
 
-public sealed class FeatureSalesforceRecordReader : ISalesforceRecordReader
+internal sealed class FeatureSalesforceRecordReader : ISalesforceRecordReader
 {
-    public Task<SalesforceRecord> ReadAsync(
-        SalesforceRecordReadRequest request,
-        CancellationToken cancellationToken = default) =>
-        FeatureRunScope.Current.QueryAsync<SalesforceRecord>(
-            SalesforceCapabilityIds.RecordRead,
-            "salesforce",
-            FeatureRunScope.Current.Next("salesforce-record-read"),
-            request,
-            cancellationToken);
+    public Task<SalesforceRecord> ReadAsync(SalesforceRecordReadRequest request, CancellationToken cancellationToken = default) =>
+        FeatureRunScope.Current.QueryAsync<SalesforceRecord>(SalesforceCapabilityIds.RecordRead, "salesforce", FeatureRunScope.Current.Next("salesforce-record-read"), request, cancellationToken);
 }
 
-public sealed class FeatureSalesforceUpdateProposer : ISalesforceUpdateProposer
+internal sealed class FeatureSalesforceUpdateProposer : ISalesforceUpdateProposer
 {
-    public Task<SalesforceUpdateProposal> ProposeAsync(
-        SalesforceUpdateProposalRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<SalesforceUpdateProposal> ProposeAsync(SalesforceUpdateProposalRequest request, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var proposal = new SalesforceUpdateProposal(
-            request.Record,
-            request.Field,
-            request.NewValue,
-            request.LogicalOperationKey);
-        FeatureRunScope.Current.AddExternalProposal(
-            SalesforceCapabilityIds.RecordUpdatePropose,
-            "salesforce",
-            request.LogicalOperationKey,
-            proposal);
-        return Task.FromResult(proposal);
+        var proposal = new SalesforceUpdateProposal(request.Record, request.Field, request.NewValue, request.LogicalOperationKey);
+        await FeatureRunScope.Current.PrepareExternalProposalAsync(SalesforceCapabilityIds.RecordUpdatePropose, "salesforce", request.LogicalOperationKey, request, cancellationToken);
+        return proposal;
     }
 }

@@ -44,9 +44,6 @@ class ReconnectPolicy {
 
 typedef Delay = Future<void> Function(Duration duration);
 
-/// Owns runtime authentication, feed resume/reset/reconnect, acknowledgement, and
-/// action submission. Stream completion is handled in one async control path,
-/// so a later onDone can never overwrite the error that ended the stream.
 class RuntimeController extends ChangeNotifier {
   RuntimeController({
     required this.transport,
@@ -245,11 +242,7 @@ class RuntimeController extends ChangeNotifier {
           final result = feed.accept(envelope);
           if (result is FeedReset) {
             lastReset = result;
-            // after_sequence=0 can legitimately replay ordinary 1..N events
-            // when the server still retains the complete history. Clear both
-            // sequence/action state so replay converges. Keep the last
-            // rendered surface in the same authenticated scope so a chat
-            // draft, focus, and scroll position survive the snapshot repair.
+
             feed.reset();
             _forceSnapshot = true;
             reconnectImmediately = true;
@@ -283,9 +276,7 @@ class RuntimeController extends ChangeNotifier {
         if (call != null) {
           try {
             await call.cancel();
-          } catch (_) {
-            // Cancellation is best-effort and never replaces the stream error.
-          }
+          } catch (_) {}
         }
       }
 
@@ -314,8 +305,6 @@ class RuntimeController extends ChangeNotifier {
         }
       }
       if (connectionError == null && !reconnectImmediately) {
-        // Preserve any prior stream error; synthesize a close error only when
-        // the stream actually ended cleanly and unexpectedly.
         transientError ??= const TransportException(
           TransportErrorCode.unavailable,
           'Surface feed closed unexpectedly.',
@@ -413,9 +402,7 @@ class RuntimeController extends ChangeNotifier {
     if (call != null) {
       try {
         cancellation = call.cancel();
-      } catch (_) {
-        // Transport shutdown below remains the final cancellation boundary.
-      }
+      } catch (_) {}
     }
     if (closeTransport) await transport.close();
     if (cancellation != null) {

@@ -3,15 +3,12 @@ namespace DigitalBrain.Kernel.Llm;
 using Azure;
 using Azure.AI.OpenAI;
 using Azure.Identity;
-using DigitalBrain.Core.Models;
+using DigitalBrain.Kernel.Contracts.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-// Registers one keyed IChatClient per LLM model the Aspire host declared (see
-// DigitalBrainBuilderExtensions.WithModelRegistry), so grains can resolve a specific registered model's
-// client via GetRequiredKeyedService instead of only ever getting the single flat unkeyed default.
-public static class DigitalBrainChatClientRegistration
+internal static class DigitalBrainChatClientRegistration
 {
     public static IServiceCollection AddDigitalBrainChatClients(this IServiceCollection services, IConfiguration config)
     {
@@ -41,15 +38,11 @@ public static class DigitalBrainChatClientRegistration
         return services;
     }
 
-    // Mirrors DigitalBrainChat.AddDigitalBrainChat's azureopenai branch exactly (same AzureKeyCredential/
-    // DefaultAzureCredential fallback), just keyed per-registration by deployment id instead of the single
-    // global model.
     private static IChatClient BuildAzureOpenAi(DigitalBrainLlmRuntimeOptions options, string deploymentId)
     {
         if (string.IsNullOrWhiteSpace(options.AzureOpenAIEndpoint))
         {
-            throw new InvalidOperationException(
-                $"Registered azureopenai model '{deploymentId}' has no DigitalBrain:Llm:AzureOpenAIEndpoint configured.");
+            throw new InvalidOperationException($"Registered azureopenai model '{deploymentId}' has no DigitalBrain:Llm:AzureOpenAIEndpoint configured.");
         }
 
         var azureClient = (string.IsNullOrWhiteSpace(options.AzureOpenAIKey)
@@ -65,54 +58,40 @@ public static class DigitalBrainChatClientRegistration
     {
         if (string.IsNullOrWhiteSpace(options.OpenAIApiKey))
         {
-            throw new InvalidOperationException(
-                $"Registered openai model '{modelId}' has no DigitalBrain:Llm:OpenAIApiKey configured.");
+            throw new InvalidOperationException($"Registered openai model '{modelId}' has no DigitalBrain:Llm:OpenAIApiKey configured.");
         }
 
         return DigitalBrainChatClients.BuildOpenAi(modelId, options.OpenAIApiKey);
     }
 
-    // Official anthropics/anthropic-sdk-csharp AsIChatClient() is [Experimental("MEAI001")] — suppressed
-    // repo-wide in DigitalBrain.Kernel.csproj's <NoWarn>.
     private static IChatClient BuildAnthropic(DigitalBrainLlmRuntimeOptions options, string modelId)
     {
         if (string.IsNullOrWhiteSpace(options.AnthropicApiKey))
         {
-            throw new InvalidOperationException(
-                $"Registered anthropic model '{modelId}' has no DigitalBrain:Llm:AnthropicApiKey configured.");
+            throw new InvalidOperationException($"Registered anthropic model '{modelId}' has no DigitalBrain:Llm:AnthropicApiKey configured.");
         }
 
         var client = new Anthropic.AnthropicClient { ApiKey = options.AnthropicApiKey };
         return DigitalBrainChatTelemetry.Wrap(client.AsIChatClient(modelId));
     }
 
-    // xAI has no dedicated SDK — Grok's API is OpenAI-API-compatible, so this reuses the official OpenAI
-    // .NET SDK pointed at x.ai's base URL via OpenAIClientOptions.Endpoint instead of the default OpenAI one.
     private static IChatClient BuildXai(DigitalBrainLlmRuntimeOptions options, string modelId)
     {
         if (string.IsNullOrWhiteSpace(options.XaiApiKey))
         {
-            throw new InvalidOperationException(
-                $"Registered xai model '{modelId}' has no DigitalBrain:Llm:XaiApiKey configured.");
+            throw new InvalidOperationException($"Registered xai model '{modelId}' has no DigitalBrain:Llm:XaiApiKey configured.");
         }
 
-        return DigitalBrainChatClients.BuildOpenAiCompatible(
-            "https://api.x.ai/v1",
-            modelId,
-            options.XaiApiKey);
+        return DigitalBrainChatClients.BuildOpenAiCompatible("https://api.x.ai/v1", modelId, options.XaiApiKey);
     }
 
     private static IChatClient BuildGitHubModels(DigitalBrainLlmRuntimeOptions options, string modelId)
     {
         if (string.IsNullOrWhiteSpace(options.GitHubModelsToken))
         {
-            throw new InvalidOperationException(
-                $"Registered github-models model '{modelId}' has no DigitalBrain:Llm:GitHubModelsToken configured.");
+            throw new InvalidOperationException($"Registered github-models model '{modelId}' has no DigitalBrain:Llm:GitHubModelsToken configured.");
         }
 
-        return DigitalBrainChatClients.BuildGitHubModels(
-            options.GitHubModelsEndpoint,
-            modelId,
-            options.GitHubModelsToken);
+        return DigitalBrainChatClients.BuildGitHubModels(options.GitHubModelsEndpoint, modelId, options.GitHubModelsToken);
     }
 }

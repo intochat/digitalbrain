@@ -102,7 +102,6 @@ class _Canvas3DWidgetState extends State<Canvas3DWidget>
         child: AnimatedBuilder(
           animation: _spinController,
           builder: (context, child) {
-            // Apply auto-spin to yaw based on spinSpeed
             final currentYaw =
                 _yaw +
                 (_spinController.value * 2.0 * math.pi * widget.spinSpeed);
@@ -130,7 +129,6 @@ class _ProjectedItem implements Comparable<_ProjectedItem> {
 
   @override
   int compareTo(_ProjectedItem other) {
-    // Sort from back to front (descending depth)
     return other.depth.compareTo(depth);
   }
 }
@@ -175,7 +173,6 @@ class _Canvas3DPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (atoms.isEmpty) {
-      // Paint an elegant empty message
       final textPainter = TextPainter(
         text: TextSpan(
           text:
@@ -201,36 +198,33 @@ class _Canvas3DPainter extends CustomPainter {
 
     final cx = size.width / 2;
     final cy = size.height / 2;
-    final scale = math.min(cx, cy) * 0.6; // scale factor to fit viewport
+    final scale = math.min(cx, cy) * 0.6;
 
     final cosY = math.cos(yaw);
     final sinY = math.sin(yaw);
     final cosP = math.cos(pitch);
     final sinP = math.sin(pitch);
 
-    // 1. Project all atoms into 3D camera coordinates & Z-depth
     final projX = List<double>.filled(atoms.length, 0);
     final projY = List<double>.filled(atoms.length, 0);
     final projZ = List<double>.filled(atoms.length, 0);
 
     for (var i = 0; i < atoms.length; i++) {
       final a = atoms[i];
-      // Rotate around Y-axis (Yaw)
+
       final x1 = a.x * cosY - a.z * sinY;
       final z1 = a.x * sinY + a.z * cosY;
-      // Rotate around X-axis (Pitch)
+
       final y2 = a.y * cosP - z1 * sinP;
       final z2 = a.y * sinP + z1 * cosP;
 
       projX[i] = cx + x1 * scale;
       projY[i] = cy + y2 * scale;
-      projZ[i] = z2; // larger Z is further away in camera depth
+      projZ[i] = z2;
     }
 
-    // 2. Prepare draw items for depth sorting
     final drawItems = <_ProjectedItem>[];
 
-    // Add bonds as projected items
     for (final b in bonds) {
       if (b.from >= 0 &&
           b.from < atoms.length &&
@@ -254,7 +248,7 @@ class _Canvas3DPainter extends CustomPainter {
               ).createShader(Rect.fromPoints(p1, p2));
 
             canvas.drawLine(p1, p2, paint);
-            // Highlight overlay for a premium glowing 3D vibe
+
             canvas.drawLine(
               p1,
               p2,
@@ -269,14 +263,12 @@ class _Canvas3DPainter extends CustomPainter {
       }
     }
 
-    // Add atoms as projected items
     for (var i = 0; i < atoms.length; i++) {
       final a = atoms[i];
       final ax = projX[i];
       final ay = projY[i];
       final az = projZ[i];
 
-      // Perspective correction factor for radius based on Z-depth
       final factor = 1.0 / (1.0 + az * 0.15);
       final r = a.radius * factor;
       final color = _resolveColor(a.colorName);
@@ -285,15 +277,13 @@ class _Canvas3DPainter extends CustomPainter {
         _ProjectedItem(az, (canvas, size) {
           final rect = Rect.fromCircle(center: Offset(ax, ay), radius: r);
 
-          // Beautiful radial gradient shader to render the atom as a shiny 3D sphere
           final paint = Paint()
             ..shader = RadialGradient(
-              center: const Alignment(-0.35, -0.35), // light source offset
+              center: const Alignment(-0.35, -0.35),
               colors: [Colors.white, color, color.withValues(alpha: 0.7)],
               stops: const [0.0, 0.6, 1.0],
             ).createShader(rect);
 
-          // Shadow glow
           canvas.drawCircle(
             Offset(ax, ay),
             r + 3.0,
@@ -304,7 +294,6 @@ class _Canvas3DPainter extends CustomPainter {
 
           canvas.drawCircle(Offset(ax, ay), r, paint);
 
-          // Draw chemical symbol text cleanly in monospaced font
           final textPainter = TextPainter(
             text: TextSpan(
               text: a.symbol,
@@ -327,13 +316,11 @@ class _Canvas3DPainter extends CustomPainter {
       );
     }
 
-    // 3. Sort draw items from back to front (Z-depth) and paint!
     drawItems.sort();
     for (final item in drawItems) {
       item.draw(canvas, size);
     }
 
-    // Paint scene label floating in the top left
     final labelPainter = TextPainter(
       text: TextSpan(
         text: '3D CANVAS: ${sceneName.toUpperCase()}',

@@ -14,17 +14,13 @@ internal static class RuntimeStateKeyConfiguration
     private const string SectionPath = "DigitalBrain:Runtime:State";
     private static readonly byte[] DerivationSalt = Encoding.UTF8.GetBytes("digitalbrain-runtime-state-v1");
 
-    public static RuntimeStateKeyRing Load(
-        IConfiguration configuration,
-        bool requireConfiguredKeys,
-        bool production)
+    public static RuntimeStateKeyRing Load(IConfiguration configuration, bool requireConfiguredKeys, bool production)
     {
         var section = configuration.GetSection(SectionPath);
         var activeText = section["ActiveKekVersion"];
         var signingText = section["SigningKey"];
         var kekEntries = section.GetSection("Keks").GetChildren().ToArray();
-        var hasConfiguredMaterial = !string.IsNullOrWhiteSpace(activeText) ||
-                                    !string.IsNullOrWhiteSpace(signingText) || kekEntries.Length != 0;
+        var hasConfiguredMaterial = !string.IsNullOrWhiteSpace(activeText) || !string.IsNullOrWhiteSpace(signingText) || kekEntries.Length != 0;
         if (!hasConfiguredMaterial)
         {
             if (requireConfiguredKeys)
@@ -89,12 +85,7 @@ internal static class RuntimeStateKeyConfiguration
                 throw new InvalidOperationException($"{SectionPath}:Keks:{version} must decode to at least 32 bytes.");
             if (production)
                 throw new InvalidOperationException($"{SectionPath}:Keks:{version} must decode to exactly 32 bytes in Production.");
-            return HKDF.DeriveKey(
-                HashAlgorithmName.SHA256,
-                decoded,
-                32,
-                DerivationSalt,
-                Encoding.UTF8.GetBytes($"kek:{version}"));
+            return HKDF.DeriveKey(HashAlgorithmName.SHA256, decoded, 32, DerivationSalt, Encoding.UTF8.GetBytes($"kek:{version}"));
         }
         finally
         {
@@ -126,11 +117,7 @@ internal static class RuntimeStateNamespace
         RuntimeStateStorageNames.Container(storageNamespace, kind);
 }
 
-internal sealed record RuntimeStateHealthMetadata(
-    string BackendKind,
-    string StorageNamespace,
-    int SchemaVersion,
-    int ActiveKekVersion);
+internal sealed record RuntimeStateHealthMetadata(string BackendKind, string StorageNamespace, int SchemaVersion, int ActiveKekVersion);
 
 internal sealed class RuntimeStateHealthCheck : IHealthCheck
 {
@@ -141,9 +128,7 @@ internal sealed class RuntimeStateHealthCheck : IHealthCheck
         _metadata = metadata;
     }
 
-    public Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context,
-        CancellationToken cancellationToken = default)
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         var data = new Dictionary<string, object>
         {

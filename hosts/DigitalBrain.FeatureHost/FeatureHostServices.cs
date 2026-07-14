@@ -11,11 +11,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.FeatureHost;
 
-public static class FeatureHostServices
+internal static class FeatureHostServices
 {
-    public static IServiceCollection AddDigitalBrainFeatureHost(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    public static IServiceCollection AddDigitalBrainFeatureHost(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -28,20 +26,11 @@ public static class FeatureHostServices
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IFeatureHostRecycle, HostedFeatureHostRecycle>();
-        services.TryAddSingleton(serviceProvider => new FeatureReleaseManager(
-            serviceProvider,
-            serviceProvider.GetRequiredService<IFeatureHostRecycle>(),
-            configuration["DigitalBrain:FeatureHost:CacheDirectory"]));
-        services.TryAddSingleton<IFeatureArtifactCatalog>(serviceProvider => new BlobFeatureArtifactCatalog(
-            serviceProvider.GetRequiredKeyedService<BlobServiceClient>("features"),
-            configuration["DigitalBrain:FeatureHost:ArtifactCacheDirectory"]));
+        services.TryAddSingleton(serviceProvider => new FeatureReleaseManager(serviceProvider, serviceProvider.GetRequiredService<IFeatureHostRecycle>(), configuration["DigitalBrain:FeatureHost:CacheDirectory"]));
+        services.TryAddSingleton<IFeatureArtifactCatalog>(serviceProvider => new BlobFeatureArtifactCatalog(serviceProvider.GetRequiredKeyedService<BlobServiceClient>("features"), configuration["DigitalBrain:FeatureHost:ArtifactCacheDirectory"]));
         services.TryAddSingleton<IFeatureWorkSource, OrleansFeatureWorkSource>();
         services.TryAddSingleton<IFeatureRunContextFactory, CapabilityFeatureRunContextFactory>();
-        services.TryAddSingleton(new FeatureExecutionOptions(
-            $"feature-host-{Environment.MachineName}-{Guid.NewGuid():N}",
-            TimeSpan.FromSeconds(45),
-            TimeSpan.FromSeconds(10),
-            TimeSpan.FromSeconds(5)));
+        services.TryAddSingleton(new FeatureExecutionOptions($"feature-host-{Environment.MachineName}-{Guid.NewGuid():N}", TimeSpan.FromSeconds(45), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(5)));
         services.TryAddSingleton<IFeatureCapabilityClient>(_ =>
         {
             var client = new HttpClient();
@@ -68,23 +57,15 @@ public static class FeatureHostServices
     }
 }
 
-public sealed class HttpFeatureCapabilityClient(HttpClient client) : IFeatureCapabilityClient, IDisposable
+internal sealed class HttpFeatureCapabilityClient(HttpClient client) : IFeatureCapabilityClient, IDisposable
 {
-    public async Task<JsonElement> ExecuteAsync(
-        CapabilityRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        using var response = await client.PostAsJsonAsync(
-            "/internal/features/capabilities/execute",
-            request,
-            FeatureJson.Options,
-            cancellationToken);
+        using var response = await client.PostAsJsonAsync("/internal/features/capabilities/execute", request, FeatureJson.Options, cancellationToken);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException("RuntimeHost denied or failed the feature capability operation.");
-        var result = await response.Content.ReadFromJsonAsync<FeatureCapabilityResponse>(
-            FeatureJson.Options,
-            cancellationToken) ?? throw new InvalidOperationException("RuntimeHost returned no capability result.");
+        var result = await response.Content.ReadFromJsonAsync<FeatureCapabilityResponse>(FeatureJson.Options, cancellationToken) ?? throw new InvalidOperationException("RuntimeHost returned no capability result.");
         return result.Payload.Clone();
     }
 

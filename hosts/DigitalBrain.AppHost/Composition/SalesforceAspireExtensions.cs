@@ -1,12 +1,9 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel.Contracts;
 
 namespace DigitalBrain.AppHost;
 
-/// <summary>
-/// Aspire wiring for Salesforce app-level configuration used by the kernel.
-/// </summary>
 internal static class SalesforceAspireExtensions
 {
     public const string ClientIdParameterName = "salesforce-client-id";
@@ -22,52 +19,28 @@ internal static class SalesforceAspireExtensions
     private const string SalesforceSetupUrl = "https://login.salesforce.com/lightning/setup/SetupOneHome/home";
     private const string SalesforceConnectedAppGuideUrl = "https://developer.salesforce.com/docs/platform/mobile-sdk/guide/connected-apps-howto";
 
-    public static SalesforceAppConfigParameters AddSalesforceAppConfig(
-        this IDistributedApplicationBuilder builder)
+    public static SalesforceAppConfigParameters AddSalesforceAppConfig(this IDistributedApplicationBuilder builder)
     {
         var defaultRedirectUri = ResolveRedirectUri(builder);
 
-        var clientId = builder.AddParameter(ClientIdParameterName, secret: true)
-            .WithDescription(
-                SalesforceConnectedAppParameterDescription("Consumer Key (client ID)", defaultRedirectUri),
-                enableMarkdown: true);
+        var clientId = builder.AddParameter(ClientIdParameterName, secret: true).WithDescription(SalesforceConnectedAppParameterDescription("Consumer Key (client ID)", defaultRedirectUri), enableMarkdown: true);
 
-        var clientSecret = builder.AddParameter(ClientSecretParameterName, secret: true)
-            .WithDescription(
-                SalesforceConnectedAppParameterDescription("Consumer Secret (client secret)", defaultRedirectUri),
-                enableMarkdown: true);
+        var clientSecret = builder.AddParameter(ClientSecretParameterName, secret: true).WithDescription(SalesforceConnectedAppParameterDescription("Consumer Secret (client secret)", defaultRedirectUri), enableMarkdown: true);
 
-        var redirectUri = builder.AddParameter(RedirectUriParameterName, defaultRedirectUri, publishValueAsDefault: true)
-            .WithDescription(
-                SalesforceRedirectUriDescription(defaultRedirectUri),
-                enableMarkdown: true);
+        var redirectUri = builder.AddParameter(RedirectUriParameterName, defaultRedirectUri, publishValueAsDefault: true).WithDescription(SalesforceRedirectUriDescription(defaultRedirectUri), enableMarkdown: true);
 
-        var loginUrl = builder.AddParameter(LoginUrlParameterName, DefaultLoginUrl, publishValueAsDefault: true)
-            .WithDescription(
+        var loginUrl = builder.AddParameter(LoginUrlParameterName, DefaultLoginUrl, publishValueAsDefault: true).WithDescription(
                 "Salesforce login URL. Use [login.salesforce.com](https://login.salesforce.com) for production, [test.salesforce.com](https://test.salesforce.com) for sandboxes, or your My Domain login URL.",
                 enableMarkdown: true);
 
-        var apiVersion = builder.AddParameter(ApiVersionParameterName, DefaultApiVersion, publishValueAsDefault: true)
-            .WithDescription(
-                "Salesforce REST API version used by CRM queries, for example `v60.0`.",
-                enableMarkdown: true);
+        var apiVersion = builder.AddParameter(ApiVersionParameterName, DefaultApiVersion, publishValueAsDefault: true).WithDescription("Salesforce REST API version used by CRM queries, for example `v60.0`.", enableMarkdown: true);
 
-        return new SalesforceAppConfigParameters(
-            clientId,
-            clientSecret,
-            redirectUri,
-            loginUrl,
-            apiVersion,
-            defaultRedirectUri);
+        return new SalesforceAppConfigParameters(clientId, clientSecret, redirectUri, loginUrl, apiVersion, defaultRedirectUri);
     }
 
-    public static IResourceBuilder<T> WithSalesforceAppConfig<T>(
-        this IResourceBuilder<T> resource,
-        SalesforceAppConfigParameters parameters)
+    public static IResourceBuilder<T> WithSalesforceAppConfig<T>(this IResourceBuilder<T> resource, SalesforceAppConfigParameters parameters)
         where T : IResourceWithEnvironment =>
-        resource
-            .WithEnvironment("DigitalBrain__Salesforce__ClientId", parameters.ClientId)
-            .WithEnvironment("DigitalBrain__Salesforce__ClientSecret", parameters.ClientSecret)
+        resource.WithEnvironment("DigitalBrain__Salesforce__ClientId", parameters.ClientId).WithEnvironment("DigitalBrain__Salesforce__ClientSecret", parameters.ClientSecret)
             .WithEnvironment("DigitalBrain__Salesforce__LoginUrl", parameters.LoginUrl)
             .WithEnvironment("DigitalBrain__Salesforce__ApiVersion", parameters.ApiVersion)
             .WithEnvironment("DigitalBrain__Salesforce__RedirectUri", parameters.RedirectUri);

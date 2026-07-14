@@ -3,7 +3,7 @@ using System.Text;
 
 namespace DigitalBrain.Kernel.Runtime;
 
-public sealed class InoEffectPlanAuthority(IRuntimeStateKeyRing keys)
+internal sealed class InoEffectPlanAuthority(IRuntimeStateKeyRing keys)
 {
     private const string Prefix = "plan-v1.";
     private const string ExecutionPurpose = "digitalbrain-ino-effect-execution-v1";
@@ -19,42 +19,26 @@ public sealed class InoEffectPlanAuthority(IRuntimeStateKeyRing keys)
         return Prefix + planId + "." + summaryDigest + "." + Base64UrlEncode(signature);
     }
 
-    public bool TryValidate(
-        string? scope,
-        string actorScope,
-        string toolId,
-        string safeSummary,
-        out string planId)
+    public bool TryValidate(string? scope, string actorScope, string toolId, string safeSummary, out string planId)
     {
-        if (!TryValidateToken(scope, actorScope, toolId, out planId, out var summaryDigest) ||
-            !IsSafeSummary(safeSummary))
+        if (!TryValidateToken(scope, actorScope, toolId, out planId, out var summaryDigest) || !IsSafeSummary(safeSummary))
             return false;
         var expectedDigest = SummaryDigest(safeSummary);
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.ASCII.GetBytes(expectedDigest),
-            Encoding.ASCII.GetBytes(summaryDigest));
+        return CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expectedDigest), Encoding.ASCII.GetBytes(summaryDigest));
     }
 
-    public bool TryValidateToken(
-        string? scope,
-        string actorScope,
-        string toolId,
-        out string planId,
-        out string summaryDigest)
+    public bool TryValidateToken(string? scope, string actorScope, string toolId, out string planId, out string summaryDigest)
     {
         planId = string.Empty;
         summaryDigest = string.Empty;
-        if (!IsScopeHash(actorScope) || !IsToolId(toolId) || scope is null ||
-            !scope.StartsWith(Prefix, StringComparison.Ordinal))
+        if (!IsScopeHash(actorScope) || !IsToolId(toolId) || scope is null || !scope.StartsWith(Prefix, StringComparison.Ordinal))
             return false;
 
         var planSeparator = scope.IndexOf('.', Prefix.Length);
-        if (planSeparator < 0 || planSeparator != Prefix.Length + 64 ||
-            !IsScopeHash(scope.AsSpan(Prefix.Length, 64)))
+        if (planSeparator < 0 || planSeparator != Prefix.Length + 64 || !IsScopeHash(scope.AsSpan(Prefix.Length, 64)))
             return false;
         var digestSeparator = scope.IndexOf('.', planSeparator + 1);
-        if (digestSeparator != planSeparator + 65 ||
-            !IsScopeHash(scope.AsSpan(planSeparator + 1, 64)))
+        if (digestSeparator != planSeparator + 65 || !IsScopeHash(scope.AsSpan(planSeparator + 1, 64)))
             return false;
 
         var candidatePlanId = scope.Substring(Prefix.Length, 64);
@@ -74,18 +58,10 @@ public sealed class InoEffectPlanAuthority(IRuntimeStateKeyRing keys)
     {
         if (!IsSafeSummary(safeSummary) || !IsScopeHash(summaryDigest)) return false;
         var expected = SummaryDigest(safeSummary);
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.ASCII.GetBytes(expected),
-            Encoding.ASCII.GetBytes(summaryDigest));
+        return CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(summaryDigest));
     }
 
-    public string IssueExecutionProof(
-        string planId,
-        string actorScope,
-        string operationId,
-        string toolId,
-        string effectId,
-        string providerIdempotencyKey)
+    public string IssueExecutionProof(string planId, string actorScope, string operationId, string toolId, string effectId, string providerIdempotencyKey)
     {
         DemandScopeHash(planId, nameof(planId));
         DemandScopeHash(actorScope, nameof(actorScope));
@@ -93,47 +69,28 @@ public sealed class InoEffectPlanAuthority(IRuntimeStateKeyRing keys)
         DemandBoundedId(operationId, nameof(operationId));
         DemandBoundedId(effectId, nameof(effectId));
         DemandBoundedId(providerIdempotencyKey, nameof(providerIdempotencyKey));
-        return Base64UrlEncode(SignExecution(
-            planId, actorScope, operationId, toolId, effectId, providerIdempotencyKey));
+        return Base64UrlEncode(SignExecution(planId, actorScope, operationId, toolId, effectId, providerIdempotencyKey));
     }
 
-    public bool ValidateExecutionProof(
-        string? proof,
-        string planId,
-        string actorScope,
-        string operationId,
-        string toolId,
-        string effectId,
-        string providerIdempotencyKey)
+    public bool ValidateExecutionProof(string? proof, string planId, string actorScope, string operationId, string toolId, string effectId, string providerIdempotencyKey)
     {
-        if (!IsScopeHash(planId) || !IsScopeHash(actorScope) || !IsToolId(toolId) ||
-            !IsBoundedId(operationId) || !IsBoundedId(effectId) || !IsBoundedId(providerIdempotencyKey) ||
+        if (!IsScopeHash(planId) || !IsScopeHash(actorScope) || !IsToolId(toolId) || !IsBoundedId(operationId) || !IsBoundedId(effectId) || !IsBoundedId(providerIdempotencyKey) ||
             proof is null || !TryBase64UrlDecode(proof, out var supplied) || supplied.Length != 32)
             return false;
-        var expected = SignExecution(
-            planId, actorScope, operationId, toolId, effectId, providerIdempotencyKey);
+        var expected = SignExecution(planId, actorScope, operationId, toolId, effectId, providerIdempotencyKey);
         return CryptographicOperations.FixedTimeEquals(expected, supplied);
     }
 
     private byte[] Sign(string planId, string actorScope, string toolId, string summaryDigest)
     {
         using var hmac = new HMACSHA256(keys.SigningKey.ToArray());
-        return hmac.ComputeHash(Encoding.UTF8.GetBytes(
-            "digitalbrain-ino-effect-plan-v1\0" + planId + "\0" + actorScope + "\0" + toolId + "\0" + summaryDigest));
+        return hmac.ComputeHash(Encoding.UTF8.GetBytes("digitalbrain-ino-effect-plan-v1\0" + planId + "\0" + actorScope + "\0" + toolId + "\0" + summaryDigest));
     }
 
-    private byte[] SignExecution(
-        string planId,
-        string actorScope,
-        string operationId,
-        string toolId,
-        string effectId,
-        string providerIdempotencyKey)
+    private byte[] SignExecution(string planId, string actorScope, string operationId, string toolId, string effectId, string providerIdempotencyKey)
     {
         using var hmac = new HMACSHA256(keys.SigningKey.ToArray());
-        return hmac.ComputeHash(Encoding.UTF8.GetBytes(
-            ExecutionPurpose + "\0" + planId + "\0" + actorScope + "\0" + operationId + "\0" + toolId +
-            "\0" + effectId + "\0" + providerIdempotencyKey));
+        return hmac.ComputeHash(Encoding.UTF8.GetBytes(ExecutionPurpose + "\0" + planId + "\0" + actorScope + "\0" + operationId + "\0" + toolId + "\0" + effectId + "\0" + providerIdempotencyKey));
     }
 
     private static void DemandScopeHash(string value, string name)
@@ -177,8 +134,7 @@ public sealed class InoEffectPlanAuthority(IRuntimeStateKeyRing keys)
     }
 
     private static bool IsSafeSummary(string? value) =>
-        !string.IsNullOrWhiteSpace(value) && value.Length <= InoEffectPlanTransitions.MaximumSafeTextLength &&
-        !value.Any(char.IsControl);
+        !string.IsNullOrWhiteSpace(value) && value.Length <= InoEffectPlanTransitions.MaximumSafeTextLength && !value.Any(char.IsControl);
 
     private static string SummaryDigest(string safeSummary) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(safeSummary)));

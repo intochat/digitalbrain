@@ -1,6 +1,6 @@
 namespace DigitalBrain.Kernel.Features;
 
-public static class FeatureLimits
+internal static class FeatureLimits
 {
     public const int InstallationsPerOwner = 100;
     public const int InboxEntries = 1_000;
@@ -15,6 +15,6 @@ public static class FeatureLimits
     public static readonly TimeSpan RunDeadline = TimeSpan.FromSeconds(60);
 }
 
-public sealed class FeatureLimitExceededException(string message) : InvalidOperationException(message);
+internal sealed class FeatureLimitExceededException(string message) : InvalidOperationException(message);
 
-public sealed class FeatureConcurrencyException(string message) : InvalidOperationException(message);
+internal sealed class FeatureConcurrencyException(string message) : InvalidOperationException(message);
