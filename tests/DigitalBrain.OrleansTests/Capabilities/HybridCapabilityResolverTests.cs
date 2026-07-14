@@ -51,6 +51,16 @@ public sealed class HybridCapabilityResolverTests
         Assert.NotEqual(GoogleCapabilityIds.GmailSendPropose, result.Receipt.CapabilityId);
     }
 
+    [Fact]
+    public async Task ResolveAsync_surfaces_ambiguity_when_match_budget_is_one()
+    {
+        var request = Request("show customer records", connections: ["google", "salesforce"]) with { MaximumMatches = 1 };
+
+        var result = await ResolverWithEqualVectors().ResolveAsync(request);
+
+        Assert.Equal(CapabilityResolutionKind.Ambiguous, result.Receipt.Kind);
+    }
+
     private static BuiltInCapabilityCatalog Catalog() =>
         new([new GoogleCapabilityDescriptorSource(), new SalesforceCapabilityDescriptorSource()]);
 

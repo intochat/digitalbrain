@@ -50,14 +50,14 @@ internal sealed class HybridCapabilityResolver(
             })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Descriptor.Id, StringComparer.Ordinal)
-            .Take(request.MaximumMatches)
             .ToArray();
 
+        var reported = ranked.Take(request.MaximumMatches).ToArray();
         var first = ranked[0];
-        if (first.Score < MatchThreshold) return Missing(ranked);
+        if (first.Score < MatchThreshold) return Missing(reported);
         if (ranked.Length > 1 && first.Score - ranked[1].Score < AmbiguityMargin)
-            return Ambiguous(ranked);
-        return Match(first, ranked);
+            return Ambiguous(reported);
+        return Match(first, reported);
     }
 
     internal static string SearchDocument(CapabilityDescriptor descriptor) =>
