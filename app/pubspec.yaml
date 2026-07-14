@@ -31,11 +31,11 @@ dependencies:
 
   rfw: ^1.0.0
   graphic: ^2.7.0
-  forui: ^0.21.3
+  forui: ^0.24.0
 
 
 
-  lottie: ^3.3.3
+  lottie: ^3.5.1
   flutter_earth_globe: ^2.2.1
   shared_preferences: ^2.5.5
   flutter_web_plugins:
@@ -49,7 +49,7 @@ dependencies:
   digital_brain_sdk_flutter:
     path: packages/digital_brain_sdk_flutter
 
-  widgetbook: any
+  widgetbook: 3.25.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
