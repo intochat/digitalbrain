@@ -17,11 +17,11 @@ jobs:
       name: production
     steps:
       - name: Checkout
-        # actions/checkout@v4
+
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Setup Node
-        # actions/setup-node@v4
+
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22.x
@@ -37,7 +37,7 @@ jobs:
           echo "$HOME/.aspire/bin" >> "$GITHUB_PATH"
 
       - name: Azure Login
-        # azure/login@v2
+
         uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}

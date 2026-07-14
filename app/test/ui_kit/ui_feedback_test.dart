@@ -7,12 +7,17 @@ import 'package:digitalbrain_flutter/ui_kit/ui_spinner.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_tooltip.dart';
 
 Widget _host(Widget child) => MaterialApp(
-      home: FTheme(data: FThemes.neutral.light.touch, child: FScaffold(child: child)),
-    );
+  home: FTheme(
+    data: FThemes.neutral.light.touch,
+    child: FScaffold(child: child),
+  ),
+);
 
 void main() {
   testWidgets('Alert shows title and subtitle', (tester) async {
-    await tester.pumpWidget(_host(const UiKitAlert(title: 'Heads up', subtitle: 'details')));
+    await tester.pumpWidget(
+      _host(const UiKitAlert(title: 'Heads up', subtitle: 'details')),
+    );
     expect(find.text('Heads up'), findsOneWidget);
     expect(find.text('details'), findsOneWidget);
   });
@@ -28,7 +33,9 @@ void main() {
   });
 
   testWidgets('Tooltip wraps its child', (tester) async {
-    await tester.pumpWidget(_host(UiKitTooltip(tip: 'hint', child: const Text('hover me'))));
+    await tester.pumpWidget(
+      _host(UiKitTooltip(tip: 'hint', child: const Text('hover me'))),
+    );
     expect(find.text('hover me'), findsOneWidget);
   });
 }

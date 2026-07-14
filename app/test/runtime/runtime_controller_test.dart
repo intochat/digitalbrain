@@ -727,10 +727,7 @@ void main() {
         bootstrapResults: [
           testSession(),
           testSession(
-            identity: testIdentity(
-              principal: 'principal-b',
-              session: 'session-b',
-            ),
+            identity: testIdentity(actor: 'actor-b', session: 'session-b'),
           ),
         ],
         actionResult: receipt.future,

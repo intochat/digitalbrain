@@ -1,6 +1,3 @@
-/// Public barrel for the future `digital-brain-ui` pub package.
-/// When the package is extracted, this file becomes lib/digital_brain_ui.dart
-/// at the new repo root with no other code changes.
 library;
 
 export 'breakpoints/window_size.dart';
@@ -13,7 +10,6 @@ export 'adaptive/adaptive_sheet.dart';
 export 'adaptive/adaptive_side_sheet.dart';
 export 'adaptive/adaptive_surface.dart';
 
-// glass/*, rfw/*, debug/* added by later tasks.
 export 'debug/debug_brain_stats.dart';
 export 'glass/glass_material.dart';
 export 'glass/liquid_glass_surface.dart';

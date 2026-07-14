@@ -12,8 +12,6 @@ import 'runtime.dart';
 
 const Duration unaryRequestTimeout = Duration(seconds: 10);
 
-/// Small generated-client seam used by transport tests. Production always
-/// uses [_GeneratedGrpcClientPort].
 abstract interface class GrpcClientPort {
   GrpcUnaryResponse<wire.SessionReply> bootstrapSession(
     wire.BootstrapSessionRequest request,
@@ -71,8 +69,7 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
         'DigitalBrain transport requires an HTTPS endpoint.',
       );
     }
-    // grpc-dart's optional timeline profiler includes call metadata. UI call
-    // metadata contains the signed session, so it must stay disabled.
+
     isTimelineLoggingEnabled = false;
     final port = endpoint.hasPort ? endpoint.port : 443;
     final channel = GrpcOrGrpcWebClientChannel.toSingleEndpoint(
@@ -255,9 +252,7 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
     for (final response in pending) {
       try {
         await response.cancel();
-      } catch (_) {
-        // Channel shutdown below is the final cancellation boundary.
-      }
+      } catch (_) {}
     }
     await _close();
   }
@@ -287,9 +282,8 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
     return SessionBundle(
       identity: SessionIdentity(
         sessionId: reply.sessionId,
-        tenantId: reply.tenantId,
-        workspaceId: reply.workspaceId,
-        principalId: reply.principalId,
+        ownerId: reply.ownerId,
+        actorId: reply.actorId,
       ),
       credentials: SessionCredentials(
         accessToken: reply.accessToken,
@@ -327,10 +321,8 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
 
   static wire.FeedAudienceKind _wireAudience(FeedAudience audience) =>
       switch (audience) {
-        FeedAudience.principal =>
-          wire.FeedAudienceKind.FEED_AUDIENCE_KIND_PRINCIPAL,
-        FeedAudience.workspace =>
-          wire.FeedAudienceKind.FEED_AUDIENCE_KIND_WORKSPACE,
+        FeedAudience.actor => wire.FeedAudienceKind.FEED_AUDIENCE_KIND_ACTOR,
+        FeedAudience.owner => wire.FeedAudienceKind.FEED_AUDIENCE_KIND_OWNER,
         FeedAudience.public => wire.FeedAudienceKind.FEED_AUDIENCE_KIND_PUBLIC,
       };
 
@@ -519,11 +511,10 @@ const Set<String> _forbiddenActionInputKeys = {
   'actiontoken',
   'authorization',
   'clientsecret',
-  'principalid',
+  'actorid',
+  'ownerid',
   'refreshtoken',
   'sessionid',
-  'tenantid',
-  'workspaceid',
 };
 
 void _validateActionInput(Object? value, [int depth = 0]) {

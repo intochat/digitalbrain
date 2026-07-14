@@ -1,16 +1,16 @@
 <Project>
   <PropertyGroup>
-    <!--
-      Defaults for fast .NET-only development loop.
 
-      - SkipFlutterBuild: skips pub get + flutter build web (Flutter CLI not required for most .NET work)
-      - SkipDeployBuild: skips the standalone Pulumi deploy project
 
-      These are opt-in skips. To force full builds (e.g. before release or in CI when needed):
-        dotnet build Brain.slnx -p:SkipFlutterBuild=false -p:SkipDeployBuild=false
 
-      This eliminates the need to type -p: flags for every normal `dotnet build` / `dotnet test`.
-    -->
+
+
+
+
+
+
+
+
     <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">true</SkipFlutterBuild>
     <SkipDeployBuild Condition="'$(SkipDeployBuild)' == ''">true</SkipDeployBuild>
     <EnforceCodeStyleInBuild Condition="'$(EnforceCodeStyleInBuild)' == ''">true</EnforceCodeStyleInBuild>

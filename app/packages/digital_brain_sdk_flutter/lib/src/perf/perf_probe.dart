@@ -21,8 +21,8 @@ class PerfProbe extends StatefulWidget {
   final Widget child;
   final Duration samplePeriod;
 
-  // Element-tree DFS dominates per-sample cost; subsample to keep the UI
-  // isolate quiet. At samplePeriod=1s, default 5 → census at 0.2 Hz.
+
+
   final int censusEveryNFlushes;
 
   @override
@@ -39,8 +39,8 @@ class _PerfProbeState extends State<PerfProbe> {
   @override
   void initState() {
     super.initState();
-    // Skip probe work in release. Tier downgrade still flows independently
-    // via PerfStream.bootstrap's watchHints, owned by main.dart.
+
+
     if (kReleaseMode) return;
     SchedulerBinding.instance.addTimingsCallback(_onTimings);
     _ticker = Timer.periodic(widget.samplePeriod, (_) => _flush());
@@ -72,8 +72,8 @@ class _PerfProbeState extends State<PerfProbe> {
     final jankCount = sortedMs.where((m) => m > 16.0).length;
     final jankPct = jankCount / sortedMs.length;
     _flushCounter++;
-    // First flush captures so the published widgetCount is meaningful from
-    // sample 1; subsequent captures every Nth flush.
+
+
     final isFirstFlush = _lastCensus.widgetCount == 0;
     if (isFirstFlush || _flushCounter % widget.censusEveryNFlushes == 0) {
       _lastCensus = WidgetCensus.capture(WidgetsBinding.instance);

@@ -6,6 +6,7 @@ import 'package:digitalbrain_flutter/runtime/runtime.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_composer.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_conversation_view.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/runtime_shell.dart';
+import 'package:digitalbrain_flutter/runtime/widgets/surface_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -43,6 +44,58 @@ void main() {
     expect(find.text('Ask INO about this workspace.'), findsOneWidget);
     expect(find.byKey(inoComposerFieldKey), findsOneWidget);
     expect(transport.bootstrapSecret, 'bootstrap-once');
+
+    await runtime.stop();
+  });
+
+  testWidgets('feature approval stays on the authenticated chat feed route', (
+    tester,
+  ) async {
+    final feed = _ShellFeedCall.open();
+    final transport = _ShellTransport(feed);
+    final runtime = _runtime(transport);
+
+    await tester.pumpWidget(
+      _host(
+        RuntimeShell(
+          configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+          controller: runtime,
+        ),
+      ),
+    );
+    await _pumpUntil(tester, () => transport.watchStarted);
+    feed.add(
+      FeedSurfaceJson(
+        surfaceJsonString(
+          sequence: 1,
+          payload: featureApprovalPayload(),
+          actions: [
+            testActionJson(
+              bindingId: 'feature-approval-${List.filled(64, 'a').join()}',
+              actionType: 'feature.release.decision.v1',
+            ),
+          ],
+        ),
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(featureApprovalApproveKey).evaluate().isNotEmpty,
+    );
+    await tester.ensureVisible(find.byKey(featureApprovalApproveKey));
+    await tester.tap(find.byKey(featureApprovalApproveKey));
+    await _pumpUntil(tester, () => transport.submittedInput != null);
+
+    expect(
+      transport.submittedAction?.bindingId,
+      'feature-approval-${List.filled(64, 'a').join()}',
+    );
+    expect(
+      transport.submittedInput?['releaseDigest'],
+      List.filled(64, 'b').join(),
+    );
+    expect(transport.submittedInput?['expectedRevision'], 7);
+    expect(transport.submittedInput?['decision'], 'approve');
 
     await runtime.stop();
   });
@@ -318,6 +371,8 @@ class _ShellTransport implements UiTransport {
   String? bootstrapSecret;
   bool watchStarted = false;
   int closeCount = 0;
+  UiActionRef? submittedAction;
+  Map<String, Object?>? submittedInput;
 
   @override
   Future<SessionBundle> bootstrapSession(String bootstrapSecret) async {
@@ -356,10 +411,14 @@ class _ShellTransport implements UiTransport {
     required String accessToken,
     required UiActionRef action,
     required Map<String, Object?> input,
-  }) async => const ActionResult(
-    operationId: 'operation-a',
-    idempotencyKey: 'idempotency-a',
-  );
+  }) async {
+    submittedAction = action;
+    submittedInput = input;
+    return const ActionResult(
+      operationId: 'operation-a',
+      idempotencyKey: 'idempotency-a',
+    );
+  }
 
   @override
   Future<void> close() async {

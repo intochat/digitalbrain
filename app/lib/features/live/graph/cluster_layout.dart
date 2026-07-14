@@ -47,8 +47,7 @@ class GraphEdge {
 vm.Vector3 sphericalSeed(String id, String domain) {
   final base = styleForDomain(domain).anchor;
   final rng = Random(id.hashCode);
-  // Scatter within a small ball around the domain anchor so neurons in the
-  // same domain start near each other but don't overlap.
+
   final dx = (rng.nextDouble() - 0.5) * 80;
   final dy = (rng.nextDouble() - 0.5) * 80;
   final dz = (rng.nextDouble() - 0.5) * 80;
@@ -71,8 +70,6 @@ void stepLayout({
     n.force.setZero();
   }
 
-  // O(n^2) repulsion — clamped to 200 nodes is fine. Past that the inner
-  // loop turns into a perf cliff; switch to a quadtree if it ever matters.
   for (var i = 0; i < nodes.length; i++) {
     for (var j = i + 1; j < nodes.length; j++) {
       final delta = nodes[i].position - nodes[j].position;
@@ -85,7 +82,6 @@ void stepLayout({
     }
   }
 
-  // Edge attraction (existing semantics from brain_view_screen.dart).
   final byId = {for (final n in nodes) n.id: n};
   for (final e in edges) {
     final a = byId[e.fromId];
@@ -100,7 +96,6 @@ void stepLayout({
     b.force.sub(dir * f);
   }
 
-  // Cluster cohesion: pull each node toward its domain anchor.
   for (final n in nodes) {
     final anchor = styleForDomain(n.domain).anchor;
     final delta = anchor - n.position;

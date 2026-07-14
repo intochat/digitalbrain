@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Integrations.Salesforce.Contracts\DigitalBrain.Integrations.Salesforce.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DeveloperForce.Force" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="DigitalBrain.Integrations.Salesforce.Grains" />
+  </ItemGroup>
+
+</Project>

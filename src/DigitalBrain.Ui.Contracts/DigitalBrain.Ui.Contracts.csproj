@@ -16,6 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
   </ItemGroup>
 </Project>

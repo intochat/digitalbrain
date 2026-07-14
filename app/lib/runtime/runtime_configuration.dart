@@ -14,9 +14,6 @@ class RuntimeConfiguration {
 
   final Uri endpoint;
 
-  /// A local, scope-limited bootstrap exchange credential supplied to the
-  /// desktop process by Aspire. It is not an access token and is never accepted
-  /// from a URL or compiled into the Flutter application.
   final String? bootstrapSecret;
   final ExternalIdentityConfiguration? externalIdentity;
 

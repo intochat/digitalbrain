@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <ReqnrollUseIntermediateOutputPathForCodeBehind>true</ReqnrollUseIntermediateOutputPathForCodeBehind>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Grpc.Net.Client.Web" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="Microsoft.Orleans.TestingHost" />
+    <PackageReference Include="Reqnroll" />
+    <PackageReference Include="Reqnroll.Tools.MsBuild.Generation" />
+    <PackageReference Include="Reqnroll.xUnit" />
+    <PackageReference Include="Xunit.SkippableFact" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\hosts\DigitalBrain.RuntimeHost\DigitalBrain.RuntimeHost.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce\DigitalBrain.Integrations.Salesforce.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" Aliases="McpProject" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="DigitalBrain.Kernel.Contracts" />
+    <Using Include="DigitalBrain.Integrations.Salesforce.Grains" />
+    <Using Include="DigitalBrain.Ui.Contracts" />
+  </ItemGroup>
+
+</Project>

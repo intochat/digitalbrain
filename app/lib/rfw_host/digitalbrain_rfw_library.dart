@@ -1,12 +1,3 @@
-// The DigitalBrain RFW widget dictionary.
-//
-// This is the *fixed, host-owned* vocabulary an RFW document may compose.
-// It is small and slow-changing on purpose: the Creator generates trees
-// over these primitives (no client rebuild), and because every widget here
-// reads `Theme.of(context)` / DigitalBrainColors, generated UI inherits the
-// DigitalBrain visual language for free. No arbitrary code is ever executed —
-// an RFW document can only assemble these vetted widgets.
-
 import 'dart:convert';
 import 'dart:ui' show ImageFilter;
 
@@ -70,12 +61,7 @@ Map<String, LocalWidgetBuilder> get _widgets => <String, LocalWidgetBuilder>{
   },
   'TelemetryPanel': _telemetryPanel,
   'LlmSettingsPanel': _llmSettingsPanel,
-
-  // Pruned per P1.14 audit (kernel only emits via UiKitVocabulary + real surfaces from UiSurfaceRuntime / Pack / neurons).
-  // Removed: Image, Tag, KeyValue, Bars, Metric, SectionLabel, GlowIcon, Bullets, AdaptiveContainer, Counter, Stars, Calendar, Donut, demo tabs, palette extras.
 };
-
-// (helpers provided via parts)
 
 Widget _table(BuildContext c, DataSource s) {
   final nc = s.length(['columns']);
@@ -129,8 +115,6 @@ Widget _table(BuildContext c, DataSource s) {
   return Column(mainAxisSize: MainAxisSize.min, children: children);
 }
 
-// ── code editor ────────────────────────────────────────────
-
 Widget _codeEditor(BuildContext c, DataSource s) {
   final text = _str(s, 'text');
   final typing = _bool(s, 'typing', false);
@@ -153,7 +137,6 @@ String? resolveWordToFqn(String word, String fullText) {
     return word;
   }
 
-  // 1. using alias = synapse(FQN)
   final usingReg = RegExp(
     r'\busing\s+' +
         RegExp.escape(word) +
@@ -165,7 +148,6 @@ String? resolveWordToFqn(String word, String fullText) {
     return usingMatch.group(1)!.trim();
   }
 
-  // 2. Bound variable: on/given synapse alias/FQN word
   final boundReg = RegExp(
     r'\b(?:on|given)\s+synapse\s+(?:([a-zA-Z_]\w*)|([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)+))\s+' +
         RegExp.escape(word) +
@@ -179,7 +161,6 @@ String? resolveWordToFqn(String word, String fullText) {
     if (fqn != null) {
       return fqn;
     } else if (alias != null) {
-      // Recursively resolve
       return resolveWordToFqn(alias, fullText);
     }
   }
@@ -214,11 +195,9 @@ class InoLangTextEditingController extends TextEditingController {
     final List<InlineSpan> spans = <InlineSpan>[];
     int lastMatchEnd = 0;
 
-    // Find all custom aliases and bound variables in the text
     final aliases = <String>{};
     final boundVars = <String>{};
 
-    // 1. using alias = synapse(FQN)
     final usingReg = RegExp(
       r'\busing\s+([a-zA-Z_]\w*)\s*=\s*(?:synapse|neuron|signal)\(',
       caseSensitive: true,
@@ -227,7 +206,6 @@ class InoLangTextEditingController extends TextEditingController {
       aliases.add(m.group(1)!);
     }
 
-    // 2. on/given synapse alias/FQN varName:
     final boundReg = RegExp(
       r'\b(?:on|given)\s+synapse\s+(?:[a-zA-Z_]\w*|[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)+)\s+([a-zA-Z_]\w*)\b',
     );
@@ -245,7 +223,7 @@ class InoLangTextEditingController extends TextEditingController {
       r'("[^"]*")|'
       r'(\b(?:on|synapse|signal|neuron|instance|ask|to|for|emit|given|returns|when|then|every|any|no|has|emitted|let|save|into|count|counter|scenario)\b)|'
       r'(\bit\b)|'
-      '(\\b[a-zA-Z_]\\w*(?:\\.[a-zA-Z_]\\w*)+$customWordsPattern)|' // Group 5: FQNs, aliases, bound variables
+      '(\\b[a-zA-Z_]\\w*(?:\\.[a-zA-Z_]\\w*)+$customWordsPattern)|'
       r'(\b\d+\b)|'
       r'(\b(?:using|namespace|public|sealed|record|class|struct|interface|get|set|init|private|protected|internal|override|virtual|async|await|return|string|int|var|bool|void)\b)|'
       r'(\[[a-zA-Z_]\w*\])',
@@ -262,7 +240,6 @@ class InoLangTextEditingController extends TextEditingController {
       }
 
       if (match.group(1) != null) {
-        // Comment
         spans.add(
           TextSpan(
             text: match.group(1),
@@ -270,7 +247,6 @@ class InoLangTextEditingController extends TextEditingController {
           ),
         );
       } else if (match.group(2) != null) {
-        // String
         spans.add(
           TextSpan(
             text: match.group(2),
@@ -278,7 +254,6 @@ class InoLangTextEditingController extends TextEditingController {
           ),
         );
       } else if (match.group(3) != null) {
-        // Ino keyword
         spans.add(
           TextSpan(
             text: match.group(3),
@@ -289,7 +264,6 @@ class InoLangTextEditingController extends TextEditingController {
           ),
         );
       } else if (match.group(4) != null) {
-        // Pronoun 'it'
         spans.add(
           TextSpan(
             text: match.group(4),
@@ -300,7 +274,6 @@ class InoLangTextEditingController extends TextEditingController {
           ),
         );
       } else if (match.group(5) != null) {
-        // Dotted FQN or alias or bound variable
         final word = match.group(5)!;
 
         final isFqn = word.contains('.');
@@ -310,7 +283,7 @@ class InoLangTextEditingController extends TextEditingController {
         if (isFqn || isAlias || isBound) {
           final fqn = resolveWordToFqn(word, text);
 
-          Color fqnColor = DigitalBrainColors.tealSoft; // Default to synapse
+          Color fqnColor = DigitalBrainColors.tealSoft;
           if (fqn != null) {
             final schema = DigitalBrainCatalogManager.instance.catalog
                 .firstWhere(
@@ -348,7 +321,6 @@ class InoLangTextEditingController extends TextEditingController {
           spans.add(TextSpan(text: word, style: defaultStyle));
         }
       } else if (match.group(6) != null) {
-        // Number
         spans.add(
           TextSpan(
             text: match.group(6),
@@ -356,7 +328,6 @@ class InoLangTextEditingController extends TextEditingController {
           ),
         );
       } else if (match.group(7) != null) {
-        // C# keyword
         spans.add(
           TextSpan(
             text: match.group(7),
@@ -367,7 +338,6 @@ class InoLangTextEditingController extends TextEditingController {
           ),
         );
       } else if (match.group(8) != null) {
-        // C# Attribute
         spans.add(
           TextSpan(
             text: match.group(8),
@@ -391,7 +361,7 @@ class InoLangTextEditingController extends TextEditingController {
 
 class CatalogContractSchema {
   final String fqn;
-  final int kind; // 0 = Synapse, 1 = Signal, 2 = Neuron
+  final int kind;
   final List<String> fields;
 
   CatalogContractSchema({
@@ -552,7 +522,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
   List<CatalogContractSchema> _catalog = [];
   bool _catalogLoaded = false;
 
-  // Hover card state
   OverlayEntry? _hoverCardEntry;
   String? _hoveredFqn;
 
@@ -824,7 +793,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
 
     final textBeforeCursor = text.substring(0, selection.baseOffset);
 
-    // 1. Property access completion: e.g. $mySyn. or $mySyn.De
     final propMatch = RegExp(
       r'\$?([a-zA-Z_]\w*)\.(\w*)$',
     ).firstMatch(textBeforeCursor);
@@ -858,7 +826,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
       }
     }
 
-    // 2. Kind-specific FQN completion inside parentheses: e.g. neuron( or synapse( or signal(
     final kindMatch = RegExp(
       r'\b(neuron|synapse|signal)\(([\w\.]*)$',
     ).firstMatch(textBeforeCursor);
@@ -889,7 +856,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
       }
     }
 
-    // 3. Fallback: standard word completion
     final lastWordMatch = RegExp(
       r'([\w\.]+|[#!\$~])$',
     ).firstMatch(textBeforeCursor);
@@ -1030,7 +996,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gutter
           Container(
             padding: const EdgeInsets.only(
               left: 12,
@@ -1052,7 +1017,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
             ),
           ),
 
-          // Editable text area
           Expanded(
             child: TextField(
               key: const Key('ino-code-editor'),
@@ -1192,8 +1156,6 @@ class _CodeEditorBodyState extends State<_CodeEditorBody> {
     );
   }
 }
-
-// ── prompt input ──────────────────────────────────────────
 
 Widget _promptInput(BuildContext c, DataSource s) {
   final placeholder = _str(s, 'placeholder', 'Describe a new behavior…');
@@ -1555,8 +1517,6 @@ class _PromptInputBodyState extends State<_PromptInputBody> {
   }
 }
 
-// ── split ─────────────────────────────────────────────────
-
 Widget _split(BuildContext c, DataSource s) {
   final size = WindowSizeContext.of(c);
   final leftFraction = _d(s, 'leftFraction', 0.42).clamp(0.1, 0.9);
@@ -1592,8 +1552,6 @@ Widget _split(BuildContext c, DataSource s) {
     ),
   );
 }
-
-// ── settings menu tabs & panels ───────────────────────────
 
 Widget _tabButton(BuildContext c, DataSource s) {
   final label = _str(s, 'label');
@@ -1673,12 +1631,12 @@ class _StateEditorBodyState extends State<_StateEditorBody> {
   void _parseJson() {
     try {
       _stateMap = jsonDecode(widget.stateJson) as Map<String, dynamic>;
-      // Dispose old controllers
+
       for (final ctrl in _controllers.values) {
         ctrl.dispose();
       }
       _controllers.clear();
-      // Create new controllers
+
       for (final entry in _stateMap.entries) {
         _controllers[entry.key] = TextEditingController(
           text: entry.value.toString(),
@@ -1724,7 +1682,6 @@ class _StateEditorBodyState extends State<_StateEditorBody> {
     StateEditorBus.instance.set(key, parsed);
     widget.onUpdate?.call();
 
-    // Show instant micro-animation or feedback
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('State variable "$key" updated to: $parsed'),
@@ -2409,7 +2366,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
 
   void _changeTemp(double delta) {
     final double next = (_temp + delta).clamp(0.0, 1.2);
-    // Parse to double via string to avoid float imprecision issues
+
     final double parsed = double.parse(next.toStringAsFixed(1));
     _updateSettings(temp: parsed);
   }
@@ -2473,7 +2430,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
             ],
           ),
           const SizedBox(height: 12),
-          // Model row
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2525,7 +2482,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
             ],
           ),
           const SizedBox(height: 12),
-          // Temperature row
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2566,7 +2523,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
             ],
           ),
           const SizedBox(height: 12),
-          // Max Attempts row
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2609,7 +2566,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
           const SizedBox(height: 12),
           const Divider(color: DigitalBrainColors.hairline),
           const SizedBox(height: 12),
-          // Replace Spheres with Icons
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2635,7 +2592,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
             ],
           ),
           const SizedBox(height: 8),
-          // Show Synapses Filament Web
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2661,7 +2618,7 @@ class _LlmSettingsPanelBodyState extends State<_LlmSettingsPanelBody> {
             ],
           ),
           const SizedBox(height: 8),
-          // Local AI Mode
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

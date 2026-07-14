@@ -8,8 +8,8 @@
     <Nullable>enable</Nullable>
     <RootNamespace>DigitalBrain.Deploy</RootNamespace>
     <AssemblyName>DigitalBrain.Deploy</AssemblyName>
-    <!-- Standalone deployment project. Its Pulumi/Azure dependency graph does not affect the
-         main solution build. Build directly with dotnet build deploy/DigitalBrain.Deploy.csproj. -->
+
+
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
 

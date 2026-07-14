@@ -61,9 +61,8 @@ void main() {
       ]);
       expect(controller.status, SessionStatus.authenticated);
       expect(controller.sessionId, 'session-a');
-      expect(controller.tenantId, 'tenant-a');
-      expect(controller.workspaceId, 'workspace-a');
-      expect(controller.principalId, 'principal-a');
+      expect(controller.ownerId, 'owner-a');
+      expect(controller.actorId, 'actor-a');
     });
   });
 

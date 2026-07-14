@@ -10,8 +10,6 @@ WindowSize _windowSizeFromWidth(double width) {
   return WindowSize.xLarge;
 }
 
-/// Publishes the current [WindowSize] computed from [MediaQuery.sizeOf]'s width.
-/// Cheap to read; consumers call [WindowSize.of(context)] (extension below).
 class WindowSizeScope extends StatelessWidget {
   const WindowSizeScope({required this.child, super.key});
 

@@ -1,9 +1,4 @@
-// DigitalBrain.Mcp - standalone MCP server for DigitalBrain.
-// An Orleans CLIENT that exposes cluster interactions as MCP tools (DigitalBrain.Mcp.Tools).
-// Requires the kernel cluster (storage + Ollama) to be running - the tools operate on real grains, so there is
-// no degraded no-cluster mode (fail-fast). The authenticated HTTP transport is the only production surface.
-
-using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Mcp;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Http.Features;
@@ -11,40 +6,30 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
-
-
+using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 ConfigureOrleansClient(builder);
-
+builder.AddKeyedAzureBlobServiceClient("features", settings => settings.DisableTracing = true);
 var configuredProfile = builder.Configuration["DigitalBrain:Profile"];
 if (string.IsNullOrWhiteSpace(configuredProfile))
     throw new InvalidOperationException("DigitalBrain:Profile must be supplied by the AppHost or deployment configuration.");
 var profileText = configuredProfile;
 if (!Enum.TryParse<RuntimeProfile>(profileText, true, out var profile))
     throw new InvalidOperationException($"Unknown runtime profile '{profileText}'.");
-// HTTP is the authoritative MCP surface. INO is the sole user-facing mutation path;
-// generic command/admin tools would bypass the journaled conversation rail.
-builder.Services.AddMcpServer()
-    .WithHttpTransport()
-    .WithTools<McpConversationTools>();
+builder.Services.AddMcpServer().WithHttpTransport().WithTools<McpConversationTools>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<McpAuthority>();
 builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
 builder.Services.AddSingleton(TimeProvider.System);
 var mcpAudience = SessionAudiences.RequireFixedMcp(builder.Configuration["DigitalBrain:Runtime:Mcp:Audience"]);
-builder.Services.AddSingleton(new SchemaRegistry([
-    new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true)]));
 builder.Services.AddSingleton<ConversationStateClient>();
 builder.Services.AddSingleton<McpInoCommandHandler>();
+builder.Services.AddSingleton<FeatureArtifactPublisher>();
+builder.Services.AddSingleton<FeatureBuildEndpoint>();
+builder.Services.AddSingleton<FeatureLifecycleRail>();
 builder.Services.AddSingleton(AuthorizationFlowProxyOptions.FromConfiguration(builder.Configuration, profile));
-builder.Services.AddHttpClient<AuthorizationFlowStartProxy>()
-    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-    {
-        AllowAutoRedirect = false,
-        PooledConnectionLifetime = TimeSpan.FromMinutes(5)
-    });
+builder.Services.AddHttpClient<AuthorizationFlowStartProxy>().ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5) });
 var sessionKeyText = builder.Configuration["DigitalBrain:Auth:SessionSigningKey"] ?? Environment.GetEnvironmentVariable("DigitalBrain__Auth__SessionSigningKey");
 if (string.IsNullOrWhiteSpace(sessionKeyText)) throw new InvalidOperationException("A session signing key is required for HTTP MCP.");
 byte[] sessionSigningKey;
@@ -61,7 +46,6 @@ builder.Services.AddSingleton(sp => new McpRequestGuard(new McpTransportPolicy(
     int.TryParse(builder.Configuration["DigitalBrain:Runtime:Mcp:MaxConcurrentRequests"], out var concurrent) ? concurrent : 8,
     int.TryParse(builder.Configuration["DigitalBrain:Runtime:Mcp:RequestsPerMinute"], out var rate) ? rate : 120)));
 builder.Services.AddUiTransport(builder.Configuration, builder.Environment, profile);
-
 var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseMiddleware<RuntimeTransportBoundary>();
@@ -73,9 +57,7 @@ app.Use(async (context, next) =>
         await next();
         return;
     }
-    var principal = await context.RequestServices
-        .GetRequiredService<RuntimeRequestAuthenticator>()
-        .AuthenticateMcpAsync(context, context.RequestAborted)
+    var principal = await context.RequestServices.GetRequiredService<RuntimeRequestAuthenticator>().AuthenticateMcpAsync(context, context.RequestAborted)
         .ConfigureAwait(false);
     if (principal is null)
     {
@@ -94,19 +76,13 @@ app.Use(async (context, next) =>
     using (lease) await next();
 });
 app.MapMcp("/mcp");
-app.MapGet("/oauth/start/{provider}", (
-    string provider,
-    HttpRequest request,
-    AuthorizationFlowStartProxy proxy,
-    CancellationToken cancellationToken) =>
+app.MapGet("/oauth/start/{provider}", (string provider, HttpRequest request, AuthorizationFlowStartProxy proxy, CancellationToken cancellationToken) =>
     proxy.StartAsync(provider, request, cancellationToken));
 app.MapDefaultEndpoints();
 await app.RunAsync();
-
 static void ConfigureOrleansClient(IHostApplicationBuilder builder)
 {
     builder.Services.AddSingleton<IClientConnectionRetryFilter, BoundedOrleansClientConnectionRetryFilter>();
-    // Orleans client clustering: Aspire injects the provider type. Azure Table in cloud, Redis locally.
     var clusteringProvider = Environment.GetEnvironmentVariable("Orleans__Clustering__ProviderType");
     if (string.Equals(clusteringProvider, "AzureTableStorage", StringComparison.OrdinalIgnoreCase))
     {
@@ -117,6 +93,5 @@ static void ConfigureOrleansClient(IHostApplicationBuilder builder)
     {
         builder.AddKeyedRedisClient("redis");
     }
-
     builder.UseOrleansClient();
 }

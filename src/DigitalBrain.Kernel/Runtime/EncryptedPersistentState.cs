@@ -4,14 +4,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalBrain.Kernel.Runtime;
 using Orleans.Runtime;
-
 namespace DigitalBrain.Kernel;
 
-public sealed class RuntimeStateKeyRing : IRuntimeStateKeyRing
+internal sealed class RuntimeStateKeyRing : IRuntimeStateKeyRing
 {
     private readonly IReadOnlyDictionary<int, byte[]> _keks;
     private readonly byte[] _signingKey;
-
     public RuntimeStateKeyRing(int activeKekVersion, IReadOnlyDictionary<int, byte[]> keks, byte[] signingKey)
     {
         if (activeKekVersion < 1 || !keks.TryGetValue(activeKekVersion, out var active) || active.Length != 32)
@@ -26,10 +24,8 @@ public sealed class RuntimeStateKeyRing : IRuntimeStateKeyRing
         _keks = keks.ToDictionary(static pair => pair.Key, static pair => pair.Value.ToArray());
         _signingKey = signingKey.ToArray();
     }
-
     public int ActiveKekVersion { get; }
     public ReadOnlyMemory<byte> SigningKey => _signingKey;
-
     public bool TryGetKek(int version, out ReadOnlyMemory<byte> key)
     {
         if (_keks.TryGetValue(version, out var value))
@@ -41,21 +37,18 @@ public sealed class RuntimeStateKeyRing : IRuntimeStateKeyRing
         return false;
     }
 }
-
-public sealed class EncryptedRuntimeStateProtector
+internal sealed class EncryptedRuntimeStateProtector
 {
     private const int NonceSize = 12;
     private const int TagSize = 16;
     private const int DataEncryptionKeySize = 32;
-    private const int MaximumCiphertextBytes = 4 * 1024 * 1024;
+    internal const int MaximumProtectedPlaintextBytes = 4 * 1024 * 1024;
     private readonly IRuntimeStateKeyRing _keys;
     private readonly JsonSerializerOptions _json;
-
     public EncryptedRuntimeStateProtector(IRuntimeStateKeyRing keys, JsonSerializerOptions? json = null)
     {
         _keys = keys;
-        if (!_keys.TryGetKek(_keys.ActiveKekVersion, out var active) || active.Length != DataEncryptionKeySize ||
-            _keys.SigningKey.Length < 32)
+        if (!_keys.TryGetKek(_keys.ActiveKekVersion, out var active) || active.Length != DataEncryptionKeySize || _keys.SigningKey.Length < 32)
             throw new ArgumentException("Runtime-state key material is incomplete.", nameof(keys));
         if (CryptographicOperations.FixedTimeEquals(active.Span, _keys.SigningKey.Span))
             throw new ArgumentException("Runtime-state KEK and signing material must be distinct.", nameof(keys));
@@ -63,13 +56,7 @@ public sealed class EncryptedRuntimeStateProtector
         _json.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
         _json.MaxDepth = Math.Min(_json.MaxDepth == 0 ? 64 : _json.MaxDepth, 64);
     }
-
-    public EncryptedRuntimeStateEnvelope Protect<TState>(
-        string scopeHash,
-        string aggregateKind,
-        int schemaVersion,
-        long revision,
-        TState value)
+    public EncryptedRuntimeStateEnvelope Protect<TState>(string scopeHash, string aggregateKind, int schemaVersion, long revision, TState value)
     {
         var dataKey = RandomNumberGenerator.GetBytes(DataEncryptionKeySize);
         try
@@ -81,25 +68,16 @@ public sealed class EncryptedRuntimeStateProtector
             CryptographicOperations.ZeroMemory(dataKey);
         }
     }
-
-    public TState Unprotect<TState>(
-        string scopeHash,
-        string aggregateKind,
-        int schemaVersion,
-        EncryptedRuntimeStateEnvelope envelope)
+    public TState Unprotect<TState>(string scopeHash, string aggregateKind, int schemaVersion, EncryptedRuntimeStateEnvelope envelope)
     {
         using var opened = Open<TState>(scopeHash, aggregateKind, schemaVersion, envelope);
         return opened.Value;
     }
-
     public bool RequiresRewrap(EncryptedRuntimeStateEnvelope envelope) =>
         envelope.KekVersion != _keys.ActiveKekVersion;
-
-    internal OpenedRuntimeState<TState> Open<TState>(
-        string scopeHash,
-        string aggregateKind,
-        int schemaVersion,
-        EncryptedRuntimeStateEnvelope envelope)
+    internal int MeasurePlaintextBytes<TState>(TState value) =>
+        JsonSerializer.SerializeToUtf8Bytes(value, _json).Length;
+    internal OpenedRuntimeState<TState> Open<TState>(string scopeHash, string aggregateKind, int schemaVersion, EncryptedRuntimeStateEnvelope envelope)
     {
         RuntimeStateKeys.DemandScopeHash(scopeHash);
         DemandKind(aggregateKind);
@@ -111,27 +89,15 @@ public sealed class EncryptedRuntimeStateProtector
         if (envelope.Signature.Length != expectedSignature.Length ||
             !CryptographicOperations.FixedTimeEquals(envelope.Signature, expectedSignature))
             throw new RuntimeStateIntegrityException("invalid envelope signature");
-
         var dataKey = new byte[DataEncryptionKeySize];
         var plaintext = new byte[envelope.PayloadCiphertext.Length];
         try
         {
             using (var wrapper = new AesGcm(kek.Span, TagSize))
-                wrapper.Decrypt(
-                    envelope.WrappedDekNonce,
-                    envelope.WrappedDekCiphertext,
-                    envelope.WrappedDekTag,
-                    dataKey,
-                    AppendPurpose(aad, "dek"));
+                wrapper.Decrypt(envelope.WrappedDekNonce, envelope.WrappedDekCiphertext, envelope.WrappedDekTag, dataKey, AppendPurpose(aad, "dek"));
             using (var payload = new AesGcm(dataKey, TagSize))
-                payload.Decrypt(
-                    envelope.PayloadNonce,
-                    envelope.PayloadCiphertext,
-                    envelope.PayloadTag,
-                    plaintext,
-                    AppendPurpose(aad, "payload"));
-            var value = JsonSerializer.Deserialize<TState>(plaintext, _json)
-                        ?? throw new RuntimeStateIntegrityException("empty plaintext state");
+                payload.Decrypt(envelope.PayloadNonce, envelope.PayloadCiphertext, envelope.PayloadTag, plaintext, AppendPurpose(aad, "payload"));
+            var value = JsonSerializer.Deserialize<TState>(plaintext, _json) ?? throw new RuntimeStateIntegrityException("empty plaintext state");
             return new(value, dataKey, envelope.KekVersion != _keys.ActiveKekVersion);
         }
         catch (RuntimeStateIntegrityException)
@@ -149,14 +115,7 @@ public sealed class EncryptedRuntimeStateProtector
             CryptographicOperations.ZeroMemory(plaintext);
         }
     }
-
-    internal EncryptedRuntimeStateEnvelope Seal<TState>(
-        string scopeHash,
-        string aggregateKind,
-        int schemaVersion,
-        long revision,
-        TState value,
-        ReadOnlySpan<byte> dataKey)
+    internal EncryptedRuntimeStateEnvelope Seal<TState>(string scopeHash, string aggregateKind, int schemaVersion, long revision, TState value, ReadOnlySpan<byte> dataKey)
     {
         RuntimeStateKeys.DemandScopeHash(scopeHash);
         DemandKind(aggregateKind);
@@ -165,7 +124,7 @@ public sealed class EncryptedRuntimeStateProtector
         if (!_keys.TryGetKek(_keys.ActiveKekVersion, out var kek))
             throw new RuntimeStateIntegrityException("active key unavailable");
         var plaintext = JsonSerializer.SerializeToUtf8Bytes(value, _json);
-        if (plaintext.Length > MaximumCiphertextBytes)
+        if (plaintext.Length > MaximumProtectedPlaintextBytes)
             throw new InvalidOperationException("Encrypted runtime state exceeds the persistence bound.");
         var aad = BuildAad(scopeHash, aggregateKind, schemaVersion, revision);
         try
@@ -184,19 +143,9 @@ public sealed class EncryptedRuntimeStateProtector
                 PayloadTag = new byte[TagSize]
             };
             using (var wrapper = new AesGcm(kek.Span, TagSize))
-                wrapper.Encrypt(
-                    envelope.WrappedDekNonce,
-                    dataKey,
-                    envelope.WrappedDekCiphertext,
-                    envelope.WrappedDekTag,
-                    AppendPurpose(aad, "dek"));
+                wrapper.Encrypt(envelope.WrappedDekNonce, dataKey, envelope.WrappedDekCiphertext, envelope.WrappedDekTag, AppendPurpose(aad, "dek"));
             using (var payload = new AesGcm(dataKey, TagSize))
-                payload.Encrypt(
-                    envelope.PayloadNonce,
-                    plaintext,
-                    envelope.PayloadCiphertext,
-                    envelope.PayloadTag,
-                    AppendPurpose(aad, "payload"));
+                payload.Encrypt(envelope.PayloadNonce, plaintext, envelope.PayloadCiphertext, envelope.PayloadTag, AppendPurpose(aad, "payload"));
             envelope.Signature = Sign(aad, envelope);
             return envelope;
         }
@@ -205,7 +154,6 @@ public sealed class EncryptedRuntimeStateProtector
             CryptographicOperations.ZeroMemory(plaintext);
         }
     }
-
     private byte[] Sign(ReadOnlySpan<byte> aad, EncryptedRuntimeStateEnvelope envelope)
     {
         using var stream = new MemoryStream();
@@ -224,7 +172,6 @@ public sealed class EncryptedRuntimeStateProtector
         writer.Flush();
         return HMACSHA256.HashData(_keys.SigningKey.Span, stream.ToArray());
     }
-
     private static byte[] BuildAad(string scopeHash, string aggregateKind, int schemaVersion, long revision)
     {
         using var stream = new MemoryStream();
@@ -237,7 +184,6 @@ public sealed class EncryptedRuntimeStateProtector
         writer.Flush();
         return stream.ToArray();
     }
-
     private static byte[] AppendPurpose(ReadOnlySpan<byte> aad, string purpose)
     {
         var purposeBytes = Encoding.ASCII.GetBytes(purpose);
@@ -247,42 +193,32 @@ public sealed class EncryptedRuntimeStateProtector
         purposeBytes.CopyTo(result, aad.Length + sizeof(int));
         return result;
     }
-
     private static void ValidateEnvelope(EncryptedRuntimeStateEnvelope envelope, int schemaVersion)
     {
-        if (envelope.EnvelopeVersion != RuntimeStateSchemas.Envelope || envelope.SchemaVersion != schemaVersion ||
-            envelope.KekVersion < 1 || envelope.Revision < 0 ||
+        if (envelope.EnvelopeVersion != RuntimeStateSchemas.Envelope || envelope.SchemaVersion != schemaVersion || envelope.KekVersion < 1 || envelope.Revision < 0 ||
             envelope.WrappedDekNonce is not { Length: NonceSize } ||
             envelope.WrappedDekCiphertext is not { Length: DataEncryptionKeySize } ||
             envelope.WrappedDekTag is not { Length: TagSize } ||
             envelope.PayloadNonce is not { Length: NonceSize } ||
             envelope.PayloadTag is not { Length: TagSize } ||
             envelope.Signature is not { Length: 32 } ||
-            envelope.PayloadCiphertext is null || envelope.PayloadCiphertext.Length > MaximumCiphertextBytes)
+            envelope.PayloadCiphertext is null || envelope.PayloadCiphertext.Length > MaximumProtectedPlaintextBytes)
             throw new RuntimeStateIntegrityException("invalid envelope metadata");
     }
-
     private static void DemandKind(string aggregateKind)
     {
         if (aggregateKind is not (RuntimeStateKinds.Conversation or RuntimeStateKinds.ConversationArchive or
-            RuntimeStateKinds.SurfaceFeed or RuntimeStateKinds.Session or RuntimeStateKinds.SynapseJournal or
+            RuntimeStateKinds.SurfaceFeed or RuntimeStateKinds.Session or
             RuntimeStateKinds.InoEffectPlan))
             throw new ArgumentException("Unsupported encrypted runtime-state kind.", nameof(aggregateKind));
     }
-
     private static void Write(BinaryWriter writer, ReadOnlySpan<byte> bytes)
     {
         writer.Write(bytes.Length);
         writer.Write(bytes);
     }
-
-    private static JsonSerializerOptions CreateJson() => new(JsonSerializerDefaults.Web)
-    {
-        MaxDepth = 64,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
-    };
+    private static JsonSerializerOptions CreateJson() => new(JsonSerializerDefaults.Web) { MaxDepth = 64, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
 }
-
 internal sealed class OpenedRuntimeState<TState>(TState value, byte[] dataKey, bool requiresRewrap) : IDisposable
 {
     public TState Value { get; } = value;
@@ -290,8 +226,7 @@ internal sealed class OpenedRuntimeState<TState>(TState value, byte[] dataKey, b
     public bool RequiresRewrap { get; } = requiresRewrap;
     public void Dispose() => CryptographicOperations.ZeroMemory(DataKey);
 }
-
-public sealed class EncryptedPersistentState<TState>
+internal sealed class EncryptedPersistentState<TState>
 {
     private readonly IPersistentState<EncryptedRuntimeStateEnvelope> _persistentState;
     private readonly EncryptedRuntimeStateProtector _protector;
@@ -304,7 +239,6 @@ public sealed class EncryptedPersistentState<TState>
     private readonly Func<TState, TState, CancellationToken, Task>? _prepareCommit;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _poisoned;
-
     public EncryptedPersistentState(
         IPersistentState<EncryptedRuntimeStateEnvelope> persistentState,
         EncryptedRuntimeStateProtector protector,
@@ -327,7 +261,6 @@ public sealed class EncryptedPersistentState<TState>
         _validate = validate;
         _prepareCommit = prepareCommit;
     }
-
     public async Task<TState> ReadAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -342,21 +275,13 @@ public sealed class EncryptedPersistentState<TState>
             _gate.Release();
         }
     }
-
-    public Task<TState> UpdateAsync(
-        long expectedRevision,
-        Func<TState, TState> transition,
-        CancellationToken cancellationToken = default) =>
+    public Task<TState> UpdateAsync(long expectedRevision, Func<TState, TState> transition, CancellationToken cancellationToken = default) =>
         UpdateAsync(expectedRevision, current =>
         {
             var next = transition(current);
             return (next, next);
         }, cancellationToken);
-
-    public async Task<TResult> UpdateAsync<TResult>(
-        long expectedRevision,
-        Func<TState, (TState State, TResult Result)> transition,
-        CancellationToken cancellationToken = default)
+    public async Task<TResult> UpdateAsync<TResult>(long expectedRevision, Func<TState, (TState State, TResult Result)> transition, CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -380,13 +305,7 @@ public sealed class EncryptedPersistentState<TState>
             EncryptedRuntimeStateEnvelope envelope;
             try
             {
-                envelope = _protector.Seal(
-                    _scopeHash,
-                    _aggregateKind,
-                    _schemaVersion,
-                    nextRevision,
-                    next,
-                    dataKey);
+                envelope = _protector.Seal(_scopeHash, _aggregateKind, _schemaVersion, nextRevision, next, dataKey);
             }
             finally
             {
@@ -400,7 +319,6 @@ public sealed class EncryptedPersistentState<TState>
             _gate.Release();
         }
     }
-
     private async Task<OpenedRuntimeState<TState>> OpenAsync(CancellationToken cancellationToken)
     {
         DemandUsable();
@@ -424,13 +342,7 @@ public sealed class EncryptedPersistentState<TState>
                 throw new RuntimeStateIntegrityException("envelope and domain revisions differ");
             if (opened.RequiresRewrap)
             {
-                var rewrapped = _protector.Seal(
-                    _scopeHash,
-                    _aggregateKind,
-                    _schemaVersion,
-                    envelope.Revision,
-                    opened.Value,
-                    opened.DataKey);
+                var rewrapped = _protector.Seal(_scopeHash, _aggregateKind, _schemaVersion, envelope.Revision, opened.Value, opened.DataKey);
                 await WriteWithRollbackAsync(rewrapped).ConfigureAwait(false);
             }
             return opened;
@@ -441,13 +353,11 @@ public sealed class EncryptedPersistentState<TState>
             throw;
         }
     }
-
     private async Task WriteWithRollbackAsync(EncryptedRuntimeStateEnvelope next)
     {
         try
         {
-            await PersistedStateReconciliation.WriteWithRollbackAsync(_persistentState, next, SameEnvelope)
-                .ConfigureAwait(false);
+            await PersistedStateReconciliation.WriteWithRollbackAsync(_persistentState, next, SameEnvelope).ConfigureAwait(false);
         }
         catch (PersistedStateWriteOutcomeUnknownException)
         {
@@ -455,16 +365,12 @@ public sealed class EncryptedPersistentState<TState>
             throw;
         }
     }
-
     private void DemandUsable()
     {
         if (_poisoned)
             throw new RuntimeStateIntegrityException("storage write outcome for this activation is unknown");
     }
-
-    private static bool SameEnvelope(
-        EncryptedRuntimeStateEnvelope first,
-        EncryptedRuntimeStateEnvelope second) =>
+    private static bool SameEnvelope(EncryptedRuntimeStateEnvelope first, EncryptedRuntimeStateEnvelope second) =>
         first.EnvelopeVersion == second.EnvelopeVersion && first.KekVersion == second.KekVersion &&
         first.SchemaVersion == second.SchemaVersion && first.Revision == second.Revision &&
         first.WrappedDekNonce.AsSpan().SequenceEqual(second.WrappedDekNonce) &&

@@ -7,30 +7,8 @@ import 'adaptive_dialog.dart';
 import 'adaptive_sheet.dart';
 import 'adaptive_side_sheet.dart';
 
-/// Describes the conceptual "weight" of a surface — how much screen space and
-/// visual prominence it should command at each window size.
-enum SurfaceWeight {
-  /// Lightweight overlays: tooltips, pickers, short confirmations.
-  light,
+enum SurfaceWeight { light, medium, heavy }
 
-  /// Mid-weight content: settings panels, detail views, form editors.
-  medium,
-
-  /// Heavy content: immersive editors, full-context views, multi-step flows.
-  heavy,
-}
-
-/// Routes an overlay to the correct container widget by consulting the
-/// `(SurfaceWeight × WindowSize)` dispatch table.
-///
-/// Place this widget where you would normally show a modal; it picks
-/// [AdaptiveSheet], [AdaptiveDialog], [AdaptiveSideSheet], or
-/// [_FullScreenRoute] automatically so that each weight reads correctly
-/// on every breakpoint.
-///
-/// [morphFrom] anchors the Liquid Glass entrance — pass the screen-space
-/// origin (e.g. the tapped neuron's projected center) and the wrapped child
-/// expands from that point. Pass null to skip the morph.
 class AdaptiveSurface extends StatelessWidget {
   const AdaptiveSurface({
     required this.weight,
@@ -45,12 +23,8 @@ class AdaptiveSurface extends StatelessWidget {
   final Widget child;
   final VoidCallback onDismiss;
 
-  /// Screen-space origin forwarded to [LiquidGlassSurface].
   final Offset? morphFrom;
 
-  /// Called with the dismiss origin before [onDismiss]. Use to fire a
-  /// brain-side CollapseWave effect. Falls back to screen center when
-  /// [morphFrom] is null.
   final void Function(Offset origin)? onDismissEffect;
 
   VoidCallback _wrapDismiss(BuildContext context) {
@@ -77,7 +51,6 @@ class AdaptiveSurface extends StatelessWidget {
     final dismiss = _wrapDismiss(context);
 
     return switch ((weight, size)) {
-      // Light: bottom sheet on compact; centered dialog everywhere else.
       (SurfaceWeight.light, WindowSize.compact) => AdaptiveSheet(
         onDismiss: dismiss,
         child: body,
@@ -89,8 +62,6 @@ class AdaptiveSurface extends StatelessWidget {
         child: body,
       ),
 
-      // Medium: full-bleed sheet on compact; wide dialog through expanded;
-      // side-sheet on large+.
       (SurfaceWeight.medium, WindowSize.compact) => AdaptiveSheet(
         onDismiss: dismiss,
         fullBleed: true,
@@ -119,8 +90,6 @@ class AdaptiveSurface extends StatelessWidget {
         child: body,
       ),
 
-      // Heavy: full-screen route on compact+medium; 90% dialog on expanded;
-      // wide side-sheet on large+.
       (SurfaceWeight.heavy, WindowSize.compact) => _FullScreenRoute(
         onDismiss: dismiss,
         child: body,

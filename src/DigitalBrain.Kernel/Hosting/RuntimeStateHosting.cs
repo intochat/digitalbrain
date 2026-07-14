@@ -6,39 +6,31 @@ using Azure.Storage.Blobs;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-
 namespace DigitalBrain.Kernel.Hosting;
 
 internal static class RuntimeStateKeyConfiguration
 {
     private const string SectionPath = "DigitalBrain:Runtime:State";
     private static readonly byte[] DerivationSalt = Encoding.UTF8.GetBytes("digitalbrain-runtime-state-v1");
-
-    public static RuntimeStateKeyRing Load(
-        IConfiguration configuration,
-        bool requireConfiguredKeys,
-        bool production)
+    public static RuntimeStateKeyRing Load(IConfiguration configuration, bool requireConfiguredKeys, bool production)
     {
         var section = configuration.GetSection(SectionPath);
         var activeText = section["ActiveKekVersion"];
         var signingText = section["SigningKey"];
         var kekEntries = section.GetSection("Keks").GetChildren().ToArray();
-        var hasConfiguredMaterial = !string.IsNullOrWhiteSpace(activeText) ||
-                                    !string.IsNullOrWhiteSpace(signingText) || kekEntries.Length != 0;
+        var hasConfiguredMaterial = !string.IsNullOrWhiteSpace(activeText) || !string.IsNullOrWhiteSpace(signingText) || kekEntries.Length != 0;
         if (!hasConfiguredMaterial)
         {
             if (requireConfiguredKeys)
                 throw new InvalidOperationException($"{SectionPath} key material is required for hosted or Production execution.");
             return CreateEphemeralLocalRing();
         }
-
         if (!int.TryParse(activeText, NumberStyles.None, CultureInfo.InvariantCulture, out var activeVersion) || activeVersion < 1)
             throw new InvalidOperationException($"{SectionPath}:ActiveKekVersion must be a positive integer.");
         if (string.IsNullOrWhiteSpace(signingText))
             throw new InvalidOperationException($"{SectionPath}:SigningKey is required when runtime-state keys are configured.");
         if (kekEntries.Length == 0)
             throw new InvalidOperationException($"{SectionPath}:Keks must contain at least one versioned key.");
-
         var keks = new Dictionary<int, byte[]>();
         byte[]? signingKey = null;
         try
@@ -63,7 +55,6 @@ internal static class RuntimeStateKeyConfiguration
             if (signingKey is not null) CryptographicOperations.ZeroMemory(signingKey);
         }
     }
-
     private static RuntimeStateKeyRing CreateEphemeralLocalRing()
     {
         var kek = RandomNumberGenerator.GetBytes(32);
@@ -78,7 +69,6 @@ internal static class RuntimeStateKeyConfiguration
             CryptographicOperations.ZeroMemory(signingKey);
         }
     }
-
     private static byte[] DecodeKek(string? encoded, int version, bool production)
     {
         var decoded = DecodeBase64(encoded, $"{SectionPath}:Keks:{version}");
@@ -89,19 +79,13 @@ internal static class RuntimeStateKeyConfiguration
                 throw new InvalidOperationException($"{SectionPath}:Keks:{version} must decode to at least 32 bytes.");
             if (production)
                 throw new InvalidOperationException($"{SectionPath}:Keks:{version} must decode to exactly 32 bytes in Production.");
-            return HKDF.DeriveKey(
-                HashAlgorithmName.SHA256,
-                decoded,
-                32,
-                DerivationSalt,
-                Encoding.UTF8.GetBytes($"kek:{version}"));
+            return HKDF.DeriveKey(HashAlgorithmName.SHA256, decoded, 32, DerivationSalt, Encoding.UTF8.GetBytes($"kek:{version}"));
         }
         finally
         {
             CryptographicOperations.ZeroMemory(decoded);
         }
     }
-
     private static byte[] DecodeBase64(string? encoded, string configurationPath)
     {
         if (string.IsNullOrWhiteSpace(encoded))
@@ -116,34 +100,22 @@ internal static class RuntimeStateKeyConfiguration
         }
     }
 }
-
 internal static class RuntimeStateNamespace
 {
     public static string Resolve(IConfiguration configuration) =>
         RuntimeStateStorageNames.NormalizeNamespace(configuration["DigitalBrain:Runtime:StorageNamespace"]);
-
     public static string Container(string storageNamespace, string kind) =>
         RuntimeStateStorageNames.Container(storageNamespace, kind);
 }
-
-internal sealed record RuntimeStateHealthMetadata(
-    string BackendKind,
-    string StorageNamespace,
-    int SchemaVersion,
-    int ActiveKekVersion);
-
+internal sealed record RuntimeStateHealthMetadata(string BackendKind, string StorageNamespace, int SchemaVersion, int ActiveKekVersion);
 internal sealed class RuntimeStateHealthCheck : IHealthCheck
 {
     private readonly RuntimeStateHealthMetadata _metadata;
-
     public RuntimeStateHealthCheck(RuntimeStateHealthMetadata metadata)
     {
         _metadata = metadata;
     }
-
-    public Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context,
-        CancellationToken cancellationToken = default)
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         var data = new Dictionary<string, object>
         {

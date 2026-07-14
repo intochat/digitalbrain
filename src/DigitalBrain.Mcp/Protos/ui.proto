@@ -27,14 +27,14 @@ message SessionReply {
   int64 access_expires_at_unix_ms = 3;
   int64 refresh_expires_at_unix_ms = 4;
   string session_id = 5;
-  string tenant_id = 6;
-  string workspace_id = 7;
-  string principal_id = 8;
+  string owner_id = 6;
+  string actor_id = 7;
+  reserved 8;
 }
 
 enum FeedAudienceKind {
-  FEED_AUDIENCE_KIND_PRINCIPAL = 0;
-  FEED_AUDIENCE_KIND_WORKSPACE = 1;
+  FEED_AUDIENCE_KIND_ACTOR = 0;
+  FEED_AUDIENCE_KIND_OWNER = 1;
   FEED_AUDIENCE_KIND_PUBLIC = 2;
 }
 

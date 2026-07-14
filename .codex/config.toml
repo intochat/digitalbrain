@@ -1,52 +1,39 @@
-# Project-scoped Codex MCP configuration for universal tool access.
-# This complements the root .mcp.json (Claude-style JSON, used by this Grok CLI and many Claude Code setups).
-#
-# MCP is the common standard (stdio + streamable HTTP).
-# gcf-proxy is a drop-in wrapper (see https://github.com/blackwell-systems/gcf-proxy)
-# that dramatically reduces tokens (70-90% on responses) while staying transparent.
-# Install once: npm install -g gcf-proxy (or equivalent) and ensure it is in PATH.
-#
-# Usage:
-# - Codex CLI: `codex mcp list` (global) or run from this dir for project.
-# - Codex desktop app: May pick project config when the folder is open/trusted; use Settings > MCP servers or restart after changes.
-# - For Claude Code / other agents: The root .mcp.json is usually sufficient (copy or symlink as needed).
-# - To register globally in Codex: run `codex mcp add <name> -- gcf-proxy <real-command...>`
-#
-# Prefer gcf-wrapped for cost/latency in long sessions. Provide direct fallbacks in comments for sandboxes that block wrappers.
-# After editing, restart affected agent or run `codex mcp list`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 [mcp_servers.codegraph]
 command = "gcf-proxy"
 args = ["npx", "-y", "@colbymchenry/codegraph", "serve", "--mcp"]
-# Direct fallback (no token savings): command = "npx"; args = ["-y", "@colbymchenry/codegraph", "serve", "--mcp"]
+
 
 [mcp_servers.aspire]
 command = "gcf-proxy"
 args = ["aspire", "agent", "mcp"]
-# Direct: command = "aspire"; args = ["agent", "mcp"]
+
 
 [mcp_servers.context7]
 command = "gcf-proxy"
 args = ["npx", "-y", "@upstash/context7-mcp@latest"]
-# Context7: up-to-date docs for libraries/frameworks.
+
 
 [mcp_servers.dart]
 command = "gcf-proxy"
 args = ["dart", "mcp-server"]
 
-# HTTP servers (no gcf wrapper needed)
+
 [mcp_servers.microsoft-learn]
 url = "https://learn.microsoft.com/api/mcp"
-
-# Example of how to add more (e.g. your own DigitalBrain MCP when running in HTTP mode):
-# [mcp_servers.digitalbrain]
-# url = "http://localhost:5000/mcp"   # or whatever the transport url
-# Or for stdio when self-hosting the Mcp project.
-
-# Features / policy examples (uncomment and adjust):
-# [mcp_servers.codegraph]
-# enabled = true
-# default_tools_approval_mode = "prompt"
-
-# See Codex docs: https://learn.chatgpt.com/codex/extend/mcp and /codex/hooks for hooks + plugins.
-# This setup makes codegraph (architecture), aspire, context7, dart etc. available across agents.

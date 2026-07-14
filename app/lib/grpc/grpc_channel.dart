@@ -15,7 +15,4 @@ dynamic createKernelChannel({
   );
 }
 
-// OTel-aware interceptors for kernel gRPC clients. Pass to generated client
-// ctors via `interceptors: kernelInterceptors()` so traceparent + spans +
-// per-call metrics flow through every RPC.
 List<ClientInterceptor> kernelInterceptors() => [OtelGrpcInterceptor()];

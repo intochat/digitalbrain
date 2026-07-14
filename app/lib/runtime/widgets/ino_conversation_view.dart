@@ -309,7 +309,6 @@ class _InoConversationViewState extends State<InoConversationView> {
           });
       if (!mounted) return;
       setState(() {
-        // Keep the signed decision disabled until the authoritative feed advances the operation.
         _decidingApproval = true;
       });
     } catch (error) {

@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import '../glass/glass_material.dart';
 
-/// A platform-conventional centered modal.
-/// On iOS / macOS → transparent scrim + [ClipRRect] body (Cupertino-style).
-/// Everywhere else → [Colors.black54] scrim + [Material] body.
-///
-/// Scrim-tap calls [onDismiss]; tap inside the dialog body does NOT dismiss.
-/// [widthFraction] / [heightFraction] express size relative to the screen.
 class AdaptiveDialog extends StatelessWidget {
   const AdaptiveDialog({
     required this.child,

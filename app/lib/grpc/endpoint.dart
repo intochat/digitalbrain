@@ -32,10 +32,6 @@ import 'package:digitalbrain_flutter/telemetry/platform_env.dart';
   );
 }
 
-/// Endpoint for ordinary HTTP requests such as multipart upload.
-///
-/// Desktop Aspire exposes the kernel twice: a gRPC HTTP/2-only endpoint and a
-/// web endpoint. Multipart upload is HTTP/1.x, so it must prefer the web URL.
 (String host, int port, bool secure) resolveKernelUploadEndpoint() {
   final base = Uri.base;
 
