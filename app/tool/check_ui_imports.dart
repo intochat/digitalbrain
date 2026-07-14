@@ -42,8 +42,9 @@ Future<int> main(List<String> args) async {
 
       if (!uri.contains(':')) continue;
 
-      if (uri.startsWith('package:digitalbrain_flutter/digital_brain_ui/'))
+      if (uri.startsWith('package:digitalbrain_flutter/digital_brain_ui/')) {
         continue;
+      }
 
       final allowed = _allowedPrefixes.any(uri.startsWith);
       final forbidden = _forbiddenAppDirs.any(uri.startsWith);
