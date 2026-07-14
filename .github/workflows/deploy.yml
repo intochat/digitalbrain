@@ -25,7 +25,7 @@ jobs:
       KERNEL_CUSTOM_HOSTNAME: "${{ vars.DIGITALBRAIN_KERNEL_HOSTNAME || 'api.digitalbrain.tech' }}"
       MCP_CUSTOM_HOSTNAME: "${{ vars.DIGITALBRAIN_MCP_HOSTNAME || 'mcp.digitalbrain.tech' }}"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-dotnet@v5
         with:
@@ -33,7 +33,7 @@ jobs:
           dotnet-quality: preview
 
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
@@ -81,7 +81,7 @@ jobs:
         working-directory: app
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -101,14 +101,14 @@ jobs:
             -p:ContainerImageTag="${TAG}"
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Provision (pulumi up)
-        uses: pulumi/actions@v6
+        uses: pulumi/actions@v7
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
           DIGITALBRAIN_IMAGE_TAG: "${{ env.TAG }}"
