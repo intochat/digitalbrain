@@ -573,6 +573,91 @@ public sealed class EncryptedDomainStateTests
     }
 
     [Fact]
+    public void Terminal_completion_rejects_out_of_bounds_capability_receipts()
+    {
+        CapabilityResolutionReceipt[] invalidReceipts =
+        [
+            CapabilityReceipt(capabilityId: new string('a', 129)),
+            CapabilityReceipt(capabilityName: new string('n', 81)),
+            CapabilityReceipt(capabilityName: "Read\nrecords"),
+            CapabilityReceipt(candidateIds: Enumerable.Range(0, 6).Select(index => "candidate-" + index).ToArray()),
+            CapabilityReceipt(candidateIds: [new string('c', 129)]),
+            CapabilityReceipt(confidence: -0.1),
+            CapabilityReceipt(confidence: 1.1),
+            CapabilityReceipt(confidence: double.NaN)
+        ];
+
+        Assert.All(invalidReceipts, receipt =>
+            Assert.Throws<ArgumentException>(() => CompleteWithCapability(receipt)));
+    }
+
+    [Fact]
+    public void Terminal_completion_accepts_capability_receipts_at_exact_bounds()
+    {
+        var lowerBound = CapabilityReceipt(
+            capabilityId: new string('a', 128),
+            capabilityName: new string('n', 80),
+            candidateIds: Enumerable.Range(0, 5).Select(index => index + new string('c', 127)).ToArray(),
+            confidence: 0);
+        var upperBound = CapabilityReceipt(confidence: 1);
+
+        var lowerBoundState = CompleteWithCapability(lowerBound);
+        var upperBoundState = CompleteWithCapability(upperBound);
+
+        var lowerBoundOperation = lowerBoundState.Operations.Single(operation => operation.OperationId == "operation");
+        Assert.Equal(ConversationOperationStatus.Succeeded, lowerBoundOperation.Status);
+        Assert.Equal(lowerBound.CapabilityId, lowerBoundOperation.Capability!.CapabilityId);
+        Assert.Equal(lowerBound.CapabilityName, lowerBoundOperation.Capability.CapabilityName);
+        Assert.Equal(lowerBound.CandidateIds, lowerBoundOperation.Capability.CandidateIds);
+        Assert.Equal(0, lowerBoundOperation.Capability.Confidence);
+        var upperBoundOperation = upperBoundState.Operations.Single(operation => operation.OperationId == "operation");
+        Assert.Equal(1, upperBoundOperation.Capability!.Confidence);
+    }
+
+    private static CapabilityResolutionReceipt CapabilityReceipt(
+        string? capabilityId = "capability.read.v1",
+        string? capabilityName = "Read records",
+        string[]? candidateIds = null,
+        double confidence = 0.5) =>
+        new(CapabilityResolutionKind.Match, capabilityId, capabilityName, candidateIds ?? [], confidence);
+
+    private static ConversationState CompleteWithCapability(CapabilityResolutionReceipt receipt)
+    {
+        var now = Utc(0);
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state,
+            state.Revision,
+            "command",
+            Hash("input"),
+            "operation",
+            "answer the request",
+            "request-command",
+            AcceptedOutbox("operation", now),
+            now);
+        var claim = ConversationTransitions.TryClaimOperation(
+            state,
+            state.Revision,
+            "operation",
+            "worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        return ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "The request completed.",
+            new ConversationOutboxEntry("completed-operation", "surface-feed", [], now, null),
+            now,
+            leaseFence: new ConversationLeaseFence("worker", claim.Operation!.Attempt),
+            capability: receipt);
+    }
+
+    [Fact]
     public void Same_owner_claim_does_not_reacquire_and_a_stale_fence_cannot_complete()
     {
         var now = Utc(0);
