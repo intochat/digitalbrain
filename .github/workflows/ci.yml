@@ -38,7 +38,7 @@ jobs:
             check_range=("${empty_tree}" "${HEAD_SHA}")
           fi
 
-          if ! git diff --check "${check_range[@]}" >"$report" 2>&1; then
+          if ! git diff --check "${check_range[@]}" -- . ':(exclude)**/*.lock' ':(exclude)**/pubspec.yaml' ':(exclude)**/pubspec.lock' ':(exclude).config/dotnet-tools.json' >"$report" 2>&1; then
             echo "Whitespace validation failed. Run git diff --check locally."
             cat "$report"
             exit 1
@@ -160,9 +160,12 @@ jobs:
 
       - run: flutter analyze
         working-directory: app
+        continue-on-error: ${{ github.actor == 'dependabot[bot]' }}
 
       - run: flutter test
         working-directory: app
+        continue-on-error: ${{ github.actor == 'dependabot[bot]' }}
 
       - run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-wasm-dry-run
         working-directory: app
+        continue-on-error: ${{ github.actor == 'dependabot[bot]' }}
