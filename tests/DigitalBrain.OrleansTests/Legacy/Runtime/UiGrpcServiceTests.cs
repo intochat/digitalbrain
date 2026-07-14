@@ -2,6 +2,10 @@ extern alias McpProject;
 
 using System.Diagnostics;
 using System.Text.Json;
+using DigitalBrain.Integrations.Google;
+using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Integrations.Salesforce;
+using DigitalBrain.Integrations.Salesforce.Contracts;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel;
@@ -56,6 +60,8 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
                 services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
                 services.AddSingleton(new EncryptedRuntimeStateProtector(keyRing));
                 services.AddSingleton<IChatClient>(_chatClient);
+                services.AddSingleton<ICapabilityDescriptorSource, GoogleCapabilityDescriptorSource>();
+                services.AddSingleton<ICapabilityDescriptorSource, SalesforceCapabilityDescriptorSource>();
                 services.AddSingleton<ICapabilityCatalog, BuiltInCapabilityCatalog>();
                 services.AddSingleton<ICapabilityResolver, HybridCapabilityResolver>();
                 services.AddSingleton<ICapabilityParameterModel, CapabilityParameterModel>();
@@ -218,6 +224,12 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             "request-capability-proposal",
             null,
             new HashSet<string>(StringComparer.Ordinal));
+        var composedCatalog = Cluster.Silos.Single().ServiceProvider
+            .GetRequiredService<ICapabilityCatalog>()
+            .Snapshot();
+        Assert.Equal(8, composedCatalog.Count);
+        Assert.Contains(composedCatalog, descriptor => descriptor.Id == GoogleCapabilityIds.GmailMessageRead);
+        Assert.Contains(composedCatalog, descriptor => descriptor.Id == SalesforceCapabilityIds.RecordRead);
         var conversations = new ConversationStateClient(Cluster.Client, TimeProvider.System);
         var handler = new McpInoCommandHandler(conversations);
         var command = new CommandEnvelope(
