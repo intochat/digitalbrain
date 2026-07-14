@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
@@ -40,6 +41,25 @@ public static class ConversationSurfacePayload
         if (operation is not null && current!.Action is { } action && OAuthCallbackPaths.IsStructurallyValidAction(action))
         {
             operation["action"] = new Dictionary<string, object?> { ["kind"] = action.Kind, ["label"] = action.Label, ["target"] = action.Target };
+        }
+        if (operation is not null && current!.Capability is { } capability)
+        {
+            operation["capability"] = new Dictionary<string, object?>
+            {
+                ["kind"] = CapabilityKindLabel(capability.Kind),
+                ["id"] = capability.CapabilityId,
+                ["name"] = capability.CapabilityName,
+                ["confidence"] = capability.Confidence
+            };
+        }
+        if (operation is not null && current!.Proposal is { } proposal)
+        {
+            operation["proposal"] = new Dictionary<string, object?>
+            {
+                ["id"] = proposal.ProposalId,
+                ["label"] = proposal.Label,
+                ["route"] = proposal.Route
+            };
         }
         var messages = conversation.Turns.TakeLast(MaximumFeedTurns).Select(static turn => new FeedMessage(TurnKey(turn), turn.Role, BoundedFeedText(turn.Text), turn.State))
             .ToList();
@@ -160,6 +180,13 @@ public static class ConversationSurfacePayload
         InoConversationStates.Queued => "accepted",
         InoConversationStates.Responding => "running",
         _ => state
+    };
+    private static string CapabilityKindLabel(CapabilityResolutionKind kind) => kind switch
+    {
+        CapabilityResolutionKind.Match => "match",
+        CapabilityResolutionKind.Ambiguous => "ambiguous",
+        CapabilityResolutionKind.Missing => "missing",
+        _ => kind.ToString().ToLowerInvariant()
     };
     private sealed record FeedMessage(
         [property: JsonPropertyName("turnKey")] string TurnKey,

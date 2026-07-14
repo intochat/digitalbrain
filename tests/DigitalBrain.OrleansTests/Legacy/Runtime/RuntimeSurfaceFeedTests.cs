@@ -2,6 +2,7 @@ extern alias McpProject;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
@@ -887,7 +888,7 @@ public sealed class RuntimeSurfaceFeedTests
             throw new NotSupportedException();
         public Task<ConversationState> BeginOperationAsync(
             long expectedRevision, string commandId, string inputHash, string operationId, string userText, string requestId,
-            ConversationOutboxEntry acceptedOutbox, DateTimeOffset createdAt)
+            ConversationOutboxEntry acceptedOutbox, DateTimeOffset createdAt, string[]? grants = null)
         {
             Current = ConversationTransitions.BeginOperation(
                 Current,
@@ -898,7 +899,8 @@ public sealed class RuntimeSurfaceFeedTests
                 userText,
                 requestId,
                 acceptedOutbox,
-                createdAt);
+                createdAt,
+                grants);
             return Task.FromResult(Current);
         }
         public Task<ConversationClaim> TryClaimOperationAsync(
@@ -930,7 +932,8 @@ public sealed class RuntimeSurfaceFeedTests
             long expectedRevision, string operationId, ConversationOperationStatus terminalStatus,
             ConversationTerminalPolicy terminalPolicy, string? safeReason, string assistantText,
             ConversationOutboxEntry feedOutbox, DateTimeOffset now, WorkflowReference? workflow = null,
-            ConversationLeaseFence? leaseFence = null) =>
+            ConversationLeaseFence? leaseFence = null, CapabilityResolutionReceipt? capability = null,
+            FeatureDraftReference? proposal = null) =>
             throw new NotSupportedException();
         public Task<ConversationState> CompleteEffectWithAssistantAsync(
             long expectedRevision, string operationId, EffectRecord effect, ConversationOperationStatus terminalStatus,

@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
@@ -81,9 +82,10 @@ internal sealed class ConversationNeuron(
         string userText,
         string requestId,
         ConversationOutboxEntry acceptedOutbox,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string[]? grants = null)
     {
-        var state = await State.UpdateAsync(expectedRevision, current => ConversationTransitions.BeginOperation(current, expectedRevision, commandId, inputHash, operationId, userText, requestId, acceptedOutbox, createdAt));
+        var state = await State.UpdateAsync(expectedRevision, current => ConversationTransitions.BeginOperation(current, expectedRevision, commandId, inputHash, operationId, userText, requestId, acceptedOutbox, createdAt, grants));
         await EnsureOperationReminderAsync();
         return state;
     }
@@ -225,8 +227,10 @@ internal sealed class ConversationNeuron(
         ConversationOutboxEntry feedOutbox,
         DateTimeOffset now,
         WorkflowReference? workflow = null,
-        ConversationLeaseFence? leaseFence = null) =>
-        State.UpdateAsync(expectedRevision, current => ConversationTransitions.CompleteWithAssistant(current, expectedRevision, operationId, terminalStatus, terminalPolicy, safeReason, assistantText, feedOutbox, now, workflow, leaseFence));
+        ConversationLeaseFence? leaseFence = null,
+        CapabilityResolutionReceipt? capability = null,
+        FeatureDraftReference? proposal = null) =>
+        State.UpdateAsync(expectedRevision, current => ConversationTransitions.CompleteWithAssistant(current, expectedRevision, operationId, terminalStatus, terminalPolicy, safeReason, assistantText, feedOutbox, now, workflow, leaseFence, capability, proposal));
     public Task<ConversationState> CompleteEffectWithAssistantAsync(
         long expectedRevision,
         string operationId,

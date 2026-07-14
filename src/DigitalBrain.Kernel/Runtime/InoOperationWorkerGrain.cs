@@ -231,7 +231,8 @@ internal sealed class InoOperationWorkerGrain(
                 claimed.Workflow,
                 RequestScope.Id(state.Identity.OwnerId, state.Identity.ActorId),
                 state.Identity.OwnerId,
-                state.Identity.ActorId), deadline.Token);
+                state.Identity.ActorId,
+                claimed.Grants), deadline.Token);
         }
         catch (OperationCanceledException)
         {
@@ -257,8 +258,22 @@ internal sealed class InoOperationWorkerGrain(
         activity?.SetTag("db.ino.workflow_session_id", result.Workflow.SessionId);
         if (result.ToolRequest is { } requestedTool)
             activity?.SetTag("db.ino.tool_id", requestedTool.ToolId);
+        if (result.Capability is { } capabilityReceipt)
+        {
+            activity?.SetTag("db.ino.capability_kind", CapabilityKindTag(capabilityReceipt.Kind));
+            if (!string.IsNullOrWhiteSpace(capabilityReceipt.CapabilityId))
+                activity?.SetTag("db.ino.capability_id", capabilityReceipt.CapabilityId);
+        }
+        if (result.Proposal is { } draftProposal)
+            activity?.SetTag("db.ino.proposal_id", draftProposal.ProposalId);
         await PersistWorkflowResultAsync(conversation, state.Identity, claimed, result, activity);
     }
+    private static string CapabilityKindTag(CapabilityResolutionKind kind) => kind switch
+    {
+        CapabilityResolutionKind.Match => "match",
+        CapabilityResolutionKind.Ambiguous => "ambiguous",
+        _ => "missing"
+    };
     private async Task PersistWorkflowResultAsync(IConversationNeuron conversation, ConversationIdentity identity, ConversationOperation claimed, InoWorkflowResult result, Activity? activity)
     {
         var leaseFence = LeaseFence(claimed);
@@ -361,7 +376,9 @@ internal sealed class InoOperationWorkerGrain(
                     safeReason,
                     result.Workflow,
                     leaseFence,
-                    now);
+                    now,
+                    capability: result.Capability,
+                    proposal: result.Proposal);
                 return "failed";
             }
             var effectId = StableIdentifier("effect", current.OperationId, approvedTool.ToolId, approvedTool.Scope);
@@ -408,7 +425,9 @@ internal sealed class InoOperationWorkerGrain(
                 result.Workflow,
                 leaseFence,
                 now,
-                requestedTool.ToolId);
+                requestedTool.ToolId,
+                result.Capability,
+                result.Proposal);
             return "failed";
         }
         await CompleteWorkflowResultAsync(
@@ -421,7 +440,9 @@ internal sealed class InoOperationWorkerGrain(
             result.Text,
             result.Workflow,
             leaseFence,
-            now);
+            now,
+            capability: result.Capability,
+            proposal: result.Proposal);
         return "succeeded";
     }
     private async Task CompleteWorkflowResultAsync(
@@ -435,7 +456,9 @@ internal sealed class InoOperationWorkerGrain(
         WorkflowReference workflow,
         ConversationLeaseFence leaseFence,
         DateTimeOffset now,
-        string? toolId = null) =>
+        string? toolId = null,
+        CapabilityResolutionReceipt? capability = null,
+        FeatureDraftReference? proposal = null) =>
         await conversation.CompleteWithAssistantAsync(
             state.Revision,
             current.OperationId,
@@ -457,10 +480,14 @@ internal sealed class InoOperationWorkerGrain(
                 assistantText,
                 now,
                 workflow: workflow,
-                toolId: toolId),
+                toolId: toolId,
+                capability: capability,
+                proposal: proposal),
             now,
             workflow,
-            leaseFence);
+            leaseFence,
+            capability,
+            proposal);
     private async Task PersistWorkflowResultOutcomeUnknownAsync(IConversationNeuron conversation, ConversationOperation claimed, WorkflowReference workflow, ConversationLeaseFence leaseFence, Activity? activity)
     {
         for (var attempt = 0; attempt < MaximumWorkflowResultPersistenceAttempts; attempt++)
@@ -860,7 +887,9 @@ internal sealed class InoOperationWorkerGrain(
         ToolAction? action = null,
         string? toolId = null,
         string? effectId = null,
-        string? approvalId = null)
+        string? approvalId = null,
+        CapabilityResolutionReceipt? capability = null,
+        FeatureDraftReference? proposal = null)
     {
         var identity = state.Identity ?? throw new RuntimeStateIntegrityException("conversation identity is missing");
         var includeMessage = !string.IsNullOrWhiteSpace(text) && phase is not InoOperationPhase.Running and not InoOperationPhase.RetryScheduled;
@@ -894,7 +923,9 @@ internal sealed class InoOperationWorkerGrain(
                 phase is InoOperationPhase.RetryScheduled or InoOperationPhase.Failed or InoOperationPhase.OutcomeUnknown ? text : null,
                 approvalId ?? operation.Approval?.ApprovalId,
                 action,
-                turns.TakeLast(16).ToArray()),
+                turns.TakeLast(16).ToArray(),
+                capability,
+                proposal),
             toolId,
             effectId,
             approvalId ?? operation.Approval?.ApprovalId,

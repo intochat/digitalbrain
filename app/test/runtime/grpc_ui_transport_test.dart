@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:digitalbrain_flutter/grpc/ui.pb.dart' as wire;
 import 'package:digitalbrain_flutter/runtime/runtime_configuration.dart';
 import 'package:digitalbrain_flutter/runtime/grpc_ui_transport.dart';
+import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
 import 'package:digitalbrain_flutter/runtime/runtime.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -306,6 +307,58 @@ void main() {
       },
     );
 
+    test('delivers a missing capability receipt and feature proposal through '
+        'the runtime controller', () async {
+      final response = _FakeGrpcFeedResponse(
+        Stream.fromIterable([
+          wire.SurfaceFeedEvent(
+            surfaceJson: surfaceJsonString(
+              payload: inoConversationPayload(
+                operation: inoOperation(
+                  state: 'succeeded',
+                  capability: inoCapability(
+                    kind: 'missing',
+                    id: 'assistant.answer',
+                    name: 'Assistant answer',
+                    confidence: 0,
+                  ),
+                  proposal: inoFeatureProposal(),
+                ),
+              ),
+            ),
+          ),
+        ]),
+      );
+      final port = _FakeGrpcClientPort()..feedResponse = response;
+      final transport = GrpcUiTransport.forTesting(client: port);
+      final runtime = RuntimeController(transport: transport);
+
+      await runtime.authenticateWithBootstrap('bootstrap-once');
+      await _eventually(() => runtime.latestSurface != null);
+
+      final payload =
+          runtime.latestSurface!.payload as InoConversationSurfacePayload;
+      final operation = payload.operation!;
+      expect(operation.capability?.kind, InoCapabilityResolutionKind.missing);
+      expect(operation.proposal, isNotNull);
+      expect(
+        operation.proposal!.id,
+        'proposal-0123456789abcdef0123456789abcdef',
+      );
+      expect(
+        InoFeatureProposalReference.routeShape.hasMatch(
+          operation.proposal!.route,
+        ),
+        isTrue,
+      );
+      expect(
+        operation.proposal!.route,
+        '/features/proposals/${operation.proposal!.id}',
+      );
+
+      await runtime.stop();
+    });
+
     test(
       'maps authentication errors without retaining server details',
       () async {
@@ -328,6 +381,14 @@ void main() {
       },
     );
   });
+}
+
+Future<void> _eventually(bool Function() condition) async {
+  for (var attempt = 0; attempt < 100; attempt++) {
+    if (condition()) return;
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  fail('Condition was not reached.');
 }
 
 class _FakeGrpcClientPort implements GrpcClientPort {

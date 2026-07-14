@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../protocol/surface_protocol.dart';
@@ -9,6 +10,8 @@ import '../runtime.dart';
 import 'ino_composer.dart';
 
 const Key inoConversationKey = Key('v2-ino-conversation');
+const Key chatCapabilityChipKey = Key('chat-capability-chip');
+const Key chatOpenStudioButtonKey = Key('chat-open-studio-button');
 const Key inoIntroKey = Key('v2-ino-intro');
 const Key inoTranscriptKey = Key('v2-ino-transcript');
 const Key inoEmptyTranscriptKey = Key('v2-ino-empty-transcript');
@@ -478,6 +481,8 @@ class _InoConversationViewState extends State<InoConversationView> {
   @override
   Widget build(BuildContext context) {
     final operation = widget.payload.operation;
+    final capability = operation?.capability;
+    final proposal = operation?.proposal;
     final optimisticPrompt = _optimisticPrompt;
     final messages = <_PresentedMessage>[
       for (final message in widget.payload.messages)
@@ -497,7 +502,7 @@ class _InoConversationViewState extends State<InoConversationView> {
     return Semantics(
       key: inoConversationKey,
       container: true,
-      label: 'INO conversation',
+      label: 'Chat conversation',
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -508,7 +513,7 @@ class _InoConversationViewState extends State<InoConversationView> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Ask INO',
+                    'Chat',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 6),
@@ -568,6 +573,17 @@ class _InoConversationViewState extends State<InoConversationView> {
                   ],
                   if (operation != null) ...[
                     const SizedBox(height: 10),
+                    if (capability != null &&
+                        capability.kind == InoCapabilityResolutionKind.match &&
+                        capability.id != null &&
+                        capability.name != null) ...[
+                      _CapabilityChip(name: capability.name!),
+                      const SizedBox(height: 8),
+                    ],
+                    if (proposal != null) ...[
+                      _OpenStudioButton(proposal: proposal),
+                      const SizedBox(height: 8),
+                    ],
                     _OperationStatus(
                       operation: operation,
                       retryEnabled:
@@ -696,6 +712,56 @@ class _ConversationTurn extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CapabilityChip extends StatelessWidget {
+  const _CapabilityChip({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Semantics(
+        container: true,
+        label: 'Capability: $name',
+        child: Material(
+          key: chatCapabilityChipKey,
+          color: colors.secondaryContainer,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: ExcludeSemantics(
+              child: Text(
+                name,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colors.onSecondaryContainer,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OpenStudioButton extends StatelessWidget {
+  const _OpenStudioButton({required this.proposal});
+
+  final InoFeatureProposalReference proposal;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: OutlinedButton(
+      key: chatOpenStudioButtonKey,
+      onPressed: () => context.go(proposal.route),
+      child: Text(proposal.label),
+    ),
+  );
 }
 
 class _OperationStatus extends StatelessWidget {

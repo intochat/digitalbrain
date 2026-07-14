@@ -1,4 +1,5 @@
 using System.Text;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 
@@ -121,5 +122,74 @@ public sealed class ConversationSurfacePayloadTests
         Assert.Equal("operation-1", operation.GetProperty("operationId").GetString());
         Assert.Equal("running", operation.GetProperty("phase").GetString());
         Assert.Equal(9, operation.GetProperty("version").GetInt64());
+    }
+
+    [Fact]
+    public void Build_projects_capability_and_proposal_receipts_without_leaking_the_prompt()
+    {
+        var conversation = new InoConversationSnapshot(
+            "ino-" + new string('a', 64),
+            3,
+            [new InoConversationTurn("command-1", "assistant", "I can help with that.", InoConversationStates.Succeeded)],
+            [new InoConversationOperation(
+                "operation-1",
+                "command-1",
+                "read my records",
+                InoConversationStates.Succeeded,
+                null,
+                false,
+                DateTimeOffset.UtcNow,
+                null,
+                null,
+                null,
+                1,
+                null,
+                null,
+                null,
+                new CapabilityResolutionReceipt(
+                    CapabilityResolutionKind.Match,
+                    "salesforce.record.read.v1",
+                    "Read Salesforce records",
+                    [],
+                    0.92),
+                new FeatureDraftReference(
+                    "proposal-0123456789abcdef0123456789abcdef",
+                    "Open Studio",
+                    "/features/proposals/proposal-0123456789abcdef0123456789abcdef"))]);
+
+        var payload = ConversationSurfacePayload.Build(conversation);
+        var operation = payload.GetProperty("data").GetProperty("operation");
+
+        Assert.Equal("salesforce.record.read.v1", operation.GetProperty("capability").GetProperty("id").GetString());
+        Assert.Equal("Read Salesforce records", operation.GetProperty("capability").GetProperty("name").GetString());
+        Assert.Equal("match", operation.GetProperty("capability").GetProperty("kind").GetString());
+        Assert.Equal("proposal-0123456789abcdef0123456789abcdef", operation.GetProperty("proposal").GetProperty("id").GetString());
+        Assert.Equal(
+            "/features/proposals/proposal-0123456789abcdef0123456789abcdef",
+            operation.GetProperty("proposal").GetProperty("route").GetString());
+        Assert.DoesNotContain("prompt", payload.GetRawText(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Build_omits_capability_and_proposal_blocks_when_the_operation_carries_neither()
+    {
+        var conversation = new InoConversationSnapshot(
+            "ino-" + new string('a', 64),
+            3,
+            [],
+            [new InoConversationOperation(
+                "operation-1",
+                "command-1",
+                "read my records",
+                InoConversationStates.Succeeded,
+                null,
+                false,
+                DateTimeOffset.UtcNow)]);
+
+        var payload = ConversationSurfacePayload.Build(conversation);
+        var operation = payload.GetProperty("data").GetProperty("operation");
+
+        Assert.False(operation.TryGetProperty("capability", out _));
+        Assert.False(operation.TryGetProperty("proposal", out _));
     }
 }

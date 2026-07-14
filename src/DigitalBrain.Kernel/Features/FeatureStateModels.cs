@@ -10,9 +10,10 @@ internal sealed record FeatureHubState(
     [property: Id(3)] FeatureReleaseMetadata[] Releases,
     [property: Id(4)] FeatureApprovalState[] Approvals,
     [property: Id(5)] FeatureInstallationAuthorityState[] Authorities,
-    [property: Id(6)] FeatureBackpressureAlert[] Alerts)
+    [property: Id(6)] FeatureBackpressureAlert[] Alerts,
+    [property: Id(7)] FeatureDraftProposal[]? Drafts = null)
 {
-    public static FeatureHubState Empty { get; } = new([], 0, [], [], [], [], []);
+    public static FeatureHubState Empty { get; } = new([], 0, [], [], [], [], [], []);
 }
 [GenerateSerializer, Alias("digitalbrain.v3.feature-approval-state")]
 internal sealed record FeatureApprovalState(
@@ -100,6 +101,7 @@ internal sealed record FeatureInstallationState(
     public static FeatureInstallationState Create(ReleaseDigest release, FeatureInstallationId? installationId = null) =>
         new(installationId ?? new FeatureInstallationId("unbound"), release, null, "{}", false, [], null, [], [], 0, 0, null, []);
 }
+internal sealed record FeatureCreateDraftTransition(FeatureHubState State, FeatureDraftProposal Draft);
 internal sealed record FeatureAppendTransition(FeatureInstallationState State, FeatureAppendStatus Status);
 internal sealed record FeatureClaimTransition(FeatureInstallationState State, FeatureRunClaim? Claim);
 internal sealed record FeatureCommitTransition(FeatureInstallationState State, FeatureCompletion Completion);

@@ -123,6 +123,137 @@ void main() {
     }
   });
 
+  test('parses bounded capability and proposal receipts', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            capability: inoCapability(),
+            proposal: inoFeatureProposal(),
+          ),
+        ),
+      ),
+    );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.capability?.kind, InoCapabilityResolutionKind.match);
+    expect(operation.capability?.id, 'salesforce.record.read.v1');
+    expect(operation.capability?.name, 'Read Salesforce records');
+    expect(operation.capability?.confidence, 0.91);
+    expect(operation.proposal?.label, 'Open Studio');
+    expect(
+      operation.proposal?.route,
+      '/features/proposals/proposal-0123456789abcdef0123456789abcdef',
+    );
+  });
+
+  test('omits capability and proposal when the operation carries neither', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: inoOperation(state: 'succeeded'),
+        ),
+      ),
+    );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.capability, isNull);
+    expect(operation.proposal, isNull);
+  });
+
+  test('rejects external or malformed proposal routes', () {
+    expect(
+      () => const SurfaceEnvelopeDecoder().decode(
+        surfaceJsonString(
+          payload: inoConversationPayload(
+            operation: inoOperation(
+              state: 'succeeded',
+              proposal: inoFeatureProposal(route: 'https://example.com'),
+            ),
+          ),
+        ),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('rejects malformed capability receipts', () {
+    final oversizedId = 'x' * 129;
+    final oversizedName = 'x' * 81;
+    final invalidCapabilities = <Map<String, Object?>>[
+      inoCapability(kind: 'bogus'),
+      inoCapability(id: oversizedId),
+      inoCapability(name: oversizedName),
+      inoCapability(confidence: 1.5),
+      inoCapability(confidence: -0.1),
+      inoCapability(id: 42),
+      inoCapability(name: 42),
+      inoCapability(kind: 7),
+    ];
+
+    for (final capability in invalidCapabilities) {
+      expect(
+        () => const SurfaceEnvelopeDecoder().decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                capability: capability,
+              ),
+            ),
+          ),
+        ),
+        throwsFormatException,
+        reason: capability.toString(),
+      );
+    }
+  });
+
+  test('rejects malformed feature proposal references', () {
+    final oversizedId = 'proposal-${'x' * 129}';
+    const validId = 'proposal-0123456789abcdef0123456789abcdef';
+    const validRoute = '/features/proposals/$validId';
+    final invalidProposals = <Map<String, Object?>>[
+      inoFeatureProposal(route: 'https://example.com'),
+      inoFeatureProposal(route: '/features/proposals/not-a-proposal-id'),
+      inoFeatureProposal(
+        id: oversizedId,
+        route: '/features/proposals/$oversizedId',
+      ),
+      inoFeatureProposal(label: 'x' * 81),
+      inoFeatureProposal(route: '$validRoute/extra'),
+      inoFeatureProposal(route: '$validRoute?query=1'),
+      inoFeatureProposal(route: '$validRoute#fragment'),
+      inoFeatureProposal(route: '$validRoute/../x'),
+      inoFeatureProposal(
+        route:
+            '/features/proposals/proposal-'
+            '0123456789ABCDEF0123456789ABCDEF',
+      ),
+      inoFeatureProposal(
+        id: 'proposal-ffffffffffffffffffffffffffffffff',
+        route: validRoute,
+      ),
+    ];
+
+    for (final proposal in invalidProposals) {
+      expect(
+        () => const SurfaceEnvelopeDecoder().decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(state: 'succeeded', proposal: proposal),
+            ),
+          ),
+        ),
+        throwsFormatException,
+        reason: proposal.toString(),
+      );
+    }
+  });
+
   test('decodes only the complete safe legacy INO operation shape', () {
     final envelope = const SurfaceEnvelopeDecoder().decode(
       surfaceJsonString(

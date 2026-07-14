@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
 import 'package:digitalbrain_flutter/runtime/runtime_configuration.dart';
 import 'package:digitalbrain_flutter/runtime/runtime.dart';
+import 'package:digitalbrain_flutter/runtime/widgets/feature_proposal_placeholder.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_composer.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_conversation_view.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/runtime_shell.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/surface_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'test_fixtures.dart';
 
@@ -335,6 +337,278 @@ void main() {
       tester.widget<FilledButton>(find.byKey(inoSendButtonKey)).onPressed,
       isNull,
     );
+    await runtime.stop();
+  });
+
+  testWidgets('chat copy replaces the legacy INO product language', (
+    tester,
+  ) async {
+    final feed = _ShellFeedCall.open();
+    final transport = _ShellTransport(feed);
+    final runtime = _runtime(transport);
+
+    await tester.pumpWidget(
+      _host(
+        RuntimeShell(
+          configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+          controller: runtime,
+        ),
+      ),
+    );
+    await _pumpUntil(tester, () => transport.watchStarted);
+    feed.add(
+      FeedSurfaceJson(
+        surfaceJsonString(
+          sequence: 1,
+          payload: inoConversationPayload(),
+          actions: [testInoActionJson()],
+        ),
+      ),
+    );
+    await _pumpUntil(tester, () => runtime.latestSurface != null);
+
+    expect(find.text('Chat'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.byKey(inoConversationKey)).label,
+      startsWith('Chat conversation'),
+    );
+
+    await runtime.stop();
+  });
+
+  testWidgets(
+    'chat surface renders a capability chip showing only the human name',
+    (tester) async {
+      final feed = _ShellFeedCall.open();
+      final transport = _ShellTransport(feed);
+      final runtime = _runtime(transport);
+
+      await tester.pumpWidget(
+        _host(
+          RuntimeShell(
+            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+            controller: runtime,
+          ),
+        ),
+      );
+      await _pumpUntil(tester, () => transport.watchStarted);
+      feed.add(
+        FeedSurfaceJson(
+          surfaceJsonString(
+            sequence: 1,
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                capability: inoCapability(),
+              ),
+            ),
+            actions: [testInoActionJson()],
+          ),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(chatCapabilityChipKey).evaluate().isNotEmpty,
+      );
+
+      expect(find.text('Read Salesforce records'), findsOneWidget);
+      expect(find.textContaining('salesforce.record.read.v1'), findsNothing);
+
+      await runtime.stop();
+    },
+  );
+
+  testWidgets(
+    'chat surface renders ambiguous capability choices from assistant text',
+    (tester) async {
+      final feed = _ShellFeedCall.open();
+      final transport = _ShellTransport(feed);
+      final runtime = _runtime(transport);
+
+      await tester.pumpWidget(
+        _host(
+          RuntimeShell(
+            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+            controller: runtime,
+          ),
+        ),
+      );
+      await _pumpUntil(tester, () => transport.watchStarted);
+      feed.add(
+        FeedSurfaceJson(
+          surfaceJsonString(
+            sequence: 1,
+            payload: inoConversationPayload(
+              messages: [
+                inoMessage(
+                  role: 'assistant',
+                  text:
+                      'A few capabilities could match this request: Read a Gmail message; List Gmail mailbox messages. Please choose one and ask again.',
+                  state: 'succeeded',
+                ),
+              ],
+              operation: inoOperation(state: 'succeeded'),
+            ),
+            actions: [testInoActionJson()],
+          ),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.textContaining('Read a Gmail message').evaluate().isNotEmpty,
+      );
+
+      expect(find.textContaining('Read a Gmail message'), findsOneWidget);
+      expect(
+        find.textContaining('List Gmail mailbox messages'),
+        findsOneWidget,
+      );
+
+      await runtime.stop();
+    },
+  );
+
+  testWidgets(
+    'chat surface hides the capability chip and Open Studio without metadata',
+    (tester) async {
+      final feed = _ShellFeedCall.open();
+      final transport = _ShellTransport(feed);
+      final runtime = _runtime(transport);
+
+      await tester.pumpWidget(
+        _host(
+          RuntimeShell(
+            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+            controller: runtime,
+          ),
+        ),
+      );
+      await _pumpUntil(tester, () => transport.watchStarted);
+      feed.add(
+        FeedSurfaceJson(
+          surfaceJsonString(
+            sequence: 1,
+            payload: inoConversationPayload(
+              operation: inoOperation(state: 'succeeded'),
+            ),
+            actions: [testInoActionJson()],
+          ),
+        ),
+      );
+      await _pumpUntil(tester, () => runtime.latestSurface != null);
+
+      expect(find.byKey(chatCapabilityChipKey), findsNothing);
+      expect(find.byKey(chatOpenStudioButtonKey), findsNothing);
+
+      await runtime.stop();
+    },
+  );
+
+  testWidgets(
+    'chat surface hides the capability chip for a missing resolution',
+    (tester) async {
+      final feed = _ShellFeedCall.open();
+      final transport = _ShellTransport(feed);
+      final runtime = _runtime(transport);
+
+      await tester.pumpWidget(
+        _host(
+          RuntimeShell(
+            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+            controller: runtime,
+          ),
+        ),
+      );
+      await _pumpUntil(tester, () => transport.watchStarted);
+      feed.add(
+        FeedSurfaceJson(
+          surfaceJsonString(
+            sequence: 1,
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                capability: inoCapability(
+                  kind: 'missing',
+                  id: 'memory.fact.remember.v1',
+                  name: 'Remember a fact',
+                  confidence: 0.41,
+                ),
+                proposal: inoFeatureProposal(),
+              ),
+            ),
+            actions: [testInoActionJson()],
+          ),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(chatOpenStudioButtonKey).evaluate().isNotEmpty,
+      );
+
+      expect(find.byKey(chatCapabilityChipKey), findsNothing);
+      expect(find.byKey(chatOpenStudioButtonKey), findsOneWidget);
+
+      await runtime.stop();
+    },
+  );
+
+  testWidgets('Open Studio navigates to the safe Feature Studio placeholder', (
+    tester,
+  ) async {
+    final feed = _ShellFeedCall.open();
+    final transport = _ShellTransport(feed);
+    final runtime = _runtime(transport);
+    final router = GoRouter(
+      initialLocation: '/chat',
+      routes: [
+        GoRoute(
+          path: '/chat',
+          builder: (context, state) => RuntimeShell(
+            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+            controller: runtime,
+          ),
+        ),
+        GoRoute(
+          path: '/features/proposals/:proposalId',
+          builder: (context, state) => FeatureProposalPlaceholder(
+            proposalId: state.pathParameters['proposalId']!,
+          ),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await _pumpUntil(tester, () => transport.watchStarted);
+    feed.add(
+      FeedSurfaceJson(
+        surfaceJsonString(
+          sequence: 1,
+          payload: inoConversationPayload(
+            operation: inoOperation(
+              state: 'succeeded',
+              proposal: inoFeatureProposal(),
+            ),
+          ),
+          actions: [testInoActionJson()],
+        ),
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(chatOpenStudioButtonKey).evaluate().isNotEmpty,
+    );
+
+    await tester.tap(find.byKey(chatOpenStudioButtonKey));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Feature Studio'), findsOneWidget);
+    expect(find.text('Draft created from Chat'), findsOneWidget);
+    expect(
+      find.text('proposal-0123456789abcdef0123456789abcdef'),
+      findsOneWidget,
+    );
+    expect(find.byKey(runtimeSurfaceKey), findsNothing);
+
     await runtime.stop();
   });
 }

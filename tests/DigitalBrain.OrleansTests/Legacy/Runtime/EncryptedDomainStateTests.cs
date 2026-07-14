@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
@@ -90,6 +91,34 @@ public sealed class EncryptedDomainStateTests
         Assert.Equal(1, storage.WriteAttempts);
         Assert.Equal(state.OpaqueSessionId, rotated.Unprotect<SessionState>(
             scope, RuntimeStateKinds.Session, RuntimeStateSchemas.Session, storage.State).OpaqueSessionId);
+    }
+
+    [Fact]
+    public void Conversation_state_with_legacy_null_grant_snapshots_stays_valid_and_accepts_new_operations()
+    {
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state, state.Revision, "command-0", Hash("input-0"), "operation-0", "turn-0",
+            "request-command-0", AcceptedOutbox("operation-0", Utc(0)), Utc(0), ["mail.read"]);
+        var legacyState = state with
+        {
+            AcceptedCommands = state.AcceptedCommands.Select(command => command with { Grants = null }).ToArray(),
+            Operations = state.Operations.Select(operation => operation with { Grants = null }).ToArray()
+        };
+
+        ConversationTransitions.Validate(legacyState);
+        var next = ConversationTransitions.BeginOperation(
+            legacyState, legacyState.Revision, "command-1", Hash("input-1"), "operation-1", "turn-1",
+            "request-command-1", AcceptedOutbox("operation-1", Utc(1)), Utc(1), ["mail.read"]);
+
+        Assert.Null(next.AcceptedCommands.Single(command => command.CommandId == "command-0").Grants);
+        var acceptedGrants = next.AcceptedCommands.Single(command => command.CommandId == "command-1").Grants;
+        Assert.NotNull(acceptedGrants);
+        Assert.Equal(["mail.read"], acceptedGrants);
+        var operationGrants = next.Operations.Single(operation => operation.OperationId == "operation-1").Grants;
+        Assert.NotNull(operationGrants);
+        Assert.Equal(["mail.read"], operationGrants);
     }
 
     [Fact]
@@ -489,6 +518,238 @@ public sealed class EncryptedDomainStateTests
             "The request completed.",
             new ConversationOutboxEntry("completed-operation", "surface-feed", [], now, null),
             now));
+    }
+
+    [Fact]
+    public void Terminal_completion_rejects_a_feature_proposal_route_outside_the_proposals_namespace()
+    {
+        var now = Utc(0);
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state,
+            state.Revision,
+            "command",
+            Hash("input"),
+            "operation",
+            "answer the request",
+            "request-command",
+            AcceptedOutbox("operation", now),
+            now);
+        var claim = ConversationTransitions.TryClaimOperation(
+            state,
+            state.Revision,
+            "operation",
+            "worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        var leaseFence = new ConversationLeaseFence("worker", claim.Operation!.Attempt);
+
+        Assert.Throws<ArgumentException>(() => ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "The request completed.",
+            new ConversationOutboxEntry("completed-operation-external", "surface-feed", [], now, null),
+            now,
+            leaseFence: leaseFence,
+            proposal: new FeatureDraftReference("proposal-0123456789abcdef0123456789abcdef", "Open Studio", "https://example.com")));
+
+        Assert.Throws<ArgumentException>(() => ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "The request completed.",
+            new ConversationOutboxEntry("completed-operation-other", "surface-feed", [], now, null),
+            now,
+            leaseFence: leaseFence,
+            proposal: new FeatureDraftReference("proposal-0123456789abcdef0123456789abcdef", "Open Studio", "/other")));
+    }
+
+    [Fact]
+    public void Terminal_completion_rejects_a_feature_proposal_route_that_deviates_from_the_anchored_shape()
+    {
+        var now = Utc(0);
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state,
+            state.Revision,
+            "command",
+            Hash("input"),
+            "operation",
+            "answer the request",
+            "request-command",
+            AcceptedOutbox("operation", now),
+            now);
+        var claim = ConversationTransitions.TryClaimOperation(
+            state,
+            state.Revision,
+            "operation",
+            "worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        var leaseFence = new ConversationLeaseFence("worker", claim.Operation!.Attempt);
+        const string validId = "proposal-0123456789abcdef0123456789abcdef";
+        const string validRoute = "/features/proposals/" + validId;
+        string[] deviantRoutes =
+        [
+            validRoute + "/extra",
+            validRoute + "?query=1",
+            "/features/proposals/proposal-0123456789ABCDEF0123456789ABCDEF",
+            "/features/proposals/proposal-0123456789abcdef0123456789abcde"
+        ];
+
+        foreach (var route in deviantRoutes)
+        {
+            var outboxId = "completed-operation-" + route.GetHashCode();
+            Assert.Throws<ArgumentException>(() => ConversationTransitions.CompleteWithAssistant(
+                claim.State,
+                claim.State.Revision,
+                "operation",
+                ConversationOperationStatus.Succeeded,
+                ConversationTerminalPolicy.NeverRetry,
+                null,
+                "The request completed.",
+                new ConversationOutboxEntry(outboxId, "surface-feed", [], now, null),
+                now,
+                leaseFence: leaseFence,
+                proposal: new FeatureDraftReference(validId, "Open Studio", route)));
+        }
+    }
+
+    [Fact]
+    public void Terminal_completion_accepts_the_exact_anchored_proposal_route_shape()
+    {
+        var now = Utc(0);
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state,
+            state.Revision,
+            "command",
+            Hash("input"),
+            "operation",
+            "answer the request",
+            "request-command",
+            AcceptedOutbox("operation", now),
+            now);
+        var claim = ConversationTransitions.TryClaimOperation(
+            state,
+            state.Revision,
+            "operation",
+            "worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        var leaseFence = new ConversationLeaseFence("worker", claim.Operation!.Attempt);
+        const string proposalId = "proposal-0123456789abcdef0123456789abcdef";
+
+        var completed = ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "The request completed.",
+            new ConversationOutboxEntry("completed-operation", "surface-feed", [], now, null),
+            now,
+            leaseFence: leaseFence,
+            proposal: new FeatureDraftReference(proposalId, "Open Studio", "/features/proposals/" + proposalId));
+
+        Assert.Contains(completed.Turns, turn =>
+            turn.OperationId == "operation" && turn.Kind == ConversationTurnKind.Assistant);
+    }
+
+    [Fact]
+    public void Terminal_completion_rejects_out_of_bounds_capability_receipts()
+    {
+        CapabilityResolutionReceipt[] invalidReceipts =
+        [
+            CapabilityReceipt(capabilityId: new string('a', 129)),
+            CapabilityReceipt(capabilityName: new string('n', 81)),
+            CapabilityReceipt(capabilityName: "Read\nrecords"),
+            CapabilityReceipt(candidateIds: Enumerable.Range(0, 6).Select(index => "candidate-" + index).ToArray()),
+            CapabilityReceipt(candidateIds: [new string('c', 129)]),
+            CapabilityReceipt(confidence: -0.1),
+            CapabilityReceipt(confidence: 1.1),
+            CapabilityReceipt(confidence: double.NaN)
+        ];
+
+        Assert.All(invalidReceipts, receipt =>
+            Assert.Throws<ArgumentException>(() => CompleteWithCapability(receipt)));
+    }
+
+    [Fact]
+    public void Terminal_completion_accepts_capability_receipts_at_exact_bounds()
+    {
+        var lowerBound = CapabilityReceipt(
+            capabilityId: new string('a', 128),
+            capabilityName: new string('n', 80),
+            candidateIds: Enumerable.Range(0, 5).Select(index => index + new string('c', 127)).ToArray(),
+            confidence: 0);
+        var upperBound = CapabilityReceipt(confidence: 1);
+
+        var lowerBoundState = CompleteWithCapability(lowerBound);
+        var upperBoundState = CompleteWithCapability(upperBound);
+
+        var lowerBoundOperation = lowerBoundState.Operations.Single(operation => operation.OperationId == "operation");
+        Assert.Equal(ConversationOperationStatus.Succeeded, lowerBoundOperation.Status);
+        Assert.Equal(lowerBound.CapabilityId, lowerBoundOperation.Capability!.CapabilityId);
+        Assert.Equal(lowerBound.CapabilityName, lowerBoundOperation.Capability.CapabilityName);
+        Assert.Equal(lowerBound.CandidateIds, lowerBoundOperation.Capability.CandidateIds);
+        Assert.Equal(0, lowerBoundOperation.Capability.Confidence);
+        var upperBoundOperation = upperBoundState.Operations.Single(operation => operation.OperationId == "operation");
+        Assert.Equal(1, upperBoundOperation.Capability!.Confidence);
+    }
+
+    private static CapabilityResolutionReceipt CapabilityReceipt(
+        string? capabilityId = "capability.read.v1",
+        string? capabilityName = "Read records",
+        string[]? candidateIds = null,
+        double confidence = 0.5) =>
+        new(CapabilityResolutionKind.Match, capabilityId, capabilityName, candidateIds ?? [], confidence);
+
+    private static ConversationState CompleteWithCapability(CapabilityResolutionReceipt receipt)
+    {
+        var now = Utc(0);
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state,
+            state.Revision,
+            "command",
+            Hash("input"),
+            "operation",
+            "answer the request",
+            "request-command",
+            AcceptedOutbox("operation", now),
+            now);
+        var claim = ConversationTransitions.TryClaimOperation(
+            state,
+            state.Revision,
+            "operation",
+            "worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        return ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "The request completed.",
+            new ConversationOutboxEntry("completed-operation", "surface-feed", [], now, null),
+            now,
+            leaseFence: new ConversationLeaseFence("worker", claim.Operation!.Attempt),
+            capability: receipt);
     }
 
     [Fact]

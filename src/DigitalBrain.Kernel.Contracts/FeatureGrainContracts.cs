@@ -264,6 +264,18 @@ public sealed record FeatureHubSnapshot(
     [property: Id(4)] FeatureApprovalSnapshot[] Approvals,
     [property: Id(5)] FeatureAuthoritySnapshot[] Authorities,
     [property: Id(6)] FeatureBackpressureAlert[] Alerts);
+[GenerateSerializer, Alias("digitalbrain.feature.draft-proposal.v1")]
+public sealed record FeatureDraftProposal(
+    [property: Id(0)] string ProposalId,
+    [property: Id(1)] string OperationId,
+    [property: Id(2)] string Goal,
+    [property: Id(3)] string Status,
+    [property: Id(4)] DateTimeOffset CreatedAt);
+[GenerateSerializer, Alias("digitalbrain.feature.create-draft.v1")]
+public sealed record CreateFeatureDraft(
+    [property: Id(0)] string OperationId,
+    [property: Id(1)] string Goal,
+    [property: Id(2)] DateTimeOffset RequestedAt);
 public interface IFeatureGrainResolver
 {
     IFeatureHubGrain Hub(BrainOwnerId ownerId);
@@ -274,6 +286,8 @@ public interface IFeatureHubGrain : IGrainWithStringKey
 {
     [Alias("register")]
     Task RegisterAsync(FeatureInstallationRegistration registration);
+    [Alias("create-draft")]
+    Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request);
     [Alias("publish")]
     Task<FeatureFanOutResult> PublishAsync(FeatureInput input);
     [Alias("read")]

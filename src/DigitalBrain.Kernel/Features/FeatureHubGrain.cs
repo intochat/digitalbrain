@@ -125,6 +125,13 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         await WriteAsync(registered);
         return AuthoritySnapshot(authority);
     }
+    public async Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request)
+    {
+        using var activity = Start("create-draft");
+        var result = Domain(() => FeatureHubTransitions.CreateDraft(State, this.GetPrimaryKeyString(), request));
+        if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
+        return result.Draft;
+    }
     public Task<FeatureGrantSnapshot?> ReadGrantAsync(FeatureGrantLookup lookup)
     {
         using var activity = Start("read-grant");

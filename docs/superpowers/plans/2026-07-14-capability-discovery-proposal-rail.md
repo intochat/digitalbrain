@@ -2,11 +2,29 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace hardcoded provider-first intent selection with an authorized hybrid capability catalog that Chat can expose, and create a durable Feature proposal when no capability safely matches.
+**Goal:** Give Chat an authorized hybrid capability catalog it can expose, and create a durable Feature draft proposal when no capability safely matches.
 
-**Architecture:** Runtime-composed capability descriptors become the source of truth. A deterministic resolver filters unavailable descriptors, combines exact, lexical, and embedding similarity, and returns match, ambiguity, or missing without letting the model invent capabilities. The existing conversation/model workflow extracts parameters only after the server selects a capability; missing actionable requests create an idempotent proposal in the owner-scoped `FeatureHubGrain` and project a safe capability/proposal receipt to Flutter.
+**Architecture:** Runtime-composed capability descriptors become the source of truth. A deterministic resolver filters unavailable descriptors, combines exact, lexical, and embedding similarity, and returns match, ambiguity, or missing without letting the model invent capabilities. The model extracts capability parameters only after the server selects a capability; missing actionable requests create an idempotent draft proposal on the existing owner-scoped `FeatureHubGrain` and project a safe capability/proposal receipt to Flutter.
 
 **Tech Stack:** .NET 11, C# 14, Orleans 10.2, Microsoft.Extensions.AI embeddings, Aspire 13.4, xUnit, Flutter/Dart, GoRouter, existing native conversation surface protocol.
+
+## Architecture reconciliation (2026-07-14, post-consolidation master)
+
+This plan was originally written before all active work was consolidated into master. The following corrections bind every task below; where a task body and this section disagree, this section governs.
+
+| Original plan reference | Current repository reality |
+|---|---|
+| `src/DigitalBrain.Kernel.Abstractions/*` | Empty stub. All contracts live in `src/DigitalBrain.Kernel.Contracts/` |
+| `src/DigitalBrain.Core/{DurableInoContracts,Conversation,ConversationSurfacePayload}.cs` | `src/DigitalBrain.Kernel.Contracts/Core/…` (files exist) |
+| `tests/DigitalBrain.Tests/Runtime/*` | Existing files: `tests/DigitalBrain.OrleansTests/Legacy/Runtime/*`. New capability tests: `tests/DigitalBrain.OrleansTests/Capabilities/`. New feature-draft tests: `tests/DigitalBrain.OrleansTests/Features/` |
+| `SemanticIntent.cs`, `ConversationModel.cs`, `ConversationModelGrain.cs`, `SemanticProvider`, `SemanticOperation`, `TryExecuteTypedReadAsync`, `TypedReadWorkflowRunnerTests` | Do not exist. There is no intent-selection layer in Chat; `AgentFrameworkWorkflowRunner` sends the prompt straight to a `ChatClientAgent`. Capability resolution is additive, and parameter extraction is a new capability-scoped service |
+| `GmailTools.ReadMessages/ReadMailboxOverview/ReadThreads`, `SalesforceTools.DiscoverObjects/SearchRecords/ReadRecords/AggregateRecords/ContinueRecords`, `CrossProviderTools.*` | Do not exist. Real runtime capability IDs: `GoogleCapabilityIds.GmailMessageRead/GmailMailboxRead/GmailSendPropose`, `SalesforceCapabilityIds.RecordRead/RecordUpdatePropose`, `MemoryCapabilityIds.Recall/Remember`, each backed by a registered `ICapabilityHandler`. Effect tool IDs `GmailTools.Send`, `SalesforceTools.UpdateRecord` gate mutations |
+| New `FeatureProposal`, `FeatureHubState`, `FeatureHubTransitions`, `IFeatureHubGrain`, `FeatureHubGrain`, `RuntimeStateStorageProviders.GrainState`, `EncryptedPersistentState<FeatureHubState>` | All five type names already exist as the release→approval→grant→install lifecycle rail (`src/DigitalBrain.Kernel.Contracts/FeatureGrainContracts.cs`, `src/DigitalBrain.Kernel/Features/`). Draft proposals extend that existing hub (`FeatureDraftProposal`, `CreateFeatureDraft`, `CreateDraftAsync`) and inherit its `[PersistentState("feature-hub")]` persistence |
+| `CapabilityRisk` enum | Reuse existing `CapabilityOperationKind` (Query, InternalWrite, ExternalEffect) |
+| Grant snapshot source | `context.Grants` on the authenticated MCP request context (see `RuntimeSessionAuthority`, `UiGrpcService`); external-effect gating already uses `ExternalEffectGrants` (`src/DigitalBrain.Kernel.Contracts/Runtime/InoEffectPlan.cs`) |
+| Serialized field appends | Verified against master: `AcceptedCommand` next free is `Id(9)`; `ConversationOperation` next free is `Id(16)` (grants), then `Id(17)` capability, `Id(18)` proposal |
+
+Scope clarification: matching an integration capability in Chat performs deterministic selection plus capability-scoped parameter extraction and projects the receipt; execution of integration reads from Chat remains on the existing FeatureHost/effect rails and is delivered by the next plans. `assistant.answer` matches continue through the existing bounded Chat agent path.
 
 ## Global Constraints
 
@@ -15,10 +33,10 @@
 - Capability search must combine structured filtering, exact aliases, lexical overlap, and vector similarity.
 - Zero-vector or unavailable embeddings must fall back to deterministic exact and lexical scoring.
 - Ambiguous matches must ask for clarification; they must not silently choose.
-- Missing actionable work must create an idempotent proposal and ask permission to open Studio; it must not install code.
+- Missing actionable work must create an idempotent draft proposal and ask permission to open Studio; it must not install code.
 - Conversation history, capability retrieval, and trusted Memory remain separate.
 - Every external mutation continues through the existing effect approval rail.
-- Keep Feature proposals owner-scoped, encrypted at rest, bounded, and free of credentials or provider payloads.
+- Keep draft proposals owner-scoped, bounded, and free of credentials or provider payloads; they inherit the existing FeatureHub persistence.
 - Do not add a vector database for this slice; the bounded runtime catalog is scored in memory.
 - Do not add a new Flutter state-management package.
 - Do not modify or regenerate the existing platform plugin registrant files.
@@ -29,13 +47,7 @@
 
 ## Scope boundary
 
-This plan delivers the first independently releasable Capability OS slice. It does not build FeatureBuilder, FeatureHost, editable BDD/source Studio, the persistent navigation shell, operational Home, Connectors, Runs, or governed Memory screens.
-
-After this plan is green, write these independent execution plans in order:
-
-1. `2026-07-14-feature-authoring-company-research.md` — living BDD, one C# file, verification, release, installation, and the Company Research Feature.
-2. `2026-07-14-flutter-capability-shell.md` — persistent rail, six routes, contextual global command, and full Chat expansion.
-3. `2026-07-14-operational-capability-views.md` — Home, Features, Connectors, Runs, and Memory projections.
+This plan delivers the first independently releasable Capability OS slice. It does not build Chat-side execution of integration capabilities, editable BDD/source Studio, the persistent navigation shell, operational Home, Connectors, Runs, or governed Memory screens.
 
 ---
 
@@ -43,68 +55,73 @@ After this plan is green, write these independent execution plans in order:
 
 ### New backend files
 
-- `src/DigitalBrain.Kernel.Abstractions/Capabilities.cs` — serialized capability, resolution receipt, and safe proposal-reference contracts.
-- `src/DigitalBrain.Kernel.Abstractions/FeatureHub.cs` — proposal state, transition API, and owner-scoped grain contract.
-- `src/DigitalBrain.Kernel/Runtime/BuiltInCapabilityCatalog.cs` — explicit Gmail, Salesforce, Chat, and proposal-safe descriptors plus typed intent bindings.
-- `src/DigitalBrain.Kernel/Runtime/HybridCapabilityResolver.cs` — structured filtering and deterministic exact/lexical/vector ranking.
-- `src/DigitalBrain.Kernel/Runtime/FeatureHubGrain.cs` — encrypted durable proposal ownership.
-- `tests/DigitalBrain.Tests/Runtime/BuiltInCapabilityCatalogTests.cs` — descriptor and binding contract tests.
-- `tests/DigitalBrain.Tests/Runtime/HybridCapabilityResolverTests.cs` — ranking, fallback, ambiguity, and missing tests.
-- `tests/DigitalBrain.Tests/Runtime/FeatureHubTransitionsTests.cs` — idempotency, bounds, and owner-state tests.
-- `tests/DigitalBrain.Tests/Runtime/CapabilityWorkflowRunnerTests.cs` — runner integration tests.
+- `src/DigitalBrain.Kernel.Contracts/Runtime/CapabilityDiscovery.cs` — serialized capability descriptor, resolution receipt, draft-proposal reference, search contracts.
+- `src/DigitalBrain.Kernel/Capabilities/BuiltInCapabilityCatalog.cs` — explicit descriptors over real capability IDs plus typed bindings.
+- `src/DigitalBrain.Kernel/Capabilities/HybridCapabilityResolver.cs` — structured filtering and deterministic exact/lexical/vector ranking.
+- `src/DigitalBrain.Kernel/Runtime/CapabilityParameterModel.cs` — capability-scoped bounded parameter extraction.
+- `tests/DigitalBrain.OrleansTests/Capabilities/BuiltInCapabilityCatalogTests.cs`
+- `tests/DigitalBrain.OrleansTests/Capabilities/HybridCapabilityResolverTests.cs`
+- `tests/DigitalBrain.OrleansTests/Capabilities/CapabilityParameterModelTests.cs`
+- `tests/DigitalBrain.OrleansTests/Capabilities/CapabilityWorkflowRunnerTests.cs`
+- `tests/DigitalBrain.OrleansTests/Features/FeatureDraftTransitionTests.cs`
 
 ### Modified backend files
 
-- `src/DigitalBrain.Kernel.Abstractions/SemanticIntent.cs` — bind parameter extraction to a server-selected capability ID.
-- `src/DigitalBrain.Kernel.Abstractions/ConversationModel.cs` — retain the grain API while accepting the selected capability in its request.
-- `src/DigitalBrain.Kernel.Abstractions/ConversationNeuron.cs` — durably retain safe capability and proposal receipts on the operation.
-- `src/DigitalBrain.Core/DurableInoContracts.cs` — carry safe resolution metadata from workflow to the Orleans-owned operation.
-- `src/DigitalBrain.Core/Conversation.cs` — project safe capability/proposal metadata to the native conversation snapshot.
-- `src/DigitalBrain.Core/ConversationSurfacePayload.cs` — serialize the capability chip and proposal action.
-- `src/DigitalBrain.Kernel/Runtime/ConversationModelGrain.cs` — extract parameters within the selected capability boundary.
-- `src/DigitalBrain.Kernel/Runtime/AgentFrameworkWorkflowRunner.cs` — resolve before model use and create proposals for missing actionable work.
-- `src/DigitalBrain.Kernel/Runtime/InoOperationWorkerGrain.cs` — persist the resolution receipt with the terminal operation transition.
-- `src/DigitalBrain.Kernel/Runtime/ConversationNeuron.cs` — pass the receipt through the state transition.
+- `src/DigitalBrain.Kernel.Contracts/Core/DurableInoContracts.cs` — grant snapshot on `AcceptedCommand`, grants on `InoWorkflowRequest`, capability/proposal receipts on `InoWorkflowResult`.
+- `src/DigitalBrain.Kernel.Contracts/Runtime/ConversationNeuron.cs` — grants and receipts on `ConversationOperation`.
+- `src/DigitalBrain.Kernel.Contracts/FeatureGrainContracts.cs` — `FeatureDraftProposal`, `CreateFeatureDraft`, `IFeatureHubGrain.CreateDraftAsync`.
+- `src/DigitalBrain.Kernel/Features/FeatureStateModels.cs` — `Drafts` on `FeatureHubState`.
+- `src/DigitalBrain.Kernel/Features/FeatureHubTransitions.cs` — `CreateDraft` pure transition.
+- `src/DigitalBrain.Kernel/Features/FeatureHubGrain.cs` — `CreateDraftAsync`.
+- `src/DigitalBrain.Kernel/Runtime/ConversationNeuron.cs` — thread grants and receipts through transitions.
+- `src/DigitalBrain.Kernel/Runtime/InoOperationWorkerGrain.cs` — pass grants into the workflow request and receipts into completion.
+- `src/DigitalBrain.Kernel/Runtime/AgentFrameworkWorkflowRunner.cs` — resolve before model use; create draft proposals for missing actionable work.
 - `src/DigitalBrain.Mcp/ConversationStateClient.cs` — capture the authenticated grant snapshot when accepting a command.
-- `src/DigitalBrain.Kernel/Hosting/DigitalBrainOrleansExtensions.cs` — register the catalog and resolver once per RuntimeHost process.
-- `tests/DigitalBrain.Tests/Runtime/SemanticIntentModelTests.cs` — prove the model cannot select a different capability.
-- `tests/DigitalBrain.Tests/Runtime/ConversationSurfacePayloadTests.cs` — prove bounded safe projection.
-- `tests/DigitalBrain.Tests/Runtime/InoReminderHandoffTests.cs` — prove retry/recovery preserves the receipt.
+- `src/DigitalBrain.Kernel/Hosting/DigitalBrainOrleansExtensions.cs` — register catalog, resolver, and parameter model once.
+- `src/DigitalBrain.Kernel.Contracts/Core/ConversationSurfacePayload.cs` — serialize the capability chip and proposal action.
+- `tests/DigitalBrain.OrleansTests/Legacy/Runtime/ConversationSurfacePayloadTests.cs`
+- `tests/DigitalBrain.OrleansTests/Legacy/Runtime/InoReminderHandoffTests.cs`
+- `tests/DigitalBrain.OrleansTests/Legacy/Runtime/RuntimeSurfaceFeedTests.cs`
+- `tests/DigitalBrain.OrleansTests/Legacy/Runtime/UiGrpcServiceTests.cs`
 
 ### Modified Flutter files
 
 - `app/lib/runtime/protocol/surface_protocol.dart` — parse capability and proposal receipts.
-- `app/lib/runtime/widgets/ino_conversation_view.dart` — rename INO copy to Chat, render the capability chip, and render “Open Studio”.
-- `app/lib/router.dart` — add a proposal-safe `/features/proposals/:proposalId` placeholder route owned by the next Studio plan.
-- `app/test/runtime/surface_protocol_test.dart` — protocol parsing and rejection tests.
-- `app/test/runtime/runtime_shell_test.dart` — capability chip and proposal action widget tests.
+- `app/lib/runtime/widgets/ino_conversation_view.dart` — rename INO copy to Chat, render the capability chip, render “Open Studio”.
+- `app/lib/router.dart` — add the `/features/proposals/:proposalId` placeholder route.
+- `app/lib/runtime/widgets/feature_proposal_placeholder.dart` — new placeholder screen.
+- `app/test/runtime/surface_protocol_test.dart`, `app/test/runtime/runtime_shell_test.dart`, `app/test/runtime/grpc_ui_transport_test.dart`
 
 ---
 
 ### Task 1: Define the capability catalog and typed bindings
 
 **Files:**
-- Create: `src/DigitalBrain.Kernel.Abstractions/Capabilities.cs`
-- Create: `src/DigitalBrain.Kernel/Runtime/BuiltInCapabilityCatalog.cs`
-- Create: `tests/DigitalBrain.Tests/Runtime/BuiltInCapabilityCatalogTests.cs`
+- Create: `src/DigitalBrain.Kernel.Contracts/Runtime/CapabilityDiscovery.cs`
+- Create: `src/DigitalBrain.Kernel/Capabilities/BuiltInCapabilityCatalog.cs`
+- Create: `tests/DigitalBrain.OrleansTests/Capabilities/BuiltInCapabilityCatalogTests.cs`
 
 **Interfaces:**
-- Produces: `CapabilityDescriptor`, `CapabilityRisk`, `CapabilityOrigin`, `CapabilityResolutionKind`, `CapabilityResolutionReceipt`, `ICapabilityCatalog`, `CapabilityIntentBinding`, and `BuiltInCapabilityCatalog`.
-- Consumes: existing `GmailTools`, `SalesforceTools`, `SemanticProvider`, and `SemanticOperation` constants.
+- Produces: `CapabilityDescriptor`, `CapabilityOrigin`, `CapabilityResolutionKind`, `CapabilityResolutionReceipt`, `FeatureDraftReference`, `CapabilitySearchRequest`, `CapabilityResolution`, `ICapabilityCatalog`, `ICapabilityResolver`, `ICapabilityDescriptorSource`, `BuiltInCapabilityCatalog`, `GoogleCapabilityDescriptorSource` (in `DigitalBrain.Integrations.Google`), `SalesforceCapabilityDescriptorSource` (in `DigitalBrain.Integrations.Salesforce`).
+- Consumes: existing `GoogleCapabilityIds`, `GmailTools.Send` (from the Google integration project, inside `GoogleCapabilityDescriptorSource` only), `SalesforceCapabilityIds`, `SalesforceTools.UpdateRecord` (from the Salesforce integration project, inside `SalesforceCapabilityDescriptorSource` only), `MemoryCapabilityIds`, `CapabilityOperationKind`, `ExternalEffectGrants`.
 
 - [ ] **Step 1: Write the catalog contract test**
 
 ```csharp
-using DigitalBrain.Kernel.Runtime;
+using DigitalBrain.Integrations.Google;
+using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Integrations.Salesforce;
+using DigitalBrain.Integrations.Salesforce.Contracts;
+using DigitalBrain.Kernel.Capabilities;
 
-namespace DigitalBrain.Tests.Runtime;
+namespace DigitalBrain.OrleansTests.Capabilities;
 
 public sealed class BuiltInCapabilityCatalogTests
 {
     [Fact]
     public void Snapshot_has_unique_stable_ids_and_complete_typed_bindings()
     {
-        var catalog = new BuiltInCapabilityCatalog();
+        var catalog = new BuiltInCapabilityCatalog([new GoogleCapabilityDescriptorSource(), new SalesforceCapabilityDescriptorSource()]);
 
         var descriptors = catalog.Snapshot();
 
@@ -115,39 +132,29 @@ public sealed class BuiltInCapabilityCatalogTests
             Assert.Matches("^[a-z0-9]+(?:[.-][a-z0-9]+)*$", descriptor.Id);
             Assert.NotEmpty(descriptor.Examples);
             Assert.True(descriptor.Version > 0);
-            Assert.True(BuiltInCapabilityCatalog.TryBind(descriptor.Id, out _));
+            Assert.True(catalog.TryBind(descriptor.Id, out _));
         });
-        Assert.Contains(descriptors, x => x.Id == GmailTools.ReadMessages);
-        Assert.Contains(descriptors, x => x.Id == SalesforceTools.SearchRecords);
+        Assert.Contains(descriptors, x => x.Id == GoogleCapabilityIds.GmailMessageRead);
+        Assert.Contains(descriptors, x => x.Id == SalesforceCapabilityIds.RecordRead);
         Assert.Contains(descriptors, x => x.Id == "assistant.answer");
     }
 }
 ```
 
+If the integration implementation or contracts projects are not referenced by `DigitalBrain.OrleansTests`, add the project references; do not restate the ID strings.
+
 - [ ] **Step 2: Run the root suite and verify the new test fails**
 
-Run from the repository root in a background PowerShell job:
+Run from the repository root in a background job: `dotnet test --logger "console;verbosity=minimal"`.
 
-```powershell
-$repo = (Get-Location).Path
-$testJob = Start-Job -ScriptBlock { param($path) Set-Location $path; dotnet test --logger "console;verbosity=minimal" } -ArgumentList $repo
-Wait-Job $testJob
-Receive-Job $testJob
-```
+Expected: FAIL because `BuiltInCapabilityCatalog` and discovery contracts do not exist.
 
-Expected: FAIL because `BuiltInCapabilityCatalog` and capability contracts do not exist.
+- [ ] **Step 3: Add the public capability discovery contracts**
 
-- [ ] **Step 3: Add the public capability contracts**
-
-Create `src/DigitalBrain.Kernel.Abstractions/Capabilities.cs` with these exact public shapes:
+Create `src/DigitalBrain.Kernel.Contracts/Runtime/CapabilityDiscovery.cs` in namespace `DigitalBrain.Kernel.Capabilities` with these exact public shapes:
 
 ```csharp
-using Orleans;
-
-namespace DigitalBrain.Kernel.Runtime;
-
 public enum CapabilityOrigin { Platform, Integration, Feature }
-public enum CapabilityRisk { Read, InternalWrite, ExternalEffect }
 public enum CapabilityResolutionKind { Match, Ambiguous, Missing }
 
 [GenerateSerializer, Alias("digitalbrain.capability.descriptor.v1")]
@@ -160,7 +167,7 @@ public sealed record CapabilityDescriptor(
     [property: Id(5)] string[] RequiredGrants,
     [property: Id(6)] string[] RequiredConnections,
     [property: Id(7)] CapabilityOrigin Origin,
-    [property: Id(8)] CapabilityRisk Risk,
+    [property: Id(8)] CapabilityOperationKind Kind,
     [property: Id(9)] bool Available);
 
 [GenerateSerializer, Alias("digitalbrain.capability.resolution-receipt.v1")]
@@ -171,8 +178,8 @@ public sealed record CapabilityResolutionReceipt(
     [property: Id(3)] string[] CandidateIds,
     [property: Id(4)] double Confidence);
 
-[GenerateSerializer, Alias("digitalbrain.feature.proposal-reference.v1")]
-public sealed record FeatureProposalReference(
+[GenerateSerializer, Alias("digitalbrain.feature.draft-reference.v1")]
+public sealed record FeatureDraftReference(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] string Label,
     [property: Id(2)] string Route);
@@ -201,114 +208,36 @@ public interface ICapabilityResolver
 }
 ```
 
-- [ ] **Step 4: Add explicit built-in descriptors and bindings**
+- [ ] **Step 4: Compose the catalog from Kernel platform descriptors and integration-owned sources**
 
-Create `src/DigitalBrain.Kernel/Runtime/BuiltInCapabilityCatalog.cs`. Declare descriptors for `assistant.answer`, every currently routed `GmailTools` read/send ID, every currently routed `SalesforceTools` read/update ID, and `CrossProviderTools.MatchSalesforceAccountToGmailSender`. Each descriptor must have human examples, exact connection/grant requirements, and an explicit `CapabilityIntentBinding`:
+`RepositoryPolicyTests.Production_code_has_no_deleted_namespaces_or_provider_shaped_kernel_types` forbids `gmail|google|salesforce` (case-insensitive) anywhere under `src/DigitalBrain.Kernel/` or `src/DigitalBrain.Kernel.Contracts/`. The Kernel must never hardcode provider descriptor content or reference the Google/Salesforce contracts projects. Descriptors are contributed at runtime by the integrations that own them.
+
+Add a provider-neutral contribution contract to `src/DigitalBrain.Kernel.Contracts/Runtime/CapabilityDiscovery.cs`:
 
 ```csharp
-namespace DigitalBrain.Kernel.Runtime;
-
-public sealed record CapabilityIntentBinding(SemanticProvider Provider, SemanticOperation Operation);
-
-public sealed class BuiltInCapabilityCatalog : ICapabilityCatalog
+public interface ICapabilityDescriptorSource
 {
-    private static readonly IReadOnlyDictionary<string, CapabilityIntentBinding> Bindings =
-        new Dictionary<string, CapabilityIntentBinding>(StringComparer.Ordinal)
-        {
-            ["assistant.answer"] = new(SemanticProvider.None, SemanticOperation.Answer),
-            [GmailTools.ReadMessages] = new(SemanticProvider.Gmail, SemanticOperation.List),
-            [GmailTools.ReadMailboxOverview] = new(SemanticProvider.Gmail, SemanticOperation.Overview),
-            [GmailTools.ReadThreads] = new(SemanticProvider.Gmail, SemanticOperation.Threads),
-            [GmailTools.Send] = new(SemanticProvider.Gmail, SemanticOperation.MutationPreview),
-            [SalesforceTools.DiscoverObjects] = new(SemanticProvider.Salesforce, SemanticOperation.Discover),
-            [SalesforceTools.SearchRecords] = new(SemanticProvider.Salesforce, SemanticOperation.Search),
-            [SalesforceTools.ReadRecords] = new(SemanticProvider.Salesforce, SemanticOperation.List),
-            [SalesforceTools.AggregateRecords] = new(SemanticProvider.Salesforce, SemanticOperation.Aggregate),
-            [SalesforceTools.ContinueRecords] = new(SemanticProvider.Salesforce, SemanticOperation.NextPage),
-            [SalesforceTools.UpdateRecord] = new(SemanticProvider.Salesforce, SemanticOperation.MutationPreview),
-            [CrossProviderTools.MatchSalesforceAccountToGmailSender] = new(SemanticProvider.CrossProvider, SemanticOperation.Match)
-        };
-
-    private static readonly CapabilityDescriptor[] Descriptors = CapabilityDescriptorFactory.Create(Bindings.Keys);
-
-    public IReadOnlyList<CapabilityDescriptor> Snapshot() => Descriptors;
-
-    public static bool TryBind(string capabilityId, out CapabilityIntentBinding binding) =>
-        Bindings.TryGetValue(capabilityId, out binding!);
+    IReadOnlyList<CapabilityDescriptor> Descriptors { get; }
 }
 ```
 
-Keep `CapabilityDescriptorFactory` internal in the same file. It must use a switch expression with one complete descriptor per binding key and throw for an unrecognized key. Do not derive IDs from CLR member names.
+Create `src/DigitalBrain.Kernel/Capabilities/BuiltInCapabilityCatalog.cs` as an aggregator constructed from `IEnumerable<ICapabilityDescriptorSource>` (resolved by DI). It contributes only the Kernel-owned platform descriptors itself — `assistant.answer`, `MemoryCapabilityIds.Recall`, `MemoryCapabilityIds.Remember` (the words "memory"/"assistant" are allowed in the Kernel) — and appends every source-contributed descriptor. It rejects duplicate capability IDs by throwing `InvalidOperationException`, mirroring the duplicate-handler rule in `CapabilityDispatcher` (`src/DigitalBrain.Kernel/Capabilities/CapabilityDispatcher.cs`). `Snapshot()` returns the composed list ordered by `Id` (`StringComparer.Ordinal`). Lookup is an instance method, `bool TryBind(string capabilityId, out CapabilityDescriptor descriptor)`, derived from the same composed dictionary used by `Snapshot()` — there is no static `TryBind` and no separate `CapabilityIntentBinding` record, because a binding of `(CapabilityId, CapabilityVersion, Kind)` carries no information the `CapabilityDescriptor` does not already have.
 
-Use this complete factory shape, preserving the existing tool constants:
+Move the Gmail descriptors (`GmailMessageRead`, `GmailMailboxRead`, `GmailSendPropose` with grant `GmailTools.Send`) into a new `internal sealed class GoogleCapabilityDescriptorSource : ICapabilityDescriptorSource` in `integrations/DigitalBrain.Integrations.Google/`, next to `GmailCapabilityHandlers.cs`, using the real `GoogleCapabilityIds` and `GmailTools.Send` constants. Move the Salesforce descriptors (`RecordRead`, `RecordUpdatePropose` with grant `SalesforceTools.UpdateRecord`) into a new `internal sealed class SalesforceCapabilityDescriptorSource : ICapabilityDescriptorSource` in `integrations/DigitalBrain.Integrations.Salesforce/`, next to `SalesforceCapabilityHandlers.cs`. Each descriptor keeps its exact field values (names, descriptions, examples, connection `google`/`salesforce`, `CapabilityOrigin.Integration`, `CapabilityOperationKind`, `Version = 1`, `Available = true`).
 
-```csharp
-internal static class CapabilityDescriptorFactory
-{
-    public static CapabilityDescriptor[] Create(IEnumerable<string> ids) => ids.Select(CreateOne).ToArray();
+Register each source in DI exactly where that integration already registers its `ICapabilityHandler` implementations: `services.AddSingleton<ICapabilityDescriptorSource, GoogleCapabilityDescriptorSource>();` in `GoogleServiceCollectionExtensions.AddDigitalBrainGoogle` (`integrations/DigitalBrain.Integrations.Google/GoogleAppConfigSeeder.cs`), and the Salesforce equivalent in `SalesforceServiceCollectionExtensions.AddDigitalBrainSalesforce` (`integrations/DigitalBrain.Integrations.Salesforce/SalesforceAppConfigSeeder.cs`). Do not add or keep a Kernel → Google.Contracts or Kernel → Salesforce.Contracts project reference; the Kernel no longer needs either.
 
-    private static CapabilityDescriptor CreateOne(string id) => id switch
-    {
-        "assistant.answer" => D(id, "Answer in Chat", "Answer an ordinary question without external data.",
-            ["hello", "what can you do", "help me use DigitalBrain"]),
-        GmailTools.ReadMessages => D(id, "Read Gmail messages", "List Gmail message metadata using bounded filters.",
-            ["list my latest Gmail messages", "show unread inbox mail"], ["google"]),
-        GmailTools.ReadMailboxOverview => D(id, "Read Gmail overview", "Read bounded mailbox totals.",
-            ["how many unread emails do I have", "show my inbox overview"], ["google"]),
-        GmailTools.ReadThreads => D(id, "Read Gmail threads", "List bounded Gmail thread metadata.",
-            ["show recent email threads", "list unread Gmail conversations"], ["google"]),
-        GmailTools.Send => D(id, "Send Gmail message", "Prepare one Gmail message for approval.",
-            ["send an email", "email this update to Ada"], ["google"], ["gmail.send"], CapabilityRisk.ExternalEffect),
-        SalesforceTools.DiscoverObjects => D(id, "Discover Salesforce objects", "List available Salesforce business objects.",
-            ["what Salesforce objects are available", "discover CRM objects"], ["salesforce"]),
-        SalesforceTools.SearchRecords => D(id, "Search Salesforce records", "Search Salesforce by a human business label.",
-            ["find Acme in Salesforce", "search CRM accounts for Contoso"], ["salesforce"]),
-        SalesforceTools.ReadRecords => D(id, "Read Salesforce records", "Read bounded Salesforce record fields.",
-            ["list recent Salesforce accounts", "show account details"], ["salesforce"]),
-        SalesforceTools.AggregateRecords => D(id, "Aggregate Salesforce records", "Calculate a bounded Salesforce aggregate.",
-            ["count Salesforce accounts", "sum annual revenue by industry"], ["salesforce"]),
-        SalesforceTools.ContinueRecords => D(id, "Continue Salesforce results", "Continue an existing Salesforce result page.",
-            ["show the next Salesforce page", "continue those CRM results"], ["salesforce"]),
-        SalesforceTools.UpdateRecord => D(id, "Update Salesforce field", "Prepare one Salesforce field change for approval.",
-            ["update this Salesforce account description", "change one CRM field"], ["salesforce"], ["salesforce.write"], CapabilityRisk.ExternalEffect),
-        CrossProviderTools.MatchSalesforceAccountToGmailSender => D(id, "Match Gmail sender to Salesforce", "Match a Gmail sender to a Salesforce account.",
-            ["find the Salesforce account for this email sender", "match this Gmail sender to CRM"], ["google", "salesforce"]),
-        _ => throw new ArgumentOutOfRangeException(nameof(id), id, "Capability binding has no descriptor.")
-    };
-
-    private static CapabilityDescriptor D(
-        string id,
-        string name,
-        string description,
-        string[] examples,
-        string[]? connections = null,
-        string[]? grants = null,
-        CapabilityRisk risk = CapabilityRisk.Read) => new(
-            id,
-            1,
-            name,
-            description,
-            examples,
-            grants ?? [],
-            connections ?? [],
-            id == "assistant.answer" ? CapabilityOrigin.Platform : CapabilityOrigin.Integration,
-            risk,
-            true);
-}
-```
+Connection requirements: `google` for Gmail descriptors, `salesforce` for Salesforce descriptors, none for `assistant.answer` and memory descriptors. Grant requirements: the exact effect-tool ID for the two effect-proposal descriptors (`GmailSendPropose`, `RecordUpdatePropose`); none otherwise. `assistant.answer` has `CapabilityOrigin.Platform` and `CapabilityOperationKind.Query`; memory descriptors are Platform; integration descriptors are Integration. All descriptors are `Available = true` and `Version = 1`.
 
 - [ ] **Step 5: Run the root suite and verify it passes**
-
-Run the exact root job command from Step 2.
 
 Expected: PASS with zero failed tests.
 
 - [ ] **Step 6: Verify Aspire and commit**
 
-Run `aspire doctor`, inspect `aspire resource list`, then commit:
+Run `aspire doctor`, inspect resources, then commit exactly:
 
 ```powershell
-git add src/DigitalBrain.Kernel.Abstractions/Capabilities.cs src/DigitalBrain.Kernel/Runtime/BuiltInCapabilityCatalog.cs tests/DigitalBrain.Tests/Runtime/BuiltInCapabilityCatalogTests.cs
 git commit -m "feat: define capability catalog"
 ```
 
@@ -317,12 +246,12 @@ git commit -m "feat: define capability catalog"
 ### Task 2: Implement deterministic hybrid capability resolution
 
 **Files:**
-- Create: `src/DigitalBrain.Kernel/Runtime/HybridCapabilityResolver.cs`
-- Create: `tests/DigitalBrain.Tests/Runtime/HybridCapabilityResolverTests.cs`
+- Create: `src/DigitalBrain.Kernel/Capabilities/HybridCapabilityResolver.cs`
+- Create: `tests/DigitalBrain.OrleansTests/Capabilities/HybridCapabilityResolverTests.cs`
 - Modify: `src/DigitalBrain.Kernel/Hosting/DigitalBrainOrleansExtensions.cs`
 
 **Interfaces:**
-- Consumes: `ICapabilityCatalog`, `IEmbeddingGenerator<string, Embedding<float>>`, and `CapabilitySearchRequest`.
+- Consumes: `ICapabilityCatalog`, `IEmbeddingGenerator<string, Embedding<float>>`, `CapabilitySearchRequest`.
 - Produces: `HybridCapabilityResolver.ResolveAsync` implementing `ICapabilityResolver`.
 
 - [ ] **Step 1: Write ranking, fallback, ambiguity, and filtering tests**
@@ -331,33 +260,33 @@ Create `HybridCapabilityResolverTests.cs` with four facts using a deterministic 
 
 ```csharp
 [Fact]
-public async Task ResolveAsync_selects_company_search_from_semantic_similarity()
+public async Task ResolveAsync_selects_salesforce_read_from_semantic_similarity()
 {
     var resolver = Resolver(new Dictionary<string, float[]>
     {
         ["Find Acme in our CRM"] = [1, 0],
-        ["Search Salesforce records by a company or account name"] = [1, 0],
-        ["Read recent Gmail messages"] = [0, 1]
+        [Document(SalesforceCapabilityIds.RecordRead)] = [1, 0],
+        [Document(GoogleCapabilityIds.GmailMessageRead)] = [0, 1]
     });
 
     var result = await resolver.ResolveAsync(Request("Find Acme in our CRM", connections: ["salesforce"]));
 
     Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
-    Assert.Equal(SalesforceTools.SearchRecords, result.Receipt.CapabilityId);
+    Assert.Equal(SalesforceCapabilityIds.RecordRead, result.Receipt.CapabilityId);
 }
 
 [Fact]
 public async Task ResolveAsync_falls_back_to_lexical_scoring_for_zero_vectors()
 {
-    var result = await ResolverWithZeroVectors().ResolveAsync(Request("list recent gmail messages", connections: ["google"]));
+    var result = await ResolverWithZeroVectors().ResolveAsync(Request("read gmail messages", connections: ["google"]));
 
-    Assert.Equal(GmailTools.ReadMessages, result.Receipt.CapabilityId);
+    Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Receipt.CapabilityId);
 }
 
 [Fact]
 public async Task ResolveAsync_returns_ambiguous_when_top_scores_are_too_close()
 {
-    var result = await ResolverWithEqualVectors().ResolveAsync(Request("show customer records", connections: ["salesforce"]));
+    var result = await ResolverWithEqualVectors().ResolveAsync(Request("show customer records", connections: ["google", "salesforce"]));
 
     Assert.Equal(CapabilityResolutionKind.Ambiguous, result.Receipt.Kind);
     Assert.True(result.Receipt.CandidateIds.Length >= 2);
@@ -368,16 +297,14 @@ public async Task ResolveAsync_filters_missing_grants_before_scoring()
 {
     var result = await ResolverWithExactVectors().ResolveAsync(Request("send an email", connections: ["google"]));
 
-    Assert.DoesNotContain(GmailTools.Send, result.Receipt.CandidateIds);
-    Assert.NotEqual(GmailTools.Send, result.Receipt.CapabilityId);
+    Assert.DoesNotContain(GoogleCapabilityIds.GmailSendPropose, result.Receipt.CandidateIds);
+    Assert.NotEqual(GoogleCapabilityIds.GmailSendPropose, result.Receipt.CapabilityId);
 }
 ```
 
-The shared `Request` helper must default grants and connections to empty `HashSet<string>(StringComparer.Ordinal)`. The fake generator must return configured vectors by exact input and `[0, 0]` otherwise.
+The shared `Request` helper must default grants and connections to empty `HashSet<string>(StringComparer.Ordinal)`. The fake generator must return configured vectors by exact input and `[0, 0]` otherwise. `Document(id)` returns the exact search document the resolver builds for that descriptor — `id + name + description + examples`, joined deterministically — so the semantic test configures the true embedding input and paraphrased prompts that only overlap the description or examples still rank correctly.
 
 - [ ] **Step 2: Run the root suite and verify failure**
-
-Run the exact root job command from Task 1.
 
 Expected: FAIL because `HybridCapabilityResolver` does not exist.
 
@@ -421,7 +348,7 @@ public sealed class HybridCapabilityResolver(
                 Lexical(query, SearchDocument(descriptor)),
                 vectorEnabled ? Cosine(queryVector, generated[index + 1].Vector.Span) : 0))
             .Select(x => x with { Score = vectorEnabled
-                ? 0.45 * x.Exact + 0.20 * x.Lexical + 0.35 * x.Vector
+                ? Math.Max(0.65 * x.Exact + 0.35 * x.Lexical, 0.70 * x.Vector + 0.30 * x.Lexical)
                 : 0.65 * x.Exact + 0.35 * x.Lexical })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Descriptor.Id, StringComparer.Ordinal)
@@ -437,7 +364,9 @@ public sealed class HybridCapabilityResolver(
 }
 ```
 
-Implement `Normalize`, `SearchDocument`, `Exact`, `Lexical`, and `Cosine` as pure bounded helpers in the same file. Exact scoring returns `1` for a normalized capability ID, name, or complete example match, `0.8` when the prompt contains the normalized name, and `0` otherwise. Lexical scoring is Jaccard similarity over distinct lowercase letter/digit tokens. Cosine returns `0` for zero norms and clamps to `0..1`. `Missing`, `Ambiguous`, and `Match` must populate only safe descriptor metadata in the receipt.
+Implement `Normalize`, `SearchDocument`, `Exact`, `Lexical`, and `Cosine` as pure bounded helpers in the same file. `SearchDocument` joins `descriptor.Id`, `descriptor.Name`, `descriptor.Description`, and every entry in `descriptor.Examples` — deterministic and bounded because descriptors are fixed runtime data — so lexical scoring (and the embedding input) can match a paraphrase against the full intent, not just the id and name. Exact scoring returns `1` for a normalized capability ID, name, or complete example match, `0.8` when the prompt contains the normalized name, and `0` otherwise. Lexical scoring is Jaccard similarity over distinct lowercase letter/digit tokens computed against `SearchDocument`. Cosine returns `0` for zero norms and clamps to `0..1`. `Missing`, `Ambiguous`, and `Match` must populate only safe descriptor metadata in the receipt.
+
+The embedder call is wrapped: any exception other than an `OperationCanceledException` tied to the caller's `cancellationToken` is swallowed and resolution proceeds with `vectorEnabled = false`, falling back to deterministic exact and lexical scoring exactly as it does for an all-zero embedding. A cancellation that reflects the caller's own token is rethrown, never swallowed. This keeps an embedding-service outage from failing chat outright.
 
 - [ ] **Step 4: Register the catalog and resolver**
 
@@ -448,16 +377,15 @@ services.TryAddSingleton<ICapabilityCatalog, BuiltInCapabilityCatalog>();
 services.TryAddSingleton<ICapabilityResolver, HybridCapabilityResolver>();
 ```
 
-- [ ] **Step 5: Run the root suite and verify it passes**
+Verify `IEmbeddingGenerator<string, Embedding<float>>` is already registered in the same composition (existing embedding registration tests cover it); if the runner host lacks it, resolve lazily so hosts without embeddings still start.
 
-Run the exact root job command from Task 1.
+- [ ] **Step 5: Run the root suite and verify it passes**
 
 Expected: PASS with zero failed tests, including all four resolver cases.
 
 - [ ] **Step 6: Verify Aspire and commit**
 
 ```powershell
-git add src/DigitalBrain.Kernel/Runtime/HybridCapabilityResolver.cs src/DigitalBrain.Kernel/Hosting/DigitalBrainOrleansExtensions.cs tests/DigitalBrain.Tests/Runtime/HybridCapabilityResolverTests.cs
 git commit -m "feat: resolve capabilities with hybrid search"
 ```
 
@@ -466,80 +394,60 @@ git commit -m "feat: resolve capabilities with hybrid search"
 ### Task 3: Constrain model extraction to the selected capability
 
 **Files:**
-- Modify: `src/DigitalBrain.Kernel.Abstractions/SemanticIntent.cs`
-- Modify: `src/DigitalBrain.Kernel/Runtime/ConversationModelGrain.cs`
-- Modify: `tests/DigitalBrain.Tests/Runtime/SemanticIntentModelTests.cs`
+- Create: `src/DigitalBrain.Kernel/Runtime/CapabilityParameterModel.cs`
+- Create: `tests/DigitalBrain.OrleansTests/Capabilities/CapabilityParameterModelTests.cs`
 
 **Interfaces:**
-- Consumes: `BuiltInCapabilityCatalog.TryBind` and `SemanticIntentRequest.CapabilityId`.
-- Produces: a `SemanticIntentProposal` whose provider and operation must match the selected descriptor binding.
+- Consumes: `BuiltInCapabilityCatalog.TryBind` on an injected catalog instance resolved via DI (`TryBind` is an instance method returning the composed `CapabilityDescriptor`, not a static lookup and not `CapabilityIntentBinding`, which was deleted), `IChatClient` structured output, `RetainedInoCapabilityPayload`.
+- Produces: `ICapabilityParameterModel.ExtractAsync` returning a payload whose tool ID must equal the server-selected capability.
 
 - [ ] **Step 1: Add a failing model-boundary test**
 
-Add a test in `SemanticIntentModelTests.cs` that configures the recording model to return Salesforce Search for a Gmail-selected request:
-
 ```csharp
 [Fact]
-public async Task ResolveIntentAsync_rejects_a_model_selected_capability_change()
+public async Task ExtractAsync_rejects_a_model_selected_capability_change()
 {
-    var chat = new RecordingStructuredChatClient(new SemanticIntentProposal(
-        SemanticProvider.Salesforce,
-        SemanticOperation.Search,
-        SearchText: "Acme"));
-    var grain = new ConversationModelGrain(chat);
+    var chat = RecordingChatClientReturning(toolId: SalesforceCapabilityIds.RecordRead, argumentsJson: "{\"query\":\"Acme\"}");
+    var model = new CapabilityParameterModel(chat);
 
-    await Assert.ThrowsAsync<InvalidOperationException>(() => grain.ResolveIntentAsync(new SemanticIntentRequest(
-        ActorScope,
-        ActorScope,
-        "conversation-1",
-        "list recent mail",
-        [],
-        GmailTools.ReadMessages)));
+    await Assert.ThrowsAsync<InvalidOperationException>(() => model.ExtractAsync(new CapabilityParameterRequest(
+        GoogleCapabilityIds.GmailMessageRead,
+        "list recent mail")));
+}
+
+[Fact]
+public async Task ExtractAsync_rejects_an_unknown_capability()
+{
+    var model = new CapabilityParameterModel(RecordingChatClientReturning(GoogleCapabilityIds.GmailMessageRead, "{}"));
+
+    await Assert.ThrowsAsync<ArgumentException>(() => model.ExtractAsync(new CapabilityParameterRequest(
+        "not.a.capability",
+        "list recent mail")));
 }
 ```
 
 - [ ] **Step 2: Run the root suite and verify failure**
 
-Run the exact root job command from Task 1.
+Expected: FAIL because `CapabilityParameterModel` does not exist.
 
-Expected: FAIL because `SemanticIntentRequest` has no selected capability field and the grain does not validate it.
+- [ ] **Step 3: Implement capability-scoped extraction**
 
-- [ ] **Step 3: Add the serialized request field**
-
-Append this field to `SemanticIntentRequest` without renumbering existing fields:
+`CapabilityParameterRequest(string CapabilityId, string Prompt)` with prompt bounded to 4096 characters. `CapabilityParameterModel` takes the Kernel's `BuiltInCapabilityCatalog` as a constructor-injected dependency. `ExtractAsync` must first call `catalog.TryBind(request.CapabilityId, out var descriptor)` and throw `ArgumentException` for an unknown ID. The extraction guidance states the capability is a fixed server decision. After structured output, reject any tool ID that differs:
 
 ```csharp
-[property: Id(5)] string CapabilityId
+if (!string.Equals(extracted.ToolId, request.CapabilityId, StringComparison.Ordinal))
+    throw new InvalidOperationException("The extraction model changed the selected capability.");
 ```
 
-Update every existing constructor call to pass the server-selected ID. Existing tests that bypass resolution must pass the capability matching their expected provider and operation.
+Return a `RetainedInoCapabilityPayload` (existing bounded type). Register `ICapabilityParameterModel` as a singleton beside the resolver.
 
-- [ ] **Step 4: Bind and validate model output**
-
-At the start of `ConversationModelGrain.ResolveIntentAsync`, resolve the binding and reject an unknown ID. Replace open provider-choice guidance with capability-specific guidance. After structured output, reject any provider or operation that differs:
-
-```csharp
-if (!BuiltInCapabilityCatalog.TryBind(request.CapabilityId, out var binding))
-    throw new ArgumentException("The selected capability is unknown.", nameof(request));
-
-var proposal = response.Result ?? throw new InvalidOperationException("The intent model returned no structured proposal.");
-if (proposal.Provider != binding.Provider || proposal.Operation != binding.Operation)
-    throw new InvalidOperationException("The intent model changed the selected capability.");
-return proposal;
-```
-
-`IntentGuidance` must receive the binding and capability ID, state both as fixed server decisions, and retain the existing rules for filters, ordinals, time ranges, and provider-safe values.
-
-- [ ] **Step 5: Run the root suite and verify it passes**
-
-Run the exact root job command from Task 1.
+- [ ] **Step 4: Run the root suite and verify it passes**
 
 Expected: PASS with zero failed tests.
 
-- [ ] **Step 6: Verify Aspire and commit**
+- [ ] **Step 5: Verify Aspire and commit**
 
 ```powershell
-git add src/DigitalBrain.Kernel.Abstractions/SemanticIntent.cs src/DigitalBrain.Kernel/Runtime/ConversationModelGrain.cs tests/DigitalBrain.Tests/Runtime/SemanticIntentModelTests.cs tests/DigitalBrain.Tests/Runtime/TypedReadWorkflowRunnerTests.cs tests/DigitalBrain.Tests/Runtime/AgentFrameworkWorkflowRunnerTests.cs
 git commit -m "refactor: bind intent extraction to capabilities"
 ```
 
@@ -548,16 +456,16 @@ git commit -m "refactor: bind intent extraction to capabilities"
 ### Task 4: Route Chat through the capability resolver
 
 **Files:**
-- Modify: `src/DigitalBrain.Core/DurableInoContracts.cs`
-- Modify: `src/DigitalBrain.Kernel.Abstractions/ConversationNeuron.cs`
+- Modify: `src/DigitalBrain.Kernel.Contracts/Core/DurableInoContracts.cs`
+- Modify: `src/DigitalBrain.Kernel.Contracts/Runtime/ConversationNeuron.cs`
 - Modify: `src/DigitalBrain.Kernel/Runtime/ConversationNeuron.cs`
 - Modify: `src/DigitalBrain.Kernel/Runtime/InoOperationWorkerGrain.cs`
 - Modify: `src/DigitalBrain.Mcp/ConversationStateClient.cs`
 - Modify: `src/DigitalBrain.Kernel/Runtime/AgentFrameworkWorkflowRunner.cs`
-- Create: `tests/DigitalBrain.Tests/Runtime/CapabilityWorkflowRunnerTests.cs`
+- Create: `tests/DigitalBrain.OrleansTests/Capabilities/CapabilityWorkflowRunnerTests.cs`
 
 **Interfaces:**
-- Consumes: `ICapabilityResolver`, `CapabilitySearchRequest`, and the selected typed binding.
+- Consumes: `ICapabilityResolver`, `ICapabilityParameterModel`, `CapabilitySearchRequest`.
 - Produces: `InoWorkflowResult.Capability` for match, ambiguity, and missing outcomes.
 
 - [ ] **Step 1: Write failing runner tests**
@@ -568,26 +476,26 @@ Create three tests:
 [Fact]
 public async Task ExecuteAsync_resolves_before_calling_the_parameter_model()
 {
-    var resolver = new RecordingCapabilityResolver(Match(GmailTools.ReadMessages, "Read Gmail messages"));
+    var resolver = new RecordingCapabilityResolver(Match(GoogleCapabilityIds.GmailMessageRead, "Read Gmail messages"));
     var runner = Runner(resolver);
 
     var result = await runner.ExecuteAsync(Request("list my latest messages"));
 
     Assert.Equal(1, resolver.CallCount);
-    Assert.Equal(GmailTools.ReadMessages, result.Capability?.CapabilityId);
-    Assert.Equal(GmailTools.ReadMessages, Model.LastRequest?.CapabilityId);
+    Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Capability?.CapabilityId);
+    Assert.Equal(GoogleCapabilityIds.GmailMessageRead, ParameterModel.LastRequest?.CapabilityId);
 }
 
 [Fact]
 public async Task ExecuteAsync_returns_clarification_for_ambiguous_capabilities()
 {
-    var runner = Runner(new RecordingCapabilityResolver(Ambiguous(GmailTools.ReadMessages, GmailTools.ReadThreads)));
+    var runner = Runner(new RecordingCapabilityResolver(Ambiguous(GoogleCapabilityIds.GmailMessageRead, GoogleCapabilityIds.GmailMailboxRead)));
 
     var result = await runner.ExecuteAsync(Request("show my mail"));
 
     Assert.Equal(CapabilityResolutionKind.Ambiguous, result.Capability?.Kind);
     Assert.Contains("choose", result.Text, StringComparison.OrdinalIgnoreCase);
-    Assert.Equal(0, Model.IntentCalls);
+    Assert.Equal(0, ParameterModel.CallCount);
 }
 
 [Fact]
@@ -604,8 +512,6 @@ public async Task ExecuteAsync_does_not_call_the_general_agent_for_missing_actio
 
 - [ ] **Step 2: Run the root suite and verify failure**
 
-Run the exact root job command from Task 1.
-
 Expected: FAIL because the workflow result has no capability receipt and the runner does not resolve capabilities.
 
 - [ ] **Step 3: Extend the workflow result safely**
@@ -619,205 +525,134 @@ public sealed record InoWorkflowResult(
     InoToolRequest? ToolRequest = null,
     InoAuthorizationRequest? AuthorizationRequest = null,
     CapabilityResolutionReceipt? Capability = null,
-    FeatureProposalReference? Proposal = null);
+    FeatureDraftReference? Proposal = null);
 ```
 
 Do not add embeddings, prompts, provider payloads, or candidate descriptions to this durable boundary.
 
 - [ ] **Step 4: Capture the authenticated grant snapshot**
 
-Append an Orleans field to `AcceptedCommand` and `ConversationOperation` without changing existing IDs:
+Append `[property: Id(9)] string[] Grants` to `AcceptedCommand` and `[property: Id(16)] string[] Grants` to `ConversationOperation` without changing existing IDs (verified free against master). Append `IReadOnlyList<string>? Grants = null` as the final parameter of `InoWorkflowRequest`.
 
-```csharp
-[property: Id(9)] string[] Grants
-```
+`ConversationStateClient.BeginAsync` must sort and copy `context.Grants` into `AcceptedCommand`. `ConversationTransitions.BeginOperation` must copy that array into `ConversationOperation`. `InoOperationWorkerGrain` must pass the claimed grants to `InoWorkflowRequest`. Validation must reject null entries, control characters, duplicates, more than 64 grants, and grant strings longer than 128 characters. This snapshot controls discovery only; the existing effect gate remains authoritative for execution and revocation.
 
-```csharp
-[property: Id(16)] string[] Grants
-```
+- [ ] **Step 5: Resolve before the general agent**
 
-Append grants to the in-process workflow request:
+In `AgentFrameworkWorkflowRunner.ExecuteAsync`, resolve once with the bounded prompt before creating the agent. Do not hardcode a provider-composition constant in `src/DigitalBrain.Kernel/` — `RepositoryPolicyTests` forbids provider strings (gmail/google/salesforce) in tracked Kernel `.cs` files. Instead derive the composed connection set from the catalog itself: `catalog.Snapshot().SelectMany(descriptor => descriptor.RequiredConnections).ToHashSet(StringComparer.Ordinal)`. That set is exactly "connections declared by integrations registered in this host"; the Feature runtime plan replaces it with owner-scoped installed Feature contributions.
 
-```csharp
-public sealed record InoWorkflowRequest(
-    string OperationId,
-    string ConversationId,
-    string Prompt,
-    IReadOnlyList<string> History,
-    string RequestId,
-    InoAuthorizationResume? AuthorizationResume = null,
-    WorkflowReference? PriorWorkflow = null,
-    string? ActorScope = null,
-    IReadOnlyList<string>? Grants = null);
-```
-
-`ConversationStateClient.BeginAsync` must sort and copy `RequestContext.Grants` into `AcceptedCommand`. `ConversationTransitions.BeginOperation` must copy that array into `ConversationOperation`. `InoOperationWorkerGrain` must pass `claimed.Grants` to `InoWorkflowRequest`. Validation must reject null entries, control characters, duplicates, more than 64 grants, and grant strings longer than 128 characters. This snapshot controls discovery only; the existing effect gate remains authoritative for execution and revocation.
-
-- [ ] **Step 5: Resolve before parameter extraction**
-
-In `TryExecuteTypedReadAsync`, resolve once with the bounded prompt. Build the search context from server-known grants and composed connections. For this slice, the composed connection set is `google` and `salesforce`; grants remain the exact session grants already supplied to the worker. Pass those grants through `InoWorkflowRequest` as an immutable string array populated by `InoOperationWorkerGrain` from the authoritative session state, not from Flutter input.
-
-Add this current-composition constant beside the runner bounds; the Feature runtime plan replaces it with owner-scoped installed Feature contributions:
-
-```csharp
-private static readonly IReadOnlySet<string> ComposedIntegrationIds =
-    new HashSet<string>(["google", "salesforce"], StringComparer.Ordinal);
-```
-
-Use this control flow:
-
-```csharp
-var search = new CapabilitySearchRequest(
-    request.Prompt,
-    new HashSet<string>(request.Grants ?? [], StringComparer.Ordinal),
-    ComposedIntegrationIds,
-    3);
-var resolution = await resolver.ResolveAsync(search, cancellationToken).ConfigureAwait(false);
-if (resolution.Receipt.Kind == CapabilityResolutionKind.Ambiguous)
-    return new InoWorkflowResult(
-        "I found more than one capability that could handle this. Please choose the intended result.",
-        workflow,
-        Capability: resolution.Receipt);
-if (resolution.Receipt.Kind == CapabilityResolutionKind.Missing)
-    return await CreateMissingCapabilityResultAsync(request, workflow, resolution.Receipt, cancellationToken);
-var selected = resolution.Selected ?? throw new InvalidOperationException("A matched capability has no descriptor.");
-var intent = await model.ResolveIntentAsync(new SemanticIntentRequest(
-    request.ActorScope,
-    request.ActorScope,
-    request.ConversationId,
-    request.Prompt,
-    [],
-    selected.Id), cancellationToken).ConfigureAwait(false);
-```
-
-`ComposedIntegrationIds` contains only provider packages registered in RuntimeHost, not OAuth connection state. The `assistant.answer` match returns control to the existing bounded Chat path. All integration and cross-provider matches continue through typed dispatch and the existing connection and effect rails.
+Control flow: normalize `request.Prompt` once at the runner boundary — replace every control character (including `\r\n`) with a single space, collapse runs of whitespace, trim, and truncate to 4096 characters — and build `CapabilitySearchRequest(normalizedPrompt, grants, composedConnections, 3)` from that normalized prompt, the server-known grants, and the catalog-derived connection set. The same normalized prompt feeds parameter extraction and the draft goal; only the general `ChatClientAgent` path keeps the original, un-normalized prompt (history and free-form answers must not be mangled). This lets multi-line or oversized prompts flow through the resolver (bounded to 4096 characters), extraction, and draft-creation boundaries (both also control-character-free) — each of which independently keeps enforcing its own bound as defense in depth — without the runner ever handing them unbounded or control-character-laden text. Ambiguous returns the clarification result with the receipt and calls no model. Missing calls `CreateMissingCapabilityResultAsync` (Task 5 wires the grain; in this task it returns the missing receipt with bounded text). A match on `assistant.answer` continues through the existing `ChatClientAgent` path with the receipt attached. A match on any other capability calls `ICapabilityParameterModel.ExtractAsync` with the selected capability ID and the normalized prompt, then returns a bounded acknowledgment naming the capability with the receipt attached; Chat-side execution of integration capabilities arrives in the next plan.
 
 - [ ] **Step 6: Run the root suite and verify it passes**
 
-Run the exact root job command from Task 1.
-
-Expected: PASS with zero failed tests and no behavior regression in typed Gmail/Salesforce tests.
+Expected: PASS with zero failed tests and no behavior regression.
 
 - [ ] **Step 7: Verify Aspire and commit**
 
 ```powershell
-git add src/DigitalBrain.Core/DurableInoContracts.cs src/DigitalBrain.Kernel.Abstractions/ConversationNeuron.cs src/DigitalBrain.Kernel/Runtime/ConversationNeuron.cs src/DigitalBrain.Kernel/Runtime/AgentFrameworkWorkflowRunner.cs src/DigitalBrain.Kernel/Runtime/InoOperationWorkerGrain.cs src/DigitalBrain.Mcp/ConversationStateClient.cs tests/DigitalBrain.Tests/Runtime/CapabilityWorkflowRunnerTests.cs tests/DigitalBrain.Tests/Runtime/TypedReadWorkflowRunnerTests.cs
 git commit -m "feat: resolve chat requests through capabilities"
 ```
 
 ---
 
-### Task 5: Persist idempotent missing-capability proposals
+### Task 5: Persist idempotent missing-capability draft proposals
 
 **Files:**
-- Create: `src/DigitalBrain.Kernel.Abstractions/FeatureHub.cs`
-- Create: `src/DigitalBrain.Kernel/Runtime/FeatureHubGrain.cs`
-- Create: `tests/DigitalBrain.Tests/Runtime/FeatureHubTransitionsTests.cs`
-- Modify: `src/DigitalBrain.Kernel.Abstractions/RuntimeState.cs`
+- Modify: `src/DigitalBrain.Kernel.Contracts/FeatureGrainContracts.cs`
+- Modify: `src/DigitalBrain.Kernel/Features/FeatureStateModels.cs`
+- Modify: `src/DigitalBrain.Kernel/Features/FeatureHubTransitions.cs`
+- Modify: `src/DigitalBrain.Kernel/Features/FeatureHubGrain.cs`
 - Modify: `src/DigitalBrain.Kernel/Runtime/AgentFrameworkWorkflowRunner.cs`
+- Create: `tests/DigitalBrain.OrleansTests/Features/FeatureDraftTransitionTests.cs`
 
 **Interfaces:**
-- Produces: `FeatureProposal`, `FeatureHubState`, `FeatureHubTransitions.CreateProposal`, and `IFeatureHubGrain`.
-- Consumes: owner scope, operation ID, original prompt, and `TimeProvider`.
+- Produces: `FeatureDraftProposal`, `CreateFeatureDraft`, `FeatureHubTransitions.CreateDraft`, `IFeatureHubGrain.CreateDraftAsync`.
+- Consumes: owner scope, operation ID, original prompt, `TimeProvider`, existing `FeatureHubState` persistence.
 
 - [ ] **Step 1: Write transition tests**
 
 ```csharp
 [Fact]
-public void CreateProposal_is_idempotent_for_the_same_operation()
+public void CreateDraft_is_idempotent_for_the_same_operation()
 {
-    var request = new CreateFeatureProposal("operation-1", "Research Acme and create a text file", Now);
+    var request = new CreateFeatureDraft("operation-1", "Research Acme and create a text file", Now);
 
-    var first = FeatureHubTransitions.CreateProposal(FeatureHubState.Empty(), OwnerScope, request);
-    var second = FeatureHubTransitions.CreateProposal(first.State, OwnerScope, request);
+    var first = FeatureHubTransitions.CreateDraft(EmptyState, OwnerScope, request);
+    var second = FeatureHubTransitions.CreateDraft(first.State, OwnerScope, request);
 
-    Assert.Equal(first.Proposal, second.Proposal);
+    Assert.Equal(first.Draft, second.Draft);
     Assert.Same(first.State, second.State);
 }
 
 [Fact]
-public void CreateProposal_rejects_unbounded_or_control_character_prompts()
+public void CreateDraft_rejects_unbounded_or_control_character_prompts()
 {
-    Assert.Throws<ArgumentException>(() => FeatureHubTransitions.CreateProposal(
-        FeatureHubState.Empty(),
+    Assert.Throws<ArgumentException>(() => FeatureHubTransitions.CreateDraft(
+        EmptyState,
         OwnerScope,
-        new CreateFeatureProposal("operation-1", new string('x', 4097), Now)));
-    Assert.Throws<ArgumentException>(() => FeatureHubTransitions.CreateProposal(
-        FeatureHubState.Empty(),
+        new CreateFeatureDraft("operation-1", new string('x', 4097), Now)));
+    Assert.Throws<ArgumentException>(() => FeatureHubTransitions.CreateDraft(
+        EmptyState,
         OwnerScope,
-        new CreateFeatureProposal("operation-2", "unsafe\u0000prompt", Now)));
+        new CreateFeatureDraft("operation-2", "unsafe prompt", Now)));
 }
 ```
 
 - [ ] **Step 2: Run the root suite and verify failure**
 
-Run the exact root job command from Task 1.
+Expected: FAIL because draft contracts and transitions do not exist.
 
-Expected: FAIL because Feature Hub contracts and transitions do not exist.
+- [ ] **Step 3: Add draft contracts and the pure transition**
 
-- [ ] **Step 3: Add Feature Hub contracts and pure transitions**
-
-Create `FeatureHub.cs` with serialized state and grain contracts. Use these fields:
+Extend `FeatureGrainContracts.cs`:
 
 ```csharp
-[GenerateSerializer, Alias("digitalbrain.feature.proposal.v1")]
-public sealed record FeatureProposal(
+[GenerateSerializer, Alias("digitalbrain.feature.draft-proposal.v1")]
+public sealed record FeatureDraftProposal(
     [property: Id(0)] string ProposalId,
     [property: Id(1)] string OperationId,
     [property: Id(2)] string Goal,
     [property: Id(3)] string Status,
     [property: Id(4)] DateTimeOffset CreatedAt);
 
-[GenerateSerializer, Alias("digitalbrain.feature.hub-state.v1")]
-public sealed record FeatureHubState(
-    [property: Id(0)] int SchemaVersion,
-    [property: Id(1)] long Revision,
-    [property: Id(2)] FeatureProposal[] Proposals)
-{
-    public static FeatureHubState Empty() => new(RuntimeStateSchemas.FeatureHub, 0, []);
-}
-
-[Alias("digitalbrain.feature.hub-grain.v1")]
-public interface IFeatureHubGrain : IGrainWithStringKey
-{
-    [Alias("digitalbrain.feature.proposal.create.v1")]
-    Task<FeatureProposal> CreateProposalAsync(CreateFeatureProposal request);
-}
+[GenerateSerializer, Alias("digitalbrain.feature.create-draft.v1")]
+public sealed record CreateFeatureDraft(
+    [property: Id(0)] string OperationId,
+    [property: Id(1)] string Goal,
+    [property: Id(2)] DateTimeOffset RequestedAt);
 ```
 
-`FeatureHubTransitions` must cap proposals at 100 per owner, prompts at 4096 characters, and proposal labels at 80 characters. Derive `ProposalId` as `proposal-` plus the first 32 lowercase hex characters of SHA-256 over `ownerScope + "\0" + operationId`. Store the bounded original goal; do not generate source, permissions, or triggers in this slice.
+Add `[Alias("create-draft")] Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request);` to the existing `IFeatureHubGrain`. Append a `FeatureDraftProposal[] Drafts` field to the existing internal `FeatureHubState` using the next free serializer ID with `= []` compatibility default.
 
-- [ ] **Step 4: Implement encrypted durable ownership**
+`FeatureHubTransitions.CreateDraft` caps drafts at 100 per owner, goals at 4096 characters, and returns the existing state instance unchanged when the same operation ID repeats with the same goal digest. Derive `ProposalId` as `proposal-` plus the first 32 lowercase hex characters of SHA-256 over `ownerScope + "\0" + operationId`. New drafts have `Status = "draft"` and increment the hub revision. Store the bounded original goal; do not generate source, permissions, or triggers in this slice.
 
-Create `FeatureHubGrain.cs` using the existing `EncryptedPersistentState<FeatureHubState>` pattern with `[PersistentState("feature-hub", RuntimeStateStorageProviders.GrainState)]`. Add `RuntimeStateSchemas.FeatureHub` and `RuntimeStateKinds.FeatureHub` without changing existing numeric schema values.
+- [ ] **Step 4: Implement grain surface**
 
-- [ ] **Step 5: Create proposals only for missing actionable work**
+`FeatureHubGrain.CreateDraftAsync` applies the transition, writes state through the existing `[PersistentState("feature-hub")]` persistence, and returns the draft.
 
-In `AgentFrameworkWorkflowRunner.CreateMissingCapabilityResultAsync`, classify a missing request as ordinary conversation only when the prompt is a greeting, thanks, help request, or capability question covered by `assistant.answer`. For any other missing request, call the owner-scoped `IFeatureHubGrain` idempotently and return:
+- [ ] **Step 5: Create drafts only for missing actionable work**
+
+In `AgentFrameworkWorkflowRunner.CreateMissingCapabilityResultAsync`, classify a missing request as ordinary conversation — routed through the existing bounded Chat path with the Missing receipt attached and no draft — when any of these deterministic, model-free rules match the normalized prompt: it equals one of a fixed exact-phrase list (greetings, thanks, help, and `assistant.answer`-shaped questions such as "what can you do"); or its trimmed form ends with `?`; or its first whitespace-delimited token (lowercased, with surrounding punctuation stripped so contractions like "What's" normalize to "whats") is one of a bounded interrogative set (what, whats, how, why, when, where, who, whos, which, is, are, am, can, could, should, would, will, do, does, did). This lets "how are you" and "What is the difference between TCP and UDP?" resolve as ordinary conversation without growing the exact-phrase list for every paraphrase. Everything else — including "Research Acme Corporation and create a text file with the findings.", which starts with "research" and carries no `?` — is actionable. For any actionable missing request, call the owner-scoped `IFeatureHubGrain` idempotently (keyed by owner via the existing `IFeatureGrainResolver`) with the normalized prompt as the goal, catching `InvalidOperationException` around the call — the type `FeatureHubGrain.Domain<T>` converts both `FeatureLimitExceededException` and `FeatureConcurrencyException` into at the grain boundary — so a draft-creation failure (draft cap reached, or a concurrent goal conflict for the same operation id) degrades to the same bounded no-proposal missing result instead of poisoning the operation, and return:
 
 ```csharp
 return new InoWorkflowResult(
     "I don’t have a trusted capability for that yet. I created a Feature draft. Open Studio to define and verify its behavior?",
     workflow,
     Capability: receipt,
-    Proposal: new FeatureProposalReference(
-        proposal.ProposalId,
+    Proposal: new FeatureDraftReference(
+        draft.ProposalId,
         "Open Studio",
-        "/features/proposals/" + proposal.ProposalId));
+        "/features/proposals/" + draft.ProposalId));
 ```
 
 Do not call a model to decide whether code should be installed.
 
 - [ ] **Step 6: Run the root suite and verify it passes**
 
-Run the exact root job command from Task 1.
-
 Expected: PASS with zero failed tests.
 
 - [ ] **Step 7: Verify Aspire and commit**
 
 ```powershell
-git add src/DigitalBrain.Kernel.Abstractions/FeatureHub.cs src/DigitalBrain.Kernel.Abstractions/RuntimeState.cs src/DigitalBrain.Kernel/Runtime/FeatureHubGrain.cs src/DigitalBrain.Kernel/Runtime/AgentFrameworkWorkflowRunner.cs tests/DigitalBrain.Tests/Runtime/FeatureHubTransitionsTests.cs tests/DigitalBrain.Tests/Runtime/CapabilityWorkflowRunnerTests.cs
 git commit -m "feat: persist feature proposals for missing capabilities"
 ```
 
@@ -826,14 +661,12 @@ git commit -m "feat: persist feature proposals for missing capabilities"
 ### Task 6: Persist and project safe capability receipts
 
 **Files:**
-- Modify: `src/DigitalBrain.Kernel.Abstractions/ConversationNeuron.cs`
+- Modify: `src/DigitalBrain.Kernel.Contracts/Runtime/ConversationNeuron.cs`
 - Modify: `src/DigitalBrain.Kernel/Runtime/ConversationNeuron.cs`
 - Modify: `src/DigitalBrain.Kernel/Runtime/InoOperationWorkerGrain.cs`
-- Modify: `src/DigitalBrain.Core/Conversation.cs`
-- Modify: `src/DigitalBrain.Core/DurableInoContracts.cs`
-- Modify: `src/DigitalBrain.Core/ConversationSurfacePayload.cs`
-- Modify: `tests/DigitalBrain.Tests/Runtime/ConversationSurfacePayloadTests.cs`
-- Modify: `tests/DigitalBrain.Tests/Runtime/InoReminderHandoffTests.cs`
+- Modify: `src/DigitalBrain.Kernel.Contracts/Core/ConversationSurfacePayload.cs`
+- Modify: `tests/DigitalBrain.OrleansTests/Legacy/Runtime/ConversationSurfacePayloadTests.cs`
+- Modify: `tests/DigitalBrain.OrleansTests/Legacy/Runtime/InoReminderHandoffTests.cs`
 
 **Interfaces:**
 - Consumes: `InoWorkflowResult.Capability` and `.Proposal`.
@@ -844,8 +677,8 @@ git commit -m "feat: persist feature proposals for missing capabilities"
 Add a payload test asserting exact safe JSON:
 
 ```csharp
-Assert.Equal("salesforce.search.records", operation.GetProperty("capability").GetProperty("id").GetString());
-Assert.Equal("Search Salesforce records", operation.GetProperty("capability").GetProperty("name").GetString());
+Assert.Equal("salesforce.record.read.v1", operation.GetProperty("capability").GetProperty("id").GetString());
+Assert.Equal("Read Salesforce records", operation.GetProperty("capability").GetProperty("name").GetString());
 Assert.Equal("match", operation.GetProperty("capability").GetProperty("kind").GetString());
 Assert.Equal("proposal-0123456789abcdef0123456789abcdef", operation.GetProperty("proposal").GetProperty("id").GetString());
 Assert.Equal("/features/proposals/proposal-0123456789abcdef0123456789abcdef", operation.GetProperty("proposal").GetProperty("route").GetString());
@@ -856,8 +689,6 @@ Add a reminder handoff test that persists, deactivates, and reloads an operation
 
 - [ ] **Step 2: Run the root suite and verify failure**
 
-Run the exact root job command from Task 1.
-
 Expected: FAIL because operation state and surface payload do not retain the receipts.
 
 - [ ] **Step 3: Append serialized operation fields**
@@ -866,14 +697,14 @@ Append these optional fields to `ConversationOperation` after the grant snapshot
 
 ```csharp
 [property: Id(17)] CapabilityResolutionReceipt? Capability = null,
-[property: Id(18)] FeatureProposalReference? Proposal = null
+[property: Id(18)] FeatureDraftReference? Proposal = null
 ```
 
-Thread them through `CompleteWithAssistantAsync`, `ConversationTransitions.CompleteWithAssistant`, and the worker completion call. Existing callers pass null by default. Add validation that receipt IDs, names, labels, routes, confidence, and candidate counts are bounded and that proposal routes begin with `/features/proposals/proposal-`.
+Thread them through the assistant-completion path (`ConversationTransitions.CompleteWithAssistant` and the worker completion call). Existing callers pass null by default. Add validation that receipt IDs, names, labels, routes, confidence, and candidate counts are bounded and that proposal routes begin with `/features/proposals/proposal-`.
 
 - [ ] **Step 4: Project only safe fields**
 
-In `ConversationSurfacePayload.Build`, emit:
+In the conversation surface payload builder, emit:
 
 ```csharp
 operation["capability"] = new Dictionary<string, object?>
@@ -895,14 +726,11 @@ Emit each block only when its source is non-null. Do not emit the original promp
 
 - [ ] **Step 5: Run the root suite and verify it passes**
 
-Run the exact root job command from Task 1.
-
 Expected: PASS with zero failed tests.
 
 - [ ] **Step 6: Verify Aspire and commit**
 
 ```powershell
-git add src/DigitalBrain.Kernel.Abstractions/ConversationNeuron.cs src/DigitalBrain.Kernel/Runtime/ConversationNeuron.cs src/DigitalBrain.Kernel/Runtime/InoOperationWorkerGrain.cs src/DigitalBrain.Core/Conversation.cs src/DigitalBrain.Core/DurableInoContracts.cs src/DigitalBrain.Core/ConversationSurfacePayload.cs tests/DigitalBrain.Tests/Runtime/ConversationSurfacePayloadTests.cs tests/DigitalBrain.Tests/Runtime/InoReminderHandoffTests.cs
 git commit -m "feat: project capability receipts to chat"
 ```
 
@@ -929,8 +757,8 @@ test('parses bounded capability and proposal receipts', () {
   final payload = InoConversationSurfacePayload.fromJson(fixtureWith(
     capability: {
       'kind': 'match',
-      'id': 'salesforce.search.records',
-      'name': 'Search Salesforce records',
+      'id': 'salesforce.record.read.v1',
+      'name': 'Read Salesforce records',
       'confidence': 0.91,
     },
     proposal: {
@@ -940,7 +768,7 @@ test('parses bounded capability and proposal receipts', () {
     },
   ));
 
-  expect(payload.operation!.capability!.id, 'salesforce.search.records');
+  expect(payload.operation!.capability!.id, 'salesforce.record.read.v1');
   expect(payload.operation!.proposal!.label, 'Open Studio');
 });
 
@@ -960,13 +788,7 @@ test('rejects external or malformed proposal routes', () {
 
 - [ ] **Step 2: Run Flutter tests and verify failure**
 
-Run from `app`:
-
-```powershell
-flutter test
-```
-
-Expected: FAIL because receipt models and parsing do not exist.
+Run `flutter test` from `app`. Expected: FAIL because receipt models and parsing do not exist.
 
 - [ ] **Step 3: Add strict protocol models**
 
@@ -978,7 +800,7 @@ In `ino_conversation_view.dart`:
 
 - change the semantic label from `INO conversation` to `Chat conversation`;
 - change `Ask INO` to `Chat`;
-- render a small capability chip above `_OperationStatus` when a receipt has an ID and name;
+- render a small capability chip above the operation status only when a receipt is a `match` (not a `missing` closest-candidate) and has an ID and name, with the chip's text excluded from semantics so the surrounding label is not announced twice;
 - show at most the human name by default;
 - render an `Open Studio` button only for a validated proposal reference;
 - call `context.go(proposal.route)` for that internal route;
@@ -1013,14 +835,11 @@ Add tests that assert the capability chip, `Open Studio` button, internal naviga
 
 - [ ] **Step 7: Run Flutter tests and verify they pass**
 
-Run `flutter test` from `app`.
-
-Expected: PASS with zero failed tests.
+Run `flutter test` from `app`. Expected: PASS with zero failed tests.
 
 - [ ] **Step 8: Verify Aspire and commit**
 
 ```powershell
-git add app/lib/runtime/protocol/surface_protocol.dart app/lib/runtime/widgets/ino_conversation_view.dart app/lib/runtime/widgets/feature_proposal_placeholder.dart app/lib/router.dart app/test/runtime/surface_protocol_test.dart app/test/runtime/runtime_shell_test.dart
 git commit -m "feat: show capabilities and feature proposals in chat"
 ```
 
@@ -1029,12 +848,12 @@ git commit -m "feat: show capabilities and feature proposals in chat"
 ### Task 8: Prove the vertical slice end to end
 
 **Files:**
-- Modify: `tests/DigitalBrain.Tests/Runtime/RuntimeSurfaceFeedTests.cs`
-- Modify: `tests/DigitalBrain.Tests/Runtime/UiGrpcServiceTests.cs`
+- Modify: `tests/DigitalBrain.OrleansTests/Legacy/Runtime/RuntimeSurfaceFeedTests.cs`
+- Modify: `tests/DigitalBrain.OrleansTests/Legacy/Runtime/UiGrpcServiceTests.cs`
 - Modify: `app/test/runtime/grpc_ui_transport_test.dart`
 
 **Interfaces:**
-- Consumes: the completed capability resolution, proposal persistence, feed projection, gRPC transport, and Flutter parsing path.
+- Consumes: the completed capability resolution, draft persistence, feed projection, gRPC transport, and Flutter parsing path.
 - Produces: one backend acceptance test and one Flutter transport acceptance test for the Company Research request.
 
 - [ ] **Step 1: Add a backend acceptance test**
@@ -1050,7 +869,7 @@ Assert.Contains("I don’t have a trusted capability", assistantTurn.Text, Strin
 Assert.Equal(0, recordingGeneralChatClient.CallCount);
 ```
 
-Repeat delivery with the same operation ID and assert exactly one proposal in `FeatureHubState`.
+Repeat delivery with the same operation ID and assert exactly one draft in the hub state.
 
 - [ ] **Step 2: Add a Flutter transport acceptance test**
 
@@ -1071,15 +890,16 @@ Run `aspire doctor`, confirm RuntimeHost, MCP/UI Edge, embed model, storage, and
 - no prompt, embedding vector, grant, credential, or provider payload appears in logs;
 - Flutter opens the internal proposal placeholder and returns to Chat.
 
+If credentials or infrastructure are unavailable, document exactly what could and could not be validated; never fabricate live results.
+
 - [ ] **Step 5: Commit the acceptance proof**
 
 ```powershell
-git add tests/DigitalBrain.Tests/Runtime/RuntimeSurfaceFeedTests.cs tests/DigitalBrain.Tests/Runtime/UiGrpcServiceTests.cs app/test/runtime/grpc_ui_transport_test.dart
 git commit -m "test: prove capability proposal flow end to end"
 ```
 
 ## Completion gate
 
-This plan is complete only when all eight task commits exist, the exact root .NET suite and full Flutter suite pass, Aspire is healthy, and a live Company Research request creates one durable proposal without calling the general Chat model or installing code.
+This plan is complete only when all eight task commits exist, the exact root .NET suite and full Flutter suite pass, Aspire is healthy, and a live Company Research request creates one durable draft proposal without calling the general Chat model or installing code.
 
 The next plan begins from that proposal ID and replaces the Flutter placeholder with the living BDD and single-file C# Studio workflow.
