@@ -30,7 +30,7 @@ public sealed record AcceptedCommand(
     [property: Id(6)] string RequestId,
     [property: Id(7)] DateTimeOffset AcceptedAt,
     [property: Id(8)] int SchemaVersion,
-    [property: Id(9)] string[] Grants);
+    [property: Id(9)] string[]? Grants = null);
 [GenerateSerializer, Alias("digitalbrain.runtime.operation-receipt")]
 public sealed record OperationReceipt(
     [property: Id(0)] string OperationId,

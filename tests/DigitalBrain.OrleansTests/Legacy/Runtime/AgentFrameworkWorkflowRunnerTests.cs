@@ -46,6 +46,21 @@ public sealed class AgentFrameworkWorkflowRunnerTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_attaches_no_capability_receipt_when_no_resolver_is_registered()
+    {
+        var chatClient = new EchoChatClient();
+        using var services = new ServiceCollection()
+            .AddSingleton<IChatClient>(chatClient)
+            .BuildServiceProvider();
+        var runner = new AgentFrameworkWorkflowRunner(services);
+
+        var result = await runner.ExecuteAsync(Request());
+
+        Assert.Null(result.Capability);
+        Assert.Equal(1, chatClient.CallCount);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_rejects_a_prior_workflow_without_a_session_reference()
     {
         var chatClient = new EchoChatClient();

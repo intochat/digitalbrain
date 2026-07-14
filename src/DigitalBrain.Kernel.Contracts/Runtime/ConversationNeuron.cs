@@ -1065,8 +1065,7 @@ public static class ConversationTransitions
             DemandId(command.IdempotencyKey, nameof(command.IdempotencyKey));
             DemandId(command.RequestId, nameof(command.RequestId));
             DemandHash(command.InputHash, nameof(command.InputHash));
-            var canonicalCommandGrants = ValidateAndCanonicalizeGrants(command.Grants);
-            if (!command.Grants.SequenceEqual(canonicalCommandGrants, StringComparer.Ordinal))
+            if (command.Grants is { } commandGrants && !commandGrants.SequenceEqual(ValidateAndCanonicalizeGrants(commandGrants), StringComparer.Ordinal))
                 throw new RuntimeStateIntegrityException("accepted command grants are not canonical");
             if (command.SchemaVersion != 1 || command.AcceptedAt == default ||
                 !string.Equals(command.CommandId, command.IdempotencyKey, StringComparison.Ordinal) ||

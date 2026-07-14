@@ -93,6 +93,34 @@ public sealed class EncryptedDomainStateTests
     }
 
     [Fact]
+    public void Conversation_state_with_legacy_null_grant_snapshots_stays_valid_and_accepts_new_operations()
+    {
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state, state.Revision, "command-0", Hash("input-0"), "operation-0", "turn-0",
+            "request-command-0", AcceptedOutbox("operation-0", Utc(0)), Utc(0), ["mail.read"]);
+        var legacyState = state with
+        {
+            AcceptedCommands = state.AcceptedCommands.Select(command => command with { Grants = null }).ToArray(),
+            Operations = state.Operations.Select(operation => operation with { Grants = null }).ToArray()
+        };
+
+        ConversationTransitions.Validate(legacyState);
+        var next = ConversationTransitions.BeginOperation(
+            legacyState, legacyState.Revision, "command-1", Hash("input-1"), "operation-1", "turn-1",
+            "request-command-1", AcceptedOutbox("operation-1", Utc(1)), Utc(1), ["mail.read"]);
+
+        Assert.Null(next.AcceptedCommands.Single(command => command.CommandId == "command-0").Grants);
+        var acceptedGrants = next.AcceptedCommands.Single(command => command.CommandId == "command-1").Grants;
+        Assert.NotNull(acceptedGrants);
+        Assert.Equal(["mail.read"], acceptedGrants);
+        var operationGrants = next.Operations.Single(operation => operation.OperationId == "operation-1").Grants;
+        Assert.NotNull(operationGrants);
+        Assert.Equal(["mail.read"], operationGrants);
+    }
+
+    [Fact]
     public void Conversation_transitions_are_idempotent_take_over_expired_leases_and_archive_without_losing_sequence()
     {
         var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
