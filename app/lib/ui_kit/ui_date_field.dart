@@ -12,7 +12,7 @@ class UiKitDateField extends StatefulWidget {
 }
 
 class _UiKitDateFieldState extends State<UiKitDateField> {
-  late final FDateSelectionControl<DateTime?> _ctrl;
+  late final FDateSelectionController<DateTime?> _ctrl;
 
   static String _iso(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-'
@@ -22,7 +22,7 @@ class _UiKitDateFieldState extends State<UiKitDateField> {
   @override
   void initState() {
     super.initState();
-    _ctrl = FDateSelectionControl.managedSingle();
+    _ctrl = FDateSelectionController.single();
     _ctrl.addListener(_onDateChanged);
   }
 
@@ -40,7 +40,7 @@ class _UiKitDateFieldState extends State<UiKitDateField> {
 
   @override
   Widget build(BuildContext context) => FDateField(
-    selectionControl: _ctrl,
+    selectionControl: FDateSelectionControl.managedSingle(controller: _ctrl),
     label: widget.label.isEmpty ? null : Text(widget.label),
   );
 }

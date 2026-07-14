@@ -293,7 +293,7 @@ class UiSurfaceTreeRenderer {
           children: [
             if (title.isNotEmpty) Text(title),
             if (sub.isNotEmpty) Text(sub),
-            if (childWidgets != null) childWidgets,
+            ?childWidgets,
           ],
         ),
       );

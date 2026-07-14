@@ -6,16 +6,17 @@ class UiKitIcon extends StatelessWidget {
   final String name;
 
   static final Map<String, IconData> _icons = {
-    'star': FIcons.star,
-    'check': FIcons.check,
-    'list': FIcons.list,
-    'search': FIcons.search,
-    'user': FIcons.userRound,
-    'settings': FIcons.settings,
-    'info': FIcons.info,
-    'house': FIcons.house,
+    'star': FLucideIcons.star,
+    'check': FLucideIcons.check,
+    'list': FLucideIcons.list,
+    'search': FLucideIcons.search,
+    'user': FLucideIcons.userRound,
+    'settings': FLucideIcons.settings,
+    'info': FLucideIcons.info,
+    'house': FLucideIcons.house,
   };
 
   @override
-  Widget build(BuildContext context) => Icon(_icons[name] ?? FIcons.circle);
+  Widget build(BuildContext context) =>
+      Icon(_icons[name] ?? FLucideIcons.circle);
 }
