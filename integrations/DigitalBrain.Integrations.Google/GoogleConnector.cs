@@ -1,7 +1,7 @@
+using System.Globalization;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Configuration;
 using DigitalBrain.Kernel.Contracts.Runtime;
-using System.Globalization;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Services;
 using Microsoft.Extensions.Configuration;

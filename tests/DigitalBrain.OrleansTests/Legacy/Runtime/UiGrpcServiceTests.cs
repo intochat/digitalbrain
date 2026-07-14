@@ -1,8 +1,7 @@
 extern alias McpProject;
-
 using System.Text.Json;
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.TestSupport;
 using DigitalBrain.Tests.TestSupport;

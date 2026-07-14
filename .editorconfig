@@ -18,10 +18,6 @@ max_line_length = 160
 [*.{csproj,props,targets,slnx,xml,resx,config,nuspec,manifest,runsettings}]
 indent_size = 2
 
-# slnx is manually curated for logical folder grouping in solution explorer.
-# dotnet format can rewrite XML order/sections undesirably (observed reordering + dup folders).
-# Exclude it when formatting sources: dotnet format --include src/ --include integrations/ ...
-# (Bare `dotnet format` from root may touch it for trivial ws; revert order if it does.)
 [*.slnx]
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none
@@ -43,8 +39,6 @@ end_of_line = crlf
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none
 
-# Generated code (pack embodiment, source generators) - exclude from dotnet format and analysis.
-# These may be checked-in outputs; format on them can cause noise (eol) and is meaningless.
 [**/Generated/**]
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none

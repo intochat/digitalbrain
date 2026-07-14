@@ -1,5 +1,5 @@
-using Azure.Monitor.OpenTelemetry.AspNetCore;
 using System.Text.Json;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;

@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Threading;
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;

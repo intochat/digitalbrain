@@ -1,6 +1,6 @@
 using System.Reflection;
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 

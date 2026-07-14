@@ -1,6 +1,6 @@
+using System.Text;
 using DigitalBrain.Features.Sdk;
 using DigitalBrain.Integrations.Google.Contracts;
-using System.Text;
 namespace DigitalBrain.Features.EmailSummarizer;
 
 public sealed class EmailSummarizerFeature : IFeature

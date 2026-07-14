@@ -1,12 +1,11 @@
 extern alias McpProject;
-
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Threading;
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;

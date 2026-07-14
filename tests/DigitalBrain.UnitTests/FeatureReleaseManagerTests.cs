@@ -1,8 +1,8 @@
+using System.Runtime.CompilerServices;
 using DigitalBrain.FeatureHost;
 using DigitalBrain.Features.Sdk;
 using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Kernel.Contracts;
-using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace DigitalBrain.UnitTests;

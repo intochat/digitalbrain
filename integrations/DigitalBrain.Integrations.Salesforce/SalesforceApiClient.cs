@@ -1,12 +1,12 @@
 using System.Globalization;
 using System.Text;
-using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.Integrations.Salesforce.Contracts;
-using StjSerializer = System.Text.Json.JsonSerializer;
+using DigitalBrain.Kernel.Runtime;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Salesforce.Common.Models.Json;
 using Salesforce.Force;
+using StjSerializer = System.Text.Json.JsonSerializer;
 namespace DigitalBrain.Integrations.Salesforce;
 
 internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiClient

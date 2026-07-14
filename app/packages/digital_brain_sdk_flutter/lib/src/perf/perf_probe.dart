@@ -21,8 +21,6 @@ class PerfProbe extends StatefulWidget {
   final Widget child;
   final Duration samplePeriod;
 
-
-
   final int censusEveryNFlushes;
 
   @override
@@ -39,7 +37,6 @@ class _PerfProbeState extends State<PerfProbe> {
   @override
   void initState() {
     super.initState();
-
 
     if (kReleaseMode) return;
     SchedulerBinding.instance.addTimingsCallback(_onTimings);
@@ -72,7 +69,6 @@ class _PerfProbeState extends State<PerfProbe> {
     final jankCount = sortedMs.where((m) => m > 16.0).length;
     final jankPct = jankCount / sortedMs.length;
     _flushCounter++;
-
 
     final isFirstFlush = _lastCensus.widgetCount == 0;
     if (isFirstFlush || _flushCounter % widget.censusEveryNFlushes == 0) {

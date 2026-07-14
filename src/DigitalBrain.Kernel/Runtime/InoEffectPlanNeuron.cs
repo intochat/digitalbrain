@@ -1,5 +1,5 @@
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;

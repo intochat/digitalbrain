@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Text;
 using System.Text.RegularExpressions;
+using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Kernel.Runtime;
 using Google;
 using Google.Apis.Auth.OAuth2;
@@ -9,7 +10,6 @@ using Google.Apis.Gmail.v1;
 using Google.Apis.Gmail.v1.Data;
 using Google.Apis.Services;
 using Google.Apis.Util;
-using DigitalBrain.Integrations.Google.Contracts;
 using ContractGmailMessage = DigitalBrain.Integrations.Google.Contracts.GmailMessage;
 namespace DigitalBrain.Integrations.Google;
 
