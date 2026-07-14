@@ -574,6 +574,7 @@ class _InoConversationViewState extends State<InoConversationView> {
                   if (operation != null) ...[
                     const SizedBox(height: 10),
                     if (capability != null &&
+                        capability.kind == InoCapabilityResolutionKind.match &&
                         capability.id != null &&
                         capability.name != null) ...[
                       _CapabilityChip(name: capability.name!),

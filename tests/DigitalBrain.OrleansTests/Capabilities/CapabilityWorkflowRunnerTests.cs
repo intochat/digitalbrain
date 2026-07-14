@@ -31,6 +31,46 @@ public sealed class CapabilityWorkflowRunnerTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_acknowledges_a_multi_line_prompt_with_a_single_line_bounded_prompt()
+    {
+        var resolver = new RecordingCapabilityResolver(Match(GoogleCapabilityIds.GmailMessageRead, "Read Gmail messages"));
+        var runner = Runner(resolver);
+
+        var result = await runner.ExecuteAsync(Request("list my latest messages\nfrom Anna\r\nthis week"));
+
+        Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Capability?.CapabilityId);
+        Assert.Equal("list my latest messages from Anna  this week", resolver.LastRequest?.Prompt);
+        Assert.Equal("list my latest messages from Anna  this week", _parameterModel.LastRequest?.Prompt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_resolves_an_over_length_prompt_with_a_bounded_prompt()
+    {
+        var resolver = new RecordingCapabilityResolver(Match(GoogleCapabilityIds.GmailMessageRead, "Read Gmail messages"));
+        var runner = Runner(resolver);
+        var prompt = new string('a', 5000);
+
+        var result = await runner.ExecuteAsync(Request(prompt));
+
+        Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Capability?.CapabilityId);
+        Assert.Equal(prompt[..4096], resolver.LastRequest?.Prompt);
+        Assert.Equal(prompt[..4096], _parameterModel.LastRequest?.Prompt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_creates_a_control_character_free_draft_goal_for_a_multi_line_prompt()
+    {
+        var hub = new RecordingFeatureHubGrain();
+        var runner = Runner(new RecordingCapabilityResolver(Missing()), new RecordingFeatureGrainResolver(hub));
+
+        var result = await runner.ExecuteAsync(Request("Research Acme\r\nand create a text file", Owner));
+
+        Assert.Equal(1, hub.CreateDraftCallCount);
+        Assert.Equal("Research Acme  and create a text file", hub.LastCreateDraftRequest?.Goal);
+        Assert.Equal("Open Studio", result.Proposal?.Label);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_returns_clarification_for_ambiguous_capabilities()
     {
         var runner = Runner(new RecordingCapabilityResolver(Ambiguous(GoogleCapabilityIds.GmailMessageRead, GoogleCapabilityIds.GmailMailboxRead)));
@@ -164,10 +204,12 @@ public sealed class CapabilityWorkflowRunnerTests
     {
         private FeatureHubState _state = FeatureHubState.Empty;
         public int CreateDraftCallCount { get; private set; }
+        public CreateFeatureDraft? LastCreateDraftRequest { get; private set; }
 
         public Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request)
         {
             CreateDraftCallCount++;
+            LastCreateDraftRequest = request;
             var transition = FeatureHubTransitions.CreateDraft(_state, "owner-scope-1", request);
             _state = transition.State;
             return Task.FromResult(transition.Draft);

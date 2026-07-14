@@ -26,11 +26,12 @@ public sealed class HybridCapabilityResolverTests
     }
 
     [Fact]
-    public async Task ResolveAsync_falls_back_to_lexical_scoring_for_zero_vectors()
+    public async Task ResolveAsync_falls_back_to_exact_and_lexical_scoring_for_zero_vectors()
     {
-        var result = await ResolverWithZeroVectors().ResolveAsync(Request("read gmail messages", connections: ["google"]));
+        var result = await ResolverWithZeroVectors().ResolveAsync(Request("list gmail mailbox messages", connections: ["google"]));
 
-        Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Receipt.CapabilityId);
+        Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
+        Assert.Equal(GoogleCapabilityIds.GmailMailboxRead, result.Receipt.CapabilityId);
     }
 
     [Fact]

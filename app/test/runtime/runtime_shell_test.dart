@@ -454,6 +454,54 @@ void main() {
     },
   );
 
+  testWidgets(
+    'chat surface hides the capability chip for a missing resolution',
+    (tester) async {
+      final feed = _ShellFeedCall.open();
+      final transport = _ShellTransport(feed);
+      final runtime = _runtime(transport);
+
+      await tester.pumpWidget(
+        _host(
+          RuntimeShell(
+            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+            controller: runtime,
+          ),
+        ),
+      );
+      await _pumpUntil(tester, () => transport.watchStarted);
+      feed.add(
+        FeedSurfaceJson(
+          surfaceJsonString(
+            sequence: 1,
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                capability: inoCapability(
+                  kind: 'missing',
+                  id: 'memory.fact.remember.v1',
+                  name: 'Remember a fact',
+                  confidence: 0.41,
+                ),
+                proposal: inoFeatureProposal(),
+              ),
+            ),
+            actions: [testInoActionJson()],
+          ),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(chatOpenStudioButtonKey).evaluate().isNotEmpty,
+      );
+
+      expect(find.byKey(chatCapabilityChipKey), findsNothing);
+      expect(find.byKey(chatOpenStudioButtonKey), findsOneWidget);
+
+      await runtime.stop();
+    },
+  );
+
   testWidgets('Open Studio navigates to the safe Feature Studio placeholder', (
     tester,
   ) async {

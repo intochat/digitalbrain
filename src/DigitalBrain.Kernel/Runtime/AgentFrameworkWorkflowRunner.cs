@@ -11,6 +11,7 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
 {
     private const string RunnerName = "agent-framework";
     private const int MaximumCapabilityMatches = 3;
+    private const int MaximumSearchableTextLength = 4096;
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Ino.Workflow");
     private static readonly HashSet<string> ConversationalPrompts = new(StringComparer.Ordinal)
     {
@@ -39,9 +40,10 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         if (services.GetService<ICapabilityResolver>() is not { } resolver)
             return await RunGeneralAgentAsync(request, workflow, capability: null, cancellationToken).ConfigureAwait(false);
         var catalog = services.GetRequiredService<ICapabilityCatalog>();
+        var searchableText = BoundedSearchableText(request.Prompt);
         var resolution = await resolver.ResolveAsync(
             new CapabilitySearchRequest(
-                request.Prompt,
+                searchableText,
                 (request.Grants ?? []).ToHashSet(StringComparer.Ordinal),
                 ComposedConnections(catalog),
                 MaximumCapabilityMatches),
@@ -52,20 +54,30 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
                 "A few capabilities could match this request. Please choose one and ask again.",
                 workflow,
                 Capability: resolution.Receipt),
-            CapabilityResolutionKind.Missing => await CreateMissingCapabilityResultAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
+            CapabilityResolutionKind.Missing => await CreateMissingCapabilityResultAsync(request, searchableText, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
             CapabilityResolutionKind.Match when !string.Equals(resolution.Receipt.CapabilityId, BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, StringComparison.Ordinal) =>
-                await AcknowledgeSelectedCapabilityAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
+                await AcknowledgeSelectedCapabilityAsync(searchableText, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
             _ => await RunGeneralAgentAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false)
         };
     }
+    private static string BoundedSearchableText(string prompt)
+    {
+        var bounded = prompt.Length > MaximumSearchableTextLength ? prompt[..MaximumSearchableTextLength] : prompt;
+        if (!bounded.Any(char.IsControl)) return bounded;
+        var characters = bounded.ToCharArray();
+        for (var index = 0; index < characters.Length; index++)
+            if (char.IsControl(characters[index]))
+                characters[index] = ' ';
+        return new string(characters);
+    }
     private async Task<InoWorkflowResult> AcknowledgeSelectedCapabilityAsync(
-        InoWorkflowRequest request,
+        string searchableText,
         WorkflowReference workflow,
         CapabilityResolutionReceipt receipt,
         CancellationToken cancellationToken)
     {
         var parameterModel = services.GetRequiredService<ICapabilityParameterModel>();
-        await parameterModel.ExtractAsync(new CapabilityParameterRequest(receipt.CapabilityId!, request.Prompt), cancellationToken).ConfigureAwait(false);
+        await parameterModel.ExtractAsync(new CapabilityParameterRequest(receipt.CapabilityId!, searchableText), cancellationToken).ConfigureAwait(false);
         return new InoWorkflowResult(
             $"I can help with that using {receipt.CapabilityName}.",
             workflow,
@@ -73,16 +85,17 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
     }
     private async Task<InoWorkflowResult> CreateMissingCapabilityResultAsync(
         InoWorkflowRequest request,
+        string searchableText,
         WorkflowReference workflow,
         CapabilityResolutionReceipt receipt,
         CancellationToken cancellationToken)
     {
-        if (IsConversationalPrompt(request.Prompt))
+        if (IsConversationalPrompt(searchableText))
             return await RunGeneralAgentAsync(request, workflow, receipt, cancellationToken).ConfigureAwait(false);
         if (services.GetService<IFeatureGrainResolver>() is not { } resolver || request.OwnerId is not { } ownerId)
             return new InoWorkflowResult("I don't have a capability for that request yet.", workflow, Capability: receipt);
         var draft = await resolver.Hub(ownerId).CreateDraftAsync(
-            new CreateFeatureDraft(request.OperationId, request.Prompt, ResolveNow())).ConfigureAwait(false);
+            new CreateFeatureDraft(request.OperationId, searchableText, ResolveNow())).ConfigureAwait(false);
         return new InoWorkflowResult(
             "I don’t have a trusted capability for that yet. I created a Feature draft. Open Studio to define and verify its behavior?",
             workflow,
