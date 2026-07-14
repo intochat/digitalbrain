@@ -231,7 +231,8 @@ internal sealed class InoOperationWorkerGrain(
                 claimed.Workflow,
                 RequestScope.Id(state.Identity.OwnerId, state.Identity.ActorId),
                 state.Identity.OwnerId,
-                state.Identity.ActorId), deadline.Token);
+                state.Identity.ActorId,
+                claimed.Grants), deadline.Token);
         }
         catch (OperationCanceledException)
         {

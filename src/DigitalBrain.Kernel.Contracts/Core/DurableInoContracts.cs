@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using Orleans;
 namespace DigitalBrain.Kernel.Contracts.Runtime;
@@ -28,7 +29,8 @@ public sealed record AcceptedCommand(
     [property: Id(5)] string InputHash,
     [property: Id(6)] string RequestId,
     [property: Id(7)] DateTimeOffset AcceptedAt,
-    [property: Id(8)] int SchemaVersion);
+    [property: Id(8)] int SchemaVersion,
+    [property: Id(9)] string[] Grants);
 [GenerateSerializer, Alias("digitalbrain.runtime.operation-receipt")]
 public sealed record OperationReceipt(
     [property: Id(0)] string OperationId,
@@ -233,7 +235,8 @@ public sealed record InoWorkflowRequest(
     WorkflowReference? PriorWorkflow = null,
     string? ActorScope = null,
     BrainOwnerId? OwnerId = null,
-    ActorId? ActorId = null);
+    ActorId? ActorId = null,
+    IReadOnlyList<string>? Grants = null);
 public enum InoToolAccess { Read, Mutation }
 public sealed record InoToolRequest(string ToolId, InoToolAccess Access, string Scope, string SafeSummary);
 public sealed record InoApprovedTool(string ToolId, string Scope, string SafeSummary);
@@ -241,7 +244,13 @@ public sealed record InoToolEffectRequest(string OperationId, string EffectId, s
 public enum InoToolEffectDisposition { Succeeded, Failed, OutcomeUnknown }
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-tool-effect-result")]
 public sealed record InoToolEffectResult([property: Id(0)] InoToolEffectDisposition Disposition, [property: Id(1)] string SafeResult);
-public sealed record InoWorkflowResult(string Text, WorkflowReference Workflow, InoToolRequest? ToolRequest = null, InoAuthorizationRequest? AuthorizationRequest = null);
+public sealed record InoWorkflowResult(
+    string Text,
+    WorkflowReference Workflow,
+    InoToolRequest? ToolRequest = null,
+    InoAuthorizationRequest? AuthorizationRequest = null,
+    CapabilityResolutionReceipt? Capability = null,
+    FeatureDraftReference? Proposal = null);
 public interface IAgentWorkflowRunner
 {
     Task<InoWorkflowResult> ExecuteAsync(InoWorkflowRequest request, CancellationToken cancellationToken = default);

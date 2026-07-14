@@ -536,14 +536,9 @@ Append `[property: Id(9)] string[] Grants` to `AcceptedCommand` and `[property: 
 
 - [ ] **Step 5: Resolve before the general agent**
 
-In `AgentFrameworkWorkflowRunner.ExecuteAsync`, resolve once with the bounded prompt before creating the agent. Add this current-composition constant beside the runner bounds; the Feature runtime plan replaces it with owner-scoped installed Feature contributions:
+In `AgentFrameworkWorkflowRunner.ExecuteAsync`, resolve once with the bounded prompt before creating the agent. Do not hardcode a provider-composition constant in `src/DigitalBrain.Kernel/` — `RepositoryPolicyTests` forbids provider strings (gmail/google/salesforce) in tracked Kernel `.cs` files. Instead derive the composed connection set from the catalog itself: `catalog.Snapshot().SelectMany(descriptor => descriptor.RequiredConnections).ToHashSet(StringComparer.Ordinal)`. That set is exactly "connections declared by integrations registered in this host"; the Feature runtime plan replaces it with owner-scoped installed Feature contributions.
 
-```csharp
-private static readonly IReadOnlySet<string> ComposedIntegrationIds =
-    new HashSet<string>(["google", "salesforce"], StringComparer.Ordinal);
-```
-
-Control flow: build `CapabilitySearchRequest(request.Prompt, grants, ComposedIntegrationIds, 3)` from the server-known grants. Ambiguous returns the clarification result with the receipt and calls no model. Missing calls `CreateMissingCapabilityResultAsync` (Task 5 wires the grain; in this task it returns the missing receipt with bounded text). A match on `assistant.answer` continues through the existing `ChatClientAgent` path with the receipt attached. A match on any other capability calls `ICapabilityParameterModel.ExtractAsync` with the selected capability ID, then returns a bounded acknowledgment naming the capability with the receipt attached; Chat-side execution of integration capabilities arrives in the next plan.
+Control flow: build `CapabilitySearchRequest(request.Prompt, grants, composedConnections, 3)` from the server-known grants and the catalog-derived connection set. Ambiguous returns the clarification result with the receipt and calls no model. Missing calls `CreateMissingCapabilityResultAsync` (Task 5 wires the grain; in this task it returns the missing receipt with bounded text). A match on `assistant.answer` continues through the existing `ChatClientAgent` path with the receipt attached. A match on any other capability calls `ICapabilityParameterModel.ExtractAsync` with the selected capability ID, then returns a bounded acknowledgment naming the capability with the receipt attached; Chat-side execution of integration capabilities arrives in the next plan.
 
 - [ ] **Step 6: Run the root suite and verify it passes**
 

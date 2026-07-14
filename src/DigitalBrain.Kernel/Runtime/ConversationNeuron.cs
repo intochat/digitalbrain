@@ -81,9 +81,10 @@ internal sealed class ConversationNeuron(
         string userText,
         string requestId,
         ConversationOutboxEntry acceptedOutbox,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string[]? grants = null)
     {
-        var state = await State.UpdateAsync(expectedRevision, current => ConversationTransitions.BeginOperation(current, expectedRevision, commandId, inputHash, operationId, userText, requestId, acceptedOutbox, createdAt));
+        var state = await State.UpdateAsync(expectedRevision, current => ConversationTransitions.BeginOperation(current, expectedRevision, commandId, inputHash, operationId, userText, requestId, acceptedOutbox, createdAt, grants));
         await EnsureOperationReminderAsync();
         return state;
     }

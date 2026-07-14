@@ -888,7 +888,7 @@ public sealed class RuntimeSurfaceFeedTests
             throw new NotSupportedException();
         public Task<ConversationState> BeginOperationAsync(
             long expectedRevision, string commandId, string inputHash, string operationId, string userText, string requestId,
-            ConversationOutboxEntry acceptedOutbox, DateTimeOffset createdAt)
+            ConversationOutboxEntry acceptedOutbox, DateTimeOffset createdAt, string[]? grants = null)
         {
             Current = ConversationTransitions.BeginOperation(
                 Current,
@@ -899,7 +899,8 @@ public sealed class RuntimeSurfaceFeedTests
                 userText,
                 requestId,
                 acceptedOutbox,
-                createdAt);
+                createdAt,
+                grants);
             return Task.FromResult(Current);
         }
         public Task<ConversationClaim> TryClaimOperationAsync(

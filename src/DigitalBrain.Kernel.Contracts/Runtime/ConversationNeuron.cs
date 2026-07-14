@@ -62,7 +62,8 @@ public sealed record ConversationOperation(
     [property: Id(12)] WorkflowReference? Workflow = null,
     [property: Id(13)] string RequestId = "",
     [property: Id(14)] ApprovalRecord? Approval = null,
-    [property: Id(15)] EffectRecord? Effect = null);
+    [property: Id(15)] EffectRecord? Effect = null,
+    [property: Id(16)] string[]? Grants = null);
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-outbox-entry")]
 public sealed record ConversationOutboxEntry(
     [property: Id(0)] string OutboxId,
@@ -127,7 +128,8 @@ public interface IConversationNeuron : IGrainWithStringKey
         string userText,
         string requestId,
         ConversationOutboxEntry acceptedOutbox,
-        DateTimeOffset createdAt);
+        DateTimeOffset createdAt,
+        string[]? grants = null);
     [Alias("digitalbrain.runtime.conversation.try-claim-operation")]
     Task<ConversationClaim> TryClaimOperationAsync(
         long expectedRevision,
@@ -257,7 +259,8 @@ public static class ConversationTransitions
         string userText,
         string requestId,
         ConversationOutboxEntry acceptedOutbox,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string[]? grants = null)
     {
         DemandMutable(state, expectedRevision);
         DemandId(commandId, nameof(commandId));
@@ -266,6 +269,7 @@ public static class ConversationTransitions
         DemandHash(inputHash, nameof(inputHash));
         ValidateTurnText(userText, nameof(userText));
         ValidatePendingOutbox(acceptedOutbox);
+        var canonicalGrants = ValidateAndCanonicalizeGrants(grants);
         var priorAccepted = state.AcceptedCommands.FirstOrDefault(command =>
             string.Equals(command.CommandId, commandId, StringComparison.Ordinal));
         if (priorAccepted is not null)
@@ -301,7 +305,8 @@ public static class ConversationTransitions
             null,
             createdAt,
             Version: 1,
-            RequestId: requestId);
+            RequestId: requestId,
+            Grants: canonicalGrants);
         var accepted = new AcceptedCommand(
             commandId,
             operationId,
@@ -311,7 +316,8 @@ public static class ConversationTransitions
             inputHash.ToLowerInvariant(),
             requestId,
             createdAt,
-            SchemaVersion: 1);
+            SchemaVersion: 1,
+            Grants: canonicalGrants);
         var next = AppendOutbox(AppendTurnRecord(state, operationId, ConversationTurnKind.User, commandId, userText, createdAt) with
         {
             Revision = checked(state.Revision + 1),
@@ -821,7 +827,8 @@ public static class ConversationTransitions
                 inbox.InputHash.ToLowerInvariant(),
                 requestId,
                 inbox.RecordedAt,
-                SchemaVersion: 1);
+                SchemaVersion: 1,
+                Grants: []);
             acceptedByCommand.Add(accepted.CommandId, accepted);
             migrated.Add(accepted);
         }
@@ -1058,6 +1065,9 @@ public static class ConversationTransitions
             DemandId(command.IdempotencyKey, nameof(command.IdempotencyKey));
             DemandId(command.RequestId, nameof(command.RequestId));
             DemandHash(command.InputHash, nameof(command.InputHash));
+            var canonicalCommandGrants = ValidateAndCanonicalizeGrants(command.Grants);
+            if (!command.Grants.SequenceEqual(canonicalCommandGrants, StringComparer.Ordinal))
+                throw new RuntimeStateIntegrityException("accepted command grants are not canonical");
             if (command.SchemaVersion != 1 || command.AcceptedAt == default ||
                 !string.Equals(command.CommandId, command.IdempotencyKey, StringComparison.Ordinal) ||
                 state.Identity is null || !string.Equals(command.ConversationId, state.Identity.ConversationId, StringComparison.Ordinal) ||
@@ -1118,6 +1128,8 @@ public static class ConversationTransitions
         }
         else if (operation.Approval is not null || operation.Effect is not null || operation.Status == ConversationOperationStatus.AwaitingApproval)
             throw new ArgumentException("Conversation approval metadata is invalid.", nameof(operation));
+        if (operation.Grants is { } operationGrants && !operationGrants.SequenceEqual(ValidateAndCanonicalizeGrants(operationGrants), StringComparer.Ordinal))
+            throw new ArgumentException("Conversation operation metadata is invalid.", nameof(operation));
         if (operation.SuspendedInvocation is not { } invocation) return;
         ValidateInvocationMetadata(invocation);
         if (invocation.InputUtf8 is null || invocation.InputUtf8.Length > 64 * 1024)
@@ -1172,5 +1184,13 @@ public static class ConversationTransitions
     {
         if (value.Length != 64 || value.Any(character => !Uri.IsHexDigit(character)))
             throw new ArgumentException("A SHA-256 digest is required.", name);
+    }
+    private static string[] ValidateAndCanonicalizeGrants(IEnumerable<string>? grants)
+    {
+        var canonical = (grants ?? []).Order(StringComparer.Ordinal).Distinct(StringComparer.Ordinal).ToArray();
+        if (canonical.Length > 64 || canonical.Any(static grant =>
+                string.IsNullOrWhiteSpace(grant) || grant.Length > 128 || grant.Any(char.IsControl)))
+            throw new ArgumentException("Conversation grants must be unique, bounded capability names.", nameof(grants));
+        return canonical;
     }
 }

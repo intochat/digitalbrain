@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -8,6 +9,7 @@ namespace DigitalBrain.Kernel.Runtime;
 internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : IAgentWorkflowRunner
 {
     private const string RunnerName = "agent-framework";
+    private const int MaximumCapabilityMatches = 3;
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Ino.Workflow");
     public async Task<InoWorkflowResult> ExecuteAsync(InoWorkflowRequest request, CancellationToken cancellationToken = default)
     {
@@ -19,6 +21,55 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         activity?.SetTag("db.ino.operation_id", request.OperationId);
         activity?.SetTag("db.ino.workflow_id", workflow.WorkflowId);
         activity?.SetTag("db.ino.request_id", request.RequestId);
+        if (services.GetService<ICapabilityResolver>() is not { } resolver)
+            return await RunGeneralAgentAsync(request, workflow, capability: null, cancellationToken).ConfigureAwait(false);
+        var catalog = services.GetRequiredService<ICapabilityCatalog>();
+        var resolution = await resolver.ResolveAsync(
+            new CapabilitySearchRequest(
+                request.Prompt,
+                (request.Grants ?? []).ToHashSet(StringComparer.Ordinal),
+                ComposedConnections(catalog),
+                MaximumCapabilityMatches),
+            cancellationToken).ConfigureAwait(false);
+        return resolution.Receipt.Kind switch
+        {
+            CapabilityResolutionKind.Ambiguous => new InoWorkflowResult(
+                "A few capabilities could match this request. Please choose one and ask again.",
+                workflow,
+                Capability: resolution.Receipt),
+            CapabilityResolutionKind.Missing => await CreateMissingCapabilityResultAsync(workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
+            CapabilityResolutionKind.Match when !string.Equals(resolution.Receipt.CapabilityId, BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, StringComparison.Ordinal) =>
+                await AcknowledgeSelectedCapabilityAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
+            _ => await RunGeneralAgentAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false)
+        };
+    }
+    private async Task<InoWorkflowResult> AcknowledgeSelectedCapabilityAsync(
+        InoWorkflowRequest request,
+        WorkflowReference workflow,
+        CapabilityResolutionReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        var parameterModel = services.GetRequiredService<ICapabilityParameterModel>();
+        await parameterModel.ExtractAsync(new CapabilityParameterRequest(receipt.CapabilityId!, request.Prompt), cancellationToken).ConfigureAwait(false);
+        return new InoWorkflowResult(
+            $"I can help with that using {receipt.CapabilityName}.",
+            workflow,
+            Capability: receipt);
+    }
+    private static Task<InoWorkflowResult> CreateMissingCapabilityResultAsync(
+        WorkflowReference workflow,
+        CapabilityResolutionReceipt receipt,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new InoWorkflowResult(
+            "I don't have a capability for that request yet.",
+            workflow,
+            Capability: receipt));
+    private async Task<InoWorkflowResult> RunGeneralAgentAsync(
+        InoWorkflowRequest request,
+        WorkflowReference workflow,
+        CapabilityResolutionReceipt? capability,
+        CancellationToken cancellationToken)
+    {
         var chatClient = services.GetService<IChatClient>()
             ?? throw new InvalidOperationException("INO requires a configured Microsoft.Extensions.AI chat client.");
         var agent = new ChatClientAgent(
@@ -33,8 +84,10 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         var text = response.Text.Trim();
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("The workflow returned an empty response.");
-        return new InoWorkflowResult(text, workflow);
+        return new InoWorkflowResult(text, workflow, Capability: capability);
     }
+    private static IReadOnlySet<string> ComposedConnections(ICapabilityCatalog catalog) =>
+        catalog.Snapshot().SelectMany(static descriptor => descriptor.RequiredConnections).ToHashSet(StringComparer.Ordinal);
     private static WorkflowReference ResolveWorkflowReference(InoWorkflowRequest request)
     {
         var workflowId = RunnerName + "-" + request.OperationId;

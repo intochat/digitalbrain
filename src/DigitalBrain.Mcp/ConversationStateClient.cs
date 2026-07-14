@@ -30,6 +30,7 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
         var normalizedPrompt = prompt.Trim();
         var inputHash = Hash(normalizedPrompt);
         var acceptedAt = timeProvider.GetUtcNow();
+        var grants = context.Grants.Order(StringComparer.Ordinal).ToArray();
         state = await RetryConflictAsync(
             neuron,
             state,
@@ -55,7 +56,8 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
                     normalizedPrompt,
                     context.CorrelationId,
                     CreateOutbox(operationId, InoOperationPhase.Accepted, 1, acceptedProjection, acceptedAt),
-                    acceptedAt);
+                    acceptedAt,
+                    grants);
             },
             cancellationToken).ConfigureAwait(false);
         return ToSnapshot(context, state);
