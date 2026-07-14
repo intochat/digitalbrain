@@ -261,9 +261,11 @@ Evidence: AppHost now owns the absorbed and internalized Aspire composition surf
 - Shipped and runtime-authored source call the same build, source/capability diff, exact-digest approval, grant, install, update, pause, resume, park inspection, and rollback APIs.
 - Approval shows digest, requested capabilities, connection, constraints, and revision.
 
-- [ ] Add transport tests proving FeatureHost cache cannot grant, revoke/pause takes effect next operation, and payloads never enter logs/audit.
-- [ ] Add Flutter tests for chat-based authoring and approval while preserving `/chat`, `RuntimeShell`, auth, feed, and `SurfaceView`.
-- [ ] Commit `feat: expose feature lifecycle rail`.
+- [x] Add transport tests proving FeatureHost cache cannot grant, revoke/pause takes effect next operation, and payloads never enter logs/audit.
+- [x] Add Flutter tests for chat-based authoring and approval while preserving `/chat`, `RuntimeShell`, auth, feed, and `SurfaceView`.
+- [x] Commit `feat: expose feature lifecycle rail`.
+
+Evidence: Feature lifecycle authority is owner-scoped and durable in the existing two-grain model. Every capability operation revalidates the active release, installation state, exact capability version, connection, constraints, and grant revision; pause and revoke therefore take effect on the next operation without cached authority. The transient builder enforces bounded source, offline restore, scrubbed environment, and immutable release metadata. MCP and the authenticated chat feed expose exact-digest approval, grants, install/update/pause/resume/inspection/rollback, and replay-safe decision handling without a parallel route. Boundary tests exclude provider payload logging and FeatureHost lifecycle mutation authority. The focused Flutter runtime suite passes 51 tests, the exact root suite passes 616 tests, `git diff --check` is clean, and `aspire doctor` passes 5/5.
 
 ### Task 12: Gmail events and Salesforce external-effect scenario
 

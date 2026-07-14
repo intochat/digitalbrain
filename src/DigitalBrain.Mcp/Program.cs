@@ -17,6 +17,7 @@ using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 ConfigureOrleansClient(builder);
+builder.AddKeyedAzureBlobServiceClient("features", settings => settings.DisableTracing = true);
 
 var configuredProfile = builder.Configuration["DigitalBrain:Profile"];
 if (string.IsNullOrWhiteSpace(configuredProfile))
@@ -38,6 +39,9 @@ builder.Services.AddSingleton(new SchemaRegistry([
     new SchemaDescriptor("digitalbrain.v2.command-envelope", 2, "Operational", true)]));
 builder.Services.AddSingleton<ConversationStateClient>();
 builder.Services.AddSingleton<McpInoCommandHandler>();
+builder.Services.AddSingleton<FeatureArtifactPublisher>();
+builder.Services.AddSingleton<FeatureBuildEndpoint>();
+builder.Services.AddSingleton<FeatureLifecycleRail>();
 builder.Services.AddSingleton(AuthorizationFlowProxyOptions.FromConfiguration(builder.Configuration, profile));
 builder.Services.AddHttpClient<AuthorizationFlowStartProxy>()
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler

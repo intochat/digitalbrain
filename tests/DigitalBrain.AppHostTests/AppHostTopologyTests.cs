@@ -98,6 +98,12 @@ public sealed class AppHostTopologyTests
         Assert.Contains(
             mcp.Annotations.OfType<ResourceRelationshipAnnotation>(),
             relationship => ReferenceEquals(relationship.Resource, clustering));
+        Assert.Contains(
+            mcp.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            relationship => ReferenceEquals(relationship.Resource, featureArtifacts));
+        Assert.Contains(
+            mcp.Annotations.OfType<WaitAnnotation>(),
+            wait => ReferenceEquals(wait.Resource, featureArtifacts) && wait.WaitType == WaitType.WaitUntilHealthy);
         var featureHostEnvironment = await EvaluateEnvironmentAsync(builder, featureHost);
         var kernelEnvironment = await EvaluateEnvironmentAsync(builder, kernel);
         var featureHostToken = Assert.IsType<ParameterResource>(
@@ -181,6 +187,8 @@ public sealed class AppHostTopologyTests
         var mcpEnvironment = await EvaluateEnvironmentAsync(builder, mcp);
         Assert.Equal(DigitalBrain.Core.Runtime.SessionAudiences.Mcp, mcpEnvironment["DigitalBrain__Runtime__Mcp__Audience"]);
         Assert.Equal(DigitalBrain.Core.Runtime.SessionAudiences.Ui, mcpEnvironment["DigitalBrain__Runtime__Ui__Audience"]);
+        Assert.Equal("6291456", mcpEnvironment["DigitalBrain__Runtime__Mcp__MaxBodyBytes"]);
+        Assert.Equal("6291456", mcpEnvironment["DigitalBrain__Runtime__Transport__MaxBodyBytes"]);
         Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__Runtime__Ui__BootstrapSecret"]);
         Assert.DoesNotContain("DigitalBrain__Runtime__StorageNamespace", mcpEnvironment.Keys);
         Assert.DoesNotContain(
@@ -273,7 +281,7 @@ public sealed class AppHostTopologyTests
         Assert.Equal(oidcIssuer, mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__Issuer"]);
         Assert.Equal(oidcAudience, mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__Audience"]);
         Assert.Equal(
-            "brain.read,ui.action,gmail.read,gmail.send,salesforce.read,salesforce.write",
+            "brain.read,ui.action,feature.manage,gmail.read,gmail.send,salesforce.read,salesforce.write",
             mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__AllowedGrants"]);
     }
 

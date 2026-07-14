@@ -12,6 +12,60 @@ import 'package:forui/forui.dart';
 import 'test_fixtures.dart';
 
 void main() {
+  testWidgets('renders and submits an exact-digest Feature approval', (
+    tester,
+  ) async {
+    final surface = testSurface(
+      payload: featureApprovalPayload(),
+      actions: [
+        testActionJson(
+          bindingId: 'feature-approval-${List.filled(64, 'a').join()}',
+          actionType: 'feature.release.decision.v1',
+        ),
+      ],
+    );
+    String? bindingId;
+    Map<String, Object?>? input;
+
+    await tester.pumpWidget(
+      _host(
+        SurfaceView(
+          surface: surface,
+          onSubmitAction: (surface, binding, submitted) async {
+            bindingId = binding;
+            input = submitted;
+            return const ActionResult(
+              operationId: 'feature-decision-a',
+              idempotencyKey: 'feature-decision-a',
+            );
+          },
+        ),
+      ),
+    );
+
+    expect(find.text('email-summarizer'), findsOneWidget);
+    expect(find.text(List.filled(64, 'b').join()), findsOneWidget);
+    expect(find.textContaining('google-primary'), findsOneWidget);
+    expect(find.textContaining('maximumMessages'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(featureApprovalApproveKey));
+    await tester.tap(find.byKey(featureApprovalApproveKey));
+    await tester.pump();
+
+    expect(bindingId, 'feature-approval-${List.filled(64, 'a').join()}');
+    expect(input?['approvalId'], List.filled(64, 'a').join());
+    expect(input?['releaseDigest'], List.filled(64, 'b').join());
+    expect(input?['expectedRevision'], 7);
+    expect(input?['decision'], 'approve');
+    expect(
+      input?['clientDecisionId'],
+      isA<String>().having(
+        (value) => value.length,
+        'length',
+        greaterThanOrEqualTo(16),
+      ),
+    );
+  });
+
   testWidgets('renders a runtime widget-tree surface', (tester) async {
     final surface = testSurface(
       payload: {

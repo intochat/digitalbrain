@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -16,6 +18,8 @@ typedef SurfaceActionSubmit =
 
 const Key surfaceActionProgressKey = Key('v2-surface-action-progress');
 const Key surfaceActionErrorKey = Key('v2-surface-action-error');
+const Key featureApprovalApproveKey = Key('v2-feature-approval-approve');
+const Key featureApprovalRejectKey = Key('v2-feature-approval-reject');
 
 class SurfaceView extends StatefulWidget {
   const SurfaceView({
@@ -63,6 +67,7 @@ class _SurfaceViewState extends State<SurfaceView> {
           reconnecting: widget.reconnecting,
           connectionUnavailable: widget.connectionUnavailable,
         ),
+        FeatureApprovalSurfacePayload payload => _buildFeatureApproval(payload),
         NativeSurfacePayload payload => _buildNative(payload),
       };
     } catch (_) {
@@ -179,6 +184,121 @@ class _SurfaceViewState extends State<SurfaceView> {
         ),
       ),
     );
+  }
+
+  Widget _buildFeatureApproval(FeatureApprovalSurfacePayload payload) {
+    final theme = Theme.of(context);
+    final action = widget.surface.actionByType('feature.release.decision.v1');
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(payload.title, style: theme.textTheme.headlineSmall),
+                  const SizedBox(height: 16),
+                  _approvalField('Installation', payload.installationId),
+                  _approvalField('Release digest', payload.releaseDigest),
+                  _approvalField('Source', '${payload.sourceKind} · ${payload.sourceReference}'),
+                  _approvalField('Revision', payload.revision.toString()),
+                  _approvalList('Requested capabilities', payload.requestedCapabilities),
+                  _approvalList('Added', payload.addedCapabilities),
+                  _approvalList('Removed', payload.removedCapabilities),
+                  const SizedBox(height: 8),
+                  Text('Capability bindings', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  for (final binding in payload.capabilityBindings)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: theme.colorScheme.outlineVariant),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${binding.capabilityId} v${binding.capabilityVersion}'),
+                              if (binding.provider != null)
+                                Text('Provider: ${binding.provider}'),
+                              if (binding.providerConnectionId != null)
+                                Text('Connection: ${binding.providerConnectionId}'),
+                              Text('Constraints: ${jsonEncode(binding.constraints)}'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton(
+                        key: featureApprovalRejectKey,
+                        onPressed: action == null || _submitting || !widget.actionEnabled
+                            ? null
+                            : () => _submitFeatureDecision(action, payload, false),
+                        child: const Text('Reject'),
+                      ),
+                      const SizedBox(width: 12),
+                      FilledButton(
+                        key: featureApprovalApproveKey,
+                        onPressed: action == null || _submitting || !widget.actionEnabled
+                            ? null
+                            : () => _submitFeatureDecision(action, payload, true),
+                        child: const Text('Approve'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _approvalField(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 2),
+        SelectableText(value),
+      ],
+    ),
+  );
+
+  Widget _approvalList(String label, List<String> values) =>
+      _approvalField(label, values.isEmpty ? 'None' : values.join(', '));
+
+  Future<void> _submitFeatureDecision(
+    UiActionRef action,
+    FeatureApprovalSurfacePayload payload,
+    bool approved,
+  ) => _submit(action, {
+    'approvalId': payload.approvalId,
+    'releaseDigest': payload.releaseDigest,
+    'expectedRevision': payload.revision,
+    'decision': approved ? 'approve' : 'reject',
+    'clientDecisionId': _clientDecisionId(),
+  });
+
+  static String _clientDecisionId() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
   }
 
   void _onRemoteEvent(String name, Map<String, Object?> arguments) {

@@ -15,6 +15,29 @@ void main() {
       const ClientCapabilities().names,
       contains('ui.native.ino-conversation'),
     );
+    expect(
+      const ClientCapabilities().names,
+      contains('ui.native.feature-approval'),
+    );
+  });
+
+  test('decodes an exact-digest Feature approval surface', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(payload: featureApprovalPayload()),
+    );
+
+    final payload = envelope.payload as FeatureApprovalSurfacePayload;
+    expect(payload.installationId, 'email-summarizer');
+    expect(payload.approvalId, hasLength(64));
+    expect(payload.releaseDigest, hasLength(64));
+    expect(payload.revision, 7);
+    expect(payload.addedCapabilities, ['gmail.message.read.v1']);
+    expect(payload.capabilityBindings.single.provider, 'google');
+    expect(
+      payload.capabilityBindings.single.providerConnectionId,
+      'google-primary',
+    );
+    expect(payload.capabilityBindings.single.constraints['maximumMessages'], 20);
   });
 
   test('decodes a complete SurfaceEnvelope and typed action binding', () {

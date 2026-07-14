@@ -22,6 +22,11 @@
     <ProjectReference Include="..\DigitalBrain.Ui.Contracts\DigitalBrain.Ui.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Ui.Runtime\DigitalBrain.Ui.Runtime.csproj" />
     <ProjectReference Include="..\..\hosts\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\hosts\DigitalBrain.FeatureBuilder\DigitalBrain.FeatureBuilder.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\artifacts\packages\*.nupkg" Link="feature-packages\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,6 +37,7 @@
 
     <!-- Orleans Client -->
     <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
     <PackageReference Include="Aspire.StackExchange.Redis" />
     <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />

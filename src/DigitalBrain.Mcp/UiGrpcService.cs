@@ -43,7 +43,7 @@ public sealed record UiBootstrapOptions(
         return new(secret, new(owner), new(actor), TimeSpan.FromMinutes(15),
             new HashSet<string>(StringComparer.Ordinal)
             {
-                "brain.read", "ui.action", "gmail.read", "gmail.send", "salesforce.read", "salesforce.write"
+                "brain.read", "ui.action", "feature.manage", "gmail.read", "gmail.send", "salesforce.read", "salesforce.write"
             });
     }
 }
@@ -99,7 +99,8 @@ public sealed class UiGrpcService(
     McpInoCommandHandler conversationHandler,
     ConversationStateClient conversations,
     UiDeliveryOptions deliveryOptions,
-    ILogger<UiGrpcService> logger) : DigitalBrainV2Ui.DigitalBrainV2UiBase
+    ILogger<UiGrpcService> logger,
+    FeatureLifecycleRail? featureLifecycle = null) : DigitalBrainV2Ui.DigitalBrainV2UiBase
 {
     private const int MaximumInputBytes = 64 * 1024;
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Mcp");
@@ -354,6 +355,23 @@ public sealed class UiGrpcService(
         }
 
         var submission = authorized.Submission;
+        if (string.Equals(submission.ActionType, FeatureApprovalSurface.ActionType, StringComparison.Ordinal))
+        {
+            if (featureLifecycle is null ||
+                !RuntimeSurfaceFeed.TryReadFeatureReleaseDecision(submission.Input, out var featureDecision))
+                throw new RpcException(new Status(StatusCode.PermissionDenied, "Action authorization failed."));
+            await featureLifecycle.DecideAsync(
+                authenticated,
+                new FeatureApprovalDecision(
+                    featureDecision.ApprovalId,
+                    new ReleaseDigest(featureDecision.ReleaseDigest),
+                    featureDecision.Approved,
+                    submission.IdempotencyKey),
+                featureDecision.ExpectedRevision,
+                context.CancellationToken).ConfigureAwait(false);
+            await feed.RestoreConversationSurfaceAsync(authenticated, context.CancellationToken).ConfigureAwait(false);
+            return Accepted(submission);
+        }
         if (string.Equals(submission.ActionType, ConversationSurfacePayload.ApprovalActionType, StringComparison.Ordinal))
         {
             if (!RuntimeSurfaceFeed.TryReadApprovalDecision(submission.Input, out var decision) ||

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
 using Orleans;
@@ -256,6 +258,72 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         var snapshot = await installation.ReadAsync();
         Assert.Equal(ReleaseOne, snapshot.ActiveRelease);
         Assert.Null(snapshot.PreviousRelease);
+    }
+
+    [Fact]
+    public async Task Runtime_grant_source_revalidates_actor_connection_revision_revoke_and_pause_on_every_read()
+    {
+        var owner = new BrainOwnerId("owner-live-grant");
+        var actor = new ActorId("actor-live-grant");
+        var installationId = new FeatureInstallationId("live-grant");
+        var connection = new ProviderConnectionId("google-live-grant");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var proposal = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                installationId,
+                new FeatureReleaseMetadata(
+                    ReleaseOne,
+                    "sha256:" + ReleaseOne.Value,
+                    FeatureSourceKind.RuntimeAuthored,
+                    ["gmail.message.read.v1"],
+                    ["DigitalBrain.Integrations.Google.Contracts"]),
+                [new("gmail.message.read.v1", 1, connection, "{\"mailbox\":\"primary\"}", "google")]),
+            0);
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(proposal.ApprovalId, ReleaseOne, true, "decision-live-grant"),
+            1);
+        var authority = await hub.GrantAsync(
+            new FeatureGrantRequest(
+                installationId,
+                ReleaseOne,
+                actor,
+                [new("gmail.message.read.v1", 1, connection, "{\"mailbox\":\"primary\"}", "google")]),
+            2);
+        await hub.InstallAsync(
+            new FeatureInstallationRegistration(installationId, ReleaseOne, ["gmail.message.received.v1"]),
+            3);
+        var source = new FeatureCapabilityGrantSource(fixture.Cluster.Client);
+        CapabilityRequest Request(ActorId requestActor, ProviderConnectionId? requestConnection, GrantRevision revision) => new(
+            owner,
+            requestActor,
+            installationId,
+            ReleaseOne,
+            "input-live-grant",
+            "read-message",
+            "gmail.message.read.v1",
+            1,
+            requestConnection,
+            revision,
+            JsonSerializer.SerializeToElement(new { messageId = "message-1" }),
+            fixture.Time.GetUtcNow().AddSeconds(30),
+            "correlation-live-grant",
+            null);
+        var grantRevision = Assert.IsType<GrantRevision>(authority.PendingGrantRevision);
+        var request = Request(actor, connection, grantRevision);
+
+        Assert.NotNull(await source.ReadAsync(request));
+        Assert.Null(await source.ReadAsync(Request(new ActorId("another-actor"), connection, grantRevision)));
+        Assert.Null(await source.ReadAsync(Request(actor, new ProviderConnectionId("another-connection"), grantRevision)));
+        Assert.Null(await source.ReadAsync(Request(actor, connection, new GrantRevision(grantRevision.Value + 1))));
+
+        await hub.PauseInstallationAsync(installationId, "operator hold", (await hub.ReadAsync()).Revision);
+        Assert.Null(await source.ReadAsync(request));
+        await hub.ResumeInstallationAsync(installationId, (await hub.ReadAsync()).Revision);
+        Assert.NotNull(await source.ReadAsync(request));
+        await hub.RevokeAsync(
+            new FeatureGrantRevocation(installationId, ReleaseOne, "gmail.message.read.v1", 1),
+            (await hub.ReadAsync()).Revision);
+        Assert.Null(await source.ReadAsync(request));
     }
 
     [Fact]

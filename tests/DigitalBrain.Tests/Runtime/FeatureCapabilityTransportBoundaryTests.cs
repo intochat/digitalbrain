@@ -115,6 +115,24 @@ public sealed class FeatureCapabilityTransportBoundaryTests
         Assert.Equal(StatusCodes.Status429TooManyRequests, overflow.Response.StatusCode);
     }
 
+    [Fact]
+    public void Capability_transport_has_no_payload_log_or_audit_sink()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "hosts",
+            "DigitalBrain.RuntimeHost",
+            "Program.cs"));
+        var start = source.IndexOf("private static void MapFeatureCapabilities", StringComparison.Ordinal);
+        var end = source.IndexOf("private static void ConfigureKestrel", start, StringComparison.Ordinal);
+        var transport = source[start..end];
+
+        Assert.DoesNotContain("ILogger", transport, StringComparison.Ordinal);
+        Assert.DoesNotContain("LogInformation", transport, StringComparison.Ordinal);
+        Assert.DoesNotContain("LogWarning", transport, StringComparison.Ordinal);
+        Assert.DoesNotContain("Audit", transport, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static RuntimeHostExtensions.FeatureCapabilityTransportBoundary Boundary(RequestDelegate next)
     {
         var configuration = new ConfigurationBuilder()
@@ -143,5 +161,13 @@ public sealed class FeatureCapabilityTransportBoundaryTests
     {
         public bool IsReadOnly => false;
         public long? MaxRequestBodySize { get; set; }
+    }
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Brain.slnx")))
+            directory = directory.Parent;
+        return directory?.FullName ?? throw new DirectoryNotFoundException();
     }
 }

@@ -109,6 +109,8 @@ if (ctx.EnableMcp)
         .WithEnvironment("DigitalBrain__Profile", profile)
         .WithEnvironment("DigitalBrain__Salesforce__RedirectUri", salesforceAppConfig.RedirectUri)
         .WithEnvironment("DigitalBrain__Runtime__Mcp__Audience", DigitalBrain.Core.Runtime.SessionAudiences.Mcp)
+        .WithEnvironment("DigitalBrain__Runtime__Mcp__MaxBodyBytes", "6291456")
+        .WithEnvironment("DigitalBrain__Runtime__Transport__MaxBodyBytes", "6291456")
         .WithEnvironment("DigitalBrain__Runtime__Ui__Audience", DigitalBrain.Core.Runtime.SessionAudiences.Ui)
         .WithEndpoint(name: "http", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
         .WithHttpsEndpoint(name: "https", env: "ASPNETCORE_HTTPS_PORTS", isProxied: true)
@@ -117,9 +119,11 @@ if (ctx.EnableMcp)
         .WithHttpHealthCheck(path: "/health", endpointName: "https")
         .WithReplicas(1);
     ctx.ConfigureClient(mcp);
+    mcp.WithReference(ctx.FeatureArtifacts);
     mcp.WaitFor(ctx.ConversationStateBlobs);
     mcp.WaitFor(ctx.SurfaceFeedStateBlobs);
     mcp.WaitFor(ctx.SessionStateBlobs);
+    mcp.WaitFor(ctx.FeatureArtifacts);
     mcp.WaitFor(kernel);
 
     if (uiBootstrapSecret is not null)
@@ -140,7 +144,7 @@ if (ctx.EnableMcp)
             mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Audience", uiOidcAudience);
             mcp.WithEnvironment(
                 "DigitalBrain__Runtime__Ui__Oidc__AllowedGrants",
-                "brain.read,ui.action,gmail.read,gmail.send,salesforce.read,salesforce.write");
+                "brain.read,ui.action,feature.manage,gmail.read,gmail.send,salesforce.read,salesforce.write");
             var flutterWeb = ctx.AddDefaultDevFlutterWebClient(
                     mcp,
                     uiOidcIssuer,

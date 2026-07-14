@@ -216,7 +216,9 @@ public static class DigitalBrainOrleansExtensions
             builder.Environment.IsEnvironment("Testing") ||
             builder.Configuration.GetValue<bool>("DigitalBrain:TestMode"));
         builder.Services.AddSingleton<CapabilityGrantValidator>();
-        builder.Services.AddSingleton<ICapabilityGrantSource, RetainedInoCapabilityGrantSource>();
+        builder.Services.AddSingleton<RetainedInoCapabilityGrantSource>();
+        builder.Services.AddSingleton<FeatureCapabilityGrantSource>();
+        builder.Services.AddSingleton<ICapabilityGrantSource, RuntimeCapabilityGrantSource>();
         builder.Services.AddSingleton<ICapabilityDispatcher, CapabilityDispatcher>();
         builder.Services.AddHostedService<CapabilityDispatcherStartupValidation>();
         builder.Services.AddSingleton<IAgentWorkflowRunner, AgentFrameworkWorkflowRunner>();

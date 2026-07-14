@@ -146,7 +146,11 @@ public sealed class FeatureInstallationGrain(
                 schedule.ScheduleId,
                 schedule.LastOccurrenceAt,
                 schedule.NextOccurrenceAt)).ToArray(),
-            state.Revision));
+            state.Revision,
+            state.Inbox.Where(entry => entry.Parked).Select(entry => new FeatureParkedInput(
+                entry.Input,
+                entry.Attempts,
+                entry.LastFailure)).ToArray()));
     }
 
     private async Task PersistAsync(string operation, Func<FeatureInstallationState, FeatureInstallationState> transition)

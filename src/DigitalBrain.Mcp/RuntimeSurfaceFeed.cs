@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using RuntimeRequestContext = DigitalBrain.Core.Runtime.RequestContext;
@@ -27,6 +28,22 @@ internal sealed record ApprovalDecisionInput(
     string ApprovalId,
     bool Approved,
     string ClientDecisionId);
+
+internal sealed record FeatureReleaseDecisionInput(
+    string ApprovalId,
+    string ReleaseDigest,
+    long ExpectedRevision,
+    bool Approved,
+    string ClientDecisionId);
+
+internal static class FeatureApprovalSurface
+{
+    public const string SurfaceId = "surface.feature-approval";
+    public const string ActionType = "feature.release.decision.v1";
+    public const string InputSchema = "digitalbrain.feature.release-decision.v1";
+    public static readonly string[] RequiredCapabilities =
+        ["ui.protocol.v2", "ui.payload.native", "ui.native.feature-approval", "ui.native.typed-actions"];
+}
 
 public sealed class RuntimeSurfaceFeed(
     IClusterClient cluster,
@@ -71,6 +88,115 @@ public sealed class RuntimeSurfaceFeed(
                 .ConfigureAwait(false);
 
         return new(state, IssueActionCapabilities(context, state));
+    }
+
+    public async Task PublishFeatureApprovalAsync(
+        RuntimeRequestContext context,
+        FeatureApprovalSnapshot approval,
+        CancellationToken cancellationToken = default)
+    {
+        DemandActor(context);
+        var feed = Feed(context);
+        var state = await EnsureInitializedAsync(context, feed, cancellationToken).ConfigureAwait(false);
+        var now = timeProvider.GetUtcNow();
+        var expiresAt = now.Add(UiProtocol.ActionTokenLifetime);
+        var payload = JsonSerializer.SerializeToElement(new
+        {
+            kind = "native",
+            nativeKind = "featureApproval",
+            data = new
+            {
+                title = "Approve Feature release",
+                installationId = approval.InstallationId.Value,
+                approvalId = approval.ApprovalId,
+                releaseDigest = approval.Release.Digest.Value,
+                sourceReference = approval.Release.SourceReference,
+                sourceKind = approval.Release.SourceKind.ToString(),
+                requestedCapabilities = approval.Release.RequestedCapabilities,
+                addedCapabilities = approval.AddedCapabilities,
+                removedCapabilities = approval.RemovedCapabilities,
+                capabilityBindings = approval.Grants.Select(grant => new
+                {
+                    capabilityId = grant.CapabilityId,
+                    capabilityVersion = grant.CapabilityVersion,
+                    provider = grant.Provider,
+                    providerConnectionId = grant.ProviderConnectionId?.Value,
+                    constraints = ParseJson(grant.ConstraintsJson)
+                }).ToArray(),
+                revision = approval.Revision
+            }
+        });
+        var bindingId = "feature-approval-" + approval.ApprovalId;
+        var descriptor = new StoredActionBinding(
+            bindingId,
+            FeatureApprovalSurface.ActionType,
+            FeatureApprovalSurface.InputSchema,
+            "feature.manage",
+            1,
+            expiresAt);
+        var revision = checked((state.CurrentSurfaces.FirstOrDefault(surface =>
+            string.Equals(surface.SurfaceId, FeatureApprovalSurface.SurfaceId, StringComparison.Ordinal))?.SurfaceRevision ?? 0) + 1);
+        var presentation = new SurfaceFeedPresentation(
+            context.CorrelationId,
+            "feature-approval",
+            approval.ApprovalId,
+            FeatureApprovalSurface.RequiredCapabilities,
+            payload,
+            0,
+            SurfaceFeedPresentation.CurrentVersion);
+        var projection = new SurfaceFeedProjection(
+            "feature-approval-" + approval.ApprovalId + "-" + approval.Revision,
+            FeatureApprovalSurface.SurfaceId,
+            revision,
+            SurfaceContentHash.Compute(payload, [descriptor]),
+            JsonSerializer.SerializeToUtf8Bytes(presentation),
+            now,
+            expiresAt,
+            [new SurfaceActionBinding(
+                bindingId,
+                FeatureApprovalSurface.SurfaceId,
+                revision,
+                FeatureApprovalSurface.ActionType,
+                FeatureApprovalSurface.InputSchema,
+                "feature.manage",
+                UiProtocol.ActionSchemaVersion,
+                Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)),
+                1,
+                0,
+                expiresAt,
+                null,
+                null)]);
+        await feed.ApplyProjectionAsync(state.Revision, projection, now)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static JsonElement ParseJson(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+
+    public async Task RestoreConversationSurfaceAsync(
+        RuntimeRequestContext context,
+        CancellationToken cancellationToken = default)
+    {
+        DemandActor(context);
+        var feed = Feed(context);
+        var state = await feed.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var conversationId = ActiveConversationId(context, state);
+        var now = timeProvider.GetUtcNow();
+        state = await feed.RebuildAsync(
+                state.Revision,
+                "feature-approval-return-" + Guid.NewGuid().ToString("N"),
+                now)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await EnsureHomeSurfaceAsync(
+            context with { ConversationId = conversationId },
+            feed,
+            state,
+            cancellationToken).ConfigureAwait(false);
     }
 
     public RuntimeFeedPage ReadPage(
@@ -173,6 +299,7 @@ public sealed class RuntimeSurfaceFeed(
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         var activeConversationId = ActiveConversationId(context, state);
         var hasApprovalDecision = TryReadApprovalDecision(input, out var approvalDecision);
+        var hasFeatureDecision = TryReadFeatureReleaseDecision(input, out var featureDecision);
         if (TryReadPrompt(input, out var requestedPrompt, out var clientSubmissionId) &&
             clientSubmissionId is not null)
         {
@@ -238,15 +365,21 @@ public sealed class RuntimeSurfaceFeed(
         DemandActionCapability(context, actionToken, binding);
         if (hasApprovalDecision)
             DemandApprovalMatchesBoundSurface(state, binding, approvalDecision);
+        if (hasFeatureDecision)
+            DemandFeatureDecisionMatchesBoundSurface(state, binding, featureDecision);
         var authorizedInput = AuthorizeInput(binding, input);
-        var clientActionId = clientSubmissionId ?? (hasApprovalDecision ? approvalDecision.ClientDecisionId : null);
+        var clientActionId = clientSubmissionId ??
+            (hasApprovalDecision ? approvalDecision.ClientDecisionId :
+                hasFeatureDecision ? featureDecision.ClientDecisionId : null);
         var idempotencyKey = clientActionId is null
             ? "surface-action-" + Hash(
                 RequestScope.Id(context) + "\0" + bindingId + "\0" + surfaceRevision + "\0" + CanonicalJson(input))
             : StableIdempotencyKey(context, clientActionId);
         var operationId = hasApprovalDecision
             ? approvalDecision.OperationId
-            : ConversationStateClient.OperationId(
+            : hasFeatureDecision
+                ? "feature-" + Hash(RequestScope.Id(context) + "\0" + featureDecision.ApprovalId + "\0" + idempotencyKey)
+                : ConversationStateClient.OperationId(
                 context with { ConversationId = activeConversationId },
                 idempotencyKey);
         if (hasApprovalDecision)
@@ -269,11 +402,15 @@ public sealed class RuntimeSurfaceFeed(
             DemandActionCapability(context, actionToken, binding);
             if (hasApprovalDecision)
                 DemandApprovalMatchesBoundSurface(state, binding, approvalDecision);
+            if (hasFeatureDecision)
+                DemandFeatureDecisionMatchesBoundSurface(state, binding, featureDecision);
             authorizedInput = AuthorizeInput(binding, input);
             activeConversationId = ActiveConversationId(context, state);
             operationId = hasApprovalDecision
                 ? approvalDecision.OperationId
-                : ConversationStateClient.OperationId(
+                : hasFeatureDecision
+                    ? "feature-" + Hash(RequestScope.Id(context) + "\0" + featureDecision.ApprovalId + "\0" + idempotencyKey)
+                    : ConversationStateClient.OperationId(
                     context with { ConversationId = activeConversationId },
                     idempotencyKey);
             try
@@ -315,6 +452,8 @@ public sealed class RuntimeSurfaceFeed(
         {
             throw new ActionRejectedException(ActionRejection.Replay);
         }
+        if (hasFeatureDecision && !consumption.Consumed)
+            throw new ActionRejectedException(ActionRejection.Replay);
         return new(
             new ActionSubmission(
                 consumption.OperationId,
@@ -599,6 +738,29 @@ public sealed class RuntimeSurfaceFeed(
             throw new ActionRejectedException(ActionRejection.PolicyDenied);
     }
 
+    private static void DemandFeatureDecisionMatchesBoundSurface(
+        SurfaceFeedState state,
+        SurfaceActionBinding binding,
+        FeatureReleaseDecisionInput decision)
+    {
+        if (!string.Equals(binding.ActionType, FeatureApprovalSurface.ActionType, StringComparison.Ordinal))
+            throw new ActionRejectedException(ActionRejection.PolicyDenied);
+        var surface = state.CurrentSurfaces.FirstOrDefault(candidate =>
+            string.Equals(candidate.SurfaceId, binding.SurfaceId, StringComparison.Ordinal) &&
+            candidate.SurfaceRevision == binding.SurfaceRevision)
+            ?? throw new ActionRejectedException(ActionRejection.WrongRevision);
+        var payload = ReadPresentation(surface).Payload;
+        if (payload.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object ||
+            !data.TryGetProperty("approvalId", out var approval) || approval.ValueKind != JsonValueKind.String ||
+            !data.TryGetProperty("releaseDigest", out var release) || release.ValueKind != JsonValueKind.String ||
+            !data.TryGetProperty("revision", out var revision) || !revision.TryGetInt64(out var expectedRevision) ||
+            !string.Equals(approval.GetString(), decision.ApprovalId, StringComparison.Ordinal) ||
+            !string.Equals(release.GetString(), decision.ReleaseDigest, StringComparison.Ordinal) ||
+            expectedRevision != decision.ExpectedRevision)
+            throw new ActionRejectedException(ActionRejection.PolicyDenied);
+    }
+
     private static JsonElement AuthorizeInput(SurfaceActionBinding binding, JsonElement input)
     {
         if (binding.ActionSchemaVersion != UiProtocol.ActionSchemaVersion)
@@ -611,8 +773,22 @@ public sealed class RuntimeSurfaceFeed(
             string.Equals(binding.InputSchemaRef, ConversationSurfacePayload.ApprovalInputSchema, StringComparison.Ordinal) &&
             TryReadApprovalDecision(input, out var decision))
             return CanonicalApprovalDecision(decision);
+        if (string.Equals(binding.ActionType, FeatureApprovalSurface.ActionType, StringComparison.Ordinal) &&
+            string.Equals(binding.InputSchemaRef, FeatureApprovalSurface.InputSchema, StringComparison.Ordinal) &&
+            TryReadFeatureReleaseDecision(input, out var featureDecision))
+            return CanonicalFeatureReleaseDecision(featureDecision);
         throw new ActionRejectedException(ActionRejection.PolicyDenied);
     }
+
+    private static JsonElement CanonicalFeatureReleaseDecision(FeatureReleaseDecisionInput decision) =>
+        JsonSerializer.SerializeToElement(new
+        {
+            approvalId = decision.ApprovalId,
+            releaseDigest = decision.ReleaseDigest,
+            expectedRevision = decision.ExpectedRevision,
+            decision = decision.Approved ? "approve" : "reject",
+            clientDecisionId = decision.ClientDecisionId
+        });
 
     private static JsonElement CanonicalApprovalDecision(ApprovalDecisionInput decision) =>
         JsonSerializer.SerializeToElement(new
@@ -677,6 +853,42 @@ public sealed class RuntimeSurfaceFeed(
             decisionText is not ("approve" or "reject"))
             return false;
         decision = new(operationId!, approvalId!, decisionText == "approve", clientDecisionId);
+        return true;
+    }
+
+    internal static bool TryReadFeatureReleaseDecision(
+        JsonElement input,
+        out FeatureReleaseDecisionInput decision)
+    {
+        decision = default!;
+        if (input.ValueKind != JsonValueKind.Object) return false;
+        var properties = input.EnumerateObject().ToArray();
+        if (properties.Length != 5 || properties.Any(property => property.Name is not
+                ("approvalId" or "releaseDigest" or "expectedRevision" or "decision" or "clientDecisionId")))
+            return false;
+        if (!input.TryGetProperty("approvalId", out var approval) || approval.ValueKind != JsonValueKind.String ||
+            !input.TryGetProperty("releaseDigest", out var release) || release.ValueKind != JsonValueKind.String ||
+            !input.TryGetProperty("expectedRevision", out var revision) || !revision.TryGetInt64(out var expectedRevision) ||
+            !input.TryGetProperty("decision", out var action) || action.ValueKind != JsonValueKind.String ||
+            !input.TryGetProperty("clientDecisionId", out var client) || client.ValueKind != JsonValueKind.String)
+            return false;
+        var approvalId = approval.GetString();
+        var releaseDigest = release.GetString();
+        var actionValue = action.GetString();
+        var clientDecisionId = client.GetString();
+        if (string.IsNullOrWhiteSpace(approvalId) || approvalId.Length != 64 ||
+            string.IsNullOrWhiteSpace(releaseDigest) || releaseDigest.Length != 64 ||
+            expectedRevision < 1 || actionValue is not ("approve" or "reject") ||
+            string.IsNullOrWhiteSpace(clientDecisionId) || clientDecisionId.Length is < 16 or > 128 ||
+            !clientDecisionId.All(character =>
+                character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'))
+            return false;
+        decision = new FeatureReleaseDecisionInput(
+            approvalId,
+            releaseDigest,
+            expectedRevision,
+            string.Equals(actionValue, "approve", StringComparison.Ordinal),
+            clientDecisionId);
         return true;
     }
 

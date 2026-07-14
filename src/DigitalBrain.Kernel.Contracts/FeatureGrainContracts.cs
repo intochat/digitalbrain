@@ -63,6 +63,107 @@ public sealed record FeatureInstallationRegistration(
     [property: Id(1)] ReleaseDigest Release,
     [property: Id(2)] string[] Subscriptions);
 
+[Alias("digitalbrain.v3.feature-source-kind")]
+public enum FeatureSourceKind
+{
+    Repository,
+    RuntimeAuthored
+}
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-release-metadata")]
+public sealed record FeatureReleaseMetadata(
+    [property: Id(0)] ReleaseDigest Digest,
+    [property: Id(1)] string SourceReference,
+    [property: Id(2)] FeatureSourceKind SourceKind,
+    [property: Id(3)] string[] RequestedCapabilities,
+    [property: Id(4)] string[] Dependencies);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-release-proposal")]
+public sealed record FeatureReleaseProposal(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] FeatureReleaseMetadata Release,
+    [property: Id(2)] FeatureGrantSpec[] Grants);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-grant-spec")]
+public sealed record FeatureGrantSpec(
+    [property: Id(0)] string CapabilityId,
+    [property: Id(1)] int CapabilityVersion,
+    [property: Id(2)] ProviderConnectionId? ProviderConnectionId,
+    [property: Id(3)] string ConstraintsJson,
+    [property: Id(4)] string? Provider = null);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-approval-decision")]
+public sealed record FeatureApprovalDecision(
+    [property: Id(0)] string ApprovalId,
+    [property: Id(1)] ReleaseDigest Release,
+    [property: Id(2)] bool Approved,
+    [property: Id(3)] string DecisionId);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-grant-request")]
+public sealed record FeatureGrantRequest(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ReleaseDigest Release,
+    [property: Id(2)] ActorId ActorId,
+    [property: Id(3)] FeatureGrantSpec[] Grants);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-grant-revocation")]
+public sealed record FeatureGrantRevocation(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ReleaseDigest Release,
+    [property: Id(2)] string CapabilityId,
+    [property: Id(3)] int CapabilityVersion);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-grant-lookup")]
+public sealed record FeatureGrantLookup(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ReleaseDigest Release,
+    [property: Id(2)] string CapabilityId,
+    [property: Id(3)] int CapabilityVersion);
+
+[Alias("digitalbrain.v3.feature-approval-status")]
+public enum FeatureApprovalStatus
+{
+    Pending,
+    Approved,
+    Rejected
+}
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-approval-snapshot")]
+public sealed record FeatureApprovalSnapshot(
+    [property: Id(0)] string ApprovalId,
+    [property: Id(1)] FeatureInstallationId InstallationId,
+    [property: Id(2)] FeatureReleaseMetadata Release,
+    [property: Id(3)] string[] AddedCapabilities,
+    [property: Id(4)] string[] RemovedCapabilities,
+    [property: Id(5)] FeatureApprovalStatus Status,
+    [property: Id(6)] string? DecisionId,
+    [property: Id(7)] DateTimeOffset? DecidedAt,
+    [property: Id(8)] long Revision,
+    [property: Id(9)] FeatureGrantSpec[] Grants);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-authority-snapshot")]
+public sealed record FeatureAuthoritySnapshot(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ActorId ActorId,
+    [property: Id(2)] ReleaseDigest? ActiveRelease,
+    [property: Id(3)] ReleaseDigest? PreviousRelease,
+    [property: Id(4)] GrantRevision? ActiveGrantRevision,
+    [property: Id(5)] FeatureGrantSpec[] ActiveGrants,
+    [property: Id(6)] ReleaseDigest? PendingRelease,
+    [property: Id(7)] GrantRevision? PendingGrantRevision,
+    [property: Id(8)] FeatureGrantSpec[] PendingGrants,
+    [property: Id(9)] bool Paused,
+    [property: Id(10)] string? PauseReason);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-grant-snapshot")]
+public sealed record FeatureGrantSnapshot(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ReleaseDigest Release,
+    [property: Id(2)] FeatureGrantSpec Grant,
+    [property: Id(3)] GrantRevision Revision,
+    [property: Id(4)] ActorId ActorId,
+    [property: Id(5)] bool Paused);
+
 [GenerateSerializer, Alias("digitalbrain.v3.feature-input")]
 public sealed record FeatureInput(
     [property: Id(0)] string InputId,
@@ -174,7 +275,14 @@ public sealed record FeatureInstallationSnapshot(
     [property: Id(8)] FeatureCompletionReceipt[] Completions,
     [property: Id(9)] FeatureIntentStatus[] Intents,
     [property: Id(10)] FeatureScheduleStatus[] Schedules,
-    [property: Id(11)] long Revision);
+    [property: Id(11)] long Revision,
+    [property: Id(12)] FeatureParkedInput[] Parked);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-parked-input")]
+public sealed record FeatureParkedInput(
+    [property: Id(0)] FeatureInput Input,
+    [property: Id(1)] int Attempts,
+    [property: Id(2)] string? SafeFailure);
 
 [Alias("digitalbrain.v3.feature-failure-disposition")]
 public enum FeatureFailureDisposition
@@ -193,7 +301,10 @@ public sealed record FeatureFanOutResult(
 public sealed record FeatureHubSnapshot(
     [property: Id(0)] FeatureInstallationRegistration[] Installations,
     [property: Id(1)] FeatureFanOutResult[] FanOuts,
-    [property: Id(2)] long Revision);
+    [property: Id(2)] long Revision,
+    [property: Id(3)] FeatureReleaseMetadata[] Releases,
+    [property: Id(4)] FeatureApprovalSnapshot[] Approvals,
+    [property: Id(5)] FeatureAuthoritySnapshot[] Authorities);
 
 [Alias("digitalbrain.v3.feature-hub-grain")]
 public interface IFeatureHubGrain : IGrainWithStringKey
@@ -204,6 +315,24 @@ public interface IFeatureHubGrain : IGrainWithStringKey
     Task<FeatureFanOutResult> PublishAsync(FeatureInput input);
     [Alias("read")]
     Task<FeatureHubSnapshot> ReadAsync();
+    [Alias("propose-release")]
+    Task<FeatureApprovalSnapshot> ProposeAsync(FeatureReleaseProposal proposal, long expectedRevision);
+    [Alias("decide-release")]
+    Task<FeatureApprovalSnapshot> DecideAsync(FeatureApprovalDecision decision, long expectedRevision);
+    [Alias("grant-release")]
+    Task<FeatureAuthoritySnapshot> GrantAsync(FeatureGrantRequest request, long expectedRevision);
+    [Alias("install-release")]
+    Task<FeatureAuthoritySnapshot> InstallAsync(FeatureInstallationRegistration registration, long expectedRevision);
+    [Alias("revoke-grant")]
+    Task RevokeAsync(FeatureGrantRevocation revocation, long expectedRevision);
+    [Alias("pause-installation")]
+    Task PauseInstallationAsync(FeatureInstallationId installationId, string reason, long expectedRevision);
+    [Alias("resume-installation")]
+    Task ResumeInstallationAsync(FeatureInstallationId installationId, long expectedRevision);
+    [Alias("rollback-installation")]
+    Task<FeatureAuthoritySnapshot> RollbackInstallationAsync(FeatureInstallationId installationId, long expectedRevision);
+    [Alias("read-grant")]
+    Task<FeatureGrantSnapshot?> ReadGrantAsync(FeatureGrantLookup lookup);
 }
 
 [Alias("digitalbrain.v3.feature-installation-grain")]

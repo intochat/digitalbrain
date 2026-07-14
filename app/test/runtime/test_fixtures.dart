@@ -104,6 +104,32 @@ Map<String, Object?> inoConversationPayload({
   'data': {'intro': intro, 'messages': messages, 'operation': operation},
 };
 
+Map<String, Object?> featureApprovalPayload() => <String, Object?>{
+  'kind': 'native',
+  'nativeKind': 'featureApproval',
+  'data': {
+    'title': 'Approve Feature release',
+    'installationId': 'email-summarizer',
+    'approvalId': List.filled(64, 'a').join(),
+    'releaseDigest': List.filled(64, 'b').join(),
+    'sourceReference': 'sha256:${List.filled(64, 'c').join()}',
+    'sourceKind': 'Shipped',
+    'requestedCapabilities': ['gmail.message.read.v1'],
+    'addedCapabilities': ['gmail.message.read.v1'],
+    'removedCapabilities': <String>[],
+    'capabilityBindings': [
+      {
+        'capabilityId': 'gmail.message.read.v1',
+        'capabilityVersion': 1,
+        'provider': 'google',
+        'providerConnectionId': 'google-primary',
+        'constraints': {'maximumMessages': 20},
+      },
+    ],
+    'revision': 7,
+  },
+};
+
 Map<String, Object?> inoMessage({
   required String role,
   required String text,

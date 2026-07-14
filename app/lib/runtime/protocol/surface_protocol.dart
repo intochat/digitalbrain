@@ -23,6 +23,7 @@ class ClientCapabilities {
       'feed-reset',
       'feed-ack',
       'ino-conversation',
+      'feature-approval',
     },
   });
 
@@ -260,6 +261,149 @@ class NativeSurfacePayload extends SurfacePayload {
     'kind': kind,
     'nativeKind': nativeKind,
     'data': data,
+  };
+}
+
+class FeatureApprovalCapabilityBinding {
+  const FeatureApprovalCapabilityBinding({
+    required this.capabilityId,
+    required this.capabilityVersion,
+    required this.constraints,
+    this.provider,
+    this.providerConnectionId,
+  });
+
+  final String capabilityId;
+  final int capabilityVersion;
+  final String? provider;
+  final String? providerConnectionId;
+  final Map<String, Object?> constraints;
+
+  factory FeatureApprovalCapabilityBinding.fromJson(Object? value) {
+    final json = _safeObject(value, 'payload.data.capabilityBindings[]');
+    _demandOnlyKeys(json, const {
+      'capabilityId',
+      'capabilityVersion',
+      'provider',
+      'providerConnectionId',
+      'constraints',
+    }, 'payload.data.capabilityBindings[]');
+    final version = json['capabilityVersion'];
+    if (version is! int || version < 1) {
+      throw const FormatException('Capability version must be positive.');
+    }
+    return FeatureApprovalCapabilityBinding(
+      capabilityId: _boundedString(json, 'capabilityId', maxLength: 256),
+      capabilityVersion: version,
+      provider: _nullableBoundedString(json, 'provider', 64),
+      providerConnectionId: _nullableBoundedString(
+        json,
+        'providerConnectionId',
+        256,
+      ),
+      constraints: _safeObject(json['constraints'], 'constraints'),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'capabilityId': capabilityId,
+    'capabilityVersion': capabilityVersion,
+    'provider': provider,
+    'providerConnectionId': providerConnectionId,
+    'constraints': constraints,
+  };
+}
+
+class FeatureApprovalSurfacePayload extends SurfacePayload {
+  const FeatureApprovalSurfacePayload({
+    required this.title,
+    required this.installationId,
+    required this.approvalId,
+    required this.releaseDigest,
+    required this.sourceReference,
+    required this.sourceKind,
+    required this.requestedCapabilities,
+    required this.addedCapabilities,
+    required this.removedCapabilities,
+    required this.capabilityBindings,
+    required this.revision,
+  });
+
+  static const String nativeKindName = 'featureApproval';
+
+  @override
+  String get kind => 'native';
+
+  String get nativeKind => nativeKindName;
+  final String title;
+  final String installationId;
+  final String approvalId;
+  final String releaseDigest;
+  final String sourceReference;
+  final String sourceKind;
+  final List<String> requestedCapabilities;
+  final List<String> addedCapabilities;
+  final List<String> removedCapabilities;
+  final List<FeatureApprovalCapabilityBinding> capabilityBindings;
+  final int revision;
+
+  factory FeatureApprovalSurfacePayload.fromJson(Map<String, Object?> json) {
+    if (_boundedString(json, 'nativeKind', maxLength: 64) != nativeKindName) {
+      throw const FormatException('Unsupported Feature approval surface.');
+    }
+    final data = _safeObject(json['data'], 'payload.data');
+    _demandOnlyKeys(data, const {
+      'title',
+      'installationId',
+      'approvalId',
+      'releaseDigest',
+      'sourceReference',
+      'sourceKind',
+      'requestedCapabilities',
+      'addedCapabilities',
+      'removedCapabilities',
+      'capabilityBindings',
+      'revision',
+    }, 'payload.data');
+    final revision = data['revision'];
+    final bindings = data['capabilityBindings'];
+    if (revision is! int || revision < 1 || bindings is! List || bindings.length > 32) {
+      throw const FormatException('Feature approval data is not bounded.');
+    }
+    return FeatureApprovalSurfacePayload(
+      title: _boundedString(data, 'title', maxLength: 128),
+      installationId: _boundedString(data, 'installationId', maxLength: 256),
+      approvalId: _boundedString(data, 'approvalId', maxLength: 256),
+      releaseDigest: _boundedString(data, 'releaseDigest', maxLength: 128),
+      sourceReference: _boundedString(data, 'sourceReference', maxLength: 256),
+      sourceKind: _boundedString(data, 'sourceKind', maxLength: 64),
+      requestedCapabilities: _boundedStringList(data, 'requestedCapabilities'),
+      addedCapabilities: _boundedStringList(data, 'addedCapabilities'),
+      removedCapabilities: _boundedStringList(data, 'removedCapabilities'),
+      capabilityBindings: List.unmodifiable(
+        bindings.map(FeatureApprovalCapabilityBinding.fromJson),
+      ),
+      revision: revision,
+    );
+  }
+
+  @override
+  Map<String, Object?> toJson() => {
+    'kind': kind,
+    'nativeKind': nativeKind,
+    'data': {
+      'title': title,
+      'installationId': installationId,
+      'approvalId': approvalId,
+      'releaseDigest': releaseDigest,
+      'sourceReference': sourceReference,
+      'sourceKind': sourceKind,
+      'requestedCapabilities': requestedCapabilities,
+      'addedCapabilities': addedCapabilities,
+      'removedCapabilities': removedCapabilities,
+      'capabilityBindings': capabilityBindings.map((binding) => binding.toJson()).toList(),
+      'revision': revision,
+    },
   };
 }
 
@@ -819,6 +963,9 @@ SurfacePayload _nativeSurfacePayloadFromJson(
       oauthStartOrigin: oauthStartOrigin,
     );
   }
+  if (nativeKind == FeatureApprovalSurfacePayload.nativeKindName) {
+    return FeatureApprovalSurfacePayload.fromJson(json);
+  }
   return NativeSurfacePayload.fromJson(json);
 }
 
@@ -1112,6 +1259,32 @@ void _demandOnlyKeys(
       throw FormatException('$path contains unsupported field "$key".');
     }
   }
+}
+
+String? _nullableBoundedString(
+  Map<String, Object?> json,
+  String key,
+  int maximumLength,
+) {
+  final value = json[key];
+  if (value == null) return null;
+  if (value is! String || value.isEmpty || value.length > maximumLength) {
+    throw FormatException('$key must be a bounded string.');
+  }
+  return value;
+}
+
+List<String> _boundedStringList(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is! List || value.length > 64) {
+    throw FormatException('$key must be a bounded array.');
+  }
+  return List.unmodifiable(value.map((item) {
+    if (item is! String || item.isEmpty || item.length > 256) {
+      throw FormatException('$key contains an invalid identifier.');
+    }
+    return item;
+  }));
 }
 
 Map<String, Object?> _safeObject(

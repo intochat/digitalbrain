@@ -7,10 +7,50 @@ namespace DigitalBrain.Kernel.Features;
 public sealed record FeatureHubState(
     [property: Id(0)] FeatureInstallationRegistration[] Installations,
     [property: Id(1)] long Revision,
-    [property: Id(2)] FeatureFanOutState[] FanOuts)
+    [property: Id(2)] FeatureFanOutState[] FanOuts,
+    [property: Id(3)] FeatureReleaseMetadata[] Releases,
+    [property: Id(4)] FeatureApprovalState[] Approvals,
+    [property: Id(5)] FeatureInstallationAuthorityState[] Authorities)
 {
-    public static FeatureHubState Empty { get; } = new([], 0, []);
+    public static FeatureHubState Empty { get; } = new([], 0, [], [], [], []);
 }
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-approval-state")]
+public sealed record FeatureApprovalState(
+    [property: Id(0)] string ApprovalId,
+    [property: Id(1)] FeatureInstallationId InstallationId,
+    [property: Id(2)] FeatureReleaseMetadata Release,
+    [property: Id(3)] string[] AddedCapabilities,
+    [property: Id(4)] string[] RemovedCapabilities,
+    [property: Id(5)] FeatureApprovalStatus Status,
+    [property: Id(6)] string? DecisionId,
+    [property: Id(7)] DateTimeOffset? DecidedAt,
+    [property: Id(8)] long Revision,
+    [property: Id(9)] FeatureGrantState[] Grants);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-grant-state")]
+public sealed record FeatureGrantState(
+    [property: Id(0)] string CapabilityId,
+    [property: Id(1)] int CapabilityVersion,
+    [property: Id(2)] ProviderConnectionId? ProviderConnectionId,
+    [property: Id(3)] string ConstraintsJson,
+    [property: Id(4)] string? Provider);
+
+[GenerateSerializer, Alias("digitalbrain.v3.feature-installation-authority-state")]
+public sealed record FeatureInstallationAuthorityState(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ActorId ActorId,
+    [property: Id(2)] ReleaseDigest? ActiveRelease,
+    [property: Id(3)] ReleaseDigest? PreviousRelease,
+    [property: Id(4)] GrantRevision? ActiveGrantRevision,
+    [property: Id(5)] FeatureGrantState[] ActiveGrants,
+    [property: Id(6)] GrantRevision? PreviousGrantRevision,
+    [property: Id(7)] FeatureGrantState[] PreviousGrants,
+    [property: Id(8)] ReleaseDigest? PendingRelease,
+    [property: Id(9)] GrantRevision? PendingGrantRevision,
+    [property: Id(10)] FeatureGrantState[] PendingGrants,
+    [property: Id(11)] bool Paused,
+    [property: Id(12)] string? PauseReason);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-fanout-delivery-state")]
 public sealed record FeatureFanOutDeliveryState(

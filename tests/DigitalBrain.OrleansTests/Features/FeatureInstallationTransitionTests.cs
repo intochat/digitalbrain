@@ -299,6 +299,143 @@ public sealed class FeatureInstallationTransitionTests
         Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.BeginFanOut(begun, conflicting));
     }
 
+    [Fact]
+    public void Exact_digest_approval_stages_then_activates_a_complete_grant_set()
+    {
+        FeatureGrantSpec[] grants =
+        [
+            new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google"),
+            new("model.complete.v1", 1, null, "{}")
+        ];
+        var proposal = Proposal(ReleaseOne, grants);
+        var proposed = FeatureHubTransitions.Propose(FeatureHubState.Empty, proposal, 0, Now);
+        var approval = Assert.Single(proposed.Approvals);
+        var approved = FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-1"),
+            proposed.Revision,
+            Now.AddSeconds(1));
+        var staged = FeatureHubTransitions.Grant(
+            approved,
+            new FeatureGrantRequest(
+                InstallationId,
+                ReleaseOne,
+                new ActorId("actor-1"),
+                grants),
+            approved.Revision);
+        var activated = FeatureHubTransitions.Activate(staged, InstallationId, staged.Revision);
+
+        var authority = Assert.Single(activated.Authorities);
+        Assert.Equal(ReleaseOne, authority.ActiveRelease);
+        Assert.Equal(new GrantRevision(1), authority.ActiveGrantRevision);
+        Assert.Null(authority.PendingRelease);
+        Assert.Equal(2, authority.ActiveGrants.Length);
+        Assert.Equal(
+            "gmail.message.read.v1",
+            Assert.IsType<FeatureGrantState>(FeatureHubTransitions.ReadGrant(
+                activated,
+                new FeatureGrantLookup(InstallationId, ReleaseOne, "gmail.message.read.v1", 1))).CapabilityId);
+    }
+
+    [Fact]
+    public void Approval_cannot_be_replayed_for_another_digest_or_an_incomplete_grant_set()
+    {
+        FeatureGrantSpec[] grants =
+        [
+            new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google"),
+            new("model.complete.v1", 1, null, "{}")
+        ];
+        var proposed = FeatureHubTransitions.Propose(
+            FeatureHubState.Empty,
+            Proposal(ReleaseOne, grants),
+            0,
+            Now);
+        var approval = Assert.Single(proposed.Approvals);
+
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseTwo, true, "decision-wrong-digest"),
+            proposed.Revision,
+            Now.AddSeconds(1)));
+
+        var approved = FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-1"),
+            proposed.Revision,
+            Now.AddSeconds(1));
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Grant(
+            approved,
+            new FeatureGrantRequest(
+                InstallationId,
+                ReleaseOne,
+                new ActorId("actor-1"),
+                [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google")]),
+            approved.Revision));
+    }
+
+    [Fact]
+    public void Update_keeps_previous_grants_for_drain_and_pause_or_revoke_denies_the_next_operation()
+    {
+        FeatureGrantSpec[] readGrant = [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google")];
+        FeatureGrantSpec[] modelGrant = [new("model.complete.v1", 1, null, "{}")];
+        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, readGrant), readGrant);
+        var updated = Activate(active, Proposal(ReleaseTwo, modelGrant), modelGrant);
+
+        Assert.NotNull(FeatureHubTransitions.ReadGrant(
+            updated,
+            new FeatureGrantLookup(InstallationId, ReleaseOne, "gmail.message.read.v1", 1)));
+        Assert.NotNull(FeatureHubTransitions.ReadGrant(
+            updated,
+            new FeatureGrantLookup(InstallationId, ReleaseTwo, "model.complete.v1", 1)));
+
+        var paused = FeatureHubTransitions.PauseAuthority(
+            updated,
+            InstallationId,
+            "owner pause",
+            updated.Revision);
+        Assert.Null(FeatureHubTransitions.ReadGrant(
+            paused,
+            new FeatureGrantLookup(InstallationId, ReleaseTwo, "model.complete.v1", 1)));
+
+        var resumed = FeatureHubTransitions.ResumeAuthority(paused, InstallationId, paused.Revision);
+        var revoked = FeatureHubTransitions.Revoke(
+            resumed,
+            new FeatureGrantRevocation(InstallationId, ReleaseTwo, "model.complete.v1", 1),
+            resumed.Revision);
+        Assert.Null(FeatureHubTransitions.ReadGrant(
+            revoked,
+            new FeatureGrantLookup(InstallationId, ReleaseTwo, "model.complete.v1", 1)));
+    }
+
+    private static FeatureHubState Activate(
+        FeatureHubState state,
+        FeatureReleaseProposal proposal,
+        FeatureGrantSpec[] grants)
+    {
+        var proposed = FeatureHubTransitions.Propose(state, proposal, state.Revision, Now);
+        var approval = proposed.Approvals[^1];
+        var approved = FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(approval.ApprovalId, proposal.Release.Digest, true, "decision-" + proposed.Revision),
+            proposed.Revision,
+            Now);
+        var staged = FeatureHubTransitions.Grant(
+            approved,
+            new FeatureGrantRequest(InstallationId, proposal.Release.Digest, new ActorId("actor-1"), grants),
+            approved.Revision);
+        return FeatureHubTransitions.Activate(staged, InstallationId, staged.Revision);
+    }
+
+    private static FeatureReleaseProposal Proposal(ReleaseDigest release, FeatureGrantSpec[] grants) => new(
+        InstallationId,
+        new FeatureReleaseMetadata(
+            release,
+            "sha256:" + release.Value,
+            FeatureSourceKind.Repository,
+            grants.Select(grant => grant.CapabilityId).ToArray(),
+            ["DigitalBrain.Features.Sdk"]),
+        grants);
+
     private static FeatureInstallationState State() =>
         FeatureInstallationState.Create(ReleaseOne, InstallationId);
 

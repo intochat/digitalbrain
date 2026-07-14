@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core.Runtime;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using Orleans.Runtime;
@@ -19,6 +20,88 @@ namespace DigitalBrain.Tests.Runtime;
 // this project rather than standing up a full Orleans TestCluster for a single MCP-layer class.
 public sealed class RuntimeSurfaceFeedTests
 {
+    [Fact]
+    public async Task Feature_approval_surface_binds_exact_digest_revision_and_single_use_decision()
+    {
+        var now = new DateTimeOffset(2026, 7, 13, 9, 0, 0, TimeSpan.Zero);
+        var clock = new MutableTimeProvider(now);
+        var context = Context() with
+        {
+            Grants = new HashSet<string>(["ui.action", "feature.manage"], StringComparer.Ordinal)
+        };
+        var conversationNeuron = new FakeConversationNeuron(ConversationState.Empty());
+        var surfaceFeedNeuron = new FakeSurfaceFeedNeuron(SurfaceFeedState.Empty());
+        var feed = new RuntimeSurfaceFeed(
+            new FakeClusterClient(conversationNeuron, surfaceFeedNeuron),
+            clock,
+            ActionCapabilities(clock));
+        var approvalId = new string('a', 64);
+        var digest = new ReleaseDigest(new string('b', 64));
+        var approval = new FeatureApprovalSnapshot(
+            approvalId,
+            new FeatureInstallationId("email-summarizer"),
+            new FeatureReleaseMetadata(
+                digest,
+                "sha256:" + new string('c', 64),
+                FeatureSourceKind.Repository,
+                ["gmail.message.read.v1"],
+                []),
+            ["gmail.message.read.v1"],
+            [],
+            FeatureApprovalStatus.Pending,
+            null,
+            null,
+            7,
+            [new FeatureGrantSpec(
+                "gmail.message.read.v1",
+                1,
+                new ProviderConnectionId("google-primary"),
+                "{\"maximumMessages\":20}",
+                "google")]);
+
+        await feed.PublishFeatureApprovalAsync(context, approval, CancellationToken.None);
+        var prepared = await feed.PrepareSessionAsync(context, CancellationToken.None);
+        var surface = prepared.State.CurrentSurfaces.Single(candidate =>
+            string.Equals(candidate.SurfaceId, "surface.feature-approval", StringComparison.Ordinal));
+        var binding = prepared.State.ActionBindings.Single(candidate =>
+            string.Equals(candidate.ActionType, "feature.release.decision.v1", StringComparison.Ordinal));
+        var token = prepared.ActionTokens[binding.BindingId].Token;
+        using var persisted = JsonDocument.Parse(
+            JsonSerializer.Deserialize<SurfaceFeedPresentation>(surface.PayloadUtf8)!.Payload.GetRawText());
+        var data = persisted.RootElement.GetProperty("data");
+        Assert.Equal(digest.Value, data.GetProperty("releaseDigest").GetString());
+        Assert.Equal(7, data.GetProperty("revision").GetInt64());
+        Assert.False(data.TryGetProperty("source", out _));
+
+        var exact = JsonSerializer.SerializeToElement(new
+        {
+            approvalId,
+            releaseDigest = digest.Value,
+            expectedRevision = 7,
+            decision = "approve",
+            clientDecisionId = "feature-decision-0000000000000001"
+        });
+        var authorized = await feed.AuthorizeActionAsync(
+            context,
+            binding.BindingId,
+            token,
+            surface.SurfaceId,
+            surface.SurfaceRevision,
+            exact,
+            CancellationToken.None);
+        Assert.Equal("feature.release.decision.v1", authorized.Submission.ActionType);
+
+        var replay = await Assert.ThrowsAsync<ActionRejectedException>(() => feed.AuthorizeActionAsync(
+            context,
+            binding.BindingId,
+            token,
+            surface.SurfaceId,
+            surface.SurfaceRevision,
+            exact,
+            CancellationToken.None));
+        Assert.Equal(ActionRejection.Replay, replay.Reason);
+    }
+
     [Fact]
     public async Task BeginAsync_bounds_the_accepted_projection_to_the_latest_sixteen_turns()
     {
