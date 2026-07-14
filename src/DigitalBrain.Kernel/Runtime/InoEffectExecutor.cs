@@ -1,5 +1,5 @@
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using Orleans;
 namespace DigitalBrain.Kernel.Runtime;
 

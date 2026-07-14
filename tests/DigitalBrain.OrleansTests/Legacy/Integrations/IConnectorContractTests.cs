@@ -1,8 +1,8 @@
 using System.Threading;
-using DigitalBrain.Kernel.Contracts;
-using DigitalBrain.Kernel.Contracts.Configuration;
 using DigitalBrain.Integrations.Google;
 using DigitalBrain.Integrations.Salesforce;
+using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Configuration;
 using Xunit;
 
 namespace DigitalBrain.Tests.Integrations;

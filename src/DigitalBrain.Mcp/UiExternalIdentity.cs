@@ -1,6 +1,6 @@
 using System.Security.Claims;
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
 using Grpc.Core;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

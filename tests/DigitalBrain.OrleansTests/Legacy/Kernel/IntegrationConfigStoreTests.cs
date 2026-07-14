@@ -1,6 +1,6 @@
 using System.Text;
-using DigitalBrain.Kernel.Contracts.Configuration;
 using DigitalBrain.Kernel.Config;
+using DigitalBrain.Kernel.Contracts.Configuration;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 

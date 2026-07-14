@@ -1,5 +1,5 @@
-using DigitalBrain.FeatureBuilder;
 using System.Xml.Linq;
+using DigitalBrain.FeatureBuilder;
 using Xunit;
 
 namespace DigitalBrain.IntegrationContractTests;

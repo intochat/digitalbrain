@@ -1,14 +1,14 @@
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel;
-using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
+using DigitalBrain.Kernel.Features;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Memory;
-using DigitalBrain.Kernel.Features;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;

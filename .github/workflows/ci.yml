@@ -18,31 +18,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v5
         with:
-          fetch-depth: 0
+          dotnet-version: '11.0.x'
+          dotnet-quality: preview
 
-      - name: Check changed lines for whitespace errors
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - run: dotnet restore Brain.slnx
+
+      - run: dotnet restore deploy/DigitalBrain.Deploy.csproj
+
+      - name: Verify .NET code style
         run: |
-          set -euo pipefail
-          report=$(mktemp)
-          trap 'rm -f "$report"' EXIT
+          dotnet format Brain.slnx --verify-no-changes --no-restore --verbosity minimal
+          dotnet format deploy/DigitalBrain.Deploy.csproj --verify-no-changes --no-restore --verbosity minimal
 
-          if [[ -n "${BASE_SHA}" && ! "${BASE_SHA}" =~ ^0+$ ]] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            check_range=("${BASE_SHA}...${HEAD_SHA}")
-          else
-            empty_tree=$(git hash-object -t tree /dev/null)
-            check_range=("${empty_tree}" "${HEAD_SHA}")
-          fi
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.6'
+          cache: true
 
-          if ! git diff --check "${check_range[@]}" >"$report" 2>&1; then
-            echo "Whitespace validation failed. Run git diff --check locally."
-            cat "$report"
-            exit 1
-          fi
+      - name: Verify Dart code style
+        run: dart format --output=none --set-exit-if-changed app
 
       - name: Scan tracked files for credential-shaped content
         shell: bash
@@ -111,10 +117,6 @@ jobs:
 
       - run: dotnet restore deploy/DigitalBrain.Deploy.csproj
 
-      - run: dotnet format whitespace Brain.slnx --verify-no-changes --no-restore --verbosity minimal
-
-      - run: dotnet format whitespace deploy/DigitalBrain.Deploy.csproj --verify-no-changes --no-restore --verbosity minimal
-
       - run: dotnet build Brain.slnx --no-restore
 
       - run: dotnet build deploy/DigitalBrain.Deploy.csproj --no-restore
@@ -153,6 +155,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.44.6'
           cache: true
 
       - run: flutter pub get

@@ -1,5 +1,5 @@
-using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.Integrations.Salesforce.Contracts;
+using DigitalBrain.Kernel.Runtime;
 namespace DigitalBrain.Integrations.Salesforce;
 
 internal interface ISalesforceApiClient

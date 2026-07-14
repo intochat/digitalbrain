@@ -1,11 +1,11 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using DigitalBrain.Integrations.Google;
+using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Configuration;
 using DigitalBrain.Kernel.Contracts.Runtime;
-using DigitalBrain.Integrations.Google;
-using DigitalBrain.Integrations.Salesforce;
 
 namespace DigitalBrain.Tests.Integrations;
 

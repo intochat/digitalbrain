@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 import 'dart:io';
 
 const _allowedPrefixes = <String>[
@@ -47,10 +40,11 @@ Future<int> main(List<String> args) async {
       if (match == null) continue;
       final uri = match.group(1)!;
 
-
       if (!uri.contains(':')) continue;
 
-      if (uri.startsWith('package:digitalbrain_flutter/digital_brain_ui/')) continue;
+      if (uri.startsWith('package:digitalbrain_flutter/digital_brain_ui/')) {
+        continue;
+      }
 
       final allowed = _allowedPrefixes.any(uri.startsWith);
       final forbidden = _forbiddenAppDirs.any(uri.startsWith);

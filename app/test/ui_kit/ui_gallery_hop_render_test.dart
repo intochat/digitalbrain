@@ -19,7 +19,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (_, child) =>
-            FTheme(data: FThemes.neutral.dark.desktop, child: child!),
+            FTheme(data: FTheme.neutral.dark.desktop, child: child!),
         home: Scaffold(
           body: UiKitScreen(
             children: [

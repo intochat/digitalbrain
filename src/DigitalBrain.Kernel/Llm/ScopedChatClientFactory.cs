@@ -1,6 +1,6 @@
+using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Models;
-using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel.Llm;
 

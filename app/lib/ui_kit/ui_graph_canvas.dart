@@ -44,7 +44,7 @@ class UiKitGraphCanvas extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = FTheme.of(context);
     if (_nodes.isEmpty) {
-      return Text(_title, style: theme.typography.sm);
+      return Text(_title, style: theme.typography.body.sm);
     }
 
     return Semantics(
@@ -129,7 +129,9 @@ class _GraphHeader extends StatelessWidget {
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.typography.sm.copyWith(fontWeight: FontWeight.w700),
+            style: theme.typography.body.sm.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         if (summary != null && summary!.isNotEmpty) ...[
@@ -140,7 +142,7 @@ class _GraphHeader extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: theme.typography.xs.copyWith(
+              style: theme.typography.body.xs.copyWith(
                 color: theme.colors.mutedForeground,
               ),
             ),
@@ -186,7 +188,7 @@ class _GraphNodeCard extends StatelessWidget {
                   node.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.typography.sm.copyWith(
+                  style: theme.typography.body.sm.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -201,7 +203,7 @@ class _GraphNodeCard extends StatelessWidget {
               '+ $hiddenCount more',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.typography.xs.copyWith(
+              style: theme.typography.body.xs.copyWith(
                 color: theme.colors.mutedForeground,
               ),
             ),
@@ -229,7 +231,7 @@ class _FieldRow extends StatelessWidget {
               field.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.typography.xs.copyWith(
+              style: theme.typography.body.xs.copyWith(
                 fontWeight: field.key ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
@@ -242,7 +244,7 @@ class _FieldRow extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
-                style: theme.typography.xs.copyWith(
+                style: theme.typography.body.xs.copyWith(
                   color: theme.colors.mutedForeground,
                 ),
               ),
@@ -280,7 +282,7 @@ class _SmallBadge extends StatelessWidget {
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: theme.typography.xs.copyWith(color: theme.colors.primary),
+        style: theme.typography.body.xs.copyWith(color: theme.colors.primary),
       ),
     );
   }
@@ -316,7 +318,7 @@ class _EdgeLabel extends StatelessWidget {
             edge.label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.typography.xs.copyWith(
+            style: theme.typography.body.xs.copyWith(
               color: theme.colors.mutedForeground,
             ),
           ),

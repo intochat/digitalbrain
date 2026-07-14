@@ -8,7 +8,7 @@ import 'package:digitalbrain_flutter/ui_kit/ui_form_scope.dart';
 
 Widget _host(Widget child) => MaterialApp(
   home: FTheme(
-    data: FThemes.neutral.light.touch,
+    data: FTheme.neutral.light.touch,
     child: FScaffold(child: child),
   ),
 );
@@ -39,7 +39,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(FSwitch));
+    await tester.tap(find.text('Notify'));
     await tester.pumpAndSettle();
     expect(c.values['notify'], 'true');
   });

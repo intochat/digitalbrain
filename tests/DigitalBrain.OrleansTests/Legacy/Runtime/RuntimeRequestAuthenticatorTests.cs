@@ -1,13 +1,12 @@
 extern alias McpProject;
-
 using System.Security.Claims;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using McpAuthority = McpProject::DigitalBrain.Mcp.McpAuthority;
 using RuntimeRequestAuthenticator = McpProject::DigitalBrain.Mcp.RuntimeRequestAuthenticator;
 using RuntimeSessionAuthority = McpProject::DigitalBrain.Mcp.RuntimeSessionAuthority;
-using McpAuthority = McpProject::DigitalBrain.Mcp.McpAuthority;
 using UiExternalIdentityAuthenticator = McpProject::DigitalBrain.Mcp.UiExternalIdentityAuthenticator;
 using UiExternalIdentityOptions = McpProject::DigitalBrain.Mcp.UiExternalIdentityOptions;
 

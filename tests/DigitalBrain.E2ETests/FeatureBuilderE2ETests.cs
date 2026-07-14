@@ -141,7 +141,7 @@ public sealed class FeatureBuilderDeadlineE2ETests : FeatureBuilderE2ETestBase
             "using Reqnroll; namespace DigitalBrain.Features.EmailSummarizer.Tests; [Binding] public sealed class DocStringSteps { [Given(\"a doc string value\")] public void Read(string value) {} }");
         snapshot = AddFile(
             snapshot,
-            "features/EmailSummarizer.Tests/ForgedDocStringScenario.cs",
+            "features/EmailSummarizer.Tests/DocStringForgedSteps.cs",
             "namespace DigitalBrain.Features.EmailSummarizer.Tests; [System.CodeDom.Compiler.GeneratedCode(\"Reqnroll\", \"3.3.4\")] public sealed class ForgedDocStringScenario { [Xunit.Fact, Xunit.Trait(\"FeatureTitle\", \"Doc string\")] public void Pass() {} }");
 
         var exception = await Assert.ThrowsAsync<FeatureBuildException>(() =>

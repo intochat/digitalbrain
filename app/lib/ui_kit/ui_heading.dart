@@ -8,6 +8,8 @@ class UiKitHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     text,
-    style: context.theme.typography.xl2.copyWith(fontWeight: FontWeight.bold),
+    style: context.theme.typography.body.xl2.copyWith(
+      fontWeight: FontWeight.bold,
+    ),
   );
 }

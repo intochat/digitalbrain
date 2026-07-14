@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
 namespace DigitalBrain.Kernel.Capabilities;
 
 public enum CapabilityOperationKind

@@ -44,9 +44,7 @@ class PerfStream {
     while (!_disposed) {
       try {
         await _gateway.pushSamples(_outbox.stream);
-      } catch (_) {
-
-      }
+      } catch (_) {}
       backoff = await _pauseBeforeRetry(backoff);
     }
   }
@@ -59,9 +57,7 @@ class PerfStream {
           if (_disposed) return;
           tierController.update(hint.tier);
         }
-      } catch (_) {
-
-      }
+      } catch (_) {}
       backoff = await _pauseBeforeRetry(backoff);
     }
   }
