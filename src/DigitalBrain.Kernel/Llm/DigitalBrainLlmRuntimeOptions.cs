@@ -1,6 +1,5 @@
 using DigitalBrain.Kernel.Contracts.Models;
 using Microsoft.Extensions.Configuration;
-
 namespace DigitalBrain.Kernel.Llm;
 
 internal sealed record DigitalBrainLlmRuntimeOptions(
@@ -20,14 +19,12 @@ internal sealed record DigitalBrainLlmRuntimeOptions(
     public const string DefaultOpenAIModel = "gpt-4o-mini";
     public const string DefaultGitHubModelsModel = "openai/gpt-4.1-mini";
     public const string DefaultGitHubModelsEndpoint = "https://models.github.ai/inference";
-
     public static DigitalBrainLlmRuntimeOptions FromConfiguration(IConfiguration config)
     {
         var registryProvider = config["DigitalBrain:ModelRegistry:DefaultLlm:Provider"];
         var registryModel = config["DigitalBrain:ModelRegistry:DefaultLlm:Id"];
         var provider = FirstNonWhiteSpace(registryProvider, config["DigitalBrain:Llm:Provider"]);
         var model = FirstNonWhiteSpace(registryModel, config["DigitalBrain:Llm:Model"]) ?? DefaultModelForProvider(provider);
-
         return new DigitalBrainLlmRuntimeOptions(
             provider,
             model,
@@ -41,7 +38,6 @@ internal sealed record DigitalBrainLlmRuntimeOptions(
             config["DigitalBrain:Llm:GitHubModelsEndpoint"] ?? DefaultGitHubModelsEndpoint,
             FindRegisteredLlmModel(config, DigitalBrainProviderIds.OpenAI) ?? config["DigitalBrain:Llm:OpenAIModel"] ?? DefaultOpenAIModel);
     }
-
     private static string? FindRegisteredLlmModel(IConfiguration config, string provider)
     {
         var entries = DigitalBrainModelRegistrySnapshot.Read(config);
@@ -51,10 +47,8 @@ internal sealed record DigitalBrainLlmRuntimeOptions(
             entry => string.Equals(entry.Provider, provider, StringComparison.OrdinalIgnoreCase));
         return string.IsNullOrWhiteSpace(match?.Id) ? null : match.Id;
     }
-
     private static string? FirstNonWhiteSpace(params string?[] values) =>
         values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
-
     private static string DefaultModelForProvider(string? provider)
     {
         if (string.Equals(provider, DigitalBrainProviderIds.AzureOpenAI, StringComparison.OrdinalIgnoreCase) ||
@@ -62,12 +56,10 @@ internal sealed record DigitalBrainLlmRuntimeOptions(
         {
             return DefaultOpenAIModel;
         }
-
         if (string.Equals(provider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase))
         {
             return DefaultGitHubModelsModel;
         }
-
         return DefaultOllamaModel;
     }
 }

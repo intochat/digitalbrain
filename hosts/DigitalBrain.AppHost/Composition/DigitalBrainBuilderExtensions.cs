@@ -3,7 +3,6 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
 using DigitalBrain.Kernel.Contracts.Models;
-
 namespace DigitalBrain.AppHost;
 
 internal static class DigitalBrainBuilderExtensions
@@ -13,7 +12,6 @@ internal static class DigitalBrainBuilderExtensions
     private const string ConversationStateProvider = "runtime-conversations";
     private const string SurfaceFeedStateProvider = "runtime-surface-feeds";
     private const string SessionStateProvider = "runtime-sessions";
-
     public static DigitalBrainContext AddDigitalBrain(this IDistributedApplicationBuilder builder, [ResourceName] string name = "digitalbrain", Action<DigitalBrainOptions>? configure = null)
     {
         var options = new DigitalBrainOptions();
@@ -22,10 +20,8 @@ internal static class DigitalBrainBuilderExtensions
         {
             options.KernelReplicas = replicaOverride;
         }
-
         var llmProvider = options.ResolvedLlmProvider;
         var llmModel = options.ResolvedLlmModel ?? (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase) ? "gpt-4o-mini" : "llama3.1:8b");
-
         IResourceBuilder<ParameterResource>? azureOpenAIEndpoint = null;
         IResourceBuilder<ParameterResource>? azureOpenAIKey = null;
         if (string.Equals(llmProvider, "azureopenai", StringComparison.OrdinalIgnoreCase))
@@ -33,30 +29,25 @@ internal static class DigitalBrainBuilderExtensions
             azureOpenAIEndpoint = builder.AddParameter("azure-openai-endpoint");
             azureOpenAIKey = builder.AddParameter("azure-openai-key", secret: true);
         }
-
         IResourceBuilder<ParameterResource>? openAIApiKey = null;
         if (string.Equals(llmProvider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase) ||
             options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.OpenAI, StringComparison.OrdinalIgnoreCase)))
         {
             openAIApiKey = builder.AddParameter("openai-api-key", secret: true);
         }
-
         IResourceBuilder<ParameterResource>? anthropicApiKey = null;
         if (options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.Anthropic, StringComparison.OrdinalIgnoreCase)))
         {
             anthropicApiKey = builder.AddParameter("anthropic-api-key", secret: true);
         }
-
         IResourceBuilder<ParameterResource>? githubModelsToken = null;
         if (string.Equals(llmProvider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase) ||
             options.ModelRegistry.Registrations.Any(r => string.Equals(r.Model.Provider, DigitalBrainProviderIds.GitHubModels, StringComparison.OrdinalIgnoreCase)))
         {
             githubModelsToken = builder.AddParameter("github-models-token", secret: true);
         }
-
         var isRunMode = builder.ExecutionContext.IsRunMode;
         var runtimeStorageNamespace = ResolveRuntimeStorageNamespace(builder.Configuration["DigitalBrain:Runtime:StorageNamespace"]);
-
         var storage = builder.AddAzureStorage(isRunMode ? "runtime-storage" : "storage");
         if (isRunMode)
         {
@@ -72,18 +63,14 @@ internal static class DigitalBrainBuilderExtensions
         var conversationStateBlobs = storage.AddBlobs("conversationstate");
         var surfaceFeedStateBlobs = storage.AddBlobs("surfacefeedstate");
         var sessionStateBlobs = storage.AddBlobs("sessionstate");
-
         var orleans = builder.AddOrleans("kernel").WithClustering(clusteringTable).WithGrainStorage("Default", grainBlobs).WithGrainStorage(ConversationStateProvider, conversationStateBlobs)
             .WithGrainStorage(SurfaceFeedStateProvider, surfaceFeedStateBlobs)
             .WithGrainStorage(SessionStateProvider, sessionStateBlobs)
             .WithReminders(clusteringTable);
-
         if (isRunMode)
         {
-
             orleans.WithClusterId(ResolveLocalClusterId());
         }
-
         var defaultLlm = options.ModelRegistry.DefaultLlm?.Model;
         var defaultOllamaLlm = defaultLlm is not null && string.Equals(defaultLlm.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase)
                 ? defaultLlm.Id
@@ -102,7 +89,6 @@ internal static class DigitalBrainBuilderExtensions
             var ollama = builder.AddOllama("ollama").WithGPUSupport().WithDataVolume().WithLifetime(ContainerLifetime.Persistent).WithOpenWebUI(webui => webui.WithLifetime(ContainerLifetime.Persistent).WithDataVolume());
             llm = ollama.AddModel("llm", defaultOllamaLlm);
             embeddingModel = ollama.AddModel("embed", defaultOllamaEmbedding);
-
             var pulledOllamaModelIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { defaultOllamaLlm };
             foreach (var entry in options.ModelRegistry.Registrations)
             {
@@ -114,16 +100,13 @@ internal static class DigitalBrainBuilderExtensions
                 }
                 ollama.AddModel(OllamaModelResourceName(entry.Model.Id), entry.Model.Id);
             }
-
             ollamaEndpoint = ollama.GetEndpoint("http");
-
             embeddingOllamaEndpoint = ollamaEndpoint;
         }
         else
         {
             llm = builder.AddConnectionString("llm");
         }
-
         return new DigitalBrainContext
         {
             Name = name,
@@ -153,7 +136,6 @@ internal static class DigitalBrainBuilderExtensions
             FeatureArtifacts = featureArtifacts
         };
     }
-
     public static IResourceBuilder<ProjectResource> ConfigureServer(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
         kernel = kernel.WithReference(ctx.Orleans).WithReference(ctx.ClusteringTable).WithReference(ctx.MemoryFacts).WithReference(ctx.FeatureArtifacts)
@@ -166,7 +148,6 @@ internal static class DigitalBrainBuilderExtensions
             .WithEndpoint(name: "web", scheme: "http", port: KernelWebPort(ctx.ApplicationBuilder), env: "DIGITALBRAIN_WEB_PORT", isProxied: true)
             .WithExternalHttpEndpoints()
             .WithReplicas(ctx.KernelReplicas);
-
         kernel.WaitFor(ctx.ClusteringTable);
         kernel.WaitFor(ctx.MemoryFacts);
         kernel.WaitFor(ctx.FeatureArtifacts);
@@ -174,9 +155,7 @@ internal static class DigitalBrainBuilderExtensions
         kernel.WaitFor(ctx.ConversationStateBlobs);
         kernel.WaitFor(ctx.SurfaceFeedStateBlobs);
         kernel.WaitFor(ctx.SessionStateBlobs);
-
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
-
         kernel.WithEnvironment("DigitalBrain__Llm__Provider", ctx.LlmProvider);
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
         if (ctx.OllamaEndpoint is not null)
@@ -193,7 +172,6 @@ internal static class DigitalBrainBuilderExtensions
             }
         }
         kernel.WithModelRegistry(ctx);
-
         if (ctx.AzureOpenAIEndpoint is not null)
         {
             kernel.WithEnvironment("DigitalBrain__Llm__AzureOpenAIEndpoint", ctx.AzureOpenAIEndpoint);
@@ -214,21 +192,16 @@ internal static class DigitalBrainBuilderExtensions
         {
             kernel.WithEnvironment("DigitalBrain__Llm__GitHubModelsToken", ctx.GitHubModelsToken);
         }
-
         return kernel;
     }
-
     public static IResourceBuilder<ProjectResource> ConfigureClient(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> client)
     {
         return client.WithReference(ctx.OrleansClient);
     }
-
     private static ReferenceExpression HttpUrl(EndpointReference endpoint, string pathSuffix = "") =>
         ReferenceExpression.Create($"http://{endpoint.Property(EndpointProperty.Host)}:{endpoint.Property(EndpointProperty.Port)}{pathSuffix}");
-
     private static string OllamaModelResourceName(string modelId) =>
             modelId.Replace(':', '-').Replace('.', '-').ToLowerInvariant();
-
     private static void WithModelRegistry(this IResourceBuilder<ProjectResource> kernel, DigitalBrainContext ctx)
     {
         if (ctx.ModelRegistry.DefaultLlm is not null)
@@ -237,14 +210,12 @@ internal static class DigitalBrainBuilderExtensions
             kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultLlm__Provider", ctx.LlmProvider);
             kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultLlm__Id", ctx.LlmModel);
         }
-
         if (ctx.ModelRegistry.DefaultEmbedding is { } defaultEmbedding)
         {
             kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultEmbedding__Kind", DigitalBrainCapabilityKind.Embedding.ToString());
             kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultEmbedding__Provider", defaultEmbedding.Model.Provider);
             kernel.WithEnvironment("DigitalBrain__ModelRegistry__DefaultEmbedding__Id", defaultEmbedding.Model.Id);
         }
-
         for (var i = 0; i < ctx.ModelRegistry.Registrations.Count; i++)
         {
             var registration = ctx.ModelRegistry.Registrations[i];
@@ -261,7 +232,6 @@ internal static class DigitalBrainBuilderExtensions
             kernel.WithEnvironment($"{prefix}__SupportsStructuredOutput", registration.Model.Capabilities.SupportsStructuredOutput.ToString());
         }
     }
-
     private static void WithOptionalEnvironment(this IResourceBuilder<ProjectResource> resource, string configurationKey, string environmentKey, string targetKey)
     {
         var value = resource.ApplicationBuilder.Configuration[configurationKey] ?? Environment.GetEnvironmentVariable(environmentKey);
@@ -270,37 +240,28 @@ internal static class DigitalBrainBuilderExtensions
             resource.WithEnvironment(targetKey, value);
         }
     }
-
     public static int KernelWebPort(IDistributedApplicationBuilder builder)
     {
         var configured = builder.Configuration["DigitalBrain:Kernel:WebPort"] ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_KERNEL_WEB_PORT");
-
         return int.TryParse(configured, out var port) && port > 0 ? port : DefaultKernelWebPort;
     }
-
     internal static string ResolveRuntimeStorageNamespace(string? configured)
     {
         var value = string.IsNullOrWhiteSpace(configured) ? DefaultRuntimeStorageNamespace : configured.Trim().ToLowerInvariant();
-
         if (value.Length > 48 || !char.IsAsciiLetterOrDigit(value[0]) ||
             value.Any(static character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_' and not '.'))
         {
             throw new InvalidOperationException(
                 "DigitalBrain:Runtime:StorageNamespace must start with an ASCII letter or digit and contain at most 48 ASCII letters, digits, hyphens, underscores, or periods.");
         }
-
         return value;
     }
-
     internal static string ResolveLocalClusterId() => ResolveLocalClusterId(Environment.GetEnvironmentVariable);
-
     internal static string ResolveLocalClusterId(Func<string, string?> getEnvironmentVariable)
     {
         ArgumentNullException.ThrowIfNull(getEnvironmentVariable);
-
         return getEnvironmentVariable("DIGITALBRAIN_CLUSTER_ID")
             ?? getEnvironmentVariable("DigitalBrain__ClusterId")
             ?? getEnvironmentVariable("Orleans__ClusterId") ?? $"digitalbrain-dev-{Guid.NewGuid():N}";
     }
-
 }

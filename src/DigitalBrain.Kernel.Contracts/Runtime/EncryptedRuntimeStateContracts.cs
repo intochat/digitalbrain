@@ -4,7 +4,6 @@ using System.Text;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Contracts;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 public static class RuntimeStateStorageProviders
@@ -13,7 +12,6 @@ public static class RuntimeStateStorageProviders
     public const string SurfaceFeeds = "runtime-surface-feeds";
     public const string Sessions = "runtime-sessions";
 }
-
 public static class RuntimeStateSchemas
 {
     public const int Envelope = 1;
@@ -23,7 +21,6 @@ public static class RuntimeStateSchemas
     public const int Session = 1;
     public const int InoEffectPlan = 1;
 }
-
 public static class RuntimeStateKinds
 {
     public const string Conversation = "conversation";
@@ -32,12 +29,10 @@ public static class RuntimeStateKinds
     public const string Session = "session";
     public const string InoEffectPlan = "ino-effect-plan";
 }
-
 public static class RuntimeStateKeys
 {
     public static string Conversation(BrainOwnerId owner, ActorId actor, string conversationId) =>
         Hash(RuntimeStateKinds.Conversation, owner.Value, actor.Value, conversationId);
-
     public static string ConversationArchiveSegment(string conversationScopeHash, string? previousSegmentId, long throughSequence, string digest)
     {
         DemandScopeHash(conversationScopeHash);
@@ -51,23 +46,18 @@ public static class RuntimeStateKeys
             throughSequence.ToString(CultureInfo.InvariantCulture),
             digest);
     }
-
     public static string SurfaceFeed(BrainOwnerId owner, ActorId actor) =>
         Hash(RuntimeStateKinds.SurfaceFeed, owner.Value, actor.Value);
-
     public static string Session(string opaqueSessionId) =>
         Hash(RuntimeStateKinds.Session, opaqueSessionId);
-
     public static bool IsScopeHash(string? value) =>
         value is { Length: 64 } && value.All(static character =>
             character is >= '0' and <= '9' or >= 'a' and <= 'f');
-
     public static void DemandScopeHash(string value)
     {
         if (!IsScopeHash(value))
             throw new ArgumentException("Runtime state keys must be lowercase SHA-256 scope hashes.", nameof(value));
     }
-
     private static string Hash(string kind, params string[] components)
     {
         using var stream = new MemoryStream();
@@ -83,7 +73,6 @@ public static class RuntimeStateKeys
         writer.Flush();
         return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
     }
-
     private static void Write(BinaryWriter writer, string value)
     {
         var bytes = Encoding.UTF8.GetBytes(value);
@@ -91,11 +80,9 @@ public static class RuntimeStateKeys
         writer.Write(bytes);
     }
 }
-
 public static class RuntimeStateStorageNames
 {
     public const string DefaultNamespace = "main";
-
     public static string NormalizeNamespace(string? value)
     {
         value = value?.Trim().ToLowerInvariant();
@@ -106,7 +93,6 @@ public static class RuntimeStateStorageNames
             throw new ArgumentException("Runtime storage namespace is invalid.", nameof(value));
         return value;
     }
-
     public static string Container(string storageNamespace, string kind)
     {
         storageNamespace = NormalizeNamespace(storageNamespace);
@@ -117,14 +103,12 @@ public static class RuntimeStateStorageNames
         return $"dbrt-{digest}-{kind}";
     }
 }
-
 public interface IRuntimeStateKeyRing
 {
     int ActiveKekVersion { get; }
     ReadOnlyMemory<byte> SigningKey { get; }
     bool TryGetKek(int version, out ReadOnlyMemory<byte> key);
 }
-
 [GenerateSerializer]
 [Alias("digitalbrain.runtime.encrypted-state-envelope")]
 public sealed class EncryptedRuntimeStateEnvelope
@@ -141,7 +125,6 @@ public sealed class EncryptedRuntimeStateEnvelope
     [Id(9)] public byte[] PayloadTag { get; set; } = [];
     [Id(10)] public byte[] Signature { get; set; } = [];
 }
-
 [GenerateSerializer]
 [Alias("digitalbrain.runtime.state-conflict")]
 public sealed class RuntimeStateConflictException(long expectedRevision, long actualRevision)
@@ -150,6 +133,5 @@ public sealed class RuntimeStateConflictException(long expectedRevision, long ac
     [Id(0)] public long ExpectedRevision { get; } = expectedRevision;
     [Id(1)] public long ActualRevision { get; } = actualRevision;
 }
-
 public sealed class RuntimeStateIntegrityException(string reason)
     : IOException($"Encrypted runtime state failed closed: {reason}.");

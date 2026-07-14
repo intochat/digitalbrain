@@ -1,5 +1,4 @@
 using System.Text.Json;
-
 namespace DigitalBrain.Kernel.Contracts;
 
 [GenerateSerializer]
@@ -9,7 +8,6 @@ public struct JsonElementSurrogate
     [Id(0)]
     public string Json;
 }
-
 [RegisterConverter]
 public sealed class JsonElementSurrogateConverter : IConverter<JsonElement, JsonElementSurrogate>
 {
@@ -18,7 +16,6 @@ public sealed class JsonElementSurrogateConverter : IConverter<JsonElement, Json
         using var document = JsonDocument.Parse(surrogate.Json);
         return document.RootElement.Clone();
     }
-
     public JsonElementSurrogate ConvertToSurrogate(in JsonElement value) =>
         new() { Json = value.GetRawText() };
 }

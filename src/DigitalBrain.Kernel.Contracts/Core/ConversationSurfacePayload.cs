@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public static class ConversationSurfacePayload
@@ -18,10 +17,8 @@ public static class ConversationSurfacePayload
     public const string ApprovalBindingId = "ino.approval.decision";
     public const string ApprovalActionType = "ino.approval.decision";
     public const string ApprovalInputSchema = "digitalbrain.ino.approval-decision.v1";
-
     public static readonly string[] RequiredCapabilities =
         ["ui.protocol.v2", "ui.payload.native", "ui.native.ino-conversation", "ui.native.typed-actions"];
-
     public static JsonElement Build(InoConversationSnapshot conversation)
     {
         var current = conversation.CurrentOperation;
@@ -40,12 +37,10 @@ public static class ConversationSurfacePayload
         if (operation is not null && current!.State == InoConversationStates.AwaitingApproval &&
             !string.IsNullOrWhiteSpace(current.ApprovalId))
             operation["approvalId"] = current.ApprovalId;
-
         if (operation is not null && current!.Action is { } action && OAuthCallbackPaths.IsStructurallyValidAction(action))
         {
             operation["action"] = new Dictionary<string, object?> { ["kind"] = action.Kind, ["label"] = action.Label, ["target"] = action.Target };
         }
-
         var messages = conversation.Turns.TakeLast(MaximumFeedTurns).Select(static turn => new FeedMessage(TurnKey(turn), turn.Role, BoundedFeedText(turn.Text), turn.State))
             .ToList();
         var payload = Serialize(operation, messages);
@@ -58,9 +53,7 @@ public static class ConversationSurfacePayload
             throw new InvalidOperationException("The bounded INO surface payload exceeds the persistence contract.");
         return payload;
     }
-
     public static IReadOnlyList<StoredActionBinding> Actions(InoConversationSnapshot conversation, DateTimeOffset now) => Actions(conversation.CurrentOperation?.State, conversation.CurrentOperation?.ApprovalId, now);
-
     public static bool TryActions(JsonElement payload, DateTimeOffset now, out IReadOnlyList<StoredActionBinding> actions)
     {
         actions = [];
@@ -73,7 +66,6 @@ public static class ConversationSurfacePayload
             !payload.TryGetProperty("data", out var data) ||
             data.ValueKind != JsonValueKind.Object)
             return false;
-
         if (!data.TryGetProperty("operation", out var operation) || operation.ValueKind == JsonValueKind.Null)
         {
             actions = Actions(null, null, now);
@@ -82,7 +74,6 @@ public static class ConversationSurfacePayload
         if (operation.ValueKind != JsonValueKind.Object || !operation.TryGetProperty("state", out var stateProperty) ||
             stateProperty.ValueKind != JsonValueKind.String)
             return false;
-
         var state = stateProperty.GetString();
         if (!IsKnownState(state)) return false;
         string? approvalId = null;
@@ -91,7 +82,6 @@ public static class ConversationSurfacePayload
         actions = Actions(state, approvalId, now);
         return true;
     }
-
     private static IReadOnlyList<StoredActionBinding> Actions(string? state, string? approvalId, DateTimeOffset now)
     {
         var expiresAt = now.Add(UiProtocol.ActionTokenLifetime);
@@ -103,7 +93,6 @@ public static class ConversationSurfacePayload
         return
         [new(SendBindingId, SendActionType, SendInputSchema, "ui.action", 1, expiresAt)];
     }
-
     private static bool IsKnownState(string? state) => state is
         InoConversationStates.Idle or
         InoConversationStates.Queued or
@@ -116,14 +105,12 @@ public static class ConversationSurfacePayload
         InoConversationStates.Failed or
         InoConversationStates.OutcomeUnknown or
         InoConversationStates.Cancelled;
-
     private static string TurnKey(InoConversationTurn turn)
     {
         var source = Encoding.UTF8.GetBytes(turn.CommandId + "\0" + turn.Role);
         var hash = Convert.ToHexStringLower(SHA256.HashData(source));
         return "turn-" + hash[..24];
     }
-
     private static JsonElement Serialize(Dictionary<string, object?>? operation, IReadOnlyList<FeedMessage> messages) =>
         JsonSerializer.SerializeToElement(new
         {
@@ -136,7 +123,6 @@ public static class ConversationSurfacePayload
                 operation
             }
         });
-
     private static string BoundedFeedText(string value)
     {
         if (Encoding.UTF8.GetByteCount(value) <= MaximumFeedTurnUtf8Bytes) return value;
@@ -153,7 +139,6 @@ public static class ConversationSurfacePayload
         }
         return builder.Append(ellipsis).ToString();
     }
-
     private static string ProjectionPhase(InoOperationPhase? phase, string state) => phase switch
     {
         InoOperationPhase.Accepted => "accepted",
@@ -170,14 +155,12 @@ public static class ConversationSurfacePayload
         InoOperationPhase.ApplyingEffect => "applying-effect",
         _ => ProjectionPhase(state)
     };
-
     private static string ProjectionPhase(string state) => state switch
     {
         InoConversationStates.Queued => "accepted",
         InoConversationStates.Responding => "running",
         _ => state
     };
-
     private sealed record FeedMessage(
         [property: JsonPropertyName("turnKey")] string TurnKey,
         [property: JsonPropertyName("role")] string Role,

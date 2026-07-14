@@ -7,7 +7,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
 namespace DigitalBrain.Integrations.Google;
 
 public static class GoogleServiceCollectionExtensions
@@ -26,7 +25,6 @@ public static class GoogleServiceCollectionExtensions
         return services;
     }
 }
-
 internal sealed class GoogleAppConfigSeeder(IConfiguration configuration, IIntegrationConfigStore store, ILogger<GoogleAppConfigSeeder> logger)
     : IHostedService
 {
@@ -37,48 +35,38 @@ internal sealed class GoogleAppConfigSeeder(IConfiguration configuration, IInteg
         {
             return;
         }
-
         if (!appConfig.HasConnectedAppConfig)
         {
             logger.LogWarning("Google app-level configuration is incomplete.");
             return;
         }
-
         var existing = await store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, cancellationToken).ConfigureAwait(false);
         var merged = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
-
         var changed = SetIfConfigured(merged, GoogleClientFactory.ClientIdKey, appConfig.ClientId);
         changed |= SetIfConfigured(merged, GoogleClientFactory.ClientSecretKey, appConfig.ClientSecret);
         changed |= SetIfConfigured(merged, GoogleClientFactory.RedirectUriKey, appConfig.RedirectUri);
-
         if (!changed)
         {
             return;
         }
-
         await store.SetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, merged, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Seeded Google OAuth client configuration.");
     }
-
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
     private static bool SetIfConfigured(IDictionary<string, string> values, string key, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             return false;
         }
-
         var trimmed = value.Trim();
         if (values.TryGetValue(key, out var existing) && string.Equals(existing, trimmed, StringComparison.Ordinal))
         {
             return false;
         }
-
         values[key] = trimmed;
         return true;
     }
-
     private sealed record GoogleAppConfig(string? ClientId, string? ClientSecret, string? RedirectUri)
     {
         public bool HasAnyValue => HasValue(ClientId) || HasValue(ClientSecret) || HasValue(RedirectUri);

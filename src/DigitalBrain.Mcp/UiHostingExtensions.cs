@@ -3,13 +3,11 @@ using Grpc.AspNetCore.Web;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-
 namespace DigitalBrain.Mcp;
 
 public static class UiHostingExtensions
 {
     public const string CorsPolicy = "digitalbrain-runtime-ui-grpc-web";
-
     public static IServiceCollection AddUiTransport(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment, RuntimeProfile profile)
     {
         services.AddGrpc(options =>
@@ -27,12 +25,10 @@ public static class UiHostingExtensions
                 string.Equals(configuration["DigitalBrain:Runtime:ForwardedHeaders:TrustAzureContainerAppsIngress"], "true", StringComparison.OrdinalIgnoreCase);
             if (trustContainerAppsIngress)
             {
-
                 options.KnownIPNetworks.Clear();
                 options.KnownProxies.Clear();
             }
         });
-
         var bootstrap = UiBootstrapOptions.FromConfiguration(configuration, profile);
         var externalIdentity = UiExternalIdentityOptions.FromConfiguration(configuration, profile);
         services.AddSingleton(bootstrap);
@@ -50,14 +46,12 @@ public static class UiHostingExtensions
             ? configuredRevalidation
             : defaultDelivery.AuthenticationRevalidationInterval;
         services.AddSingleton(new UiDeliveryOptions(renewal, revalidation).Validate());
-
         services.AddSingleton<RuntimeSurfaceFeed>();
         services.AddSingleton<SurfaceEnvelopeWriter>();
         services.AddSingleton<UiGrpcService>();
         services.AddHealthChecks().AddCheck<UiTransportHealthCheck>("runtime-ui-transport", tags: ["ready"]);
         return services;
     }
-
     public static WebApplication MapUiTransport(this WebApplication app)
     {
         app.UseAuthentication();
@@ -66,7 +60,6 @@ public static class UiHostingExtensions
         app.MapGrpcService<UiGrpcService>().EnableGrpcWeb().RequireCors(CorsPolicy);
         return app;
     }
-
     private static void ConfigureCors(CorsPolicyBuilder policy, IConfiguration configuration, RuntimeProfile profile)
     {
         var origins = (configuration["DigitalBrain:Runtime:Ui:AllowedOrigins"] ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -78,15 +71,12 @@ public static class UiHostingExtensions
             policy.WithOrigins("https://invalid.digitalbrain.local");
         policy.AllowAnyMethod().AllowAnyHeader().WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
     }
-
 }
-
 public sealed class UiTransportHealthCheck(RuntimeSurfaceFeed feed, SurfaceEnvelopeWriter envelopeWriter, UiGrpcService service) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
         _ = feed;
         _ = envelopeWriter;
         _ = service;

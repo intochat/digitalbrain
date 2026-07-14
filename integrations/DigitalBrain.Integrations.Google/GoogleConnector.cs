@@ -5,7 +5,6 @@ using System.Globalization;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Services;
 using Microsoft.Extensions.Configuration;
-
 namespace DigitalBrain.Integrations.Google;
 
 public class GoogleConnector : IConnector
@@ -14,7 +13,6 @@ public class GoogleConnector : IConnector
     private readonly IOAuthStateProtector _stateProtector;
     private readonly IConfiguration? _config;
     private readonly HttpMessageHandler? _tokenEndpointHandler;
-
     public GoogleConnector(IIntegrationConfigStore store, IOAuthStateProtector stateProtector, IConfiguration? config = null, HttpMessageHandler? tokenEndpointHandler = null)
     {
         _store = store;
@@ -22,13 +20,11 @@ public class GoogleConnector : IConnector
         _config = config;
         _tokenEndpointHandler = tokenEndpointHandler;
     }
-
     public ConnectorDescriptor Descriptor => new(
         Id: "google",
         DisplayName: "Google",
         RequiredConfigKeys: new[] { GoogleClientFactory.ClientIdKey, GoogleClientFactory.ClientSecretKey, GoogleClientFactory.RedirectUriKey },
         Scopes: [GoogleClientFactory.DefaultGmailScope, GoogleClientFactory.GmailSendScope]);
-
     public async Task<ConnectorConfigStatus> ValidateConfigAsync(string? userScope = null, CancellationToken cancellationToken = default)
     {
         var scope = string.IsNullOrWhiteSpace(userScope) ? GoogleClientFactory.DefaultScope : userScope;
@@ -42,7 +38,6 @@ public class GoogleConnector : IConnector
         }
         return new ConnectorConfigStatus(true);
     }
-
     public async Task<AuthChallenge> BeginAuthAsync(NeuronId user, string? clientIdHint = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -61,7 +56,6 @@ public class GoogleConnector : IConnector
             }
             catch { }
         }
-
         var configuredRedirect = _config?["DigitalBrain:Google:RedirectUri"];
         if (!string.IsNullOrWhiteSpace(configuredRedirect))
         {
@@ -73,18 +67,15 @@ public class GoogleConnector : IConnector
                 ? r
                 : GoogleClientFactory.DefaultRedirectUri;
         }
-
         if (!values.TryGetValue(GoogleClientFactory.RedirectUriKey, out var redirectUri) || string.IsNullOrWhiteSpace(redirectUri))
         {
             redirectUri = GoogleClientFactory.DefaultRedirectUri;
             values[GoogleClientFactory.RedirectUriKey] = redirectUri;
         }
-
         if (!GoogleClientFactory.HasConnectedAppConfig(values) || store is null)
         {
             return new AuthChallenge(UrlOrForm: "credential-form-needed", IsForm: true);
         }
-
         var userScope = IntegrationConfigScopes.ForUser(new UserId(user.Value));
         var priorPending = await store.GetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, cancellationToken);
         var existingUser = await store.GetAsync(userScope, GoogleClientFactory.PackName, cancellationToken);
@@ -102,16 +93,13 @@ public class GoogleConnector : IConnector
         {
             return new AuthChallenge(replayUrl, IsForm: false, State: replayState);
         }
-
         var flowId = priorPending.TryGetValue(GoogleClientFactory.OAuthPhaseKey, out var priorPhase) &&
                      string.Equals(priorPhase, GoogleClientFactory.OAuthPhaseLocalStart, StringComparison.Ordinal) &&
                      priorPending.TryGetValue(GoogleClientFactory.OAuthFlowIdKey, out var currentFlowId) &&
                      GoogleClientFactory.IsAuthorizationFlowId(currentFlowId)
             ? currentFlowId
             : GoogleClientFactory.CreateAuthorizationFlowId();
-
         var state = _stateProtector.Protect(user);
-
         string authUrl;
         try
         {
@@ -121,13 +109,11 @@ public class GoogleConnector : IConnector
         {
             return new AuthChallenge(UrlOrForm: "error:" + ex.Message, IsForm: true);
         }
-
         if (existingUser.Count > 0)
         {
             existingUser = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             await store.SetAsync(userScope, GoogleClientFactory.PackName, existingUser, CancellationToken.None);
         }
-
         var providerPending = new Dictionary<string, string>
         {
             [GoogleClientFactory.OAuthPhaseKey] = GoogleClientFactory.OAuthPhaseChallengeIssued,
@@ -147,26 +133,21 @@ public class GoogleConnector : IConnector
             providerPending[GoogleClientFactory.OAuthStartExpiresAtKey] = priorPending[GoogleClientFactory.OAuthStartExpiresAtKey];
         }
         await store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, providerPending, cancellationToken);
-
         return new AuthChallenge(authUrl, IsForm: false, State: state);
     }
-
     public async Task<AuthResult> CompleteAuthAsync(OAuthCallback callback, CancellationToken cancellationToken = default)
     {
         if (!_stateProtector.TryUnprotect(callback.State, out var user))
             return new AuthResult(false, "invalid-state", "The authorization state is invalid or expired.");
-
         var userScope = IntegrationConfigScopes.ForUser(new UserId(user.Value));
         var appValues = await _store.GetAsync(GoogleClientFactory.DefaultScope, GoogleClientFactory.PackName, cancellationToken);
         var pending = await _store.GetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, cancellationToken);
         var existingUser = await _store.GetAsync(userScope, GoogleClientFactory.PackName, cancellationToken);
-
         if (GoogleClientFactory.IsKnownPendingExpired(pending))
         {
             await TerminalizePendingAsync(userScope, pending, "expired");
             return new AuthResult(false, "no-pending", "No pending OAuth flow.");
         }
-
         if (!pending.TryGetValue(GoogleClientFactory.OAuthStateKey, out var expectedState) || string.IsNullOrWhiteSpace(expectedState))
         {
             var callbackFingerprint = GoogleClientFactory.AuthorizationAttemptFingerprint(callback.State);
@@ -179,14 +160,12 @@ public class GoogleConnector : IConnector
                 return new AuthResult(true);
             return new AuthResult(false, "no-pending", "No pending OAuth flow.");
         }
-
         if (pending.TryGetValue(GoogleClientFactory.OAuthPhaseKey, out var phase) &&
             ((!string.Equals(phase, GoogleClientFactory.OAuthPhaseChallengeIssued, StringComparison.Ordinal) &&
               !string.Equals(phase, GoogleClientFactory.OAuthPhaseProcessing, StringComparison.Ordinal)) ||
              !pending.TryGetValue(GoogleClientFactory.OAuthFlowIdKey, out var phaseFlowId) ||
              !GoogleClientFactory.IsAuthorizationFlowId(phaseFlowId)))
             return new AuthResult(false, "no-pending", "No pending OAuth flow.");
-
         if (!string.Equals(expectedState, callback.State, StringComparison.Ordinal))
             return new AuthResult(false, "state-mismatch", "State did not match.");
         var attemptFingerprint = GoogleClientFactory.AuthorizationAttemptFingerprint(expectedState);
@@ -210,9 +189,7 @@ public class GoogleConnector : IConnector
             if (GoogleClientFactory.HasUsableCredential(mergedCredentials))
                 return new AuthResult(true);
         }
-
         await SetPendingResultAsync(userScope, pending, "processing", attemptFingerprint, flowId);
-
         if (!string.IsNullOrWhiteSpace(callback.Error))
         {
             var denied = string.Equals(callback.Error, "access_denied", StringComparison.OrdinalIgnoreCase);
@@ -221,13 +198,11 @@ public class GoogleConnector : IConnector
                 ? new AuthResult(false, "consent-denied", "Google consent was denied.")
                 : new AuthResult(false, "provider-error", "Google authorization failed.");
         }
-
         if (string.IsNullOrWhiteSpace(callback.Code))
         {
             await SetPendingResultAsync(userScope, pending, "incomplete", attemptFingerprint, flowId);
             return new AuthResult(false, "no-code", "The callback did not include an authorization code.");
         }
-
         var explicitPhase = pending.ContainsKey(GoogleClientFactory.OAuthPhaseKey);
         pending.TryGetValue(GoogleClientFactory.OAuthPendingClientIdKey, out var pinnedClientId);
         pending.TryGetValue(GoogleClientFactory.OAuthPendingRedirectUriKey, out var pinnedRedirectUri);
@@ -242,7 +217,6 @@ public class GoogleConnector : IConnector
             await SetPendingResultAsync(userScope, pending, "configuration-invalid", attemptFingerprint, flowId);
             return new AuthResult(false, "configuration-changed", "Google configuration changed. Start authorization again.");
         }
-
         var redirectUri = explicitPhase
             ? pinnedRedirectUri!
             : appValues.TryGetValue(GoogleClientFactory.RedirectUriKey, out var stored) && !string.IsNullOrWhiteSpace(stored)
@@ -252,7 +226,6 @@ public class GoogleConnector : IConnector
         {
             redirectUri = _config?["DigitalBrain:Google:RedirectUri"] ?? GoogleClientFactory.DefaultRedirectUri;
         }
-
         try
         {
             var exchangeValues = new Dictionary<string, string>(appValues, StringComparer.OrdinalIgnoreCase);
@@ -267,7 +240,6 @@ public class GoogleConnector : IConnector
             {
                 userTokenValues[kv.Key] = kv.Value;
             }
-
             if (!userTokenValues.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var newRt) || string.IsNullOrWhiteSpace(newRt))
             {
                 if (!explicitPhase && existingUser.TryGetValue(GoogleClientFactory.RefreshTokenKey, out var priorRt) &&
@@ -279,13 +251,11 @@ public class GoogleConnector : IConnector
                     return new AuthResult(false, "exchange-failed", "Google did not return a reusable authorization.");
                 }
             }
-
             userTokenValues[GoogleClientFactory.OAuthCompletedFingerprintKey] = attemptFingerprint;
             if (flowId is not null)
                 userTokenValues[GoogleClientFactory.OAuthCompletedFlowIdKey] = flowId;
             await _store.SetAsync(userScope, GoogleClientFactory.PackName, userTokenValues, cancellationToken);
             await BestEffortClearPendingAsync(userScope);
-
             return new AuthResult(true);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -304,7 +274,6 @@ public class GoogleConnector : IConnector
             return new AuthResult(false, "exchange-failed", "The authorization code exchange failed.");
         }
     }
-
     private Task SetPendingResultAsync(string userScope, IReadOnlyDictionary<string, string> pending, string result, string attemptFingerprint, string? flowId)
     {
         var processing = string.Equals(result, "processing", StringComparison.Ordinal);
@@ -321,7 +290,6 @@ public class GoogleConnector : IConnector
             values[GoogleClientFactory.OAuthProcessingExpiresAtKey] = DateTimeOffset.UtcNow.Add(GoogleClientFactory.OAuthProcessingLifetime).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
         return _store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, values, CancellationToken.None);
     }
-
     private Task TerminalizePendingAsync(string userScope, IReadOnlyDictionary<string, string> pending, string result)
     {
         var terminal = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -337,7 +305,6 @@ public class GoogleConnector : IConnector
             terminal[GoogleClientFactory.OAuthAttemptFingerprintKey] = attempt;
         return _store.SetAsync(userScope, GoogleClientFactory.OAuthPendingPackName, terminal, CancellationToken.None);
     }
-
     private async Task BestEffortClearPendingAsync(string userScope)
     {
         try
@@ -346,10 +313,8 @@ public class GoogleConnector : IConnector
         }
         catch (Exception)
         {
-
         }
     }
-
     public async Task<ConnectionHealth> TestConnectionAsync(NeuronId user, CancellationToken cancellationToken = default)
     {
         try
@@ -359,16 +324,13 @@ public class GoogleConnector : IConnector
             {
                 return new ConnectionHealth(Healthy: false, Detail: "No refresh token for user", Checked: DateTimeOffset.UtcNow);
             }
-
             if (!values.TryGetValue(GoogleClientFactory.ClientIdKey, out var cid) || string.IsNullOrWhiteSpace(cid) ||
                 !values.TryGetValue(GoogleClientFactory.ClientSecretKey, out var cs) || string.IsNullOrWhiteSpace(cs))
             {
                 return new ConnectionHealth(Healthy: false, Detail: "Missing client credentials for probe", Checked: DateTimeOffset.UtcNow);
             }
-
             var cred = GoogleCredentialFactory.FromRefreshToken(cid, cs, rt, GoogleClientFactory.DefaultGmailScope, GoogleClientFactory.GmailSendScope);
             var service = new GmailService(new BaseClientService.Initializer { HttpClientInitializer = cred, ApplicationName = "DigitalBrain-TestConnection" });
-
             var labelsResponse = await service.Users.Labels.List("me").ExecuteAsync(cancellationToken);
             var count = labelsResponse.Labels?.Count ?? 0;
             return new ConnectionHealth(Healthy: true, Detail: $"Google labels.list succeeded ({count} labels)", Checked: DateTimeOffset.UtcNow);

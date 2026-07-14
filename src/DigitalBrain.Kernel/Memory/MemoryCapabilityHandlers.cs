@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 using DigitalBrain.Features.Sdk;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Memory;
 
 internal static class MemoryCapabilityIds
@@ -12,13 +11,11 @@ internal static class MemoryCapabilityIds
     public const string Remember = "memory.remember";
     public const int Version = 1;
 }
-
 internal sealed class MemoryRecallCapabilityHandler(MemoryService memory) : ICapabilityHandler
 {
     public string CapabilityId => MemoryCapabilityIds.Recall;
     public int CapabilityVersion => MemoryCapabilityIds.Version;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.Query;
-
     public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         MemoryCapabilityPayload.Validate(request, grant, CapabilityId);
@@ -40,16 +37,13 @@ internal sealed class MemoryRecallCapabilityHandler(MemoryService memory) : ICap
             })
         });
     }
-
     private sealed record RecallPayload(string Query, IReadOnlyList<string>? Tags, int? Limit);
 }
-
 internal sealed class MemoryRememberCapabilityHandler(MemoryService memory, TimeProvider timeProvider) : ICapabilityHandler
 {
     public string CapabilityId => MemoryCapabilityIds.Remember;
     public int CapabilityVersion => MemoryCapabilityIds.Version;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.InternalWrite;
-
     public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         MemoryCapabilityPayload.Validate(request, grant, CapabilityId);
@@ -63,14 +57,11 @@ internal sealed class MemoryRememberCapabilityHandler(MemoryService memory, Time
             cancellationToken);
         return JsonSerializer.SerializeToElement(new { status = status.ToString() });
     }
-
     private sealed record RememberPayload(string FactId, string Text, IReadOnlyList<string>? Tags);
 }
-
 internal static class MemoryCapabilityPayload
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { MaxDepth = 16, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
-
     internal static T Read<T>(JsonElement payload)
     {
         try
@@ -82,7 +73,6 @@ internal static class MemoryCapabilityPayload
             throw new ArgumentException("The Memory capability payload is invalid.", nameof(payload), exception);
         }
     }
-
     internal static void Validate(CapabilityRequest request, CapabilityGrant grant, string capabilityId)
     {
         ArgumentNullException.ThrowIfNull(request);

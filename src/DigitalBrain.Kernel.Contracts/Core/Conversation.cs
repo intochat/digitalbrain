@@ -1,13 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public static class InoConversationIdentity
 {
     public static string From(RequestContext context) => "ino-" + RequestScope.Id(context);
 }
-
 public static class InoConversationStates
 {
     public const string Idle = "idle";
@@ -21,13 +19,10 @@ public static class InoConversationStates
     public const string Failed = "failed";
     public const string OutcomeUnknown = "outcome-unknown";
     public const string Cancelled = "cancelled";
-
     public static bool IsActive(string state) =>
         state is Queued or Running or Responding or AwaitingAuthorization or AwaitingApproval or RetryScheduled;
 }
-
 public sealed record InoConversationTurn(string CommandId, string Role, string Text, string State);
-
 [method: JsonConstructor]
 public sealed record InoConversationOperation(
     string OperationId,
@@ -45,7 +40,6 @@ public sealed record InoConversationOperation(
     string? ApprovalId = null,
     InoOperationPhase? Phase = null)
 {
-
     public InoConversationOperation(
             string commandId,
             string prompt,
@@ -59,14 +53,11 @@ public sealed record InoConversationOperation(
     {
     }
 }
-
 public sealed record InoConversationSnapshot(string ConversationId, int Revision, IReadOnlyList<InoConversationTurn> Turns, IReadOnlyList<InoConversationOperation> Operations)
 {
     public InoConversationOperation? CurrentOperation => Operations.LastOrDefault();
-
     public static InoConversationSnapshot Empty(RequestContext context) =>
         new(InoConversationIdentity.From(context), 0, [], []);
 }
-
 public sealed record ToolAction(string Kind, string Label, string Target);
 public sealed record ToolGrounding(string ToolId, JsonElement Content);

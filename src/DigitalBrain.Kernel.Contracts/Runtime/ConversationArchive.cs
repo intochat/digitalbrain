@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-archive-segment")]
@@ -14,35 +13,28 @@ public sealed record ConversationArchiveSegment(
     [property: Id(5)] long FromSequence,
     [property: Id(6)] long ThroughSequence,
     [property: Id(7)] ConversationTurn[] Turns);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-archive-state")]
 public sealed record ConversationArchiveState([property: Id(0)] int SchemaVersion, [property: Id(1)] long Revision, [property: Id(2)] ConversationArchiveSegment? Segment)
 {
     public static ConversationArchiveState Empty() => new(RuntimeStateSchemas.ConversationArchive, 0, null);
 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-archive-cursor")]
 public sealed record ConversationArchiveCursor([property: Id(0)] string SegmentId, [property: Id(1)] string Digest, [property: Id(2)] long BeforeSequence);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-archive-page")]
 public sealed record ConversationArchivePage([property: Id(0)] ConversationTurn[] Turns, [property: Id(1)] ConversationArchiveCursor? NextCursor);
-
 [Alias("digitalbrain.runtime.i-conversation-archive-neuron")]
 public interface IConversationArchiveNeuron : IGrainWithStringKey
 {
     [Alias("digitalbrain.runtime.conversation-archive.read")]
     Task<ConversationArchiveSegment?> ReadAsync();
-
     [Alias("digitalbrain.runtime.conversation-archive.put")]
     Task<ConversationArchiveSegment> PutAsync(ConversationArchiveSegment segment);
 }
-
 public static class ConversationArchiveTransitions
 {
     public const int MaximumPageTurns = 256;
     public const int InlineTurnsAfterCompaction = 96;
     private static readonly JsonSerializerOptions DigestJson = new(JsonSerializerDefaults.Web);
-
     public static ConversationState Compact(ConversationState state, int maximumInlineTurns)
     {
         if (state.Turns.Length <= maximumInlineTurns) return state;
@@ -67,7 +59,6 @@ public static class ConversationArchiveTransitions
                 segmentId)
         };
     }
-
     public static ConversationArchiveSegment? PrepareSegment(string conversationScopeHash, ConversationState current, ConversationState next)
     {
         RuntimeStateKeys.DemandScopeHash(conversationScopeHash);
@@ -92,7 +83,6 @@ public static class ConversationArchiveTransitions
         ValidateSegment(segment);
         return segment;
     }
-
     public static async Task<ConversationArchivePage> ReadPageAsync(
         string conversationScopeHash,
         ConversationArchiveDescriptor? archive,
@@ -143,7 +133,6 @@ public static class ConversationArchiveTransitions
         }
         return new(newestFirst.OrderBy(static turn => turn.Sequence).ToArray(), nextCursor);
     }
-
     public static void ValidateState(ConversationArchiveState state)
     {
         if (state.SchemaVersion != RuntimeStateSchemas.ConversationArchive || state.Revision is < 0 or > 1 ||
@@ -151,7 +140,6 @@ public static class ConversationArchiveTransitions
             throw new RuntimeStateIntegrityException("invalid conversation archive state");
         if (state.Segment is not null) ValidateSegment(state.Segment);
     }
-
     public static void ValidateDescriptor(ConversationArchiveDescriptor? archive, ConversationTurn[] inlineTurns)
     {
         if (archive is null) return;
@@ -161,7 +149,6 @@ public static class ConversationArchiveTransitions
             inlineTurns.Length != 0 && inlineTurns[0].Sequence != checked(archive.ThroughSequence + 1))
             throw new RuntimeStateIntegrityException("invalid conversation archive descriptor");
     }
-
     public static void ValidateSegment(ConversationArchiveSegment segment)
     {
         if (!RuntimeStateKeys.IsScopeHash(segment.SegmentId) || !RuntimeStateKeys.IsScopeHash(segment.ConversationScopeHash) ||
@@ -184,7 +171,6 @@ public static class ConversationArchiveTransitions
             !string.Equals(segment.SegmentId, expectedId, StringComparison.Ordinal))
             throw new RuntimeStateIntegrityException("conversation archive segment digest is invalid");
     }
-
     public static bool SameSegment(ConversationArchiveSegment first, ConversationArchiveSegment second) =>
         string.Equals(first.SegmentId, second.SegmentId, StringComparison.Ordinal) &&
         string.Equals(first.ConversationScopeHash, second.ConversationScopeHash, StringComparison.Ordinal) &&
@@ -193,15 +179,12 @@ public static class ConversationArchiveTransitions
         string.Equals(first.Digest, second.Digest, StringComparison.Ordinal) &&
         first.FromSequence == second.FromSequence && first.ThroughSequence == second.ThroughSequence &&
         first.Turns.SequenceEqual(second.Turns);
-
     private static string Digest(string? previousDigest, ConversationTurn[] turns) =>
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new ArchiveDigestPayload(previousDigest, turns), DigestJson)));
-
     private static void ValidateCursor(ConversationArchiveCursor cursor)
     {
         if (!RuntimeStateKeys.IsScopeHash(cursor.SegmentId) || !RuntimeStateKeys.IsScopeHash(cursor.Digest) || cursor.BeforeSequence < 1)
             throw new ArgumentException("Conversation archive cursor is invalid.", nameof(cursor));
     }
-
     private sealed record ArchiveDigestPayload(string? PreviousDigest, ConversationTurn[] Turns);
 }

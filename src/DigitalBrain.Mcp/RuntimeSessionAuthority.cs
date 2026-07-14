@@ -5,18 +5,14 @@ using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
-
 namespace DigitalBrain.Mcp;
 
 public sealed record IssuedRuntimeSession(RuntimeRequestContext Context, SessionPair Pair);
-
 public sealed record ValidatedRuntimeSession(RuntimeRequestContext Context, DateTimeOffset AccessExpiresAt, long SessionVersion);
-
 public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionTokenService tokens, TimeProvider timeProvider)
 {
     private const string RefreshPrefix = "r1";
     private static readonly TimeSpan RefreshLifetime = TimeSpan.FromDays(30);
-
     public async Task<IssuedRuntimeSession> CreateAsync(RuntimeRequestContext source, TimeSpan accessLifetime, string audience, CancellationToken cancellationToken = default)
     {
         ValidateAudience(audience);
@@ -38,7 +34,6 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
             refreshExpiresAt).WaitAsync(cancellationToken).ConfigureAwait(false);
         return Issue(context, initialized, refreshToken, accessLifetime, now);
     }
-
     public async Task<IssuedRuntimeSession?> RefreshAsync(string refreshToken, TimeSpan accessLifetime, string expectedAudience, CancellationToken cancellationToken = default)
     {
         ValidateAudience(expectedAudience);
@@ -47,7 +42,6 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
         var now = timeProvider.GetUtcNow();
         var current = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         if (!MatchesSession(current, sessionId, expectedAudience)) return null;
-
         var replacement = CreateRefreshToken(sessionId);
         SessionRotation rotation;
         try
@@ -61,14 +55,12 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
                 await RevokeAfterReplayAsync(neuron, latest, now, cancellationToken).ConfigureAwait(false);
             return null;
         }
-
         if (rotation.Status == SessionRotationStatus.Replay)
         {
             await RevokeAfterReplayAsync(neuron, rotation.State, now, cancellationToken).ConfigureAwait(false);
             return null;
         }
         if (rotation.Status != SessionRotationStatus.Rotated) return null;
-
         var identity = rotation.State.Identity!;
         var context = new RuntimeRequestContext(
             identity.OwnerId,
@@ -80,7 +72,6 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
             rotation.State.Grants.ToHashSet(StringComparer.Ordinal));
         return Issue(context, rotation.State, replacement, accessLifetime, now);
     }
-
     public async Task<bool> RevokeAsync(string refreshToken, string expectedAudience, CancellationToken cancellationToken = default)
     {
         ValidateAudience(expectedAudience);
@@ -104,7 +95,6 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
             return latest.RevokedAt is not null;
         }
     }
-
     public async Task<ValidatedRuntimeSession?> ValidateAccessAsync(string accessToken, string expectedAudience, CancellationToken cancellationToken = default)
     {
         ValidateAudience(expectedAudience);
@@ -118,7 +108,6 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
             return null;
         return new(context, accessExpiresAt, sessionVersion);
     }
-
     private IssuedRuntimeSession Issue(RuntimeRequestContext context, SessionState state, string refreshToken, TimeSpan accessLifetime, DateTimeOffset now)
     {
         var accessExpiresAt = now.Add(accessLifetime);
@@ -126,14 +115,11 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
             context,
             new SessionPair(tokens.Issue(context, accessLifetime, state.Audience!, state.SessionVersion), refreshToken, state.RefreshExpiresAt, accessExpiresAt, state.Audience!));
     }
-
     private ISessionNeuron Session(string sessionId) =>
         cluster.GetGrain<ISessionNeuron>(RuntimeStateKeys.Session(sessionId));
-
     private static bool MatchesSession(SessionState state, string sessionId, string audience) =>
         state.OpaqueSessionId is not null && string.Equals(state.OpaqueSessionId, sessionId, StringComparison.Ordinal) &&
         string.Equals(state.Audience, audience, StringComparison.Ordinal);
-
     internal static async Task RevokeAfterReplayAsync(ISessionNeuron neuron, SessionState state, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var current = state;
@@ -153,10 +139,8 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
         }
         throw new InvalidOperationException("Session replay revocation could not be committed.");
     }
-
     private static string CreateRefreshToken(string sessionId) =>
         $"{RefreshPrefix}.{sessionId}.{Base64Url(RandomNumberGenerator.GetBytes(32))}";
-
     private static bool TryParseRefreshToken(string? value, out string sessionId)
     {
         sessionId = string.Empty;
@@ -169,10 +153,8 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
         sessionId = parts[1];
         return true;
     }
-
     private static string Hash(string value) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
-
     private static bool FixedHashEquals(string first, string second)
     {
         try
@@ -184,10 +166,8 @@ public sealed class RuntimeSessionAuthority(IClusterClient cluster, SessionToken
             return false;
         }
     }
-
     private static string Base64Url(ReadOnlySpan<byte> value) =>
         Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
     private static void ValidateAudience(string audience)
     {
         if (audience is not (SessionAudiences.Mcp or SessionAudiences.Ui))

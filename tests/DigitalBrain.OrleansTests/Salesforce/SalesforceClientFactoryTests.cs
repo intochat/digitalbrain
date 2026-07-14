@@ -76,10 +76,10 @@ public class SalesforceClientFactoryTests
         const string flowReference = "abcdefghijklmnopqrstuvwxyzABCDEF0123456789-_";
         var url = SalesforceClientFactory.CreateOAuthStartUrl(flowReference);
 
-        Assert.Equal($"{OAuthCallbackPaths.SalesforceStart}?f={flowReference}", url);
+        Assert.Equal($"/oauth/start/salesforce?f={flowReference}", url);
         Assert.True(OAuthCallbackPaths.TryParseInternalStartPath(
             url,
-            OAuthCallbackPaths.SalesforceProvider,
+            "salesforce",
             out var parsed));
         Assert.Equal(flowReference, parsed);
         Assert.DoesNotContain("services/oauth2/authorize", url, StringComparison.Ordinal);

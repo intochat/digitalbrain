@@ -1,14 +1,12 @@
 using System.Diagnostics;
 using DigitalBrain.Kernel.Contracts;
 using Orleans.Runtime;
-
 namespace DigitalBrain.Kernel.Features;
 
 [GrainType("digitalbrain.v3.feature-hub")]
 internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersistentState<FeatureHubState> persistentState, IGrainFactory grainFactory, TimeProvider timeProvider) : Grain, IFeatureHubGrain
 {
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Features.Hub");
-
     public async Task RegisterAsync(FeatureInstallationRegistration registration)
     {
         using var activity = Start("register");
@@ -19,7 +17,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         await installation.InitializeAsync(registration.Release);
         await WriteAsync(next);
     }
-
     public async Task<FeatureFanOutResult> PublishAsync(FeatureInput input)
     {
         using var activity = Start("publish", input);
@@ -29,7 +26,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         {
             await WriteAsync(begun);
         }
-
         var batch = State.FanOuts.Single(candidate =>
             string.Equals(candidate.Input.InputId, input.InputId, StringComparison.Ordinal));
         var attempts = await new FeatureFanOutDeliveryRail(Resolver).DispatchAsync(ownerId, batch);
@@ -41,7 +37,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         return FanOutResult(State.FanOuts.Single(candidate =>
             string.Equals(candidate.Input.InputId, input.InputId, StringComparison.Ordinal)));
     }
-
     public Task<FeatureHubSnapshot> ReadAsync()
     {
         using var activity = Start("read");
@@ -54,7 +49,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
             State.Authorities.Select(AuthoritySnapshot).ToArray(),
             State.Alerts.ToArray()));
     }
-
     public async Task<FeatureApprovalSnapshot> ProposeAsync(FeatureReleaseProposal proposal, long expectedRevision)
     {
         using var activity = Start("propose-release");
@@ -63,7 +57,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         return ApprovalSnapshot(next.Approvals.Single(candidate =>
             candidate.InstallationId == proposal.InstallationId && candidate.Release.Digest == proposal.Release.Digest));
     }
-
     public async Task<FeatureApprovalSnapshot> DecideAsync(FeatureApprovalDecision decision, long expectedRevision)
     {
         using var activity = Start("decide-release");
@@ -72,7 +65,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         return ApprovalSnapshot(next.Approvals.Single(candidate =>
             string.Equals(candidate.ApprovalId, decision.ApprovalId, StringComparison.Ordinal)));
     }
-
     public async Task<FeatureAuthoritySnapshot> GrantAsync(FeatureGrantRequest request, long expectedRevision)
     {
         using var activity = Start("grant-release");
@@ -81,7 +73,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         return AuthoritySnapshot(next.Authorities.Single(candidate =>
             candidate.InstallationId == request.InstallationId));
     }
-
     public async Task<FeatureAuthoritySnapshot> InstallAsync(FeatureInstallationRegistration registration, long expectedRevision)
     {
         using var activity = Start("install-release");
@@ -100,14 +91,12 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         await WriteAsync(registered);
         return AuthoritySnapshot(authority);
     }
-
     public async Task RevokeAsync(FeatureGrantRevocation revocation, long expectedRevision)
     {
         using var activity = Start("revoke-grant");
         var next = Domain(() => FeatureHubTransitions.Revoke(State, revocation, expectedRevision));
         if (!ReferenceEquals(next, State)) await WriteAsync(next);
     }
-
     public async Task PauseInstallationAsync(FeatureInstallationId installationId, string reason, long expectedRevision)
     {
         using var activity = Start("pause-installation");
@@ -115,7 +104,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         if (!ReferenceEquals(next, State)) await WriteAsync(next);
         await Installation(installationId).PauseAsync(reason);
     }
-
     public async Task ResumeInstallationAsync(FeatureInstallationId installationId, long expectedRevision)
     {
         using var activity = Start("resume-installation");
@@ -123,7 +111,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         await Installation(installationId).ResumeAsync();
         if (!ReferenceEquals(next, State)) await WriteAsync(next);
     }
-
     public async Task<FeatureAuthoritySnapshot> RollbackInstallationAsync(FeatureInstallationId installationId, long expectedRevision)
     {
         using var activity = Start("rollback-installation");
@@ -138,7 +125,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         await WriteAsync(registered);
         return AuthoritySnapshot(authority);
     }
-
     public Task<FeatureGrantSnapshot?> ReadGrantAsync(FeatureGrantLookup lookup)
     {
         using var activity = Start("read-grant");
@@ -154,22 +140,16 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
             authority.ActorId,
             authority.Paused));
     }
-
     private FeatureHubState State =>
         persistentState.RecordExists && persistentState.State is not null ? persistentState.State : FeatureHubState.Empty;
-
     private BrainOwnerId ParseKey() => FeatureGrainIds.ParseHub(this.GetPrimaryKeyString());
-
     private IFeatureGrainResolver Resolver => new OrleansFeatureGrainResolver(grainFactory);
-
     private IFeatureInstallationGrain Installation(FeatureInstallationId installationId) =>
         Resolver.Installation(ParseKey(), installationId);
-
     private async Task WriteAsync(FeatureHubState next)
     {
         await PersistedStateReconciliation.WriteWithRollbackAsync(persistentState, next, FeatureStateEquality.Same);
     }
-
     private Activity? Start(string operation, FeatureInput? input = null)
     {
         var activity = ActivitySource.StartActivity(operation);
@@ -179,12 +159,10 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         activity?.SetTag("feature.trace_id", input?.TraceId);
         return activity;
     }
-
     private static FeatureFanOutResult FanOutResult(FeatureFanOutState batch) => new(
         batch.Input.InputId,
         batch.Deliveries.Count(delivery => delivery.Delivered),
         batch.Deliveries.Count(delivery => !delivery.Delivered));
-
     private static FeatureApprovalSnapshot ApprovalSnapshot(FeatureApprovalState approval) => new(
         approval.ApprovalId,
         approval.InstallationId,
@@ -196,7 +174,6 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         approval.DecidedAt,
         approval.Revision,
         approval.Grants.Select(GrantSpec).ToArray());
-
     private static FeatureAuthoritySnapshot AuthoritySnapshot(FeatureInstallationAuthorityState authority) => new(
         authority.InstallationId,
         authority.ActorId,
@@ -209,9 +186,7 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         authority.PendingGrants.Select(GrantSpec).ToArray(),
         authority.Paused,
         authority.PauseReason);
-
     private static FeatureGrantSpec GrantSpec(FeatureGrantState grant) => new(grant.CapabilityId, grant.CapabilityVersion, grant.ProviderConnectionId, grant.ConstraintsJson, grant.Provider);
-
     private static T Domain<T>(Func<T> transition)
     {
         try

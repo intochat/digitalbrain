@@ -5,27 +5,22 @@ using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
-
 namespace DigitalBrain.Integrations.Salesforce;
 
 internal static class SalesforceCapabilityJson
 {
     internal static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { MaxDepth = 16, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
-
     internal static T Read<T>(CapabilityRequest request) =>
         request.Payload.Deserialize<T>(Options)
         ?? throw new ArgumentException("The Salesforce capability payload is invalid.", nameof(request));
-
     internal static NeuronScope Scope(CapabilityRequest request) =>
         new(new UserId(request.OwnerId.Value), request.ActorId.Value);
 }
-
 internal sealed class SalesforceRecordReadCapabilityHandler(ISalesforceApiClientFactory clients) : ICapabilityHandler
 {
     public string CapabilityId => SalesforceCapabilityIds.RecordRead;
     public int CapabilityVersion => 1;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.Query;
-
     public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         var client = await clients.CreateAsync(SalesforceCapabilityJson.Scope(request), cancellationToken);
@@ -33,13 +28,11 @@ internal sealed class SalesforceRecordReadCapabilityHandler(ISalesforceApiClient
         return JsonSerializer.SerializeToElement(result, SalesforceCapabilityJson.Options);
     }
 }
-
 internal sealed class SalesforceUpdateProposalCapabilityHandler(ISalesforceMutationGateway gateway, TimeProvider timeProvider) : ICapabilityHandler
 {
     public string CapabilityId => SalesforceCapabilityIds.RecordUpdatePropose;
     public int CapabilityVersion => 1;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.ExternalEffect;
-
     public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         var proposal = SalesforceCapabilityJson.Read<SalesforceUpdateProposalRequest>(request);
@@ -54,11 +47,9 @@ internal sealed class SalesforceUpdateProposalCapabilityHandler(ISalesforceMutat
         return JsonSerializer.SerializeToElement(payload, SalesforceCapabilityJson.Options);
     }
 }
-
 internal sealed class SalesforceUpdateEffectHandler(ISalesforceMutationGateway gateway) : IInoEffectHandler
 {
     public string ToolId => SalesforceTools.UpdateRecord;
-
     public async Task<InoToolEffectResult> ApplyAsync(string actorScope, byte[] payloadUtf8, CancellationToken cancellationToken = default)
     {
         var prepared = new SalesforcePreparedUpdate(payloadUtf8);

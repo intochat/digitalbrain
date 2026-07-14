@@ -1,6 +1,5 @@
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Configuration;
-
 namespace DigitalBrain.Integrations.Salesforce;
 
 internal sealed class SalesforceApiClientFactory(IIntegrationConfigStore store) : ISalesforceApiClientFactory

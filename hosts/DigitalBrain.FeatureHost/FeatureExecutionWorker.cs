@@ -3,39 +3,32 @@ using DigitalBrain.Features.Sdk;
 using DigitalBrain.Kernel.Contracts;
 using Microsoft.Extensions.Hosting;
 using SdkInput = DigitalBrain.Features.Sdk.FeatureInput;
-
 namespace DigitalBrain.FeatureHost;
 
-internal sealed record FeatureWorkItem(FeatureInstallationId InstallationId, IFeatureInstallationGrain Installation)
-{
-    public BrainOwnerId OwnerId { get; init; } = new("test-owner");
-    public ActorId ActorId { get; init; } = new("test-actor");
-    public GrantRevision GrantRevision { get; init; } = new(1);
-    public IReadOnlyDictionary<string, ProviderConnectionId> ProviderConnections { get; init; } =
-        new Dictionary<string, ProviderConnectionId>(StringComparer.Ordinal);
-}
-
+internal sealed record FeatureWorkItem(
+    FeatureInstallationId InstallationId,
+    IFeatureInstallationGrain Installation,
+    BrainOwnerId OwnerId,
+    ActorId ActorId,
+    GrantRevision GrantRevision,
+    IReadOnlyDictionary<string, ProviderConnectionId> ProviderConnections);
 internal interface IFeatureWorkSource
 {
     ValueTask<FeatureWorkItem> TakeAsync(CancellationToken cancellationToken = default);
 }
-
 internal interface IFeatureRunContextFactory
 {
     ValueTask<IFeatureRunContext> CreateAsync(FeatureWorkItem work, FeatureRunClaim claim, CancellationToken cancellationToken = default);
 }
-
 internal interface IFeatureRunContext : IAsyncDisposable
 {
     IFeatureContext Context { get; }
     IDisposable Activate();
     ValueTask<FeatureRunCommit> SealAsync(FeatureLeaseFence fence, CancellationToken cancellationToken = default);
 }
-
 internal sealed class FeatureExecutionOptions
 {
     public static readonly TimeSpan MaximumHandlerDeadline = TimeSpan.FromSeconds(60);
-
     public FeatureExecutionOptions(string hostId, TimeSpan handlerDeadline, TimeSpan persistenceDeadline, TimeSpan retryDelay)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostId);
@@ -52,13 +45,11 @@ internal sealed class FeatureExecutionOptions
         PersistenceDeadline = persistenceDeadline;
         RetryDelay = retryDelay;
     }
-
     public string HostId { get; }
     public TimeSpan HandlerDeadline { get; }
     public TimeSpan PersistenceDeadline { get; }
     public TimeSpan RetryDelay { get; }
 }
-
 internal sealed class FeatureExecutionWorker : BackgroundService
 {
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromSeconds(60);
@@ -70,7 +61,6 @@ internal sealed class FeatureExecutionWorker : BackgroundService
     private readonly TimeProvider _timeProvider;
     private int _recycleRequested;
     private int _running;
-
     public FeatureExecutionWorker(
         FeatureReleaseManager releases,
         IFeatureWorkSource workSource,
@@ -86,11 +76,8 @@ internal sealed class FeatureExecutionWorker : BackgroundService
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
-
     public Task RunAsync(CancellationToken cancellationToken = default) => RunLoopAsync(cancellationToken);
-
     protected override Task ExecuteAsync(CancellationToken stoppingToken) => RunLoopAsync(stoppingToken);
-
     private async Task RunLoopAsync(CancellationToken stoppingToken)
     {
         if (Interlocked.Exchange(ref _running, 1) != 0)
@@ -131,7 +118,6 @@ internal sealed class FeatureExecutionWorker : BackgroundService
             Volatile.Write(ref _running, 0);
         }
     }
-
     private async Task ExecuteClaimAsync(FeatureWorkItem work, FeatureRunClaim claim, CancellationToken stoppingToken)
     {
         FeatureReleaseLease? lease = null;
@@ -148,7 +134,6 @@ internal sealed class FeatureExecutionWorker : BackgroundService
                 await FailAsync(work, claim, "feature lease budget insufficient", stoppingToken);
                 return;
             }
-
             var executionEnds = _timeProvider.GetUtcNow() + executionBudget;
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             deadline.CancelAfter(executionBudget);
@@ -175,7 +160,6 @@ internal sealed class FeatureExecutionWorker : BackgroundService
                 RequestRecycle();
                 return;
             }
-
             var input = ToSdkInput(claim.Input);
             var handler = Task.Run(async () =>
             {
@@ -272,7 +256,6 @@ internal sealed class FeatureExecutionWorker : BackgroundService
             }
         }
     }
-
     private async Task FailAsync(FeatureWorkItem work, FeatureRunClaim claim, string safeFailure, CancellationToken stoppingToken)
     {
         try
@@ -287,7 +270,6 @@ internal sealed class FeatureExecutionWorker : BackgroundService
         {
         }
     }
-
     private static SdkInput ToSdkInput(DigitalBrain.Kernel.Contracts.FeatureInput input)
     {
         using var document = JsonDocument.Parse(input.PayloadJson, new JsonDocumentOptions { MaxDepth = 64 });
@@ -299,10 +281,8 @@ internal sealed class FeatureExecutionWorker : BackgroundService
             if (!facts.TryAdd(property.Name, property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString()! : property.Value.GetRawText()))
                 throw new ArgumentException("Feature input facts must be unique.", nameof(input));
         }
-
         return new SdkInput(input.InputId, input.Kind, input.OccurredAt, facts);
     }
-
     private static async Task<bool> TryDisposeAsync(IAsyncDisposable value, TimeSpan deadline)
     {
         try
@@ -315,7 +295,6 @@ internal sealed class FeatureExecutionWorker : BackgroundService
             return false;
         }
     }
-
     private void RequestRecycle()
     {
         if (Interlocked.Exchange(ref _recycleRequested, 1) == 0)

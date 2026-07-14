@@ -8,7 +8,6 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
     public const string WidgetTreeKind = "widget-tree";
     public const string AppShellKind = "app-shell";
     public const string ViewKind = "view";
-
     public static UiSurface ForRfw(string libraryName, string rootWidget, string dataJson, string? source = null, string? emitter = null)
     {
         var props = new Dictionary<string, object?> { ["libraryName"] = libraryName, ["rootWidget"] = rootWidget, ["dataJson"] = dataJson };
@@ -16,15 +15,12 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
         {
             props["source"] = source;
         }
-
         if (emitter is not null)
         {
             props[UiSurfaceKeys.Emitter] = emitter;
         }
-
         return new UiSurface(RfwKind, props);
     }
-
     public static UiSurface ForWidgetTree(UiWidgetTree tree, string? title = null, string? emitter = null)
     {
         var props = new Dictionary<string, object?> { ["tree"] = tree };
@@ -32,17 +28,13 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
         {
             props[UiSurfaceKeys.Title] = title;
         }
-
         if (emitter is not null)
         {
             props[UiSurfaceKeys.Emitter] = emitter;
         }
-
         return new UiSurface(WidgetTreeKind, props);
     }
-
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.UiWidgetTree")]
 public record UiWidgetTree(
@@ -52,7 +44,6 @@ public record UiWidgetTree(
     [property: Id(3)] string? RfwSource = null,
     [property: Id(4)] string? RfwRoot = null
 );
-
 public static class UiKitVocabulary
 {
     public const string Screen = "ui:Screen";
@@ -94,7 +85,6 @@ public static class UiKitVocabulary
     public const string GraphCanvas = "ui:GraphCanvas";
     public const string Link = "ui:Link";
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.CanvasGraphSpec")]
 public record CanvasGraphSpec(
@@ -115,7 +105,6 @@ public record CanvasGraphSpec(
         ["summary"] = Summary
     };
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.CanvasGraphNode")]
 public record CanvasGraphNode(
@@ -136,7 +125,6 @@ public record CanvasGraphNode(
         ["details"] = Details ?? new Dictionary<string, object?>()
     };
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.CanvasGraphField")]
 public record CanvasGraphField(
@@ -149,7 +137,6 @@ public record CanvasGraphField(
     public IReadOnlyDictionary<string, object?> ToProps() => new Dictionary<string, object?>
     { ["name"] = Name, ["type"] = Type, ["badge"] = Badge, ["description"] = Description, ["key"] = Key };
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.CanvasGraphEdge")]
 public record CanvasGraphEdge(
@@ -170,14 +157,12 @@ public record CanvasGraphEdge(
         ["details"] = Details ?? new Dictionary<string, object?>()
     };
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.CanvasGraphGroup")]
 public record CanvasGraphGroup([property: Id(0)] string Id, [property: Id(1)] string Label, [property: Id(2)] IReadOnlyDictionary<string, object?>? Details = null)
 {
     public IReadOnlyDictionary<string, object?> ToProps() => new Dictionary<string, object?> { ["id"] = Id, ["label"] = Label, ["details"] = Details ?? new Dictionary<string, object?>() };
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.ChartSpec")]
 public record ChartSpec(
@@ -206,7 +191,6 @@ public record ChartSpec(
         ["summary"] = Summary
     };
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.GraphicSpec")]
 public record GraphicSpec(
@@ -229,7 +213,6 @@ public record GraphicSpec(
         ["annotations"] = Annotations
     };
 }
-
 public static class UiSurfaceKinds
 {
     public const string AuthButton = "auth-button";
@@ -243,13 +226,11 @@ public static class UiSurfaceKinds
     public const string DataChart = "data-chart";
     public const string Table = "table";
     public const string GraphCanvas = "graph-canvas";
-
     public const string AppShell = "app-shell";
     public const string ShellChrome = "shell-chrome";
     public const string NavConfig = "nav-config";
     public const string ViewDefinition = "view-definition";
 }
-
 public static class UiSurfaceKeys
 {
     public const string SurfaceId = "surfaceId";
@@ -265,7 +246,6 @@ public static class UiSurfaceKeys
     public const string ChartSpec = "chartSpec";
     public const string GraphSpec = "graphSpec";
 }
-
 public static class UiSurfaceLayouts
 {
     public const string Panel = "panel";
@@ -274,15 +254,12 @@ public static class UiSurfaceLayouts
     public const string Modal = "modal";
     public const string Compact = "compact";
 }
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.AuthButtonSurface")]
 public record AuthButtonSurface(string Provider, string Label, string Icon = "default", string Action = "oauth") : UiSurface(UiSurfaceKinds.AuthButton, new Dictionary<string, object?> { ["provider"] = Provider, ["label"] = Label, ["icon"] = Icon, ["action"] = Action });
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.ListSurface")]
 public record ListSurface(string Title, IReadOnlyList<string> Items) : UiSurface(UiSurfaceKinds.List, new Dictionary<string, object?> { ["title"] = Title, ["items"] = Items });
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Ui.Contracts.TableSurface")]
 public record TableSurface(string Title, IReadOnlyList<string> Columns, IReadOnlyList<IReadOnlyList<string>> Rows) : UiSurface(UiSurfaceKinds.Table, new Dictionary<string, object?> { ["title"] = Title, ["columns"] = Columns, ["rows"] = Rows });

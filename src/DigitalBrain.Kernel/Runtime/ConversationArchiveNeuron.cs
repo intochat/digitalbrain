@@ -1,7 +1,6 @@
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using Orleans.Runtime;
-
 namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.runtime.conversation-archive.v1")]
@@ -11,9 +10,7 @@ internal sealed class ConversationArchiveNeuron(
     EncryptedRuntimeStateProtector protector) : Grain, IConversationArchiveNeuron
 {
     private EncryptedPersistentState<ConversationArchiveState>? _state;
-
     private string SegmentId => this.GetPrimaryKeyString() ?? throw new InvalidOperationException("Conversation archive grains require a string key.");
-
     private EncryptedPersistentState<ConversationArchiveState> State => _state ??= new(
         persistentState,
         protector,
@@ -23,7 +20,6 @@ internal sealed class ConversationArchiveNeuron(
         ConversationArchiveState.Empty,
         static value => value.Revision,
         ConversationArchiveTransitions.ValidateState);
-
     public async Task<ConversationArchiveSegment?> ReadAsync()
     {
         var state = await State.ReadAsync();
@@ -31,7 +27,6 @@ internal sealed class ConversationArchiveNeuron(
             throw new RuntimeStateIntegrityException("conversation archive grain key is invalid");
         return state.Segment;
     }
-
     public async Task<ConversationArchiveSegment> PutAsync(ConversationArchiveSegment segment)
     {
         ConversationArchiveTransitions.ValidateSegment(segment);

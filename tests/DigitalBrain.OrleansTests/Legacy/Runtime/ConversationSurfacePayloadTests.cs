@@ -75,7 +75,7 @@ public sealed class ConversationSurfacePayloadTests
                 new ToolAction(
                     "openUrl",
                     "Connect Salesforce",
-                    OAuthCallbackPaths.CreateInternalStartPath(OAuthCallbackPaths.SalesforceProvider, new string('a', 32))),
+                    OAuthCallbackPaths.CreateInternalStartPath("salesforce", new string('a', 32))),
                 null,
                 null)]);
 

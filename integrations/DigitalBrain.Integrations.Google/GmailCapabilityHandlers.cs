@@ -6,27 +6,22 @@ using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
-
 namespace DigitalBrain.Integrations.Google;
 
 internal static class GmailCapabilityJson
 {
     internal static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { MaxDepth = 16, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
-
     internal static T Read<T>(CapabilityRequest request) =>
         request.Payload.Deserialize<T>(Options)
         ?? throw new ArgumentException("The Gmail capability payload is invalid.", nameof(request));
-
     internal static NeuronScope Scope(CapabilityRequest request) =>
         new(new UserId(request.OwnerId.Value), request.ActorId.Value);
 }
-
 internal sealed class GmailMessageCapabilityHandler(IGmailApiClientFactory clients) : ICapabilityHandler
 {
     public string CapabilityId => GoogleCapabilityIds.GmailMessageRead;
     public int CapabilityVersion => 1;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.Query;
-
     public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         var client = await clients.CreateAsync(GmailCapabilityJson.Scope(request), cancellationToken);
@@ -34,13 +29,11 @@ internal sealed class GmailMessageCapabilityHandler(IGmailApiClientFactory clien
         return JsonSerializer.SerializeToElement(result, GmailCapabilityJson.Options);
     }
 }
-
 internal sealed class GmailMailboxCapabilityHandler(IGmailApiClientFactory clients) : ICapabilityHandler
 {
     public string CapabilityId => GoogleCapabilityIds.GmailMailboxRead;
     public int CapabilityVersion => 1;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.Query;
-
     public async Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         var client = await clients.CreateAsync(GmailCapabilityJson.Scope(request), cancellationToken);
@@ -48,13 +41,11 @@ internal sealed class GmailMailboxCapabilityHandler(IGmailApiClientFactory clien
         return JsonSerializer.SerializeToElement(result, GmailCapabilityJson.Options);
     }
 }
-
 internal sealed class GmailSendProposalCapabilityHandler : ICapabilityHandler
 {
     public string CapabilityId => GoogleCapabilityIds.GmailSendPropose;
     public int CapabilityVersion => 1;
     public CapabilityOperationKind OperationKind => CapabilityOperationKind.ExternalEffect;
-
     public Task<JsonElement> ExecuteAsync(CapabilityRequest request, CapabilityGrant grant, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -64,11 +55,9 @@ internal sealed class GmailSendProposalCapabilityHandler : ICapabilityHandler
         return Task.FromResult(JsonSerializer.SerializeToElement(send, GmailCapabilityJson.Options));
     }
 }
-
 internal sealed class GmailSendEffectHandler(IGrainFactory grains) : IInoEffectHandler
 {
     public string ToolId => GmailTools.Send;
-
     public async Task<InoToolEffectResult> ApplyAsync(string actorScope, byte[] payloadUtf8, CancellationToken cancellationToken = default)
     {
         var request = JsonSerializer.Deserialize<GmailSendRequest>(payloadUtf8, GmailCapabilityJson.Options)

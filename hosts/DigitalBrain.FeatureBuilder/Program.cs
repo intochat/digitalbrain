@@ -1,12 +1,10 @@
 using System.Text.Json;
 using DigitalBrain.FeatureBuilder;
-
 if (args.Length != 1)
 {
     await Console.Error.WriteLineAsync("FeatureBuilder requires one JSON request path.");
     return 2;
 }
-
 try
 {
     await using var stream = File.OpenRead(Path.GetFullPath(args[0]));
@@ -24,7 +22,6 @@ catch (Exception exception) when (exception is FeatureBuildException or Argument
     await Console.Error.WriteLineAsync(exception.Message);
     return 1;
 }
-
 internal sealed record FeatureBuildCommand(
     string ImplementationProjectPath,
     string ScenarioProjectPath,
@@ -32,5 +29,4 @@ internal sealed record FeatureBuildCommand(
     string OfflineFeedDirectory,
     string OutputDirectory,
     DateTimeOffset Deadline);
-
 internal sealed record FeatureBuildCommandFile(string Path, string ContentBase64);

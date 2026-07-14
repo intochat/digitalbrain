@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public sealed record McpTransportPolicy(string Audience, IReadOnlySet<string> AllowedOrigins, int MaxBodyBytes, int MaxConcurrentRequests, int RequestsPerMinute);
@@ -11,7 +10,6 @@ public sealed class McpRequestGuard
     private readonly TimeProvider _timeProvider;
     private readonly ConcurrentDictionary<string, PrincipalWindow> _principals = new(StringComparer.Ordinal);
     private int _cleanupCounter;
-
     public McpRequestGuard(McpTransportPolicy policy, TimeProvider? timeProvider = null)
     {
         if (policy.MaxBodyBytes < 1 || policy.MaxConcurrentRequests < 1 || policy.RequestsPerMinute < 1)
@@ -19,9 +17,7 @@ public sealed class McpRequestGuard
         _policy = policy;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
-
     public int MaxBodyBytes => _policy.MaxBodyBytes;
-
     public bool TryBegin(string principal, string? origin, string? audience, long? bodyBytes, out IDisposable? lease)
     {
         lease = null;
@@ -53,7 +49,6 @@ public sealed class McpRequestGuard
         lease = new Release(window, _timeProvider);
         return true;
     }
-
     private void RemoveIdle(DateTimeOffset now)
     {
         foreach (var pair in _principals)
@@ -64,7 +59,6 @@ public sealed class McpRequestGuard
             if (remove) _principals.TryRemove(pair);
         }
     }
-
     private sealed class PrincipalWindow(DateTimeOffset start, int concurrency)
     {
         public DateTimeOffset Start = start;
@@ -73,11 +67,9 @@ public sealed class McpRequestGuard
         public int Active;
         public SemaphoreSlim Concurrency { get; } = new(concurrency, concurrency);
     }
-
     private sealed class Release(PrincipalWindow window, TimeProvider timeProvider) : IDisposable
     {
         private int _disposed;
-
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;

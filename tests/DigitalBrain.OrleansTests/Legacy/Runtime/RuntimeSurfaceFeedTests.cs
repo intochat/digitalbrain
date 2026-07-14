@@ -52,7 +52,7 @@ public sealed class RuntimeSurfaceFeedTests
                 "gmail.message.read.v1",
                 1,
                 new ProviderConnectionId("google-primary"),
-                "{\"maximumMessages\":20}",
+                "{\"allowedToolIds\":[\"gmail.message.read.v1\"],\"payload\":{\"maximumMessages\":[20]}}",
                 "google")]);
 
         await feed.PublishFeatureApprovalAsync(context, approval, CancellationToken.None);

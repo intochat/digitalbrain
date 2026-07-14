@@ -2,7 +2,6 @@ using System.Text.Json;
 using Azure;
 using Azure.Data.Tables;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Memory;
 
 internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
@@ -11,16 +10,13 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
     private const int MaximumConflictAttempts = 8;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly TableClient _table;
-
     public AzureTableMemoryFactStore(TableClient table)
     {
         _table = table ?? throw new ArgumentNullException(nameof(table));
         if (!string.Equals(_table.Name, FactsTableName, StringComparison.Ordinal))
             throw new ArgumentException($"Memory requires the '{FactsTableName}' table.", nameof(table));
     }
-
     public string TableName => _table.Name;
-
     public async Task<IReadOnlyList<MemoryFactSnapshot>> ListAsync(BrainOwnerId ownerId, int maximumCount, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumCount, 1);
@@ -35,13 +31,11 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
         }
         return facts;
     }
-
     public async Task<MemoryFactSnapshot?> FindAsync(BrainOwnerId ownerId, string factId, CancellationToken cancellationToken = default)
     {
         var response = await _table.GetEntityIfExistsAsync<MemoryFactEntity>(Partition(ownerId), MemoryValues.FactId(factId, nameof(factId)), cancellationToken: cancellationToken);
         return response.HasValue ? ToSnapshot(response.Value!) : null;
     }
-
     public async Task<MemoryWriteStatus> CreateAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, int capacity, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
@@ -52,12 +46,10 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
             var existing = await FindAsync(ownerId, fact.FactId, cancellationToken);
             if (existing is not null)
                 return SameContent(existing, fact) ? MemoryWriteStatus.AlreadyPresent : throw new MemoryConflictException();
-
             var metadata = await _table.GetEntityIfExistsAsync<MemoryCapacityEntity>(partition, MemoryValues.CapacityRowKey, cancellationToken: cancellationToken);
             var metadataValue = metadata.HasValue ? metadata.Value! : null;
             if (metadataValue is not null && metadataValue.Count >= capacity)
                 return MemoryWriteStatus.CapacityReached;
-
             var counter = metadataValue is not null ? metadataValue with { Count = metadataValue.Count + 1 } : new MemoryCapacityEntity(partition, 1);
             var actions = metadataValue is not null
                 ? new[]
@@ -81,7 +73,6 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
         }
         throw new MemoryConflictException();
     }
-
     public async Task<MemoryFactSnapshot> ReplaceAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, string expectedETag, CancellationToken cancellationToken = default)
     {
         var partition = Partition(ownerId);
@@ -101,7 +92,6 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
             throw new MemoryConflictException();
         }
     }
-
     public async Task<bool> DeleteAsync(BrainOwnerId ownerId, string factId, string expectedETag, CancellationToken cancellationToken = default)
     {
         var partition = Partition(ownerId);
@@ -141,10 +131,8 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
         }
         throw new MemoryConflictException();
     }
-
     private static string Partition(BrainOwnerId ownerId) =>
         MemoryValues.Key(ownerId.Value, nameof(ownerId));
-
     private static MemoryFactEntity ToEntity(string partition, MemoryFactSnapshot fact) => new()
     {
         PartitionKey = partition,
@@ -155,7 +143,6 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
         CreatedAt = fact.CreatedAt,
         UpdatedAt = fact.UpdatedAt
     };
-
     private static MemoryFactSnapshot ToSnapshot(MemoryFactEntity entity)
     {
         var tags = JsonSerializer.Deserialize<string[]>(entity.Tags, JsonOptions)
@@ -169,11 +156,9 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
             entity.UpdatedAt,
             entity.ETag.ToString());
     }
-
     private static bool SameContent(MemoryFactSnapshot left, MemoryFactSnapshot right) =>
         string.Equals(left.Text, right.Text, StringComparison.Ordinal) && left.Tags.SequenceEqual(right.Tags, StringComparer.Ordinal) &&
         left.SourceActor == right.SourceActor;
-
     private sealed class MemoryFactEntity : ITableEntity
     {
         public string PartitionKey { get; set; } = string.Empty;
@@ -186,20 +171,17 @@ internal sealed class AzureTableMemoryFactStore : IMemoryFactStore
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
     }
-
     private sealed record MemoryCapacityEntity : ITableEntity
     {
         public MemoryCapacityEntity()
         {
         }
-
         public MemoryCapacityEntity(string partitionKey, int count)
         {
             PartitionKey = partitionKey;
             RowKey = MemoryValues.CapacityRowKey;
             Count = count;
         }
-
         public string PartitionKey { get; set; } = string.Empty;
         public string RowKey { get; set; } = string.Empty;
         public int Count { get; set; }

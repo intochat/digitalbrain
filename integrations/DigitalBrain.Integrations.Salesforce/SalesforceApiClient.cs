@@ -7,7 +7,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Salesforce.Common.Models.Json;
 using Salesforce.Force;
-
 namespace DigitalBrain.Integrations.Salesforce;
 
 internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiClient
@@ -16,7 +15,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
     private const int MaximumMutationValueLength = 4_096;
     private const int MaximumOriginalValueLength = 32_768;
     private const int MaximumPreparedUpdateLength = 64 * 1_024;
-
     public async Task<SalesforceRecord> ReadRecordAsync(DigitalBrain.Integrations.Salesforce.Contracts.SalesforceRecordReadRequest request, CancellationToken cancellationToken = default)
     {
         var objectName = ApiIdentifier(request.Record.ObjectName);
@@ -34,7 +32,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             StringComparer.Ordinal);
         return new SalesforceRecord(request.Record, fields);
     }
-
     private static string ApiIdentifier(string value)
     {
         if (value.Length is < 1 or > 255 || !char.IsAsciiLetter(value[0]) && value[0] != '_' ||
@@ -42,7 +39,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             throw new ArgumentException("A valid Salesforce API identifier is required.", nameof(value));
         return value;
     }
-
     public async Task<string[]> ListAccountsAsync(int maxResults, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -60,12 +56,10 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             var field = ResolveField(schema, request.Field, "update");
             if (!field.Updateable || field == schema.IdField)
                 throw new SalesforceReadException(SalesforceReadFailure.AccessDenied, "That Salesforce field is not updateable for this connection.");
-
             var (_, desiredValue) = CompileMutationValue(field, request.NewValue);
             var originalValue = await ReadMutationValueAsync(schema, field, request.RecordId, ct).ConfigureAwait(false);
             if (originalValue is { Length: > MaximumOriginalValueLength })
                 throw Invalid("The Salesforce field value is too large to prepare safely.");
-
             var document = new PreparedUpdateDocument(Version: 1, request.Entity.Label, schema.ApiName, request.RecordId, request.Field.Label, field.ApiName, field.Type, originalValue, desiredValue);
             var payload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(document));
             if (payload.Length > MaximumPreparedUpdateLength)
@@ -87,7 +81,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             return new SalesforceMutationPreviewResult(SalesforceMutationStatus.Unavailable, SafeReason: "Salesforce updates are unavailable right now.");
         }
     }
-
     public async Task<SalesforceMutationApplyResult> ApplyUpdateAsync(SalesforcePreparedUpdate preparedUpdate, CancellationToken ct)
     {
         try
@@ -102,7 +95,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
                 !string.Equals(field.ApiName, document.FieldApiName, StringComparison.Ordinal) ||
                 !string.Equals(field.Type, document.FieldType, StringComparison.OrdinalIgnoreCase))
                 throw Invalid("The prepared Salesforce update no longer matches provider metadata.");
-
             var (providerValue, desiredValue) = CompileMutationValue(field, document.DesiredValue);
             if (!string.Equals(desiredValue, document.DesiredValue, StringComparison.Ordinal))
                 throw Invalid("The prepared Salesforce update is invalid.");
@@ -111,7 +103,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
                 return new SalesforceMutationApplyResult(SalesforceMutationStatus.AlreadyApplied);
             if (!string.Equals(currentValue, document.OriginalValue, StringComparison.Ordinal))
                 return new SalesforceMutationApplyResult(SalesforceMutationStatus.Conflict, "The Salesforce record changed after this update was prepared.");
-
             ct.ThrowIfCancellationRequested();
             await client.UpdateAsync(schema.ApiName, document.RecordId, new Dictionary<string, object?> { [field.ApiName] = providerValue }).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
@@ -129,7 +120,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             return new SalesforceMutationApplyResult(SalesforceMutationStatus.Unavailable, "Salesforce updates are unavailable right now.");
         }
     }
-
     public async Task<SalesforceMutationVerificationResult> VerifyUpdateAsync(SalesforcePreparedUpdate preparedUpdate, CancellationToken ct)
     {
         try
@@ -156,7 +146,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             return new SalesforceMutationVerificationResult(false, "Salesforce verification is unavailable right now.");
         }
     }
-
     private async Task<string?> ReadMutationValueAsync(ObjectSchema schema, FieldSchema field, string recordId, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -167,7 +156,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
         result.Records[0].TryGetValue(field.ApiName, out var value);
         return CanonicalMutationValue(field, value);
     }
-
     private static void ValidatePreviewRequest(SalesforceUpdatePreviewRequest request)
     {
         if (request is null || request.Entity is null || request.Field is null || request.NewValue is null)
@@ -175,7 +163,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
         if (request.NewValue.Length > MaximumMutationValueLength)
             throw Invalid("The Salesforce update value is too large.");
     }
-
     private static PreparedUpdateDocument ReadPreparedUpdate(SalesforcePreparedUpdate preparedUpdate)
     {
         if (preparedUpdate?.Payload is not { Length: > 0 } payload || payload.Length > MaximumPreparedUpdateLength)
@@ -199,7 +186,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             throw Invalid("The prepared Salesforce update is invalid.");
         return document;
     }
-
     private static (object ProviderValue, string CanonicalValue) CompileMutationValue(FieldSchema field, string value)
     {
         if (value.Length > MaximumMutationValueLength)
@@ -223,13 +209,11 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             _ => throw Invalid("That Salesforce field type is not supported for safe updates.")
         };
     }
-
     private static (object ProviderValue, string CanonicalValue) CompileReferenceMutationValue(string value)
     {
         ValidateRecordId(value, null);
         return (value, value);
     }
-
     private static string? CanonicalMutationValue(FieldSchema field, object? value)
     {
         value = value is JValue json ? json.Value : value;
@@ -238,33 +222,28 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
         var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
         return CompileMutationValue(field, text).CanonicalValue;
     }
-
     private static SalesforceMutationPreviewResult PreviewFailure(SalesforceReadException exception)
     {
         var status = MutationFailureStatus(exception);
         return new SalesforceMutationPreviewResult(status, SafeReason: MutationSafeReason(status));
     }
-
     private static SalesforceMutationApplyResult ApplyFailure(SalesforceReadException exception)
     {
         var status = MutationFailureStatus(exception);
         return new SalesforceMutationApplyResult(status, MutationSafeReason(status));
     }
-
     private static SalesforceMutationStatus MutationFailureStatus(SalesforceReadException exception) => exception.Failure switch
     {
         SalesforceReadFailure.AccessDenied => SalesforceMutationStatus.AccessDenied,
         SalesforceReadFailure.InvalidRequest => SalesforceMutationStatus.InvalidRequest,
         _ => SalesforceMutationStatus.Unavailable
     };
-
     private static string MutationSafeReason(SalesforceMutationStatus status) => status switch
     {
         SalesforceMutationStatus.AccessDenied => "Salesforce access does not permit that update.",
         SalesforceMutationStatus.InvalidRequest => "The Salesforce update request is invalid.",
         _ => "Salesforce updates are unavailable right now."
     };
-
     private async Task<ObjectSchema> ResolveObjectAsync(SalesforceSemanticEntity entity, bool requireQueryable, bool requireSearchable, CancellationToken ct, bool requireUpdateable = false)
     {
         if (entity is null || string.IsNullOrWhiteSpace(entity.Label) || entity.Label.Length > 120)
@@ -307,7 +286,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             throw Invalid("Salesforce entity metadata did not expose a record identifier.");
         return new ObjectSchema(apiName, Text(resolved, "label"), Text(resolved, "labelPlural"), Text(resolved, "keyPrefix"), fields, id);
     }
-
     private static FieldSchema ResolveField(ObjectSchema schema, SalesforceSemanticField semantic, string purpose)
     {
         if (semantic is null || string.IsNullOrWhiteSpace(semantic.Label) || semantic.Label.Length > 120)
@@ -317,23 +295,18 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             throw Invalid($"Salesforce field '{semantic.Label}' is unavailable or ambiguous on '{schema.Label}'.");
         return matches[0];
     }
-
     private static void ValidateRecordId(string value, string? keyPrefix)
     {
         if ((value.Length != 15 && value.Length != 18) || value.Any(character => !char.IsAsciiLetterOrDigit(character)) ||
             (!string.IsNullOrWhiteSpace(keyPrefix) && !value.StartsWith(keyPrefix, StringComparison.Ordinal)))
             throw Invalid("The Salesforce record reference is invalid for the resolved entity.");
     }
-
     private static bool SameLabel(string left, string right) =>
         string.Equals(NormalizeLabel(left), NormalizeLabel(right), StringComparison.Ordinal);
-
     private static string NormalizeLabel(string value) =>
         new(value.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
-
     private static string Text(JObject value, string name) => value.Value<string>(name) ?? string.Empty;
     private static bool Flag(JObject value, string name) => value.Value<bool?>(name) ?? false;
-
     private static object? Normalize(object? value) => value switch
     {
         JValue jValue => jValue.Value,
@@ -344,15 +317,11 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
             .ToDictionary(kv => kv.Key, kv => Normalize(kv.Value)),
         _ => value
     };
-
     private static SalesforceReadException Invalid(string message) =>
         new(SalesforceReadFailure.InvalidRequest, message);
-
     private static bool IsSalesforceClientException(Exception ex) =>
         ex is not OperationCanceledException && ex.GetType().Namespace?.StartsWith("Salesforce.", StringComparison.Ordinal) == true;
-
     private sealed record ObjectSchema(string ApiName, string Label, string PluralLabel, string KeyPrefix, IReadOnlyList<FieldSchema> Fields, FieldSchema IdField);
-
     private sealed record FieldSchema(
         string ApiName,
         string Label,
@@ -363,7 +332,6 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
         bool NameField,
         IReadOnlyList<string> ReferenceTo,
         bool Updateable);
-
     private sealed record PreparedUpdateDocument(
         int Version,
         string EntityLabel,

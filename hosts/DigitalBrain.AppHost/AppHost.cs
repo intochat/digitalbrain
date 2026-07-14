@@ -5,9 +5,7 @@ using AnthropicModels = DigitalBrain.Kernel.Contracts.Models.Anthropic;
 using GitHubModels = DigitalBrain.Kernel.Contracts.Models.GitHub;
 using OllamaModels = DigitalBrain.Kernel.Contracts.Models.Ollama;
 using OpenAIModels = DigitalBrain.Kernel.Contracts.Models.OpenAI;
-
 var builder = DistributedApplication.CreateBuilder(args);
-
 var configuredProfile = builder.Configuration["DigitalBrain:Profile"];
 var profile = configuredProfile ?? (builder.ExecutionContext.IsRunMode
     ? "Development"
@@ -32,17 +30,12 @@ IResourceBuilder<ParameterResource>? uiBootstrapSecret = enableDevFlutter
         () => builder.Configuration["Parameters:runtime-ui-bootstrap-secret"] ?? Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
         secret: true)
     : null;
-
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
-
     options.WithLLM<OllamaModels.Llama31_8B>().AsBalanced().WithEmbedding<OllamaModels.MxbaiEmbedLarge>();
-
 });
-
 var salesforceAppConfig = builder.AddSalesforceAppConfig();
 var googleAppConfig = builder.AddGoogleAppConfig();
-
 var kernel = builder.AddProject<Projects.DigitalBrain_RuntimeHost>("kernel");
 ctx.ConfigureServer(kernel);
 kernel.WithEnvironment("DigitalBrain__Profile", profile);
@@ -55,19 +48,15 @@ kernel.WithEnvironment("DigitalBrain__Runtime__StorageNamespace",
     builder.Configuration["DigitalBrain:Runtime:StorageNamespace"] ?? DigitalBrainBuilderExtensions.DefaultRuntimeStorageNamespace);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
 kernel.WithGoogleAppConfig(googleAppConfig);
-
 var featureHost = builder.AddProject<Projects.DigitalBrain_FeatureHost>("feature-host").WithReference(ctx.FeatureArtifacts).WithEnvironment("DigitalBrain__FeatureHost__InternalOrigin", kernel.GetEndpoint("web"))
     .WithEnvironment("DigitalBrain__FeatureHost__InternalToken", featureHostInternalToken)
     .WithReplicas(1);
 ctx.ConfigureClient(featureHost);
 featureHost.WaitFor(ctx.FeatureArtifacts);
 featureHost.WaitFor(kernel);
-
 builder.AddProject<Projects.DigitalBrain_FeatureBuilder>("feature-builder").WithExplicitStart();
-
 if (ctx.EnableMcp)
 {
-
     var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp", launchProfileName: null).WithEnvironment("DigitalBrain__Runtime__OAuth__InternalOrigin", kernel.GetEndpoint("web"))
             .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", sessionSigningKey)
             .WithEnvironment("DigitalBrain__Profile", profile)
@@ -89,15 +78,11 @@ if (ctx.EnableMcp)
     mcp.WaitFor(ctx.SessionStateBlobs);
     mcp.WaitFor(ctx.FeatureArtifacts);
     mcp.WaitFor(kernel);
-
     if (uiBootstrapSecret is not null)
     {
-
         mcp.WithEnvironment("DigitalBrain__Runtime__Ui__BootstrapSecret", uiBootstrapSecret);
-
         var flutter = ctx.AddDefaultDevFlutterClient(mcp, uiBootstrapSecret, endpointName: "https")
                     ?? throw new InvalidOperationException("Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
-
         if (uiOidcIssuer is not null && uiOidcAudience is not null)
         {
             mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Issuer", uiOidcIssuer);
@@ -108,20 +93,15 @@ if (ctx.EnableMcp)
         }
     }
 }
-
 builder.Build().Run();
-
 static bool IsLocalUiProfile(string profile) =>
     profile.Equals("Development", StringComparison.OrdinalIgnoreCase) || profile.Equals("Test", StringComparison.OrdinalIgnoreCase);
-
 static bool IsKnownRuntimeProfile(string profile) =>
     IsLocalUiProfile(profile) || profile.Equals("Production", StringComparison.OrdinalIgnoreCase);
-
 static IResourceBuilder<ParameterResource> AddRuntimeSecret(IDistributedApplicationBuilder builder, string name, bool generateLocalDefault) =>
     generateLocalDefault
         ? builder.AddParameter(name, CreateKeyDefault(), secret: true, persist: true)
         : builder.AddParameter(name, secret: true);
-
 static int? ParseOptionalPort(string? configured)
 {
     if (string.IsNullOrWhiteSpace(configured)) return null;
@@ -129,5 +109,4 @@ static int? ParseOptionalPort(string? configured)
         ? port
         : throw new InvalidOperationException("DigitalBrain:Runtime:Ui:WebPort must be between 1 and 65535.");
 }
-
 static GenerateParameterDefault CreateKeyDefault() => new() { MinLength = 44, Lower = true, Upper = true, Numeric = true, Special = false, MinLower = 1, MinUpper = 1, MinNumeric = 1 };

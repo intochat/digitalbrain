@@ -14,7 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
-
 namespace DigitalBrain.Kernel.Hosting;
 
 internal static class DigitalBrainOrleansExtensions
@@ -28,7 +27,6 @@ internal static class DigitalBrainOrleansExtensions
         var runtimeStorageNamespace = RuntimeStateNamespace.Resolve(builder.Configuration);
         var keyRing = RuntimeStateKeyConfiguration.Load(builder.Configuration, requireConfiguredKeys: requiresDurableStorage, production: builder.Environment.IsProduction());
         var stateProtector = new EncryptedRuntimeStateProtector(keyRing);
-
         builder.Services.AddSingleton(keyRing);
         builder.Services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
         builder.Services.AddSingleton(stateProtector);
@@ -40,7 +38,6 @@ internal static class DigitalBrainOrleansExtensions
             RuntimeStateSchemas.Envelope,
             keyRing.ActiveKekVersion));
         builder.Services.AddHealthChecks().AddCheck<RuntimeStateHealthCheck>("digitalbrain-runtime-state");
-
         var storageCredential = useManagedIdentity ? new DefaultAzureCredential() : null;
         var storageTableServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.table.core.windows.net") : null;
         var storageBlobServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.blob.core.windows.net") : null;
@@ -52,7 +49,6 @@ internal static class DigitalBrainOrleansExtensions
                 ? new BlobServiceClient(storageBlobServiceUri!, storageCredential!, runtimeBlobOptions)
                 : new BlobServiceClient(grainStateConnection!, runtimeBlobOptions)
             : null;
-
         builder.UseOrleans(siloBuilder =>
         {
             siloBuilder.ConfigureServices(services =>
@@ -63,7 +59,6 @@ internal static class DigitalBrainOrleansExtensions
                 else
                     services.AddSingleton<IInoEffectExecutor, DisabledInoEffectExecutor>();
             });
-
             if (!requiresDurableStorage)
             {
                 siloBuilder.UseLocalhostClustering();
@@ -77,17 +72,14 @@ internal static class DigitalBrainOrleansExtensions
             {
                 var clusterId = builder.Configuration["Orleans:ClusterId"] ?? "digitalbrain";
                 var serviceId = builder.Configuration["Orleans:ServiceId"] ?? "digitalbrain";
-
                 siloBuilder.Configure<ClusterOptions>(options =>
                 {
                     options.ClusterId = clusterId;
                     options.ServiceId = serviceId;
                 });
-
                 if (useManagedIdentity)
                 {
                     var tableOptions = new TableClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
-
                     siloBuilder.UseAzureStorageClustering(options =>
                         options.TableServiceClient = new TableServiceClient(storageTableServiceUri!, storageCredential!, tableOptions));
                     siloBuilder.UseAzureTableReminderService(options =>
@@ -102,7 +94,6 @@ internal static class DigitalBrainOrleansExtensions
                 else
                 {
                     var tableOptions = new TableClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
-
                     siloBuilder.UseAzureStorageClustering(options =>
                         options.TableServiceClient = new TableServiceClient(clusteringConnection!, tableOptions));
                     siloBuilder.UseAzureTableReminderService(options =>
@@ -115,19 +106,15 @@ internal static class DigitalBrainOrleansExtensions
                     ConfigureRuntimeStateStorage(siloBuilder, grainStateBlobs, runtimeStorageNamespace);
                 }
             }
-
         });
-
         return builder;
     }
-
     private static void ConfigureRuntimeStateStorage(ISiloBuilder siloBuilder, BlobServiceClient blobs, string storageNamespace)
     {
         Add(RuntimeStateStorageProviders.Conversations);
         Add(RuntimeStateStorageProviders.SurfaceFeeds);
         Add(RuntimeStateStorageProviders.Sessions);
         return;
-
         void Add(string providerName) => siloBuilder.AddAzureBlobGrainStorage(providerName, options =>
         {
             options.BlobServiceClient = blobs;
@@ -142,7 +129,6 @@ internal static class DigitalBrainOrleansExtensions
                 });
         });
     }
-
     private static string RequireConnectionString(IConfiguration configuration, string name)
     {
         var value = configuration.GetConnectionString(name);
@@ -150,19 +136,15 @@ internal static class DigitalBrainOrleansExtensions
             ? value
             : throw new InvalidOperationException($"ConnectionStrings:{name} is required for hosted or Production Orleans storage.");
     }
-
     public static IHostApplicationBuilder AddDigitalBrainClients(this IHostApplicationBuilder builder)
     {
         builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
         var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted(builder.Configuration);
-
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
         var useManagedIdentity = !string.IsNullOrWhiteSpace(storageAccountName);
-
         var storageCredential = useManagedIdentity ? new DefaultAzureCredential() : null;
         var storageTableServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.table.core.windows.net") : null;
         var storageBlobServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.blob.core.windows.net") : null;
-
         if (isAspireHosted && !useManagedIdentity)
         {
             var clusteringServiceKey = builder.Configuration["Orleans:Clustering:ServiceKey"] ?? "clustering";
@@ -173,18 +155,15 @@ internal static class DigitalBrainOrleansExtensions
                 builder.Configuration[$"Orleans:GrainStorage:{RuntimeStateStorageProviders.SurfaceFeeds}:ServiceKey"] ?? "surfacefeedstate",
                 builder.Configuration[$"Orleans:GrainStorage:{RuntimeStateStorageProviders.Sessions}:ServiceKey"] ?? "sessionstate"
             };
-
             builder.AddKeyedAzureTableServiceClient(clusteringServiceKey, settings => settings.DisableTracing = true);
             foreach (var serviceKey in grainStorageServiceKeys.Distinct(StringComparer.Ordinal))
                 builder.AddKeyedAzureBlobServiceClient(serviceKey, settings => settings.DisableTracing = true);
-
             builder.AddAzureBlobServiceClient("grainstate", settings =>
             {
                 settings.DisableHealthChecks = true;
                 settings.DisableTracing = true;
             });
         }
-
         builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
         TableClient? memoryTable = null;
         if (useManagedIdentity)
@@ -199,13 +178,11 @@ internal static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton<ICapabilityDispatcher, CapabilityDispatcher>();
         builder.Services.AddHostedService<CapabilityDispatcherStartupValidation>();
         builder.Services.AddSingleton<IAgentWorkflowRunner, AgentFrameworkWorkflowRunner>();
-
         BlobServiceClient? integrationConfigBlobs = null;
         if (isAspireHosted)
         {
             var blobOptions = new BlobClientOptions();
             blobOptions.Diagnostics.IsDistributedTracingEnabled = false;
-
             if (useManagedIdentity)
             {
                 integrationConfigBlobs = new BlobServiceClient(storageBlobServiceUri!, storageCredential!, blobOptions);
@@ -221,7 +198,6 @@ internal static class DigitalBrainOrleansExtensions
         }
         builder.Services.AddIntegrationConfigStore(integrationConfigBlobs);
         builder.Services.AddSingleton<DigitalBrain.Kernel.Contracts.IOAuthStateProtector, DataProtectionOAuthStateProtector>();
-
         return builder;
     }
 }

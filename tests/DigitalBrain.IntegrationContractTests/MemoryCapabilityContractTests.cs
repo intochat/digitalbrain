@@ -284,7 +284,7 @@ public sealed class MemoryCapabilityContractTests
             1,
             null,
             new GrantRevision(1),
-            JsonSerializer.SerializeToElement(new { }),
+            JsonSerializer.SerializeToElement(new { allowedToolIds = new[] { capabilityId } }),
             true,
             false);
 
@@ -318,7 +318,7 @@ public sealed class MemoryCapabilityContractTests
                 request.CapabilityVersion,
                 request.ProviderConnectionId,
                 request.GrantRevision,
-                JsonSerializer.SerializeToElement(new { }),
+                JsonSerializer.SerializeToElement(new { allowedToolIds = new[] { request.CapabilityId } }),
                 Enabled,
                 false));
     }

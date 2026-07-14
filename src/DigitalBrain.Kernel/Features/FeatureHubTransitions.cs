@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Features;
 
 internal static class FeatureHubTransitions
@@ -24,7 +24,6 @@ internal static class FeatureHubTransitions
                 throw new FeatureConcurrencyException("The release digest is already bound to different metadata.");
             return state;
         }
-
         var active = state.Authorities.FirstOrDefault(candidate =>
             candidate.InstallationId == proposal.InstallationId)?.ActiveRelease;
         var priorCapabilities = active is { } digest
@@ -49,7 +48,6 @@ internal static class FeatureHubTransitions
             : [.. state.Releases, release];
         return state with { Releases = releases, Approvals = [.. state.Approvals, approval], Revision = nextRevision };
     }
-
     public static FeatureHubState Decide(FeatureHubState state, FeatureApprovalDecision decision, long expectedRevision, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -76,7 +74,6 @@ internal static class FeatureHubTransitions
         };
         return state with { Approvals = approvals, Revision = nextRevision };
     }
-
     public static FeatureHubState Grant(FeatureHubState state, FeatureGrantRequest request, long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -89,7 +86,6 @@ internal static class FeatureHubTransitions
         var grants = ValidateGrants(request.Grants);
         if (!SameGrants(grants, approval.Grants))
             throw new FeatureConcurrencyException("The exact approved capability grants are required.");
-
         var index = Array.FindIndex(state.Authorities, candidate =>
             candidate.InstallationId == request.InstallationId);
         var current = index >= 0 ? state.Authorities[index] : null;
@@ -111,7 +107,6 @@ internal static class FeatureHubTransitions
         else authorities = [.. authorities, authority];
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureHubState Activate(FeatureHubState state, FeatureInstallationId installationId, long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -135,7 +130,6 @@ internal static class FeatureHubTransitions
         };
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureHubState PauseAuthority(FeatureHubState state, FeatureInstallationId installationId, string reason, long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -150,7 +144,6 @@ internal static class FeatureHubTransitions
         authorities[index] = authorities[index] with { Paused = true, PauseReason = reason };
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureHubState ResumeAuthority(FeatureHubState state, FeatureInstallationId installationId, long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -161,7 +154,6 @@ internal static class FeatureHubTransitions
         authorities[index] = authorities[index] with { Paused = false, PauseReason = null };
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureHubState Revoke(FeatureHubState state, FeatureGrantRevocation revocation, long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -175,7 +167,6 @@ internal static class FeatureHubTransitions
         authorities[index] = next;
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureHubState RollbackAuthority(FeatureHubState state, FeatureInstallationId installationId, long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -196,7 +187,6 @@ internal static class FeatureHubTransitions
         };
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureGrantState? ReadGrant(FeatureHubState state, FeatureGrantLookup lookup)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -208,7 +198,6 @@ internal static class FeatureHubTransitions
             return FindGrant(authority.ActiveGrants, lookup);
         return authority.PreviousRelease == lookup.Release ? FindGrant(authority.PreviousGrants, lookup) : null;
     }
-
     public static FeatureHubState Register(FeatureHubState state, FeatureInstallationRegistration registration)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -222,7 +211,6 @@ internal static class FeatureHubTransitions
                 !string.Equals(subscription, subscription.Trim(), StringComparison.Ordinal)) ||
             registration.Subscriptions.Distinct(StringComparer.Ordinal).Count() != registration.Subscriptions.Length)
             throw new ArgumentException("Canonical unique feature subscriptions are required.", nameof(registration));
-
         var existing = Array.FindIndex(
             state.Installations,
             candidate => candidate.InstallationId == registration.InstallationId);
@@ -232,13 +220,10 @@ internal static class FeatureHubTransitions
             replaced[existing] = registration;
             return state with { Installations = replaced, Revision = checked(state.Revision + 1) };
         }
-
         if (state.Installations.Length >= FeatureLimits.InstallationsPerOwner)
             throw new FeatureLimitExceededException("An owner can have at most 100 feature installations.");
-
         return state with { Installations = [.. state.Installations, registration], Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureHubState BeginFanOut(FeatureHubState state, FeatureInput input)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -251,7 +236,6 @@ internal static class FeatureHubTransitions
                 throw new FeatureConcurrencyException("The fan-out input id is already bound to different content.");
             return state;
         }
-
         var deliveries = state.Installations.Where(registration => registration.Subscriptions.Any(
                 subscription => string.Equals(subscription, input.Kind, StringComparison.Ordinal)))
             .Select(registration => new FeatureFanOutDeliveryState(registration.InstallationId, false))
@@ -270,7 +254,6 @@ internal static class FeatureHubTransitions
         FeatureFanOutState[] fanOuts = [.. retained, batch];
         return state with { FanOuts = fanOuts, Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureHubState RecordDeliveries(FeatureHubState state, string inputId, IReadOnlySet<FeatureInstallationId> delivered)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -290,7 +273,6 @@ internal static class FeatureHubTransitions
         fanOuts[index] = batch with { Deliveries = deliveries };
         return state with { FanOuts = fanOuts, Revision = checked(state.Revision + 1) };
     }
-
     public static FeatureHubState RecordDeliveryOutcomes(FeatureHubState state, string inputId, IReadOnlyList<FeatureDeliveryAttempt> attempts, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(attempts);
@@ -320,7 +302,6 @@ internal static class FeatureHubTransitions
             full.Contains(authority.InstallationId) ? authority with { Paused = true, PauseReason = "feature inbox full" } : authority).ToArray();
         return next with { Alerts = alerts.ToArray(), Authorities = authorities, Revision = checked(next.Revision + 1) };
     }
-
     private static FeatureReleaseMetadata ValidateRelease(FeatureReleaseMetadata release)
     {
         ArgumentNullException.ThrowIfNull(release);
@@ -331,7 +312,6 @@ internal static class FeatureHubTransitions
         var dependencies = CanonicalValues(release.Dependencies, "dependency");
         return release with { RequestedCapabilities = capabilities, Dependencies = dependencies };
     }
-
     private static FeatureGrantState[] ValidateGrants(FeatureGrantSpec[] grants)
     {
         ArgumentNullException.ThrowIfNull(grants);
@@ -349,8 +329,9 @@ internal static class FeatureHubTransitions
             try
             {
                 using var document = JsonDocument.Parse(grant.ConstraintsJson);
-                if (document.RootElement.ValueKind != JsonValueKind.Object)
-                    throw new JsonException();
+                var constraints = CapabilityGrantConstraintPolicy.CopyValidated(document.RootElement);
+                if (!CapabilityGrantConstraintPolicy.AllowsTool(constraints, grant.CapabilityId))
+                    throw new ArgumentException("Capability constraints must allow the exact granted capability.", nameof(grants));
             }
             catch (JsonException exception)
             {
@@ -366,20 +347,17 @@ internal static class FeatureHubTransitions
             .ThenBy(grant => grant.CapabilityVersion)
             .ToArray();
     }
-
     private static bool SameGrants(IReadOnlyList<FeatureGrantState> left, IReadOnlyList<FeatureGrantState> right) =>
         left.Count == right.Count && left.Zip(right).All(pair =>
             pair.First.CapabilityId == pair.Second.CapabilityId && pair.First.CapabilityVersion == pair.Second.CapabilityVersion &&
             pair.First.ProviderConnectionId == pair.Second.ProviderConnectionId &&
             string.Equals(pair.First.ConstraintsJson, pair.Second.ConstraintsJson, StringComparison.Ordinal) &&
             string.Equals(pair.First.Provider, pair.Second.Provider, StringComparison.Ordinal));
-
     private static bool SameRelease(FeatureReleaseMetadata left, FeatureReleaseMetadata right) =>
         left.Digest == right.Digest && string.Equals(left.SourceReference, right.SourceReference, StringComparison.Ordinal) &&
         left.SourceKind == right.SourceKind &&
         left.RequestedCapabilities.SequenceEqual(right.RequestedCapabilities, StringComparer.Ordinal) &&
         left.Dependencies.SequenceEqual(right.Dependencies, StringComparer.Ordinal);
-
     private static string? ValidateProvider(string? provider, ProviderConnectionId? connection)
     {
         if (provider is null)
@@ -393,7 +371,6 @@ internal static class FeatureHubTransitions
             throw new ArgumentException("A bounded canonical provider key is required.", nameof(provider));
         return provider;
     }
-
     private static string[] CanonicalValues(string[] values, string kind)
     {
         ArgumentNullException.ThrowIfNull(values);
@@ -402,26 +379,21 @@ internal static class FeatureHubTransitions
             throw new ArgumentException($"Canonical unique {kind} identifiers are required.", nameof(values));
         return values.Order(StringComparer.Ordinal).ToArray();
     }
-
     private static string ApprovalId(FeatureInstallationId installationId, ReleaseDigest release, long revision) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"digitalbrain.v3.feature-approval\0{installationId.Value}\0{release.Value}\0{revision}")));
-
     private static void DemandRevision(FeatureHubState state, long expectedRevision)
     {
         if (state.Revision != expectedRevision)
             throw new FeatureConcurrencyException("The feature hub revision changed.");
     }
-
     private static int AuthorityIndex(FeatureHubState state, FeatureInstallationId installationId)
     {
         var index = Array.FindIndex(state.Authorities, candidate => candidate.InstallationId == installationId);
         return index >= 0 ? index : throw new KeyNotFoundException("The feature installation authority does not exist.");
     }
-
     private static FeatureGrantState? FindGrant(FeatureGrantState[] grants, FeatureGrantLookup lookup) =>
         grants.FirstOrDefault(grant =>
             string.Equals(grant.CapabilityId, lookup.CapabilityId, StringComparison.Ordinal) &&
             grant.CapabilityVersion == lookup.CapabilityVersion);
-
     private static FeatureInstallationAuthorityState RemoveGrant(FeatureInstallationAuthorityState authority, FeatureGrantRevocation revocation)
     {
         var active = authority.ActiveRelease == revocation.Release
@@ -446,7 +418,6 @@ internal static class FeatureHubTransitions
             PreviousGrantRevision = authority.PreviousRelease == revocation.Release ? nextRevision : authority.PreviousGrantRevision
         };
     }
-
     private static bool Matches(FeatureGrantState grant, FeatureGrantRevocation revocation) =>
         string.Equals(grant.CapabilityId, revocation.CapabilityId, StringComparison.Ordinal) &&
         grant.CapabilityVersion == revocation.CapabilityVersion;

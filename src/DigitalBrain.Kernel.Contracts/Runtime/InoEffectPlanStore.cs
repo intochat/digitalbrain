@@ -1,5 +1,4 @@
 using DigitalBrain.Kernel.Contracts.Runtime;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 public interface IInoEffectPlanStore
@@ -12,7 +11,6 @@ public interface IInoEffectPlanStore
         string safeSummary,
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken = default);
-
     Task<InoToolRequest> PrepareIdempotentAsync(
         string idempotencyKey,
         string actorScope,

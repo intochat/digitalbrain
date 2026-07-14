@@ -6,19 +6,13 @@ using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
-
 namespace DigitalBrain.Mcp;
 
 public sealed record RuntimeFeedPage(IReadOnlyList<StoredSurfaceRecord> Items, bool ResetRequired, long LatestSequence);
-
 public sealed record PreparedRuntimeFeed(SurfaceFeedState State, IReadOnlyDictionary<string, SurfaceActionToken> ActionTokens);
-
 public sealed record AuthorizedRuntimeAction(ActionSubmission Submission, SurfaceActionBinding? Binding, string ConversationId);
-
 internal sealed record ApprovalDecisionInput(string OperationId, string ApprovalId, bool Approved, string ClientDecisionId);
-
 internal sealed record FeatureReleaseDecisionInput(string ApprovalId, string ReleaseDigest, long ExpectedRevision, bool Approved, string ClientDecisionId);
-
 internal static class FeatureApprovalSurface
 {
     public const string SurfaceId = "surface.feature-approval";
@@ -27,11 +21,9 @@ internal static class FeatureApprovalSurface
     public static readonly string[] RequiredCapabilities =
         ["ui.protocol.v2", "ui.payload.native", "ui.native.feature-approval", "ui.native.typed-actions"];
 }
-
 public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider timeProvider, SessionTokenService actionCapabilities)
 {
     private static readonly TimeSpan CursorLifetime = TimeSpan.FromDays(30);
-
     public async Task<string> ResolveActiveConversationIdAsync(RuntimeRequestContext context, CancellationToken cancellationToken)
     {
         DemandActor(context);
@@ -39,7 +31,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         var state = await EnsureInitializedAsync(context, neuron, cancellationToken).ConfigureAwait(false);
         return ActiveConversationId(context, state);
     }
-
     public async Task<PreparedRuntimeFeed> PrepareSessionAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
@@ -54,10 +45,8 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         if (conversationState.Outbox.Any(entry => entry.DispatchedAt is null))
             await cluster.GetGrain<IInoConversationOutboxDispatcherGrain>(conversationGrainKey).ScheduleAsync().WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
-
         return new(state, IssueActionCapabilities(context, state));
     }
-
     public async Task PublishFeatureApprovalAsync(RuntimeRequestContext context, FeatureApprovalSnapshot approval, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
@@ -127,13 +116,11 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
                 null)]);
         await feed.ApplyProjectionAsync(state.Revision, projection, now).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
-
     private static JsonElement ParseJson(string json)
     {
         using var document = JsonDocument.Parse(json);
         return document.RootElement.Clone();
     }
-
     public async Task RestoreConversationSurfaceAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
@@ -145,7 +132,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             .ConfigureAwait(false);
         await EnsureHomeSurfaceAsync(context with { ConversationId = conversationId }, feed, state, cancellationToken).ConfigureAwait(false);
     }
-
     public RuntimeFeedPage ReadPage(RuntimeRequestContext context, SurfaceFeedState state, long afterSequence, int limit)
     {
         DemandActor(context);
@@ -173,10 +159,8 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             .ToArray();
         return new(items, reset, state.LastSequence);
     }
-
     public async Task<SurfaceFeedState> ReadAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default) =>
         await Feed(context).ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-
     public async Task RecordDeliveredAsync(RuntimeRequestContext context, long sequence, CancellationToken cancellationToken = default)
     {
         var neuron = Feed(context);
@@ -188,7 +172,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             current => neuron.RecordDeliveryAsync(current.Revision, deliveryId, sequence, timeProvider.GetUtcNow()),
             cancellationToken).ConfigureAwait(false);
     }
-
     public async Task<long> AcknowledgeAsync(RuntimeRequestContext context, long sequence, CancellationToken cancellationToken = default)
     {
         var neuron = Feed(context);
@@ -206,7 +189,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         return state.Acknowledgements.First(cursor =>
             string.Equals(cursor.SessionScopeHash, RuntimeStateKeys.Session(context.SessionId.Value), StringComparison.Ordinal)).Sequence;
     }
-
     public async Task<AuthorizedRuntimeAction> AuthorizeActionAsync(
         RuntimeRequestContext context,
         string bindingId,
@@ -349,7 +331,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             consumption.AuthorizedBinding,
             activeConversationId);
     }
-
     private SurfaceActionBinding DemandBinding(SurfaceFeedState state, RuntimeRequestContext context, string bindingId, string surfaceId, int surfaceRevision)
     {
         var surface = state.CurrentSurfaces.FirstOrDefault(candidate =>
@@ -365,7 +346,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             throw new ActionRejectedException(ActionRejection.PolicyDenied);
         return binding;
     }
-
     public async Task WaitForChangeAsync(RuntimeRequestContext context, long afterSequence, CancellationToken cancellationToken)
     {
         while (true)
@@ -376,7 +356,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken).ConfigureAwait(false);
         }
     }
-
     private async Task<SurfaceFeedState> EnsureInitializedAsync(RuntimeRequestContext context, ISurfaceFeedNeuron neuron, CancellationToken cancellationToken)
     {
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -397,7 +376,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             return state;
         }
     }
-
     private async Task<SurfaceFeedState> EnsureHomeSurfaceAsync(RuntimeRequestContext context, ISurfaceFeedNeuron neuron, SurfaceFeedState initial, CancellationToken cancellationToken)
     {
         var state = initial;
@@ -420,10 +398,8 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         }
         throw new InvalidOperationException("Surface-feed home-surface revision retry exhausted.");
     }
-
     private ISurfaceFeedNeuron Feed(RuntimeRequestContext context) =>
         cluster.GetGrain<ISurfaceFeedNeuron>(RuntimeStateKeys.SurfaceFeed(context.OwnerId, context.ActorId));
-
     private async Task<SurfaceFeedState> RenewActionBindingsAsync(ISurfaceFeedNeuron neuron, SurfaceFeedState initial, CancellationToken cancellationToken)
     {
         var state = initial;
@@ -441,7 +417,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         }
         throw new InvalidOperationException("Surface-feed action-binding renewal revision retry exhausted.");
     }
-
     private IReadOnlyDictionary<string, SurfaceActionToken> IssueActionCapabilities(RuntimeRequestContext context, SurfaceFeedState state)
     {
         var now = timeProvider.GetUtcNow();
@@ -460,13 +435,11 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         }
         return issued;
     }
-
     private void DemandActionCapability(RuntimeRequestContext context, string actionToken, SurfaceActionBinding binding)
     {
         if (!actionCapabilities.TryValidateActionCapability(actionToken, context, binding.BindingId, binding.SurfaceId, binding.SurfaceRevision, binding.TokenHash))
             throw new ActionRejectedException(ActionRejection.Forged);
     }
-
     private static StoredSurfaceRecord ToStoredRecord(RuntimeRequestContext context, SurfaceFeedState state, SurfaceFeedRecord surface, bool includeActions)
     {
         var presentation = ReadPresentation(surface);
@@ -491,7 +464,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             presentation.Payload,
             actions);
     }
-
     private static StoredActionBinding ToStoredBinding(SurfaceActionBinding binding) => new(
         binding.BindingId,
         binding.ActionType,
@@ -500,7 +472,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         binding.MaxUses,
         binding.ExpiresAt,
         binding.ActionSchemaVersion);
-
     private static string ActiveConversationId(RuntimeRequestContext context, SurfaceFeedState state)
     {
         var current = state.CurrentSurfaces.FirstOrDefault(surface =>
@@ -511,7 +482,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             return presentation.CauseId;
         return InoConversationIdentity.From(context);
     }
-
     private static bool IsCanonicalConversationId(string? value)
     {
         if (value is null || value.Length != 68 || !value.StartsWith("ino-", StringComparison.Ordinal)) return false;
@@ -520,7 +490,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
                 return false;
         return true;
     }
-
     private static SurfaceFeedPresentation ReadPresentation(SurfaceFeedRecord surface)
     {
         try
@@ -533,7 +502,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             throw new RuntimeStateIntegrityException("invalid surface presentation");
         }
     }
-
     private async Task DemandAwaitingApprovalAsync(RuntimeRequestContext context, string conversationId, ApprovalDecisionInput decision, CancellationToken cancellationToken)
     {
         var conversation = cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(context.OwnerId, context.ActorId, conversationId));
@@ -545,7 +513,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             operation.Approval?.DecisionId is not null)
             throw new ActionRejectedException(ActionRejection.Unavailable);
     }
-
     private static void DemandApprovalMatchesBoundSurface(SurfaceFeedState state, SurfaceActionBinding binding, ApprovalDecisionInput decision)
     {
         if (!string.Equals(binding.ActionType, ConversationSurfacePayload.ApprovalActionType, StringComparison.Ordinal))
@@ -563,7 +530,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             !string.Equals(approvalId.GetString(), decision.ApprovalId, StringComparison.Ordinal))
             throw new ActionRejectedException(ActionRejection.PolicyDenied);
     }
-
     private static void DemandFeatureDecisionMatchesBoundSurface(SurfaceFeedState state, SurfaceActionBinding binding, FeatureReleaseDecisionInput decision)
     {
         if (!string.Equals(binding.ActionType, FeatureApprovalSurface.ActionType, StringComparison.Ordinal))
@@ -582,7 +548,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             expectedRevision != decision.ExpectedRevision)
             throw new ActionRejectedException(ActionRejection.PolicyDenied);
     }
-
     private static JsonElement AuthorizeInput(SurfaceActionBinding binding, JsonElement input)
     {
         if (binding.ActionSchemaVersion != UiProtocol.ActionSchemaVersion)
@@ -601,7 +566,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             return CanonicalFeatureReleaseDecision(featureDecision);
         throw new ActionRejectedException(ActionRejection.PolicyDenied);
     }
-
     private static JsonElement CanonicalFeatureReleaseDecision(FeatureReleaseDecisionInput decision) =>
         JsonSerializer.SerializeToElement(new
         {
@@ -611,7 +575,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             decision = decision.Approved ? "approve" : "reject",
             clientDecisionId = decision.ClientDecisionId
         });
-
     private static JsonElement CanonicalApprovalDecision(ApprovalDecisionInput decision) =>
         JsonSerializer.SerializeToElement(new
         {
@@ -620,7 +583,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
             decision = decision.Approved ? "approve" : "reject",
             clientDecisionId = decision.ClientDecisionId
         });
-
     private static bool TryReadPrompt(JsonElement input, out string prompt, out string? clientSubmissionId)
     {
         prompt = string.Empty;
@@ -644,7 +606,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         prompt = value.GetString()?.Trim() ?? string.Empty;
         return prompt.Length is > 0 and <= 4096;
     }
-
     internal static bool TryReadApprovalDecision(JsonElement input, out ApprovalDecisionInput decision)
     {
         decision = default!;
@@ -669,7 +630,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         decision = new(operationId!, approvalId!, decisionText == "approve", clientDecisionId);
         return true;
     }
-
     internal static bool TryReadFeatureReleaseDecision(JsonElement input, out FeatureReleaseDecisionInput decision)
     {
         decision = default!;
@@ -696,13 +656,10 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         decision = new FeatureReleaseDecisionInput(approvalId, releaseDigest, expectedRevision, string.Equals(actionValue, "approve", StringComparison.Ordinal), clientDecisionId);
         return true;
     }
-
     private static bool IsOpaqueId(string? value) =>
         !string.IsNullOrWhiteSpace(value) && value.Length <= 256 && !value.Any(char.IsControl);
-
     private static string StableIdempotencyKey(RuntimeRequestContext context, string clientSubmissionId) =>
         "client-submission-" + Hash(RequestScope.Id(context) + "\0" + clientSubmissionId);
-
     private static string CanonicalJson(JsonElement input)
     {
         using var stream = new MemoryStream();
@@ -711,7 +668,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
     }
-
     private static void WriteCanonical(Utf8JsonWriter writer, JsonElement value)
     {
         switch (value.ValueKind)
@@ -735,7 +691,6 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
                 break;
         }
     }
-
     private static async Task<SurfaceFeedState> RetryConflictAsync(ISurfaceFeedNeuron neuron, SurfaceFeedState initial, Func<SurfaceFeedState, Task<SurfaceFeedState>> update, CancellationToken cancellationToken)
     {
         var state = initial;
@@ -749,17 +704,13 @@ public sealed class RuntimeSurfaceFeed(IClusterClient cluster, TimeProvider time
         }
         throw new InvalidOperationException("Surface-feed revision retry exhausted.");
     }
-
     private static string DeliveryId(string sessionId, long sequence) =>
         Hash(sessionId + "\0" + sequence.ToString(System.Globalization.CultureInfo.InvariantCulture));
-
     private static string Hash(string value) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
-
     private static void DemandActor(RuntimeRequestContext context)
     {
         if (string.IsNullOrWhiteSpace(context.ActorId.Value) || string.IsNullOrWhiteSpace(context.SessionId.Value))
             throw new UnauthorizedAccessException("An actor session is required for the surface feed.");
     }
-
 }

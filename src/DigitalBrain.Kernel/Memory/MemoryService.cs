@@ -1,7 +1,6 @@
 using System.Text;
 using DigitalBrain.Features.Sdk;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Memory;
 
 internal sealed class MemoryService
@@ -9,13 +8,11 @@ internal sealed class MemoryService
     public const int MaximumFactsPerOwner = 2_000;
     private readonly IMemoryFactStore _store;
     private readonly IMemoryAuditSink _audit;
-
     public MemoryService(IMemoryFactStore store, IMemoryAuditSink audit)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _audit = audit ?? throw new ArgumentNullException(nameof(audit));
     }
-
     public async Task<IReadOnlyList<MemoryFact>> RecallAsync(BrainOwnerId ownerId, ActorId actorId, MemoryRecallRequest request, string correlationId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -36,7 +33,6 @@ internal sealed class MemoryService
         await Audit(ownerId, actorId, "recall", null, "Succeeded", correlationId, cancellationToken);
         return ranked;
     }
-
     public async Task<MemoryWriteStatus> RememberAsync(
         BrainOwnerId ownerId,
         ActorId actorId,
@@ -53,7 +49,6 @@ internal sealed class MemoryService
         await Audit(ownerId, actorId, "remember", factId, status.ToString(), correlationId, cancellationToken);
         return status;
     }
-
     public async Task<MemoryFactSnapshot> InspectAsync(BrainOwnerId ownerId, ActorId actorId, string factId, string correlationId, CancellationToken cancellationToken = default)
     {
         Validate(ownerId, actorId, correlationId);
@@ -62,7 +57,6 @@ internal sealed class MemoryService
         await Audit(ownerId, actorId, "inspect", factId, "Succeeded", correlationId, cancellationToken);
         return fact;
     }
-
     public async Task<IReadOnlyList<MemoryFactSnapshot>> ExportAsync(BrainOwnerId ownerId, ActorId actorId, string correlationId, CancellationToken cancellationToken = default)
     {
         Validate(ownerId, actorId, correlationId);
@@ -70,7 +64,6 @@ internal sealed class MemoryService
         await Audit(ownerId, actorId, "export", null, "Succeeded", correlationId, cancellationToken);
         return facts.OrderBy(fact => fact.FactId, StringComparer.Ordinal).ToArray();
     }
-
     public async Task<MemoryFactSnapshot> CorrectAsync(
         BrainOwnerId ownerId,
         ActorId actorId,
@@ -91,7 +84,6 @@ internal sealed class MemoryService
         await Audit(ownerId, actorId, "correct", factId, "Replaced", correlationId, cancellationToken);
         return updated;
     }
-
     public async Task<bool> ForgetAsync(BrainOwnerId ownerId, ActorId actorId, string factId, string expectedETag, string correlationId, CancellationToken cancellationToken = default)
     {
         Validate(ownerId, actorId, correlationId);
@@ -101,7 +93,6 @@ internal sealed class MemoryService
         await Audit(ownerId, actorId, "forget", factId, deleted ? "Deleted" : "NotFound", correlationId, cancellationToken);
         return deleted;
     }
-
     private static HashSet<string> Tokens(string value)
     {
         var tokens = new HashSet<string>(StringComparer.Ordinal);
@@ -122,16 +113,13 @@ internal sealed class MemoryService
             tokens.Add(current.ToString());
         return tokens;
     }
-
     private static void Validate(BrainOwnerId ownerId, ActorId actorId, string correlationId)
     {
         MemoryValues.Key(ownerId.Value, nameof(ownerId));
         MemoryValues.Key(actorId.Value, nameof(actorId));
         MemoryValues.Key(correlationId, nameof(correlationId));
     }
-
     private ValueTask Audit(BrainOwnerId ownerId, ActorId actorId, string operation, string? factId, string outcome, string correlationId, CancellationToken cancellationToken) =>
         _audit.WriteAsync(new MemoryAuditRecord(ownerId, actorId, operation, factId, outcome, correlationId), cancellationToken);
-
     private sealed record RankedFact(MemoryFactSnapshot Fact, int ExactTags, int TokenOverlap);
 }

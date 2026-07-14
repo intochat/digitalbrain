@@ -1,7 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Capabilities;
 
 internal sealed class FeatureCapabilityGrantSource(IGrainFactory grains) : ICapabilityGrantSource

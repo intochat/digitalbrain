@@ -1,14 +1,12 @@
 using System.Diagnostics;
 using DigitalBrain.Kernel.Contracts;
 using Orleans.Runtime;
-
 namespace DigitalBrain.Kernel.Features;
 
 [GrainType("digitalbrain.v3.feature-installation")]
 internal sealed class FeatureInstallationGrain([PersistentState("feature-installation")] IPersistentState<FeatureInstallationState> persistentState, TimeProvider timeProvider) : Grain, IFeatureInstallationGrain
 {
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Features.Installation");
-
     public async Task InitializeAsync(ReleaseDigest release)
     {
         using var activity = Start("initialize");
@@ -21,7 +19,6 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
         }
         await WriteAsync(FeatureInstallationState.Create(release, installationId));
     }
-
     public async Task<FeatureAppendStatus> AppendAsync(FeatureInput input)
     {
         using var activity = Start("append", input);
@@ -32,7 +29,6 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
         }
         return transition.Status;
     }
-
     public async Task<FeatureRunClaim?> ClaimAsync(string hostId, TimeSpan leaseDuration)
     {
         using var activity = Start("claim");
@@ -43,7 +39,6 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
         }
         return transition.Claim;
     }
-
     public async Task<FeatureFailureDisposition> FailAsync(FeatureLeaseFence fence, DateTimeOffset retryAt, string safeFailure)
     {
         using var activity = Start("fail");
@@ -53,7 +48,6 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
             ? FeatureFailureDisposition.Parked
             : FeatureFailureDisposition.RetryScheduled;
     }
-
     public async Task<FeatureAppendStatus> RecordScheduleOccurrenceAsync(FeatureScheduleOccurrence occurrence)
     {
         using var activity = Start("schedule", correlationId: occurrence.CorrelationId, traceId: occurrence.TraceId);
@@ -64,7 +58,6 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
         }
         return transition.Status;
     }
-
     public async Task<FeatureCompletionReceipt> CommitAsync(FeatureRunCommit commit)
     {
         using var activity = Start("commit");
@@ -75,7 +68,6 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
         }
         return Receipt(transition.Completion);
     }
-
     public Task<FeatureIntentStatus[]> ListPendingIntentsAsync()
     {
         using var activity = Start("list-intents");
@@ -83,7 +75,6 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
             .Select(IntentStatus)
             .ToArray());
     }
-
     public async Task ApplyIntentAsync(string operationKey)
     {
         using var activity = Start("apply-intent");
@@ -92,16 +83,11 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
             return;
         await WriteAsync(next);
     }
-
     public Task PauseAsync(string reason) => PersistAsync("pause", state => FeatureInstallationTransitions.Pause(state, reason));
-
     public Task ResumeAsync() => PersistAsync("resume", FeatureInstallationTransitions.Resume);
-
     public Task SwitchReleaseAsync(ReleaseDigest release) =>
         PersistAsync("switch-release", state => FeatureInstallationTransitions.SwitchRelease(state, release));
-
     public Task RollbackAsync() => PersistAsync("rollback", FeatureInstallationTransitions.Rollback);
-
     public Task<FeatureInstallationSnapshot> ReadAsync()
     {
         using var activity = Start("read");
@@ -121,7 +107,6 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
             state.Revision,
             state.Inbox.Where(entry => entry.Parked).Select(entry => new FeatureParkedInput(entry.Input, entry.Attempts, entry.LastFailure)).ToArray()));
     }
-
     private async Task PersistAsync(string operation, Func<FeatureInstallationState, FeatureInstallationState> transition)
     {
         using var activity = Start(operation);
@@ -130,20 +115,16 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
             return;
         await WriteAsync(next);
     }
-
     private async Task WriteAsync(FeatureInstallationState next)
     {
         await PersistedStateReconciliation.WriteWithRollbackAsync(persistentState, next, FeatureStateEquality.Same);
     }
-
     private FeatureInstallationState RequiredState() =>
         persistentState.RecordExists && persistentState.State is not null
             ? persistentState.State
             : throw new InvalidOperationException("The feature installation has not been initialized.");
-
     private (BrainOwnerId OwnerId, FeatureInstallationId InstallationId) ParseKey() =>
         FeatureGrainIds.ParseInstallation(this.GetPrimaryKeyString());
-
     private Activity? Start(string operation, FeatureInput? input = null, string? correlationId = null, string? traceId = null)
     {
         var activity = ActivitySource.StartActivity(operation);
@@ -153,11 +134,8 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
         activity?.SetTag("feature.trace_id", traceId ?? input?.TraceId);
         return activity;
     }
-
     private static FeatureCompletionReceipt Receipt(FeatureCompletion completion) => new(completion.InputId, completion.Fence, completion.ResultJson, completion.CompletedAt, completion.CommitDigest, completion.InputDigest);
-
     private static FeatureIntentStatus IntentStatus(PersistedFeatureIntent intent) => new(intent.OperationKey, intent.Kind, intent.PayloadJson, intent.AppliedAt);
-
     private static T Domain<T>(Func<T> transition)
     {
         try

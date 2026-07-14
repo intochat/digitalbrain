@@ -26,10 +26,10 @@ public sealed class AuthorizationFlowStartProxyTests
             client,
             new AuthorizationFlowProxyOptions(new Uri("https://kernel.internal")));
         using var services = Services();
-        var context = Context(OAuthCallbackPaths.GoogleStart, $"?f={FlowReference}", services);
+        var context = Context("/oauth/start/google", $"?f={FlowReference}", services);
 
         var result = await proxy.StartAsync(
-            OAuthCallbackPaths.GoogleProvider,
+            "google",
             context.Request,
             CancellationToken.None);
         await result.ExecuteAsync(context);
@@ -54,10 +54,10 @@ public sealed class AuthorizationFlowStartProxyTests
             client,
             new AuthorizationFlowProxyOptions(new Uri("https://kernel.internal")));
         using var services = Services();
-        var context = Context(OAuthCallbackPaths.GoogleStart, $"?f={FlowReference}", services);
+        var context = Context("/oauth/start/google", $"?f={FlowReference}", services);
 
         var result = await proxy.StartAsync(
-            OAuthCallbackPaths.GoogleProvider,
+            "google",
             context.Request,
             CancellationToken.None);
         await result.ExecuteAsync(context);
@@ -76,10 +76,10 @@ public sealed class AuthorizationFlowStartProxyTests
             client,
             new AuthorizationFlowProxyOptions(new Uri("https://kernel.internal")));
         using var services = Services();
-        var context = Context(OAuthCallbackPaths.GoogleStart, "?f=short", services);
+        var context = Context("/oauth/start/google", "?f=short", services);
 
         var result = await proxy.StartAsync(
-            OAuthCallbackPaths.GoogleProvider,
+            "google",
             context.Request,
             CancellationToken.None);
         await result.ExecuteAsync(context);
@@ -98,10 +98,10 @@ public sealed class AuthorizationFlowStartProxyTests
             client,
             new AuthorizationFlowProxyOptions(new Uri("https://kernel.internal")));
         using var services = Services();
-        var context = Context(OAuthCallbackPaths.GoogleStart, $"?f={FlowReference}", services);
+        var context = Context("/oauth/start/google", $"?f={FlowReference}", services);
 
         var result = await proxy.StartAsync(
-            OAuthCallbackPaths.GoogleProvider,
+            "google",
             context.Request,
             CancellationToken.None);
         await result.ExecuteAsync(context);

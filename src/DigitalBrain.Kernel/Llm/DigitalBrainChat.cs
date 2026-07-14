@@ -5,16 +5,13 @@ using Azure.Identity;
 using DigitalBrain.Kernel.Contracts.Models;
 using Microsoft.Extensions.AI;
 using OllamaSharp;
-
 namespace DigitalBrain.Kernel.Llm;
 
 internal static class DigitalBrainChat
 {
-
     public static IServiceCollection AddDigitalBrainChat(this IServiceCollection services, IConfiguration config, TokenCredential? azureCredential = null)
     {
         var options = DigitalBrainLlmRuntimeOptions.FromConfiguration(config);
-
         if (string.Equals(options.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase))
         {
             services.AddChatClient(DigitalBrainChatClients.BuildOllama(options.OllamaEndpoint, options.Model));
@@ -23,7 +20,6 @@ internal static class DigitalBrainChat
         {
             var endpoint = options.AzureOpenAIEndpoint
                 ?? throw new InvalidOperationException("DigitalBrain:Llm:AzureOpenAIEndpoint is required for azureopenai provider.");
-
             var azureClient = (string.IsNullOrWhiteSpace(options.AzureOpenAIKey)
                                 ? new AzureOpenAIClient(new Uri(endpoint), azureCredential ?? new DefaultAzureCredential())
                                 : new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(options.AzureOpenAIKey)))
@@ -59,7 +55,6 @@ internal static class DigitalBrainChat
         {
             throw new InvalidOperationException($"Unsupported LLM provider '{options.Provider}'.");
         }
-
         var embeddingOptions = DigitalBrainEmbeddingRuntimeOptions.FromConfiguration(config);
         if (string.Equals(embeddingOptions.Provider, DigitalBrainProviderIds.Ollama, StringComparison.OrdinalIgnoreCase)
             && !string.IsNullOrWhiteSpace(embeddingOptions.Model))
@@ -69,7 +64,6 @@ internal static class DigitalBrainChat
         }
         else
         {
-
             services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new NoOpEmbeddingGenerator());
         }
         return services;

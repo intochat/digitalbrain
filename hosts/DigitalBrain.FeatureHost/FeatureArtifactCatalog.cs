@@ -2,7 +2,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Azure.Storage.Blobs;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.FeatureHost;
 
 internal sealed record FeatureArtifactInstallation(
@@ -12,12 +11,10 @@ internal sealed record FeatureArtifactInstallation(
     GrantRevision GrantRevision,
     IReadOnlyDictionary<string, ProviderConnectionId> ProviderConnections,
     FeatureReleaseDescriptor Release);
-
 internal interface IFeatureArtifactCatalog
 {
     ValueTask<IReadOnlyList<FeatureArtifactInstallation>> ReadActiveAsync(CancellationToken cancellationToken = default);
 }
-
 internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
 {
     private const string ContainerName = "feature-releases";
@@ -29,7 +26,6 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
     private readonly BlobContainerClient _container;
     private readonly string _cacheRoot;
     private readonly SemaphoreSlim _materialization = new(1, 1);
-
     public BlobFeatureArtifactCatalog(BlobServiceClient blobs, string? cacheDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(blobs);
@@ -39,12 +35,10 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
         if (File.GetAttributes(_cacheRoot).HasFlag(FileAttributes.ReparsePoint))
             throw new ArgumentException("The artifact cache cannot be a filesystem link.", nameof(cacheDirectory));
     }
-
     public async ValueTask<IReadOnlyList<FeatureArtifactInstallation>> ReadActiveAsync(CancellationToken cancellationToken = default)
     {
         if (!(await _container.ExistsAsync(cancellationToken)).Value)
             return [];
-
         var active = new List<FeatureArtifactInstallation>();
         await foreach (var item in _container.GetBlobsAsync(Azure.Storage.Blobs.Models.BlobTraits.None, Azure.Storage.Blobs.Models.BlobStates.None, "active/", cancellationToken))
         {
@@ -52,7 +46,6 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
                 throw new FeatureReleaseValidationException("The active installation catalog exceeds its bound.");
             if (!item.Name.EndsWith(".json", StringComparison.Ordinal) || item.Properties.ContentLength is null or < 2 or > MaximumManifestBytes)
                 throw new FeatureReleaseValidationException("An active installation manifest is invalid.");
-
             await using var stream = new MemoryStream((int)item.Properties.ContentLength.Value);
             await DownloadBoundedAsync(_container.GetBlobClient(item.Name), item, stream, MaximumManifestBytes, cancellationToken);
             stream.Position = 0;
@@ -65,7 +58,6 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
             {
                 throw new FeatureReleaseValidationException("An active installation manifest is invalid.", exception);
             }
-
             var owner = new BrainOwnerId(manifest.OwnerId);
             var actor = new ActorId(manifest.ActorId);
             var installation = new FeatureInstallationId(manifest.InstallationId);
@@ -80,16 +72,13 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
             var releaseDirectory = await MaterializeAsync(digest, cancellationToken);
             active.Add(new FeatureArtifactInstallation(owner, actor, installation, new GrantRevision(manifest.GrantRevision), connections, new FeatureReleaseDescriptor(digest, releaseDirectory)));
         }
-
         return active;
     }
-
     private async Task<string> MaterializeAsync(ReleaseDigest digest, CancellationToken cancellationToken)
     {
         var destination = Path.Combine(_cacheRoot, digest.Value);
         if (Directory.Exists(destination))
             return destination;
-
         await _materialization.WaitAsync(cancellationToken);
         try
         {
@@ -129,7 +118,6 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
             _materialization.Release();
         }
     }
-
     private static string SafePath(string root, string relative)
     {
         if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative))
@@ -139,7 +127,6 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
             throw new FeatureReleaseValidationException("A feature artifact escapes its release directory.");
         return full;
     }
-
     private static async Task<long> DownloadBoundedAsync(BlobClient blob, Azure.Storage.Blobs.Models.BlobItem item, Stream destination, long maximumBytes, CancellationToken cancellationToken)
     {
         var options = new Azure.Storage.Blobs.Models.BlobDownloadOptions();
@@ -162,17 +149,14 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
             await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
     }
-
     private static string RequiredProvider(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 64 || value.Any(char.IsControl))
             throw new FeatureReleaseValidationException("A provider connection key is invalid.");
         return value;
     }
-
     private static string Segment(string value) =>
         Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
     private sealed record FeatureArtifactManifest(
         string OwnerId,
         string ActorId,

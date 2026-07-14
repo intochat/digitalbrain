@@ -6,20 +6,17 @@ using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using Orleans;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
-
 namespace DigitalBrain.Mcp;
 
 public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider timeProvider)
 {
     private const string FeedOutboxKind = "surface-feed";
-
     public async Task<InoConversationSnapshot> ReadAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default)
     {
         context = await ResolveContextAsync(context, cancellationToken).ConfigureAwait(false);
         var state = await ReadStateAsync(context, cancellationToken).ConfigureAwait(false);
         return ToSnapshot(context, state);
     }
-
     public async Task<InoConversationSnapshot> BeginAsync(RuntimeRequestContext context, string commandId, string prompt, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(commandId) || commandId.Length > 256)
@@ -63,7 +60,6 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
             cancellationToken).ConfigureAwait(false);
         return ToSnapshot(context, state);
     }
-
     public async Task<OperationReceipt> DecideApprovalAsync(
         RuntimeRequestContext context,
         string operationId,
@@ -130,7 +126,6 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
         return TryGetDecisionReceipt(state, operationId, approvalId, approved, decisionId, actor)
             ?? throw new RuntimeStateIntegrityException("approval decision was not durably recorded");
     }
-
     internal Task<RuntimeRequestContext> ResolveContextAsync(RuntimeRequestContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -138,13 +133,11 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
         DemandConversationId(conversationId);
         return Task.FromResult(context with { ConversationId = conversationId });
     }
-
     private async Task<ConversationState> ReadStateAsync(RuntimeRequestContext context, CancellationToken cancellationToken)
     {
         var state = await Conversation(context).ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         return state.Identity is null ? ConversationState.Empty() : state;
     }
-
     private async Task<ConversationState> EnsureInitializedAsync(RuntimeRequestContext context, IConversationNeuron neuron, CancellationToken cancellationToken)
     {
         var state = await neuron.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -167,7 +160,6 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
             return state;
         }
     }
-
     private static async Task<TResult> RetryConflictAsync<TResult>(IConversationNeuron neuron, ConversationState initial, Func<ConversationState, Task<TResult>> update, CancellationToken cancellationToken)
     {
         var state = initial;
@@ -184,21 +176,18 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
         }
         throw new InvalidOperationException("Conversation revision retry exhausted.");
     }
-
     internal IConversationNeuron Conversation(RuntimeRequestContext context)
     {
         var conversationId = context.ConversationId ?? InoConversationIdentity.From(context);
         DemandConversationId(conversationId);
         return cluster.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(context.OwnerId, context.ActorId, conversationId));
     }
-
     private static ConversationIdentity Identity(RuntimeRequestContext context)
     {
         var conversationId = context.ConversationId ?? InoConversationIdentity.From(context);
         DemandConversationId(conversationId);
         return new(context.OwnerId, context.ActorId, conversationId);
     }
-
     internal static string OperationId(RuntimeRequestContext context, string commandId)
     {
         var defaultConversationId = InoConversationIdentity.From(context);
@@ -207,7 +196,6 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
             : string.Empty;
         return "runtime-op-" + Hash(RequestScope.Id(context) + conversationScope + "\0" + commandId);
     }
-
     internal static void DemandConversationId(string? conversationId)
     {
         if (conversationId is null || conversationId.Length != 68 || !conversationId.StartsWith("ino-", StringComparison.Ordinal))
@@ -216,9 +204,7 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
             if (character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f'))
                 throw new ArgumentException("Conversation ids must be canonical scoped identifiers.", nameof(conversationId));
     }
-
     private static ConversationOutboxEntry CreateOutbox(string operationId, InoOperationPhase phase, long version, OperationOutboxRecord projection, DateTimeOffset now) => new($"operation:{operationId}:phase:{phase.ToString().ToLowerInvariant()}:v:{version}", FeedOutboxKind, projection.ToPayloadUtf8(), now, null);
-
     private static OperationReceipt? TryGetDecisionReceipt(ConversationState state, string operationId, string approvalId, bool approved, string decisionId, string actor)
     {
         var operation = state.Operations.FirstOrDefault(candidate =>
@@ -235,7 +221,6 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
             throw new InvalidOperationException("An approval decision cannot be changed.");
         return new(operation.OperationId, decisionId, approved ? InoOperationPhase.Approved : InoOperationPhase.Failed, operation.Version);
     }
-
     private static OperationOutboxRecord CreateProjection(
         RuntimeRequestContext context,
         ConversationState state,
@@ -272,7 +257,6 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
             approvalId,
             workflow);
     }
-
     internal static InoConversationSnapshot ToSnapshot(RuntimeRequestContext context, ConversationState state)
     {
         if (state.Identity is null)
@@ -320,10 +304,8 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
             ?? InoConversationStates.Succeeded)).ToArray();
         return new(state.Identity.ConversationId, checked((int)Math.Min(state.Revision, int.MaxValue)), turns, operations);
     }
-
     private static OperationOutboxRecord? TryReadProjection(ConversationOutboxEntry entry) =>
         OperationOutboxRecord.TryRead(entry.PayloadUtf8, out var projection) ? projection : null;
-
     private static OperationFeedTurn[] ToFeedTurns(ConversationState state) =>
         state.Turns.Select(turn => new OperationFeedTurn(
             turn.IdempotencyKey,
@@ -333,7 +315,6 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
                 string.Equals(operation.OperationId, turn.OperationId, StringComparison.Ordinal)) is { } operation
                 ? LegacyState(operation.Status)
                 : InoConversationStates.Succeeded)).ToArray();
-
     private static string LegacyState(ConversationOperationStatus status) => status switch
     {
         ConversationOperationStatus.Pending => InoConversationStates.Queued,
@@ -346,8 +327,6 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
         ConversationOperationStatus.Cancelled => InoConversationStates.Cancelled,
         _ => InoConversationStates.Failed
     };
-
     private static string Hash(string value) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
-
 }

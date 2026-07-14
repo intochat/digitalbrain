@@ -11,7 +11,6 @@ using Google.Apis.Services;
 using Google.Apis.Util;
 using DigitalBrain.Integrations.Google.Contracts;
 using ContractGmailMessage = DigitalBrain.Integrations.Google.Contracts.GmailMessage;
-
 namespace DigitalBrain.Integrations.Google;
 
 internal sealed class GoogleGmailApiClient : IGmailApiClient
@@ -23,13 +22,10 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
     private static readonly Regex EncodedWord = new(@"=\?([^?\s]+)\?([bq])\?([^?]*)\?=", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly Regex RepeatedWhitespace = new(@"\s+", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private readonly GmailService _service;
-
     public GoogleGmailApiClient(UserCredential credential) : this(new GmailService(new BaseClientService.Initializer { HttpClientInitializer = credential, ApplicationName = "DigitalBrain" }))
     {
     }
-
     internal GoogleGmailApiClient(GmailService service) => _service = service;
-
     public async Task<ContractGmailMessage> ReadMessageAsync(GmailMessageReadRequest request, CancellationToken cancellationToken = default)
     {
         var get = _service.Users.Messages.Get("me", request.MessageId);
@@ -45,7 +41,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             SingleHeader(message, "Subject"),
             PlainText(message.Payload));
     }
-
     public async Task<GmailMailboxPage> ReadMailboxAsync(GmailMailboxReadRequest request, CancellationToken cancellationToken = default)
     {
         var offset = request.ContinuationToken is null
@@ -59,11 +54,9 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
         var next = messages.Length == request.Limit ? (offset + messages.Length).ToString() : null;
         return new GmailMailboxPage(messages, next);
     }
-
     public async Task<GmailSendResult> SendAsync(GmailSendRequest request, CancellationToken cancellationToken = default)
     {
         GmailSendRequestValidator.Validate(request);
-
         var messageId = GmailSendRequestValidator.MessageId(request.UniqueTag);
         var existingRequest = _service.Users.Messages.List("me");
         existingRequest.LabelIds = new Repeatable<string>(["SENT"]);
@@ -74,25 +67,21 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
         var duplicate = existing.Messages?.FirstOrDefault();
         if (duplicate is not null)
             return new GmailSendResult(GmailSendStatus.AlreadyApplied, duplicate.Id, duplicate.ThreadId);
-
         var send = _service.Users.Messages.Send(new Message { Raw = Base64Url(Rfc2822(request, messageId)) }, "me");
         send.Fields = "id,threadId";
         var sent = await send.ExecuteAsync(cancellationToken).ConfigureAwait(false);
         return new GmailSendResult(GmailSendStatus.Applied, sent.Id, sent.ThreadId);
     }
-
     public async Task<GmailLatestIncomingMessage> ReadIncomingAtOffsetAsync(GmailIncomingReadRequest request, CancellationToken cancellationToken = default)
     {
         if (request.Offset is < 0 or > GmailTools.MaximumOffset)
             throw new ArgumentOutOfRangeException(nameof(request));
         if ((request.AnchorMessageId is null) != (request.AnchorInternalDate is null))
             throw new ArgumentException("A complete Gmail anchor is required.", nameof(request));
-
         var window = await ReadMetadataWindowAsync(new GmailMessageSelection(Mailbox: GmailMailboxScope.Inbox, MaxPages: 1, MaxCandidates: CandidateWindowSize), cancellationToken).ConfigureAwait(false);
         var ordered = window.Messages;
         if (ordered.Length == 0)
             return new GmailLatestIncomingMessage(request.Offset == 0 && request.AnchorMessageId is null ? GmailLatestIncomingState.EmptyInbox : GmailLatestIncomingState.PositionUnavailable);
-
         var start = 0;
         if (request.AnchorMessageId is not null)
         {
@@ -103,7 +92,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
                 return new GmailLatestIncomingMessage(GmailLatestIncomingState.PositionUnavailable);
             start = anchorIndex;
         }
-
         var requestedIndex = start + request.Offset;
         if (requestedIndex >= ordered.Length)
             return new GmailLatestIncomingMessage(GmailLatestIncomingState.PositionUnavailable);
@@ -113,13 +101,11 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             : new GmailLatestIncomingMessage(GmailLatestIncomingState.SenderAvailable, requested.From, requested.FromAddress)) with
         { MessageId = requested.MessageId, InternalDate = requested.InternalDate };
     }
-
     public async Task<GmailMessageListResult> ListMessagesAsync(GmailMessageListRequest request, CancellationToken cancellationToken = default)
     {
         Validate(request.Selection, request.Offset, request.Limit);
         if (request.Selection.AttachmentFilter != GmailAttachmentFilter.Any)
             return new GmailMessageListResult(GmailMetadataReadState.CapabilityUnavailable, [], EmptyCoverage(), AttachmentLimitation);
-
         var stableCandidateIds = request.Selection.PinnedMessageIds?.Distinct(StringComparer.Ordinal).ToArray();
         var pageSelection = request.Selection;
         var pageOffset = request.Offset;
@@ -130,7 +116,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             pageSelection = request.Selection with { PinnedMessageIds = stableCandidateIds.Skip(request.Offset).Take(request.Limit).ToArray() };
             pageOffset = 0;
         }
-
         var window = await ReadMetadataWindowAsync(pageSelection, cancellationToken).ConfigureAwait(false);
         var messages = window.Messages.Skip(pageOffset).Take(request.Limit).ToArray();
         if (stableCandidateIds is not null)
@@ -146,7 +131,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             StableCandidateMessageIds: stableCandidateIds ??
                 window.Messages.Select(static message => message.MessageId).ToArray());
     }
-
     public async Task<GmailMailboxOverview> ReadMailboxOverviewAsync(CancellationToken cancellationToken = default)
     {
         var get = _service.Users.Labels.Get("me", "INBOX");
@@ -154,7 +138,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
         var label = await get.ExecuteAsync(cancellationToken).ConfigureAwait(false);
         return new GmailMailboxOverview(label.MessagesTotal ?? 0, label.MessagesUnread ?? 0, label.ThreadsTotal ?? 0, label.ThreadsUnread ?? 0);
     }
-
     public async Task<GmailThreadListResult> ListThreadsAsync(GmailThreadListRequest request, CancellationToken cancellationToken = default)
     {
         Validate(request.Selection, request.Offset, request.Limit);
@@ -162,7 +145,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             throw new ArgumentOutOfRangeException(nameof(request));
         if (request.Selection.AttachmentFilter != GmailAttachmentFilter.Any)
             return new GmailThreadListResult(GmailMetadataReadState.CapabilityUnavailable, [], EmptyCoverage(), AttachmentLimitation);
-
         var window = await ReadMetadataWindowAsync(request.Selection, cancellationToken).ConfigureAwait(false);
         var stableThreads = window.Messages.Where(static message => !string.IsNullOrWhiteSpace(message.ThreadId))
             .GroupBy(static message => message.ThreadId!, StringComparer.Ordinal)
@@ -195,7 +177,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             StableCandidateMessageIds: window.Messages.Select(static message => message.MessageId).ToArray(),
             StableCandidateThreadIds: stableThreads.Select(static thread => thread.ThreadId).ToArray());
     }
-
     private async Task<GmailMetadataWindow> ReadMetadataWindowAsync(GmailMessageSelection selection, CancellationToken cancellationToken)
     {
         Validate(selection, 0, 1);
@@ -204,7 +185,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
         var pagesRead = 0;
         var providerExhausted = selection.PinnedMessageIds is not null;
         var candidateLimitReached = false;
-
         if (selection.PinnedMessageIds is not null)
         {
             foreach (var id in selection.PinnedMessageIds)
@@ -230,7 +210,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
                     ids.Add(item.Id);
                     if (ids.Count == selection.MaxCandidates) break;
                 }
-
                 if (string.IsNullOrWhiteSpace(page.NextPageToken))
                 {
                     providerExhausted = true;
@@ -241,7 +220,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             }
             candidateLimitReached = !providerExhausted && ids.Count == selection.MaxCandidates;
         }
-
         var metadata = new List<GmailMessageMetadata>(ids.Count);
         var unavailable = 0;
         foreach (var id in ids)
@@ -265,14 +243,12 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
                 unavailable++;
             }
         }
-
         var matches = metadata.Where(message => Matches(selection, message))
             .OrderByDescending(static message => message.InternalDate)
             .ThenBy(static message => message.MessageId, StringComparer.Ordinal)
             .ToArray();
         return new GmailMetadataWindow(matches, new GmailResultCoverage(pagesRead, ids.Count, metadata.Count, matches.Length, unavailable, providerExhausted, candidateLimitReached));
     }
-
     private static GmailMessageMetadata ToMetadata(string requestedId, long internalDate, Message message)
     {
         var fromHeader = SingleHeader(message, "From");
@@ -292,7 +268,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             labels,
             !labels.Contains("UNREAD", StringComparer.Ordinal));
     }
-
     private static bool Matches(GmailMessageSelection selection, GmailMessageMetadata message)
     {
         var labels = message.LabelIds;
@@ -313,7 +288,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
                (selection.ReceivedAfterInclusive is null || message.InternalDate >= selection.ReceivedAfterInclusive) &&
                (selection.ReceivedBeforeExclusive is null || message.InternalDate < selection.ReceivedBeforeExclusive);
     }
-
     private static void Validate(GmailMessageSelection selection, int offset, int limit)
     {
         ArgumentNullException.ThrowIfNull(selection);
@@ -337,7 +311,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
         if (selection.RecipientAddress is not null && ParseAddresses(selection.RecipientAddress).Length != 1)
             throw new ArgumentException("The Gmail recipient filter is invalid.", nameof(selection));
     }
-
     private static byte[] Rfc2822(GmailSendRequest request, string messageId)
     {
         var normalizedBody = request.Body.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Replace("\n", "\r\n", StringComparison.Ordinal);
@@ -354,10 +327,8 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             encodedBody);
         return Encoding.UTF8.GetBytes(message);
     }
-
     private static string Base64Url(byte[] value) =>
         Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
     private static string PlainText(MessagePart? part)
     {
         if (part is null) return string.Empty;
@@ -374,7 +345,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
         }
         return string.Empty;
     }
-
     private static string? ProviderLabel(GmailMailboxScope mailbox) => mailbox switch
     {
         GmailMailboxScope.Inbox => "INBOX",
@@ -382,22 +352,18 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
         GmailMailboxScope.Drafts => "DRAFT",
         _ => null
     };
-
     private static bool HasAny(string[] labels, params string[] expected) =>
         expected.Any(label => labels.Contains(label, StringComparer.Ordinal));
-
     private static string? SingleHeader(Message message, string name)
     {
         var values = HeaderValues(message, name);
         return values.Length == 1 ? values[0] : null;
     }
-
     private static string? JoinedHeader(Message message, string name)
     {
         var values = HeaderValues(message, name);
         return values.Length == 0 ? null : string.Join(", ", values);
     }
-
     private static string[] HeaderValues(Message message, string name) =>
         message.Payload?.Headers?
             .Where(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
@@ -406,13 +372,11 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             .Select(static value => value!)
             .Take(8)
             .ToArray() ?? [];
-
     private static string? NormalizeHeader(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl) || value.Length > 4096) return null;
         return RepeatedWhitespace.Replace(value, " ").Trim();
     }
-
     private static string[] ParseAddresses(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl)) return [];
@@ -431,25 +395,20 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             return [];
         }
     }
-
     private static GmailResultCoverage EmptyCoverage() => new(0, 0, 0, 0, 0, true, false);
-
     internal static GmailLatestIncomingMessage ParseSender(string? from)
     {
         if (string.IsNullOrWhiteSpace(from) || from.Any(char.IsControl))
             return new GmailLatestIncomingMessage(GmailLatestIncomingState.SenderUnavailable);
-
         try
         {
             var addresses = new MailAddressCollection();
             addresses.Add(from);
             if (addresses.Count != 1)
                 return new GmailLatestIncomingMessage(GmailLatestIncomingState.SenderUnavailable);
-
             var mailbox = addresses[0];
             if (string.IsNullOrWhiteSpace(mailbox.User) || string.IsNullOrWhiteSpace(mailbox.Host))
                 return new GmailLatestIncomingMessage(GmailLatestIncomingState.SenderUnavailable);
-
             var address = mailbox.User + "@" + mailbox.Host.ToLowerInvariant();
             var displayName = DecodeDisplayName(mailbox.DisplayName);
             var sender = string.IsNullOrWhiteSpace(displayName) ? address : $"{displayName} <{address}>";
@@ -460,14 +419,12 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             return new GmailLatestIncomingMessage(GmailLatestIncomingState.SenderUnavailable);
         }
     }
-
     private static string DecodeDisplayName(string displayName)
     {
         if (string.IsNullOrWhiteSpace(displayName)) return string.Empty;
         var decoded = EncodedWord.Replace(displayName, static match => DecodeWord(match));
         return RepeatedWhitespace.Replace(decoded, " ").Trim();
     }
-
     private static string DecodeWord(Match match)
     {
         try
@@ -483,7 +440,6 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
             return match.Value;
         }
     }
-
     private static byte[] DecodeQuotedPrintableWord(string value)
     {
         var bytes = new List<byte>(value.Length);
@@ -508,14 +464,11 @@ internal sealed class GoogleGmailApiClient : IGmailApiClient
         }
         return bytes.ToArray();
     }
-
     private sealed record GmailMetadataWindow(GmailMessageMetadata[] Messages, GmailResultCoverage Coverage);
 }
-
 internal static class GmailSendRequestValidator
 {
     private const string MessageIdDomain = "digitalbrain.invalid";
-
     public static void Validate(GmailSendRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -524,15 +477,12 @@ internal static class GmailSendRequestValidator
             !MailAddress.TryCreate(recipient, out var parsed) ||
             !string.Equals(parsed.Address, recipient, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("The Gmail recipient is invalid.", nameof(request));
-
         if (string.IsNullOrWhiteSpace(request.Subject) || request.Subject.Length > GmailTools.MaximumSubjectLength ||
             request.Subject.Any(char.IsControl))
             throw new ArgumentException("The Gmail subject is invalid.", nameof(request));
-
         if (string.IsNullOrEmpty(request.Body) || request.Body.Length > GmailTools.MaximumBodyLength ||
             request.Body.Any(static value => char.IsControl(value) && value is not '\r' and not '\n' and not '\t'))
             throw new ArgumentException("The Gmail body is invalid.", nameof(request));
-
         if (string.IsNullOrWhiteSpace(request.UniqueTag) || request.UniqueTag.Length > GmailTools.MaximumUniqueTagLength ||
             !IsAsciiLetterOrDigit(request.UniqueTag[0]) ||
             !IsAsciiLetterOrDigit(request.UniqueTag[^1]) ||
@@ -541,7 +491,6 @@ internal static class GmailSendRequestValidator
                 !IsAsciiLetterOrDigit(value) && value is not '-' and not '_' and not '.'))
             throw new ArgumentException("The Gmail unique tag is invalid.", nameof(request));
     }
-
     public static bool IsValid(GmailSendRequest request)
     {
         try
@@ -554,9 +503,7 @@ internal static class GmailSendRequestValidator
             return false;
         }
     }
-
     public static string MessageId(string uniqueTag) => $"{uniqueTag}@{MessageIdDomain}";
-
     private static bool IsAsciiLetterOrDigit(char value) =>
         value is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9');
 }

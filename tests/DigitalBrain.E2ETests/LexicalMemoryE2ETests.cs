@@ -90,7 +90,7 @@ public sealed class LexicalMemoryE2ETests
             1,
             null,
             new GrantRevision(1),
-            JsonSerializer.SerializeToElement(new { }),
+            JsonSerializer.SerializeToElement(new { allowedToolIds = new[] { capabilityId } }),
             true,
             false);
 

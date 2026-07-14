@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
 namespace DigitalBrain.Kernel.Memory;
 
 internal static class MemoryRegistration
@@ -40,17 +39,14 @@ internal static class MemoryRegistration
         return services;
     }
 }
-
 internal sealed class MemoryTableInitializer(TableClient table) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await table.CreateIfNotExistsAsync(cancellationToken);
     }
-
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
-
 internal sealed class LoggingMemoryAuditSink(ILogger<LoggingMemoryAuditSink> logger) : IMemoryAuditSink
 {
     public ValueTask WriteAsync(MemoryAuditRecord record, CancellationToken cancellationToken = default)

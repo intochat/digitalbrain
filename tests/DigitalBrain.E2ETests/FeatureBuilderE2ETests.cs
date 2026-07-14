@@ -7,7 +7,7 @@ using Xunit;
 
 namespace DigitalBrain.E2ETests;
 
-public sealed class FeatureBuilderE2ETests
+public sealed class FeatureBuilderReleaseE2ETests : FeatureBuilderE2ETestBase
 {
     [Fact]
     public async Task Email_summarizer_build_produces_a_deterministic_immutable_release()
@@ -42,7 +42,10 @@ public sealed class FeatureBuilderE2ETests
         AssertReleaseFilesEqual(first.ReleaseDirectory, second.ReleaseDirectory);
         await VerifyRestartReloadAsync(first.ReleaseDirectory, first.Digest);
     }
+}
 
+public sealed class FeatureBuilderBddE2ETests : FeatureBuilderE2ETestBase
+{
     [Theory]
     [InlineData(ScenarioFailure.Undefined, FeatureBuildFailure.ScenarioFailed)]
     [InlineData(ScenarioFailure.Pending, FeatureBuildFailure.ScenarioFailed)]
@@ -60,7 +63,10 @@ public sealed class FeatureBuilderE2ETests
         Assert.Equal(expected, exception.Failure);
         Assert.Empty(Directory.EnumerateFileSystemEntries(output.Path));
     }
+}
 
+public sealed class FeatureBuilderSecurityE2ETests : FeatureBuilderE2ETestBase
+{
     [Fact]
     public async Task Nondeterministic_framework_input_rejects_the_release()
     {
@@ -91,6 +97,10 @@ public sealed class FeatureBuilderE2ETests
         Assert.Empty(Directory.EnumerateFileSystemEntries(output.Path));
     }
 
+}
+
+public sealed class FeatureBuilderDeadlineE2ETests : FeatureBuilderE2ETestBase
+{
     [Fact]
     public async Task Forged_reqnroll_metadata_cannot_inflate_the_compiled_scenario_count()
     {
@@ -169,11 +179,14 @@ public sealed class FeatureBuilderE2ETests
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(15));
         Assert.Empty(Directory.EnumerateFileSystemEntries(output.Path));
     }
+}
 
-    private static FeatureBuildRequest Request(FeatureSourceSnapshot snapshot, string output) =>
+public abstract class FeatureBuilderE2ETestBase
+{
+    protected static FeatureBuildRequest Request(FeatureSourceSnapshot snapshot, string output) =>
         new(snapshot, OfflineFeed(), output, DateTimeOffset.UtcNow.AddSeconds(60));
 
-    private static string OfflineFeed()
+    protected static string OfflineFeed()
     {
         var configured = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
         return string.IsNullOrWhiteSpace(configured)
@@ -181,7 +194,7 @@ public sealed class FeatureBuilderE2ETests
             : configured;
     }
 
-    private static FeatureSourceSnapshot EmailSummarizerSnapshot()
+    protected static FeatureSourceSnapshot EmailSummarizerSnapshot()
     {
         var root = RepositoryRoot();
         string[] paths =
@@ -220,7 +233,7 @@ public sealed class FeatureBuilderE2ETests
             files);
     }
 
-    private static FeatureSourceSnapshot WithScenarioFailure(
+    protected static FeatureSourceSnapshot WithScenarioFailure(
         FeatureSourceSnapshot snapshot,
         ScenarioFailure failure)
     {
@@ -250,7 +263,7 @@ public sealed class FeatureBuilderE2ETests
             : AddFile(updated, "features/EmailSummarizer.Tests/BuilderFailureSteps.cs", bindings);
     }
 
-    private static FeatureSourceSnapshot AddFile(
+    protected static FeatureSourceSnapshot AddFile(
         FeatureSourceSnapshot snapshot,
         string path,
         string content) =>
@@ -259,7 +272,7 @@ public sealed class FeatureBuilderE2ETests
             snapshot.ScenarioProjectPath,
             [.. snapshot.Files, new FeatureSourceFile(path, content)]);
 
-    private static void AssertReleaseFilesEqual(string first, string second)
+    protected static void AssertReleaseFilesEqual(string first, string second)
     {
         var firstFiles = Directory.EnumerateFiles(first, "*", SearchOption.AllDirectories)
             .Select(path => Path.GetRelativePath(first, path).Replace('\\', '/'))
@@ -278,21 +291,22 @@ public sealed class FeatureBuilderE2ETests
         }
     }
 
-    private static async Task VerifyRestartReloadAsync(string releaseDirectory, string digest)
+    protected static async Task VerifyRestartReloadAsync(string releaseDirectory, string digest)
     {
         var installation = new FeatureInstallationId("email-summarizer-e2e");
         var descriptor = new FeatureReleaseDescriptor(new ReleaseDigest(digest), releaseDirectory);
+        var owner = new BrainOwnerId("e2e-owner");
         await using (var manager = Manager())
         {
-            await manager.ActivateAsync(installation, descriptor);
-            using var lease = manager.Acquire(installation, descriptor.Digest);
+            await manager.ActivateAsync(owner, installation, descriptor);
+            using var lease = manager.Acquire(owner, installation, descriptor.Digest);
             Assert.Equal(descriptor.Digest, lease.Digest);
         }
 
         await using (var restarted = Manager())
         {
-            await restarted.LoadActiveAsync([new FeatureActiveInstallation(installation, descriptor)]);
-            using var lease = restarted.Acquire(installation, descriptor.Digest);
+            await restarted.LoadActiveAsync([new FeatureActiveInstallation(owner, installation, descriptor)]);
+            using var lease = restarted.Acquire(owner, installation, descriptor.Digest);
             Assert.Equal(descriptor.Digest, lease.Digest);
         }
     }
@@ -341,7 +355,7 @@ public sealed class FeatureBuilderE2ETests
         }
     }
 
-    private sealed class TemporaryDirectory : IDisposable
+    protected sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()
         {

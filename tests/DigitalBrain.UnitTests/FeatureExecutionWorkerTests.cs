@@ -29,7 +29,7 @@ public sealed class FeatureExecutionWorkerTests
         var reader = new ImmediateGmailReader();
         await using var manager = await ManagerAsync(release, reader);
         var grain = new RecordingInstallationGrain(Claim(release.Descriptor.Digest));
-        var source = new SingleWorkSource(new FeatureWorkItem(Installation, grain));
+        var source = new SingleWorkSource(Work(grain));
         var context = new RecordingRunContext();
         var worker = Worker(manager, source, new SingleContextFactory(context));
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -52,7 +52,7 @@ public sealed class FeatureExecutionWorkerTests
         using var release = FeatureReleaseTestArtifact.Create();
         await using var manager = await ManagerAsync(release, new FeatureGmailMessageReader());
         var grain = new RecordingInstallationGrain(Claim(release.Descriptor.Digest));
-        var source = new SingleWorkSource(new FeatureWorkItem(Installation, grain));
+        var source = new SingleWorkSource(Work(grain));
         var contexts = new CapabilityFeatureRunContextFactory(new FeatureCapabilityClient(), TimeProvider.System);
         var worker = Worker(manager, source, contexts);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -72,9 +72,7 @@ public sealed class FeatureExecutionWorkerTests
     {
         var digest = new ReleaseDigest(new string('a', 64));
         var claim = Claim(digest);
-        var work = new FeatureWorkItem(
-            Installation,
-            new RecordingInstallationGrain(claim));
+        var work = Work(new RecordingInstallationGrain(claim));
         var client = new CountingCapabilityClient();
         var factory = new CapabilityFeatureRunContextFactory(client, TimeProvider.System);
         await using var runContext = await factory.CreateAsync(work, claim);
@@ -101,9 +99,7 @@ public sealed class FeatureExecutionWorkerTests
     {
         var digest = new ReleaseDigest(new string('a', 64));
         var claim = Claim(digest);
-        var work = new FeatureWorkItem(
-            Installation,
-            new RecordingInstallationGrain(claim));
+        var work = Work(new RecordingInstallationGrain(claim));
         var factory = new CapabilityFeatureRunContextFactory(new CountingCapabilityClient(), TimeProvider.System);
         await using var runContext = await factory.CreateAsync(work, claim);
 
@@ -123,9 +119,7 @@ public sealed class FeatureExecutionWorkerTests
     {
         var digest = new ReleaseDigest(new string('a', 64));
         var claim = Claim(digest);
-        var work = new FeatureWorkItem(
-            Installation,
-            new RecordingInstallationGrain(claim));
+        var work = Work(new RecordingInstallationGrain(claim));
         var client = new BlockingCapabilityClient();
         var factory = new CapabilityFeatureRunContextFactory(client, TimeProvider.System);
         await using var runContext = await factory.CreateAsync(work, claim);
@@ -151,7 +145,7 @@ public sealed class FeatureExecutionWorkerTests
         var reader = new BlockingGmailReader();
         await using var manager = await ManagerAsync(release, reader);
         var grain = new RecordingInstallationGrain(Claim(release.Descriptor.Digest));
-        var source = new SingleWorkSource(new FeatureWorkItem(Installation, grain));
+        var source = new SingleWorkSource(Work(grain));
         var context = new RecordingRunContext();
         var worker = Worker(
             manager,
@@ -181,7 +175,7 @@ public sealed class FeatureExecutionWorkerTests
         using var release = FeatureReleaseTestArtifact.Create();
         await using var manager = await ManagerAsync(release, new ImmediateGmailReader());
         var grain = new RecordingInstallationGrain(Claim(new ReleaseDigest(new string('f', 64))));
-        var source = new SingleWorkSource(new FeatureWorkItem(Installation, grain));
+        var source = new SingleWorkSource(Work(grain));
         var factory = new CountingContextFactory();
         var worker = Worker(manager, source, factory);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -205,7 +199,7 @@ public sealed class FeatureExecutionWorkerTests
         var grain = new RecordingInstallationGrain(Claim(release.Descriptor.Digest), commitGate.Task);
         var worker = Worker(
             manager,
-            new SingleWorkSource(new FeatureWorkItem(Installation, grain)),
+            new SingleWorkSource(Work(grain)),
             new SingleContextFactory(new RecordingRunContext()),
             new FeatureExecutionOptions(
                 "feature-host-tests",
@@ -237,7 +231,7 @@ public sealed class FeatureExecutionWorkerTests
         var contexts = new CountingContextFactory();
         var worker = Worker(
             manager,
-            new SingleWorkSource(new FeatureWorkItem(Installation, grain)),
+            new SingleWorkSource(Work(grain)),
             contexts);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -262,7 +256,7 @@ public sealed class FeatureExecutionWorkerTests
         var grain = new RecordingInstallationGrain(Claim(release.Descriptor.Digest));
         var worker = Worker(
             manager,
-            new SingleWorkSource(new FeatureWorkItem(Installation, grain)),
+            new SingleWorkSource(Work(grain)),
             new SingleContextFactory(new RecordingRunContext()),
             new FeatureExecutionOptions(
                 "feature-host-tests",
@@ -294,7 +288,7 @@ public sealed class FeatureExecutionWorkerTests
         var recycle = new RecordingRecycle();
         var worker = Worker(
             manager,
-            new SingleWorkSource(new FeatureWorkItem(Installation, grain)),
+            new SingleWorkSource(Work(grain)),
             contexts,
             new FeatureExecutionOptions(
                 "feature-host-tests",
@@ -323,7 +317,7 @@ public sealed class FeatureExecutionWorkerTests
         var grain = new RecordingInstallationGrain(Claim(release.Descriptor.Digest));
         var worker = Worker(
             manager,
-            new SingleWorkSource(new FeatureWorkItem(Installation, grain)),
+            new SingleWorkSource(Work(grain)),
             new SingleContextFactory(new RecordingRunContext()),
             recycle: recycle);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -364,6 +358,13 @@ public sealed class FeatureExecutionWorkerTests
         return manager;
     }
 
+    private static FeatureWorkItem Work(IFeatureInstallationGrain grain) => new(
+        Installation,
+        grain,
+        FeatureReleaseManagerTestExtensions.Owner,
+        new ActorId("test-actor"),
+        new GrantRevision(1),
+        new Dictionary<string, ProviderConnectionId>(StringComparer.Ordinal));
     private static FeatureRunClaim Claim(ReleaseDigest digest) => new(
         new GrainInput(
             "input-1",

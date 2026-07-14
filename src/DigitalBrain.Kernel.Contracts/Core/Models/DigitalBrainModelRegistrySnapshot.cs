@@ -1,7 +1,6 @@
 namespace DigitalBrain.Kernel.Contracts.Models;
 
 using Microsoft.Extensions.Configuration;
-
 public sealed record DigitalBrainRegistryEntry(
     DigitalBrainCapabilityKind Kind,
     string Provider,
@@ -10,7 +9,6 @@ public sealed record DigitalBrainRegistryEntry(
     DigitalBrainModelRole Role,
     string ServiceKey,
     DigitalBrainModelCapabilities Capabilities);
-
 public static class DigitalBrainModelRegistrySnapshot
 {
     public static IReadOnlyList<DigitalBrainRegistryEntry> Read(IConfiguration config)
@@ -22,9 +20,7 @@ public static class DigitalBrainModelRegistrySnapshot
             {
                 continue;
             }
-
             _ = Enum.TryParse<DigitalBrainModelRole>(child["Role"], out var role);
-
             entries.Add(new DigitalBrainRegistryEntry(
                 kind,
                 child["Provider"] ?? string.Empty,
@@ -38,10 +34,8 @@ public static class DigitalBrainModelRegistrySnapshot
                     ParseBool(child["SupportsStreaming"]),
                     ParseBool(child["SupportsStructuredOutput"]))));
         }
-
         return entries;
     }
-
     public static DigitalBrainRegistryEntry? FirstOrDefault(IReadOnlyList<DigitalBrainRegistryEntry> entries, DigitalBrainCapabilityKind kind, Func<DigitalBrainRegistryEntry, bool>? predicate = null)
     {
         foreach (var entry in entries)
@@ -51,9 +45,7 @@ public static class DigitalBrainModelRegistrySnapshot
                 return entry;
             }
         }
-
         return null;
     }
-
     private static bool ParseBool(string? value) => bool.TryParse(value, out var parsed) && parsed;
 }

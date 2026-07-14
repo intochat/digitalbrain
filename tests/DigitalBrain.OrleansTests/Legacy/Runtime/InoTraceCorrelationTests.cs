@@ -5,7 +5,7 @@ using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Runtime;
-using DigitalBrain.TestKit;
+using DigitalBrain.OrleansTests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;

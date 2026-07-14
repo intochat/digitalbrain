@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-
 namespace DigitalBrain.FeatureBuilder;
 
 public sealed record FeatureManifest(
@@ -12,9 +11,7 @@ public sealed record FeatureManifest(
     IReadOnlyList<string> FeatureTypes,
     IReadOnlyList<string> RequestedCapabilities,
     IReadOnlyList<string> AssemblyReferences);
-
 public sealed record FeatureScenarioResult(int Total, int Passed, int Failed, int Skipped);
-
 public sealed record FeatureRelease(
     string Digest,
     string SourceReference,
@@ -22,7 +19,6 @@ public sealed record FeatureRelease(
     FeatureManifest Manifest,
     FeatureScenarioResult Scenarios,
     TimeSpan ReleaseWriteDuration);
-
 public sealed class FeatureReleaseWriter
 {
     public async Task<FeatureRelease> WriteAsync(
@@ -48,7 +44,6 @@ public sealed class FeatureReleaseWriter
             VerifyExisting(releaseDirectory, entries, digest);
             return new FeatureRelease(digest, sourceReference, releaseDirectory, manifest, scenarios, stopwatch.Elapsed);
         }
-
         var staging = Path.Combine(outputDirectory, $".{digest}.{Guid.NewGuid():N}.tmp");
         try
         {
@@ -59,7 +54,6 @@ public sealed class FeatureReleaseWriter
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 await File.WriteAllBytesAsync(destination, entry.Content, cancellationToken);
             }
-
             await File.WriteAllTextAsync(Path.Combine(staging, "digest.txt"), digest, new UTF8Encoding(false), cancellationToken);
             try
             {
@@ -77,10 +71,8 @@ public sealed class FeatureReleaseWriter
                 Directory.Delete(staging, true);
             }
         }
-
         return new FeatureRelease(digest, sourceReference, releaseDirectory, manifest, scenarios, stopwatch.Elapsed);
     }
-
     internal static string ComputeSourceReference(FeatureSourceSnapshot snapshot)
     {
         var entries = snapshot.Files.Select(static file => new ReleaseEntry("files/" + file.Path, Encoding.UTF8.GetBytes(file.Content)))
@@ -90,7 +82,6 @@ public sealed class FeatureReleaseWriter
             .ToArray();
         return "sha256:" + ComputeDigest(entries);
     }
-
     private static ReleaseEntry[] BuildEntries(string sourceReference, string buildOutputDirectory, FeatureManifest manifest, FeatureScenarioResult scenarios)
     {
         var sharedAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -113,13 +104,11 @@ public sealed class FeatureReleaseWriter
         {
             throw new FeatureBuildException(FeatureBuildFailure.CompilationFailed, "The implementation assembly was not emitted.");
         }
-
         outputEntries.Add(new ReleaseEntry("manifest.json", ManifestJson(manifest)));
         outputEntries.Add(new ReleaseEntry("scenarios.json", ScenarioJson(scenarios)));
         outputEntries.Add(new ReleaseEntry("source.json", SourceJson(sourceReference)));
         return outputEntries.OrderBy(static entry => entry.Path, StringComparer.Ordinal).ToArray();
     }
-
     private static byte[] ManifestJson(FeatureManifest manifest) => WriteJson(writer =>
     {
         writer.WriteStartObject();
@@ -130,7 +119,6 @@ public sealed class FeatureReleaseWriter
         WriteArray(writer, "assemblyReferences", manifest.AssemblyReferences);
         writer.WriteEndObject();
     });
-
     private static byte[] ScenarioJson(FeatureScenarioResult scenarios) => WriteJson(writer =>
     {
         writer.WriteStartObject();
@@ -140,14 +128,12 @@ public sealed class FeatureReleaseWriter
         writer.WriteNumber("skipped", scenarios.Skipped);
         writer.WriteEndObject();
     });
-
     private static byte[] SourceJson(string sourceReference) => WriteJson(writer =>
     {
         writer.WriteStartObject();
         writer.WriteString("reference", sourceReference);
         writer.WriteEndObject();
     });
-
     private static byte[] WriteJson(Action<Utf8JsonWriter> write)
     {
         using var stream = new MemoryStream();
@@ -155,10 +141,8 @@ public sealed class FeatureReleaseWriter
         {
             write(writer);
         }
-
         return stream.ToArray();
     }
-
     private static void WriteArray(Utf8JsonWriter writer, string name, IReadOnlyList<string> values)
     {
         writer.WriteStartArray(name);
@@ -166,10 +150,8 @@ public sealed class FeatureReleaseWriter
         {
             writer.WriteStringValue(value);
         }
-
         writer.WriteEndArray();
     }
-
     private static string ComputeDigest(IEnumerable<ReleaseEntry> entries)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -184,10 +166,8 @@ public sealed class FeatureReleaseWriter
             hash.AppendData(length);
             hash.AppendData(entry.Content);
         }
-
         return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
-
     private static void VerifyExisting(string releaseDirectory, IReadOnlyList<ReleaseEntry> entries, string digest)
     {
         var expectedPaths = entries.Select(static entry => entry.Path)
@@ -201,7 +181,6 @@ public sealed class FeatureReleaseWriter
         {
             throw new FeatureBuildException(FeatureBuildFailure.ReleaseConflict, $"Existing release '{digest}' has unexpected files.");
         }
-
         foreach (var entry in entries)
         {
             var path = Path.Combine(releaseDirectory, entry.Path.Replace('/', Path.DirectorySeparatorChar));
@@ -210,13 +189,11 @@ public sealed class FeatureReleaseWriter
                 throw new FeatureBuildException(FeatureBuildFailure.ReleaseConflict, $"Existing release '{digest}' does not match its content address.");
             }
         }
-
         var digestPath = Path.Combine(releaseDirectory, "digest.txt");
         if (!File.Exists(digestPath) || !string.Equals(File.ReadAllText(digestPath), digest, StringComparison.Ordinal))
         {
             throw new FeatureBuildException(FeatureBuildFailure.ReleaseConflict, $"Existing release '{digest}' has an invalid digest marker.");
         }
     }
-
     private sealed record ReleaseEntry(string Path, byte[] Content);
 }

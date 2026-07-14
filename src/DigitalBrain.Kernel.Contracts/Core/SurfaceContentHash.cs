@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text.Json;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public static class SurfaceContentHash

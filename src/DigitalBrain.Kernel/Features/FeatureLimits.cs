@@ -14,7 +14,5 @@ internal static class FeatureLimits
     public const int IntentLedgerUtf8Bytes = 4 * 1024 * 1024;
     public static readonly TimeSpan RunDeadline = TimeSpan.FromSeconds(60);
 }
-
 internal sealed class FeatureLimitExceededException(string message) : InvalidOperationException(message);
-
 internal sealed class FeatureConcurrencyException(string message) : InvalidOperationException(message);

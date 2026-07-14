@@ -4,11 +4,9 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public enum AuthAssurance { None, Password, Oidc, MutualTls, OperatorBootstrap }
-
 [GenerateSerializer, Alias("digitalbrain.v3.request-context")]
 public sealed record RequestContext(
     [property: Id(0)] BrainOwnerId OwnerId,
@@ -19,12 +17,10 @@ public sealed record RequestContext(
     [property: Id(5)] string? IdempotencyKey,
     [property: Id(6)] IReadOnlySet<string> Grants,
     [property: Id(7)] string? ConversationId = null);
-
 public static class SessionAudiences
 {
     public const string Mcp = "digitalbrain-v3";
     public const string Ui = "digitalbrain-v3-ui";
-
     public static string RequireFixedMcp(string? configuredAudience)
     {
         if (configuredAudience is null) return Mcp;
@@ -33,18 +29,15 @@ public static class SessionAudiences
         return Mcp;
     }
 }
-
 public static class RequestScope
 {
     public static string Id(RequestContext context) => Id(context.OwnerId, context.ActorId);
-
     public static string Id(BrainOwnerId ownerId, ActorId actorId)
     {
         var canonical = JsonSerializer.SerializeToUtf8Bytes(new { owner = ownerId.Value, actor = actorId.Value });
         return Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant();
     }
 }
-
 public static class GrainIds
 {
     public static string Aggregate(BrainOwnerId owner, string aggregate) =>
@@ -53,19 +46,15 @@ public static class GrainIds
         ScopePrefix(owner) + "conversation/" + Segment(conversation);
     public static string Workflow(BrainOwnerId owner, string workflow) =>
         ScopePrefix(owner) + "workflow/" + Segment(workflow);
-
     public static string ScopePrefix(BrainOwnerId owner) => $"v3/{Segment(owner.Value)}/";
-
     public static bool IsInScope(string? grainId, BrainOwnerId owner) =>
         !string.IsNullOrWhiteSpace(grainId) && grainId.StartsWith(ScopePrefix(owner), StringComparison.Ordinal);
-
     private static string Segment(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("A non-empty grain id component is required.", nameof(value));
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 }
-
 public sealed class SessionTokenService
 {
     private const string StructuredPrefix = "v3s";
@@ -91,7 +80,6 @@ public sealed class SessionTokenService
         if (context.SessionId.Value.Length > 256 || context.OwnerId.Value.Length > 256 || context.ActorId.Value.Length > 256 || audience.Length > 128 || context.Grants.Count > 64 ||
             context.Grants.Any(static grant => string.IsNullOrWhiteSpace(grant) || grant.Length > 128))
             throw new ArgumentException("Session claims exceed the signed transport bound.", nameof(context));
-
         var now = _timeProvider.GetUtcNow();
         var claims = new SessionClaims(
             3,
@@ -109,23 +97,19 @@ public sealed class SessionTokenService
         var signature = Convert.ToHexString(HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(body)));
         return body + "." + signature;
     }
-
     public bool TryValidate(string token, out RequestContext context)
         => TryValidateCore(token, expectedAudience: null, out context, out _, out _);
-
     public bool TryValidate(string token, string expectedAudience, out RequestContext context)
     {
         context = default!;
         return !string.IsNullOrWhiteSpace(expectedAudience) && TryValidateCore(token, expectedAudience, out context, out _, out _);
     }
-
     public bool TryValidate(string token, string expectedAudience, out RequestContext context, out DateTimeOffset expiresAt)
     {
         context = default!;
         expiresAt = default;
         return !string.IsNullOrWhiteSpace(expectedAudience) && TryValidateCore(token, expectedAudience, out context, out expiresAt, out _);
     }
-
     public bool TryValidate(string token, string expectedAudience, out RequestContext context, out DateTimeOffset expiresAt, out long sessionVersion)
     {
         context = default!;
@@ -134,16 +118,13 @@ public sealed class SessionTokenService
         return !string.IsNullOrWhiteSpace(expectedAudience) &&
                TryValidateCore(token, expectedAudience, out context, out expiresAt, out sessionVersion);
     }
-
     public string IssueActionCapability(RequestContext context, string bindingId, string surfaceId, int surfaceRevision, string bindingTokenHash, DateTimeOffset expiresAt)
     {
         if (!IsActionCapabilityInputValid(context, bindingId, surfaceId, surfaceRevision, bindingTokenHash))
             throw new ArgumentException("A bounded action binding and complete request context are required.");
-
         var now = _timeProvider.GetUtcNow();
         if (expiresAt <= now || expiresAt > now.Add(UiProtocol.ActionTokenLifetime))
             throw new ArgumentOutOfRangeException(nameof(expiresAt));
-
         var claims = new ActionCapabilityClaims(
             1,
             RequestScope.Id(context),
@@ -158,13 +139,11 @@ public sealed class SessionTokenService
         var signature = Convert.ToHexString(HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(ActionCapabilityDomain + body)));
         return body + "." + signature;
     }
-
     public bool TryValidateActionCapability(string token, RequestContext context, string bindingId, string surfaceId, int surfaceRevision, string bindingTokenHash)
     {
         if (!IsActionCapabilityInputValid(context, bindingId, surfaceId, surfaceRevision, bindingTokenHash) ||
             string.IsNullOrWhiteSpace(token) || token.Length > 4_096)
             return false;
-
         var parts = token.Split('.');
         if (parts.Length != 3 || !string.Equals(parts[0], ActionCapabilityPrefix, StringComparison.Ordinal)) return false;
         var body = string.Join('.', parts.Take(2));
@@ -174,7 +153,6 @@ public sealed class SessionTokenService
         catch (FormatException) { return false; }
         if (actualSignature.Length != expectedSignature.Length || !CryptographicOperations.FixedTimeEquals(actualSignature, expectedSignature))
             return false;
-
         ActionCapabilityClaims? claims;
         try { claims = JsonSerializer.Deserialize<ActionCapabilityClaims>(Base64UrlDecode(parts[1])); }
         catch (Exception exception) when (exception is FormatException or JsonException or ArgumentException) { return false; }
@@ -185,7 +163,6 @@ public sealed class SessionTokenService
             claims.SurfaceRevision != surfaceRevision ||
             !FixedHashEquals(claims.BindingProof, ActionBindingProof(bindingTokenHash)))
             return false;
-
         DateTimeOffset issuedAt;
         DateTimeOffset expiresAt;
         try
@@ -197,7 +174,6 @@ public sealed class SessionTokenService
         var now = _timeProvider.GetUtcNow();
         return expiresAt > now && issuedAt <= now.AddMinutes(5) && expiresAt > issuedAt && expiresAt <= issuedAt.Add(UiProtocol.ActionTokenLifetime);
     }
-
     private bool TryValidateCore(string token, string? expectedAudience, out RequestContext context, out DateTimeOffset expiresAt, out long sessionVersion)
     {
         context = default!;
@@ -211,7 +187,6 @@ public sealed class SessionTokenService
         byte[] actual;
         try { actual = Convert.FromHexString(parts[2]); } catch (FormatException) { return false; }
         if (actual.Length != expected.Length || !CryptographicOperations.FixedTimeEquals(actual, expected)) return false;
-
         SessionClaims? claims;
         try { claims = JsonSerializer.Deserialize<SessionClaims>(Base64UrlDecode(parts[1])); }
         catch (Exception ex) when (ex is FormatException or JsonException or ArgumentException) { return false; }
@@ -240,10 +215,8 @@ public sealed class SessionTokenService
         sessionVersion = claims.SessionVersion;
         return true;
     }
-
     private static string Base64UrlEncode(ReadOnlySpan<byte> value) =>
         Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
     private static bool IsActionCapabilityInputValid(RequestContext context, string? bindingId, string? surfaceId, int surfaceRevision, string? bindingTokenHash) =>
         !string.IsNullOrWhiteSpace(context.SessionId.Value) && context.SessionId.Value.Length <= 256 &&
         !string.IsNullOrWhiteSpace(context.OwnerId.Value) && context.OwnerId.Value.Length <= 256 &&
@@ -251,31 +224,26 @@ public sealed class SessionTokenService
         !string.IsNullOrWhiteSpace(bindingId) && bindingId.Length <= 256 &&
         !string.IsNullOrWhiteSpace(surfaceId) && surfaceId.Length <= 256 &&
         surfaceRevision > 0 && IsSha256Hash(bindingTokenHash);
-
     private static bool IsSha256Hash(string? value)
     {
         if (value is not { Length: 64 }) return false;
         try { return Convert.FromHexString(value).Length == 32; }
         catch (FormatException) { return false; }
     }
-
     private static bool FixedHashEquals(string? first, string? second)
     {
         if (first is not { } firstHash || second is not { } secondHash || !IsSha256Hash(firstHash) || !IsSha256Hash(secondHash))
             return false;
         return CryptographicOperations.FixedTimeEquals(Convert.FromHexString(firstHash), Convert.FromHexString(secondHash));
     }
-
     private string ActionBindingProof(string bindingTokenHash) =>
         Convert.ToHexString(HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(ActionBindingProofDomain + bindingTokenHash.ToLowerInvariant())));
-
     private static byte[] Base64UrlDecode(string value)
     {
         var padded = value.Replace('-', '+').Replace('_', '/');
         padded += (padded.Length % 4) switch { 2 => "==", 3 => "=", 0 => string.Empty, _ => throw new FormatException() };
         return Convert.FromBase64String(padded);
     }
-
     private sealed record SessionClaims(
         int Version,
         string SessionId,
@@ -287,7 +255,6 @@ public sealed class SessionTokenService
         string[] Grants,
         long IssuedAtUnixSeconds,
         long ExpiresAtUnixSeconds);
-
     private sealed record ActionCapabilityClaims(
         int Version,
         string ScopeId,
@@ -299,14 +266,12 @@ public sealed class SessionTokenService
         long IssuedAtUnixSeconds,
         long ExpiresAtUnixSeconds);
 }
-
 public sealed record SessionPair(
     string AccessToken,
     string RefreshToken,
     DateTimeOffset RefreshExpiresAt,
     DateTimeOffset AccessExpiresAt = default,
     string Audience = SessionAudiences.Mcp);
-
 public enum Sensitivity { Public, Internal, Confidential, Secret }
 public static class Redaction
 {
@@ -315,6 +280,5 @@ public static class Redaction
     public static JsonElement Redact(JsonElement value, Sensitivity classification) =>
         classification == Sensitivity.Secret ? JsonElement.Parse("\"[REDACTED]\"") : value.Clone();
 }
-
 [GenerateSerializer, Alias("digitalbrain.v2.command-envelope")]
 public sealed record CommandEnvelope([property: Id(0)] string Type, [property: Id(1)] int Version, [property: Id(2)] string CommandId, [property: Id(3)] RequestContext Context, [property: Id(4)] JsonElement Payload);

@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public enum SurfaceAudienceKind
@@ -11,9 +10,7 @@ public enum SurfaceAudienceKind
     Owner,
     Public
 }
-
 public sealed record SurfaceAudience(SurfaceAudienceKind Kind, string Id);
-
 public static class ActorScope
 {
     public static string Id(ActorId actorId)

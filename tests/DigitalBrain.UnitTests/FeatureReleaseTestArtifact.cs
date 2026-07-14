@@ -85,8 +85,20 @@ internal sealed class FeatureReleaseTestArtifact : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(ReleaseDirectory))
-            Directory.Delete(ReleaseDirectory, recursive: true);
+        for (var attempt = 0; Directory.Exists(ReleaseDirectory); attempt++)
+        {
+            try
+            {
+                Directory.Delete(ReleaseDirectory, recursive: true);
+                return;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException && attempt < 9)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Thread.Sleep(TimeSpan.FromMilliseconds(10 * (attempt + 1)));
+            }
+        }
     }
 
     private static void Copy(string source, string destination, string fileName)

@@ -4,7 +4,6 @@ using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
-
 namespace DigitalBrain.Integrations.Salesforce;
 
 [GrainType("digitalbrain.salesforce.mutation")]
@@ -34,7 +33,6 @@ internal sealed class SalesforceMutationNeuron(
             return new SalesforceMutationPreviewResult(SalesforceMutationStatus.Unavailable, SafeReason: SafeReason(SalesforceMutationStatus.Unavailable));
         }
     }
-
     public async Task<SalesforceMutationApplyResult> ApplyUpdateAsync(SalesforcePreparedUpdate preparedUpdate, CancellationToken cancellationToken = default)
     {
         try
@@ -54,7 +52,6 @@ internal sealed class SalesforceMutationNeuron(
             return new SalesforceMutationApplyResult(SalesforceMutationStatus.Unavailable, SafeReason(SalesforceMutationStatus.Unavailable));
         }
     }
-
     public async Task<SalesforceMutationVerificationResult> VerifyUpdateAsync(SalesforcePreparedUpdate preparedUpdate, CancellationToken cancellationToken = default)
     {
         try
@@ -74,7 +71,6 @@ internal sealed class SalesforceMutationNeuron(
             return new SalesforceMutationVerificationResult(false, SafeReason(SalesforceMutationStatus.Unavailable));
         }
     }
-
     private async Task<(SalesforceMutationStatus? Status, ISalesforceApiClient? Client)> CreateClientAsync(CancellationToken cancellationToken)
     {
         var owner = new NeuronId(this.GetPrimaryKeyString());
@@ -82,13 +78,11 @@ internal sealed class SalesforceMutationNeuron(
         var config = await connector.ValidateConfigAsync(IntegrationConfigScopes.ForUser(scope.UserId), cancellationToken);
         if (!config.IsValid)
             return (SalesforceMutationStatus.ConfigurationMissing, null);
-
         var values = await SalesforceClientFactory.GetMergedScopedValuesAsync(store, scope, cancellationToken);
         if (!SalesforceClientFactory.HasUsableCredential(values))
             return (SalesforceMutationStatus.NeedsAuth, null);
         return (null, await salesforceApiClientFactory.CreateAsync(scope, cancellationToken));
     }
-
     private static string SafeReason(SalesforceMutationStatus status) => status switch
     {
         SalesforceMutationStatus.ConfigurationMissing => "Salesforce application configuration is missing.",

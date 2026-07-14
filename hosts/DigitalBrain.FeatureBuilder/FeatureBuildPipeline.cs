@@ -5,21 +5,17 @@ public sealed class FeatureBuildPipeline
     public static readonly TimeSpan RestoreTimeout = TimeSpan.FromSeconds(10);
     public static readonly TimeSpan CompileAndScenarioTimeout = TimeSpan.FromSeconds(60);
     public static readonly TimeSpan MaximumRequestDuration = TimeSpan.FromSeconds(70);
-
     private readonly TimeProvider _timeProvider;
     private readonly FeatureReleaseWriter _releaseWriter;
-
     public FeatureBuildPipeline()
         : this(TimeProvider.System, new FeatureReleaseWriter())
     {
     }
-
     public FeatureBuildPipeline(TimeProvider timeProvider, FeatureReleaseWriter releaseWriter)
     {
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _releaseWriter = releaseWriter ?? throw new ArgumentNullException(nameof(releaseWriter));
     }
-
     public async Task<FeatureRelease> BuildAsync(FeatureBuildRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -53,7 +49,6 @@ public sealed class FeatureBuildPipeline
                 "-p:NuGetAudit=false",
                 "--verbosity",
                 "quiet");
-
             var compileDeadline = Minimum(request.Deadline, _timeProvider.GetUtcNow().Add(CompileAndScenarioTimeout));
             var buildOutput = Path.Combine(workspace, "build", "implementation");
             await process.RunAsync(
@@ -79,7 +74,6 @@ public sealed class FeatureBuildPipeline
                 "--nologo",
                 "--verbosity",
                 "quiet");
-
             var implementationAssembly = FeatureManifestDeriver.AssemblyName(request.Source, request.Source.ImplementationProjectPath);
             var manifest = FeatureManifestDeriver.Derive(buildOutput, implementationAssembly);
             await process.RunAsync(
@@ -135,20 +129,17 @@ public sealed class FeatureBuildPipeline
                 "--nologo",
                 "--verbosity",
                 "quiet");
-
             var scenarios = FeatureScenarioResultReader.Read(Path.Combine(resultsDirectory, "scenarios.trx"), expectedScenarioCount);
             if (scenarios.Total == 0 || scenarios.Failed != 0 || scenarios.Skipped != 0 || scenarios.Passed != scenarios.Total)
             {
                 throw new FeatureBuildException(FeatureBuildFailure.ScenarioFailed, "Feature scenarios must contain at least one test and pass with no failures or skips.");
             }
-
             var sourceReference = FeatureReleaseWriter.ComputeSourceReference(request.Source);
             var remaining = request.Deadline - _timeProvider.GetUtcNow();
             if (remaining <= TimeSpan.Zero)
             {
                 throw FeatureBuildDeadline.Expired();
             }
-
             using var releaseCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             releaseCancellation.CancelAfter(remaining);
             try
@@ -168,7 +159,6 @@ public sealed class FeatureBuildPipeline
             }
         }
     }
-
     private static void ValidateScenarioDependencies(FeatureSourceSnapshot source, string outputDirectory, string scenarioAssembly)
     {
         foreach (var project in source.Files.Where(static file => file.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
@@ -178,7 +168,6 @@ public sealed class FeatureBuildPipeline
             {
                 continue;
             }
-
             var assemblyPath = Path.Combine(outputDirectory, assembly);
             if (File.Exists(assemblyPath))
             {
@@ -186,7 +175,6 @@ public sealed class FeatureBuildPipeline
             }
         }
     }
-
     private void ValidateDeadline(DateTimeOffset deadline)
     {
         var remaining = deadline - _timeProvider.GetUtcNow();
@@ -194,17 +182,14 @@ public sealed class FeatureBuildPipeline
         {
             throw FeatureBuildDeadline.Expired();
         }
-
         if (remaining > MaximumRequestDuration)
         {
             throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, $"A Feature build deadline cannot exceed {MaximumRequestDuration.TotalSeconds:0} seconds.");
         }
     }
-
     private static DateTimeOffset Minimum(DateTimeOffset first, DateTimeOffset second) =>
         first <= second ? first : second;
 }
-
 internal static class FeatureBuildDeadline
 {
     internal static FeatureBuildException Expired() =>

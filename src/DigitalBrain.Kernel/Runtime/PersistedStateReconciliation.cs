@@ -1,13 +1,10 @@
 using Orleans.Runtime;
-
 namespace DigitalBrain.Kernel;
 
 internal sealed class PersistedStateWriteOutcomeUnknownException(Exception writeFailure, Exception recoveryFailure)
     : InvalidOperationException("Persisted-state write outcome is unknown; the recovery read also failed.", new AggregateException(writeFailure, recoveryFailure));
-
 internal static class PersistedStateReconciliation
 {
-
     public static async Task WriteWithRollbackAsync<TPersisted>(IPersistentState<TPersisted> persistentState, TPersisted next, Func<TPersisted, TPersisted, bool> sameState)
     {
         var previousState = persistentState.State;

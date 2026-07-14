@@ -29,7 +29,7 @@ public sealed class CapabilityDispatcherTests
         Assert.True(result.Payload.GetProperty("accepted").GetBoolean());
         Assert.Equal(1, source.Reads);
         Assert.Equal(1, handler.Calls);
-        Assert.Equal("bounded", handler.LastGrant!.Constraints.GetProperty("scope").GetString());
+        Assert.Equal("test.query.v1", Assert.Single(handler.LastGrant!.Constraints.GetProperty("allowedToolIds").EnumerateArray()).GetString());
     }
 
     [Fact]
@@ -47,6 +47,57 @@ public sealed class CapabilityDispatcherTests
             Request(revision: new GrantRevision(2))));
 
         Assert.Equal(0, handler.Calls);
+    }
+
+    [Fact]
+    public async Task Constraints_must_allow_the_exact_capability_before_handler_execution()
+    {
+        var handler = new RecordingHandler("test.query.v1", CapabilityOperationKind.Query);
+        var dispatcher = new CapabilityDispatcher(
+            [handler],
+            new MutableGrantSource(Grant(allowedCapabilityId: "other.query.v1")),
+            new FixedTimeProvider(Now));
+
+        await Assert.ThrowsAsync<CapabilityDeniedException>(() => dispatcher.ExecuteAsync(Request()));
+
+        Assert.Equal(0, handler.Calls);
+    }
+
+    [Fact]
+    public async Task Payload_constraints_allow_only_the_approved_recursive_subset()
+    {
+        var handler = new RecordingHandler("test.query.v1", CapabilityOperationKind.Query);
+        var constraints = JsonSerializer.SerializeToElement(new
+        {
+            allowedToolIds = new[] { "test.query.v1" },
+            payload = new
+            {
+                record = new { objectName = new[] { "Account" }, recordId = new[] { "001" } },
+                fields = new[] { "Name", "Industry" }
+            }
+        });
+        var dispatcher = new CapabilityDispatcher(
+            [handler],
+            new MutableGrantSource(Grant(constraints: constraints)),
+            new FixedTimeProvider(Now));
+
+        await dispatcher.ExecuteAsync(Request(payload: JsonSerializer.SerializeToElement(new
+        {
+            record = new { objectName = "Account", recordId = "001" },
+            fields = new[] { "Name" }
+        })));
+        await Assert.ThrowsAsync<CapabilityDeniedException>(() => dispatcher.ExecuteAsync(Request(payload: JsonSerializer.SerializeToElement(new
+        {
+            record = new { objectName = "Contact", recordId = "001" },
+            fields = new[] { "Name" }
+        }))));
+        await Assert.ThrowsAsync<CapabilityDeniedException>(() => dispatcher.ExecuteAsync(Request(payload: JsonSerializer.SerializeToElement(new
+        {
+            record = new { objectName = "Account", recordId = "001" },
+            fields = new[] { "SecretField" }
+        }))));
+
+        Assert.Equal(1, handler.Calls);
     }
 
     [Fact]
@@ -186,7 +237,9 @@ public sealed class CapabilityDispatcherTests
     private static CapabilityGrant Grant(
         bool enabled = true,
         bool paused = false,
-        string capabilityId = "test.query.v1") =>
+        string capabilityId = "test.query.v1",
+        string? allowedCapabilityId = null,
+        JsonElement? constraints = null) =>
         new(
             Owner,
             Installation,
@@ -195,7 +248,7 @@ public sealed class CapabilityDispatcherTests
             1,
             Connection,
             new GrantRevision(1),
-            JsonSerializer.SerializeToElement(new { scope = "bounded" }),
+            constraints ?? JsonSerializer.SerializeToElement(new { allowedToolIds = new[] { allowedCapabilityId ?? capabilityId } }),
             enabled,
             paused);
 

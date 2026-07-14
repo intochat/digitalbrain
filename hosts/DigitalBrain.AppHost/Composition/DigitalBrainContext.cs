@@ -3,7 +3,6 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
 using DigitalBrain.Kernel.Contracts.Models;
-
 namespace DigitalBrain.AppHost;
 
 internal sealed class DigitalBrainContext
@@ -16,10 +15,8 @@ internal sealed class DigitalBrainContext
     public required OrleansServiceClient OrleansClient { get; init; }
     public required int KernelReplicas { get; init; }
     public required DigitalBrainModelRegistry ModelRegistry { get; init; }
-
     public required string LlmModel { get; init; }
     public required string LlmProvider { get; init; }
-
     public EndpointReference? OllamaEndpoint { get; init; }
     public EndpointReference? EmbeddingOllamaEndpoint { get; init; }
     public IResourceBuilder<ParameterResource>? AzureOpenAIEndpoint { get; init; }
@@ -27,7 +24,6 @@ internal sealed class DigitalBrainContext
     public IResourceBuilder<ParameterResource>? OpenAIApiKey { get; init; }
     public IResourceBuilder<ParameterResource>? AnthropicApiKey { get; init; }
     public IResourceBuilder<ParameterResource>? GitHubModelsToken { get; init; }
-
     public required IResourceBuilder<AzureBlobStorageResource> GrainBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> ConversationStateBlobs { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> SurfaceFeedStateBlobs { get; init; }
@@ -35,6 +31,5 @@ internal sealed class DigitalBrainContext
     public required IResourceBuilder<AzureTableStorageResource> ClusteringTable { get; init; }
     public required IResourceBuilder<AzureTableStorageResource> MemoryFacts { get; init; }
     public required IResourceBuilder<AzureBlobStorageResource> FeatureArtifacts { get; init; }
-
     public bool EnableMcp { get; init; }
 }

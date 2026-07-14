@@ -1,4 +1,4 @@
-using DigitalBrain.TestKit;
+using DigitalBrain.OrleansTests.TestSupport;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Tests.TestSupport;

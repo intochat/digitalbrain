@@ -2,14 +2,12 @@ using System.Text;
 using System.Text.Json;
 using System.Xml;
 using System.Xml.Linq;
-
 namespace DigitalBrain.FeatureBuilder;
 
 internal static class FeatureBuildSource
 {
     private const string TestingTargetsPath =
         "src/DigitalBrain.Features.Testing/buildTransitive/DigitalBrain.Features.Testing.targets";
-
     private static readonly HashSet<string> AllowedPackages = new(StringComparer.OrdinalIgnoreCase)
     {
         "DigitalBrain.Features.Sdk",
@@ -22,10 +20,8 @@ internal static class FeatureBuildSource
         "xunit",
         "xunit.runner.visualstudio"
     };
-
     private static readonly HashSet<string> TestOnlyPackages = new(StringComparer.OrdinalIgnoreCase)
     { "DigitalBrain.Features.Testing", "Microsoft.NET.Test.Sdk", "Reqnroll", "Reqnroll.xUnit", "xunit", "xunit.runner.visualstudio" };
-
     private static readonly HashSet<string> AllowedProperties = new(StringComparer.Ordinal)
     {
         "Description",
@@ -43,7 +39,6 @@ internal static class FeatureBuildSource
         "TargetFramework",
         "Version"
     };
-
     private static readonly HashSet<string> AllowedItems = new(StringComparer.Ordinal)
     {
         "AdditionalFiles",
@@ -56,9 +51,7 @@ internal static class FeatureBuildSource
         "ProjectReference",
         "ReqnrollFeatureFile"
     };
-
     private static readonly HashSet<string> AllowedItemAttributes = new(StringComparer.Ordinal) { "CopyToOutputDirectory", "Include", "Link", "Pack", "PackagePath", "Remove", "Update", "Version" };
-
     internal static void Validate(FeatureSourceSnapshot snapshot)
     {
         var files = snapshot.Files.ToDictionary(static file => file.Path, StringComparer.OrdinalIgnoreCase);
@@ -69,7 +62,6 @@ internal static class FeatureBuildSource
         {
             throw Invalid($"Source build target '{executableTarget}' is forbidden.");
         }
-
         var centralVersions = files.Where(static pair => pair.Key.EndsWith(".props", StringComparison.OrdinalIgnoreCase))
             .SelectMany(pair => ParseXml(pair.Key, pair.Value.Content).Descendants("PackageVersion").Select(element => (Id: RequiredAttribute(element, "Include", pair.Key), Version: RequiredAttribute(element, "Version", pair.Key))))
             .GroupBy(static item => item.Id, StringComparer.OrdinalIgnoreCase)
@@ -77,7 +69,6 @@ internal static class FeatureBuildSource
                 static group => group.Key,
                 static group => group.Last().Version,
                 StringComparer.OrdinalIgnoreCase);
-
         foreach (var file in snapshot.Files.Where(IsBuildFile))
         {
             var document = ParseXml(file.Path, file.Content);
@@ -86,7 +77,6 @@ internal static class FeatureBuildSource
                 ValidateTestingTargets(document);
                 continue;
             }
-
             ValidateRoot(file.Path, document);
             ValidateBuildAuthority(file.Path, document);
             ValidateImports(file.Path, document, files);
@@ -94,10 +84,8 @@ internal static class FeatureBuildSource
             ValidatePackages(file.Path, document, centralVersions, snapshot);
             ValidateItemPaths(file.Path, document, files);
         }
-
         ValidateScenarioProject(snapshot, files);
     }
-
     internal static async Task MaterializeAsync(string workspace, FeatureSourceSnapshot snapshot, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(workspace);
@@ -109,7 +97,6 @@ internal static class FeatureBuildSource
             await File.WriteAllTextAsync(destination, file.Content, new UTF8Encoding(false), cancellationToken);
         }
     }
-
     internal static async Task<string> WriteNuGetConfigAsync(string workspace, string feed, CancellationToken cancellationToken)
     {
         var path = Path.Combine(workspace, "NuGet.Config");
@@ -120,10 +107,8 @@ internal static class FeatureBuildSource
         await File.WriteAllTextAsync(path, document.ToString(SaveOptions.DisableFormatting), new UTF8Encoding(false), cancellationToken);
         return path;
     }
-
     internal static string LocalPath(string workspace, string relativePath) =>
         Path.Combine(workspace, relativePath.Replace('/', Path.DirectorySeparatorChar));
-
     internal static XDocument ParseXml(string path, string content)
     {
         try
@@ -137,7 +122,6 @@ internal static class FeatureBuildSource
             throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, $"'{path}' is not valid bounded XML.", exception);
         }
     }
-
     internal static int ExpectedScenarioCount(FeatureSourceSnapshot snapshot)
     {
         var scenarioDirectory = snapshot.ScenarioProjectPath[..snapshot.ScenarioProjectPath.LastIndexOf('/')];
@@ -165,57 +149,46 @@ internal static class FeatureBuildSource
                     {
                         docStringDelimiter = null;
                     }
-
                     continue;
                 }
-
                 if (value.StartsWith("\"\"\"", StringComparison.Ordinal) || value.StartsWith("```", StringComparison.Ordinal))
                 {
                     docStringDelimiter = value[..3];
                     continue;
                 }
-
                 if (value.StartsWith("# language:", StringComparison.OrdinalIgnoreCase))
                 {
                     throw Invalid($"Only canonical English Gherkin is supported in '{file.Path}'.");
                 }
-
                 if (value.StartsWith('#'))
                 {
                     continue;
                 }
-
                 if (value.StartsWith("Scenario Outline:", StringComparison.OrdinalIgnoreCase) ||
                     value.StartsWith("Scenario Template:", StringComparison.OrdinalIgnoreCase))
                 {
                     throw Invalid($"Scenario outlines are not supported in bounded Feature proof '{file.Path}'.");
                 }
-
                 if (value.StartsWith("Scenario:", StringComparison.OrdinalIgnoreCase))
                 {
                     count++;
                 }
             }
-
             if (docStringDelimiter is not null)
             {
                 throw Invalid($"Gherkin doc string in '{file.Path}' is not closed.");
             }
         }
-
         if (count == 0)
         {
             throw Invalid("The scenario project must contain at least one bounded source scenario.");
         }
-
         return count;
     }
-
     private static bool IsBuildFile(FeatureSourceFile file) =>
         file.Path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) ||
         file.Path.EndsWith(".props", StringComparison.OrdinalIgnoreCase) ||
         file.Path.Equals(TestingTargetsPath, StringComparison.OrdinalIgnoreCase);
-
     private static void ValidateTestingTargets(XDocument document)
     {
         var expected = XDocument.Parse("""
@@ -240,37 +213,31 @@ internal static class FeatureBuildSource
             throw Invalid($"'{TestingTargetsPath}' must match the approved testing target.");
         }
     }
-
     private static void ValidateRoot(string path, XDocument document)
     {
         if (document.Root is null || document.Root.Name.NamespaceName.Length != 0)
         {
             throw Invalid($"'{path}' must use the canonical namespace-free MSBuild format.");
         }
-
         if (!path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
-
         if (!string.Equals(document.Root.Attribute("Sdk")?.Value, "Microsoft.NET.Sdk", StringComparison.Ordinal))
         {
             throw Invalid($"Project '{path}' must use Microsoft.NET.Sdk.");
         }
-
         var targetFramework = document.Descendants("TargetFramework").Select(static element => element.Value)
             .LastOrDefault();
         if (!string.Equals(targetFramework, "net11.0", StringComparison.Ordinal))
         {
             throw Invalid($"Project '{path}' must target net11.0 exactly.");
         }
-
         if (document.Descendants("AllowUnsafeBlocks").Any(static element => string.Equals(element.Value, "true", StringComparison.OrdinalIgnoreCase)))
         {
             throw Invalid($"Project '{path}' cannot enable unsafe code.");
         }
     }
-
     private static void ValidateBuildAuthority(string path, XDocument document)
     {
         var forbiddenProperty = document.Descendants("PropertyGroup").Elements().FirstOrDefault(element => !AllowedProperties.Contains(element.Name.LocalName));
@@ -311,30 +278,25 @@ internal static class FeatureBuildSource
         {
             throw Invalid($"Build-time execution or package-source overrides are forbidden in '{path}'.");
         }
-
         if (forbiddenRemoval is not null)
         {
             throw Invalid($"Source item '{forbiddenRemoval.Name.LocalName}' cannot remove compiled inputs in '{path}'.");
         }
-
         if (document.Descendants("Target").Any())
         {
             throw Invalid($"Custom build targets are forbidden in '{path}'.");
         }
     }
-
     private static bool IsApprovedPropertyAttribute(string path, XElement property, XAttribute attribute) =>
         path.Equals("Directory.Build.props", StringComparison.OrdinalIgnoreCase) &&
         attribute.Name.LocalName.Equals("Condition", StringComparison.Ordinal) &&
         property.Name.LocalName is "SkipFlutterBuild" or "SkipDeployBuild" or "EnforceCodeStyleInBuild" &&
         attribute.Value.Equals($"'$({property.Name.LocalName})' == ''", StringComparison.Ordinal);
-
     private static bool IsApprovedTestingFeatureRemoval(string path, XElement element) =>
         path.Equals("src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj", StringComparison.OrdinalIgnoreCase) &&
         element.Name.LocalName.Equals("ReqnrollFeatureFile", StringComparison.Ordinal) &&
         element.Attributes().Count() == 1 &&
         element.Attribute("Remove")?.Value.Equals("GeneratedDuplicateInput.feature", StringComparison.Ordinal) == true;
-
     private static void ValidateImports(string sourcePath, XDocument document, IReadOnlyDictionary<string, FeatureSourceFile> files)
     {
         foreach (var import in document.Descendants("Import"))
@@ -349,7 +311,6 @@ internal static class FeatureBuildSource
             }
         }
     }
-
     private static void ValidateProjectReferences(string sourcePath, XDocument document, IReadOnlyDictionary<string, FeatureSourceFile> files, FeatureSourceSnapshot snapshot)
     {
         foreach (var reference in document.Descendants("ProjectReference"))
@@ -360,21 +321,18 @@ internal static class FeatureBuildSource
             {
                 throw Invalid($"Project reference '{include}' in '{sourcePath}' is outside the source snapshot.");
             }
-
             if (!IsApprovedProject(resolved, snapshot.ImplementationProjectPath))
             {
                 throw Invalid($"Project reference '{include}' in '{sourcePath}' is not an approved Feature dependency.");
             }
         }
     }
-
     private static bool IsApprovedProject(string path, string implementationProjectPath)
     {
         if (string.Equals(path, implementationProjectPath, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
-
         return path.Equals("src/DigitalBrain.Features.Sdk/DigitalBrain.Features.Sdk.csproj", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj", StringComparison.OrdinalIgnoreCase) ||
@@ -382,7 +340,6 @@ internal static class FeatureBuildSource
                 "integrations/DigitalBrain.Integrations.Salesforce.Contracts/DigitalBrain.Integrations.Salesforce.Contracts.csproj",
                 StringComparison.OrdinalIgnoreCase);
     }
-
     private static void ValidatePackages(string sourcePath, XDocument document, IReadOnlyDictionary<string, string> centralVersions, FeatureSourceSnapshot snapshot)
     {
         foreach (var package in document.Descendants("PackageReference"))
@@ -392,38 +349,32 @@ internal static class FeatureBuildSource
             {
                 throw new FeatureBuildException(FeatureBuildFailure.ForbiddenPackage, $"Package '{id}' is not allowed in Feature builds.");
             }
-
             if (string.Equals(sourcePath, snapshot.ImplementationProjectPath, StringComparison.OrdinalIgnoreCase) && TestOnlyPackages.Contains(id))
             {
                 throw new FeatureBuildException(FeatureBuildFailure.ForbiddenPackage, $"Test package '{id}' is not allowed in a Feature implementation.");
             }
-
             var version = package.Attribute("Version")?.Value;
             if (string.IsNullOrWhiteSpace(version) && !centralVersions.TryGetValue(id, out version))
             {
                 throw Invalid($"Package '{id}' must have an exact offline version.");
             }
-
             if (!IsExactVersion(version))
             {
                 throw Invalid($"Package '{id}' has non-deterministic version '{version}'.");
             }
         }
     }
-
     private static bool IsExactVersion(string version)
     {
         if (version.Length is 0 or > 64 || version.IndexOfAny(['*', '[', ']', '(', ')', ',']) >= 0)
         {
             return false;
         }
-
         var core = version.Split('-', 2)[0];
         var parts = core.Split('.');
         return parts.Length >= 3 && parts.All(static part =>
             part.Length > 0 && part.All(char.IsAsciiDigit));
     }
-
     private static void ValidateItemPaths(string sourcePath, XDocument document, IReadOnlyDictionary<string, FeatureSourceFile> files)
     {
         string[] itemNames =
@@ -435,7 +386,6 @@ internal static class FeatureBuildSource
             {
                 continue;
             }
-
             var normalized = value.Replace('\\', '/');
             if (normalized.Contains("$(", StringComparison.Ordinal) || normalized.IndexOfAny(['*', '?', ';']) >= 0 ||
                 !TryResolveVirtualPath(sourcePath, normalized, out var resolved) ||
@@ -443,14 +393,12 @@ internal static class FeatureBuildSource
             {
                 throw Invalid($"Item path '{value}' in '{sourcePath}' is outside the source snapshot.");
             }
-
             var link = item.Attribute("Link")?.Value;
             if (link is not null &&
                 (link.Contains("$(", StringComparison.Ordinal) || link.Contains("%(", StringComparison.Ordinal) || !IsCanonicalRelativePath(link)))
             {
                 throw Invalid($"Item link path '{link}' in '{sourcePath}' is outside the build output.");
             }
-
             var copy = item.Attribute("CopyToOutputDirectory")?.Value;
             if (copy is not null && copy is not ("Never" or "PreserveNewest" or "Always"))
             {
@@ -458,7 +406,6 @@ internal static class FeatureBuildSource
             }
         }
     }
-
     private static bool IsCanonicalRelativePath(string path)
     {
         try
@@ -471,7 +418,6 @@ internal static class FeatureBuildSource
             return false;
         }
     }
-
     private static void ValidateScenarioProject(FeatureSourceSnapshot snapshot, IReadOnlyDictionary<string, FeatureSourceFile> files)
     {
         var scenarioFile = files[snapshot.ScenarioProjectPath];
@@ -484,7 +430,6 @@ internal static class FeatureBuildSource
         {
             throw Invalid("The scenario project must reference the implementation project directly.");
         }
-
         var projectReferences = scenarioProject.Descendants("ProjectReference").Select(reference => RequiredAttribute(reference, "Include", scenarioFile.Path).Replace('\\', '/'))
             .Select(reference => TryResolveVirtualPath(scenarioFile.Path, reference, out var resolved) ? resolved : string.Empty);
         var packageReferences = scenarioProject.Descendants("PackageReference").Select(reference => RequiredAttribute(reference, "Include", scenarioFile.Path));
@@ -493,7 +438,6 @@ internal static class FeatureBuildSource
         {
             throw Invalid("The scenario project must use DigitalBrain.Features.Testing.");
         }
-
         var scenarioDirectory = scenarioFile.Path[..scenarioFile.Path.LastIndexOf('/')];
         if (!files.Keys.Any(path =>
                 path.StartsWith(scenarioDirectory + "/", StringComparison.OrdinalIgnoreCase) &&
@@ -501,15 +445,12 @@ internal static class FeatureBuildSource
         {
             throw Invalid("The scenario project must contain at least one Gherkin feature file.");
         }
-
         _ = ExpectedScenarioCount(snapshot);
-
         var configPath = scenarioDirectory + "/reqnroll.json";
         if (!files.TryGetValue(configPath, out var config))
         {
             throw Invalid("The scenario project requires strict reqnroll.json configuration.");
         }
-
         try
         {
             using var json = JsonDocument.Parse(config.Content);
@@ -525,12 +466,10 @@ internal static class FeatureBuildSource
             throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, "The scenario project has invalid strict Reqnroll configuration.", exception);
         }
     }
-
     private static string RequiredAttribute(XElement element, string name, string path) =>
         element.Attribute(name)?.Value is { Length: > 0 } value
             ? value
             : throw Invalid($"Element '{element.Name.LocalName}' in '{path}' requires '{name}'.");
-
     private static bool TryResolveVirtualPath(string sourcePath, string reference, out string path)
     {
         var segments = new List<string>();
@@ -540,7 +479,6 @@ internal static class FeatureBuildSource
             {
                 continue;
             }
-
             if (segment == "..")
             {
                 if (segments.Count == 0)
@@ -548,7 +486,6 @@ internal static class FeatureBuildSource
                     path = string.Empty;
                     return false;
                 }
-
                 segments.RemoveAt(segments.Count - 1);
             }
             else
@@ -556,11 +493,9 @@ internal static class FeatureBuildSource
                 segments.Add(segment);
             }
         }
-
         path = string.Join('/', segments);
         return path.Length > 0;
     }
-
     private static FeatureBuildException Invalid(string message) =>
         new(FeatureBuildFailure.InvalidSource, message);
 }

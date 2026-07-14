@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Hosting;
-
 namespace DigitalBrain.Kernel.Capabilities;
 
 internal sealed class CapabilityDispatcherStartupValidation(ICapabilityDispatcher dispatcher) : IHostedService
@@ -10,6 +9,5 @@ internal sealed class CapabilityDispatcherStartupValidation(ICapabilityDispatche
         cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
     }
-
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

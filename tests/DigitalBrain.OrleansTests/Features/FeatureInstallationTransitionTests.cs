@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
 
@@ -300,12 +301,36 @@ public sealed class FeatureInstallationTransitionTests
     }
 
     [Fact]
+    public void Hub_rejects_incomplete_or_unknown_capability_constraint_schemas()
+    {
+        FeatureGrantSpec[] missingToolAllowlist = [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google")];
+        FeatureGrantSpec[] unknownConstraint = [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{\"allowedToolIds\":[\"gmail.message.read.v1\"],\"scope\":\"bounded\"}", "google")];
+        FeatureGrantSpec[] mismatchedToolAllowlist = [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{\"allowedToolIds\":[\"gmail.mailbox.read.v1\"]}", "google")];
+
+        Assert.Throws<ArgumentException>(() => FeatureHubTransitions.Propose(
+            FeatureHubState.Empty,
+            Proposal(ReleaseOne, missingToolAllowlist),
+            0,
+            Now));
+        Assert.Throws<ArgumentException>(() => FeatureHubTransitions.Propose(
+            FeatureHubState.Empty,
+            Proposal(ReleaseOne, unknownConstraint),
+            0,
+            Now));
+        Assert.Throws<ArgumentException>(() => FeatureHubTransitions.Propose(
+            FeatureHubState.Empty,
+            Proposal(ReleaseOne, mismatchedToolAllowlist),
+            0,
+            Now));
+    }
+
+    [Fact]
     public void Exact_digest_approval_stages_then_activates_a_complete_grant_set()
     {
         FeatureGrantSpec[] grants =
         [
-            new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google"),
-            new("model.complete.v1", 1, null, "{}")
+            new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), Constraints("gmail.message.read.v1"), "google"),
+            new("model.complete.v1", 1, null, Constraints("model.complete.v1"))
         ];
         var proposal = Proposal(ReleaseOne, grants);
         var proposed = FeatureHubTransitions.Propose(FeatureHubState.Empty, proposal, 0, Now);
@@ -342,8 +367,8 @@ public sealed class FeatureInstallationTransitionTests
     {
         FeatureGrantSpec[] grants =
         [
-            new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google"),
-            new("model.complete.v1", 1, null, "{}")
+            new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), Constraints("gmail.message.read.v1"), "google"),
+            new("model.complete.v1", 1, null, Constraints("model.complete.v1"))
         ];
         var proposed = FeatureHubTransitions.Propose(
             FeatureHubState.Empty,
@@ -369,15 +394,15 @@ public sealed class FeatureInstallationTransitionTests
                 InstallationId,
                 ReleaseOne,
                 new ActorId("actor-1"),
-                [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google")]),
+                [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), Constraints("gmail.message.read.v1"), "google")]),
             approved.Revision));
     }
 
     [Fact]
     public void Update_keeps_previous_grants_for_drain_and_pause_or_revoke_denies_the_next_operation()
     {
-        FeatureGrantSpec[] readGrant = [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), "{}", "google")];
-        FeatureGrantSpec[] modelGrant = [new("model.complete.v1", 1, null, "{}")];
+        FeatureGrantSpec[] readGrant = [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), Constraints("gmail.message.read.v1"), "google")];
+        FeatureGrantSpec[] modelGrant = [new("model.complete.v1", 1, null, Constraints("model.complete.v1"))];
         var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, readGrant), readGrant);
         var updated = Activate(active, Proposal(ReleaseTwo, modelGrant), modelGrant);
 
@@ -435,6 +460,9 @@ public sealed class FeatureInstallationTransitionTests
             grants.Select(grant => grant.CapabilityId).ToArray(),
             ["DigitalBrain.Features.Sdk"]),
         grants);
+
+    private static string Constraints(string capabilityId) =>
+        JsonSerializer.Serialize(new { allowedToolIds = new[] { capabilityId } });
 
     private static FeatureInstallationState State() =>
         FeatureInstallationState.Create(ReleaseOne, InstallationId);

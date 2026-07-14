@@ -1,6 +1,5 @@
 using DigitalBrain.Kernel.Contracts.Runtime;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-plan")]
@@ -12,10 +11,8 @@ public sealed record InoEffectPlan(
     [property: Id(4)] byte[] PayloadUtf8,
     [property: Id(5)] string SafeSummary,
     [property: Id(6)] DateTimeOffset ExpiresAt);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-plan-completion")]
 public sealed record InoEffectPlanCompletion([property: Id(0)] InoToolEffectDisposition Disposition, [property: Id(1)] string SafeResult);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-plan-state")]
 public sealed record InoEffectPlanState(
     [property: Id(0)] int SchemaVersion,
@@ -25,13 +22,11 @@ public sealed record InoEffectPlanState(
 {
     public static InoEffectPlanState Empty() => new(RuntimeStateSchemas.InoEffectPlan, 0, null, null);
 }
-
 [Alias("digitalbrain.runtime.i-ino-effect-plan-neuron")]
 public interface IInoEffectPlanNeuron : IGrainWithStringKey
 {
     [Alias("digitalbrain.runtime.ino-effect-plan.put")]
     Task PutAsync(InoEffectPlan plan);
-
     [Alias("digitalbrain.runtime.ino-effect-plan.execute")]
     Task<InoToolEffectResult> ExecuteAsync(
         string actorScope,
@@ -43,12 +38,10 @@ public interface IInoEffectPlanNeuron : IGrainWithStringKey
         string executionProof,
         CancellationToken cancellationToken = default);
 }
-
 public static class InoEffectPlanTransitions
 {
     public const int MaximumPayloadBytes = 64 * 1024;
     public const int MaximumSafeTextLength = 512;
-
     public static InoEffectPlanState Put(InoEffectPlanState state, string planId, InoEffectPlan plan)
     {
         ValidateState(state);
@@ -61,7 +54,6 @@ public static class InoEffectPlanTransitions
         if (state.Completion is null && SamePlan(state.Plan, plan)) return state;
         throw new RuntimeStateIntegrityException("immutable effect plan changed");
     }
-
     public static InoEffectPlanState Complete(InoEffectPlanState state, InoEffectPlanCompletion completion)
     {
         ValidateState(state);
@@ -77,7 +69,6 @@ public static class InoEffectPlanTransitions
         ValidateState(completed);
         return completed;
     }
-
     public static void ValidateState(InoEffectPlanState state)
     {
         if (state.SchemaVersion != RuntimeStateSchemas.InoEffectPlan || state.Revision is < 0 or > 2 ||
@@ -94,7 +85,6 @@ public static class InoEffectPlanTransitions
             ValidateCompletion(state.Completion);
         }
     }
-
     public static void ValidatePlan(InoEffectPlan plan, bool requirePayload)
     {
         if (!RuntimeStateKeys.IsScopeHash(plan.PlanId) || !RuntimeStateKeys.IsScopeHash(plan.ActorScope) || !IsBounded(plan.OperationId, 128) || !IsToolId(plan.ToolId) ||
@@ -103,13 +93,11 @@ public static class InoEffectPlanTransitions
             !IsBounded(plan.SafeSummary, MaximumSafeTextLength) || plan.ExpiresAt == default)
             throw new ArgumentException("Effect plan metadata is invalid.", nameof(plan));
     }
-
     private static void ValidateCompletion(InoEffectPlanCompletion completion)
     {
         if (!Enum.IsDefined(completion.Disposition) || !IsBounded(completion.SafeResult, MaximumSafeTextLength))
             throw new ArgumentException("Effect plan completion is invalid.", nameof(completion));
     }
-
     private static bool SamePlan(InoEffectPlan first, InoEffectPlan second) =>
         string.Equals(first.PlanId, second.PlanId, StringComparison.Ordinal) &&
         string.Equals(first.ActorScope, second.ActorScope, StringComparison.Ordinal) &&
@@ -118,17 +106,13 @@ public static class InoEffectPlanTransitions
         first.PayloadUtf8.SequenceEqual(second.PayloadUtf8) &&
         string.Equals(first.SafeSummary, second.SafeSummary, StringComparison.Ordinal) &&
         first.ExpiresAt == second.ExpiresAt;
-
     private static InoEffectPlan Clone(InoEffectPlan plan) => plan with { PayloadUtf8 = plan.PayloadUtf8.ToArray() };
-
     private static bool IsToolId(string value) =>
         IsBounded(value, 128) && value.All(static character =>
             char.IsAsciiLetterOrDigit(character) || character is '.' or '-');
-
     private static bool IsBounded(string value, int maximumLength) =>
         !string.IsNullOrWhiteSpace(value) && value.Length <= maximumLength && !value.Any(char.IsControl);
 }
-
 public static class ExternalEffectGrants
 {
     public static void Demand(string? effectKind, IReadOnlySet<string> grants)

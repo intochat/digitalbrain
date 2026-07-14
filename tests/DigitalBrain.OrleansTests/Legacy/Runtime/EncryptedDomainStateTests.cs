@@ -378,7 +378,7 @@ public sealed class EncryptedDomainStateTests
             AcceptedOutbox("operation", now),
             now);
         var invocation = new SuspendedInvocation(
-            OAuthCallbackPaths.GoogleProvider,
+            "google",
             "gmail.read.messages",
             Encoding.UTF8.GetBytes("{}"),
             "0123456789abcdef0123456789abcdef",
@@ -571,7 +571,7 @@ public sealed class EncryptedDomainStateTests
             now,
             TimeSpan.FromMinutes(1));
         var invocation = new SuspendedInvocation(
-            OAuthCallbackPaths.GoogleProvider,
+            "google",
             "gmail.read.messages",
             Encoding.UTF8.GetBytes("{}"),
             "0123456789abcdef0123456789abcdef",
@@ -951,7 +951,7 @@ public sealed class EncryptedDomainStateTests
             AcceptedOutbox("operation", Utc(0)),
             Utc(0));
         var invalidFlow = new SuspendedInvocation(
-            OAuthCallbackPaths.GoogleProvider,
+            "google",
             "gmail.search",
             Encoding.UTF8.GetBytes("{}"),
             "0123456789abcdef0123456789abcdef",
@@ -959,12 +959,12 @@ public sealed class EncryptedDomainStateTests
             "short");
         var invalidProvider = invalidFlow with
         {
-            Provider = "github",
+            Provider = "GitHub",
             AuthorizationFlowReference = OAuthFlowReference
         };
         var invalidTool = invalidFlow with
         {
-            ToolId = "salesforce.query",
+            ToolId = string.Empty,
             AuthorizationFlowReference = OAuthFlowReference
         };
         var claim = ConversationTransitions.TryClaimOperation(

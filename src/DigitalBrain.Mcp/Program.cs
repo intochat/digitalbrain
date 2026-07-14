@@ -1,5 +1,3 @@
-
-
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Mcp;
 using DigitalBrain.ServiceDefaults;
@@ -9,19 +7,16 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
-
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 ConfigureOrleansClient(builder);
 builder.AddKeyedAzureBlobServiceClient("features", settings => settings.DisableTracing = true);
-
 var configuredProfile = builder.Configuration["DigitalBrain:Profile"];
 if (string.IsNullOrWhiteSpace(configuredProfile))
     throw new InvalidOperationException("DigitalBrain:Profile must be supplied by the AppHost or deployment configuration.");
 var profileText = configuredProfile;
 if (!Enum.TryParse<RuntimeProfile>(profileText, true, out var profile))
     throw new InvalidOperationException($"Unknown runtime profile '{profileText}'.");
-
 builder.Services.AddMcpServer().WithHttpTransport().WithTools<McpConversationTools>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<McpAuthority>();
@@ -51,7 +46,6 @@ builder.Services.AddSingleton(sp => new McpRequestGuard(new McpTransportPolicy(
     int.TryParse(builder.Configuration["DigitalBrain:Runtime:Mcp:MaxConcurrentRequests"], out var concurrent) ? concurrent : 8,
     int.TryParse(builder.Configuration["DigitalBrain:Runtime:Mcp:RequestsPerMinute"], out var rate) ? rate : 120)));
 builder.Services.AddUiTransport(builder.Configuration, builder.Environment, profile);
-
 var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseMiddleware<RuntimeTransportBoundary>();
@@ -86,11 +80,9 @@ app.MapGet("/oauth/start/{provider}", (string provider, HttpRequest request, Aut
     proxy.StartAsync(provider, request, cancellationToken));
 app.MapDefaultEndpoints();
 await app.RunAsync();
-
 static void ConfigureOrleansClient(IHostApplicationBuilder builder)
 {
     builder.Services.AddSingleton<IClientConnectionRetryFilter, BoundedOrleansClientConnectionRetryFilter>();
-
     var clusteringProvider = Environment.GetEnvironmentVariable("Orleans__Clustering__ProviderType");
     if (string.Equals(clusteringProvider, "AzureTableStorage", StringComparison.OrdinalIgnoreCase))
     {
@@ -101,6 +93,5 @@ static void ConfigureOrleansClient(IHostApplicationBuilder builder)
     {
         builder.AddKeyedRedisClient("redis");
     }
-
     builder.UseOrleansClient();
 }

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public sealed record StoredActionBinding(
@@ -11,7 +10,6 @@ public sealed record StoredActionBinding(
     int MaxUses,
     DateTimeOffset ExpiresAt,
     int ActionSchemaVersion = UiProtocol.ActionSchemaVersion);
-
 public sealed record StoredSurfaceRecord(
     long Sequence,
     BrainOwnerId OwnerId,

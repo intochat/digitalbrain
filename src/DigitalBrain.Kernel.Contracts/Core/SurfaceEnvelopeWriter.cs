@@ -1,13 +1,10 @@
 using System.Text.Json;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public sealed record SurfaceActionToken(string Token, DateTimeOffset ExpiresAt);
-
 public sealed class SurfaceEnvelopeWriter
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public string Write(
         RequestContext recipient,
         StoredSurfaceRecord record,
@@ -28,7 +25,6 @@ public sealed class SurfaceEnvelopeWriter
         }
         var missing = record.RequiredClientCapabilities.Where(required => !clientCapabilities.Contains(required)).ToArray();
         if (missing.Length > 0) throw new SurfaceCapabilityException(missing);
-
         var wireActions = record.Audience.Kind == SurfaceAudienceKind.Actor
             ? record.Actions.Where(binding => actionTokens.ContainsKey(binding.BindingId))
                 .Select(binding =>
@@ -46,7 +42,6 @@ public sealed class SurfaceEnvelopeWriter
                     };
                 }).ToArray()
             : [];
-
         return JsonSerializer.Serialize(new
         {
             protocolVersion = record.ProtocolVersion,
@@ -68,7 +63,6 @@ public sealed class SurfaceEnvelopeWriter
             actions = wireActions
         }, JsonOptions);
     }
-
     private static void DemandVisible(RequestContext recipient, StoredSurfaceRecord record)
     {
         if (record.OwnerId != recipient.OwnerId)
@@ -85,7 +79,6 @@ public sealed class SurfaceEnvelopeWriter
         if (!visible) throw new UnauthorizedAccessException("Surface audience denied.");
     }
 }
-
 public sealed class SurfaceCapabilityException(IReadOnlyList<string> missing)
     : InvalidOperationException("The client does not support required surface capabilities.")
 {

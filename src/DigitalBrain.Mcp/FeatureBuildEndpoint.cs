@@ -7,19 +7,14 @@ using Azure.Storage.Blobs.Models;
 using DigitalBrain.FeatureBuilder;
 using DigitalBrain.Kernel.Contracts;
 using Microsoft.Extensions.DependencyInjection;
-
 namespace DigitalBrain.Mcp;
 
 public sealed record FeatureSourceInput(string Path, string Content);
-
 public sealed record FeatureBuildSubmission(string ImplementationProjectPath, string ScenarioProjectPath, IReadOnlyList<FeatureSourceInput> Files, FeatureSourceKind SourceKind);
-
 public sealed record FeatureBuildArtifact(FeatureReleaseMetadata Release, FeatureScenarioResult Scenarios);
-
 public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, TimeProvider timeProvider)
 {
     private const int MaximumProcessOutputCharacters = 65_536;
-
     public async Task<FeatureBuildArtifact> BuildAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(submission);
@@ -59,7 +54,6 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
-
     private static async Task<BuilderRelease> RunBuilderAsync(string requestPath, CancellationToken cancellationToken)
     {
         var start = new ProcessStartInfo
@@ -103,7 +97,6 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? "FeatureBuilder rejected the source." : error.Trim());
         return JsonSerializer.Deserialize<BuilderRelease>(output, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? throw new InvalidDataException("FeatureBuilder returned no release.");
     }
-
     private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken)
     {
         var result = new StringBuilder();
@@ -117,16 +110,13 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
             result.Append(buffer, 0, read);
         }
     }
-
     private static string PackageFeed()
     {
         var configured = Environment.GetEnvironmentVariable("DigitalBrain__FeatureBuilder__OfflineFeed");
         var path = Path.GetFullPath(string.IsNullOrWhiteSpace(configured) ? Path.Combine(AppContext.BaseDirectory, "feature-packages") : configured);
         return Directory.Exists(path) ? path : throw new DirectoryNotFoundException("The FeatureBuilder offline package feed is unavailable.");
     }
-
     private static StringComparison PathComparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-
     private sealed record BuilderCommand(
         string ImplementationProjectPath,
         string ScenarioProjectPath,
@@ -134,12 +124,9 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
         string OfflineFeedDirectory,
         string OutputDirectory,
         DateTimeOffset Deadline);
-
     private sealed record BuilderFile(string Path, string ContentBase64);
-
     private sealed record BuilderRelease(string Digest, string SourceReference, string ReleaseDirectory, FeatureManifest Manifest, FeatureScenarioResult Scenarios);
 }
-
 public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] BlobServiceClient blobs)
 {
     private const string ContainerName = "feature-releases";
@@ -147,7 +134,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
     private const long MaximumReleaseBytes = 67_108_864;
     private const int MaximumMetadataBytes = 65_536;
     private readonly BlobContainerClient container = blobs.GetBlobContainerClient(ContainerName);
-
     public async Task PublishReleaseAsync(FeatureReleaseMetadata metadata, string releaseDirectory, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(metadata);
@@ -182,7 +168,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
         }
         await UploadImmutableAsync(container.GetBlobClient($"metadata/{digest.Value}.json"), JsonSerializer.SerializeToUtf8Bytes(metadata), cancellationToken);
     }
-
     private static string[] ReleaseFiles(string root)
     {
         var pending = new Queue<string>();
@@ -202,7 +187,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
         }
         return files.ToArray();
     }
-
     public async Task<FeatureReleaseMetadata> DemandReleaseAsync(ReleaseDigest digest, CancellationToken cancellationToken = default)
     {
         var marker = container.GetBlobClient($"releases/{digest.Value}/digest.txt");
@@ -218,7 +202,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             throw new InvalidDataException("The published Feature release metadata has another digest.");
         return metadata;
     }
-
     public async Task PublishActiveAsync(BrainOwnerId ownerId, FeatureAuthoritySnapshot authority, CancellationToken cancellationToken = default)
     {
         if (authority.ActiveRelease is not { } release || authority.ActiveGrantRevision is not { } revision)
@@ -244,7 +227,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
         await container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
         await container.GetBlobClient($"active/{Segment(ownerId.Value)}/{Segment(authority.InstallationId.Value)}.json").UploadAsync(new BinaryData(manifest), overwrite: true, cancellationToken);
     }
-
     private static async Task UploadImmutableAsync(BlobClient blob, string sourcePath, CancellationToken cancellationToken)
     {
         try
@@ -257,7 +239,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             await VerifyExistingAsync(blob, sourcePath, cancellationToken);
         }
     }
-
     private static async Task UploadImmutableAsync(BlobClient blob, byte[] content, CancellationToken cancellationToken)
     {
         try
@@ -271,7 +252,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
                 throw new InvalidDataException("An immutable Feature release metadata blob has conflicting content.");
         }
     }
-
     private static async Task<byte[]> DownloadBoundedAsync(BlobClient blob, int maximumBytes, CancellationToken cancellationToken)
     {
         var properties = (await blob.GetPropertiesAsync(cancellationToken: cancellationToken)).Value;
@@ -290,7 +270,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
     }
-
     private static async Task VerifyExistingAsync(BlobClient blob, string sourcePath, CancellationToken cancellationToken)
     {
         var properties = (await blob.GetPropertiesAsync(cancellationToken: cancellationToken)).Value;
@@ -311,7 +290,6 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             if (localRead == 0) return;
         }
     }
-
     private static string Segment(string value) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

@@ -1,6 +1,5 @@
 using DigitalBrain.Features.Sdk;
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Memory;
 
 internal enum MemoryWriteStatus
@@ -9,29 +8,20 @@ internal enum MemoryWriteStatus
     AlreadyPresent,
     CapacityReached
 }
-
 internal sealed record MemoryFactSnapshot(string FactId, string Text, IReadOnlyList<string> Tags, ActorId SourceActor, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string ETag);
-
 internal sealed record MemoryAuditRecord(BrainOwnerId OwnerId, ActorId ActorId, string Operation, string? FactId, string Outcome, string CorrelationId);
-
 internal interface IMemoryAuditSink
 {
     ValueTask WriteAsync(MemoryAuditRecord record, CancellationToken cancellationToken = default);
 }
-
 internal interface IMemoryFactStore
 {
     Task<IReadOnlyList<MemoryFactSnapshot>> ListAsync(BrainOwnerId ownerId, int maximumCount, CancellationToken cancellationToken = default);
-
     Task<MemoryFactSnapshot?> FindAsync(BrainOwnerId ownerId, string factId, CancellationToken cancellationToken = default);
-
     Task<MemoryWriteStatus> CreateAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, int capacity, CancellationToken cancellationToken = default);
-
     Task<MemoryFactSnapshot> ReplaceAsync(BrainOwnerId ownerId, MemoryFactSnapshot fact, string expectedETag, CancellationToken cancellationToken = default);
-
     Task<bool> DeleteAsync(BrainOwnerId ownerId, string factId, string expectedETag, CancellationToken cancellationToken = default);
 }
-
 internal sealed class MemoryConflictException : InvalidOperationException
 {
     public MemoryConflictException()
@@ -39,7 +29,6 @@ internal sealed class MemoryConflictException : InvalidOperationException
     {
     }
 }
-
 internal sealed class MemoryNotFoundException : KeyNotFoundException
 {
     public MemoryNotFoundException(string factId)
@@ -47,11 +36,9 @@ internal sealed class MemoryNotFoundException : KeyNotFoundException
     {
     }
 }
-
 internal static class MemoryValues
 {
     internal const string CapacityRowKey = "!capacity";
-
     internal static string Key(string value, string parameterName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
@@ -61,7 +48,6 @@ internal static class MemoryValues
             throw new ArgumentException("A bounded Azure Table key is required.", parameterName);
         return value;
     }
-
     internal static string ETag(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
@@ -69,7 +55,6 @@ internal static class MemoryValues
             throw new ArgumentException("A bounded ETag is required.", nameof(value));
         return value;
     }
-
     internal static string FactId(string value, string parameterName)
     {
         value = Key(value, parameterName);
@@ -77,10 +62,8 @@ internal static class MemoryValues
             throw new ArgumentException("A reserved Memory fact identifier cannot be used.", parameterName);
         return value;
     }
-
     internal static IReadOnlyList<string> Tags(IReadOnlyList<string> tags) =>
         new MemoryFact("validation", "validation", tags, DateTimeOffset.UnixEpoch).Tags;
-
     internal static string Text(string text) =>
         new MemoryFact("validation", text, [], DateTimeOffset.UnixEpoch).Text;
 }

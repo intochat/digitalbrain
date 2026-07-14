@@ -2,7 +2,6 @@ using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using Orleans;
 using Orleans.Concurrency;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 public enum ConversationLifecycle { Uninitialized = 0, Active = 1, Suspended = 2, Completed = 3, Tombstoned = 4 }
@@ -20,10 +19,8 @@ public enum ConversationOperationStatus
 }
 public enum ConversationTerminalPolicy { NeverRetry = 0, VerifyBeforeRetry = 1, ManualIntervention = 2 }
 public enum ConversationTurnKind { User = 0, Assistant = 1, Authorization = 2, Approval = 3 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-identity")]
 public sealed record ConversationIdentity([property: Id(0)] BrainOwnerId OwnerId, [property: Id(1)] ActorId ActorId, [property: Id(2)] string ConversationId);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-turn")]
 public sealed record ConversationTurn(
     [property: Id(0)] long Sequence,
@@ -33,26 +30,21 @@ public sealed record ConversationTurn(
     [property: Id(4)] string OperationId,
     [property: Id(5)] ConversationTurnKind Kind,
     [property: Id(6)] string IdempotencyKey);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-inbox-entry")]
 public sealed record ConversationInboxEntry(
     [property: Id(0)] string CommandId,
     [property: Id(1)] string InputHash,
     [property: Id(2)] string OperationId,
     [property: Id(3)] DateTimeOffset RecordedAt);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.suspended-invocation")]
 public sealed record SuspendedInvocation(
     [property: Id(0)] string Provider,
     [property: Id(1)] string ToolId,
-
     [property: Id(2)] byte[] InputUtf8,
     [property: Id(3)] string AuthorizationAttemptId,
     [property: Id(4)] DateTimeOffset AuthorizationExpiresAt,
     [property: Id(5)] string AuthorizationFlowReference,
-
     [property: Id(6)] WorkflowReference? Workflow = null);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-operation")]
 public sealed record ConversationOperation(
     [property: Id(0)] string OperationId,
@@ -71,7 +63,6 @@ public sealed record ConversationOperation(
     [property: Id(13)] string RequestId = "",
     [property: Id(14)] ApprovalRecord? Approval = null,
     [property: Id(15)] EffectRecord? Effect = null);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-outbox-entry")]
 public sealed record ConversationOutboxEntry(
     [property: Id(0)] string OutboxId,
@@ -80,10 +71,8 @@ public sealed record ConversationOutboxEntry(
     [property: Id(3)] DateTimeOffset CreatedAt,
     [property: Id(4)] DateTimeOffset? DispatchedAt)
 {
-
     [Id(5)] public long Sequence { get; init; }
 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-archive")]
 public sealed record ConversationArchiveDescriptor(
     [property: Id(0)] long ArchivedTurnCount,
@@ -92,10 +81,8 @@ public sealed record ConversationArchiveDescriptor(
     [property: Id(3)] DateTimeOffset LastTurnAt,
     [property: Id(4)] string Digest,
     [property: Id(5)] string HeadSegmentId);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-tombstone")]
 public sealed record ConversationTombstone([property: Id(0)] DateTimeOffset DeletedAt, [property: Id(1)] string Reason);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-state")]
 public sealed record ConversationState(
     [property: Id(0)] int SchemaVersion,
@@ -112,20 +99,16 @@ public sealed record ConversationState(
 {
     [Id(11)] public AcceptedCommand[] AcceptedCommands { get; init; } = [];
     [Id(12)] public long NextOutboxSequence { get; init; }
-
     public static ConversationState Empty() => new(RuntimeStateSchemas.Conversation, 0, ConversationLifecycle.Uninitialized, null, [], [], [], [], null, null, []);
 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-claim")]
 public sealed record ConversationClaim(
     [property: Id(0)] ConversationState State,
     [property: Id(1)] ConversationOperation? Operation,
     [property: Id(2)] bool Claimed,
     [property: Id(3)] bool Acquired = false);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-lease-fence")]
 public sealed record ConversationLeaseFence([property: Id(0)] string LeaseOwner, [property: Id(1)] int Attempt);
-
 [Alias("digitalbrain.runtime.i-conversation-neuron")]
 public interface IConversationNeuron : IGrainWithStringKey
 {
@@ -231,23 +214,19 @@ public interface IConversationNeuron : IGrainWithStringKey
     [Alias("digitalbrain.runtime.conversation.record-migration")]
     Task<ConversationState> RecordMigrationAsync(long expectedRevision, string migrationId);
 }
-
 [Alias("digitalbrain.runtime.i-ino-operation-worker")]
 public interface IInoOperationWorkerGrain : IGrainWithStringKey
 {
-
     [AlwaysInterleave]
     [Alias("digitalbrain.runtime.ino-operation-worker.schedule")]
     Task ScheduleAsync();
 }
-
 [Alias("digitalbrain.runtime.i-ino-conversation-outbox-dispatcher")]
 public interface IInoConversationOutboxDispatcherGrain : IGrainWithStringKey
 {
     [Alias("digitalbrain.runtime.ino-conversation-outbox-dispatcher.schedule")]
     Task ScheduleAsync();
 }
-
 public static class ConversationTransitions
 {
     public const int MaximumInlineTurns = 128;
@@ -258,7 +237,6 @@ public static class ConversationTransitions
     public const int MaximumPendingOutboxEntries = 512;
     public const int MaximumPendingOutboxPayloadBytes = 1 * 1024 * 1024;
     public const int MaximumMigrationIds = 64;
-
     public static ConversationState Initialize(ConversationState state, long expectedRevision, ConversationIdentity identity)
     {
         DemandRevision(state, expectedRevision);
@@ -270,7 +248,6 @@ public static class ConversationTransitions
         }
         return ValidateAndCompact(state with { Revision = checked(state.Revision + 1), Lifecycle = ConversationLifecycle.Active, Identity = identity });
     }
-
     public static ConversationState BeginOperation(
         ConversationState state,
         long expectedRevision,
@@ -344,7 +321,6 @@ public static class ConversationTransitions
         }, acceptedOutbox);
         return ValidateAndCompact(next);
     }
-
     public static ConversationClaim TryClaimOperation(
         ConversationState state,
         long expectedRevision,
@@ -387,7 +363,6 @@ public static class ConversationTransitions
         var next = WithPendingOutbox(ReplaceOperation(state, claimed), runningOutbox);
         return new(next, claimed, true, Acquired: true);
     }
-
     public static ConversationClaim TryClaimAuthorization(
         ConversationState state,
         long expectedRevision,
@@ -427,7 +402,6 @@ public static class ConversationTransitions
         var next = WithPendingOutbox(ReplaceOperation(state with { Lifecycle = ConversationLifecycle.Active }, claimed), runningOutbox);
         return new(next, claimed, true, Acquired: true);
     }
-
     public static ConversationState SuspendAuthorizationWithAssistant(
         ConversationState state,
         long expectedRevision,
@@ -475,7 +449,6 @@ public static class ConversationTransitions
         }, feedOutbox);
         return ValidateAndCompact(next);
     }
-
     public static ConversationState RequestApprovalWithAssistant(
         ConversationState state,
         long expectedRevision,
@@ -529,7 +502,6 @@ public static class ConversationTransitions
         }, feedOutbox);
         return ValidateAndCompact(next);
     }
-
     public static ConversationState DecideApprovalWithAssistant(
         ConversationState state,
         long expectedRevision,
@@ -549,7 +521,6 @@ public static class ConversationTransitions
         DemandId(decidedBy, nameof(decidedBy));
         ValidateTurnText(assistantText, nameof(assistantText));
         ValidatePendingOutbox(feedOutbox);
-
         var operation = RequiredOperation(state, operationId);
         DemandUserTurn(state, operation);
         var approval = operation.Approval ?? throw new InvalidOperationException("The operation has no approval to decide.");
@@ -561,7 +532,6 @@ public static class ConversationTransitions
             throw new InvalidOperationException("An approval decision must be bound to the conversation actor.");
         if (!string.Equals(approval.ApprovalId, approvalId, StringComparison.Ordinal))
             throw new InvalidOperationException("The approval does not belong to this operation.");
-
         var approvalState = approved ? "approved" : "rejected";
         var effectState = approved ? "approved" : "rejected";
         var priorTurn = FindTurn(state, operationId, ConversationTurnKind.Approval, decisionId);
@@ -581,7 +551,6 @@ public static class ConversationTransitions
             throw new InvalidOperationException("The approval is not awaiting a decision.");
         if (priorTurn is not null || priorOutbox is not null)
             throw new RuntimeStateIntegrityException("approval decision identity already exists before the decision");
-
         var decidedApproval = approval with
         {
             State = approvalState,
@@ -614,7 +583,6 @@ public static class ConversationTransitions
         }, feedOutbox);
         return ValidateAndCompact(next);
     }
-
     public static ConversationState ScheduleRetry(
         ConversationState state,
         long expectedRevision,
@@ -646,7 +614,6 @@ public static class ConversationTransitions
             Version = checked(operation.Version + 1)
         }), retryOutbox);
     }
-
     public static ConversationState CompleteWithAssistant(
         ConversationState state,
         long expectedRevision,
@@ -703,7 +670,6 @@ public static class ConversationTransitions
         }, feedOutbox);
         return ValidateAndCompact(next);
     }
-
     public static ConversationState CompleteEffectWithAssistant(
         ConversationState state,
         long expectedRevision,
@@ -765,7 +731,6 @@ public static class ConversationTransitions
         }, feedOutbox);
         return ValidateAndCompact(next);
     }
-
     public static ConversationState MarkOutboxDispatched(ConversationState state, long expectedRevision, string outboxId, DateTimeOffset dispatchedAt)
     {
         DemandMutable(state, expectedRevision);
@@ -778,7 +743,6 @@ public static class ConversationTransitions
             Outbox = state.Outbox.Select(candidate => candidate == entry ? candidate with { DispatchedAt = dispatchedAt } : candidate).ToArray()
         });
     }
-
     public static ConversationState RecordMigration(ConversationState state, long expectedRevision, string migrationId)
     {
         DemandMutable(state, expectedRevision);
@@ -786,7 +750,6 @@ public static class ConversationTransitions
         if (state.AppliedMigrationIds.Contains(migrationId, StringComparer.Ordinal)) return state;
         return ValidateAndCompact(state with { Revision = checked(state.Revision + 1), AppliedMigrationIds = state.AppliedMigrationIds.Append(migrationId).ToArray() });
     }
-
     public static ConversationState RemoveLegacyAuthorizationPayloads(ConversationState state)
     {
         var changed = false;
@@ -804,7 +767,6 @@ public static class ConversationTransitions
         if (!changed) return state;
         return ValidateAndCompact(state with { Revision = checked(state.Revision + 1), Operations = operations });
     }
-
     public static ConversationState MigrateLegacyOutboxSequences(ConversationState state)
     {
         if (state.Outbox.Length == 0 || state.Outbox.All(entry => entry.Sequence > 0)) return state;
@@ -817,7 +779,6 @@ public static class ConversationTransitions
             .ToArray();
         return ValidateAndCompact(state with { Revision = checked(state.Revision + 1), Outbox = outbox, NextOutboxSequence = sequence });
     }
-
     public static ConversationState MigrateLegacyAcceptedCommands(ConversationState state)
     {
         if (state.Inbox.Length == 0) return state;
@@ -826,7 +787,6 @@ public static class ConversationTransitions
         var operations = state.Operations.ToArray();
         var migrated = new List<AcceptedCommand>();
         var changed = false;
-
         foreach (var inbox in state.Inbox.OrderBy(entry => entry.RecordedAt).ThenBy(entry => entry.CommandId, StringComparer.Ordinal))
         {
             var operationIndex = Array.FindIndex(operations, operation =>
@@ -840,7 +800,6 @@ public static class ConversationTransitions
                     throw new RuntimeStateIntegrityException("legacy accepted-command metadata conflicts with its inbox entry");
                 continue;
             }
-
             var operation = operations[operationIndex];
             var requestId = operation.RequestId;
             if (string.IsNullOrWhiteSpace(requestId))
@@ -853,7 +812,6 @@ public static class ConversationTransitions
             {
                 DemandId(requestId, nameof(operation.RequestId));
             }
-
             var accepted = new AcceptedCommand(
                 inbox.CommandId,
                 inbox.OperationId,
@@ -867,11 +825,9 @@ public static class ConversationTransitions
             acceptedByCommand.Add(accepted.CommandId, accepted);
             migrated.Add(accepted);
         }
-
         if (!changed && migrated.Count == 0) return state;
         return ValidateAndCompact(state with { Revision = checked(state.Revision + 1), Operations = operations, AcceptedCommands = state.AcceptedCommands.Concat(migrated).ToArray() });
     }
-
     public static void Validate(ConversationState state)
     {
         if (state.SchemaVersion != RuntimeStateSchemas.Conversation || state.Revision < 0 || state.NextOutboxSequence < 0 ||
@@ -918,7 +874,6 @@ public static class ConversationTransitions
             throw new RuntimeStateIntegrityException("invalid conversation outbox sequence");
         ValidateAcceptedCommands(state);
     }
-
     private static ConversationState ReplaceOperation(ConversationState state, ConversationOperation operation)
     {
         var next = state with
@@ -929,22 +884,18 @@ public static class ConversationTransitions
         };
         return ValidateAndCompact(next);
     }
-
     private static ConversationOperation[] ReplaceOperationWithoutRevision(ConversationOperation[] operations, ConversationOperation operation) =>
         operations.Select(candidate => string.Equals(candidate.OperationId, operation.OperationId, StringComparison.Ordinal) ? operation : candidate).ToArray();
-
     private static ConversationState AppendTurnRecord(ConversationState state, string operationId, ConversationTurnKind kind, string idempotencyKey, string text, DateTimeOffset createdAt)
     {
         var sequence = state.Turns.Length == 0 ? (state.Archive?.ThroughSequence ?? 0) + 1 : checked(state.Turns[^1].Sequence + 1);
         var role = kind == ConversationTurnKind.User ? "user" : "assistant";
         return state with { Turns = state.Turns.Append(new(sequence, role, text, createdAt, operationId, kind, idempotencyKey)).ToArray() };
     }
-
     private static ConversationTurn? FindTurn(ConversationState state, string operationId, ConversationTurnKind kind, string idempotencyKey) =>
         state.Turns.FirstOrDefault(turn =>
             string.Equals(turn.OperationId, operationId, StringComparison.Ordinal) && turn.Kind == kind &&
             string.Equals(turn.IdempotencyKey, idempotencyKey, StringComparison.Ordinal));
-
     private static void DemandUserTurn(ConversationState state, ConversationOperation operation)
     {
         if (state.Turns.Any(turn => turn.Kind == ConversationTurnKind.User && string.Equals(turn.OperationId, operation.OperationId, StringComparison.Ordinal)) ||
@@ -953,26 +904,22 @@ public static class ConversationTransitions
             return;
         throw new RuntimeStateIntegrityException("operation has no ordered user turn");
     }
-
     private static bool SameInvocation(SuspendedInvocation? first, SuspendedInvocation second) =>
         first is not null && string.Equals(first.Provider, second.Provider, StringComparison.Ordinal) &&
         string.Equals(first.ToolId, second.ToolId, StringComparison.Ordinal) &&
         string.Equals(first.AuthorizationAttemptId, second.AuthorizationAttemptId, StringComparison.Ordinal) &&
         string.Equals(first.AuthorizationFlowReference, second.AuthorizationFlowReference, StringComparison.Ordinal) &&
         first.AuthorizationExpiresAt == second.AuthorizationExpiresAt;
-
     private static bool SameOutbox(ConversationOutboxEntry first, ConversationOutboxEntry second) =>
         string.Equals(first.OutboxId, second.OutboxId, StringComparison.Ordinal) &&
         string.Equals(first.Kind, second.Kind, StringComparison.Ordinal) && first.CreatedAt == second.CreatedAt &&
         first.PayloadUtf8.AsSpan().SequenceEqual(second.PayloadUtf8);
-
     private static bool SameEffectIntent(EffectRecord first, EffectRecord second) =>
         string.Equals(first.EffectId, second.EffectId, StringComparison.Ordinal) &&
         string.Equals(first.OperationId, second.OperationId, StringComparison.Ordinal) &&
         string.Equals(first.Kind, second.Kind, StringComparison.Ordinal) &&
         string.Equals(first.Scope, second.Scope, StringComparison.Ordinal) &&
         string.Equals(first.ProviderIdempotencyKey, second.ProviderIdempotencyKey, StringComparison.Ordinal);
-
     private static ConversationState AppendOutbox(ConversationState state, ConversationOutboxEntry entry)
     {
         var pendingOutbox = state.Outbox.Where(candidate => candidate.DispatchedAt is null).ToArray();
@@ -987,7 +934,6 @@ public static class ConversationTransitions
             NextOutboxSequence = sequence
         };
     }
-
     private static ConversationState WithPendingOutbox(ConversationState state, ConversationOutboxEntry? entry, bool incrementRevision = false)
     {
         if (entry is null) return state;
@@ -1000,14 +946,12 @@ public static class ConversationTransitions
         }
         return ValidateAndCompact(AppendOutbox(state with { Revision = incrementRevision ? checked(state.Revision + 1) : state.Revision }, entry));
     }
-
     private static void ValidatePendingOutbox(ConversationOutboxEntry entry)
     {
         ValidateOutbox(entry);
         if (entry.DispatchedAt is not null)
             throw new ArgumentException("Atomic conversation responses must enqueue an undispatched outbox entry.", nameof(entry));
     }
-
     private static void ValidateTerminal(ConversationOperationStatus terminalStatus, string? safeReason)
     {
         if (!IsTerminal(terminalStatus))
@@ -1015,7 +959,6 @@ public static class ConversationTransitions
         if (safeReason is { Length: > 256 })
             throw new ArgumentException("Safe reasons must be bounded.", nameof(safeReason));
     }
-
     private static void ValidateTurn(ConversationTurn turn)
     {
         if (turn.Sequence < 1 || !Enum.IsDefined(turn.Kind))
@@ -1026,20 +969,17 @@ public static class ConversationTransitions
         if (turn.Role != (turn.Kind == ConversationTurnKind.User ? "user" : "assistant"))
             throw new RuntimeStateIntegrityException("conversation turn role does not match its kind");
     }
-
     private static void ValidateTurnText(string text, string name)
     {
         if (string.IsNullOrWhiteSpace(text) || text.Length > 16_000)
             throw new ArgumentException("Conversation turns require bounded text.", name);
     }
-
     private static ConversationState ValidateAndCompact(ConversationState state)
     {
         state = Compact(state);
         Validate(state);
         return state;
     }
-
     private static ConversationState Compact(ConversationState state)
     {
         state = ConversationArchiveTransitions.Compact(state, MaximumInlineTurns);
@@ -1063,15 +1003,12 @@ public static class ConversationTransitions
             AppliedMigrationIds = state.AppliedMigrationIds.TakeLast(MaximumMigrationIds).ToArray()
         };
     }
-
     private static ConversationOperation RequiredOperation(ConversationState state, string operationId) =>
         state.Operations.FirstOrDefault(operation => string.Equals(operation.OperationId, operationId, StringComparison.Ordinal))
         ?? throw new KeyNotFoundException("Conversation operation not found.");
-
     private static bool IsTerminal(ConversationOperationStatus status) => status is
         ConversationOperationStatus.Succeeded or ConversationOperationStatus.Failed or
         ConversationOperationStatus.OutcomeUnknown or ConversationOperationStatus.Cancelled;
-
     private static bool IsEffectTerminalFor(string effectState, ConversationOperationStatus status) =>
         status switch
         {
@@ -1080,14 +1017,12 @@ public static class ConversationTransitions
             ConversationOperationStatus.OutcomeUnknown => effectState == "outcome-unknown",
             _ => false
         };
-
     private static void DemandMutable(ConversationState state, long expectedRevision)
     {
         DemandRevision(state, expectedRevision);
         if (state.Identity is null || state.Lifecycle is ConversationLifecycle.Uninitialized or ConversationLifecycle.Tombstoned)
             throw new InvalidOperationException("Conversation state is not mutable.");
     }
-
     private static void DemandLeaseFence(ConversationOperation operation, ConversationLeaseFence? leaseFence, DateTimeOffset now)
     {
         if (leaseFence is null)
@@ -1098,12 +1033,10 @@ public static class ConversationTransitions
             operation.Attempt != leaseFence.Attempt || operation.LeaseExpiresAt is not { } expiry || expiry <= now)
             throw new RuntimeStateConflictException(leaseFence.Attempt, operation.Attempt);
     }
-
     private static void DemandRevision(ConversationState state, long expectedRevision)
     {
         if (state.Revision != expectedRevision) throw new RuntimeStateConflictException(expectedRevision, state.Revision);
     }
-
     private static void ValidateIdentity(ConversationIdentity identity)
     {
         if (string.IsNullOrWhiteSpace(identity.OwnerId.Value) || string.IsNullOrWhiteSpace(identity.ActorId.Value) ||
@@ -1111,7 +1044,6 @@ public static class ConversationTransitions
             identity.ConversationId.Length > 256)
             throw new ArgumentException("A complete bounded conversation identity is required.", nameof(identity));
     }
-
     private static void ValidateAcceptedCommands(ConversationState state)
     {
         if (state.AcceptedCommands.Select(command => command.CommandId).Distinct(StringComparer.Ordinal).Count() !=
@@ -1144,7 +1076,6 @@ public static class ConversationTransitions
                 throw new RuntimeStateIntegrityException("accepted command inbox metadata is invalid");
         }
     }
-
     private static void ValidateApproval(ApprovalRecord approval, string operationId)
     {
         DemandId(approval.ApprovalId, nameof(approval.ApprovalId));
@@ -1159,7 +1090,6 @@ public static class ConversationTransitions
             (approval.DecidedAt is null || string.IsNullOrWhiteSpace(approval.DecidedBy) || string.IsNullOrWhiteSpace(approval.DecisionId)))
             throw new ArgumentException("Approval metadata is invalid.", nameof(approval));
     }
-
     private static void ValidateEffect(EffectRecord effect, string operationId, string approvalEffectId)
     {
         DemandId(effect.EffectId, nameof(effect.EffectId));
@@ -1173,7 +1103,6 @@ public static class ConversationTransitions
             effect.Version < 1)
             throw new ArgumentException("Effect metadata is invalid.", nameof(effect));
     }
-
     private static void ValidateOperation(ConversationOperation operation)
     {
         DemandId(operation.OperationId, nameof(operation.OperationId));
@@ -1194,7 +1123,6 @@ public static class ConversationTransitions
         if (invocation.InputUtf8 is null || invocation.InputUtf8.Length > 64 * 1024)
             throw new ArgumentException("Conversation operation metadata is invalid.", nameof(operation));
     }
-
     private static void ValidateApprovalLifecycle(ConversationOperation operation, ApprovalRecord approval, EffectRecord effect)
     {
         var valid = operation.Status switch
@@ -1211,33 +1139,23 @@ public static class ConversationTransitions
         if (!valid)
             throw new ArgumentException("Conversation approval/effect state is inconsistent.", nameof(operation));
     }
-
     private static void ValidateInvocation(SuspendedInvocation invocation, DateTimeOffset now)
     {
         ValidateInvocationMetadata(invocation);
         if (invocation.InputUtf8 is null || invocation.InputUtf8.Length > 64 * 1024 || invocation.AuthorizationExpiresAt <= now)
             throw new ArgumentException("A suspended invocation must be exact, bounded, and unexpired.", nameof(invocation));
     }
-
     private static void ValidateInvocationMetadata(SuspendedInvocation invocation)
     {
         DemandId(invocation.Provider, nameof(invocation.Provider));
         DemandId(invocation.ToolId, nameof(invocation.ToolId));
         DemandId(invocation.AuthorizationAttemptId, nameof(invocation.AuthorizationAttemptId));
-        if (!OAuthCallbackPaths.IsSupportedProvider(invocation.Provider) ||
+        if (!OAuthCallbackPaths.IsProviderKey(invocation.Provider) ||
             !OAuthCallbackPaths.IsOpaqueFlowReference(invocation.AuthorizationFlowReference) ||
             !Guid.TryParseExact(invocation.AuthorizationAttemptId, "N", out _) ||
-            invocation.AuthorizationExpiresAt == default ||
-            !IsProviderTool(invocation.Provider, invocation.ToolId))
+            invocation.AuthorizationExpiresAt == default)
             throw new ArgumentException("A suspended invocation must be exact, bounded, and unexpired.", nameof(invocation));
     }
-
-    private static bool IsProviderTool(string provider, string toolId) =>
-        toolId.StartsWith("cross.", StringComparison.Ordinal) ||
-        (string.Equals(provider, OAuthCallbackPaths.GoogleProvider, StringComparison.Ordinal)
-            ? toolId.StartsWith("gmail.", StringComparison.Ordinal)
-            : toolId.StartsWith("salesforce.", StringComparison.Ordinal));
-
     private static void ValidateOutbox(ConversationOutboxEntry entry)
     {
         DemandId(entry.OutboxId, nameof(entry.OutboxId));
@@ -1245,13 +1163,11 @@ public static class ConversationTransitions
         if (entry.Sequence < 0 || entry.PayloadUtf8 is null || entry.PayloadUtf8.Length > 64 * 1024)
             throw new ArgumentException("Outbox payloads must be bounded.", nameof(entry));
     }
-
     private static void DemandId(string value, string name)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value.Any(char.IsControl))
             throw new ArgumentException("Runtime state identifiers must be present and bounded.", name);
     }
-
     private static void DemandHash(string value, string name)
     {
         if (value.Length != 64 || value.Any(character => !Uri.IsHexDigit(character)))

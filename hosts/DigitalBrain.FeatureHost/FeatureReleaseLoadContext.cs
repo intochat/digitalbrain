@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Runtime.Loader;
-
 namespace DigitalBrain.FeatureHost;
 
 internal sealed class FeatureReleaseLoadContext : AssemblyLoadContext
@@ -9,7 +8,6 @@ internal sealed class FeatureReleaseLoadContext : AssemblyLoadContext
     private readonly AssemblyDependencyResolver _resolver;
     private readonly string _implementationDirectory;
     private readonly IReadOnlyDictionary<string, Assembly> _sharedAssemblies;
-
     public FeatureReleaseLoadContext(string implementationAssemblyPath, IEnumerable<Assembly> sharedAssemblies)
         : base($"digitalbrain-feature-{Path.GetFileNameWithoutExtension(implementationAssemblyPath)}-{Guid.NewGuid():N}", isCollectible: true)
     {
@@ -27,7 +25,6 @@ internal sealed class FeatureReleaseLoadContext : AssemblyLoadContext
         if (_sharedAssemblies.Values.Any(assembly => GetLoadContext(assembly) != Default))
             throw new ArgumentException("Shared Feature assemblies must be loaded in the default context.", nameof(sharedAssemblies));
     }
-
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         if (assemblyName.Name is null)
@@ -41,13 +38,11 @@ internal sealed class FeatureReleaseLoadContext : AssemblyLoadContext
             throw new FileNotFoundException($"Feature dependency '{assemblyName.Name}' is neither private nor explicitly shared.");
         return LoadFromAssemblyPath(ContainedPath(path));
     }
-
     protected override nint LoadUnmanagedDll(string unmanagedDllName)
     {
         var path = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
         return path is null ? 0 : LoadUnmanagedDllFromPath(ContainedPath(path));
     }
-
     private string ContainedPath(string path)
     {
         var fullPath = Path.GetFullPath(path);
@@ -57,7 +52,6 @@ internal sealed class FeatureReleaseLoadContext : AssemblyLoadContext
             throw new FileLoadException("Feature dependencies must resolve within the immutable release directory.", fullPath);
         return fullPath;
     }
-
     private static HashSet<string> GetTrustedPlatformAssemblies()
     {
         var paths = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;

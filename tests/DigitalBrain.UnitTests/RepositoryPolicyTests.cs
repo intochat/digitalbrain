@@ -61,7 +61,7 @@ public sealed class RepositoryPolicyTests
             .Where(file =>
                 file.Text.Contains("DigitalBrain.Core", StringComparison.Ordinal) ||
                 file.Text.Contains("DigitalBrain.Kernel.Abstractions", StringComparison.Ordinal) ||
-                IsKernelPath(file.Path) && ContainsProviderType(file.Text))
+                IsKernelPath(file.Path) && ContainsProviderReference(file.Text))
             .Select(file => file.Path)
             .ToArray();
 
@@ -79,11 +79,8 @@ public sealed class RepositoryPolicyTests
         path.StartsWith("src/DigitalBrain.Kernel/", StringComparison.Ordinal) ||
         path.StartsWith("src/DigitalBrain.Kernel.Contracts/", StringComparison.Ordinal);
 
-    private static bool ContainsProviderType(string text) =>
-        Regex.IsMatch(
-            text,
-            @"\b(?:class|record|interface|struct|enum)\s+\w*(?:Gmail|Google|Salesforce)\w*\b",
-            RegexOptions.CultureInvariant);
+    private static bool ContainsProviderReference(string text) =>
+        Regex.IsMatch(text, "gmail|google|salesforce", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private static string? FindViolation(string root, string relativePath)
     {

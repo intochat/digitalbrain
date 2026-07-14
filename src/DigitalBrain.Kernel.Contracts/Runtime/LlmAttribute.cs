@@ -6,12 +6,10 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
-
 [AttributeUsage(AttributeTargets.Parameter)]
 public sealed class LlmAttribute<TModel> : Attribute, IFacetMetadata
 {
 }
-
 public sealed class LlmAttributeMapper<TModel> : IAttributeToFactoryMapper<LlmAttribute<TModel>>
 {
     public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, LlmAttribute<TModel> metadata)
@@ -23,12 +21,10 @@ public sealed class LlmAttributeMapper<TModel> : IAttributeToFactoryMapper<LlmAt
                 + $"because it has an [Llm<{typeof(TModel).Name}>] attribute.",
                 parameter.Name);
         }
-
         var serviceKey = LlmServiceKeys.For(typeof(TModel));
         return context => context.ActivationServices.GetRequiredKeyedService<IChatClient>(serviceKey);
     }
 }
-
 public static class LlmServiceKeys
 {
     public static string For(Type modelType)
@@ -37,7 +33,6 @@ public static class LlmServiceKeys
         {
             throw new InvalidOperationException($"Type '{modelType.Name}' used with [Llm<{modelType.Name}>] must derive from DigitalBrainModel.");
         }
-
         var model = (DigitalBrainModel)Activator.CreateInstance(modelType)!;
         return model.Describe().ServiceKey;
     }

@@ -1,7 +1,6 @@
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Capabilities;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 internal sealed class InoEffectExecutor : IInoEffectExecutor
@@ -9,7 +8,6 @@ internal sealed class InoEffectExecutor : IInoEffectExecutor
     private readonly IGrainFactory _grainFactory;
     private readonly InoEffectPlanAuthority _authority;
     private readonly IReadOnlySet<string> _tools;
-
     public InoEffectExecutor(IGrainFactory grainFactory, InoEffectPlanAuthority authority, IEnumerable<IInoEffectHandler> handlers)
     {
         _grainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
@@ -25,7 +23,6 @@ internal sealed class InoEffectExecutor : IInoEffectExecutor
         }
         _tools = tools;
     }
-
     public bool TryAuthorizeMutation(InoToolRequest request, string actorScope, out InoApprovedTool tool)
     {
         tool = default!;
@@ -35,7 +32,6 @@ internal sealed class InoEffectExecutor : IInoEffectExecutor
         tool = new InoApprovedTool(request.ToolId, request.Scope, request.SafeSummary);
         return true;
     }
-
     public Task<InoToolEffectResult> ExecuteAsync(InoToolEffectRequest request, CancellationToken cancellationToken = default)
     {
         if (!_tools.Contains(request.ToolId) ||
@@ -53,7 +49,6 @@ internal sealed class InoEffectExecutor : IInoEffectExecutor
             cancellationToken);
     }
 }
-
 internal sealed class DisabledInoEffectExecutor : IInoEffectExecutor
 {
     public bool TryAuthorizeMutation(InoToolRequest request, string actorScope, out InoApprovedTool tool)
@@ -61,7 +56,6 @@ internal sealed class DisabledInoEffectExecutor : IInoEffectExecutor
         tool = default!;
         return false;
     }
-
     public Task<InoToolEffectResult> ExecuteAsync(InoToolEffectRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(new InoToolEffectResult(InoToolEffectDisposition.Failed, "No trusted typed tool is configured for this action. No external action was performed."));
 }

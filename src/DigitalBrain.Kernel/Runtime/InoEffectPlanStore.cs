@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 internal sealed class InoEffectPlanStore(IGrainFactory grainFactory, InoEffectPlanAuthority authority) : IInoEffectPlanStore
@@ -18,7 +17,6 @@ internal sealed class InoEffectPlanStore(IGrainFactory grainFactory, InoEffectPl
         var planId = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
         return await PrepareAsync(planId, actorScope, operationId, toolId, payloadUtf8, safeSummary, expiresAt, cancellationToken);
     }
-
     public Task<InoToolRequest> PrepareIdempotentAsync(
         string idempotencyKey,
         string actorScope,
@@ -35,7 +33,6 @@ internal sealed class InoEffectPlanStore(IGrainFactory grainFactory, InoEffectPl
         var planId = Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("feature-effect:" + idempotencyKey)));
         return PrepareAsync(planId, actorScope, operationId, toolId, payloadUtf8, safeSummary, expiresAt, cancellationToken);
     }
-
     private async Task<InoToolRequest> PrepareAsync(
         string planId,
         string actorScope,

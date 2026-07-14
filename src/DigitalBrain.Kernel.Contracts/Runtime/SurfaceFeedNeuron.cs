@@ -3,12 +3,10 @@ using System.Text.Json;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Contracts;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-feed-identity")]
 public sealed record SurfaceFeedIdentity([property: Id(0)] BrainOwnerId OwnerId, [property: Id(1)] ActorId ActorId);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-action-binding")]
 public sealed record SurfaceActionBinding(
     [property: Id(0)] string BindingId,
@@ -24,7 +22,6 @@ public sealed record SurfaceActionBinding(
     [property: Id(10)] DateTimeOffset ExpiresAt,
     [property: Id(11)] string? LastIdempotencyKey,
     [property: Id(12)] string? LastOperationId);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-feed-projection")]
 public sealed record SurfaceFeedProjection(
     [property: Id(0)] string ProjectionId,
@@ -35,14 +32,12 @@ public sealed record SurfaceFeedProjection(
     [property: Id(5)] DateTimeOffset CreatedAt,
     [property: Id(6)] DateTimeOffset? ExpiresAt,
     [property: Id(7)] SurfaceActionBinding[] ActionBindings);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.home-surface-bootstrap")]
 public sealed record HomeSurfaceBootstrap(
     [property: Id(0)] string ProjectionId,
     [property: Id(1)] string ConversationId,
     [property: Id(2)] string CorrelationId,
     [property: Id(3)] DateTimeOffset CreatedAt);
-
 public sealed record SurfaceFeedPresentation(
     string CorrelationId,
     string CauseKind,
@@ -54,10 +49,8 @@ public sealed record SurfaceFeedPresentation(
 {
     public const int CurrentVersion = 2;
 }
-
 public static class SurfaceFeedPresentationCompatibility
 {
-
     private const int VersionOne = 1;
     private static readonly string[] LegacyProperties =
     [
@@ -67,10 +60,8 @@ public static class SurfaceFeedPresentationCompatibility
         nameof(SurfaceFeedPresentation.RequiredClientCapabilities),
         nameof(SurfaceFeedPresentation.Payload)
     ];
-
     private static readonly string[] VersionedProperties =
     [.. LegacyProperties, nameof(SurfaceFeedPresentation.ConversationRevision), nameof(SurfaceFeedPresentation.PresentationVersion)];
-
     public static bool HasSupportedShape(JsonElement root, SurfaceFeedPresentation presentation)
     {
         var hasRevision = root.TryGetProperty(nameof(SurfaceFeedPresentation.ConversationRevision), out var revision);
@@ -90,7 +81,6 @@ public static class SurfaceFeedPresentationCompatibility
             return false;
         return HasExactProperties(root, LegacyProperties);
     }
-
     private static bool HasExactProperties(JsonElement root, IReadOnlyCollection<string> expected)
     {
         var properties = root.EnumerateObject().Select(property => property.Name).ToArray();
@@ -98,7 +88,6 @@ public static class SurfaceFeedPresentationCompatibility
                properties.ToHashSet(StringComparer.Ordinal).SetEquals(expected);
     }
 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-feed-record")]
 public sealed record SurfaceFeedRecord(
     [property: Id(0)] long Sequence,
@@ -109,17 +98,14 @@ public sealed record SurfaceFeedRecord(
     [property: Id(5)] byte[] PayloadUtf8,
     [property: Id(6)] DateTimeOffset CreatedAt,
     [property: Id(7)] DateTimeOffset? ExpiresAt);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-feed-ack")]
 public sealed record SurfaceFeedAckCursor(
     [property: Id(0)] string SessionScopeHash,
     [property: Id(1)] long Sequence,
     [property: Id(2)] DateTimeOffset ExpiresAt,
     [property: Id(3)] DateTimeOffset UpdatedAt);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-delivery-record")]
 public sealed record SurfaceDeliveryRecord([property: Id(0)] string DeliveryId, [property: Id(1)] long Sequence, [property: Id(2)] DateTimeOffset DeliveredAt);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-feed-state")]
 public sealed record SurfaceFeedState(
     [property: Id(0)] int SchemaVersion,
@@ -134,17 +120,14 @@ public sealed record SurfaceFeedState(
     [property: Id(9)] SurfaceFeedAckCursor[] Acknowledgements)
 {
     [Id(10)] public SurfaceFeedRecord[] EventHistory { get; init; } = [];
-
     public static SurfaceFeedState Empty() => new(RuntimeStateSchemas.SurfaceFeed, 0, null, 0, 0, [], [], [], [], []);
 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.surface-action-consumption")]
 public sealed record SurfaceActionConsumption(
     [property: Id(0)] SurfaceFeedState State,
     [property: Id(1)] string OperationId,
     [property: Id(2)] bool Consumed,
     [property: Id(3)] SurfaceActionBinding AuthorizedBinding);
-
 [Alias("digitalbrain.runtime.i-surface-feed-neuron")]
 public interface ISurfaceFeedNeuron : IGrainWithStringKey
 {
@@ -169,7 +152,6 @@ public interface ISurfaceFeedNeuron : IGrainWithStringKey
     [Alias("digitalbrain.runtime.surface-feed.rebuild")]
     Task<SurfaceFeedState> RebuildAsync(long expectedRevision, string projectionId, DateTimeOffset now);
 }
-
 public static class SurfaceFeedTransitions
 {
     private const string LegacyNewConversationBindingId = "ino.new";
@@ -181,7 +163,6 @@ public static class SurfaceFeedTransitions
     public const int MaximumAcknowledgements = 256;
     public const int MaximumEventHistory = 512;
     public const int MaximumEventHistoryPayloadBytes = 1 * 1024 * 1024;
-
     public static SurfaceFeedState Initialize(SurfaceFeedState state, long expectedRevision, SurfaceFeedIdentity identity)
     {
         DemandRevision(state, expectedRevision);
@@ -193,13 +174,11 @@ public static class SurfaceFeedTransitions
         }
         return ValidateAndCompact(state with { Revision = checked(state.Revision + 1), Identity = identity }, DateTimeOffset.MinValue);
     }
-
     public static SurfaceFeedState EnsureHomeSurface(SurfaceFeedState state, long expectedRevision, HomeSurfaceBootstrap bootstrap)
     {
         DemandMutable(state, expectedRevision);
         ValidateHomeSurfaceBootstrap(state, bootstrap);
         if (state.CurrentSurfaces.Length > 0) return state;
-
         var conversation = new InoConversationSnapshot(bootstrap.ConversationId, 0, [], []);
         var descriptors = ConversationSurfacePayload.Actions(conversation, bootstrap.CreatedAt);
         var payload = ConversationSurfacePayload.Build(conversation);
@@ -222,7 +201,6 @@ public static class SurfaceFeedTransitions
             CreateHomeBindings(descriptors, 1));
         return ApplyProjection(state, expectedRevision, projection, bootstrap.CreatedAt);
     }
-
     public static SurfaceFeedState ApplyProjection(SurfaceFeedState state, long expectedRevision, SurfaceFeedProjection projection, DateTimeOffset now)
     {
         DemandMutable(state, expectedRevision);
@@ -235,7 +213,6 @@ public static class SurfaceFeedTransitions
         if (current is not null && projection.SurfaceRevision == current.SurfaceRevision &&
             !string.Equals(projection.ContentHash, current.ContentHash, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("A surface revision cannot change content.");
-
         var surfaces = state.CurrentSurfaces;
         var bindings = state.ActionBindings;
         var history = state.EventHistory ?? [];
@@ -269,7 +246,6 @@ public static class SurfaceFeedTransitions
             AppliedProjectionIds = state.AppliedProjectionIds.Append(projection.ProjectionId).ToArray()
         }, now);
     }
-
     public static SurfaceFeedState RecordDelivery(SurfaceFeedState state, long expectedRevision, string deliveryId, long sequence, DateTimeOffset deliveredAt)
     {
         DemandMutable(state, expectedRevision);
@@ -287,7 +263,6 @@ public static class SurfaceFeedTransitions
             DeliveryDedupe = state.DeliveryDedupe.Append(new(deliveryId, sequence, deliveredAt)).ToArray()
         }, deliveredAt);
     }
-
     public static SurfaceFeedState Acknowledge(SurfaceFeedState state, long expectedRevision, string sessionScopeHash, long sequence, DateTimeOffset cursorExpiresAt, DateTimeOffset now)
     {
         DemandMutable(state, expectedRevision);
@@ -306,7 +281,6 @@ public static class SurfaceFeedTransitions
             .Append(updated).ToArray();
         return ValidateAndCompact(state with { Revision = checked(state.Revision + 1), Acknowledgements = cursors }, now);
     }
-
     public static SurfaceFeedState RevokeSession(SurfaceFeedState state, long expectedRevision, string sessionScopeHash, DateTimeOffset now)
     {
         DemandMutable(state, expectedRevision);
@@ -315,7 +289,6 @@ public static class SurfaceFeedTransitions
         if (cursors.Length == state.Acknowledgements.Length) return state;
         return ValidateAndCompact(state with { Revision = checked(state.Revision + 1), Acknowledgements = cursors }, now);
     }
-
     public static SurfaceActionConsumption ConsumeAction(SurfaceFeedState state, long expectedRevision, string bindingId, string tokenHash, string idempotencyKey, string operationId, DateTimeOffset now)
     {
         DemandMutable(state, expectedRevision);
@@ -341,7 +314,6 @@ public static class SurfaceFeedTransitions
         }, now);
         return new(next, operationId, true, updated);
     }
-
     public static SurfaceFeedState RenewActionBindings(SurfaceFeedState state, long expectedRevision, DateTimeOffset now)
     {
         DemandMutable(state, expectedRevision);
@@ -349,13 +321,11 @@ public static class SurfaceFeedTransitions
             string.Equals(candidate.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
         if (surface is null || !TryReadConversationActions(surface, now, out var presentation, out var descriptors))
             return state;
-
         var currentBindings = state.ActionBindings.Where(binding =>
             string.Equals(binding.SurfaceId, surface.SurfaceId, StringComparison.Ordinal) &&
             binding.SurfaceRevision == surface.SurfaceRevision).ToArray();
         var renewalThreshold = now.Add(TimeSpan.FromTicks(UiProtocol.ActionTokenLifetime.Ticks / 2));
         if (!RequiresActionAuthorityEvent(currentBindings, descriptors, renewalThreshold)) return state;
-
         var surfaceRevision = checked(surface.SurfaceRevision + 1);
         var sequence = checked(state.LastSequence + 1);
         var bindings = CreateHomeBindings(descriptors, surfaceRevision);
@@ -380,7 +350,6 @@ public static class SurfaceFeedTransitions
                 .Concat(bindings).ToArray()
         }, now);
     }
-
     private static bool TryReadConversationActions(SurfaceFeedRecord surface, DateTimeOffset now, out SurfaceFeedPresentation presentation, out IReadOnlyList<StoredActionBinding> descriptors)
     {
         presentation = null!;
@@ -404,10 +373,8 @@ public static class SurfaceFeedTransitions
             !presentation.RequiredClientCapabilities.SequenceEqual(ConversationSurfacePayload.RequiredCapabilities, StringComparer.Ordinal) ||
             !ConversationSurfacePayload.TryActions(presentation.Payload, now, out descriptors))
             return false;
-
         return true;
     }
-
     private static bool RequiresActionAuthorityEvent(IReadOnlyList<SurfaceActionBinding> currentBindings, IReadOnlyList<StoredActionBinding> descriptors, DateTimeOffset renewalThreshold)
     {
         if (currentBindings.Count == 0) return descriptors.Count > 0;
@@ -417,7 +384,6 @@ public static class SurfaceFeedTransitions
             currentBindings.Any(binding =>
                 binding.Uses != 0 || binding.LastIdempotencyKey is not null || binding.LastOperationId is not null))
             return false;
-
         foreach (var descriptor in descriptors)
         {
             var binding = currentBindings.FirstOrDefault(candidate =>
@@ -431,7 +397,6 @@ public static class SurfaceFeedTransitions
         }
         return currentBindings.Any(binding => binding.ExpiresAt <= renewalThreshold);
     }
-
     private static bool IsCanonicalConversationId(string? value)
     {
         if (value is null || value.Length != 68 || !value.StartsWith("ino-", StringComparison.Ordinal))
@@ -441,7 +406,6 @@ public static class SurfaceFeedTransitions
                 return false;
         return true;
     }
-
     public static SurfaceFeedState Rebuild(SurfaceFeedState state, long expectedRevision, string projectionId, DateTimeOffset now)
     {
         DemandMutable(state, expectedRevision);
@@ -457,7 +421,6 @@ public static class SurfaceFeedTransitions
             AppliedProjectionIds = state.AppliedProjectionIds.Append(projectionId).ToArray()
         }, now);
     }
-
     public static void Validate(SurfaceFeedState state)
     {
         if (state.SchemaVersion != RuntimeStateSchemas.SurfaceFeed || state.Revision < 0 || state.LastSequence < 0 || state.RebuildEpoch < 0 || state.CurrentSurfaces is null || state.EventHistory is null || state.ActionBindings is null ||
@@ -486,7 +449,6 @@ public static class SurfaceFeedTransitions
             throw new RuntimeStateIntegrityException("surface-feed history does not reach the latest sequence");
         foreach (var binding in state.ActionBindings) ValidateBinding(binding);
     }
-
     private static SurfaceFeedState ValidateAndCompact(SurfaceFeedState state, DateTimeOffset now)
     {
         state = state with
@@ -508,7 +470,6 @@ public static class SurfaceFeedTransitions
         Validate(state);
         return state;
     }
-
     private static SurfaceFeedRecord[] CompactHistory(IEnumerable<SurfaceFeedRecord> history)
     {
         var retained = history.OrderBy(record => record.Sequence)
@@ -522,24 +483,20 @@ public static class SurfaceFeedTransitions
         }
         return retained.ToArray();
     }
-
     private static void DemandMutable(SurfaceFeedState state, long expectedRevision)
     {
         DemandRevision(state, expectedRevision);
         if (state.Identity is null) throw new InvalidOperationException("Surface-feed state is not initialized.");
     }
-
     private static void DemandRevision(SurfaceFeedState state, long expectedRevision)
     {
         if (state.Revision != expectedRevision) throw new RuntimeStateConflictException(expectedRevision, state.Revision);
     }
-
     private static void ValidateIdentity(SurfaceFeedIdentity identity)
     {
         if (string.IsNullOrWhiteSpace(identity.OwnerId.Value) || string.IsNullOrWhiteSpace(identity.ActorId.Value))
             throw new ArgumentException("A complete surface-feed identity is required.", nameof(identity));
     }
-
     private static void ValidateProjection(SurfaceFeedProjection projection)
     {
         DemandId(projection.ProjectionId, nameof(projection.ProjectionId));
@@ -559,7 +516,6 @@ public static class SurfaceFeedTransitions
                 throw new ArgumentException("Action bindings must target the projected surface revision and remain unexpired.", nameof(projection));
         }
     }
-
     private static void ValidateHomeSurfaceBootstrap(SurfaceFeedState state, HomeSurfaceBootstrap bootstrap)
     {
         DemandId(bootstrap.ProjectionId, nameof(bootstrap.ProjectionId));
@@ -569,7 +525,6 @@ public static class SurfaceFeedTransitions
         if (!string.Equals(bootstrap.ConversationId, expectedConversationId, StringComparison.Ordinal))
             throw new ArgumentException("The home surface must target the feed identity's conversation.", nameof(bootstrap));
     }
-
     private static SurfaceActionBinding[] CreateHomeBindings(IReadOnlyList<StoredActionBinding> descriptors, int surfaceRevision) => descriptors.Select(descriptor => new SurfaceActionBinding(
             descriptor.BindingId,
             ConversationSurfacePayload.HomeSurfaceId,
@@ -584,7 +539,6 @@ public static class SurfaceFeedTransitions
             descriptor.ExpiresAt,
             null,
             null)).ToArray();
-
     private static void ValidateBinding(SurfaceActionBinding binding)
     {
         DemandId(binding.BindingId, nameof(binding.BindingId));
@@ -597,7 +551,6 @@ public static class SurfaceFeedTransitions
             binding.LastIdempotencyKey is { Length: > 256 } || binding.LastOperationId is { Length: > 256 })
             throw new ArgumentException("Surface action binding is invalid.", nameof(binding));
     }
-
     private static bool FixedTimeHashEquals(string first, string second)
     {
         try
@@ -609,13 +562,11 @@ public static class SurfaceFeedTransitions
             return false;
         }
     }
-
     private static void DemandId(string value, string name)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value.Any(char.IsControl))
             throw new ArgumentException("Surface-feed identifiers must be present and bounded.", name);
     }
-
     private static void DemandHash(string value, string name)
     {
         if (value.Length != 64 || value.Any(character => !Uri.IsHexDigit(character)))

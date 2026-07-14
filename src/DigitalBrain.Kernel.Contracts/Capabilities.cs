@@ -1,14 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Contracts;
 
 [GenerateSerializer, Alias("digitalbrain.v3.capability-request")]
 public sealed record CapabilityRequest
 {
     public const int MaximumPayloadBytes = 64 * 1024;
-
     [JsonConstructor]
     public CapabilityRequest(
         BrainOwnerId ownerId,
@@ -51,7 +49,6 @@ public sealed record CapabilityRequest
         CorrelationId = ContractValue.Identifier(correlationId, nameof(correlationId));
         CausationId = causationId is null ? null : ContractValue.Identifier(causationId, nameof(causationId));
     }
-
     [Id(0)] public BrainOwnerId OwnerId { get; }
     [Id(1)] public ActorId ActorId { get; }
     [Id(2)] public FeatureInstallationId InstallationId { get; }
@@ -66,7 +63,6 @@ public sealed record CapabilityRequest
     [Id(11)] public DateTimeOffset Deadline { get; }
     [Id(12)] public string CorrelationId { get; }
     [Id(13)] public string? CausationId { get; }
-
     private static JsonElement BoundedPayload(JsonElement payload)
     {
         if (payload.ValueKind == JsonValueKind.Undefined)

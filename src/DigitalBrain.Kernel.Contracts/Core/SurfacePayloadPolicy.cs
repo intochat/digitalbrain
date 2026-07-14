@@ -1,5 +1,4 @@
 using System.Text.Json;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public static class SurfacePayloadPolicy
@@ -10,7 +9,6 @@ public static class SurfacePayloadPolicy
         "actorid", "codeverifier", "grants", "ownerid", "password", "principal", "principalid", "refreshtoken",
         "secret", "secretvalue", "sessionid", "tenantid", "userid", "workspaceid"
     };
-
     public static void DemandSafe(JsonElement value, int depth = 0)
     {
         if (depth > 64) throw new ArgumentException("The surface payload exceeds the nesting bound.", nameof(value));

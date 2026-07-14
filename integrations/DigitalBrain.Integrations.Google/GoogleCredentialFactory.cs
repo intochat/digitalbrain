@@ -1,7 +1,6 @@
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
-
 namespace DigitalBrain.Integrations.Google;
 
 internal static class GoogleCredentialFactory

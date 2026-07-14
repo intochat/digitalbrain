@@ -4,7 +4,6 @@ using DigitalBrain.Kernel.Contracts.Configuration;
 using Google;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-
 namespace DigitalBrain.Integrations.Google;
 
 [GrainType("digitalbrain.google.gmail-mutation")]

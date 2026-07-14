@@ -1,14 +1,12 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
-
 namespace DigitalBrain.FeatureBuilder;
 
 internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
 {
     private const int MaximumCapturedCharacters = 16_384;
     private readonly TimeProvider _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-
     internal async Task RunAsync(
         string workspace,
         DateTimeOffset deadline,
@@ -22,7 +20,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         {
             throw FeatureBuildDeadline.Expired();
         }
-
         var timeout = remaining < stageLimit ? remaining : stageLimit;
         using var stageCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         stageCancellation.CancelAfter(timeout);
@@ -31,7 +28,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         {
             throw new FeatureBuildException(failure, "The .NET build process could not start.");
         }
-
         using var outputCancellation = CancellationTokenSource.CreateLinkedTokenSource(stageCancellation.Token);
         var outputTask = ReadBoundedAsync(process.StandardOutput, outputCancellation.Token);
         var errorTask = ReadBoundedAsync(process.StandardError, outputCancellation.Token);
@@ -51,7 +47,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
             Kill(process);
             throw;
         }
-
         var output = await outputTask;
         var error = await errorTask;
         if (process.ExitCode != 0)
@@ -59,7 +54,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
             throw new FeatureBuildException(failure, BoundedFailure(arguments[0], process.ExitCode, output, error));
         }
     }
-
     private static ProcessStartInfo CreateStartInfo(string workspace, IReadOnlyList<string> arguments)
     {
         var startInfo = new ProcessStartInfo
@@ -75,11 +69,9 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         {
             startInfo.ArgumentList.Add(argument);
         }
-
         PopulateEnvironment(startInfo, workspace);
         return startInfo;
     }
-
     private static void PopulateEnvironment(ProcessStartInfo startInfo, string workspace)
     {
         var systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
@@ -104,14 +96,12 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         {
             PopulateWindowsEnvironment(startInfo, home, systemRoot);
         }
-
         startInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
         startInfo.Environment["DOTNET_NOLOGO"] = "1";
         startInfo.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1";
         startInfo.Environment["DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE"] = "1";
         startInfo.Environment["NUGET_XMLDOC_MODE"] = "skip";
     }
-
     private static void PopulateWindowsEnvironment(ProcessStartInfo startInfo, string home, string? systemRoot)
     {
         var homeRoot = Path.GetPathRoot(home)!;
@@ -123,7 +113,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         startInfo.Environment["ALLUSERSPROFILE"] = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         startInfo.Environment["ComSpec"] = Path.Combine(systemRoot ?? "C:\\Windows", "System32", "cmd.exe");
     }
-
     private static void Add(ProcessStartInfo startInfo, string name, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value))
@@ -131,7 +120,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
             startInfo.Environment[name] = value;
         }
     }
-
     private static string ResolveDotNetHost()
     {
         var configured = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
@@ -139,7 +127,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         {
             return configured;
         }
-
         var root = Environment.GetEnvironmentVariable("DOTNET_ROOT");
         if (!string.IsNullOrWhiteSpace(root))
         {
@@ -149,7 +136,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
                 return rooted;
             }
         }
-
         if (OperatingSystem.IsWindows())
         {
             var installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe");
@@ -158,7 +144,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
                 return installed;
             }
         }
-
         var executable = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
         foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -168,10 +153,8 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
                 return candidate;
             }
         }
-
         throw new FeatureBuildException(FeatureBuildFailure.InvalidSource, "The .NET SDK host could not be resolved.");
     }
-
     private static void Kill(Process process)
     {
         try
@@ -185,7 +168,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         {
         }
     }
-
     private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken)
     {
         var captured = new StringBuilder(MaximumCapturedCharacters);
@@ -199,7 +181,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
                 {
                     return captured.ToString();
                 }
-
                 var remaining = MaximumCapturedCharacters - captured.Length;
                 if (remaining > 0)
                 {
@@ -217,7 +198,6 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
             return captured.ToString();
         }
     }
-
     private static string BoundedFailure(string stage, int exitCode, string output, string error)
     {
         var detail = string.Join(Environment.NewLine, new[] { output, error }.Where(static value => !string.IsNullOrWhiteSpace(value)))

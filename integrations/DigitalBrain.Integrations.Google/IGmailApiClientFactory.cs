@@ -1,5 +1,4 @@
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Integrations.Google;
 
 internal interface IGmailApiClientFactory

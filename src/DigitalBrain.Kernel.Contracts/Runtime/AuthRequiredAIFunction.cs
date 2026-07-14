@@ -4,15 +4,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
-
 public sealed class AuthRequiredAIFunction : DelegatingAIFunction
 {
     private readonly Func<CancellationToken, Task<bool>> _isConnectedAsync;
     private readonly string _unauthorizedMessage;
     private readonly Func<CancellationToken, Task>? _onAuthRequired;
-
     public bool LastInvocationRequiredAuthentication { get; private set; }
-
     public AuthRequiredAIFunction(
         AIFunction innerFunction,
         Func<CancellationToken, Task<bool>> isConnectedAsync,
@@ -24,7 +21,6 @@ public sealed class AuthRequiredAIFunction : DelegatingAIFunction
         _unauthorizedMessage = unauthorizedMessage;
         _onAuthRequired = onAuthRequired;
     }
-
     protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
     {
         LastInvocationRequiredAuthentication = false;
@@ -33,14 +29,11 @@ public sealed class AuthRequiredAIFunction : DelegatingAIFunction
         {
             return await InnerFunction.InvokeAsync(arguments, cancellationToken);
         }
-
         LastInvocationRequiredAuthentication = true;
-
         if (_onAuthRequired != null)
         {
             await _onAuthRequired(cancellationToken);
         }
-
         return _unauthorizedMessage;
     }
 }

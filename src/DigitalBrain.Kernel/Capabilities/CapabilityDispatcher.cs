@@ -1,5 +1,4 @@
 using DigitalBrain.Kernel.Contracts;
-
 namespace DigitalBrain.Kernel.Capabilities;
 
 internal sealed class CapabilityDispatcher : ICapabilityDispatcher
@@ -8,7 +7,6 @@ internal sealed class CapabilityDispatcher : ICapabilityDispatcher
     private readonly ICapabilityGrantSource _grants;
     private readonly TimeProvider _timeProvider;
     private readonly CapabilityGrantValidator _validator;
-
     public CapabilityDispatcher(IEnumerable<ICapabilityHandler> handlers, ICapabilityGrantSource grants, TimeProvider timeProvider, CapabilityGrantValidator? validator = null)
     {
         ArgumentNullException.ThrowIfNull(handlers);
@@ -26,14 +24,12 @@ internal sealed class CapabilityDispatcher : ICapabilityDispatcher
         }
         _handlers = registered;
     }
-
     public async Task<CapabilityDispatchResult> ExecuteAsync(CapabilityRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
         if (!_handlers.TryGetValue(request.CapabilityId, out var handler) || handler.CapabilityVersion != request.CapabilityVersion)
             throw new CapabilityDeniedException();
-
         var grant = await _grants.ReadAsync(request, cancellationToken).ConfigureAwait(false);
         var remaining = _validator.Validate(request, grant, _timeProvider.GetUtcNow());
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

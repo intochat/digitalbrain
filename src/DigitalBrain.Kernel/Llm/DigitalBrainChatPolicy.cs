@@ -1,12 +1,10 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.AI;
-
 namespace DigitalBrain.Kernel.Llm;
 
 internal sealed record DigitalBrainChatPolicyOptions(int MaximumConcurrency, TimeSpan RequestTimeout)
 {
     public static DigitalBrainChatPolicyOptions Default { get; } = new(4, TimeSpan.FromSeconds(90));
-
     internal void Validate()
     {
         if (MaximumConcurrency <= 0)
@@ -15,12 +13,10 @@ internal sealed record DigitalBrainChatPolicyOptions(int MaximumConcurrency, Tim
             throw new ArgumentOutOfRangeException(nameof(RequestTimeout));
     }
 }
-
 internal sealed class BoundedNoRetryChatClient : DelegatingChatClient
 {
     private readonly SemaphoreSlim _concurrency;
     private readonly TimeSpan _requestTimeout;
-
     public BoundedNoRetryChatClient(IChatClient innerClient, DigitalBrainChatPolicyOptions options)
         : base(innerClient)
     {
@@ -28,10 +24,8 @@ internal sealed class BoundedNoRetryChatClient : DelegatingChatClient
         _concurrency = new SemaphoreSlim(options.MaximumConcurrency, options.MaximumConcurrency);
         _requestTimeout = options.RequestTimeout;
     }
-
     public override Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
         ExecuteAsync(token => base.GetResponseAsync(messages, options, token), cancellationToken);
-
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -49,7 +43,6 @@ internal sealed class BoundedNoRetryChatClient : DelegatingChatClient
             _concurrency.Release();
         }
     }
-
     private async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

@@ -1,17 +1,13 @@
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Contracts;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Runtime;
 
 public enum SessionRotationStatus { Rotated, Replay, Expired, Revoked, Rejected }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.session-identity")]
 public sealed record SessionIdentity([property: Id(0)] BrainOwnerId OwnerId, [property: Id(1)] ActorId ActorId);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.session-refresh-replay")]
 public sealed record SessionRefreshReplay([property: Id(0)] string ConsumedHash, [property: Id(1)] string ReplacementHash, [property: Id(2)] DateTimeOffset ConsumedAt);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.session-state")]
 public sealed record SessionState(
     [property: Id(0)] int SchemaVersion,
@@ -29,10 +25,8 @@ public sealed record SessionState(
 {
     public static SessionState Empty() => new(RuntimeStateSchemas.Session, 0, null, null, null, AuthAssurance.None, [], 0, null, default, null, []);
 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.session-rotation")]
 public sealed record SessionRotation([property: Id(0)] SessionState State, [property: Id(1)] SessionRotationStatus Status);
-
 [Alias("digitalbrain.runtime.i-session-neuron")]
 public interface ISessionNeuron : IGrainWithStringKey
 {
@@ -55,11 +49,9 @@ public interface ISessionNeuron : IGrainWithStringKey
     [Alias("digitalbrain.runtime.session.is-access-valid")]
     Task<bool> IsAccessValidAsync(long sessionVersion, DateTimeOffset now);
 }
-
 public static class SessionTransitions
 {
     public const int MaximumRefreshReplayEntries = 64;
-
     public static SessionState Initialize(
         SessionState state,
         long expectedRevision,
@@ -104,7 +96,6 @@ public static class SessionTransitions
         Validate(next);
         return next;
     }
-
     public static SessionRotation RotateRefresh(
         SessionState state,
         long expectedRevision,
@@ -139,7 +130,6 @@ public static class SessionTransitions
         Validate(next);
         return new(next, SessionRotationStatus.Rotated);
     }
-
     public static SessionState Revoke(SessionState state, long expectedRevision, DateTimeOffset revokedAt)
     {
         DemandMutable(state, expectedRevision);
@@ -148,13 +138,11 @@ public static class SessionTransitions
         Validate(next);
         return next;
     }
-
     public static bool IsAccessValid(SessionState state, long sessionVersion, DateTimeOffset now)
     {
         Validate(state);
         return state.OpaqueSessionId is not null && state.RevokedAt is null && state.RefreshExpiresAt > now && sessionVersion > 0 && sessionVersion == state.SessionVersion;
     }
-
     public static void Validate(SessionState state)
     {
         if (state.SchemaVersion != RuntimeStateSchemas.Session || state.Revision < 0 || state.SessionVersion < 0 || state.Grants is null || state.RefreshReplay is null ||
@@ -180,24 +168,20 @@ public static class SessionTransitions
             DemandHash(replay.ReplacementHash, nameof(replay.ReplacementHash));
         }
     }
-
     private static void DemandMutable(SessionState state, long expectedRevision)
     {
         DemandRevision(state, expectedRevision);
         if (state.OpaqueSessionId is null) throw new InvalidOperationException("Session state is not initialized.");
     }
-
     private static void DemandRevision(SessionState state, long expectedRevision)
     {
         if (state.Revision != expectedRevision) throw new RuntimeStateConflictException(expectedRevision, state.Revision);
     }
-
     private static void ValidateIdentity(SessionIdentity identity)
     {
         if (string.IsNullOrWhiteSpace(identity.OwnerId.Value) || string.IsNullOrWhiteSpace(identity.ActorId.Value))
             throw new ArgumentException("A complete session identity is required.", nameof(identity));
     }
-
     private static string[] ValidateAndCanonicalizeGrants(IEnumerable<string> grants)
     {
         ArgumentNullException.ThrowIfNull(grants);
@@ -207,13 +191,11 @@ public static class SessionTransitions
             throw new ArgumentException("Session grants must be unique, bounded capability names.", nameof(grants));
         return canonical;
     }
-
     private static void DemandId(string value, string name)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value.Any(char.IsControl))
             throw new ArgumentException("Session identifiers must be present and bounded.", name);
     }
-
     private static void DemandHash(string value, string name)
     {
         if (value.Length != 64 || value.Any(character => !Uri.IsHexDigit(character)))

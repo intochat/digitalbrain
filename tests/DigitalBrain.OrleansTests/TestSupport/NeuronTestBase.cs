@@ -7,7 +7,7 @@ using Orleans.Configuration;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace DigitalBrain.TestKit;
+namespace DigitalBrain.OrleansTests.TestSupport;
 
 [Trait("Category", "cluster")]
 public abstract class NeuronTestBase : IAsyncLifetime

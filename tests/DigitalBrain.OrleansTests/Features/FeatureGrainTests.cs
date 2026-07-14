@@ -277,7 +277,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
                     FeatureSourceKind.RuntimeAuthored,
                     ["gmail.message.read.v1"],
                     ["DigitalBrain.Integrations.Google.Contracts"]),
-                [new("gmail.message.read.v1", 1, connection, "{\"mailbox\":\"primary\"}", "google")]),
+                [new("gmail.message.read.v1", 1, connection, "{\"allowedToolIds\":[\"gmail.message.read.v1\"]}", "google")]),
             0);
         await hub.DecideAsync(
             new FeatureApprovalDecision(proposal.ApprovalId, ReleaseOne, true, "decision-live-grant"),
@@ -287,7 +287,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
                 installationId,
                 ReleaseOne,
                 actor,
-                [new("gmail.message.read.v1", 1, connection, "{\"mailbox\":\"primary\"}", "google")]),
+                [new("gmail.message.read.v1", 1, connection, "{\"allowedToolIds\":[\"gmail.message.read.v1\"]}", "google")]),
             2);
         await hub.InstallAsync(
             new FeatureInstallationRegistration(installationId, ReleaseOne, ["gmail.message.received.v1"]),

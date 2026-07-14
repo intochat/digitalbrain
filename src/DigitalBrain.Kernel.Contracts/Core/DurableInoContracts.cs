@@ -1,7 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
 using Orleans;
-
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public enum InoOperationPhase
@@ -19,7 +18,6 @@ public enum InoOperationPhase
     Approved = 10,
     ApplyingEffect = 11
 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.accepted-command")]
 public sealed record AcceptedCommand(
     [property: Id(0)] string CommandId,
@@ -31,14 +29,12 @@ public sealed record AcceptedCommand(
     [property: Id(6)] string RequestId,
     [property: Id(7)] DateTimeOffset AcceptedAt,
     [property: Id(8)] int SchemaVersion);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.operation-receipt")]
 public sealed record OperationReceipt(
     [property: Id(0)] string OperationId,
     [property: Id(1)] string IdempotencyKey,
     [property: Id(2)] InoOperationPhase Phase,
     [property: Id(3)] long Version);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.approval-record")]
 public sealed record ApprovalRecord(
     [property: Id(0)] string ApprovalId,
@@ -50,7 +46,6 @@ public sealed record ApprovalRecord(
     [property: Id(6)] DateTimeOffset? DecidedAt = null,
     [property: Id(7)] string? DecidedBy = null,
     [property: Id(8)] string? DecisionId = null);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.effect-record")]
 public sealed record EffectRecord(
     [property: Id(0)] string EffectId,
@@ -60,10 +55,8 @@ public sealed record EffectRecord(
     [property: Id(4)] string State,
     [property: Id(5)] string ProviderIdempotencyKey,
     [property: Id(6)] long Version);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.operation-feed-turn")]
 public sealed record OperationFeedTurn([property: Id(0)] string CommandId, [property: Id(1)] string Role, [property: Id(2)] string Text, [property: Id(3)] string State);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.operation-feed-view")]
 public sealed record OperationFeedView(
     [property: Id(0)] string CommandId,
@@ -73,7 +66,6 @@ public sealed record OperationFeedView(
     [property: Id(4)] string? ApprovalId,
     [property: Id(5)] ToolAction? Action,
     [property: Id(6)] OperationFeedTurn[] Turns);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.operation-outbox-record")]
 public sealed record OperationOutboxRecord(
     [property: Id(0)] string EventId,
@@ -85,7 +77,6 @@ public sealed record OperationOutboxRecord(
 {
     public const int CurrentProjectionSchemaVersion = 1;
     public const string PhaseEventType = "ino.operation.phase.v1";
-
     [Id(6)] public int ProjectionSchemaVersion { get; init; } = CurrentProjectionSchemaVersion;
     [Id(7)] public string ConversationId { get; init; } = string.Empty;
     [Id(8)] public long ConversationRevision { get; init; }
@@ -96,7 +87,6 @@ public sealed record OperationOutboxRecord(
     [Id(13)] public string? EffectId { get; init; }
     [Id(14)] public string? ApprovalId { get; init; }
     [Id(15)] public WorkflowReference? Workflow { get; init; }
-
     public static OperationOutboxRecord Create(
         string eventId,
         string operationId,
@@ -122,7 +112,6 @@ public sealed record OperationOutboxRecord(
         if (!Enum.IsDefined(phase)) throw new ArgumentOutOfRangeException(nameof(phase));
         if (operationVersion < 1 || conversationRevision < 0)
             throw new ArgumentOutOfRangeException(nameof(operationVersion));
-
         var normalizedAction = view.Action is { } action && OAuthCallbackPaths.IsStructurallyValidAction(action) ? action : null;
         var normalized = view with
         {
@@ -144,9 +133,7 @@ public sealed record OperationOutboxRecord(
             Workflow = workflow
         };
     }
-
     public byte[] ToPayloadUtf8() => JsonSerializer.SerializeToUtf8Bytes(this);
-
     public static bool TryRead(byte[] payloadUtf8, out OperationOutboxRecord? record)
     {
         record = null;
@@ -160,7 +147,6 @@ public sealed record OperationOutboxRecord(
                 record = candidate;
                 return true;
             }
-
             if (candidate.View is not { Turns.Length: > 16 } legacyView) return false;
             var repaired = candidate with
             {
@@ -175,11 +161,9 @@ public sealed record OperationOutboxRecord(
         }
         catch (JsonException)
         {
-
             return false;
         }
     }
-
     public InoConversationSnapshot ToSnapshot()
     {
         if (!IsCurrent()) throw new InvalidOperationException("The operation projection is not a current canonical record.");
@@ -205,7 +189,6 @@ public sealed record OperationOutboxRecord(
                 view.ApprovalId,
                 Phase)]);
     }
-
     private bool IsCurrent() =>
         ProjectionSchemaVersion == CurrentProjectionSchemaVersion && string.Equals(EventType, PhaseEventType, StringComparison.Ordinal) &&
         !string.IsNullOrWhiteSpace(EventId) &&
@@ -216,7 +199,6 @@ public sealed record OperationOutboxRecord(
         Enum.IsDefined(Phase) && OperationVersion > 0 && ConversationRevision >= 0 && View is { Turns: not null } &&
         string.Equals(View.State, StateFor(Phase), StringComparison.Ordinal) &&
         View.Turns.Length <= 16;
-
     private static string StateFor(InoOperationPhase phase) => phase switch
     {
         InoOperationPhase.Accepted or InoOperationPhase.Queued or InoOperationPhase.Approved => InoConversationStates.Queued,
@@ -230,12 +212,9 @@ public sealed record OperationOutboxRecord(
         _ => InoConversationStates.Failed
     };
 }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.workflow-reference")]
 public sealed record WorkflowReference([property: Id(0)] string Runner, [property: Id(1)] string WorkflowId, [property: Id(2)] string SessionId);
-
 public sealed record InoAuthorizationResume(string Provider, string ToolId, string AuthorizationAttemptId, DateTimeOffset ExpiresAt);
-
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-authorization-request")]
 public sealed record InoAuthorizationRequest(
     [property: Id(0)] string Provider,
@@ -244,7 +223,6 @@ public sealed record InoAuthorizationRequest(
     [property: Id(3)] DateTimeOffset ExpiresAt,
     [property: Id(4)] string AuthorizationFlowReference,
     [property: Id(5)] string SafeSummary);
-
 public sealed record InoWorkflowRequest(
     string OperationId,
     string ConversationId,
@@ -256,27 +234,18 @@ public sealed record InoWorkflowRequest(
     string? ActorScope = null,
     BrainOwnerId? OwnerId = null,
     ActorId? ActorId = null);
-
 public enum InoToolAccess { Read, Mutation }
-
 public sealed record InoToolRequest(string ToolId, InoToolAccess Access, string Scope, string SafeSummary);
-
 public sealed record InoApprovedTool(string ToolId, string Scope, string SafeSummary);
-
 public sealed record InoToolEffectRequest(string OperationId, string EffectId, string ToolId, string Scope, string ActorScope, string ProviderIdempotencyKey);
-
 public enum InoToolEffectDisposition { Succeeded, Failed, OutcomeUnknown }
-
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-tool-effect-result")]
 public sealed record InoToolEffectResult([property: Id(0)] InoToolEffectDisposition Disposition, [property: Id(1)] string SafeResult);
-
 public sealed record InoWorkflowResult(string Text, WorkflowReference Workflow, InoToolRequest? ToolRequest = null, InoAuthorizationRequest? AuthorizationRequest = null);
-
 public interface IAgentWorkflowRunner
 {
     Task<InoWorkflowResult> ExecuteAsync(InoWorkflowRequest request, CancellationToken cancellationToken = default);
 }
-
 public static class InoOperationPhases
 {
     public static InoOperationPhase FromConversationStatus(string state) => state switch

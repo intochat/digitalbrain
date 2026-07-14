@@ -143,7 +143,7 @@ public sealed class FeatureReleaseManagerTests
 
         await using var restarted = Manager(new RecordingRecycle());
         await restarted.LoadActiveAsync([
-            new FeatureActiveInstallation(Installation, second.Descriptor)
+            new FeatureActiveInstallation(FeatureReleaseManagerTestExtensions.Owner, Installation, second.Descriptor)
         ]);
         Assert.Equal(second.Descriptor.Digest, restarted.GetActiveDigest(Installation));
 
@@ -272,4 +272,17 @@ public sealed class FeatureReleaseManagerTests
         public int Requests { get; private set; }
         public void RequestRecycle() => Requests++;
     }
+}
+
+internal static class FeatureReleaseManagerTestExtensions
+{
+    internal static readonly BrainOwnerId Owner = new("test-owner");
+    internal static Task ActivateAsync(this FeatureReleaseManager manager, FeatureInstallationId installationId, FeatureReleaseDescriptor release, CancellationToken cancellationToken = default) =>
+        manager.ActivateAsync(Owner, installationId, release, cancellationToken);
+    internal static FeatureReleaseLease Acquire(this FeatureReleaseManager manager, FeatureInstallationId installationId) =>
+        manager.Acquire(Owner, installationId);
+    internal static FeatureReleaseLease Acquire(this FeatureReleaseManager manager, FeatureInstallationId installationId, ReleaseDigest digest) =>
+        manager.Acquire(Owner, installationId, digest);
+    internal static ReleaseDigest? GetActiveDigest(this FeatureReleaseManager manager, FeatureInstallationId installationId) =>
+        manager.GetActiveDigest(Owner, installationId);
 }

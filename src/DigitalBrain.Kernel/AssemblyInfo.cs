@@ -1,10 +1,7 @@
 using System.Runtime.CompilerServices;
-
 [assembly: InternalsVisibleTo("DigitalBrain.AppHost")]
 [assembly: InternalsVisibleTo("DigitalBrain.AppHostTests")]
 [assembly: InternalsVisibleTo("DigitalBrain.E2ETests")]
-[assembly: InternalsVisibleTo("DigitalBrain.Integrations.Google")]
-[assembly: InternalsVisibleTo("DigitalBrain.Integrations.Salesforce")]
 [assembly: InternalsVisibleTo("DigitalBrain.IntegrationContractTests")]
 [assembly: InternalsVisibleTo("DigitalBrain.Mcp")]
 [assembly: InternalsVisibleTo("DigitalBrain.OrleansTests")]

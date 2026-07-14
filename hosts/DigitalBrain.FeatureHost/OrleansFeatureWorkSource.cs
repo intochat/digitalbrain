@@ -1,6 +1,5 @@
 using DigitalBrain.Kernel.Contracts;
 using Orleans;
-
 namespace DigitalBrain.FeatureHost;
 
 internal sealed class OrleansFeatureWorkSource : IFeatureWorkSource
@@ -10,14 +9,12 @@ internal sealed class OrleansFeatureWorkSource : IFeatureWorkSource
     private readonly FeatureReleaseManager _releases;
     private readonly IClusterClient _cluster;
     private int _cursor;
-
     public OrleansFeatureWorkSource(IFeatureArtifactCatalog artifacts, FeatureReleaseManager releases, IClusterClient cluster)
     {
         _artifacts = artifacts ?? throw new ArgumentNullException(nameof(artifacts));
         _releases = releases ?? throw new ArgumentNullException(nameof(releases));
         _cluster = cluster ?? throw new ArgumentNullException(nameof(cluster));
     }
-
     public async ValueTask<FeatureWorkItem> TakeAsync(CancellationToken cancellationToken = default)
     {
         while (true)
@@ -34,13 +31,13 @@ internal sealed class OrleansFeatureWorkSource : IFeatureWorkSource
                 var snapshot = await grain.ReadAsync();
                 if (snapshot.Paused || snapshot.Inbox.Length == 0 || snapshot.ActiveRelease != candidate.Release.Digest)
                     continue;
-                return new FeatureWorkItem(candidate.InstallationId, grain)
-                {
-                    OwnerId = candidate.OwnerId,
-                    ActorId = candidate.ActorId,
-                    GrantRevision = candidate.GrantRevision,
-                    ProviderConnections = candidate.ProviderConnections
-                };
+                return new FeatureWorkItem(
+                    candidate.InstallationId,
+                    grain,
+                    candidate.OwnerId,
+                    candidate.ActorId,
+                    candidate.GrantRevision,
+                    candidate.ProviderConnections);
             }
             await Task.Delay(EmptyPollDelay, cancellationToken);
         }
