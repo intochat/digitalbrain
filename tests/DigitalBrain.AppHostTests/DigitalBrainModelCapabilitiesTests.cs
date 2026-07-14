@@ -1,7 +1,7 @@
-using DigitalBrain.Aspire;
+using DigitalBrain.AppHost;
 using DigitalBrain.Core.Models;
 
-namespace DigitalBrain.Tests.Aspire;
+namespace DigitalBrain.AppHostTests;
 
 public class DigitalBrainModelCapabilitiesTests
 {

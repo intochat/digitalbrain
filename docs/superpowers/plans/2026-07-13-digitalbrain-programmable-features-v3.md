@@ -245,9 +245,11 @@ Evidence: lexical memory is owner-scoped, deterministic, bounded at exactly 2,00
 - Seven resources are clustering, grainstate, conversationstate, sessionstate, surfacefeedstate, Feature source/releases, and memoryfacts.
 - Steady local processes are RuntimeHost x3, MCP/UI Edge x1, FeatureHost x1; FeatureBuilder is transient.
 
-- [ ] Use `aspire docs search` and `aspire docs api search --language csharp` before AppHost edits.
-- [ ] Write AppHost model tests for resources, references, waits, health, replicas, and absence of journal/embedding Memory dependency.
-- [ ] Start isolated, wait for every required resource, capture describe/log/trace evidence, and commit `feat: compose feature runtime topology`.
+- [x] Use `aspire docs search` and `aspire docs api search --language csharp` before AppHost edits.
+- [x] Write AppHost model tests for resources, references, waits, health, replicas, and absence of journal/embedding Memory dependency.
+- [x] Start isolated, wait for every required resource, capture describe/log/trace evidence, and commit `feat: compose feature runtime topology`.
+
+Evidence: AppHost now owns the absorbed and internalized Aspire composition surface and the deleted `DigitalBrain.Aspire` project has no remaining caller or solution reference. One Orleans model uses Table clustering and reminders plus the named Blob providers; exactly seven durable resources are declared: `clustering`, `grainstate`, `conversationstate`, `sessionstate`, `surfacefeedstate`, `features`, and `memoryfacts`. RuntimeHost runs with three replicas, MCP/UI and FeatureHost with one each, FeatureHost receives the Orleans client and release Blob reference, and FeatureBuilder is explicit-start only. Feature execution seals each run before commit, cancels and drains abandoned capability calls, snapshots exact bounded usage, and rejects post-seal work. Release reads enforce canonical paths, ETag consistency, and independent streamed byte bounds instead of trusting listing metadata. The dedicated AppHost suite passes 28 model tests, the exact root suite passes 610 tests, and `aspire doctor` passes 5/5. In an isolated run all seven durable resources, all three RuntimeHost replicas, MCP, and FeatureHost became healthy; FeatureBuilder remained `NotStarted`; console evidence showed FeatureHost joining all three Orleans gateways; sampled storage and edge traces completed successfully apart from expected idempotent create-if-exists conflicts; the AppHost stopped cleanly.
 
 ### Task 11: MCP/UI authoring, approval, grant, installation, and rollback rail
 

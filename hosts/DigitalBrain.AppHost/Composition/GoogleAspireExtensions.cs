@@ -2,9 +2,9 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Aspire;
+namespace DigitalBrain.AppHost;
 
-public static class GoogleAspireExtensions
+internal static class GoogleAspireExtensions
 {
     public const string ClientIdParameterName = "google-client-id";
     public const string ClientSecretParameterName = "google-client-secret";
@@ -75,7 +75,7 @@ public static class GoogleAspireExtensions
         $"Use a separate OAuth client per environment when possible so local, staging, and production credentials do not share tokens. See [Google app audience rules]({GoogleOAuthVerificationHelpUrl}).";
 }
 
-public sealed record GoogleAppConfigParameters(
+internal sealed record GoogleAppConfigParameters(
     IResourceBuilder<ParameterResource> ClientId,
     IResourceBuilder<ParameterResource> ClientSecret,
     IResourceBuilder<ParameterResource> RedirectUri);

@@ -1,6 +1,6 @@
-using DigitalBrain.Aspire;
+using DigitalBrain.AppHost;
 
-namespace DigitalBrain.Tests.Aspire;
+namespace DigitalBrain.AppHostTests;
 
 public sealed class ResolveDevFlutterAppPathTests
 {

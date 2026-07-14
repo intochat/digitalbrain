@@ -1,9 +1,9 @@
-using DigitalBrain.Aspire;
+using DigitalBrain.AppHost;
 using DigitalBrain.Core.Models;
 using AzureOpenAIModels = DigitalBrain.Core.Models.AzureOpenAI;
 using OllamaModels = DigitalBrain.Core.Models.Ollama;
 
-namespace DigitalBrain.Tests.Aspire;
+namespace DigitalBrain.AppHostTests;
 
 public sealed class DigitalBrainModelRegistryTests
 {

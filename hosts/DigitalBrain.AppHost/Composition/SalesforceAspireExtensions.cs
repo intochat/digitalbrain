@@ -2,12 +2,12 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Aspire;
+namespace DigitalBrain.AppHost;
 
 /// <summary>
 /// Aspire wiring for Salesforce app-level configuration used by the kernel.
 /// </summary>
-public static class SalesforceAspireExtensions
+internal static class SalesforceAspireExtensions
 {
     public const string ClientIdParameterName = "salesforce-client-id";
     public const string ClientSecretParameterName = "salesforce-client-secret";
@@ -94,7 +94,7 @@ public static class SalesforceAspireExtensions
         "Use a separate Connected App per environment when possible so local, sandbox, staging, and production credentials stay isolated.";
 }
 
-public sealed record SalesforceAppConfigParameters(
+internal sealed record SalesforceAppConfigParameters(
     IResourceBuilder<ParameterResource> ClientId,
     IResourceBuilder<ParameterResource> ClientSecret,
     IResourceBuilder<ParameterResource> RedirectUri,

@@ -4,9 +4,9 @@ using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
 using DigitalBrain.Core.Models;
 
-namespace DigitalBrain.Aspire;
+namespace DigitalBrain.AppHost;
 
-public sealed class DigitalBrainContext
+internal sealed class DigitalBrainContext
 {
     public required string Name { get; init; }
     public required IDistributedApplicationBuilder ApplicationBuilder { get; init; }
@@ -34,6 +34,7 @@ public sealed class DigitalBrainContext
     public required IResourceBuilder<AzureBlobStorageResource> SessionStateBlobs { get; init; }
     public required IResourceBuilder<AzureTableStorageResource> ClusteringTable { get; init; }
     public required IResourceBuilder<AzureTableStorageResource> MemoryFacts { get; init; }
+    public required IResourceBuilder<AzureBlobStorageResource> FeatureArtifacts { get; init; }
 
     public bool EnableMcp { get; init; }
 }

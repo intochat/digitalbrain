@@ -32,7 +32,9 @@ public sealed class FeatureHostBoundaryTests
                 "DigitalBrain.Kernel.Contracts"
             ],
             projectReferences);
-        Assert.Equal(["Microsoft.Extensions.Hosting", "Microsoft.Orleans.Client"], packages);
+        Assert.Equal(
+            ["Aspire.Azure.Data.Tables", "Aspire.Azure.Storage.Blobs", "Microsoft.Extensions.Hosting", "Microsoft.Orleans.Client", "Microsoft.Orleans.Clustering.AzureStorage"],
+            packages);
         var source = string.Join('\n', Directory.EnumerateFiles(
                 Path.GetDirectoryName(projectPath)!,
                 "*.cs",
@@ -41,7 +43,9 @@ public sealed class FeatureHostBoundaryTests
         Assert.DoesNotContain("DefaultAzureCredential", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Google.Apis", source, StringComparison.Ordinal);
         Assert.DoesNotContain("DeveloperForce", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("HttpClient", source, StringComparison.Ordinal);
+        Assert.Contains("HttpFeatureCapabilityClient", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("googleapis.com", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("salesforce.com", source, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string RepositoryRoot()

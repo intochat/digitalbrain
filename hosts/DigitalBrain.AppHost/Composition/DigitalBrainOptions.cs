@@ -1,8 +1,8 @@
 using DigitalBrain.Core.Models;
 
-namespace DigitalBrain.Aspire;
+namespace DigitalBrain.AppHost;
 
-public sealed class DigitalBrainOptions
+internal sealed class DigitalBrainOptions
 {
     private int? lastModelRegistration;
     private string? llmModel;

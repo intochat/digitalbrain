@@ -1,9 +1,7 @@
-using DigitalBrain.Aspire;
+using DigitalBrain.AppHost;
 using DigitalBrain.Core;
-using DigitalBrain.Google;
-using DigitalBrain.Salesforce;
 
-namespace DigitalBrain.Tests.Aspire;
+namespace DigitalBrain.AppHostTests;
 
 public sealed class OAuthCallbackPathTests
 {
@@ -15,12 +13,6 @@ public sealed class OAuthCallbackPathTests
         Assert.Equal("/oauth/callback/google", OAuthCallbackPaths.Google);
         Assert.Equal("/oauth/start/google", OAuthCallbackPaths.GoogleStart);
         Assert.Equal(OAuthCallbackPaths.Google, GoogleAspireExtensions.DefaultCallbackPath);
-        Assert.Equal(OAuthCallbackPaths.Google, GoogleClientFactory.DefaultCallbackPath);
-        // Full-URL check, matching the Salesforce assertion below -- a path-suffix-only check let the port
-        // silently drift from the kernel's actual default (8081 vs 51014) without any test catching it.
-        Assert.Equal(
-            "http://localhost:51014/oauth/callback/google",
-            GoogleClientFactory.DefaultRedirectUri);
     }
 
     [Fact]
@@ -29,10 +21,6 @@ public sealed class OAuthCallbackPathTests
         Assert.Equal("/oauth/callback/salesforce", OAuthCallbackPaths.Salesforce);
         Assert.Equal("/oauth/start/salesforce", OAuthCallbackPaths.SalesforceStart);
         Assert.Equal(OAuthCallbackPaths.Salesforce, SalesforceAspireExtensions.DefaultCallbackPath);
-        Assert.Equal(OAuthCallbackPaths.Salesforce, SalesforceClientFactory.DefaultCallbackPath);
-        Assert.Equal(
-            "http://localhost:51014/oauth/callback/salesforce",
-            SalesforceClientFactory.DefaultRedirectUri);
     }
 
     [Theory]
@@ -96,19 +84,6 @@ public sealed class OAuthCallbackPathTests
         Assert.Throws<ArgumentOutOfRangeException>(() => OAuthCallbackPaths.CreateInternalStartPath(
             "unknown",
             FlowReference));
-    }
-
-    [Theory]
-    [InlineData("https://accounts.google.com/o/oauth2/v2/auth?client_id=test", true)]
-    [InlineData("http://accounts.google.com/o/oauth2/v2/auth?client_id=test", false)]
-    [InlineData("https://accounts.google.com:444/o/oauth2/v2/auth?client_id=test", false)]
-    [InlineData("https://accounts.google.com/o/oauth2/auth?client_id=test", false)]
-    [InlineData("https://accounts.google.com.evil.example/o/oauth2/v2/auth?client_id=test", false)]
-    [InlineData("https://accounts.google.com@evil.example/o/oauth2/v2/auth?client_id=test", false)]
-    [InlineData("https://accounts.google.com/o/oauth2/v2/auth?client_id=test#fragment", false)]
-    public void GoogleProviderRedirectAllowlistIsExact(string target, bool expected)
-    {
-        Assert.Equal(expected, GoogleClientFactory.IsAllowedAuthorizationUrl(target));
     }
 
     [Fact]

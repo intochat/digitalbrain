@@ -47,6 +47,104 @@ public sealed class FeatureExecutionWorkerTests
     }
 
     [Fact]
+    public async Task Worker_activates_constructor_injected_contract_adapters_inside_handler_task()
+    {
+        using var release = FeatureReleaseTestArtifact.Create();
+        await using var manager = await ManagerAsync(release, new FeatureGmailMessageReader());
+        var grain = new RecordingInstallationGrain(Claim(release.Descriptor.Digest));
+        var source = new SingleWorkSource(new FeatureWorkItem(Installation, grain));
+        var contexts = new CapabilityFeatureRunContextFactory(new FeatureCapabilityClient(), TimeProvider.System);
+        var worker = Worker(manager, source, contexts);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        var run = worker.RunAsync(cancellation.Token);
+        var commit = await grain.Committed.Task.WaitAsync(cancellation.Token);
+        cancellation.Cancel();
+        await run;
+
+        Assert.Single(commit.Intents);
+        Assert.Contains("summary", commit.Intents[0].PayloadJson, StringComparison.Ordinal);
+        Assert.Equal(0, grain.Failures);
+    }
+
+    [Fact]
+    public async Task Production_context_reserves_exact_limits_before_outbound_work()
+    {
+        var digest = new ReleaseDigest(new string('a', 64));
+        var claim = Claim(digest);
+        var work = new FeatureWorkItem(
+            Installation,
+            new RecordingInstallationGrain(claim));
+        var client = new CountingCapabilityClient();
+        var factory = new CapabilityFeatureRunContextFactory(client, TimeProvider.System);
+        await using var runContext = await factory.CreateAsync(work, claim);
+
+        for (var index = 0; index < 20; index++)
+            await runContext.Context.MemoryRecall.RecallAsync(new MemoryRecallRequest("query", []));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runContext.Context.MemoryRecall.RecallAsync(new MemoryRecallRequest("query", [])));
+        for (var index = 0; index < 4; index++)
+            await runContext.Context.Models.CompleteAsync(new ModelRequest("summary", "prompt", $"model-{index}"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runContext.Context.Models.CompleteAsync(new ModelRequest("summary", "prompt", "model-overflow")));
+        for (var index = 0; index < 32; index++)
+            runContext.Context.Intents.AddTextSurface(new TextSurfaceIntent($"intent-{index}", "title", "text"));
+        Assert.Throws<InvalidOperationException>(() =>
+            runContext.Context.Intents.AddTextSurface(new TextSurfaceIntent("intent-overflow", "title", "text")));
+
+        Assert.Equal(20, client.Reads);
+        Assert.Equal(4, client.Models);
+    }
+
+    [Fact]
+    public async Task Production_context_atomically_limits_parallel_intents()
+    {
+        var digest = new ReleaseDigest(new string('a', 64));
+        var claim = Claim(digest);
+        var work = new FeatureWorkItem(
+            Installation,
+            new RecordingInstallationGrain(claim));
+        var factory = new CapabilityFeatureRunContextFactory(new CountingCapabilityClient(), TimeProvider.System);
+        await using var runContext = await factory.CreateAsync(work, claim);
+
+        var attempts = Enumerable.Range(0, 64)
+            .Select(index => Task.Run(() => RecordIntent(runContext.Context, index)))
+            .ToArray();
+        var results = await Task.WhenAll(attempts);
+        var commit = await runContext.SealAsync(claim.Fence);
+
+        Assert.Equal(32, results.Count(result => result));
+        Assert.Equal(32, commit.Intents.Count);
+        Assert.Equal(32, commit.Intents.Select(intent => intent.LogicalOperationKey).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task Sealing_cancels_and_drains_fire_and_forget_capabilities_before_usage_snapshot()
+    {
+        var digest = new ReleaseDigest(new string('a', 64));
+        var claim = Claim(digest);
+        var work = new FeatureWorkItem(
+            Installation,
+            new RecordingInstallationGrain(claim));
+        var client = new BlockingCapabilityClient();
+        var factory = new CapabilityFeatureRunContextFactory(client, TimeProvider.System);
+        await using var runContext = await factory.CreateAsync(work, claim);
+
+        var abandoned = runContext.Context.Models.CompleteAsync(
+            new ModelRequest("summary", "prompt", "abandoned-model"));
+        await client.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var commit = await runContext.SealAsync(claim.Fence);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abandoned);
+        Assert.Equal(1, commit.Usage.ModelCalls);
+        Assert.True(client.Cancelled);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runContext.Context.Models.CompleteAsync(
+                new ModelRequest("summary", "prompt", "post-seal-model")));
+        Assert.Equal(1, client.Calls);
+    }
+
+    [Fact]
     public async Task Handler_deadline_cancels_feature_and_records_safe_failure_without_commit()
     {
         using var release = FeatureReleaseTestArtifact.Create();
@@ -280,6 +378,19 @@ public sealed class FeatureExecutionWorkerTests
         DateTimeOffset.UtcNow.AddMinutes(1),
         1);
 
+    private static bool RecordIntent(IFeatureContext context, int index)
+    {
+        try
+        {
+            context.Intents.AddTextSurface(new TextSurfaceIntent($"parallel-{index}", "title", "text"));
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     private sealed class SingleServiceProvider(object service) : IServiceProvider
     {
         public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(service) ? service : null;
@@ -407,17 +518,109 @@ public sealed class FeatureExecutionWorkerTests
         public ModelResponse ModelResponse => _models.Response;
         public bool Disposed { get; private set; }
 
-        public FeatureRunCommit CreateCommit(FeatureLeaseFence fence) => new(
-            fence,
-            _state.Read().Json,
-            _intents.Items,
-            new FeatureResourceUsage(0, _models.Calls),
-            "{}");
+        public ValueTask<FeatureRunCommit> SealAsync(
+            FeatureLeaseFence fence,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(new FeatureRunCommit(
+                fence,
+                _state.Read().Json,
+                _intents.Items,
+                new FeatureResourceUsage(0, _models.Calls),
+                "{}"));
+        }
+
+        public IDisposable Activate() => NoopDisposable.Instance;
 
         public ValueTask DisposeAsync()
         {
             Disposed = true;
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class NoopDisposable : IDisposable
+    {
+        public static readonly NoopDisposable Instance = new();
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class FeatureCapabilityClient : IFeatureCapabilityClient
+    {
+        public Task<JsonElement> ExecuteAsync(
+            CapabilityRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var payload = request.CapabilityId switch
+            {
+                GoogleCapabilityIds.GmailMessageRead => JsonSerializer.SerializeToElement(new GmailMessage(
+                    "message-1",
+                    "thread-1",
+                    DateTimeOffset.UnixEpoch,
+                    "sender@example.com",
+                    "Subject",
+                    "Body")),
+                "model.complete.v1" => JsonSerializer.SerializeToElement(new { text = "summary" }),
+                _ => throw new InvalidOperationException(request.CapabilityId)
+            };
+            return Task.FromResult(payload);
+        }
+    }
+
+    private sealed class CountingCapabilityClient : IFeatureCapabilityClient
+    {
+        private int _reads;
+        private int _models;
+        public int Reads => Volatile.Read(ref _reads);
+        public int Models => Volatile.Read(ref _models);
+
+        public Task<JsonElement> ExecuteAsync(
+            CapabilityRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.Equals(request.CapabilityId, "memory.recall", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref _reads);
+                return Task.FromResult(JsonSerializer.SerializeToElement(new { facts = Array.Empty<object>() }));
+            }
+            if (string.Equals(request.CapabilityId, "model.complete.v1", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref _models);
+                return Task.FromResult(JsonSerializer.SerializeToElement(new { text = "response" }));
+            }
+            throw new InvalidOperationException(request.CapabilityId);
+        }
+    }
+
+    private sealed class BlockingCapabilityClient : IFeatureCapabilityClient
+    {
+        private int _calls;
+        public TaskCompletionSource Started { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Calls => Volatile.Read(ref _calls);
+        public bool Cancelled { get; private set; }
+
+        public async Task<JsonElement> ExecuteAsync(
+            CapabilityRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _calls);
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException();
+            }
+            catch (OperationCanceledException)
+            {
+                Cancelled = true;
+                throw;
+            }
         }
     }
 

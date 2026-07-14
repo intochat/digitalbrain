@@ -12,6 +12,17 @@ namespace DigitalBrain.Tests.Integrations;
 
 public sealed class OAuthConnectorSecurityTests
 {
+    [Theory]
+    [InlineData("https://accounts.google.com/o/oauth2/v2/auth?client_id=test", true)]
+    [InlineData("http://accounts.google.com/o/oauth2/v2/auth?client_id=test", false)]
+    [InlineData("https://accounts.google.com:444/o/oauth2/v2/auth?client_id=test", false)]
+    [InlineData("https://accounts.google.com/o/oauth2/auth?client_id=test", false)]
+    [InlineData("https://accounts.google.com.evil.example/o/oauth2/v2/auth?client_id=test", false)]
+    [InlineData("https://accounts.google.com@evil.example/o/oauth2/v2/auth?client_id=test", false)]
+    [InlineData("https://accounts.google.com/o/oauth2/v2/auth?client_id=test#fragment", false)]
+    public void Google_authorization_url_allowlist_is_exact(string target, bool expected) =>
+        Assert.Equal(expected, GoogleClientFactory.IsAllowedAuthorizationUrl(target));
+
     [Fact]
     public void Google_authorization_requests_only_readonly_and_send_gmail_scopes()
     {

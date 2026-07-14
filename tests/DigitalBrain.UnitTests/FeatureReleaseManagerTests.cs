@@ -172,6 +172,26 @@ public sealed class FeatureReleaseManagerTests
     }
 
     [Fact]
+    public async Task Same_installation_id_is_isolated_by_owner()
+    {
+        using var first = FeatureReleaseTestArtifact.Create("sha256:first");
+        using var second = FeatureReleaseTestArtifact.Create("sha256:second");
+        var ownerOne = new BrainOwnerId("owner-one");
+        var ownerTwo = new BrainOwnerId("owner-two");
+        await using var manager = Manager(new RecordingRecycle());
+
+        await manager.LoadActiveAsync([
+            new FeatureActiveInstallation(ownerOne, Installation, first.Descriptor),
+            new FeatureActiveInstallation(ownerTwo, Installation, second.Descriptor)
+        ]);
+
+        using var firstLease = manager.Acquire(ownerOne, Installation, first.Descriptor.Digest);
+        using var secondLease = manager.Acquire(ownerTwo, Installation, second.Descriptor.Digest);
+        Assert.Equal(first.Descriptor.Digest, firstLease.Digest);
+        Assert.Equal(second.Descriptor.Digest, secondLease.Digest);
+    }
+
+    [Fact]
     public async Task Leaked_feature_requests_recycle_when_retired_context_cannot_unload()
     {
         using var first = FeatureReleaseTestArtifact.Create("sha256:first");

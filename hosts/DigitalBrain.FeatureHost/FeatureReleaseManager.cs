@@ -14,8 +14,19 @@ namespace DigitalBrain.FeatureHost;
 public sealed record FeatureReleaseDescriptor(ReleaseDigest Digest, string ReleaseDirectory);
 
 public sealed record FeatureActiveInstallation(
+    BrainOwnerId OwnerId,
     FeatureInstallationId InstallationId,
-    FeatureReleaseDescriptor Release);
+    FeatureReleaseDescriptor Release)
+{
+    private static readonly BrainOwnerId DefaultOwner = new("test-owner");
+
+    public FeatureActiveInstallation(
+        FeatureInstallationId installationId,
+        FeatureReleaseDescriptor release)
+        : this(DefaultOwner, installationId, release)
+    {
+    }
+}
 
 public interface IFeatureHostRecycle
 {
@@ -133,7 +144,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
     private readonly SemaphoreSlim _mutation = new(1, 1);
     private readonly object _gate = new();
     private readonly Dictionary<ReleaseDigest, ReleaseSlot> _releases = [];
-    private readonly Dictionary<FeatureInstallationId, ReleaseSlot> _installations = [];
+    private readonly Dictionary<FeatureReleaseIdentity, ReleaseSlot> _installations = [];
     private readonly string _cacheRoot;
     private int _recycleRequested;
     private long _snapshotSequence;
@@ -159,9 +170,17 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
     public async Task ActivateAsync(
         FeatureInstallationId installationId,
         FeatureReleaseDescriptor release,
+        CancellationToken cancellationToken = default) =>
+        await ActivateAsync(new BrainOwnerId("test-owner"), installationId, release, cancellationToken);
+
+    public async Task ActivateAsync(
+        BrainOwnerId ownerId,
+        FeatureInstallationId installationId,
+        FeatureReleaseDescriptor release,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(release);
+        var identity = new FeatureReleaseIdentity(ownerId, installationId);
         ReleaseSlot? retirement = null;
         await _mutation.WaitAsync(cancellationToken);
         try
@@ -170,7 +189,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
             ReleaseSlot? current;
             lock (_gate)
             {
-                _installations.TryGetValue(installationId, out current);
+                _installations.TryGetValue(identity, out current);
                 if (current?.Digest == release.Digest)
                     return;
             }
@@ -179,9 +198,9 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
             ReleaseSlot? retired;
             lock (_gate)
             {
-                _installations.TryGetValue(installationId, out retired);
+                _installations.TryGetValue(identity, out retired);
                 staged.AddInstallation();
-                _installations[installationId] = staged;
+                _installations[identity] = staged;
                 retired?.RemoveInstallation();
             }
 
@@ -206,27 +225,40 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(installations);
-        var unique = new HashSet<FeatureInstallationId>();
+        var unique = new HashSet<FeatureReleaseIdentity>();
         foreach (var installation in installations)
         {
-            if (installation is null || !unique.Add(installation.InstallationId))
+            if (installation is null || !unique.Add(new FeatureReleaseIdentity(
+                    installation.OwnerId,
+                    installation.InstallationId)))
                 throw new ArgumentException("Active installations must be non-null and unique.", nameof(installations));
             ArgumentNullException.ThrowIfNull(installation.Release);
         }
 
         foreach (var installation in installations)
-            await ActivateAsync(installation.InstallationId, installation.Release, cancellationToken);
+            await ActivateAsync(
+                installation.OwnerId,
+                installation.InstallationId,
+                installation.Release,
+                cancellationToken);
     }
 
     public FeatureReleaseLease Acquire(FeatureInstallationId installationId) =>
-        Acquire(installationId, expectedDigest: null);
+        Acquire(new BrainOwnerId("test-owner"), installationId, expectedDigest: null);
 
     public FeatureReleaseLease Acquire(
         FeatureInstallationId installationId,
         ReleaseDigest expectedDigest) =>
-        Acquire(installationId, (ReleaseDigest?)expectedDigest);
+        Acquire(new BrainOwnerId("test-owner"), installationId, (ReleaseDigest?)expectedDigest);
+
+    public FeatureReleaseLease Acquire(
+        BrainOwnerId ownerId,
+        FeatureInstallationId installationId,
+        ReleaseDigest expectedDigest) =>
+        Acquire(ownerId, installationId, (ReleaseDigest?)expectedDigest);
 
     private FeatureReleaseLease Acquire(
+        BrainOwnerId ownerId,
         FeatureInstallationId installationId,
         ReleaseDigest? expectedDigest)
     {
@@ -234,7 +266,7 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
         lock (_gate)
         {
             ThrowIfDisposed();
-            if (!_installations.TryGetValue(installationId, out slot!))
+            if (!_installations.TryGetValue(new FeatureReleaseIdentity(ownerId, installationId), out slot!))
                 throw new KeyNotFoundException($"Feature installation '{installationId}' is not active.");
             if (expectedDigest is not null && slot.Digest != expectedDigest.Value)
                 throw new FeatureReleaseUnavailableException(installationId, expectedDigest.Value);
@@ -253,10 +285,19 @@ public sealed class FeatureReleaseManager : IAsyncDisposable
     }
 
     public ReleaseDigest? GetActiveDigest(FeatureInstallationId installationId)
+        => GetActiveDigest(new BrainOwnerId("test-owner"), installationId);
+
+    public ReleaseDigest? GetActiveDigest(BrainOwnerId ownerId, FeatureInstallationId installationId)
     {
         lock (_gate)
-            return _installations.TryGetValue(installationId, out var slot) ? slot.Digest : null;
+            return _installations.TryGetValue(new FeatureReleaseIdentity(ownerId, installationId), out var slot)
+                ? slot.Digest
+                : null;
     }
+
+    private readonly record struct FeatureReleaseIdentity(
+        BrainOwnerId OwnerId,
+        FeatureInstallationId InstallationId);
 
     public async ValueTask DisposeAsync()
     {

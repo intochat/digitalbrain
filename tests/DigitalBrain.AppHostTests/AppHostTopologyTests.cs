@@ -1,9 +1,9 @@
 using System.Reflection;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
-using DigitalBrain.Aspire;
+using DigitalBrain.AppHost;
 
-namespace DigitalBrain.Tests.Aspire;
+namespace DigitalBrain.AppHostTests;
 
 // Real, executed coverage for the builder.ExecutionContext.IsRunMode branching added to
 // AddDigitalBrain (storage emulator + Ollama container vs. AddConnectionString("llm")
@@ -11,7 +11,7 @@ namespace DigitalBrain.Tests.Aspire;
 // DigitalBrain.AppHost entry point.
 // but deliberately stops after CreateAsync — never calling BuildAsync/StartAsync — so it only
 // inspects the declared resource graph. No Docker, no Orleans, no container start.
-public sealed class AddDigitalBrainExecutionModeTests
+public sealed class AppHostTopologyTests
 {
     private static async Task<IDistributedApplicationTestingBuilder> CreateAppHostBuilderAsync(params string[] args)
     {
@@ -47,8 +47,18 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.Contains(builder.Resources, r => r.Name == "conversationstate" && r.GetType().Name == "AzureBlobStorageResource");
         Assert.Contains(builder.Resources, r => r.Name == "surfacefeedstate" && r.GetType().Name == "AzureBlobStorageResource");
         Assert.Contains(builder.Resources, r => r.Name == "sessionstate" && r.GetType().Name == "AzureBlobStorageResource");
+        var featureArtifacts = Assert.Single(builder.Resources, resource => resource.Name == "features");
+        Assert.Equal("AzureBlobStorageResource", featureArtifacts.GetType().Name);
         var memoryFacts = Assert.Single(builder.Resources, resource => resource.Name == "memoryfacts");
         Assert.Equal("AzureTableStorageResource", memoryFacts.GetType().Name);
+        var durableResources = builder.Resources
+            .Where(resource => resource.GetType().Name is "AzureTableStorageResource" or "AzureBlobStorageResource")
+            .Select(resource => resource.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            ["clustering", "conversationstate", "features", "grainstate", "memoryfacts", "sessionstate", "surfacefeedstate"],
+            durableResources);
 
         var kernel = Assert.Single(builder.Resources, resource => resource.Name == "kernel");
         Assert.Contains(
@@ -57,6 +67,48 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.Contains(
             kernel.Annotations.OfType<WaitAnnotation>(),
             wait => ReferenceEquals(wait.Resource, memoryFacts) && wait.WaitType == WaitType.WaitUntilHealthy);
+        Assert.Equal(3, kernel.GetReplicaCount());
+        Assert.Contains(
+            kernel.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            relationship => ReferenceEquals(relationship.Resource, featureArtifacts));
+        Assert.Contains(
+            kernel.Annotations.OfType<WaitAnnotation>(),
+            wait => ReferenceEquals(wait.Resource, featureArtifacts) && wait.WaitType == WaitType.WaitUntilHealthy);
+
+        var featureHost = Assert.Single(builder.Resources, resource => resource.Name == "feature-host");
+        var clustering = Assert.Single(builder.Resources, resource => resource.Name == "clustering");
+        Assert.Equal(1, featureHost.GetReplicaCount());
+        Assert.Contains(
+            featureHost.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            relationship => ReferenceEquals(relationship.Resource, featureArtifacts));
+        Assert.Contains(
+            featureHost.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            relationship => ReferenceEquals(relationship.Resource, clustering));
+        Assert.Contains(
+            featureHost.Annotations.OfType<WaitAnnotation>(),
+            wait => ReferenceEquals(wait.Resource, featureArtifacts) && wait.WaitType == WaitType.WaitUntilHealthy);
+        Assert.Contains(
+            featureHost.Annotations.OfType<WaitAnnotation>(),
+            wait => ReferenceEquals(wait.Resource, kernel) && wait.WaitType == WaitType.WaitUntilHealthy);
+
+        var featureBuilder = Assert.Single(builder.Resources, resource => resource.Name == "feature-builder");
+        Assert.Single(featureBuilder.Annotations.OfType<ExplicitStartupAnnotation>());
+        var mcp = Assert.Single(builder.Resources, resource => resource.Name == "mcp");
+        Assert.Equal(1, mcp.GetReplicaCount());
+        Assert.Contains(
+            mcp.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            relationship => ReferenceEquals(relationship.Resource, clustering));
+        var featureHostEnvironment = await EvaluateEnvironmentAsync(builder, featureHost);
+        var kernelEnvironment = await EvaluateEnvironmentAsync(builder, kernel);
+        var featureHostToken = Assert.IsType<ParameterResource>(
+            featureHostEnvironment["DigitalBrain__FeatureHost__InternalToken"]);
+        Assert.True(featureHostToken.Secret);
+        Assert.Same(featureHostToken, kernelEnvironment["DigitalBrain__FeatureHost__InternalToken"]);
+        Assert.IsType<EndpointReference>(featureHostEnvironment["DigitalBrain__FeatureHost__InternalOrigin"]);
+        Assert.DoesNotContain(builder.Resources, resource => resource.Name.Contains("journal", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            memoryFacts.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            relationship => relationship.Resource.Name.Contains("embed", StringComparison.OrdinalIgnoreCase));
 
         Assert.Contains(builder.Resources, r => r.Name == "ollama" && r.GetType().Name == "OllamaResource");
 
@@ -127,6 +179,8 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.DoesNotContain("DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK", flutterEnvironment.Keys);
 
         var mcpEnvironment = await EvaluateEnvironmentAsync(builder, mcp);
+        Assert.Equal(DigitalBrain.Core.Runtime.SessionAudiences.Mcp, mcpEnvironment["DigitalBrain__Runtime__Mcp__Audience"]);
+        Assert.Equal(DigitalBrain.Core.Runtime.SessionAudiences.Ui, mcpEnvironment["DigitalBrain__Runtime__Ui__Audience"]);
         Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__Runtime__Ui__BootstrapSecret"]);
         Assert.DoesNotContain("DigitalBrain__Runtime__StorageNamespace", mcpEnvironment.Keys);
         Assert.DoesNotContain(

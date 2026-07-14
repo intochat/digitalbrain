@@ -8,7 +8,14 @@ namespace DigitalBrain.FeatureHost;
 
 public sealed record FeatureWorkItem(
     FeatureInstallationId InstallationId,
-    IFeatureInstallationGrain Installation);
+    IFeatureInstallationGrain Installation)
+{
+    public BrainOwnerId OwnerId { get; init; } = new("test-owner");
+    public ActorId ActorId { get; init; } = new("test-actor");
+    public GrantRevision GrantRevision { get; init; } = new(1);
+    public IReadOnlyDictionary<string, ProviderConnectionId> ProviderConnections { get; init; } =
+        new Dictionary<string, ProviderConnectionId>(StringComparer.Ordinal);
+}
 
 public interface IFeatureWorkSource
 {
@@ -26,7 +33,10 @@ public interface IFeatureRunContextFactory
 public interface IFeatureRunContext : IAsyncDisposable
 {
     IFeatureContext Context { get; }
-    FeatureRunCommit CreateCommit(FeatureLeaseFence fence);
+    IDisposable Activate();
+    ValueTask<FeatureRunCommit> SealAsync(
+        FeatureLeaseFence fence,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class FeatureExecutionOptions
@@ -165,7 +175,7 @@ public sealed class FeatureExecutionWorker : BackgroundService
                 if (acquireBudget <= TimeSpan.Zero)
                     throw new TimeoutException();
                 lease = await Task.Run(
-                        () => _releases.Acquire(work.InstallationId, claim.Release),
+                        () => _releases.Acquire(work.OwnerId, work.InstallationId, claim.Release),
                         stoppingToken)
                     .WaitAsync(acquireBudget, stoppingToken);
                 var contextBudget = executionEnds - _timeProvider.GetUtcNow();
@@ -184,9 +194,11 @@ public sealed class FeatureExecutionWorker : BackgroundService
             }
 
             var input = ToSdkInput(claim.Input);
-            var handler = Task.Run(
-                async () => await lease.Feature.HandleAsync(input, runContext.Context, deadline.Token),
-                stoppingToken);
+            var handler = Task.Run(async () =>
+            {
+                using var activation = runContext.Activate();
+                await lease.Feature.HandleAsync(input, runContext.Context, deadline.Token);
+            }, stoppingToken);
             try
             {
                 var remainingExecution = executionEnds - _timeProvider.GetUtcNow();
@@ -214,7 +226,24 @@ public sealed class FeatureExecutionWorker : BackgroundService
                 }
             }
             deadline.Token.ThrowIfCancellationRequested();
-            var commit = runContext.CreateCommit(claim.Fence);
+            FeatureRunCommit commit;
+            try
+            {
+                var sealBudget = executionEnds - _timeProvider.GetUtcNow();
+                if (sealBudget <= TimeSpan.Zero)
+                    throw new TimeoutException();
+                commit = await runContext
+                    .SealAsync(claim.Fence, deadline.Token)
+                    .AsTask()
+                    .WaitAsync(sealBudget, stoppingToken);
+            }
+            catch (TimeoutException)
+            {
+                deadline.Cancel();
+                unsafeExecution = true;
+                RequestRecycle();
+                return;
+            }
             var commitBudget = claim.LeaseExpiresAt - _timeProvider.GetUtcNow();
             if (commitBudget <= TimeSpan.Zero)
                 return;

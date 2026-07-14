@@ -4,9 +4,9 @@ using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
 using DigitalBrain.Core.Models;
 
-namespace DigitalBrain.Aspire;
+namespace DigitalBrain.AppHost;
 
-public static class DigitalBrainBuilderExtensions
+internal static class DigitalBrainBuilderExtensions
 {
     public const int DefaultKernelWebPort = 51014;
     public const string DefaultRuntimeStorageNamespace = "main";
@@ -81,6 +81,7 @@ public static class DigitalBrainBuilderExtensions
         }
         var clusteringTable = storage.AddTables("clustering");
         var memoryFacts = storage.AddTables("memoryfacts");
+        var featureArtifacts = storage.AddBlobs("features");
         var grainBlobs = storage.AddBlobs("grainstate");
         var conversationStateBlobs = storage.AddBlobs("conversationstate");
         var surfaceFeedStateBlobs = storage.AddBlobs("surfacefeedstate");
@@ -176,7 +177,8 @@ public static class DigitalBrainBuilderExtensions
             SurfaceFeedStateBlobs = surfaceFeedStateBlobs,
             SessionStateBlobs = sessionStateBlobs,
             ClusteringTable = clusteringTable,
-            MemoryFacts = memoryFacts
+            MemoryFacts = memoryFacts,
+            FeatureArtifacts = featureArtifacts
         };
     }
 
@@ -190,6 +192,7 @@ public static class DigitalBrainBuilderExtensions
             .WithReference(ctx.Orleans)
             .WithReference(ctx.ClusteringTable)
             .WithReference(ctx.MemoryFacts)
+            .WithReference(ctx.FeatureArtifacts)
             .WithReference(ctx.GrainBlobs)
             .WithReference(ctx.ConversationStateBlobs)
             .WithReference(ctx.SurfaceFeedStateBlobs)
@@ -210,6 +213,7 @@ public static class DigitalBrainBuilderExtensions
         // LLM waits already present below; storage waits complement the WithReference calls.
         kernel.WaitFor(ctx.ClusteringTable);
         kernel.WaitFor(ctx.MemoryFacts);
+        kernel.WaitFor(ctx.FeatureArtifacts);
         kernel.WaitFor(ctx.GrainBlobs);
         kernel.WaitFor(ctx.ConversationStateBlobs);
         kernel.WaitFor(ctx.SurfaceFeedStateBlobs);

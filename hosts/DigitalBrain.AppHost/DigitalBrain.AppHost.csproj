@@ -12,7 +12,9 @@
     <PackageReference Include="Aspire.Hosting.Orleans" />
     <PackageReference Include="Aspire.Hosting.Azure.Storage" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Core\DigitalBrain.Core.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\DigitalBrain.FeatureBuilder\DigitalBrain.FeatureBuilder.csproj" />
+    <ProjectReference Include="..\DigitalBrain.FeatureHost\DigitalBrain.FeatureHost.csproj" />
     <ProjectReference Include="..\DigitalBrain.RuntimeHost\DigitalBrain.RuntimeHost.csproj" />
   </ItemGroup>
 

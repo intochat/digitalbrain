@@ -1,6 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using DigitalBrain.Aspire;
+using DigitalBrain.AppHost;
 using AnthropicModels = DigitalBrain.Core.Models.Anthropic;
 using GitHubModels = DigitalBrain.Core.Models.GitHub;
 using OllamaModels = DigitalBrain.Core.Models.Ollama;
@@ -19,6 +19,7 @@ var isRunMode = builder.ExecutionContext.IsRunMode;
 var sessionSigningKey = AddRuntimeSecret(builder, "runtime-session-signing-key", isRunMode);
 var runtimeStateKek = AddRuntimeSecret(builder, "runtime-state-kek-v1", isRunMode);
 var runtimeStateSigningKey = AddRuntimeSecret(builder, "runtime-state-signing-key", isRunMode);
+var featureHostInternalToken = AddRuntimeSecret(builder, "feature-host-internal-token", isRunMode);
 var enableDevFlutter = isRunMode && IsLocalUiProfile(profile);
 var uiOidcIssuer = builder.Configuration["DigitalBrain:Runtime:Ui:Oidc:Issuer"]?.Trim();
 var uiOidcAudience = builder.Configuration["DigitalBrain:Runtime:Ui:Oidc:Audience"]?.Trim();
@@ -79,10 +80,23 @@ kernel.WithEnvironment("DigitalBrain__Tools__Enabled", "true");
 kernel.WithEnvironment("DigitalBrain__Runtime__State__ActiveKekVersion", "1");
 kernel.WithEnvironment("DigitalBrain__Runtime__State__Keks__1", runtimeStateKek);
 kernel.WithEnvironment("DigitalBrain__Runtime__State__SigningKey", runtimeStateSigningKey);
+kernel.WithEnvironment("DigitalBrain__FeatureHost__InternalToken", featureHostInternalToken);
 kernel.WithEnvironment("DigitalBrain__Runtime__StorageNamespace",
     builder.Configuration["DigitalBrain:Runtime:StorageNamespace"] ?? DigitalBrainBuilderExtensions.DefaultRuntimeStorageNamespace);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
 kernel.WithGoogleAppConfig(googleAppConfig);
+
+var featureHost = builder.AddProject<Projects.DigitalBrain_FeatureHost>("feature-host")
+    .WithReference(ctx.FeatureArtifacts)
+    .WithEnvironment("DigitalBrain__FeatureHost__InternalOrigin", kernel.GetEndpoint("web"))
+    .WithEnvironment("DigitalBrain__FeatureHost__InternalToken", featureHostInternalToken)
+    .WithReplicas(1);
+ctx.ConfigureClient(featureHost);
+featureHost.WaitFor(ctx.FeatureArtifacts);
+featureHost.WaitFor(kernel);
+
+builder.AddProject<Projects.DigitalBrain_FeatureBuilder>("feature-builder")
+    .WithExplicitStart();
 
 if (ctx.EnableMcp)
 {
@@ -94,8 +108,8 @@ if (ctx.EnableMcp)
         .WithEnvironment("DigitalBrain__Auth__SessionSigningKey", sessionSigningKey)
         .WithEnvironment("DigitalBrain__Profile", profile)
         .WithEnvironment("DigitalBrain__Salesforce__RedirectUri", salesforceAppConfig.RedirectUri)
-        .WithEnvironment("DigitalBrain__Runtime__Mcp__Audience", "digitalbrain-v2")
-        .WithEnvironment("DigitalBrain__Runtime__Ui__Audience", "digitalbrain-v2-ui")
+        .WithEnvironment("DigitalBrain__Runtime__Mcp__Audience", DigitalBrain.Core.Runtime.SessionAudiences.Mcp)
+        .WithEnvironment("DigitalBrain__Runtime__Ui__Audience", DigitalBrain.Core.Runtime.SessionAudiences.Ui)
         .WithEndpoint(name: "http", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
         .WithHttpsEndpoint(name: "https", env: "ASPNETCORE_HTTPS_PORTS", isProxied: true)
         .AsHttp2Service()

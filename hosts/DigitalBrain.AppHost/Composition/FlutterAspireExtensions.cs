@@ -1,9 +1,9 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 
-namespace DigitalBrain.Aspire;
+namespace DigitalBrain.AppHost;
 
-public static class FlutterAspireExtensions
+internal static class FlutterAspireExtensions
 {
     public const string TransportEndpointEnvironmentVariable = "DIGITALBRAIN_V2_UI_ENDPOINT";
     public const string BootstrapSecretEnvironmentVariable = "DIGITALBRAIN_V2_UI_BOOTSTRAP_SECRET";
