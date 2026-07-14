@@ -155,6 +155,7 @@
     .button-violet { border-color: var(--violet); color: white; background: var(--violet); }
     .button-soft { border-color: transparent; color: #5549ad; background: var(--violet-soft); }
     .button-danger-soft { border-color: transparent; color: #9e4736; background: var(--coral-soft); }
+    .button:disabled { cursor: not-allowed; opacity: .55; }
     .activity-card { min-height: 174px; padding: 19px; position: relative; overflow: hidden; }
     .activity-card::after { content: ""; position: absolute; width: 100px; height: 100px; right: -42px; bottom: -47px; border-radius: 50%; background: var(--violet-soft); }
     .activity-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 27px; }
@@ -186,9 +187,12 @@
     .proposal-item span { display: block; margin-bottom: 4px; color: var(--quiet); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
     .proposal-item strong { font-size: 10px; }
     .proposal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
+    .proposal-scenarios { margin: 14px 0; padding: 12px 14px 12px 30px; border-radius: 11px; color: var(--muted); background: #f5f4ef; font-size: 10px; line-height: 1.6; }
     .composer { width: 100%; max-width: 720px; margin: 20px auto 0; padding: 8px; display: flex; align-items: flex-end; gap: 8px; border: 1px solid var(--line-strong); border-radius: 16px; background: white; box-shadow: var(--shadow-soft); }
     .composer textarea { flex: 1; min-height: 48px; max-height: 120px; resize: vertical; padding: 13px 10px; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12px; }
     .composer button { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 12px; color: white; background: var(--ink); cursor: pointer; }
+    .composer .voice-button, .command-dock .voice-button { color: var(--ink); background: var(--violet-soft); }
+    .voice-button[aria-pressed="true"] { color: white; background: var(--coral); box-shadow: 0 0 0 4px var(--coral-soft); }
     .context-panel { padding: 19px; align-self: start; }
     .context-panel h3 { margin: 0 0 14px; font-size: 12px; }
     .context-row { padding: 12px 0; border-top: 1px solid var(--line); }
@@ -407,7 +411,7 @@
       .proposal-grid, .connector-details, .diagnostics { grid-template-columns: 1fr; }
       .chat-panel { min-height: auto; padding: 17px; }
       .chat-intro { margin-top: 0; }
-      .studio-shell { margin: -24px -16px -160px; min-height: auto; }
+      .studio-shell { margin: -24px -16px 0; min-height: auto; padding-bottom: 96px; }
       .studio-main { padding: 20px 16px 28px; }
       .studio-toolbar { display: block; }
       .studio-actions { margin-top: 15px; flex-wrap: wrap; }
@@ -424,7 +428,7 @@
         z-index: 45;
         inset: auto 10px 10px;
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         padding: 6px;
         border: 1px solid rgba(255, 255, 255, .09);
         border-radius: 17px;
@@ -465,7 +469,7 @@
         <button class="nav-button" type="button" data-view="memory"><span class="nav-icon">◫</span><span class="nav-text">Memory</span></button>
       </nav>
       <div class="rail-spacer"></div>
-      <div class="rail-status"><div class="rail-status-row"><span class="status-dot"></span><strong>All systems healthy</strong></div><small>18 capabilities available<br>4 connectors authorized</small></div>
+      <div class="rail-status"><div class="rail-status-row"><span class="status-dot"></span><strong>Action required</strong></div><small>18 capabilities available<br>3 of 4 connectors healthy</small></div>
     </aside>
 
     <div class="mobile-top">
@@ -501,8 +505,8 @@
           <div class="chat-layout">
             <div class="card chat-panel">
               <div class="chat-intro"><div class="chat-orb">D</div><h2 id="chat-heading">Ask for an outcome.</h2><p>DigitalBrain will resolve an authorized capability, ask when the match is ambiguous, or honestly propose what is missing.</p></div>
-              <div class="conversation" id="chat-conversation" aria-live="polite"><div class="proposal" id="chat-proposal" hidden><div class="proposal-top"><div><span class="tag tag-violet">Feature proposal</span><h3>Company Research Brief</h3><p>I understand the goal, but no available capability can safely gather and synthesize public company research yet.</p></div><span class="tag tag-amber">Review required</span></div><div class="proposal-grid"><div class="proposal-item"><span>Input</span><strong>Company name</strong></div><div class="proposal-item"><span>Output</span><strong>Text research brief</strong></div><div class="proposal-item"><span>Connector</span><strong>Web Research</strong></div></div><div class="proposal-actions"><button class="button" type="button" data-dismiss-proposal>Not now</button><button class="button button-violet" type="button" data-open-studio>Open Feature Studio</button></div></div></div>
-              <form class="composer" id="chat-form"><label class="sr-only" for="chat-input">Message DigitalBrain</label><textarea id="chat-input" rows="1" placeholder="Try: Research Acme Corporation and create a text file…"></textarea><button type="submit" aria-label="Send message">↑</button></form>
+              <div class="conversation" id="chat-conversation" aria-live="polite"><div class="proposal" id="chat-proposal" hidden><div class="proposal-top"><div><span class="tag tag-violet">Feature proposal</span><h3>Company Research Brief</h3><p>I understand the goal, but no available capability can safely gather and synthesize public company research yet.</p></div><span class="tag tag-amber">Review required</span></div><div class="proposal-grid"><div class="proposal-item"><span>Input</span><strong>Company name</strong></div><div class="proposal-item"><span>Output</span><strong>Text research brief</strong></div><div class="proposal-item"><span>Connector</span><strong>Web Research</strong></div></div><ul class="proposal-scenarios"><li>Create an attributed company research brief.</li><li>Ask before researching an ambiguous company.</li><li>Stop safely when Web Research is unavailable.</li></ul><div class="proposal-actions"><button class="button" type="button" data-dismiss-proposal>Not now</button><button class="button button-violet" type="button" data-open-studio>Open Feature Studio</button></div></div></div>
+              <form class="composer" id="chat-form"><button class="voice-button" type="button" data-voice-input aria-label="Start voice input" aria-pressed="false">◉</button><label class="sr-only" for="chat-input">Message DigitalBrain</label><textarea id="chat-input" rows="1" placeholder="Try: Research Acme Corporation and create a text file…"></textarea><button type="submit" aria-label="Send message">↑</button></form>
             </div>
             <aside class="card context-panel"><h3>Capability context</h3><div class="context-row"><span>Available</span><strong>18 authorized capabilities</strong></div><div class="context-row"><span>Healthy connectors</span><strong>3 of 4</strong></div><div class="context-row"><span>Trusted memory</span><strong>Workspace scope</strong></div><div class="context-row"><span>Authority</span><strong>Ask before external effects</strong></div></aside>
           </div>
@@ -522,14 +526,14 @@
           <div class="studio-shell">
             <div class="studio-main">
               <div class="studio-toolbar"><div><p class="eyebrow">Feature proposal · Autosaved</p><h2 id="studio-heading">Company Research Brief</h2><p>Original request: “Research Acme Corporation and create a text file with the findings.”</p></div><div class="studio-actions"><button class="button" type="button" id="open-code">{ } Technical</button><button class="button button-soft" type="button" id="verify-feature">✓ Verify</button><button class="button button-primary" type="button" id="install-feature">Install release</button></div></div>
-              <div class="tabs" role="tablist" aria-label="Feature document sections"><button class="tab" type="button" role="tab" aria-selected="true" aria-controls="behavior-panel" data-tab="behavior">Living behavior</button><button class="tab" type="button" role="tab" aria-selected="false" aria-controls="verification-panel" data-tab="verification">Verification <span class="tag tag-green">3</span></button><button class="tab" type="button" role="tab" aria-selected="false" aria-controls="releases-panel" data-tab="releases">Releases</button></div>
+              <div class="tabs" role="tablist" aria-label="Feature document sections"><button class="tab" type="button" role="tab" aria-selected="true" aria-controls="behavior-panel" data-tab="behavior">Living behavior</button><button class="tab" type="button" role="tab" aria-selected="false" aria-controls="verification-panel" data-tab="verification">Verification <span class="tag tag-green" id="verification-count">3</span></button><button class="tab" type="button" role="tab" aria-selected="false" aria-controls="releases-panel" data-tab="releases">Releases</button></div>
               <article class="document">
-                <div class="tab-panel is-active" id="behavior-panel" data-tab-panel="behavior"><p class="doc-kicker">Executable documentation</p><h3>Research a company and create an attributed brief</h3><p class="document-lede">This living document is both the human contract and the verification source. It stays plain enough to review and precise enough to execute.</p><section class="scenario"><div class="scenario-head"><h4>Scenario 1 · Create the research brief</h4><span class="tag tag-green">Verified</span></div><dl class="gherkin"><dt>Given</dt><dd>an authorized Web Research connector</dd><dt>And</dt><dd>a company name supplied by the user</dd><dt>When</dt><dd>the Company Research Brief Feature runs</dd><dt>Then</dt><dd>it gathers facts from attributable public sources</dd><dt>And</dt><dd>creates a text file containing the findings and citations</dd></dl></section><section class="scenario"><div class="scenario-head"><h4>Scenario 2 · Ask when the company is ambiguous</h4><span class="tag tag-green">Verified</span></div><dl class="gherkin"><dt>Given</dt><dd>a company name shared by more than one organization</dd><dt>When</dt><dd>the Feature resolves the research subject</dd><dt>Then</dt><dd>it asks the user to select the intended organization</dd><dt>And</dt><dd>does not begin research until the choice is explicit</dd></dl></section><button class="add-scenario" id="scenario-insert-point" type="button">＋ Describe another behavior in plain English</button></div>
-                <div class="tab-panel" id="verification-panel" data-tab-panel="verification"><p class="doc-kicker">Scenario-to-test evidence</p><h3>All behavior is currently verified</h3><p class="document-lede">Verification checks the living scenarios against the bounded implementation and approved interfaces.</p><div class="verification-list"><div class="verification-row"><span class="check">✓</span><span><strong>Create the research brief</strong><small>6 assertions · 1.4s</small></span><span class="tag tag-green">Passed</span></div><div class="verification-row"><span class="check">✓</span><span><strong>Ask when the company is ambiguous</strong><small>4 assertions · 0.8s</small></span><span class="tag tag-green">Passed</span></div><div class="verification-row"><span class="check">✓</span><span><strong>Decline unavailable connector</strong><small>3 assertions · 0.5s</small></span><span class="tag tag-green">Passed</span></div></div></div>
-                <div class="tab-panel" id="releases-panel" data-tab-panel="releases"><p class="doc-kicker">Immutable history</p><h3>Review, install, and roll back with confidence</h3><p class="document-lede">Each release records the exact source digest, grants, Connector selections, and trigger bindings.</p><div class="release-list"><div class="release-row"><span class="check" style="background:var(--violet-soft);color:var(--violet)">◇</span><span><strong>Draft release</strong><small>Digest 8d4c…a12f · 3 grants · no triggers</small></span><span class="tag tag-violet">Current</span></div><div class="release-row"><span class="check">✓</span><span><strong>Proposal created</strong><small>Today at 09:38 · from Chat request</small></span><span class="tag">Traceable</span></div></div></div>
+                <div class="tab-panel is-active" id="behavior-panel" data-tab-panel="behavior"><p class="doc-kicker">Executable documentation</p><h3>Research a company and create an attributed brief</h3><p class="document-lede">This living document is both the human contract and the verification source. It stays plain enough to review and precise enough to execute.</p><section class="scenario"><div class="scenario-head"><h4>Scenario 1 · Create the research brief</h4><span class="tag tag-green">Verified</span></div><dl class="gherkin"><dt>Given</dt><dd>an authorized Web Research connector</dd><dt>And</dt><dd>a company name supplied by the user</dd><dt>When</dt><dd>the Company Research Brief Feature runs</dd><dt>Then</dt><dd>it gathers facts from attributable public sources</dd><dt>And</dt><dd>creates a text file containing the findings and citations</dd></dl></section><section class="scenario"><div class="scenario-head"><h4>Scenario 2 · Ask when the company is ambiguous</h4><span class="tag tag-green">Verified</span></div><dl class="gherkin"><dt>Given</dt><dd>a company name shared by more than one organization</dd><dt>When</dt><dd>the Feature resolves the research subject</dd><dt>Then</dt><dd>it asks the user to select the intended organization</dd><dt>And</dt><dd>does not begin research until the choice is explicit</dd></dl></section><section class="scenario"><div class="scenario-head"><h4>Scenario 3 · Stop when research is unavailable</h4><span class="tag tag-green">Verified</span></div><dl class="gherkin"><dt>Given</dt><dd>the Web Research connector is unavailable or unauthorized</dd><dt>When</dt><dd>the Company Research Brief Feature is requested</dd><dt>Then</dt><dd>it explains the missing authority and does not collect data</dd></dl></section><button class="add-scenario" id="scenario-insert-point" type="button">＋ Describe another behavior in plain English</button></div>
+                <div class="tab-panel" id="verification-panel" data-tab-panel="verification"><p class="doc-kicker">Scenario-to-test evidence</p><h3 id="verification-heading">All behavior is currently verified</h3><p class="document-lede">Verification checks the living scenarios against the bounded implementation and approved interfaces.</p><div class="verification-list" id="verification-list"><div class="verification-row"><span class="check">✓</span><span><strong>Create the research brief</strong><small>6 assertions · 1.4s</small></span><span class="tag tag-green">Passed</span></div><div class="verification-row"><span class="check">✓</span><span><strong>Ask when the company is ambiguous</strong><small>4 assertions · 0.8s</small></span><span class="tag tag-green">Passed</span></div><div class="verification-row"><span class="check">✓</span><span><strong>Stop when research is unavailable</strong><small>3 assertions · 0.5s</small></span><span class="tag tag-green">Passed</span></div></div></div>
+                <div class="tab-panel" id="releases-panel" data-tab-panel="releases"><p class="doc-kicker">Immutable history</p><h3>Review, install, and roll back with confidence</h3><p class="document-lede">Each release records the exact source digest, grants, Connector selections, and trigger bindings.</p><div class="release-list"><div class="release-row"><span class="check" style="background:var(--violet-soft);color:var(--violet)">◇</span><span><strong>Draft release</strong><small>Digest 8d4c…a12f · 3 grants · no triggers</small></span><span class="tag tag-violet" id="release-state">Current</span></div><div class="release-row"><span class="check">✓</span><span><strong>Proposal created</strong><small>Today at 09:38 · from Chat request</small></span><span class="tag">Traceable</span></div></div></div>
               </article>
             </div>
-            <aside class="studio-assistant"><div class="assistant-head"><div class="chat-orb">D</div><div><strong>Studio assistant</strong><small>Working on this draft</small></div></div><div class="assistant-message">I translated the original request into two core scenarios and a safe Web Research dependency. The output stays local until the user explicitly shares it.</div><div class="assistant-suggestions"><button type="button" data-scenario-title="Use current sources" data-scenario-copy="the brief prioritizes sources published or updated within the last 30 days">Add a freshness requirement</button><button type="button" data-scenario-title="Prefer authoritative sources" data-scenario-copy="each material claim is supported by an authoritative source or independently cross-checked">Describe source-quality rules</button><button type="button" data-scenario-title="Stop without required authority" data-scenario-copy="the Feature explains the missing Web Research grant and does not begin collection">What grants will this need?</button></div><div class="assistant-message" id="assistant-ack" aria-live="polite">The implementation can only use approved DigitalBrain and Integration interfaces. Open <strong>Technical</strong> when you want to inspect the single C# file.</div><form class="assistant-composer"><label class="sr-only" for="studio-prompt">Ask about this Feature</label><input id="studio-prompt" placeholder="Change this draft…"><button type="submit" aria-label="Send to Studio assistant">↑</button></form></aside>
+            <aside class="studio-assistant"><div class="assistant-head"><div class="chat-orb">D</div><div><strong>Studio assistant</strong><small>Working on this draft</small></div></div><div class="assistant-message">I translated the original request into three core scenarios and a safe Web Research dependency. The output stays local until the user explicitly shares it.</div><div class="assistant-suggestions"><button type="button" data-scenario-title="Use current sources" data-scenario-copy="the brief prioritizes sources published or updated within the last 30 days">Add a freshness requirement</button><button type="button" data-scenario-title="Prefer authoritative sources" data-scenario-copy="each material claim is supported by an authoritative source or independently cross-checked">Describe source-quality rules</button><button type="button" data-scenario-title="Stop without required authority" data-scenario-copy="the Feature explains the missing Web Research grant and does not begin collection">What grants will this need?</button></div><div class="assistant-message" id="assistant-ack" aria-live="polite">The implementation can only use approved DigitalBrain and Integration interfaces. Open <strong>Technical</strong> when you want to inspect the single C# file.</div><form class="assistant-composer"><label class="sr-only" for="studio-prompt">Ask about this Feature</label><input id="studio-prompt" placeholder="Change this draft…"><button type="submit" aria-label="Send to Studio assistant">↑</button></form></aside>
           </div>
         </section>
 
@@ -557,9 +561,9 @@
 
   <nav class="mobile-nav" aria-label="Mobile navigation"><button class="nav-button" type="button" data-view="today" aria-current="page"><span class="nav-icon">⌂</span><span class="nav-text">Today</span></button><button class="nav-button" type="button" data-view="chat"><span class="nav-icon">◌</span><span class="nav-text">Chat</span></button><button class="nav-button" type="button" data-view="features"><span class="nav-icon">◇</span><span class="nav-text">Features</span></button><button class="nav-button" type="button" data-view="connectors"><span class="nav-icon">⌁</span><span class="nav-text">Connect</span></button><button class="nav-button" type="button" data-view="runs"><span class="nav-icon">↗</span><span class="nav-text">Runs</span></button><button class="nav-button" type="button" data-view="memory"><span class="nav-icon">◫</span><span class="nav-text">Memory</span></button></nav>
 
-  <form class="command-dock" id="command-form"><span class="command-spark">✦</span><label class="sr-only" for="command-input">Ask DigitalBrain in this workspace</label><input id="command-input" autocomplete="off" placeholder="Ask DigitalBrain in this workspace…"><span class="command-hint">Press Enter</span><button type="submit" aria-label="Submit command">↑</button></form>
+  <form class="command-dock" id="command-form"><span class="command-spark">✦</span><button class="voice-button" type="button" data-voice-input aria-label="Start voice input" aria-pressed="false">◉</button><label class="sr-only" for="command-input">Ask DigitalBrain in this workspace</label><input id="command-input" autocomplete="off" placeholder="Ask DigitalBrain in this workspace…"><span class="command-hint">Press Enter</span><button type="submit" aria-label="Submit command">↑</button></form>
 
-  <section class="conversation-layer" id="conversation-layer" aria-labelledby="layer-title" hidden><div class="layer-head"><div><h3 id="layer-title">Capability not available yet</h3><p>Your request is preserved and attached to this proposal.</p></div><button class="close-button" type="button" data-close-layer aria-label="Close conversation layer">×</button></div><div class="resolution"><span>◇</span><div><strong>No safe authorized match</strong><span>DigitalBrain checked availability, grants, risk, aliases, and semantic matches before proposing a Feature.</span></div></div><div class="layer-proposal"><h4>Company Research Brief</h4><p>Input: company name · Output: attributed text file · Suggested connector: Web Research</p><div class="layer-actions"><button class="button" type="button" data-close-layer>Not now</button><button class="button button-violet" type="button" data-open-studio>Approve &amp; open Studio</button></div></div></section>
+  <section class="conversation-layer" id="conversation-layer" aria-labelledby="layer-title" hidden><div class="layer-head"><div><h3 id="layer-title">Capability not available yet</h3><p>Your request is preserved and attached to this proposal.</p></div><button class="close-button" type="button" data-close-layer aria-label="Close conversation layer">×</button></div><div class="resolution"><span>◇</span><div><strong>No safe authorized match</strong><span>DigitalBrain checked availability, grants, risk, aliases, and semantic matches before proposing a Feature.</span></div></div><div class="layer-proposal"><h4>Company Research Brief</h4><p>Input: company name · Output: attributed text file · Suggested connector: Web Research</p><ul class="proposal-scenarios"><li>Create an attributed company research brief.</li><li>Ask before researching an ambiguous company.</li><li>Stop safely when Web Research is unavailable.</li></ul><div class="layer-actions"><button class="button" type="button" data-close-layer>Not now</button><button class="button button-violet" type="button" data-open-studio>Approve &amp; open Studio</button></div></div></section>
 
   <div class="scrim" id="scrim" hidden></div>
   <aside class="technical-drawer" id="technical-drawer" aria-labelledby="drawer-title" hidden><div class="drawer-head"><div><p class="eyebrow" style="color:#82908b">Advanced · Inspectable by design</p><h2 id="drawer-title">CompanyResearchFeature.cs</h2><p>One bounded C# implementation file · digest 8d4c…a12f</p></div><button class="close-button" id="close-drawer" type="button" aria-label="Close technical drawer">×</button></div><div class="code-tabs"><button class="is-selected" type="button">Implementation</button><button type="button">Interfaces</button><button type="button">Diff</button></div><pre><code><span class="code-keyword">public sealed class</span> <span class="code-type">CompanyResearchFeature</span>
@@ -576,7 +580,7 @@
             <span class="code-string">$"{subject.Slug}-research.txt"</span>,
             brief);
     }
-}</code></pre><div class="diagnostics"><div class="diagnostic"><span>Approved interfaces</span><strong>3 of 3</strong></div><div class="diagnostic"><span>External effects</span><strong>None</strong></div><div class="diagnostic"><span>Verification</span><strong>3 scenarios pass</strong></div></div></aside>
+}</code></pre><div class="diagnostics"><div class="diagnostic"><span>Approved interfaces</span><strong>3 of 3</strong></div><div class="diagnostic"><span>External effects</span><strong>None</strong></div><div class="diagnostic"><span>Verification</span><strong id="diagnostic-verification">3 scenarios pass</strong></div></div></aside>
 
   <script>
     const viewDetails = {
@@ -649,6 +653,16 @@
       document.getElementById("chat-proposal").scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
 
+    document.querySelectorAll("[data-voice-input]").forEach(button => button.addEventListener("click", () => {
+      const listening = button.getAttribute("aria-pressed") !== "true";
+      const input = button.closest("form").querySelector("input, textarea");
+      button.setAttribute("aria-pressed", String(listening));
+      button.setAttribute("aria-label", listening ? "Stop voice input" : "Start voice input");
+      if (!input.dataset.idlePlaceholder) input.dataset.idlePlaceholder = input.placeholder;
+      input.placeholder = listening ? "Listening… tap the voice button to stop" : input.dataset.idlePlaceholder;
+      if (listening) input.focus();
+    }));
+
     document.querySelectorAll("[data-tab]").forEach(tab => tab.addEventListener("click", () => {
       document.querySelectorAll("[data-tab]").forEach(candidate => candidate.setAttribute("aria-selected", String(candidate === tab)));
       document.querySelectorAll("[data-tab-panel]").forEach(panel => panel.classList.toggle("is-active", panel.dataset.tabPanel === tab.dataset.tab));
@@ -667,11 +681,53 @@
     });
     document.getElementById("close-drawer").addEventListener("click", closeDrawer);
     scrim.addEventListener("click", closeDrawer);
+    const installFeatureButton = document.getElementById("install-feature");
+
+    function showPendingVerification() {
+      const pending = document.querySelectorAll("#behavior-panel .scenario.is-new").length;
+      const total = document.querySelectorAll("#behavior-panel .scenario").length;
+      const count = document.getElementById("verification-count");
+      count.textContent = `${total} · ${pending} pending`;
+      count.className = "tag tag-amber";
+      document.getElementById("verification-heading").textContent = `${pending} behavior ${pending === 1 ? "needs" : "need"} verification`;
+      installFeatureButton.disabled = true;
+      installFeatureButton.textContent = "Verify before install";
+      const releaseState = document.getElementById("release-state");
+      releaseState.textContent = "Verification required";
+      releaseState.className = "tag tag-amber";
+      document.getElementById("diagnostic-verification").textContent = `${total - pending} pass · ${pending} pending`;
+    }
+
     document.getElementById("verify-feature").addEventListener("click", () => {
+      const pendingScenarios = [...document.querySelectorAll("#behavior-panel .scenario.is-new")];
+      pendingScenarios.forEach(scenario => {
+        scenario.classList.remove("is-new");
+        scenario.querySelector(".scenario-head .tag").className = "tag tag-green";
+        scenario.querySelector(".scenario-head .tag").textContent = "Verified";
+      });
+      document.querySelectorAll("#verification-list .verification-row.is-pending").forEach(row => {
+        row.classList.remove("is-pending");
+        row.querySelector(".check").textContent = "✓";
+        row.querySelector("small").textContent = "Generated assertions · just now";
+        row.querySelector(".tag").className = "tag tag-green";
+        row.querySelector(".tag").textContent = "Passed";
+      });
+      const total = document.querySelectorAll("#behavior-panel .scenario").length;
+      const count = document.getElementById("verification-count");
+      count.textContent = String(total);
+      count.className = "tag tag-green";
+      document.getElementById("verification-heading").textContent = "All behavior is currently verified";
+      installFeatureButton.disabled = false;
+      installFeatureButton.textContent = "Install release";
+      const releaseState = document.getElementById("release-state");
+      releaseState.textContent = "Current";
+      releaseState.className = "tag tag-violet";
+      document.getElementById("diagnostic-verification").textContent = `${total} scenarios pass`;
+      document.getElementById("assistant-ack").textContent = `Verification passed for all ${total} living scenarios. The draft release can now be installed.`;
       document.querySelector('[data-tab="verification"]').click();
     });
-    document.getElementById("install-feature").addEventListener("click", () => {
-      document.querySelector('[data-tab="releases"]').click();
+    installFeatureButton.addEventListener("click", () => {
+      if (!installFeatureButton.disabled) document.querySelector('[data-tab="releases"]').click();
     });
     function addStudioScenario(title, requirement) {
       const scenarioNumber = document.querySelectorAll("#behavior-panel .scenario").length + 1;
@@ -696,6 +752,23 @@
       });
       scenario.append(head, steps);
       document.getElementById("scenario-insert-point").before(scenario);
+      const verificationRow = document.createElement("div");
+      verificationRow.className = "verification-row is-pending";
+      const check = document.createElement("span");
+      check.className = "check";
+      check.textContent = "!";
+      const evidence = document.createElement("span");
+      const evidenceTitle = document.createElement("strong");
+      evidenceTitle.textContent = title;
+      const evidenceDetail = document.createElement("small");
+      evidenceDetail.textContent = "Living scenario changed · not run";
+      evidence.append(evidenceTitle, evidenceDetail);
+      const verificationStatus = document.createElement("span");
+      verificationStatus.className = "tag tag-amber";
+      verificationStatus.textContent = "Pending";
+      verificationRow.append(check, evidence, verificationStatus);
+      document.getElementById("verification-list").append(verificationRow);
+      showPendingVerification();
       document.getElementById("assistant-ack").textContent = `Added “${title}” to the living behavior document. It is saved as a draft and needs verification.`;
       scenario.scrollIntoView({ behavior: "smooth", block: "center" });
     }
