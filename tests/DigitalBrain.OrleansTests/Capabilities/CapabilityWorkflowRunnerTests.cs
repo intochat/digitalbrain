@@ -39,8 +39,8 @@ public sealed class CapabilityWorkflowRunnerTests
         var result = await runner.ExecuteAsync(Request("list my latest messages\nfrom Anna\r\nthis week"));
 
         Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Capability?.CapabilityId);
-        Assert.Equal("list my latest messages from Anna  this week", resolver.LastRequest?.Prompt);
-        Assert.Equal("list my latest messages from Anna  this week", _parameterModel.LastRequest?.Prompt);
+        Assert.Equal("list my latest messages from Anna this week", resolver.LastRequest?.Prompt);
+        Assert.Equal("list my latest messages from Anna this week", _parameterModel.LastRequest?.Prompt);
     }
 
     [Fact]
@@ -58,16 +58,40 @@ public sealed class CapabilityWorkflowRunnerTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_creates_a_control_character_free_draft_goal_for_a_multi_line_prompt()
+    public async Task ExecuteAsync_creates_a_bounded_control_character_free_draft_goal_for_a_multi_line_over_length_prompt()
     {
         var hub = new RecordingFeatureHubGrain();
         var runner = Runner(new RecordingCapabilityResolver(Missing()), new RecordingFeatureGrainResolver(hub));
+        var prompt = "Research Acme\r\nand create a text file about " + new string('x', 5000);
+        var expectedGoal = ("Research Acme and create a text file about " + new string('x', 5000))[..4096];
 
-        var result = await runner.ExecuteAsync(Request("Research Acme\r\nand create a text file", Owner));
+        var result = await runner.ExecuteAsync(Request(prompt, Owner));
 
         Assert.Equal(1, hub.CreateDraftCallCount);
-        Assert.Equal("Research Acme  and create a text file", hub.LastCreateDraftRequest?.Goal);
+        Assert.Equal(expectedGoal, hub.LastCreateDraftRequest?.Goal);
+        Assert.False(hub.LastCreateDraftRequest?.Goal.Any(char.IsControl));
         Assert.Equal("Open Studio", result.Proposal?.Label);
+    }
+
+    public static TheoryData<string> DraftCreationFailureKinds => new("draft-limit-exceeded", "draft-goal-conflict", "grain-boundary-invalid-operation");
+
+    [Theory]
+    [MemberData(nameof(DraftCreationFailureKinds))]
+    public async Task ExecuteAsync_degrades_to_the_no_proposal_missing_result_when_draft_creation_fails(string failureKind)
+    {
+        Exception draftCreationFailure = failureKind switch
+        {
+            "draft-limit-exceeded" => new FeatureLimitExceededException("An owner can have at most 100 feature drafts."),
+            "draft-goal-conflict" => new FeatureConcurrencyException("The operation id is already bound to a different feature draft goal."),
+            _ => new InvalidOperationException("An owner can have at most 100 feature drafts.")
+        };
+        var hub = new ThrowingFeatureHubGrain(draftCreationFailure);
+        var runner = Runner(new RecordingCapabilityResolver(Missing()), new RecordingFeatureGrainResolver(hub));
+
+        var result = await runner.ExecuteAsync(Request("Research Acme and create a text file", Owner));
+
+        Assert.Equal(CapabilityResolutionKind.Missing, result.Capability?.Kind);
+        Assert.Null(result.Proposal);
     }
 
     [Fact]
@@ -214,6 +238,24 @@ public sealed class CapabilityWorkflowRunnerTests
             _state = transition.State;
             return Task.FromResult(transition.Draft);
         }
+
+        public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
+        public Task<FeatureFanOutResult> PublishAsync(FeatureInput input) => throw new NotSupportedException();
+        public Task<FeatureHubSnapshot> ReadAsync() => throw new NotSupportedException();
+        public Task<FeatureApprovalSnapshot> ProposeAsync(FeatureReleaseProposal proposal, long expectedRevision) => throw new NotSupportedException();
+        public Task<FeatureApprovalSnapshot> DecideAsync(FeatureApprovalDecision decision, long expectedRevision) => throw new NotSupportedException();
+        public Task<FeatureAuthoritySnapshot> GrantAsync(FeatureGrantRequest request, long expectedRevision) => throw new NotSupportedException();
+        public Task<FeatureAuthoritySnapshot> InstallAsync(FeatureInstallationRegistration registration, long expectedRevision) => throw new NotSupportedException();
+        public Task RevokeAsync(FeatureGrantRevocation revocation, long expectedRevision) => throw new NotSupportedException();
+        public Task PauseInstallationAsync(FeatureInstallationId installationId, string reason, long expectedRevision) => throw new NotSupportedException();
+        public Task ResumeInstallationAsync(FeatureInstallationId installationId, long expectedRevision) => throw new NotSupportedException();
+        public Task<FeatureAuthoritySnapshot> RollbackInstallationAsync(FeatureInstallationId installationId, long expectedRevision) => throw new NotSupportedException();
+        public Task<FeatureGrantSnapshot?> ReadGrantAsync(FeatureGrantLookup lookup) => throw new NotSupportedException();
+    }
+
+    private sealed class ThrowingFeatureHubGrain(Exception exception) : IFeatureHubGrain
+    {
+        public Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request) => throw exception;
 
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
         public Task<FeatureFanOutResult> PublishAsync(FeatureInput input) => throw new NotSupportedException();

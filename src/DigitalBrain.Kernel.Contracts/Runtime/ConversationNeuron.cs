@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
@@ -1216,13 +1217,16 @@ public static class ConversationTransitions
             !double.IsFinite(receipt.Confidence) || receipt.Confidence < 0 || receipt.Confidence > 1)
             throw new ArgumentException("A capability resolution receipt must be bounded and well-formed.", nameof(receipt));
     }
+    private static readonly Regex FeatureProposalRoute = new(
+        "^/features/proposals/proposal-[0-9a-f]{32}$",
+        RegexOptions.Compiled);
     private static void ValidateFeatureProposal(FeatureDraftReference? proposal)
     {
         if (proposal is null) return;
         if (string.IsNullOrWhiteSpace(proposal.ProposalId) || proposal.ProposalId.Length > 128 || proposal.ProposalId.Any(char.IsControl) ||
             string.IsNullOrWhiteSpace(proposal.Label) || proposal.Label.Length > 80 || proposal.Label.Any(char.IsControl) ||
             string.IsNullOrWhiteSpace(proposal.Route) || proposal.Route.Length > 256 || proposal.Route.Any(char.IsControl) ||
-            !proposal.Route.StartsWith("/features/proposals/proposal-", StringComparison.Ordinal))
+            !FeatureProposalRoute.IsMatch(proposal.Route))
             throw new ArgumentException("A feature draft reference must be bounded and route to a proposal.", nameof(proposal));
     }
 }

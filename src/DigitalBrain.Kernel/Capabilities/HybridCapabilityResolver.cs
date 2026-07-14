@@ -34,14 +34,21 @@ internal sealed class HybridCapabilityResolver(
 
         var query = Normalize(request.Prompt);
         var documents = candidates.Select(SearchDocument).ToArray();
-        var generated = await embedder.GenerateAsync([request.Prompt, .. documents], cancellationToken: cancellationToken);
-        var queryVector = generated[0].Vector;
-        var vectorEnabled = queryVector.Span.IndexOfAnyExcept(0f) >= 0;
+        GeneratedEmbeddings<Embedding<float>>? generated;
+        try
+        {
+            generated = await embedder.GenerateAsync([request.Prompt, .. documents], cancellationToken: cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            generated = null;
+        }
+        var vectorEnabled = generated is not null && generated[0].Vector.Span.IndexOfAnyExcept(0f) >= 0;
         var ranked = candidates.Select((descriptor, index) => new RankedCapability(
                 descriptor,
                 Exact(query, descriptor),
-                Lexical(query, SearchDocument(descriptor)),
-                vectorEnabled ? Cosine(queryVector.Span, generated[index + 1].Vector.Span) : 0))
+                Lexical(query, documents[index]),
+                vectorEnabled ? Cosine(generated![0].Vector.Span, generated[index + 1].Vector.Span) : 0))
             .Select(x => x with
             {
                 Score = vectorEnabled
@@ -61,7 +68,7 @@ internal sealed class HybridCapabilityResolver(
     }
 
     internal static string SearchDocument(CapabilityDescriptor descriptor) =>
-        string.Join(' ', descriptor.Id, descriptor.Name);
+        string.Join(' ', [descriptor.Id, descriptor.Name, descriptor.Description, .. descriptor.Examples]);
 
     private static string Normalize(string value) => value.Trim().ToLowerInvariant();
 

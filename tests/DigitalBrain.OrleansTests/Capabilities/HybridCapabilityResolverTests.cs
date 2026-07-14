@@ -62,6 +62,36 @@ public sealed class HybridCapabilityResolverTests
         Assert.Equal(CapabilityResolutionKind.Ambiguous, result.Receipt.Kind);
     }
 
+    [Fact]
+    public async Task ResolveAsync_matches_the_assistant_answer_capability_via_its_pinned_example_phrase()
+    {
+        var result = await ResolverWithZeroVectors().ResolveAsync(Request("what can you do"));
+
+        Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
+        Assert.Equal(BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, result.Receipt.CapabilityId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_falls_back_to_deterministic_scoring_when_the_embedder_fails()
+    {
+        var resolver = new HybridCapabilityResolver(Catalog(), new ThrowingEmbeddingGenerator());
+
+        var result = await resolver.ResolveAsync(Request("read gmail messages", connections: ["google"]));
+
+        Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Receipt.CapabilityId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_rethrows_cancellation_for_the_callers_token_when_the_embedder_is_cancelled()
+    {
+        var resolver = new HybridCapabilityResolver(Catalog(), new CancelingEmbeddingGenerator());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => resolver.ResolveAsync(Request("read gmail messages", connections: ["google"]), cancellation.Token));
+    }
+
     private static BuiltInCapabilityCatalog Catalog() =>
         new([new GoogleCapabilityDescriptorSource(), new SalesforceCapabilityDescriptorSource()]);
 
@@ -107,6 +137,32 @@ public sealed class HybridCapabilityResolverTests
                 .ToList();
             return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(embeddings));
         }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    private sealed class ThrowingEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
+    {
+        public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+            IEnumerable<string> values,
+            EmbeddingGenerationOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The embedding service is unavailable.");
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    private sealed class CancelingEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
+    {
+        public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+            IEnumerable<string> values,
+            EmbeddingGenerationOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            throw new OperationCanceledException(cancellationToken);
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
 

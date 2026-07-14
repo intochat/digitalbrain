@@ -36,7 +36,7 @@ internal sealed class BuiltInCapabilityCatalog : ICapabilityCatalog
             1,
             "Assistant answer",
             "Answers the user directly from the assistant's own reasoning without reading or changing any external system.",
-            ["Explain what a capability grant is.", "What time zone is Kyiv in?"],
+            ["Explain what a capability grant is.", "What time zone is Kyiv in?", "what can you do"],
             [],
             [],
             CapabilityOrigin.Platform,

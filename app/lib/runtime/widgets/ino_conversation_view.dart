@@ -733,10 +733,12 @@ class _CapabilityChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Text(
-              name,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: colors.onSecondaryContainer,
+            child: ExcludeSemantics(
+              child: Text(
+                name,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colors.onSecondaryContainer,
+                ),
               ),
             ),
           ),

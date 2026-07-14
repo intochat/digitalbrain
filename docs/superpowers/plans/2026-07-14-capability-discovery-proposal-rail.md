@@ -302,7 +302,7 @@ public async Task ResolveAsync_filters_missing_grants_before_scoring()
 }
 ```
 
-The shared `Request` helper must default grants and connections to empty `HashSet<string>(StringComparer.Ordinal)`. The fake generator must return configured vectors by exact input and `[0, 0]` otherwise. `Document(id)` returns the exact search document the resolver builds for that descriptor so the semantic test configures the true embedding input.
+The shared `Request` helper must default grants and connections to empty `HashSet<string>(StringComparer.Ordinal)`. The fake generator must return configured vectors by exact input and `[0, 0]` otherwise. `Document(id)` returns the exact search document the resolver builds for that descriptor — `id + name + description + examples`, joined deterministically — so the semantic test configures the true embedding input and paraphrased prompts that only overlap the description or examples still rank correctly.
 
 - [ ] **Step 2: Run the root suite and verify failure**
 
@@ -364,7 +364,9 @@ public sealed class HybridCapabilityResolver(
 }
 ```
 
-Implement `Normalize`, `SearchDocument`, `Exact`, `Lexical`, and `Cosine` as pure bounded helpers in the same file. Exact scoring returns `1` for a normalized capability ID, name, or complete example match, `0.8` when the prompt contains the normalized name, and `0` otherwise. Lexical scoring is Jaccard similarity over distinct lowercase letter/digit tokens. Cosine returns `0` for zero norms and clamps to `0..1`. `Missing`, `Ambiguous`, and `Match` must populate only safe descriptor metadata in the receipt.
+Implement `Normalize`, `SearchDocument`, `Exact`, `Lexical`, and `Cosine` as pure bounded helpers in the same file. `SearchDocument` joins `descriptor.Id`, `descriptor.Name`, `descriptor.Description`, and every entry in `descriptor.Examples` — deterministic and bounded because descriptors are fixed runtime data — so lexical scoring (and the embedding input) can match a paraphrase against the full intent, not just the id and name. Exact scoring returns `1` for a normalized capability ID, name, or complete example match, `0.8` when the prompt contains the normalized name, and `0` otherwise. Lexical scoring is Jaccard similarity over distinct lowercase letter/digit tokens computed against `SearchDocument`. Cosine returns `0` for zero norms and clamps to `0..1`. `Missing`, `Ambiguous`, and `Match` must populate only safe descriptor metadata in the receipt.
+
+The embedder call is wrapped: any exception other than an `OperationCanceledException` tied to the caller's `cancellationToken` is swallowed and resolution proceeds with `vectorEnabled = false`, falling back to deterministic exact and lexical scoring exactly as it does for an all-zero embedding. A cancellation that reflects the caller's own token is rethrown, never swallowed. This keeps an embedding-service outage from failing chat outright.
 
 - [ ] **Step 4: Register the catalog and resolver**
 
@@ -538,7 +540,7 @@ Append `[property: Id(9)] string[] Grants` to `AcceptedCommand` and `[property: 
 
 In `AgentFrameworkWorkflowRunner.ExecuteAsync`, resolve once with the bounded prompt before creating the agent. Do not hardcode a provider-composition constant in `src/DigitalBrain.Kernel/` — `RepositoryPolicyTests` forbids provider strings (gmail/google/salesforce) in tracked Kernel `.cs` files. Instead derive the composed connection set from the catalog itself: `catalog.Snapshot().SelectMany(descriptor => descriptor.RequiredConnections).ToHashSet(StringComparer.Ordinal)`. That set is exactly "connections declared by integrations registered in this host"; the Feature runtime plan replaces it with owner-scoped installed Feature contributions.
 
-Control flow: build `CapabilitySearchRequest(request.Prompt, grants, composedConnections, 3)` from the server-known grants and the catalog-derived connection set. Ambiguous returns the clarification result with the receipt and calls no model. Missing calls `CreateMissingCapabilityResultAsync` (Task 5 wires the grain; in this task it returns the missing receipt with bounded text). A match on `assistant.answer` continues through the existing `ChatClientAgent` path with the receipt attached. A match on any other capability calls `ICapabilityParameterModel.ExtractAsync` with the selected capability ID, then returns a bounded acknowledgment naming the capability with the receipt attached; Chat-side execution of integration capabilities arrives in the next plan.
+Control flow: normalize `request.Prompt` once at the runner boundary — replace every control character (including `\r\n`) with a single space, collapse runs of whitespace, trim, and truncate to 4096 characters — and build `CapabilitySearchRequest(normalizedPrompt, grants, composedConnections, 3)` from that normalized prompt, the server-known grants, and the catalog-derived connection set. The same normalized prompt feeds parameter extraction and the draft goal; only the general `ChatClientAgent` path keeps the original, un-normalized prompt (history and free-form answers must not be mangled). This lets multi-line or oversized prompts flow through the resolver (bounded to 4096 characters), extraction, and draft-creation boundaries (both also control-character-free) — each of which independently keeps enforcing its own bound as defense in depth — without the runner ever handing them unbounded or control-character-laden text. Ambiguous returns the clarification result with the receipt and calls no model. Missing calls `CreateMissingCapabilityResultAsync` (Task 5 wires the grain; in this task it returns the missing receipt with bounded text). A match on `assistant.answer` continues through the existing `ChatClientAgent` path with the receipt attached. A match on any other capability calls `ICapabilityParameterModel.ExtractAsync` with the selected capability ID and the normalized prompt, then returns a bounded acknowledgment naming the capability with the receipt attached; Chat-side execution of integration capabilities arrives in the next plan.
 
 - [ ] **Step 6: Run the root suite and verify it passes**
 
@@ -629,7 +631,7 @@ Add `[Alias("create-draft")] Task<FeatureDraftProposal> CreateDraftAsync(CreateF
 
 - [ ] **Step 5: Create drafts only for missing actionable work**
 
-In `AgentFrameworkWorkflowRunner.CreateMissingCapabilityResultAsync`, classify a missing request as ordinary conversation only when the prompt is a greeting, thanks, help request, or capability question covered by `assistant.answer`; those continue through the existing bounded Chat path. For any other missing request, call the owner-scoped `IFeatureHubGrain` idempotently (keyed by owner via the existing `IFeatureGrainResolver`) and return:
+In `AgentFrameworkWorkflowRunner.CreateMissingCapabilityResultAsync`, classify a missing request as ordinary conversation — routed through the existing bounded Chat path with the Missing receipt attached and no draft — when any of these deterministic, model-free rules match the normalized prompt: it equals one of a fixed exact-phrase list (greetings, thanks, help, and `assistant.answer`-shaped questions such as "what can you do"); or its trimmed form ends with `?`; or its first whitespace-delimited token (lowercased, with surrounding punctuation stripped so contractions like "What's" normalize to "whats") is one of a bounded interrogative set (what, whats, how, why, when, where, who, whos, which, is, are, am, can, could, should, would, will, do, does, did). This lets "how are you" and "What is the difference between TCP and UDP?" resolve as ordinary conversation without growing the exact-phrase list for every paraphrase. Everything else — including "Research Acme Corporation and create a text file with the findings.", which starts with "research" and carries no `?` — is actionable. For any actionable missing request, call the owner-scoped `IFeatureHubGrain` idempotently (keyed by owner via the existing `IFeatureGrainResolver`) with the normalized prompt as the goal, catching `InvalidOperationException` around the call — the type `FeatureHubGrain.Domain<T>` converts both `FeatureLimitExceededException` and `FeatureConcurrencyException` into at the grain boundary — so a draft-creation failure (draft cap reached, or a concurrent goal conflict for the same operation id) degrades to the same bounded no-proposal missing result instead of poisoning the operation, and return:
 
 ```csharp
 return new InoWorkflowResult(
@@ -798,7 +800,7 @@ In `ino_conversation_view.dart`:
 
 - change the semantic label from `INO conversation` to `Chat conversation`;
 - change `Ask INO` to `Chat`;
-- render a small capability chip above the operation status when a receipt has an ID and name;
+- render a small capability chip above the operation status only when a receipt is a `match` (not a `missing` closest-candidate) and has an ID and name, with the chip's text excluded from semantics so the surrounding label is not announced twice;
 - show at most the human name by default;
 - render an `Open Studio` button only for a validated proposal reference;
 - call `context.go(proposal.route)` for that internal route;

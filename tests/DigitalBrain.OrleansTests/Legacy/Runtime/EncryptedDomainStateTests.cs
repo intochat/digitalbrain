@@ -573,6 +573,101 @@ public sealed class EncryptedDomainStateTests
     }
 
     [Fact]
+    public void Terminal_completion_rejects_a_feature_proposal_route_that_deviates_from_the_anchored_shape()
+    {
+        var now = Utc(0);
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state,
+            state.Revision,
+            "command",
+            Hash("input"),
+            "operation",
+            "answer the request",
+            "request-command",
+            AcceptedOutbox("operation", now),
+            now);
+        var claim = ConversationTransitions.TryClaimOperation(
+            state,
+            state.Revision,
+            "operation",
+            "worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        var leaseFence = new ConversationLeaseFence("worker", claim.Operation!.Attempt);
+        const string validId = "proposal-0123456789abcdef0123456789abcdef";
+        const string validRoute = "/features/proposals/" + validId;
+        string[] deviantRoutes =
+        [
+            validRoute + "/extra",
+            validRoute + "?query=1",
+            "/features/proposals/proposal-0123456789ABCDEF0123456789ABCDEF",
+            "/features/proposals/proposal-0123456789abcdef0123456789abcde"
+        ];
+
+        foreach (var route in deviantRoutes)
+        {
+            var outboxId = "completed-operation-" + route.GetHashCode();
+            Assert.Throws<ArgumentException>(() => ConversationTransitions.CompleteWithAssistant(
+                claim.State,
+                claim.State.Revision,
+                "operation",
+                ConversationOperationStatus.Succeeded,
+                ConversationTerminalPolicy.NeverRetry,
+                null,
+                "The request completed.",
+                new ConversationOutboxEntry(outboxId, "surface-feed", [], now, null),
+                now,
+                leaseFence: leaseFence,
+                proposal: new FeatureDraftReference(validId, "Open Studio", route)));
+        }
+    }
+
+    [Fact]
+    public void Terminal_completion_accepts_the_exact_anchored_proposal_route_shape()
+    {
+        var now = Utc(0);
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state,
+            state.Revision,
+            "command",
+            Hash("input"),
+            "operation",
+            "answer the request",
+            "request-command",
+            AcceptedOutbox("operation", now),
+            now);
+        var claim = ConversationTransitions.TryClaimOperation(
+            state,
+            state.Revision,
+            "operation",
+            "worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        var leaseFence = new ConversationLeaseFence("worker", claim.Operation!.Attempt);
+        const string proposalId = "proposal-0123456789abcdef0123456789abcdef";
+
+        var completed = ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "The request completed.",
+            new ConversationOutboxEntry("completed-operation", "surface-feed", [], now, null),
+            now,
+            leaseFence: leaseFence,
+            proposal: new FeatureDraftReference(proposalId, "Open Studio", "/features/proposals/" + proposalId));
+
+        Assert.Contains(completed.Turns, turn =>
+            turn.OperationId == "operation" && turn.Kind == ConversationTurnKind.Assistant);
+    }
+
+    [Fact]
     public void Terminal_completion_rejects_out_of_bounds_capability_receipts()
     {
         CapabilityResolutionReceipt[] invalidReceipts =
