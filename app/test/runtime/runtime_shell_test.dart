@@ -419,6 +419,56 @@ void main() {
   );
 
   testWidgets(
+    'chat surface renders ambiguous capability choices from assistant text',
+    (tester) async {
+      final feed = _ShellFeedCall.open();
+      final transport = _ShellTransport(feed);
+      final runtime = _runtime(transport);
+
+      await tester.pumpWidget(
+        _host(
+          RuntimeShell(
+            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+            controller: runtime,
+          ),
+        ),
+      );
+      await _pumpUntil(tester, () => transport.watchStarted);
+      feed.add(
+        FeedSurfaceJson(
+          surfaceJsonString(
+            sequence: 1,
+            payload: inoConversationPayload(
+              messages: [
+                inoMessage(
+                  role: 'assistant',
+                  text:
+                      'A few capabilities could match this request: Read a Gmail message; List Gmail mailbox messages. Please choose one and ask again.',
+                  state: 'succeeded',
+                ),
+              ],
+              operation: inoOperation(state: 'succeeded'),
+            ),
+            actions: [testInoActionJson()],
+          ),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.textContaining('Read a Gmail message').evaluate().isNotEmpty,
+      );
+
+      expect(find.textContaining('Read a Gmail message'), findsOneWidget);
+      expect(
+        find.textContaining('List Gmail mailbox messages'),
+        findsOneWidget,
+      );
+
+      await runtime.stop();
+    },
+  );
+
+  testWidgets(
     'chat surface hides the capability chip and Open Studio without metadata',
     (tester) async {
       final feed = _ShellFeedCall.open();

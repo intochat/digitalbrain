@@ -2,7 +2,13 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 namespace DigitalBrain.Kernel.Capabilities;
 
-internal sealed record RankedCapability(CapabilityDescriptor Descriptor, double Exact, double Lexical, double Vector)
+internal sealed record RankedCapability(
+    CapabilityDescriptor Descriptor,
+    double Exact,
+    double Lexical,
+    double LexicalFallback,
+    int LexicalMatches,
+    double Vector)
 {
     public double Score { get; init; }
 }
@@ -12,8 +18,10 @@ internal sealed class HybridCapabilityResolver(
     IEmbeddingGenerator<string, Embedding<float>> embedder) : ICapabilityResolver
 {
     internal const double MatchThreshold = 0.68;
+    internal const double LexicalFallbackThreshold = 0.75;
     internal const double AmbiguityMargin = 0.06;
     internal const int MaximumPromptLength = 4096;
+    internal const int MinimumLexicalFallbackMatches = 3;
     private static readonly Regex TokenPattern = new("[a-z0-9]+", RegexOptions.Compiled);
 
     public async Task<CapabilityResolution> ResolveAsync(
@@ -23,6 +31,7 @@ internal sealed class HybridCapabilityResolver(
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Prompt);
         if (request.Prompt.Length > MaximumPromptLength || request.MaximumMatches is < 1 or > 5)
             throw new ArgumentException("Capability search bounds are invalid.", nameof(request));
+        cancellationToken.ThrowIfCancellationRequested();
 
         var candidates = catalog.Snapshot()
             .Where(x => x.Available)
@@ -34,6 +43,33 @@ internal sealed class HybridCapabilityResolver(
 
         var query = Normalize(request.Prompt);
         var documents = candidates.Select(SearchDocument).ToArray();
+        var ranked = candidates.Select((descriptor, index) =>
+            {
+                var lexicalFallback = LexicalFallback(query, descriptor, documents[index]);
+                return new RankedCapability(
+                    descriptor,
+                    Exact(query, descriptor),
+                    Lexical(query, documents[index]),
+                    lexicalFallback.Score,
+                    lexicalFallback.Matches,
+                    0);
+            })
+            .ToArray();
+
+        var exactRanked = ranked
+            .OrderByDescending(x => x.Exact)
+            .ThenByDescending(x => x.LexicalFallback)
+            .ThenBy(x => x.Descriptor.Id, StringComparer.Ordinal)
+            .Select(x => x with { Score = x.Exact })
+            .ToArray();
+        if (exactRanked[0].Exact == 1)
+        {
+            var reportedExact = exactRanked.Take(request.MaximumMatches).ToArray();
+            if (exactRanked.Length > 1 && exactRanked[1].Exact == 1)
+                return Ambiguous(reportedExact);
+            return Match(exactRanked[0], reportedExact);
+        }
+
         GeneratedEmbeddings<Embedding<float>>? generated;
         try
         {
@@ -43,26 +79,42 @@ internal sealed class HybridCapabilityResolver(
         {
             generated = null;
         }
-        var vectorEnabled = generated is not null && generated[0].Vector.Span.IndexOfAnyExcept(0f) >= 0;
-        var ranked = candidates.Select((descriptor, index) => new RankedCapability(
-                descriptor,
-                Exact(query, descriptor),
-                Lexical(query, documents[index]),
-                vectorEnabled ? Cosine(generated![0].Vector.Span, generated[index + 1].Vector.Span) : 0))
+        var vectorEnabled = HasUsableVectors(generated, documents.Length + 1);
+
+        if (!vectorEnabled)
+        {
+            var lexicalRanked = ranked
+                .OrderByDescending(x => x.LexicalFallback)
+                .ThenByDescending(x => x.LexicalMatches)
+                .ThenBy(x => x.Descriptor.Id, StringComparer.Ordinal)
+                .Select(x => x with { Score = x.LexicalFallback })
+                .ToArray();
+            var reportedLexical = lexicalRanked.Take(request.MaximumMatches).ToArray();
+            if (!IsStrongLexicalMatch(lexicalRanked[0])) return Missing(reportedLexical);
+            if (lexicalRanked.Length > 1
+                && IsStrongLexicalMatch(lexicalRanked[1])
+                && lexicalRanked[0].Score - lexicalRanked[1].Score < AmbiguityMargin)
+                return Ambiguous(reportedLexical);
+            return Match(lexicalRanked[0], reportedLexical);
+        }
+
+        var semanticRanked = ranked
+            .Select((x, index) => x with
+            {
+                Vector = Cosine(generated![0].Vector.Span, generated[index + 1].Vector.Span)
+            })
             .Select(x => x with
             {
-                Score = vectorEnabled
-                    ? Math.Max(0.65 * x.Exact + 0.35 * x.Lexical, 0.70 * x.Vector + 0.30 * x.Lexical)
-                    : 0.65 * x.Exact + 0.35 * x.Lexical
+                Score = Math.Max(0.65 * x.Exact + 0.35 * x.Lexical, 0.70 * x.Vector + 0.30 * x.Lexical)
             })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Descriptor.Id, StringComparer.Ordinal)
             .ToArray();
 
-        var reported = ranked.Take(request.MaximumMatches).ToArray();
-        var first = ranked[0];
+        var reported = semanticRanked.Take(request.MaximumMatches).ToArray();
+        var first = semanticRanked[0];
         if (first.Score < MatchThreshold) return Missing(reported);
-        if (ranked.Length > 1 && first.Score - ranked[1].Score < AmbiguityMargin)
+        if (semanticRanked.Length > 1 && first.Score - semanticRanked[1].Score < AmbiguityMargin)
             return Ambiguous(reported);
         return Match(first, reported);
     }
@@ -90,6 +142,32 @@ internal sealed class HybridCapabilityResolver(
         var intersection = left.Intersect(right).Count();
         var union = left.Count + right.Count - intersection;
         return union == 0 ? 0 : (double)intersection / union;
+    }
+
+    private static (double Score, int Matches) LexicalFallback(
+        string query,
+        CapabilityDescriptor descriptor,
+        string document)
+    {
+        var requested = Tokenize(query);
+        if (requested.Count == 0) return (0, 0);
+        var nameMatches = requested.Intersect(Tokenize(descriptor.Name)).Count();
+        var documentMatches = requested.Intersect(Tokenize(document)).Count();
+        var nameCoverage = (double)nameMatches / requested.Count;
+        var documentCoverage = (double)documentMatches / requested.Count;
+        return (0.8 * nameCoverage + 0.2 * documentCoverage, nameMatches);
+    }
+
+    private static bool IsStrongLexicalMatch(RankedCapability ranked) =>
+        ranked.LexicalMatches >= MinimumLexicalFallbackMatches
+        && ranked.LexicalFallback >= LexicalFallbackThreshold;
+
+    private static bool HasUsableVectors(GeneratedEmbeddings<Embedding<float>>? generated, int expectedCount)
+    {
+        if (generated is null || generated.Count != expectedCount || generated[0].Vector.Length == 0) return false;
+        var dimensions = generated[0].Vector.Length;
+        return generated[0].Vector.Span.IndexOfAnyExcept(0f) >= 0
+            && generated.All(embedding => embedding.Vector.Length == dimensions);
     }
 
     private static HashSet<string> Tokenize(string value) =>

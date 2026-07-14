@@ -28,10 +28,10 @@ public sealed class HybridCapabilityResolverTests
     [Fact]
     public async Task ResolveAsync_falls_back_to_exact_and_lexical_scoring_for_zero_vectors()
     {
-        var result = await ResolverWithZeroVectors().ResolveAsync(Request("list gmail mailbox messages", connections: ["google"]));
+        var result = await ResolverWithZeroVectors().ResolveAsync(Request("read gmail messages", connections: ["google"]));
 
         Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
-        Assert.Equal(GoogleCapabilityIds.GmailMailboxRead, result.Receipt.CapabilityId);
+        Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Receipt.CapabilityId);
     }
 
     [Fact]
@@ -71,6 +71,29 @@ public sealed class HybridCapabilityResolverTests
         Assert.Equal(BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, result.Receipt.CapabilityId);
     }
 
+    [Theory]
+    [InlineData("assistant.answer")]
+    [InlineData("Assistant answer")]
+    public async Task ResolveAsync_matches_exact_capability_identifiers_and_names_without_embeddings(string prompt)
+    {
+        var result = await ResolverWithZeroVectors().ResolveAsync(Request(prompt));
+
+        Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
+        Assert.Equal(BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, result.Receipt.CapabilityId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_does_not_call_embeddings_for_an_exact_match()
+    {
+        var embedder = new ThrowingEmbeddingGenerator();
+        var resolver = new HybridCapabilityResolver(Catalog(), embedder);
+
+        var result = await resolver.ResolveAsync(Request("assistant.answer"));
+
+        Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
+        Assert.Equal(0, embedder.CallCount);
+    }
+
     [Fact]
     public async Task ResolveAsync_falls_back_to_deterministic_scoring_when_the_embedder_fails()
     {
@@ -78,7 +101,16 @@ public sealed class HybridCapabilityResolverTests
 
         var result = await resolver.ResolveAsync(Request("read gmail messages", connections: ["google"]));
 
+        Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
         Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Receipt.CapabilityId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_keeps_weak_lexical_overlap_missing_without_embeddings()
+    {
+        var result = await ResolverWithZeroVectors().ResolveAsync(Request("read messages", connections: ["google"]));
+
+        Assert.Equal(CapabilityResolutionKind.Missing, result.Receipt.Kind);
     }
 
     [Fact]
@@ -145,11 +177,16 @@ public sealed class HybridCapabilityResolverTests
 
     private sealed class ThrowingEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
     {
+        public int CallCount { get; private set; }
+
         public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
             IEnumerable<string> values,
             EmbeddingGenerationOptions? options = null,
-            CancellationToken cancellationToken = default) =>
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
             throw new InvalidOperationException("The embedding service is unavailable.");
+        }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
 

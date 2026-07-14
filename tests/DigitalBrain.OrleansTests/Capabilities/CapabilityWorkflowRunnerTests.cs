@@ -97,12 +97,20 @@ public sealed class CapabilityWorkflowRunnerTests
     [Fact]
     public async Task ExecuteAsync_returns_clarification_for_ambiguous_capabilities()
     {
-        var runner = Runner(new RecordingCapabilityResolver(Ambiguous(GoogleCapabilityIds.GmailMessageRead, GoogleCapabilityIds.GmailMailboxRead)));
+        var runner = Runner(new RecordingCapabilityResolver(Ambiguous(
+            (GoogleCapabilityIds.GmailMessageRead, "Read a Gmail message"),
+            (GoogleCapabilityIds.GmailMailboxRead, "List Gmail mailbox messages"),
+            ("memory.recall", "Recall remembered facts"),
+            ("extra.capability", "Extra capability"))));
 
         var result = await runner.ExecuteAsync(Request("show my mail"));
 
         Assert.Equal(CapabilityResolutionKind.Ambiguous, result.Capability?.Kind);
         Assert.Contains("choose", result.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Read a Gmail message", result.Text, StringComparison.Ordinal);
+        Assert.Contains("List Gmail mailbox messages", result.Text, StringComparison.Ordinal);
+        Assert.Contains("Recall remembered facts", result.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Extra capability", result.Text, StringComparison.Ordinal);
         Assert.Equal(0, _parameterModel.CallCount);
         Assert.Equal(0, _chat.CallCount);
     }
@@ -147,6 +155,54 @@ public sealed class CapabilityWorkflowRunnerTests
 
         Assert.Equal(2, hub.CreateDraftCallCount);
         Assert.Equal(first.Proposal?.ProposalId, second.Proposal?.ProposalId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_creates_one_durable_draft_for_a_repeated_polite_action_request()
+    {
+        var hub = new RecordingFeatureHubGrain();
+        var runner = Runner(new RecordingCapabilityResolver(Missing()), new RecordingFeatureGrainResolver(hub));
+        var request = Request("Can you send an email to Alice?", Owner);
+
+        var first = await runner.ExecuteAsync(request);
+        var second = await runner.ExecuteAsync(request);
+
+        Assert.Equal(CapabilityResolutionKind.Missing, first.Capability?.Kind);
+        Assert.Equal(first.Proposal?.ProposalId, second.Proposal?.ProposalId);
+        Assert.Equal(1, hub.DraftCount);
+        Assert.Equal(0, _chat.CallCount);
+        Assert.Equal(0, _parameterModel.CallCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_returns_bounded_missing_for_a_polite_action_request_without_owner_scope()
+    {
+        var runner = Runner(new RecordingCapabilityResolver(Missing()));
+
+        var result = await runner.ExecuteAsync(Request("Could you research Acme and create a file?"));
+
+        Assert.Equal(CapabilityResolutionKind.Missing, result.Capability?.Kind);
+        Assert.Null(result.Proposal);
+        Assert.Equal("I don't have a capability for that request yet.", result.Text);
+        Assert.Equal(0, _chat.CallCount);
+        Assert.Equal(0, _parameterModel.CallCount);
+    }
+
+    [Theory]
+    [InlineData("What is the difference between TCP and UDP?")]
+    [InlineData("Can you explain TCP congestion control?")]
+    public async Task ExecuteAsync_keeps_informational_questions_in_general_chat(string prompt)
+    {
+        var hub = new RecordingFeatureHubGrain();
+        var runner = Runner(new RecordingCapabilityResolver(Missing()), new RecordingFeatureGrainResolver(hub));
+
+        var result = await runner.ExecuteAsync(Request(prompt, Owner));
+
+        Assert.Equal(CapabilityResolutionKind.Missing, result.Capability?.Kind);
+        Assert.Null(result.Proposal);
+        Assert.Equal(1, _chat.CallCount);
+        Assert.Equal(0, _parameterModel.CallCount);
+        Assert.Equal(0, hub.DraftCount);
     }
 
     [Fact]
@@ -201,10 +257,25 @@ public sealed class CapabilityWorkflowRunnerTests
         new CapabilityDescriptor(capabilityId, 1, name, name, [], [], [], CapabilityOrigin.Integration, CapabilityOperationKind.Query, true),
         []);
 
-    private static CapabilityResolution Ambiguous(params string[] candidateIds) => new(
-        new CapabilityResolutionReceipt(CapabilityResolutionKind.Ambiguous, null, null, candidateIds, 0.5),
+    private static CapabilityResolution Ambiguous(params (string Id, string Name)[] candidates) => new(
+        new CapabilityResolutionReceipt(
+            CapabilityResolutionKind.Ambiguous,
+            null,
+            null,
+            candidates.Select(static candidate => candidate.Id).ToArray(),
+            0.5),
         null,
-        []);
+        candidates.Select(static candidate => new CapabilityDescriptor(
+            candidate.Id,
+            1,
+            candidate.Name,
+            candidate.Name,
+            [],
+            [],
+            [],
+            CapabilityOrigin.Integration,
+            CapabilityOperationKind.Query,
+            true)).ToArray());
 
     private static CapabilityResolution Missing() => new(
         new CapabilityResolutionReceipt(CapabilityResolutionKind.Missing, null, null, [], 0),
@@ -228,6 +299,7 @@ public sealed class CapabilityWorkflowRunnerTests
     {
         private FeatureHubState _state = FeatureHubState.Empty;
         public int CreateDraftCallCount { get; private set; }
+        public int DraftCount => (_state.Drafts ?? []).Length;
         public CreateFeatureDraft? LastCreateDraftRequest { get; private set; }
 
         public Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request)

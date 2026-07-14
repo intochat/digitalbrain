@@ -13,6 +13,7 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
 {
     private const string RunnerName = "agent-framework";
     private const int MaximumCapabilityMatches = 3;
+    private const int MaximumCandidateNameLength = 80;
     private static readonly int MaximumNormalizedPromptLength = Math.Min(
         HybridCapabilityResolver.MaximumPromptLength,
         Math.Min(CapabilityParameterRequest.MaximumPromptLength, FeatureLimits.DraftGoalCharacters));
@@ -32,6 +33,15 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
     {
         "what", "whats", "how", "why", "when", "where", "who", "whos", "which",
         "is", "are", "am", "can", "could", "should", "would", "will", "do", "does", "did"
+    };
+    private static readonly HashSet<string> PoliteRequestLeadWords = new(StringComparer.Ordinal)
+    {
+        "can", "could", "would", "will"
+    };
+    private static readonly HashSet<string> ActionLeadWords = new(StringComparer.Ordinal)
+    {
+        "book", "buy", "cancel", "change", "create", "delete", "download", "order", "pay", "post",
+        "publish", "remember", "research", "run", "save", "schedule", "send", "submit", "update", "upload", "write"
     };
     private static readonly Regex ControlCharacters = new(@"\p{Cc}", RegexOptions.Compiled);
     private static readonly Regex WhitespaceRun = new(@"\s+", RegexOptions.Compiled);
@@ -58,10 +68,7 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
             cancellationToken).ConfigureAwait(false);
         return resolution.Receipt.Kind switch
         {
-            CapabilityResolutionKind.Ambiguous => new InoWorkflowResult(
-                "A few capabilities could match this request. Please choose one and ask again.",
-                workflow,
-                Capability: resolution.Receipt),
+            CapabilityResolutionKind.Ambiguous => AmbiguousResult(workflow, resolution),
             CapabilityResolutionKind.Missing => await CreateMissingCapabilityResultAsync(request, normalizedPrompt, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
             CapabilityResolutionKind.Match when !string.Equals(resolution.Receipt.CapabilityId, BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, StringComparison.Ordinal) =>
                 await AcknowledgeSelectedCapabilityAsync(normalizedPrompt, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
@@ -73,6 +80,30 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         var withoutControlCharacters = ControlCharacters.Replace(prompt, " ");
         var collapsed = WhitespaceRun.Replace(withoutControlCharacters, " ").Trim();
         return collapsed.Length > MaximumNormalizedPromptLength ? collapsed[..MaximumNormalizedPromptLength] : collapsed;
+    }
+    private static InoWorkflowResult AmbiguousResult(
+        WorkflowReference workflow,
+        CapabilityResolution resolution)
+    {
+        var candidateIds = resolution.Receipt.CandidateIds
+            .Take(MaximumCapabilityMatches)
+            .ToHashSet(StringComparer.Ordinal);
+        var names = resolution.Candidates
+            .Where(candidate => candidateIds.Contains(candidate.Id))
+            .Take(MaximumCapabilityMatches)
+            .Select(static candidate => NormalizeCandidateName(candidate.Name))
+            .Where(static name => name.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var text = names.Length == 0
+            ? "A few capabilities could match this request. Please choose one and ask again."
+            : $"A few capabilities could match this request: {string.Join("; ", names)}. Please choose one and ask again.";
+        return new InoWorkflowResult(text, workflow, Capability: resolution.Receipt);
+    }
+    private static string NormalizeCandidateName(string name)
+    {
+        var normalized = WhitespaceRun.Replace(ControlCharacters.Replace(name, " "), " ").Trim();
+        return normalized.Length > MaximumCandidateNameLength ? normalized[..MaximumCandidateNameLength] : normalized;
     }
     private async Task<InoWorkflowResult> AcknowledgeSelectedCapabilityAsync(
         string normalizedPrompt,
@@ -119,9 +150,27 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
     private static bool IsConversationalPrompt(string prompt)
     {
         var trimmed = prompt.Trim();
+        if (IsActionablePrompt(trimmed)) return false;
         if (ConversationalPrompts.Contains(trimmed.TrimEnd('.', '!', '?').Trim().ToLowerInvariant())) return true;
         if (trimmed.EndsWith('?')) return true;
         return LeadWord(trimmed) is { } leadWord && InterrogativeLeadWords.Contains(leadWord);
+    }
+    private static bool IsActionablePrompt(string prompt)
+    {
+        var words = prompt
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(static token => new string(token.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant())
+            .Where(static token => token.Length > 0)
+            .ToArray();
+        if (words.Length == 0) return false;
+        var actionIndex = 0;
+        if (PoliteRequestLeadWords.Contains(words[0]))
+        {
+            actionIndex = 1;
+            if (actionIndex < words.Length && string.Equals(words[actionIndex], "you", StringComparison.Ordinal)) actionIndex++;
+            if (actionIndex < words.Length && string.Equals(words[actionIndex], "please", StringComparison.Ordinal)) actionIndex++;
+        }
+        return actionIndex < words.Length && ActionLeadWords.Contains(words[actionIndex]);
     }
     private static string? LeadWord(string trimmed)
     {

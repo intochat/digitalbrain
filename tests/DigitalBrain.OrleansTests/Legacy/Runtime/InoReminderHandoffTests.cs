@@ -160,17 +160,17 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
         Assert.True(claim.Acquired);
 
         var capability = new CapabilityResolutionReceipt(
-            CapabilityResolutionKind.Match,
-            "salesforce.record.read.v1",
-            "Read Salesforce records",
-            [],
+            CapabilityResolutionKind.Ambiguous,
+            null,
+            null,
+            ["salesforce.record.read.v1", "google.gmail.message.read.v1"],
             0.92);
         var proposal = new FeatureDraftReference(
             "proposal-0123456789abcdef0123456789abcdef",
             "Open Studio",
             "/features/proposals/proposal-0123456789abcdef0123456789abcdef");
         var terminalOutboxId = "terminal-receipt-handoff";
-        var assistantText = "I can help with that using Read Salesforce records.";
+        var assistantText = "A few capabilities could match this request: Read Salesforce records; Read a Gmail message. Please choose one and ask again.";
         var terminalProjection = OperationOutboxRecord.Create(
             terminalOutboxId,
             "operation-receipt-handoff",
@@ -230,6 +230,9 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
         Assert.Equal(capability.CandidateIds, operation.Capability.CandidateIds);
         Assert.Equal(capability.Confidence, operation.Capability.Confidence);
         Assert.Equal(proposal, operation.Proposal);
+        Assert.Contains(state.Turns, turn =>
+            string.Equals(turn.OperationId, "operation-receipt-handoff", StringComparison.Ordinal)
+            && string.Equals(turn.Text, assistantText, StringComparison.Ordinal));
     }
 
     [Fact]
