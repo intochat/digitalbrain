@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>DigitalBrain Capability OS — Product Vision</title>
+  <style>
+    :root {
+      --ink: #16201f;
+      --muted: #64706d;
+      --quiet: #8c9693;
+      --paper: #f7f6f1;
+      --panel: #ffffff;
+      --line: #e4e5de;
+      --line-strong: #ced2c8;
+      --rail: #172221;
+      --rail-soft: #23302e;
+      --mint: #b9f5d1;
+      --mint-strong: #1d8a57;
+      --violet: #7868d7;
+      --violet-soft: #efecff;
+      --coral: #ef775f;
+      --coral-soft: #fff0eb;
+      --amber: #c17a18;
+      --amber-soft: #fff5dc;
+      --shadow: 0 18px 54px rgba(20, 33, 31, .12);
+      --shadow-soft: 0 8px 28px rgba(20, 33, 31, .07);
+      --radius: 18px;
+      --radius-sm: 12px;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--paper);
+      text-rendering: optimizeLegibility;
+    }
+    button, input, textarea { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { color: inherit; }
+    a { color: inherit; }
+    :focus-visible { outline: 3px solid rgba(120, 104, 215, .35); outline-offset: 3px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+    .app { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+    .rail {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 30;
+      width: 248px;
+      display: flex;
+      flex-direction: column;
+      padding: 22px 14px 18px;
+      color: #edf3ef;
+      background:
+        radial-gradient(circle at 14% 8%, rgba(185, 245, 209, .12), transparent 29%),
+        var(--rail);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; padding: 4px 10px 22px; text-decoration: none; }
+    .brand-mark { width: 35px; height: 35px; position: relative; flex: none; }
+    .brand-mark span { position: absolute; display: block; border-radius: 50%; background: var(--mint); }
+    .brand-mark span:nth-child(1) { width: 22px; height: 22px; left: 0; top: 0; }
+    .brand-mark span:nth-child(2) { width: 17px; height: 17px; right: 0; bottom: 0; background: #a59bf0; }
+    .brand-mark span:nth-child(3) { width: 8px; height: 8px; right: 2px; top: 2px; background: var(--coral); }
+    .brand strong { display: block; font-size: 15px; letter-spacing: -.02em; }
+    .brand small { display: block; margin-top: 2px; color: #9daaa6; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+    .rail-label { padding: 8px 12px; color: #76847f; font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+    .nav-list { display: grid; gap: 4px; }
+    .nav-button {
+      width: 100%;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 11px;
+      color: #aeb8b4;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+      transition: background .18s ease, color .18s ease, transform .18s ease;
+    }
+    .nav-button:hover { color: #fff; background: rgba(255, 255, 255, .06); transform: translateX(2px); }
+    .nav-button[aria-current="page"] { color: #fff; background: var(--rail-soft); box-shadow: inset 3px 0 var(--mint); }
+    .nav-icon { width: 22px; text-align: center; font-size: 17px; line-height: 1; }
+    .nav-text { font-size: 13px; font-weight: 650; }
+    .nav-badge { margin-left: auto; min-width: 20px; height: 20px; display: grid; place-items: center; padding: 0 6px; border-radius: 999px; color: #15211e; background: var(--mint); font-size: 10px; font-weight: 800; }
+    .rail-spacer { flex: 1; }
+    .rail-status { margin: 14px 6px 0; padding: 13px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 13px; background: rgba(255, 255, 255, .035); }
+    .rail-status-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #bbc5c1; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #57d88f; box-shadow: 0 0 0 4px rgba(87, 216, 143, .12); }
+    .rail-status small { display: block; margin: 8px 0 0 16px; color: #788680; font-size: 10px; line-height: 1.45; }
+
+    .mobile-top, .mobile-nav { display: none; }
+    .content { grid-column: 2; min-width: 0; min-height: 100vh; }
+    .page-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      min-height: 84px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px clamp(24px, 4vw, 58px);
+      border-bottom: 1px solid rgba(206, 210, 200, .7);
+      background: rgba(247, 246, 241, .88);
+      backdrop-filter: blur(18px);
+    }
+    .eyebrow { margin: 0 0 5px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+    .page-title { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(25px, 3vw, 34px); font-weight: 500; letter-spacing: -.035em; line-height: 1; }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .icon-button, .button, .chip-button {
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      background: var(--panel);
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
+    }
+    .icon-button:hover, .button:hover, .chip-button:hover { transform: translateY(-1px); box-shadow: var(--shadow-soft); border-color: #bbc0b5; }
+    .icon-button { width: 39px; height: 39px; display: grid; place-items: center; }
+    .avatar { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 50%; color: white; background: linear-gradient(135deg, var(--violet), #443b8e); font-size: 12px; font-weight: 800; }
+    .workspace { width: min(1280px, 100%); margin: 0 auto; padding: 34px clamp(24px, 4vw, 58px) 136px; }
+    .view { display: none; animation: enter .28s ease both; }
+    .view.is-active { display: block; }
+    @keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    .hero-row { display: flex; justify-content: space-between; gap: 32px; align-items: flex-end; margin-bottom: 30px; }
+    .hero-copy { max-width: 720px; }
+    .hero-copy h2 { margin: 0 0 10px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(31px, 4vw, 49px); font-weight: 400; letter-spacing: -.045em; line-height: 1.04; }
+    .hero-copy p { max-width: 650px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
+    .date-block { min-width: 120px; text-align: right; color: var(--muted); }
+    .date-block strong { display: block; color: var(--ink); font-family: Georgia, serif; font-size: 32px; font-weight: 400; }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 30px 0 13px; }
+    .section-heading h3 { margin: 0; font-size: 13px; letter-spacing: -.01em; }
+    .section-heading a, .text-button { border: 0; padding: 0; color: var(--violet); background: none; font-size: 11px; font-weight: 750; text-decoration: none; cursor: pointer; }
+    .count { display: inline-grid; place-items: center; min-width: 21px; height: 21px; margin-left: 6px; border-radius: 999px; color: #795021; background: var(--amber-soft); font-size: 10px; }
+    .grid { display: grid; gap: 14px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: 0 1px 0 rgba(20, 33, 31, .02); }
+    .attention-card { display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 14px; padding: 17px 18px; }
+    .attention-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: var(--coral-soft); color: var(--coral); font-size: 18px; }
+    .attention-card h4, .activity-card h4, .feature-card h3 { margin: 0 0 5px; font-size: 14px; letter-spacing: -.015em; }
+    .attention-card p, .activity-card p, .feature-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .button { min-height: 39px; padding: 0 15px; font-size: 11px; font-weight: 750; }
+    .button-primary { border-color: var(--ink); color: white; background: var(--ink); }
+    .button-violet { border-color: var(--violet); color: white; background: var(--violet); }
+    .button-soft { border-color: transparent; color: #5549ad; background: var(--violet-soft); }
+    .button-danger-soft { border-color: transparent; color: #9e4736; background: var(--coral-soft); }
+    .activity-card { min-height: 174px; padding: 19px; position: relative; overflow: hidden; }
+    .activity-card::after { content: ""; position: absolute; width: 100px; height: 100px; right: -42px; bottom: -47px; border-radius: 50%; background: var(--violet-soft); }
+    .activity-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 27px; }
+    .tag { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 9px; border-radius: 999px; color: var(--muted); background: #f1f2ed; font-size: 10px; font-weight: 700; }
+    .tag-green { color: #206443; background: #e5f8ec; }
+    .tag-violet { color: #5549ad; background: var(--violet-soft); }
+    .tag-amber { color: #7d531b; background: var(--amber-soft); }
+    .tag-coral { color: #984432; background: var(--coral-soft); }
+    .progress { height: 5px; margin-top: 17px; border-radius: 999px; overflow: hidden; background: #eceee8; }
+    .progress span { display: block; height: 100%; border-radius: inherit; background: var(--violet); }
+    .activity-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; color: var(--quiet); font-size: 10px; }
+
+    .chat-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 24px; }
+    .chat-panel { min-height: calc(100vh - 180px); display: flex; flex-direction: column; padding: 26px; }
+    .chat-intro { max-width: 620px; margin: 2vh auto 24px; text-align: center; }
+    .chat-orb { width: 58px; height: 58px; display: grid; place-items: center; margin: 0 auto 19px; border-radius: 18px; color: #fff; background: linear-gradient(135deg, var(--rail), #344d48); box-shadow: 0 12px 25px rgba(23, 34, 33, .18); font-family: Georgia, serif; font-size: 24px; }
+    .chat-intro h2 { margin: 0 0 10px; font-family: Georgia, serif; font-size: 32px; font-weight: 400; letter-spacing: -.035em; }
+    .chat-intro p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .conversation { flex: 1; display: grid; align-content: end; gap: 14px; max-width: 720px; width: 100%; margin: 0 auto; }
+    .message { max-width: 86%; padding: 13px 15px; border-radius: 14px; font-size: 12px; line-height: 1.55; }
+    .message-user { justify-self: end; color: white; background: var(--ink); border-bottom-right-radius: 4px; }
+    .proposal { padding: 19px; border: 1px solid #dcd7ff; border-radius: 16px; background: linear-gradient(145deg, #fff, #faf9ff); box-shadow: var(--shadow-soft); }
+    .proposal[hidden] { display: none; }
+    .proposal-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .proposal h3 { margin: 9px 0 5px; font-family: Georgia, serif; font-size: 22px; font-weight: 400; letter-spacing: -.025em; }
+    .proposal p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .proposal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+    .proposal-item { padding: 11px; border-radius: 10px; background: #f5f4ef; }
+    .proposal-item span { display: block; margin-bottom: 4px; color: var(--quiet); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .proposal-item strong { font-size: 10px; }
+    .proposal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
+    .composer { width: 100%; max-width: 720px; margin: 20px auto 0; padding: 8px; display: flex; align-items: flex-end; gap: 8px; border: 1px solid var(--line-strong); border-radius: 16px; background: white; box-shadow: var(--shadow-soft); }
+    .composer textarea { flex: 1; min-height: 48px; max-height: 120px; resize: vertical; padding: 13px 10px; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12px; }
+    .composer button { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 12px; color: white; background: var(--ink); cursor: pointer; }
+    .context-panel { padding: 19px; align-self: start; }
+    .context-panel h3 { margin: 0 0 14px; font-size: 12px; }
+    .context-row { padding: 12px 0; border-top: 1px solid var(--line); }
+    .context-row span { display: block; margin-bottom: 4px; color: var(--quiet); font-size: 9px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    .context-row strong { font-size: 11px; }
+
+    .catalog-tools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+    .search-box { max-width: 420px; flex: 1; display: flex; align-items: center; gap: 9px; padding: 0 13px; border: 1px solid var(--line); border-radius: 11px; background: white; }
+    .search-box input { width: 100%; height: 42px; border: 0; outline: 0; background: transparent; font-size: 11px; }
+    .filter-row { display: flex; gap: 7px; flex-wrap: wrap; }
+    .chip-button { min-height: 34px; padding: 0 12px; font-size: 10px; font-weight: 700; }
+    .chip-button.is-selected { border-color: var(--ink); color: white; background: var(--ink); }
+    .feature-card { min-height: 260px; display: flex; flex-direction: column; padding: 20px; overflow: hidden; position: relative; }
+    .feature-card::before { content: ""; width: 78px; height: 78px; position: absolute; top: -37px; right: -29px; border-radius: 50%; background: var(--accent, var(--violet-soft)); }
+    .feature-symbol { width: 41px; height: 41px; display: grid; place-items: center; margin-bottom: 19px; border-radius: 12px; background: var(--accent, var(--violet-soft)); font-size: 18px; }
+    .feature-card h3 { font-size: 15px; }
+    .feature-card p { min-height: 56px; }
+    .feature-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 18px 0; padding: 13px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .feature-stat span { display: block; color: var(--quiet); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+    .feature-stat strong { display: block; margin-top: 4px; font-size: 10px; }
+    .feature-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+    .studio-shell { margin: -34px clamp(-58px, -4vw, -24px) -136px; min-height: calc(100vh - 84px); display: grid; grid-template-columns: minmax(0, 1fr) 300px; background: #f0efe9; }
+    .studio-main { padding: 28px clamp(24px, 4vw, 48px) 50px; min-width: 0; }
+    .studio-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+    .studio-toolbar h2 { margin: 3px 0 4px; font-family: Georgia, serif; font-size: 30px; font-weight: 400; letter-spacing: -.035em; }
+    .studio-toolbar p { margin: 0; color: var(--muted); font-size: 11px; }
+    .studio-actions { display: flex; gap: 8px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: -1px; position: relative; z-index: 2; }
+    .tab { min-height: 38px; padding: 0 15px; border: 1px solid transparent; border-bottom: 0; border-radius: 10px 10px 0 0; color: var(--muted); background: transparent; cursor: pointer; font-size: 10px; font-weight: 750; }
+    .tab[aria-selected="true"] { border-color: var(--line); color: var(--ink); background: white; }
+    .document { min-height: 590px; padding: clamp(28px, 5vw, 58px); border: 1px solid var(--line); border-radius: 0 var(--radius) var(--radius) var(--radius); background: white; box-shadow: var(--shadow-soft); }
+    .tab-panel { display: none; }
+    .tab-panel.is-active { display: block; }
+    .doc-kicker { margin: 0 0 14px; color: var(--violet); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .document h3 { max-width: 700px; margin: 0 0 12px; font-family: Georgia, serif; font-size: 37px; font-weight: 400; letter-spacing: -.04em; }
+    .document-lede { max-width: 690px; margin: 0 0 35px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .scenario { max-width: 760px; margin: 0 0 24px; padding: 20px; border-left: 3px solid var(--violet); border-radius: 0 12px 12px 0; background: #faf9ff; }
+    .scenario.is-new { animation: enter .3s ease both; border-left-color: var(--coral); }
+    .scenario-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+    .scenario h4 { margin: 0; font-size: 12px; }
+    .gherkin { display: grid; grid-template-columns: 54px 1fr; gap: 7px 12px; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; line-height: 1.65; }
+    .gherkin dt { color: var(--violet); font-weight: 800; }
+    .gherkin dd { margin: 0; color: #394441; }
+    .add-scenario { width: 100%; max-width: 760px; min-height: 50px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); background: transparent; cursor: pointer; font-size: 11px; }
+    .verification-list, .release-list { display: grid; gap: 11px; max-width: 780px; }
+    .verification-row, .release-row { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; }
+    .check { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: #1e6e47; background: #e4f7eb; font-size: 12px; }
+    .verification-row strong, .release-row strong { display: block; font-size: 11px; }
+    .verification-row small, .release-row small { color: var(--muted); font-size: 9px; }
+    .studio-assistant { padding: 25px 20px; border-left: 1px solid var(--line-strong); background: #fbfbf7; }
+    .assistant-head { display: flex; align-items: center; gap: 10px; margin-bottom: 23px; }
+    .assistant-head .chat-orb { width: 34px; height: 34px; margin: 0; border-radius: 10px; font-size: 15px; }
+    .assistant-head strong { display: block; font-size: 11px; }
+    .assistant-head small { color: var(--mint-strong); font-size: 9px; }
+    .assistant-message { padding: 13px; border-radius: 12px; background: white; box-shadow: 0 2px 12px rgba(20, 33, 31, .05); font-size: 10px; line-height: 1.55; }
+    .assistant-suggestions { display: grid; gap: 7px; margin: 13px 0; }
+    .assistant-suggestions button { padding: 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: transparent; cursor: pointer; text-align: left; font-size: 9px; }
+    .assistant-composer { margin-top: 18px; display: flex; gap: 7px; }
+    .assistant-composer input { min-width: 0; flex: 1; height: 37px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: white; font-size: 9px; }
+    .assistant-composer button { width: 37px; border: 0; border-radius: 9px; color: white; background: var(--ink); cursor: pointer; }
+
+    .connector-card, .run-card, .memory-card { padding: 18px; }
+    .connector-head, .run-head, .memory-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .connector-identity { display: flex; gap: 12px; align-items: center; }
+    .connector-logo { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 13px; background: #eef0eb; font-weight: 800; }
+    .connector-card h3, .run-card h3, .memory-card h3 { margin: 0 0 4px; font-size: 13px; }
+    .connector-card p, .run-card p, .memory-card p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .connector-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 17px; }
+    .mini-stat { padding: 10px; border-radius: 10px; background: #f4f5f0; }
+    .mini-stat span { display: block; color: var(--quiet); font-size: 8px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+    .mini-stat strong { display: block; margin-top: 4px; font-size: 10px; }
+    .run-list, .memory-list { display: grid; gap: 11px; }
+    .run-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 15px; }
+    .run-state { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: #f2f3ee; }
+    .run-meta, .memory-meta { display: flex; flex-wrap: wrap; gap: 7px 13px; margin-top: 9px; color: var(--quiet); font-size: 9px; }
+    .run-time { text-align: right; color: var(--quiet); font-size: 9px; }
+    .run-time strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: 10px; }
+    .memory-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; }
+    .memory-actions { display: flex; gap: 7px; align-items: flex-start; }
+    .governance-banner { display: flex; gap: 16px; align-items: center; margin-bottom: 20px; padding: 17px 19px; border: 1px solid #dcd7ff; border-radius: var(--radius); background: var(--violet-soft); }
+    .governance-banner .attention-icon { background: white; color: var(--violet); }
+    .governance-banner h3 { margin: 0 0 4px; font-size: 12px; }
+    .governance-banner p { margin: 0; color: #625b8c; font-size: 10px; line-height: 1.5; }
+
+    .command-dock {
+      position: fixed;
+      z-index: 26;
+      right: clamp(24px, 4vw, 58px);
+      bottom: 22px;
+      left: calc(248px + clamp(24px, 4vw, 58px));
+      max-width: 850px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px 9px 15px;
+      border: 1px solid rgba(206, 210, 200, .9);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(15px);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .command-dock.is-hidden { opacity: 0; pointer-events: none; transform: translateY(20px); }
+    .command-spark { color: var(--violet); font-size: 18px; }
+    .command-dock input { min-width: 0; flex: 1; height: 38px; border: 0; outline: 0; background: transparent; font-size: 11px; }
+    .command-hint { color: var(--quiet); font-size: 9px; white-space: nowrap; }
+    .command-dock button { width: 39px; height: 39px; border: 0; border-radius: 11px; color: white; background: var(--ink); cursor: pointer; }
+    .conversation-layer {
+      position: fixed;
+      z-index: 40;
+      right: 28px;
+      bottom: 86px;
+      width: min(430px, calc(100vw - 40px));
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: white;
+      box-shadow: var(--shadow);
+      transform-origin: bottom right;
+      animation: pop .2s ease both;
+    }
+    .conversation-layer[hidden] { display: none; }
+    @keyframes pop { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: none; } }
+    .layer-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .layer-head h3 { margin: 0 0 4px; font-family: Georgia, serif; font-size: 20px; font-weight: 400; }
+    .layer-head p { margin: 0; color: var(--muted); font-size: 10px; }
+    .close-button { width: 28px; height: 28px; border: 0; border-radius: 8px; background: #f1f2ed; cursor: pointer; }
+    .resolution { display: flex; gap: 10px; margin: 17px 0; padding: 12px; border-radius: 11px; background: var(--amber-soft); }
+    .resolution strong { display: block; font-size: 10px; }
+    .resolution span { display: block; margin-top: 3px; color: #866124; font-size: 9px; line-height: 1.4; }
+    .layer-proposal { padding: 14px; border: 1px solid #dcd7ff; border-radius: 12px; background: #fbfaff; }
+    .layer-proposal h4 { margin: 0 0 5px; font-size: 12px; }
+    .layer-proposal p { margin: 0 0 13px; color: var(--muted); font-size: 9px; line-height: 1.5; }
+    .layer-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    .technical-drawer {
+      position: fixed;
+      inset: 0 0 0 auto;
+      z-index: 60;
+      width: min(680px, 92vw);
+      padding: 24px;
+      color: #e9efec;
+      background: #111a19;
+      box-shadow: -20px 0 60px rgba(10, 16, 15, .25);
+      overflow: auto;
+      animation: slide .24s ease both;
+    }
+    .technical-drawer[hidden] { display: none; }
+    @keyframes slide { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .drawer-head { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
+    .drawer-head h2 { margin: 5px 0 6px; font-family: Georgia, serif; font-size: 28px; font-weight: 400; }
+    .drawer-head p { margin: 0; color: #8e9d98; font-size: 10px; }
+    .technical-drawer .close-button { color: white; background: #263330; }
+    .code-tabs { display: flex; gap: 7px; margin: 26px 0 12px; }
+    .code-tabs button { padding: 8px 11px; border: 1px solid #33423e; border-radius: 8px; color: #92a09c; background: transparent; cursor: pointer; font-size: 9px; }
+    .code-tabs button.is-selected { color: white; border-color: #60706b; background: #263330; }
+    pre { margin: 0; padding: 20px; overflow: auto; border: 1px solid #2d3a37; border-radius: 13px; color: #d9e4df; background: #0c1413; font: 11px/1.75 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .code-keyword { color: #bcaeff; }
+    .code-type { color: #83dfac; }
+    .code-string { color: #f0a18e; }
+    .diagnostics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 14px; }
+    .diagnostic { padding: 13px; border: 1px solid #2d3a37; border-radius: 10px; }
+    .diagnostic span { display: block; color: #7e8c88; font-size: 8px; text-transform: uppercase; letter-spacing: .09em; }
+    .diagnostic strong { display: block; margin-top: 5px; color: #dfe8e4; font-size: 10px; }
+    .scrim { position: fixed; inset: 0; z-index: 50; background: rgba(16, 24, 23, .34); backdrop-filter: blur(2px); }
+    .scrim[hidden] { display: none; }
+
+    @media (max-width: 1040px) {
+      .app { grid-template-columns: 208px minmax(0, 1fr); }
+      .rail { width: 208px; }
+      .content { grid-column: 2; }
+      .command-dock { left: calc(208px + 24px); }
+      .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .chat-layout { grid-template-columns: 1fr; }
+      .context-panel { display: none; }
+      .studio-shell { grid-template-columns: 1fr; }
+      .studio-assistant { border: 1px solid var(--line); border-radius: var(--radius); margin: 0 24px 30px; }
+    }
+
+    @media (max-width: 760px) {
+      .app { display: block; }
+      .rail { display: none; }
+      .content { min-height: 100vh; }
+      .mobile-top {
+        position: sticky;
+        top: 0;
+        z-index: 35;
+        height: 57px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        color: white;
+        background: var(--rail);
+      }
+      .mobile-top .brand { padding: 0; }
+      .mobile-top .brand-mark { width: 28px; height: 28px; }
+      .mobile-top .brand-mark span:nth-child(1) { width: 18px; height: 18px; }
+      .mobile-top .brand-mark span:nth-child(2) { width: 14px; height: 14px; }
+      .mobile-top .brand small { display: none; }
+      .mobile-top button { width: 36px; height: 36px; border: 0; border-radius: 10px; color: white; background: var(--rail-soft); }
+      .page-header { min-height: 72px; top: 57px; padding: 14px 18px; }
+      .page-title { font-size: 25px; }
+      .header-actions .icon-button { display: none; }
+      .workspace { padding: 24px 16px 160px; }
+      .hero-row { display: block; }
+      .date-block { display: none; }
+      .hero-copy h2 { font-size: 36px; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .attention-card { grid-template-columns: 40px 1fr; }
+      .attention-card .button { grid-column: 2; justify-self: start; }
+      .catalog-tools { align-items: stretch; flex-direction: column; }
+      .search-box { max-width: none; }
+      .proposal-grid, .connector-details, .diagnostics { grid-template-columns: 1fr; }
+      .chat-panel { min-height: auto; padding: 17px; }
+      .chat-intro { margin-top: 0; }
+      .studio-shell { margin: -24px -16px -160px; min-height: auto; }
+      .studio-main { padding: 20px 16px 28px; }
+      .studio-toolbar { display: block; }
+      .studio-actions { margin-top: 15px; flex-wrap: wrap; }
+      .tabs { overflow-x: auto; }
+      .document { padding: 25px 18px; border-radius: 0 13px 13px 13px; }
+      .document h3 { font-size: 29px; }
+      .gherkin { grid-template-columns: 48px 1fr; font-size: 10px; }
+      .studio-assistant { margin: 0 16px 22px; }
+      .run-card { grid-template-columns: 40px 1fr; }
+      .run-time { grid-column: 2; text-align: left; }
+      .memory-card { grid-template-columns: 1fr; }
+      .mobile-nav {
+        position: fixed;
+        z-index: 45;
+        inset: auto 10px 10px;
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        padding: 6px;
+        border: 1px solid rgba(255, 255, 255, .09);
+        border-radius: 17px;
+        background: rgba(23, 34, 33, .96);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+      .mobile-nav .nav-button { min-height: 48px; justify-content: center; display: grid; gap: 2px; padding: 5px 2px; text-align: center; }
+      .mobile-nav .nav-button:hover { transform: none; }
+      .mobile-nav .nav-button[aria-current="page"] { box-shadow: none; background: var(--rail-soft); }
+      .mobile-nav .nav-text { font-size: 7px; }
+      .mobile-nav .nav-icon { width: auto; font-size: 15px; }
+      .mobile-nav .nav-button[data-view="memory"] { display: none; }
+      .command-dock { right: 14px; bottom: 76px; left: 14px; }
+      .command-hint { display: none; }
+      .conversation-layer { right: 14px; bottom: 136px; width: calc(100vw - 28px); max-height: calc(100vh - 170px); overflow: auto; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body data-current-view="today">
+  <div class="app">
+    <aside class="rail" aria-label="Primary navigation">
+      <a class="brand" href="#today" data-view-link="today" aria-label="DigitalBrain home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span><strong>DigitalBrain</strong><small>Capability OS</small></span>
+      </a>
+      <div class="rail-label">Workspace</div>
+      <nav class="nav-list">
+        <button class="nav-button" type="button" data-view="today" aria-current="page"><span class="nav-icon">⌂</span><span class="nav-text">Today</span><span class="nav-badge">2</span></button>
+        <button class="nav-button" type="button" data-view="chat"><span class="nav-icon">◌</span><span class="nav-text">Chat</span></button>
+        <button class="nav-button" type="button" data-view="features"><span class="nav-icon">◇</span><span class="nav-text">Features</span><span class="nav-badge">1</span></button>
+        <button class="nav-button" type="button" data-view="connectors"><span class="nav-icon">⌁</span><span class="nav-text">Connectors</span></button>
+        <button class="nav-button" type="button" data-view="runs"><span class="nav-icon">↗</span><span class="nav-text">Runs</span></button>
+        <button class="nav-button" type="button" data-view="memory"><span class="nav-icon">◫</span><span class="nav-text">Memory</span></button>
+      </nav>
+      <div class="rail-spacer"></div>
+      <div class="rail-status"><div class="rail-status-row"><span class="status-dot"></span><strong>All systems healthy</strong></div><small>18 capabilities available<br>4 connectors authorized</small></div>
+    </aside>
+
+    <div class="mobile-top">
+      <a class="brand" href="#today" data-view-link="today"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span><strong>DigitalBrain</strong><small>Capability OS</small></span></a>
+      <button type="button" data-view="memory" aria-label="Open governed memory">◫</button>
+    </div>
+
+    <main class="content">
+      <header class="page-header">
+        <div><p class="eyebrow" id="page-eyebrow">Operational workspace</p><h1 class="page-title" id="page-title">Today</h1></div>
+        <div class="header-actions"><button class="icon-button" type="button" aria-label="Search capabilities">⌕</button><button class="icon-button" type="button" aria-label="Notifications">♢</button><span class="avatar" aria-label="Signed in as VH">VH</span></div>
+      </header>
+
+      <div class="workspace">
+        <section class="view is-active" id="today" data-view-panel="today" aria-labelledby="today-heading">
+          <div class="hero-row"><div class="hero-copy"><p class="eyebrow">Tuesday, 14 July</p><h2 id="today-heading">Good morning. Two things need your attention.</h2><p>DigitalBrain brings decisions forward and keeps routine history in Runs. Every effect remains visible, authorized, and recoverable.</p></div><div class="date-block"><strong>09:42</strong>Prague · 23°C</div></div>
+          <div class="section-heading"><h3>Needs attention <span class="count">2</span></h3><a href="#runs" data-view-link="runs">See all Runs →</a></div>
+          <div class="grid grid-2">
+            <article class="card attention-card"><div class="attention-icon">!</div><div><h4>Quarterly archive needs approval</h4><p>File Organizer wants to move 84 files to the Finance archive.</p></div><button class="button button-danger-soft" type="button">Review effect</button></article>
+            <article class="card attention-card"><div class="attention-icon" style="background:var(--amber-soft);color:var(--amber)">⌁</div><div><h4>SharePoint connection needs repair</h4><p>Two Features are paused until authentication is restored.</p></div><button class="button" type="button" data-view="connectors">Reconnect</button></article>
+          </div>
+          <div class="section-heading"><h3>Active now</h3><a href="#runs" data-view-link="runs">Open journal →</a></div>
+          <div class="grid grid-3">
+            <article class="card activity-card"><div class="activity-top"><span class="tag tag-violet">Feature · Chat</span><span>•••</span></div><h4>Prepare leadership brief</h4><p>Reading 7 trusted sources and reconciling two metric definitions.</p><div class="progress"><span style="width:68%"></span></div><div class="activity-meta"><span>5 of 7 sources</span><span>1m 18s</span></div></article>
+            <article class="card activity-card"><div class="activity-top"><span class="tag tag-green">Built-in · Schedule</span><span>•••</span></div><h4>Back up project notes</h4><p>Copying approved workspace notes to the encrypted archive.</p><div class="progress"><span style="width:43%;background:var(--mint-strong)"></span></div><div class="activity-meta"><span>43 files</span><span>48s</span></div></article>
+            <article class="card activity-card"><div class="activity-top"><span class="tag">Connector · Event</span><span>•••</span></div><h4>Triage customer escalation</h4><p>Classifying a new priority message from the support connector.</p><div class="progress"><span style="width:82%;background:var(--coral)"></span></div><div class="activity-meta"><span>Drafting response</span><span>32s</span></div></article>
+          </div>
+          <div class="section-heading"><h3>Completed today</h3><a href="#runs" data-view-link="runs">View outcomes →</a></div>
+          <div class="grid grid-2"><article class="card attention-card"><div class="attention-icon" style="background:#e7f8ed;color:var(--mint-strong)">✓</div><div><h4>Morning market digest</h4><p>Brief created · 12 sources · <u>market-digest.txt</u></p></div><span class="tag">08:10</span></article><article class="card attention-card"><div class="attention-icon" style="background:#e7f8ed;color:var(--mint-strong)">✓</div><div><h4>Invoice exceptions reviewed</h4><p>6 records summarized · no external effects</p></div><span class="tag">08:32</span></article></div>
+        </section>
+
+        <section class="view" id="chat" data-view-panel="chat" aria-labelledby="chat-heading">
+          <div class="chat-layout">
+            <div class="card chat-panel">
+              <div class="chat-intro"><div class="chat-orb">D</div><h2 id="chat-heading">Ask for an outcome.</h2><p>DigitalBrain will resolve an authorized capability, ask when the match is ambiguous, or honestly propose what is missing.</p></div>
+              <div class="conversation" id="chat-conversation" aria-live="polite"><div class="proposal" id="chat-proposal" hidden><div class="proposal-top"><div><span class="tag tag-violet">Feature proposal</span><h3>Company Research Brief</h3><p>I understand the goal, but no available capability can safely gather and synthesize public company research yet.</p></div><span class="tag tag-amber">Review required</span></div><div class="proposal-grid"><div class="proposal-item"><span>Input</span><strong>Company name</strong></div><div class="proposal-item"><span>Output</span><strong>Text research brief</strong></div><div class="proposal-item"><span>Connector</span><strong>Web Research</strong></div></div><div class="proposal-actions"><button class="button" type="button" data-dismiss-proposal>Not now</button><button class="button button-violet" type="button" data-open-studio>Open Feature Studio</button></div></div></div>
+              <form class="composer" id="chat-form"><label class="sr-only" for="chat-input">Message DigitalBrain</label><textarea id="chat-input" rows="1" placeholder="Try: Research Acme Corporation and create a text file…"></textarea><button type="submit" aria-label="Send message">↑</button></form>
+            </div>
+            <aside class="card context-panel"><h3>Capability context</h3><div class="context-row"><span>Available</span><strong>18 authorized capabilities</strong></div><div class="context-row"><span>Healthy connectors</span><strong>3 of 4</strong></div><div class="context-row"><span>Trusted memory</span><strong>Workspace scope</strong></div><div class="context-row"><span>Authority</span><strong>Ask before external effects</strong></div></aside>
+          </div>
+        </section>
+
+        <section class="view" id="features" data-view-panel="features" aria-labelledby="features-heading">
+          <div class="hero-row"><div class="hero-copy"><p class="eyebrow">Capability catalog</p><h2 id="features-heading">Everything DigitalBrain can honestly do.</h2><p>Built-in, Connector-provided, and programmable Features share one searchable index. Authority and availability are checked before invocation.</p></div><button class="button button-primary" type="button" data-open-studio>＋ New proposal</button></div>
+          <div class="catalog-tools"><label class="search-box"><span>⌕</span><span class="sr-only">Search capabilities</span><input type="search" placeholder="Search by outcome, example, or capability"></label><div class="filter-row"><button class="chip-button is-selected" type="button">All 18</button><button class="chip-button" type="button">Installed</button><button class="chip-button" type="button">Drafts 1</button><button class="chip-button" type="button">Needs attention</button></div></div>
+          <div class="grid grid-3">
+            <article class="card feature-card" style="--accent:var(--violet-soft)"><div class="feature-symbol">⌕</div><span class="tag tag-violet" style="align-self:flex-start">Proposal</span><h3 style="margin-top:11px">Company Research Brief</h3><p>Research a company from trusted public sources and create an attributed text brief.</p><div class="feature-stats"><div class="feature-stat"><span>Release</span><strong>Draft</strong></div><div class="feature-stat"><span>Scenarios</span><strong>3 proposed</strong></div></div><div class="feature-footer"><span class="tag tag-amber">Review needed</span><button class="text-button" type="button" data-open-studio>Open Studio →</button></div></article>
+            <article class="card feature-card" style="--accent:#e5f8ec"><div class="feature-symbol">▤</div><span class="tag tag-green" style="align-self:flex-start">Healthy</span><h3 style="margin-top:11px">Leadership Brief</h3><p>Turn trusted workspace sources into a concise, attributed executive briefing.</p><div class="feature-stats"><div class="feature-stat"><span>Release</span><strong>v1.4</strong></div><div class="feature-stat"><span>Recent Runs</span><strong>12 successful</strong></div></div><div class="feature-footer"><span class="tag">No triggers</span><button class="text-button" type="button" data-open-studio>Open Feature →</button></div></article>
+            <article class="card feature-card" style="--accent:var(--coral-soft)"><div class="feature-symbol">↗</div><span class="tag tag-green" style="align-self:flex-start">Healthy</span><h3 style="margin-top:11px">File Organizer</h3><p>Classify, rename, and move files after reviewing consequential effects.</p><div class="feature-stats"><div class="feature-stat"><span>Release</span><strong>v2.1</strong></div><div class="feature-stat"><span>Triggers</span><strong>1 schedule</strong></div></div><div class="feature-footer"><span class="tag tag-amber">Effect approval</span><button class="text-button" type="button" data-open-studio>Open Feature →</button></div></article>
+          </div>
+        </section>
+
+        <section class="view" id="studio" data-view-panel="studio" aria-labelledby="studio-heading">
+          <div class="studio-shell">
+            <div class="studio-main">
+              <div class="studio-toolbar"><div><p class="eyebrow">Feature proposal · Autosaved</p><h2 id="studio-heading">Company Research Brief</h2><p>Original request: “Research Acme Corporation and create a text file with the findings.”</p></div><div class="studio-actions"><button class="button" type="button" id="open-code">{ } Technical</button><button class="button button-soft" type="button" id="verify-feature">✓ Verify</button><button class="button button-primary" type="button" id="install-feature">Install release</button></div></div>
+              <div class="tabs" role="tablist" aria-label="Feature document sections"><button class="tab" type="button" role="tab" aria-selected="true" aria-controls="behavior-panel" data-tab="behavior">Living behavior</button><button class="tab" type="button" role="tab" aria-selected="false" aria-controls="verification-panel" data-tab="verification">Verification <span class="tag tag-green">3</span></button><button class="tab" type="button" role="tab" aria-selected="false" aria-controls="releases-panel" data-tab="releases">Releases</button></div>
+              <article class="document">
+                <div class="tab-panel is-active" id="behavior-panel" data-tab-panel="behavior"><p class="doc-kicker">Executable documentation</p><h3>Research a company and create an attributed brief</h3><p class="document-lede">This living document is both the human contract and the verification source. It stays plain enough to review and precise enough to execute.</p><section class="scenario"><div class="scenario-head"><h4>Scenario 1 · Create the research brief</h4><span class="tag tag-green">Verified</span></div><dl class="gherkin"><dt>Given</dt><dd>an authorized Web Research connector</dd><dt>And</dt><dd>a company name supplied by the user</dd><dt>When</dt><dd>the Company Research Brief Feature runs</dd><dt>Then</dt><dd>it gathers facts from attributable public sources</dd><dt>And</dt><dd>creates a text file containing the findings and citations</dd></dl></section><section class="scenario"><div class="scenario-head"><h4>Scenario 2 · Ask when the company is ambiguous</h4><span class="tag tag-green">Verified</span></div><dl class="gherkin"><dt>Given</dt><dd>a company name shared by more than one organization</dd><dt>When</dt><dd>the Feature resolves the research subject</dd><dt>Then</dt><dd>it asks the user to select the intended organization</dd><dt>And</dt><dd>does not begin research until the choice is explicit</dd></dl></section><button class="add-scenario" id="scenario-insert-point" type="button">＋ Describe another behavior in plain English</button></div>
+                <div class="tab-panel" id="verification-panel" data-tab-panel="verification"><p class="doc-kicker">Scenario-to-test evidence</p><h3>All behavior is currently verified</h3><p class="document-lede">Verification checks the living scenarios against the bounded implementation and approved interfaces.</p><div class="verification-list"><div class="verification-row"><span class="check">✓</span><span><strong>Create the research brief</strong><small>6 assertions · 1.4s</small></span><span class="tag tag-green">Passed</span></div><div class="verification-row"><span class="check">✓</span><span><strong>Ask when the company is ambiguous</strong><small>4 assertions · 0.8s</small></span><span class="tag tag-green">Passed</span></div><div class="verification-row"><span class="check">✓</span><span><strong>Decline unavailable connector</strong><small>3 assertions · 0.5s</small></span><span class="tag tag-green">Passed</span></div></div></div>
+                <div class="tab-panel" id="releases-panel" data-tab-panel="releases"><p class="doc-kicker">Immutable history</p><h3>Review, install, and roll back with confidence</h3><p class="document-lede">Each release records the exact source digest, grants, Connector selections, and trigger bindings.</p><div class="release-list"><div class="release-row"><span class="check" style="background:var(--violet-soft);color:var(--violet)">◇</span><span><strong>Draft release</strong><small>Digest 8d4c…a12f · 3 grants · no triggers</small></span><span class="tag tag-violet">Current</span></div><div class="release-row"><span class="check">✓</span><span><strong>Proposal created</strong><small>Today at 09:38 · from Chat request</small></span><span class="tag">Traceable</span></div></div></div>
+              </article>
+            </div>
+            <aside class="studio-assistant"><div class="assistant-head"><div class="chat-orb">D</div><div><strong>Studio assistant</strong><small>Working on this draft</small></div></div><div class="assistant-message">I translated the original request into two core scenarios and a safe Web Research dependency. The output stays local until the user explicitly shares it.</div><div class="assistant-suggestions"><button type="button" data-scenario-title="Use current sources" data-scenario-copy="the brief prioritizes sources published or updated within the last 30 days">Add a freshness requirement</button><button type="button" data-scenario-title="Prefer authoritative sources" data-scenario-copy="each material claim is supported by an authoritative source or independently cross-checked">Describe source-quality rules</button><button type="button" data-scenario-title="Stop without required authority" data-scenario-copy="the Feature explains the missing Web Research grant and does not begin collection">What grants will this need?</button></div><div class="assistant-message" id="assistant-ack" aria-live="polite">The implementation can only use approved DigitalBrain and Integration interfaces. Open <strong>Technical</strong> when you want to inspect the single C# file.</div><form class="assistant-composer"><label class="sr-only" for="studio-prompt">Ask about this Feature</label><input id="studio-prompt" placeholder="Change this draft…"><button type="submit" aria-label="Send to Studio assistant">↑</button></form></aside>
+          </div>
+        </section>
+
+        <section class="view" id="connectors" data-view-panel="connectors" aria-labelledby="connectors-heading">
+          <div class="hero-row"><div class="hero-copy"><p class="eyebrow">Authorized connections</p><h2 id="connectors-heading">Data access with visible boundaries.</h2><p>Connectors supply capabilities and operations. Health, grants, dependent Features, and trigger bindings stay inspectable.</p></div><button class="button button-primary" type="button">＋ Add connector</button></div>
+          <div class="section-heading"><h3>Healthy <span class="count" style="background:#e5f8ec;color:#206443">3</span></h3></div>
+          <div class="grid grid-2"><article class="card connector-card"><div class="connector-head"><div class="connector-identity"><div class="connector-logo">W</div><div><h3>Web Research</h3><p>Public web discovery and attributed reading</p></div></div><span class="tag tag-green">Healthy</span></div><div class="connector-details"><div class="mini-stat"><span>Capabilities</span><strong>Search · Read</strong></div><div class="mini-stat"><span>Dependents</span><strong>1 proposal</strong></div><div class="mini-stat"><span>Last test</span><strong>2 min ago</strong></div></div></article><article class="card connector-card"><div class="connector-head"><div class="connector-identity"><div class="connector-logo">G</div><div><h3>Google Drive</h3><p>Workspace files and document operations</p></div></div><span class="tag tag-green">Healthy</span></div><div class="connector-details"><div class="mini-stat"><span>Permissions</span><strong>Read selected</strong></div><div class="mini-stat"><span>Dependents</span><strong>3 Features</strong></div><div class="mini-stat"><span>Activity</span><strong>8 Runs today</strong></div></div></article></div>
+          <div class="section-heading"><h3>Needs attention <span class="count">1</span></h3></div>
+          <article class="card connector-card" style="border-color:#f1c6bc"><div class="connector-head"><div class="connector-identity"><div class="connector-logo" style="background:var(--coral-soft)">S</div><div><h3>SharePoint</h3><p>Authentication expired at 08:51. Two dependent Features are paused.</p></div></div><button class="button button-danger-soft" type="button">Reconnect</button></div><div class="connector-details"><div class="mini-stat"><span>Affected Features</span><strong>Leadership Brief · Archive</strong></div><div class="mini-stat"><span>Bindings</span><strong>1 paused</strong></div><div class="mini-stat"><span>Safe action</span><strong>Inspect failed Runs</strong></div></div></article>
+        </section>
+
+        <section class="view" id="runs" data-view-panel="runs" aria-labelledby="runs-heading">
+          <div class="hero-row"><div class="hero-copy"><p class="eyebrow">Unified execution journal</p><h2 id="runs-heading">Every invocation leaves a clear trail.</h2><p>Chat, direct UI, schedules, and Connector events resolve to the same Run model with inputs, approvals, progress, outputs, and recovery.</p></div><div class="filter-row"><button class="chip-button is-selected" type="button">Active &amp; blocked</button><button class="chip-button" type="button">All Runs</button></div></div>
+          <div class="run-list"><article class="card run-card"><div class="run-state">↻</div><div><div class="run-head"><div><h3>Prepare leadership brief</h3><p>Leadership Brief v1.4 · invoked from Chat</p></div><span class="tag tag-violet">Running</span></div><div class="run-meta"><span>Capability: brief.create</span><span>7 sources</span><span>Run R-1048</span></div></div><div class="run-time"><strong>68%</strong>Started 1m ago</div></article><article class="card run-card" style="border-color:#f1c6bc"><div class="run-state" style="background:var(--coral-soft);color:var(--coral)">!</div><div><div class="run-head"><div><h3>Archive quarterly finance files</h3><p>File Organizer v2.1 · invoked by schedule</p></div><span class="tag tag-coral">Approval needed</span></div><div class="run-meta"><span>84 file moves</span><span>Policy: ask every time</span><span>Run R-1047</span></div></div><div class="run-time"><strong>Blocked</strong>Since 09:36</div></article><article class="card run-card"><div class="run-state" style="background:#e5f8ec;color:var(--mint-strong)">✓</div><div><div class="run-head"><div><h3>Morning market digest</h3><p>Market Digest v3.0 · invoked by schedule</p></div><span class="tag tag-green">Completed</span></div><div class="run-meta"><span>12 sources</span><span>Artifact: market-digest.txt</span><span>Run R-1046</span></div></div><div class="run-time"><strong>1m 42s</strong>Completed 08:10</div></article></div>
+        </section>
+
+        <section class="view" id="memory" data-view-panel="memory" aria-labelledby="memory-heading">
+          <div class="hero-row"><div class="hero-copy"><p class="eyebrow">Trusted reusable knowledge</p><h2 id="memory-heading">Memory is governed, not inferred.</h2><p>Conversation history never silently becomes trusted Memory. Every item has explicit text, provenance, scope, retention, and a usage trail.</p></div><button class="button button-primary" type="button">＋ Add memory item</button></div>
+          <div class="governance-banner"><div class="attention-icon">◫</div><div><h3>A Chat suggestion is waiting for review</h3><p>“Leadership briefs should use calendar quarters.” Review its wording, provenance, scope, and retention before promotion.</p></div><button class="button button-violet" type="button" style="margin-left:auto">Review suggestion</button></div>
+          <div class="memory-list"><article class="card memory-card"><div><div class="memory-head"><div><h3>Use Czech koruna for internal cost summaries</h3><p>Approved preference · supplied directly by VH</p></div><span class="tag tag-green">Trusted</span></div><div class="memory-meta"><span>Scope: Finance workspace</span><span>Retention: Until revoked</span><span>Last used: Run R-1032</span><span>Confidence: Explicit</span></div></div><div class="memory-actions"><button class="button" type="button">Usage</button><button class="button" type="button">•••</button></div></article><article class="card memory-card"><div><div class="memory-head"><div><h3>Acme refers to Acme Corporation (ACM) in research requests</h3><p>Approved entity resolution · proposed from Run R-0984</p></div><span class="tag tag-green">Trusted</span></div><div class="memory-meta"><span>Scope: Company Research Feature</span><span>Retention: 90 days</span><span>Last used: Never</span><span>Owner: VH</span></div></div><div class="memory-actions"><button class="button" type="button">Usage</button><button class="button" type="button">•••</button></div></article></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation"><button class="nav-button" type="button" data-view="today" aria-current="page"><span class="nav-icon">⌂</span><span class="nav-text">Today</span></button><button class="nav-button" type="button" data-view="chat"><span class="nav-icon">◌</span><span class="nav-text">Chat</span></button><button class="nav-button" type="button" data-view="features"><span class="nav-icon">◇</span><span class="nav-text">Features</span></button><button class="nav-button" type="button" data-view="connectors"><span class="nav-icon">⌁</span><span class="nav-text">Connect</span></button><button class="nav-button" type="button" data-view="runs"><span class="nav-icon">↗</span><span class="nav-text">Runs</span></button><button class="nav-button" type="button" data-view="memory"><span class="nav-icon">◫</span><span class="nav-text">Memory</span></button></nav>
+
+  <form class="command-dock" id="command-form"><span class="command-spark">✦</span><label class="sr-only" for="command-input">Ask DigitalBrain in this workspace</label><input id="command-input" autocomplete="off" placeholder="Ask DigitalBrain in this workspace…"><span class="command-hint">Press Enter</span><button type="submit" aria-label="Submit command">↑</button></form>
+
+  <section class="conversation-layer" id="conversation-layer" aria-labelledby="layer-title" hidden><div class="layer-head"><div><h3 id="layer-title">Capability not available yet</h3><p>Your request is preserved and attached to this proposal.</p></div><button class="close-button" type="button" data-close-layer aria-label="Close conversation layer">×</button></div><div class="resolution"><span>◇</span><div><strong>No safe authorized match</strong><span>DigitalBrain checked availability, grants, risk, aliases, and semantic matches before proposing a Feature.</span></div></div><div class="layer-proposal"><h4>Company Research Brief</h4><p>Input: company name · Output: attributed text file · Suggested connector: Web Research</p><div class="layer-actions"><button class="button" type="button" data-close-layer>Not now</button><button class="button button-violet" type="button" data-open-studio>Approve &amp; open Studio</button></div></div></section>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="technical-drawer" id="technical-drawer" aria-labelledby="drawer-title" hidden><div class="drawer-head"><div><p class="eyebrow" style="color:#82908b">Advanced · Inspectable by design</p><h2 id="drawer-title">CompanyResearchFeature.cs</h2><p>One bounded C# implementation file · digest 8d4c…a12f</p></div><button class="close-button" id="close-drawer" type="button" aria-label="Close technical drawer">×</button></div><div class="code-tabs"><button class="is-selected" type="button">Implementation</button><button type="button">Interfaces</button><button type="button">Diff</button></div><pre><code><span class="code-keyword">public sealed class</span> <span class="code-type">CompanyResearchFeature</span>
+{
+    <span class="code-keyword">public async</span> Task&lt;<span class="code-type">FeatureResult</span>&gt; RunAsync(
+        <span class="code-type">CompanyResearchInput</span> input,
+        <span class="code-type">IFeatureContext</span> context)
+    {
+        <span class="code-keyword">var</span> subject = <span class="code-keyword">await</span> context.ResolveCompanyAsync(input.Name);
+        <span class="code-keyword">var</span> sources = <span class="code-keyword">await</span> context.Research.SearchAsync(subject);
+        <span class="code-keyword">var</span> brief = <span class="code-keyword">await</span> context.Compose.AttributedBriefAsync(sources);
+
+        <span class="code-keyword">return</span> <span class="code-type">FeatureResult</span>.TextArtifact(
+            <span class="code-string">$"{subject.Slug}-research.txt"</span>,
+            brief);
+    }
+}</code></pre><div class="diagnostics"><div class="diagnostic"><span>Approved interfaces</span><strong>3 of 3</strong></div><div class="diagnostic"><span>External effects</span><strong>None</strong></div><div class="diagnostic"><span>Verification</span><strong>3 scenarios pass</strong></div></div></aside>
+
+  <script>
+    const viewDetails = {
+      today: ["Operational workspace", "Today"],
+      chat: ["Universal interaction", "Chat"],
+      features: ["Capability catalog", "Features"],
+      studio: ["Controlled programming surface", "Feature Studio"],
+      connectors: ["Authorized access", "Connectors"],
+      runs: ["Execution journal", "Runs"],
+      memory: ["Governed knowledge", "Memory"]
+    };
+
+    const panels = [...document.querySelectorAll("[data-view-panel]")];
+    const navigationButtons = [...document.querySelectorAll("[data-view]")];
+    const commandDock = document.getElementById("command-form");
+    const conversationLayer = document.getElementById("conversation-layer");
+    const technicalDrawer = document.getElementById("technical-drawer");
+    const scrim = document.getElementById("scrim");
+
+    function showView(view, updateHash = true) {
+      if (!viewDetails[view]) return;
+      panels.forEach(panel => panel.classList.toggle("is-active", panel.dataset.viewPanel === view));
+      navigationButtons.forEach(button => {
+        if (button.dataset.view === view) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+      });
+      document.body.dataset.currentView = view;
+      document.getElementById("page-eyebrow").textContent = viewDetails[view][0];
+      document.getElementById("page-title").textContent = viewDetails[view][1];
+      commandDock.classList.toggle("is-hidden", view === "chat" || view === "studio");
+      if (updateHash) history.replaceState(null, "", `#${view}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.addEventListener("click", event => {
+      const viewButton = event.target.closest("[data-view]");
+      const viewLink = event.target.closest("[data-view-link]");
+      const studioButton = event.target.closest("[data-open-studio]");
+      if (viewButton) showView(viewButton.dataset.view);
+      if (viewLink) {
+        event.preventDefault();
+        showView(viewLink.dataset.viewLink);
+      }
+      if (studioButton) {
+        conversationLayer.hidden = true;
+        showView("studio");
+      }
+      if (event.target.closest("[data-close-layer]")) conversationLayer.hidden = true;
+      if (event.target.closest("[data-dismiss-proposal]")) document.getElementById("chat-proposal").hidden = true;
+    });
+
+    commandDock.addEventListener("submit", event => {
+      event.preventDefault();
+      const input = document.getElementById("command-input");
+      if (!input.value.trim()) input.value = "Research Acme Corporation and create a text file with the findings";
+      conversationLayer.hidden = false;
+      conversationLayer.querySelector("button").focus();
+    });
+
+    document.getElementById("chat-form").addEventListener("submit", event => {
+      event.preventDefault();
+      const input = document.getElementById("chat-input");
+      const text = input.value.trim() || "Research Acme Corporation and create a text file with the findings.";
+      const message = document.createElement("div");
+      message.className = "message message-user";
+      message.textContent = text;
+      document.getElementById("chat-conversation").prepend(message);
+      document.getElementById("chat-proposal").hidden = false;
+      input.value = "";
+      document.getElementById("chat-proposal").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+
+    document.querySelectorAll("[data-tab]").forEach(tab => tab.addEventListener("click", () => {
+      document.querySelectorAll("[data-tab]").forEach(candidate => candidate.setAttribute("aria-selected", String(candidate === tab)));
+      document.querySelectorAll("[data-tab-panel]").forEach(panel => panel.classList.toggle("is-active", panel.dataset.tabPanel === tab.dataset.tab));
+    }));
+
+    function closeDrawer() {
+      technicalDrawer.hidden = true;
+      scrim.hidden = true;
+      document.getElementById("open-code").focus();
+    }
+
+    document.getElementById("open-code").addEventListener("click", () => {
+      technicalDrawer.hidden = false;
+      scrim.hidden = false;
+      document.getElementById("close-drawer").focus();
+    });
+    document.getElementById("close-drawer").addEventListener("click", closeDrawer);
+    scrim.addEventListener("click", closeDrawer);
+    document.getElementById("verify-feature").addEventListener("click", () => {
+      document.querySelector('[data-tab="verification"]').click();
+    });
+    document.getElementById("install-feature").addEventListener("click", () => {
+      document.querySelector('[data-tab="releases"]').click();
+    });
+    function addStudioScenario(title, requirement) {
+      const scenarioNumber = document.querySelectorAll("#behavior-panel .scenario").length + 1;
+      const scenario = document.createElement("section");
+      scenario.className = "scenario is-new";
+      const head = document.createElement("div");
+      head.className = "scenario-head";
+      const heading = document.createElement("h4");
+      heading.textContent = `Scenario ${scenarioNumber} · ${title}`;
+      const status = document.createElement("span");
+      status.className = "tag tag-amber";
+      status.textContent = "Needs verification";
+      head.append(heading, status);
+      const steps = document.createElement("dl");
+      steps.className = "gherkin";
+      [["Given", "the Company Research Brief draft"], ["When", "this behavior is reviewed"], ["Then", requirement]].forEach(([term, detail]) => {
+        const name = document.createElement("dt");
+        const description = document.createElement("dd");
+        name.textContent = term;
+        description.textContent = detail;
+        steps.append(name, description);
+      });
+      scenario.append(head, steps);
+      document.getElementById("scenario-insert-point").before(scenario);
+      document.getElementById("assistant-ack").textContent = `Added “${title}” to the living behavior document. It is saved as a draft and needs verification.`;
+      scenario.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    document.querySelectorAll("[data-scenario-title]").forEach(button => button.addEventListener("click", () => {
+      addStudioScenario(button.dataset.scenarioTitle, button.dataset.scenarioCopy);
+    }));
+    document.querySelector(".assistant-composer").addEventListener("submit", event => {
+      event.preventDefault();
+      const input = event.currentTarget.querySelector("input");
+      const change = input.value.trim();
+      if (!change) return;
+      addStudioScenario(change, `the living document reflects the requested change: ${change}`);
+      input.value = "";
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        if (!technicalDrawer.hidden) closeDrawer();
+        conversationLayer.hidden = true;
+      }
+    });
+    window.addEventListener("hashchange", () => showView(location.hash.slice(1) || "today", false));
+    showView(viewDetails[location.hash.slice(1)] ? location.hash.slice(1) : "today", false);
+  </script>
+</body>
+</html>
