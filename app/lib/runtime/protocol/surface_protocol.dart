@@ -562,6 +562,110 @@ enum InoConversationOperationPhase {
       };
 }
 
+enum InoCapabilityResolutionKind {
+  match,
+  ambiguous,
+  missing;
+
+  String get wire => switch (this) {
+    match => 'match',
+    ambiguous => 'ambiguous',
+    missing => 'missing',
+  };
+
+  static InoCapabilityResolutionKind fromWire(String value) => switch (value) {
+    'match' => match,
+    'ambiguous' => ambiguous,
+    'missing' => missing,
+    _ => throw FormatException('Unsupported INO capability kind "$value".'),
+  };
+}
+
+class InoCapabilityReceipt {
+  const InoCapabilityReceipt({
+    required this.kind,
+    required this.id,
+    required this.name,
+    required this.confidence,
+  });
+
+  final InoCapabilityResolutionKind kind;
+  final String? id;
+  final String? name;
+  final double confidence;
+
+  factory InoCapabilityReceipt.fromJson(Object? value) {
+    final json = _safeObject(value, 'payload.data.operation.capability');
+    _demandOnlyKeys(json, const {
+      'kind',
+      'id',
+      'name',
+      'confidence',
+    }, 'payload.data.operation.capability');
+    final kind = InoCapabilityResolutionKind.fromWire(
+      _boundedString(json, 'kind', maxLength: 16),
+    );
+    final id = _nullableBoundedString(json, 'id', 128);
+    final name = _nullableBoundedString(json, 'name', 80);
+    final confidence = json['confidence'];
+    if (confidence is! num ||
+        !confidence.isFinite ||
+        confidence < 0 ||
+        confidence > 1) {
+      throw const FormatException(
+        'payload.data.operation.capability.confidence must be within 0..1.',
+      );
+    }
+    return InoCapabilityReceipt(
+      kind: kind,
+      id: id,
+      name: name,
+      confidence: confidence.toDouble(),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'kind': kind.wire,
+    'id': id,
+    'name': name,
+    'confidence': confidence,
+  };
+}
+
+class InoFeatureProposalReference {
+  const InoFeatureProposalReference({
+    required this.id,
+    required this.label,
+    required this.route,
+  });
+
+  static const String routePrefix = '/features/proposals/proposal-';
+
+  final String id;
+  final String label;
+  final String route;
+
+  factory InoFeatureProposalReference.fromJson(Object? value) {
+    final json = _safeObject(value, 'payload.data.operation.proposal');
+    _demandOnlyKeys(json, const {
+      'id',
+      'label',
+      'route',
+    }, 'payload.data.operation.proposal');
+    final id = _boundedString(json, 'id', maxLength: 128);
+    final label = _boundedString(json, 'label', maxLength: 80);
+    final route = _boundedString(json, 'route', maxLength: 256);
+    if (!route.startsWith(routePrefix)) {
+      throw const FormatException(
+        'payload.data.operation.proposal.route must be an internal Studio route.',
+      );
+    }
+    return InoFeatureProposalReference(id: id, label: label, route: route);
+  }
+
+  Map<String, Object?> toJson() => {'id': id, 'label': label, 'route': route};
+}
+
 class InoConversationMessage {
   const InoConversationMessage({
     required this.turnKey,
@@ -619,6 +723,8 @@ class InoConversationOperation {
     this.safeReason,
     this.action,
     this.approvalId,
+    this.capability,
+    this.proposal,
   });
 
   final String operationId;
@@ -629,6 +735,8 @@ class InoConversationOperation {
   final String? safeReason;
   final InoConversationAction? action;
   final String? approvalId;
+  final InoCapabilityReceipt? capability;
+  final InoFeatureProposalReference? proposal;
 
   factory InoConversationOperation.fromJson(
     Object? value, {
@@ -644,6 +752,8 @@ class InoConversationOperation {
       'retryable',
       'action',
       'approvalId',
+      'capability',
+      'proposal',
     }, 'payload.data.operation');
     const metadataKeys = {'operationId', 'phase', 'version'};
     final metadataCount = metadataKeys.where(json.containsKey).length;
@@ -763,6 +873,12 @@ class InoConversationOperation {
               oauthStartOrigin: oauthStartOrigin,
             ),
       approvalId: approvalId,
+      capability: json['capability'] == null
+          ? null
+          : InoCapabilityReceipt.fromJson(json['capability']),
+      proposal: json['proposal'] == null
+          ? null
+          : InoFeatureProposalReference.fromJson(json['proposal']),
     );
   }
 
@@ -777,6 +893,8 @@ class InoConversationOperation {
     'safeReason': ?safeReason,
     'action': action?.toJson(),
     'approvalId': ?approvalId,
+    'capability': ?capability?.toJson(),
+    'proposal': ?proposal?.toJson(),
   };
 }
 

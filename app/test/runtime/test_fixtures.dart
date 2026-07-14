@@ -152,6 +152,8 @@ Map<String, Object?> inoOperation({
   String? safeReason,
   Map<String, Object?>? action,
   String? approvalId,
+  Map<String, Object?>? capability,
+  Map<String, Object?>? proposal,
 }) => <String, Object?>{
   'operationId': operationId,
   'phase':
@@ -167,6 +169,30 @@ Map<String, Object?> inoOperation({
   'safeReason': ?safeReason,
   'action': ?action,
   'approvalId': ?approvalId,
+  'capability': ?capability,
+  'proposal': ?proposal,
+};
+
+Map<String, Object?> inoCapability({
+  Object? kind = 'match',
+  Object? id = 'salesforce.record.read.v1',
+  Object? name = 'Read Salesforce records',
+  Object? confidence = 0.91,
+}) => <String, Object?>{
+  'kind': kind,
+  'id': id,
+  'name': name,
+  'confidence': confidence,
+};
+
+Map<String, Object?> inoFeatureProposal({
+  String id = 'proposal-0123456789abcdef0123456789abcdef',
+  String label = 'Open Studio',
+  String? route,
+}) => <String, Object?>{
+  'id': id,
+  'label': label,
+  'route': route ?? '/features/proposals/$id',
 };
 
 Map<String, Object?> googleConnectionAction({
