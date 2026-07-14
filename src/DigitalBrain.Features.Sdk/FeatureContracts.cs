@@ -111,6 +111,43 @@ internal static class FeatureContractGuard
         return new ReadOnlyCollection<string>(copy);
     }
 
+    internal static IReadOnlyList<string> Tags(IReadOnlyList<string> values, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(values, parameterName);
+        if (values.Count > 16)
+            throw new ArgumentException("Tags cannot contain more than 16 entries.", parameterName);
+        var normalized = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var value in values)
+        {
+            ArgumentNullException.ThrowIfNull(value, parameterName);
+            var tag = value.Trim().ToLowerInvariant();
+            if (tag.Length is 0 or > 128 || ContainsControl(tag))
+                throw new ArgumentException("Tags must be bounded non-empty text.", parameterName);
+            normalized.Add(tag);
+        }
+        var copy = new string[normalized.Count];
+        normalized.CopyTo(copy);
+        return new ReadOnlyCollection<string>(copy);
+    }
+
+    internal static string MemoryFactId(string value, string parameterName)
+    {
+        value = Required(value, parameterName, 256);
+        if (string.Equals(value, "!capacity", StringComparison.Ordinal))
+            throw new ArgumentException("A reserved Memory fact identifier cannot be used.", parameterName);
+        return value;
+    }
+
+    private static bool ContainsControl(string value)
+    {
+        foreach (var character in value)
+        {
+            if (char.IsControl(character))
+                return true;
+        }
+        return false;
+    }
+
     internal static string Utf8(string value, string parameterName, int maximumBytes)
     {
         ArgumentNullException.ThrowIfNull(value, parameterName);

@@ -7,6 +7,7 @@ using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
+using DigitalBrain.Kernel.Memory;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
@@ -173,6 +174,7 @@ public static class DigitalBrainOrleansExtensions
         var useManagedIdentity = !string.IsNullOrWhiteSpace(storageAccountName);
 
         var storageCredential = useManagedIdentity ? new DefaultAzureCredential() : null;
+        var storageTableServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.table.core.windows.net") : null;
         var storageBlobServiceUri = useManagedIdentity ? new Uri($"https://{storageAccountName}.blob.core.windows.net") : null;
 
         if (isAspireHosted && !useManagedIdentity)
@@ -198,6 +200,21 @@ public static class DigitalBrainOrleansExtensions
         }
 
         builder.Services.AddDigitalBrainChat(builder.Configuration, storageCredential);
+        TableClient? memoryTable = null;
+        if (useManagedIdentity)
+        {
+            var tableOptions = new TableClientOptions { Diagnostics = { IsDistributedTracingEnabled = false } };
+            memoryTable = new TableClient(
+                storageTableServiceUri!,
+                AzureTableMemoryFactStore.FactsTableName,
+                storageCredential!,
+                tableOptions);
+        }
+        builder.Services.AddDigitalBrainMemory(
+            builder.Configuration,
+            memoryTable,
+            builder.Environment.IsEnvironment("Testing") ||
+            builder.Configuration.GetValue<bool>("DigitalBrain:TestMode"));
         builder.Services.AddSingleton<CapabilityGrantValidator>();
         builder.Services.AddSingleton<ICapabilityGrantSource, RetainedInoCapabilityGrantSource>();
         builder.Services.AddSingleton<ICapabilityDispatcher, CapabilityDispatcher>();

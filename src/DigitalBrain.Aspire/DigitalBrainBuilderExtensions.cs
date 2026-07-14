@@ -80,6 +80,7 @@ public static class DigitalBrainBuilderExtensions
             });
         }
         var clusteringTable = storage.AddTables("clustering");
+        var memoryFacts = storage.AddTables("memoryfacts");
         var grainBlobs = storage.AddBlobs("grainstate");
         var conversationStateBlobs = storage.AddBlobs("conversationstate");
         var surfaceFeedStateBlobs = storage.AddBlobs("surfacefeedstate");
@@ -174,7 +175,8 @@ public static class DigitalBrainBuilderExtensions
             ConversationStateBlobs = conversationStateBlobs,
             SurfaceFeedStateBlobs = surfaceFeedStateBlobs,
             SessionStateBlobs = sessionStateBlobs,
-            ClusteringTable = clusteringTable
+            ClusteringTable = clusteringTable,
+            MemoryFacts = memoryFacts
         };
     }
 
@@ -187,6 +189,7 @@ public static class DigitalBrainBuilderExtensions
         kernel = kernel
             .WithReference(ctx.Orleans)
             .WithReference(ctx.ClusteringTable)
+            .WithReference(ctx.MemoryFacts)
             .WithReference(ctx.GrainBlobs)
             .WithReference(ctx.ConversationStateBlobs)
             .WithReference(ctx.SurfaceFeedStateBlobs)
@@ -206,6 +209,7 @@ public static class DigitalBrainBuilderExtensions
         // This sequences Azurite ahead of silo initialization and its health probe.
         // LLM waits already present below; storage waits complement the WithReference calls.
         kernel.WaitFor(ctx.ClusteringTable);
+        kernel.WaitFor(ctx.MemoryFacts);
         kernel.WaitFor(ctx.GrainBlobs);
         kernel.WaitFor(ctx.ConversationStateBlobs);
         kernel.WaitFor(ctx.SurfaceFeedStateBlobs);

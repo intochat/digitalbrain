@@ -47,6 +47,16 @@ public sealed class AddDigitalBrainExecutionModeTests
         Assert.Contains(builder.Resources, r => r.Name == "conversationstate" && r.GetType().Name == "AzureBlobStorageResource");
         Assert.Contains(builder.Resources, r => r.Name == "surfacefeedstate" && r.GetType().Name == "AzureBlobStorageResource");
         Assert.Contains(builder.Resources, r => r.Name == "sessionstate" && r.GetType().Name == "AzureBlobStorageResource");
+        var memoryFacts = Assert.Single(builder.Resources, resource => resource.Name == "memoryfacts");
+        Assert.Equal("AzureTableStorageResource", memoryFacts.GetType().Name);
+
+        var kernel = Assert.Single(builder.Resources, resource => resource.Name == "kernel");
+        Assert.Contains(
+            kernel.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            relationship => ReferenceEquals(relationship.Resource, memoryFacts));
+        Assert.Contains(
+            kernel.Annotations.OfType<WaitAnnotation>(),
+            wait => ReferenceEquals(wait.Resource, memoryFacts) && wait.WaitType == WaitType.WaitUntilHealthy);
 
         Assert.Contains(builder.Resources, r => r.Name == "ollama" && r.GetType().Name == "OllamaResource");
 

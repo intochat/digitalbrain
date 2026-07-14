@@ -227,9 +227,11 @@ Evidence: the loader now stages digest-verified host-owned snapshots, shares onl
 - `IMemoryRemember` produces a deterministic InternalWrite intent.
 - Owner inspect/export/correct/forget use ETag replacement and physical delete.
 
-- [ ] Test deterministic ties, normalization, 2,000-fact capacity, 2-KiB text, 16 tags, conflict, delete, and audit redaction.
-- [ ] Implement `memoryfacts` with no embedding/vector dependency and no `MemoryGrain`.
-- [ ] Commit `feat: add bounded lexical memory`.
+- [x] Test deterministic ties, normalization, 2,000-fact capacity, 2-KiB text, 16 tags, conflict, delete, and audit redaction.
+- [x] Implement `memoryfacts` with no embedding/vector dependency and no `MemoryGrain`.
+- [x] Commit `feat: add bounded lexical memory`.
+
+Evidence: lexical memory is owner-scoped, deterministic, bounded at exactly 2,000 facts, normalized at the SDK boundary, and exposed only through `memory.recall` Query and `memory.remember` InternalWrite capabilities. Azure Table persistence uses one `memoryfacts` table with atomic same-partition fact/counter transactions, bounded optimistic-concurrency retries, ETag correction, physical deletion, startup initialization, reserved-row protection, and fail-closed production registration. Unit, integration-contract, feature BDD, Orleans, TestKit, Salesforce, kernel/runtime, and E2E suites pass 595 tests with zero failures; independent review reports no Critical, Important, or Moderate findings; `aspire doctor` passes 5/5; an isolated AppHost run made `memoryfacts` and all three RuntimeHost replicas healthy, and sampled traces completed without errors or payload disclosure. No embedding, vector, or `MemoryGrain` dependency exists.
 
 ### Task 10: Aspire topology, AppHost tests, and host composition
 
