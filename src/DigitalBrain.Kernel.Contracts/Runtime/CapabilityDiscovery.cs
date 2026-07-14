@@ -59,6 +59,11 @@ public interface ICapabilityCatalog
     IReadOnlyList<CapabilityDescriptor> Snapshot();
 }
 
+public interface ICapabilityDescriptorSource
+{
+    IReadOnlyList<CapabilityDescriptor> Descriptors { get; }
+}
+
 public interface ICapabilityResolver
 {
     Task<CapabilityResolution> ResolveAsync(

@@ -18,6 +18,7 @@ public static class SalesforceServiceCollectionExtensions
         services.AddSingleton<ISalesforceMutationGateway, SalesforceMutationGateway>();
         services.AddSingleton<ICapabilityHandler, SalesforceRecordReadCapabilityHandler>();
         services.AddSingleton<ICapabilityHandler, SalesforceUpdateProposalCapabilityHandler>();
+        services.AddSingleton<ICapabilityDescriptorSource, SalesforceCapabilityDescriptorSource>();
         services.AddSingleton<IInoEffectHandler, SalesforceUpdateEffectHandler>();
         services.AddSingleton<IExternalAuthorizationResolver, SalesforceAuthorizationResolver>();
         services.AddSingleton<SalesforceFeatureEffectRail>();

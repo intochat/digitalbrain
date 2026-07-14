@@ -102,15 +102,17 @@ This plan delivers the first independently releasable Capability OS slice. It do
 - Create: `tests/DigitalBrain.OrleansTests/Capabilities/BuiltInCapabilityCatalogTests.cs`
 
 **Interfaces:**
-- Produces: `CapabilityDescriptor`, `CapabilityOrigin`, `CapabilityResolutionKind`, `CapabilityResolutionReceipt`, `FeatureDraftReference`, `CapabilitySearchRequest`, `CapabilityResolution`, `ICapabilityCatalog`, `ICapabilityResolver`, `CapabilityIntentBinding`, `BuiltInCapabilityCatalog`.
-- Consumes: existing `GoogleCapabilityIds`, `SalesforceCapabilityIds`, `MemoryCapabilityIds`, `CapabilityOperationKind`, `ExternalEffectGrants`.
+- Produces: `CapabilityDescriptor`, `CapabilityOrigin`, `CapabilityResolutionKind`, `CapabilityResolutionReceipt`, `FeatureDraftReference`, `CapabilitySearchRequest`, `CapabilityResolution`, `ICapabilityCatalog`, `ICapabilityResolver`, `ICapabilityDescriptorSource`, `BuiltInCapabilityCatalog`, `GoogleCapabilityDescriptorSource` (in `DigitalBrain.Integrations.Google`), `SalesforceCapabilityDescriptorSource` (in `DigitalBrain.Integrations.Salesforce`).
+- Consumes: existing `GoogleCapabilityIds`, `GmailTools.Send` (from the Google integration project, inside `GoogleCapabilityDescriptorSource` only), `SalesforceCapabilityIds`, `SalesforceTools.UpdateRecord` (from the Salesforce integration project, inside `SalesforceCapabilityDescriptorSource` only), `MemoryCapabilityIds`, `CapabilityOperationKind`, `ExternalEffectGrants`.
 
 - [ ] **Step 1: Write the catalog contract test**
 
 ```csharp
-using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Integrations.Google;
 using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Integrations.Salesforce.Contracts;
+using DigitalBrain.Kernel.Capabilities;
 
 namespace DigitalBrain.OrleansTests.Capabilities;
 
@@ -119,7 +121,7 @@ public sealed class BuiltInCapabilityCatalogTests
     [Fact]
     public void Snapshot_has_unique_stable_ids_and_complete_typed_bindings()
     {
-        var catalog = new BuiltInCapabilityCatalog();
+        var catalog = new BuiltInCapabilityCatalog([new GoogleCapabilityDescriptorSource(), new SalesforceCapabilityDescriptorSource()]);
 
         var descriptors = catalog.Snapshot();
 
@@ -130,7 +132,7 @@ public sealed class BuiltInCapabilityCatalogTests
             Assert.Matches("^[a-z0-9]+(?:[.-][a-z0-9]+)*$", descriptor.Id);
             Assert.NotEmpty(descriptor.Examples);
             Assert.True(descriptor.Version > 0);
-            Assert.True(BuiltInCapabilityCatalog.TryBind(descriptor.Id, out _));
+            Assert.True(catalog.TryBind(descriptor.Id, out _));
         });
         Assert.Contains(descriptors, x => x.Id == GoogleCapabilityIds.GmailMessageRead);
         Assert.Contains(descriptors, x => x.Id == SalesforceCapabilityIds.RecordRead);
@@ -139,7 +141,7 @@ public sealed class BuiltInCapabilityCatalogTests
 }
 ```
 
-If the integration contracts projects are not referenced by `DigitalBrain.OrleansTests`, add the project references; do not restate the ID strings.
+If the integration implementation or contracts projects are not referenced by `DigitalBrain.OrleansTests`, add the project references; do not restate the ID strings.
 
 - [ ] **Step 2: Run the root suite and verify the new test fails**
 
@@ -206,15 +208,26 @@ public interface ICapabilityResolver
 }
 ```
 
-- [ ] **Step 4: Add explicit built-in descriptors and bindings**
+- [ ] **Step 4: Compose the catalog from Kernel platform descriptors and integration-owned sources**
 
-Create `src/DigitalBrain.Kernel/Capabilities/BuiltInCapabilityCatalog.cs`. Declare descriptors for `assistant.answer`, `GoogleCapabilityIds.GmailMessageRead`, `GoogleCapabilityIds.GmailMailboxRead`, `GoogleCapabilityIds.GmailSendPropose`, `SalesforceCapabilityIds.RecordRead`, `SalesforceCapabilityIds.RecordUpdatePropose`, `MemoryCapabilityIds.Recall`, and `MemoryCapabilityIds.Remember`. Each descriptor must have human examples and exact connection/grant requirements. The binding carries the dispatch identity, not a semantic enum:
+`RepositoryPolicyTests.Production_code_has_no_deleted_namespaces_or_provider_shaped_kernel_types` forbids `gmail|google|salesforce` (case-insensitive) anywhere under `src/DigitalBrain.Kernel/` or `src/DigitalBrain.Kernel.Contracts/`. The Kernel must never hardcode provider descriptor content or reference the Google/Salesforce contracts projects. Descriptors are contributed at runtime by the integrations that own them.
+
+Add a provider-neutral contribution contract to `src/DigitalBrain.Kernel.Contracts/Runtime/CapabilityDiscovery.cs`:
 
 ```csharp
-public sealed record CapabilityIntentBinding(string CapabilityId, int CapabilityVersion, CapabilityOperationKind Kind);
+public interface ICapabilityDescriptorSource
+{
+    IReadOnlyList<CapabilityDescriptor> Descriptors { get; }
+}
 ```
 
-`BuiltInCapabilityCatalog : ICapabilityCatalog` keeps a `Bindings` dictionary keyed by capability ID and a static `TryBind(string capabilityId, out CapabilityIntentBinding binding)`. Descriptors are produced by an internal factory using a switch expression with one complete descriptor per binding key, throwing for an unrecognized key. Do not derive IDs from CLR member names. Connection requirements: `google` for Gmail descriptors, `salesforce` for Salesforce descriptors, none for `assistant.answer` and memory descriptors. Grant requirements: the exact `ExternalEffectGrants` grant constant for the two effect-proposal descriptors (`GmailSendPropose`, `RecordUpdatePropose`); none otherwise. `assistant.answer` has `CapabilityOrigin.Platform` and `CapabilityOperationKind.Query`; memory descriptors are Platform; integration descriptors are Integration. All descriptors are `Available = true` and `Version = 1`.
+Create `src/DigitalBrain.Kernel/Capabilities/BuiltInCapabilityCatalog.cs` as an aggregator constructed from `IEnumerable<ICapabilityDescriptorSource>` (resolved by DI). It contributes only the Kernel-owned platform descriptors itself — `assistant.answer`, `MemoryCapabilityIds.Recall`, `MemoryCapabilityIds.Remember` (the words "memory"/"assistant" are allowed in the Kernel) — and appends every source-contributed descriptor. It rejects duplicate capability IDs by throwing `InvalidOperationException`, mirroring the duplicate-handler rule in `CapabilityDispatcher` (`src/DigitalBrain.Kernel/Capabilities/CapabilityDispatcher.cs`). `Snapshot()` returns the composed list ordered by `Id` (`StringComparer.Ordinal`). Lookup is an instance method, `bool TryBind(string capabilityId, out CapabilityDescriptor descriptor)`, derived from the same composed dictionary used by `Snapshot()` — there is no static `TryBind` and no separate `CapabilityIntentBinding` record, because a binding of `(CapabilityId, CapabilityVersion, Kind)` carries no information the `CapabilityDescriptor` does not already have.
+
+Move the Gmail descriptors (`GmailMessageRead`, `GmailMailboxRead`, `GmailSendPropose` with grant `GmailTools.Send`) into a new `internal sealed class GoogleCapabilityDescriptorSource : ICapabilityDescriptorSource` in `integrations/DigitalBrain.Integrations.Google/`, next to `GmailCapabilityHandlers.cs`, using the real `GoogleCapabilityIds` and `GmailTools.Send` constants. Move the Salesforce descriptors (`RecordRead`, `RecordUpdatePropose` with grant `SalesforceTools.UpdateRecord`) into a new `internal sealed class SalesforceCapabilityDescriptorSource : ICapabilityDescriptorSource` in `integrations/DigitalBrain.Integrations.Salesforce/`, next to `SalesforceCapabilityHandlers.cs`. Each descriptor keeps its exact field values (names, descriptions, examples, connection `google`/`salesforce`, `CapabilityOrigin.Integration`, `CapabilityOperationKind`, `Version = 1`, `Available = true`).
+
+Register each source in DI exactly where that integration already registers its `ICapabilityHandler` implementations: `services.AddSingleton<ICapabilityDescriptorSource, GoogleCapabilityDescriptorSource>();` in `GoogleServiceCollectionExtensions.AddDigitalBrainGoogle` (`integrations/DigitalBrain.Integrations.Google/GoogleAppConfigSeeder.cs`), and the Salesforce equivalent in `SalesforceServiceCollectionExtensions.AddDigitalBrainSalesforce` (`integrations/DigitalBrain.Integrations.Salesforce/SalesforceAppConfigSeeder.cs`). Do not add or keep a Kernel → Google.Contracts or Kernel → Salesforce.Contracts project reference; the Kernel no longer needs either.
+
+Connection requirements: `google` for Gmail descriptors, `salesforce` for Salesforce descriptors, none for `assistant.answer` and memory descriptors. Grant requirements: the exact effect-tool ID for the two effect-proposal descriptors (`GmailSendPropose`, `RecordUpdatePropose`); none otherwise. `assistant.answer` has `CapabilityOrigin.Platform` and `CapabilityOperationKind.Query`; memory descriptors are Platform; integration descriptors are Integration. All descriptors are `Available = true` and `Version = 1`.
 
 - [ ] **Step 5: Run the root suite and verify it passes**
 
@@ -383,7 +396,7 @@ git commit -m "feat: resolve capabilities with hybrid search"
 - Create: `tests/DigitalBrain.OrleansTests/Capabilities/CapabilityParameterModelTests.cs`
 
 **Interfaces:**
-- Consumes: `BuiltInCapabilityCatalog.TryBind`, `IChatClient` structured output, `RetainedInoCapabilityPayload`.
+- Consumes: `BuiltInCapabilityCatalog.TryBind` on an injected catalog instance resolved via DI (`TryBind` is an instance method returning the composed `CapabilityDescriptor`, not a static lookup and not `CapabilityIntentBinding`, which was deleted), `IChatClient` structured output, `RetainedInoCapabilityPayload`.
 - Produces: `ICapabilityParameterModel.ExtractAsync` returning a payload whose tool ID must equal the server-selected capability.
 
 - [ ] **Step 1: Add a failing model-boundary test**
@@ -417,7 +430,7 @@ Expected: FAIL because `CapabilityParameterModel` does not exist.
 
 - [ ] **Step 3: Implement capability-scoped extraction**
 
-`CapabilityParameterRequest(string CapabilityId, string Prompt)` with prompt bounded to 4096 characters. `ExtractAsync` must first call `BuiltInCapabilityCatalog.TryBind(request.CapabilityId, out var binding)` and throw `ArgumentException` for an unknown ID. The extraction guidance states the capability is a fixed server decision. After structured output, reject any tool ID that differs:
+`CapabilityParameterRequest(string CapabilityId, string Prompt)` with prompt bounded to 4096 characters. `CapabilityParameterModel` takes the Kernel's `BuiltInCapabilityCatalog` as a constructor-injected dependency. `ExtractAsync` must first call `catalog.TryBind(request.CapabilityId, out var descriptor)` and throw `ArgumentException` for an unknown ID. The extraction guidance states the capability is a fixed server decision. After structured output, reject any tool ID that differs:
 
 ```csharp
 if (!string.Equals(extracted.ToolId, request.CapabilityId, StringComparison.Ordinal))

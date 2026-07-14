@@ -19,6 +19,7 @@ public static class GoogleServiceCollectionExtensions
         services.AddSingleton<ICapabilityHandler, GmailMessageCapabilityHandler>();
         services.AddSingleton<ICapabilityHandler, GmailMailboxCapabilityHandler>();
         services.AddSingleton<ICapabilityHandler, GmailSendProposalCapabilityHandler>();
+        services.AddSingleton<ICapabilityDescriptorSource, GoogleCapabilityDescriptorSource>();
         services.AddSingleton<IInoEffectHandler, GmailSendEffectHandler>();
         services.AddSingleton<IExternalAuthorizationResolver, GoogleAuthorizationResolver>();
         services.AddKeyedSingleton<IConnector>("google", (provider, _) => new GoogleConnector(provider.GetRequiredService<IIntegrationConfigStore>(), provider.GetRequiredService<IOAuthStateProtector>(), provider.GetService<IConfiguration>()));

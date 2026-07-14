@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\hosts\DigitalBrain.RuntimeHost\DigitalBrain.RuntimeHost.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google\DigitalBrain.Integrations.Google.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google.Contracts\DigitalBrain.Integrations.Google.Contracts.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce\DigitalBrain.Integrations.Salesforce.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce.Contracts\DigitalBrain.Integrations.Salesforce.Contracts.csproj" />

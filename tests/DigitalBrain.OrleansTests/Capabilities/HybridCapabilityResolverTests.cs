@@ -1,4 +1,6 @@
+using DigitalBrain.Integrations.Google;
 using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Integrations.Salesforce.Contracts;
 using DigitalBrain.Kernel.Capabilities;
 using Microsoft.Extensions.AI;
@@ -49,8 +51,11 @@ public sealed class HybridCapabilityResolverTests
         Assert.NotEqual(GoogleCapabilityIds.GmailSendPropose, result.Receipt.CapabilityId);
     }
 
+    private static BuiltInCapabilityCatalog Catalog() =>
+        new([new GoogleCapabilityDescriptorSource(), new SalesforceCapabilityDescriptorSource()]);
+
     private static HybridCapabilityResolver Resolver(IReadOnlyDictionary<string, float[]> vectors) =>
-        new(new BuiltInCapabilityCatalog(), new FakeEmbeddingGenerator(vectors));
+        new(Catalog(), new FakeEmbeddingGenerator(vectors));
 
     private static HybridCapabilityResolver ResolverWithZeroVectors() =>
         Resolver(new Dictionary<string, float[]>(StringComparer.Ordinal));
@@ -77,7 +82,7 @@ public sealed class HybridCapabilityResolverTests
             (connections ?? []).ToHashSet(StringComparer.Ordinal));
 
     private static string Document(string capabilityId) =>
-        HybridCapabilityResolver.SearchDocument(BuiltInCapabilityCatalog.CreateDescriptor(capabilityId));
+        HybridCapabilityResolver.SearchDocument(Catalog().Snapshot().First(descriptor => descriptor.Id == capabilityId));
 
     private sealed class FakeEmbeddingGenerator(IReadOnlyDictionary<string, float[]> vectors) : IEmbeddingGenerator<string, Embedding<float>>
     {

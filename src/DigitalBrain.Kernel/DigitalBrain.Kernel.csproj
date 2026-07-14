@@ -33,8 +33,6 @@
 
     <ProjectReference Include="..\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Features.Sdk\DigitalBrain.Features.Sdk.csproj" />
-    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google.Contracts\DigitalBrain.Integrations.Google.Contracts.csproj" />
-    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce.Contracts\DigitalBrain.Integrations.Salesforce.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
