@@ -15,9 +15,11 @@ public static class SalesforceServiceCollectionExtensions
     {
         services.AddHostedService<SalesforceAppConfigSeeder>();
         services.AddSingleton<ISalesforceApiClientFactory, SalesforceApiClientFactory>();
+        services.AddSingleton<ISalesforceMutationGateway, SalesforceMutationGateway>();
         services.AddSingleton<ICapabilityHandler, SalesforceRecordReadCapabilityHandler>();
         services.AddSingleton<ICapabilityHandler, SalesforceUpdateProposalCapabilityHandler>();
         services.AddSingleton<IInoEffectHandler, SalesforceUpdateEffectHandler>();
+        services.AddSingleton<SalesforceFeatureEffectRail>();
         services.AddKeyedSingleton<IConnector>("salesforce", (provider, _) => new SalesforceConnector(
             provider.GetRequiredService<ISalesforceApiClientFactory>(),
             provider.GetRequiredService<IPackConfigStore>(),

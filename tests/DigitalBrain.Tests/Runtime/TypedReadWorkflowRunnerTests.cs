@@ -595,5 +595,23 @@ public sealed class TypedReadWorkflowRunnerTests
             PayloadUtf8 = payloadUtf8.ToArray();
             return Task.FromResult(new InoToolRequest(toolId, InoToolAccess.Mutation, "test-plan", safeSummary));
         }
+
+        public Task<InoToolRequest> PrepareIdempotentAsync(
+            string idempotencyKey,
+            string actorScope,
+            string operationId,
+            string toolId,
+            byte[] payloadUtf8,
+            string safeSummary,
+            DateTimeOffset expiresAt,
+            CancellationToken cancellationToken = default) =>
+            PrepareAsync(
+                actorScope,
+                operationId,
+                toolId,
+                payloadUtf8,
+                safeSummary,
+                expiresAt,
+                cancellationToken);
     }
 }

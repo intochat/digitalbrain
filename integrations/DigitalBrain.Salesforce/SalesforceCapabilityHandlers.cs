@@ -81,7 +81,7 @@ public sealed class SalesforceUpdateProposalCapabilityHandler(IGrainFactory grai
     }
 }
 
-public sealed class SalesforceUpdateEffectHandler(IGrainFactory grainFactory) : IInoEffectHandler
+public sealed class SalesforceUpdateEffectHandler(ISalesforceMutationGateway gateway) : IInoEffectHandler
 {
     public string ToolId => SalesforceTools.UpdateRecord;
 
@@ -90,8 +90,16 @@ public sealed class SalesforceUpdateEffectHandler(IGrainFactory grainFactory) : 
         byte[] payloadUtf8,
         CancellationToken cancellationToken = default)
     {
-        var result = await grainFactory.GetGrain<ISalesforceMutationToolGrain>(actorScope)
-            .ApplyUpdateAsync(new SalesforcePreparedUpdate(payloadUtf8), cancellationToken).ConfigureAwait(false);
+        var prepared = new SalesforcePreparedUpdate(payloadUtf8);
+        var result = await gateway.ApplyAsync(actorScope, prepared, cancellationToken).ConfigureAwait(false);
+        if (result.Status is SalesforceMutationStatus.Applied or SalesforceMutationStatus.AlreadyApplied)
+        {
+            var verification = await gateway.VerifyAsync(actorScope, prepared, cancellationToken).ConfigureAwait(false);
+            if (!verification.Verified)
+                return new InoToolEffectResult(
+                    InoToolEffectDisposition.OutcomeUnknown,
+                    "The Salesforce update could not be confirmed. Review the record before trying again.");
+        }
         return result.Status switch
         {
             SalesforceMutationStatus.Applied => new(

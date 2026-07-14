@@ -31,7 +31,8 @@ internal static class FeatureStateEquality
         Same(left.FanOuts, right.FanOuts) &&
         Same(left.Releases, right.Releases) &&
         Same(left.Approvals, right.Approvals) &&
-        Same(left.Authorities, right.Authorities);
+        Same(left.Authorities, right.Authorities) &&
+        left.Alerts.SequenceEqual(right.Alerts);
 
     private static bool Same(
         IReadOnlyList<FeatureInstallationRegistration> left,

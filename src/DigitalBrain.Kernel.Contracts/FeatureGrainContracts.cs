@@ -171,7 +171,8 @@ public sealed record FeatureInput(
     [property: Id(2)] string PayloadJson,
     [property: Id(3)] DateTimeOffset OccurredAt,
     [property: Id(4)] string CorrelationId,
-    [property: Id(5)] string TraceId);
+    [property: Id(5)] string TraceId,
+    [property: Id(6)] string? CausationId = null);
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease-fence")]
 public sealed record FeatureLeaseFence(
@@ -201,6 +202,20 @@ public sealed record FeatureIntent(
     [property: Id(0)] string LogicalOperationKey,
     [property: Id(1)] FeatureIntentKind Kind,
     [property: Id(2)] string PayloadJson);
+
+public static class FeatureIntentKeys
+{
+    public static string Create(
+        FeatureInstallationId installationId,
+        string inputId,
+        string logicalOperationKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(installationId.Value);
+        ArgumentException.ThrowIfNullOrWhiteSpace(inputId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(logicalOperationKey);
+        return $"{installationId.Value.Length}:{installationId.Value}{inputId.Length}:{inputId}{logicalOperationKey.Length}:{logicalOperationKey}";
+    }
+}
 
 [GenerateSerializer, Alias("digitalbrain.v3.feature-resource-usage")]
 public sealed record FeatureResourceUsage(
@@ -297,6 +312,14 @@ public sealed record FeatureFanOutResult(
     [property: Id(1)] int Delivered,
     [property: Id(2)] int Pending);
 
+[GenerateSerializer, Alias("digitalbrain.v3.feature-backpressure-alert")]
+public sealed record FeatureBackpressureAlert(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] string InputId,
+    [property: Id(2)] string Kind,
+    [property: Id(3)] DateTimeOffset OccurredAt,
+    [property: Id(4)] string Reason);
+
 [GenerateSerializer, Alias("digitalbrain.v3.feature-hub-snapshot")]
 public sealed record FeatureHubSnapshot(
     [property: Id(0)] FeatureInstallationRegistration[] Installations,
@@ -304,7 +327,14 @@ public sealed record FeatureHubSnapshot(
     [property: Id(2)] long Revision,
     [property: Id(3)] FeatureReleaseMetadata[] Releases,
     [property: Id(4)] FeatureApprovalSnapshot[] Approvals,
-    [property: Id(5)] FeatureAuthoritySnapshot[] Authorities);
+    [property: Id(5)] FeatureAuthoritySnapshot[] Authorities,
+    [property: Id(6)] FeatureBackpressureAlert[] Alerts);
+
+public interface IFeatureGrainResolver
+{
+    IFeatureHubGrain Hub(BrainOwnerId ownerId);
+    IFeatureInstallationGrain Installation(BrainOwnerId ownerId, FeatureInstallationId installationId);
+}
 
 [Alias("digitalbrain.v3.feature-hub-grain")]
 public interface IFeatureHubGrain : IGrainWithStringKey

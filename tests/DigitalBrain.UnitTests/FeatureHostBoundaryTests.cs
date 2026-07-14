@@ -43,12 +43,19 @@ public sealed class FeatureHostBoundaryTests
         Assert.DoesNotContain("DefaultAzureCredential", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Google.Apis", source, StringComparison.Ordinal);
         Assert.DoesNotContain("DeveloperForce", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ClientSecret", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("AccessToken", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("RefreshToken", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderCredential", source, StringComparison.Ordinal);
         Assert.Contains("HttpFeatureCapabilityClient", source, StringComparison.Ordinal);
         Assert.DoesNotContain("IFeatureHubGrain", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GrantAsync", source, StringComparison.Ordinal);
         Assert.DoesNotContain("RevokeAsync", source, StringComparison.Ordinal);
         Assert.DoesNotContain("PauseInstallationAsync", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ResumeInstallationAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("AwaitingApproval", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("WaitForApproval", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DecideApproval", source, StringComparison.Ordinal);
         Assert.DoesNotContain("googleapis.com", source, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("salesforce.com", source, StringComparison.OrdinalIgnoreCase);
     }

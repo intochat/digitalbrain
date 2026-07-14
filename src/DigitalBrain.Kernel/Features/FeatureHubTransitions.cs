@@ -362,6 +362,55 @@ public static class FeatureHubTransitions
         return state with { FanOuts = fanOuts, Revision = checked(state.Revision + 1) };
     }
 
+    public static FeatureHubState RecordDeliveryOutcomes(
+        FeatureHubState state,
+        string inputId,
+        IReadOnlyList<FeatureDeliveryAttempt> attempts,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(attempts);
+        if (now.Offset != TimeSpan.Zero)
+            throw new ArgumentException("Feature delivery timestamps must be UTC.", nameof(now));
+        var delivered = attempts
+            .Where(attempt => attempt.Status is FeatureAppendStatus.Accepted or FeatureAppendStatus.Duplicate)
+            .Select(attempt => attempt.InstallationId)
+            .ToHashSet();
+        var next = RecordDeliveries(state, inputId, delivered);
+        var full = attempts
+            .Where(attempt => attempt.Status == FeatureAppendStatus.Full)
+            .Select(attempt => attempt.InstallationId)
+            .Distinct()
+            .ToArray();
+        if (full.Length == 0) return next;
+        var batch = next.FanOuts.Single(candidate =>
+            string.Equals(candidate.Input.InputId, inputId, StringComparison.Ordinal));
+        var alerts = next.Alerts.ToList();
+        foreach (var installationId in full)
+        {
+            if (alerts.Any(alert => alert.InstallationId == installationId &&
+                                    string.Equals(alert.InputId, inputId, StringComparison.Ordinal)))
+                continue;
+            alerts.Add(new FeatureBackpressureAlert(
+                installationId,
+                inputId,
+                batch.Input.Kind,
+                now,
+                "feature inbox full"));
+        }
+        if (alerts.Count > FeatureLimits.FanOutBatches)
+            alerts = alerts.TakeLast(FeatureLimits.FanOutBatches).ToList();
+        var authorities = next.Authorities.Select(authority =>
+            full.Contains(authority.InstallationId)
+                ? authority with { Paused = true, PauseReason = "feature inbox full" }
+                : authority).ToArray();
+        return next with
+        {
+            Alerts = alerts.ToArray(),
+            Authorities = authorities,
+            Revision = checked(next.Revision + 1)
+        };
+    }
+
     private static FeatureReleaseMetadata ValidateRelease(FeatureReleaseMetadata release)
     {
         ArgumentNullException.ThrowIfNull(release);

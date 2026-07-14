@@ -5,9 +5,11 @@ using DigitalBrain.Core.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Config;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Kernel;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Memory;
+using DigitalBrain.Kernel.Features;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
@@ -35,6 +37,7 @@ public static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
         builder.Services.AddSingleton(stateProtector);
         builder.Services.AddSingleton<InoEffectPlanAuthority>();
+        builder.Services.AddSingleton<IFeatureGrainResolver, OrleansFeatureGrainResolver>();
         builder.Services.AddSingleton(new RuntimeStateHealthMetadata(
             requiresDurableStorage
                 ? useManagedIdentity ? "azure-blob-managed-identity" : "azure-blob-connection-string"

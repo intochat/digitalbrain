@@ -15,6 +15,7 @@ public static class GoogleServiceCollectionExtensions
     {
         services.AddHostedService<GoogleAppConfigSeeder>();
         services.AddSingleton<IGmailApiClientFactory, GmailApiClientFactory>();
+        services.AddSingleton<IGmailWatchEventHandler, GmailWatchEventHandler>();
         services.AddSingleton<ICapabilityHandler, GmailMailboxCapabilityHandler>();
         services.AddSingleton<ICapabilityHandler, GmailSendProposalCapabilityHandler>();
         services.AddSingleton<IInoEffectHandler, GmailSendEffectHandler>();

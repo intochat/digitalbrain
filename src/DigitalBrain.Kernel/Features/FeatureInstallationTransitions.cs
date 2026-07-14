@@ -37,7 +37,12 @@ public static class FeatureInstallationTransitions
         if (state.Inbox.Length >= FeatureLimits.InboxEntries)
         {
             return new(
-                state with { Paused = true, Revision = checked(state.Revision + 1) },
+                state with
+                {
+                    Paused = true,
+                    PauseReason = "feature inbox full",
+                    Revision = checked(state.Revision + 1)
+                },
                 FeatureAppendStatus.Full);
         }
 
@@ -194,7 +199,7 @@ public static class FeatureInstallationTransitions
             ArgumentException.ThrowIfNullOrWhiteSpace(intent.LogicalOperationKey);
             ValidateJson(intent.PayloadJson, nameof(intent.PayloadJson), FeatureLimits.StateUtf8Bytes);
             return new PersistedFeatureIntent(
-                OperationKey(state.InstallationId, commit.Fence.InputId, intent.LogicalOperationKey),
+                FeatureIntentKeys.Create(state.InstallationId, commit.Fence.InputId, intent.LogicalOperationKey),
                 intent.Kind,
                 intent.PayloadJson,
                 null);
@@ -388,6 +393,8 @@ public static class FeatureInstallationTransitions
         ValidateIdentifier(input.Kind, nameof(input.Kind));
         ValidateIdentifier(input.CorrelationId, nameof(input.CorrelationId));
         ValidateIdentifier(input.TraceId, nameof(input.TraceId));
+        if (input.CausationId is not null)
+            ValidateIdentifier(input.CausationId, nameof(input.CausationId));
         if (input.OccurredAt.Offset != TimeSpan.Zero)
             throw new ArgumentException("Feature input timestamps must be UTC.", nameof(input));
         ValidateJson(input.PayloadJson, nameof(input.PayloadJson), FeatureLimits.StateUtf8Bytes);
@@ -403,6 +410,7 @@ public static class FeatureInstallationTransitions
         canonical.Append(input.OccurredAt.UtcTicks).Append(';');
         AppendCanonical(canonical, input.CorrelationId);
         AppendCanonical(canonical, input.TraceId);
+        AppendCanonical(canonical, input.CausationId ?? string.Empty);
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
     }
 
@@ -428,12 +436,6 @@ public static class FeatureInstallationTransitions
             throw new ArgumentException("Canonical JSON is required.", parameterName, exception);
         }
     }
-
-    private static string OperationKey(
-        FeatureInstallationId installationId,
-        string inputId,
-        string logicalOperationKey) =>
-        $"{installationId.Value.Length}:{installationId.Value}{inputId.Length}:{inputId}{logicalOperationKey.Length}:{logicalOperationKey}";
 
     private static string ScheduledInputId(
         FeatureInstallationId installationId,

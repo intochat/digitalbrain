@@ -18,8 +18,7 @@ public sealed class FeatureHubGrain(
         ArgumentNullException.ThrowIfNull(registration);
         var ownerId = ParseKey();
         var next = Domain(() => FeatureHubTransitions.Register(State, registration));
-        var installation = grainFactory.GetGrain<IFeatureInstallationGrain>(
-            FeatureGrainIds.Installation(ownerId, registration.InstallationId));
+        var installation = Resolver.Installation(ownerId, registration.InstallationId);
         await installation.InitializeAsync(registration.Release);
         await WriteAsync(next);
     }
@@ -36,15 +35,12 @@ public sealed class FeatureHubGrain(
 
         var batch = State.FanOuts.Single(candidate =>
             string.Equals(candidate.Input.InputId, input.InputId, StringComparison.Ordinal));
-        var tasks = batch.Deliveries
-            .Where(delivery => !delivery.Delivered)
-            .Select(delivery => DeliverAsync(ownerId, delivery.InstallationId, batch.Input))
-            .ToArray();
-        var delivered = (await Task.WhenAll(tasks))
-            .Where(result => result.Delivered)
-            .Select(result => result.InstallationId)
-            .ToHashSet();
-        var completed = FeatureHubTransitions.RecordDeliveries(State, input.InputId, delivered);
+        var attempts = await new FeatureFanOutDeliveryRail(Resolver).DispatchAsync(ownerId, batch);
+        var completed = FeatureHubTransitions.RecordDeliveryOutcomes(
+            State,
+            input.InputId,
+            attempts,
+            timeProvider.GetUtcNow());
         if (!ReferenceEquals(completed, persistentState.State))
         {
             await WriteAsync(completed);
@@ -62,7 +58,8 @@ public sealed class FeatureHubGrain(
             State.Revision,
             State.Releases.ToArray(),
             State.Approvals.Select(ApprovalSnapshot).ToArray(),
-            State.Authorities.Select(AuthoritySnapshot).ToArray()));
+            State.Authorities.Select(AuthoritySnapshot).ToArray(),
+            State.Alerts.ToArray()));
     }
 
     public async Task<FeatureApprovalSnapshot> ProposeAsync(
@@ -119,8 +116,7 @@ public sealed class FeatureHubGrain(
             throw new InvalidOperationException("The staged grant release does not match the installation release.");
         var registered = Domain(() => FeatureHubTransitions.Register(activated, registration));
         var ownerId = ParseKey();
-        var installation = grainFactory.GetGrain<IFeatureInstallationGrain>(
-            FeatureGrainIds.Installation(ownerId, registration.InstallationId));
+        var installation = Resolver.Installation(ownerId, registration.InstallationId);
         if (State.Installations.Any(candidate => candidate.InstallationId == registration.InstallationId))
             await installation.SwitchReleaseAsync(registration.Release);
         else
@@ -205,8 +201,10 @@ public sealed class FeatureHubGrain(
 
     private BrainOwnerId ParseKey() => FeatureGrainIds.ParseHub(this.GetPrimaryKeyString());
 
+    private IFeatureGrainResolver Resolver => new OrleansFeatureGrainResolver(grainFactory);
+
     private IFeatureInstallationGrain Installation(FeatureInstallationId installationId) =>
-        grainFactory.GetGrain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(ParseKey(), installationId));
+        Resolver.Installation(ParseKey(), installationId);
 
     private async Task WriteAsync(FeatureHubState next)
     {
@@ -214,24 +212,6 @@ public sealed class FeatureHubGrain(
             persistentState,
             next,
             FeatureStateEquality.Same);
-    }
-
-    private async Task<(FeatureInstallationId InstallationId, bool Delivered)> DeliverAsync(
-        BrainOwnerId ownerId,
-        FeatureInstallationId installationId,
-        FeatureInput input)
-    {
-        try
-        {
-            var grain = grainFactory.GetGrain<IFeatureInstallationGrain>(
-                FeatureGrainIds.Installation(ownerId, installationId));
-            var status = await grain.AppendAsync(input);
-            return (installationId, status is FeatureAppendStatus.Accepted or FeatureAppendStatus.Duplicate);
-        }
-        catch
-        {
-            return (installationId, false);
-        }
     }
 
     private Activity? Start(string operation, FeatureInput? input = null)

@@ -278,9 +278,11 @@ Evidence: Feature lifecycle authority is owner-scoped and durable in the existin
 - `gmail.message.received.v1` carries only owner, IDs, correlation/causation, occurrence, and bounded minimal facts.
 - Salesforce updates are buffered proposals keyed by installation + input + logical operation key and applied only after signed approval/policy evidence.
 
-- [ ] Test watch replay, duplicate event, slow-installation isolation, full-inbox pause/alert, proposal idempotency, approval delay, connector verification, and outcome event.
-- [ ] Verify FeatureHost receives no provider credential and does not block for approval.
-- [ ] Commit `feat: connect feature event and effect rails`.
+- [x] Test watch replay, duplicate event, slow-installation isolation, full-inbox pause/alert, proposal idempotency, approval delay, connector verification, and outcome event.
+- [x] Verify FeatureHost receives no provider credential and does not block for approval.
+- [x] Commit `feat: connect feature event and effect rails`.
+
+Evidence: Gmail watch notifications become owner-scoped `gmail.message.received.v1` inputs containing only bounded message, thread, history, correlation, causation, occurrence, and trace data. Durable fan-out remains concurrent across installations; duplicate inputs are idempotent, a slow installation cannot prevent independent append attempts, and a full inbox pauses itself while the Hub persists a visible backpressure alert. Salesforce external-effect intents are keyed by owner, actor, installation, input, and logical operation; proposal replay binds the same signed immutable plan and expiry, execution waits for explicit approval evidence, the connector performs apply plus read-after-write verification, and a bounded outcome event is published after durable intent completion. FeatureHost boundary tests exclude provider SDKs, credentials, lifecycle authority, and approval waiting. The E2E suite passes 15 tests, the exact root suite passes 620 tests, `git diff --check` is clean, and `aspire doctor` passes 5/5.
 
 ### Task 13: Deletion and target-project convergence
 
