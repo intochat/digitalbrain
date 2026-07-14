@@ -44,6 +44,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.44.6'
           cache: true
 
       - name: Verify Dart code style
@@ -154,6 +155,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.44.6'
           cache: true
 
       - run: flutter pub get
