@@ -214,6 +214,8 @@ void main() {
 
   test('rejects malformed feature proposal references', () {
     final oversizedId = 'proposal-${'x' * 129}';
+    const validId = 'proposal-0123456789abcdef0123456789abcdef';
+    const validRoute = '/features/proposals/$validId';
     final invalidProposals = <Map<String, Object?>>[
       inoFeatureProposal(route: 'https://example.com'),
       inoFeatureProposal(route: '/features/proposals/not-a-proposal-id'),
@@ -222,6 +224,19 @@ void main() {
         route: '/features/proposals/$oversizedId',
       ),
       inoFeatureProposal(label: 'x' * 81),
+      inoFeatureProposal(route: '$validRoute/extra'),
+      inoFeatureProposal(route: '$validRoute?query=1'),
+      inoFeatureProposal(route: '$validRoute#fragment'),
+      inoFeatureProposal(route: '$validRoute/../x'),
+      inoFeatureProposal(
+        route:
+            '/features/proposals/proposal-'
+            '0123456789ABCDEF0123456789ABCDEF',
+      ),
+      inoFeatureProposal(
+        id: 'proposal-ffffffffffffffffffffffffffffffff',
+        route: validRoute,
+      ),
     ];
 
     for (final proposal in invalidProposals) {

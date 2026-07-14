@@ -639,7 +639,9 @@ class InoFeatureProposalReference {
     required this.route,
   });
 
-  static const String routePrefix = '/features/proposals/proposal-';
+  static final RegExp routeShape = RegExp(
+    r'^/features/proposals/proposal-[0-9a-f]{32}$',
+  );
 
   final String id;
   final String label;
@@ -655,7 +657,7 @@ class InoFeatureProposalReference {
     final id = _boundedString(json, 'id', maxLength: 128);
     final label = _boundedString(json, 'label', maxLength: 80);
     final route = _boundedString(json, 'route', maxLength: 256);
-    if (!route.startsWith(routePrefix)) {
+    if (!routeShape.hasMatch(route) || route != '/features/proposals/$id') {
       throw const FormatException(
         'payload.data.operation.proposal.route must be an internal Studio route.',
       );

@@ -580,7 +580,7 @@ class _InoConversationViewState extends State<InoConversationView> {
                       const SizedBox(height: 8),
                     ],
                     if (proposal != null) ...[
-                      _OpenStudioButton(route: proposal.route),
+                      _OpenStudioButton(proposal: proposal),
                       const SizedBox(height: 8),
                     ],
                     _OperationStatus(
@@ -746,17 +746,17 @@ class _CapabilityChip extends StatelessWidget {
 }
 
 class _OpenStudioButton extends StatelessWidget {
-  const _OpenStudioButton({required this.route});
+  const _OpenStudioButton({required this.proposal});
 
-  final String route;
+  final InoFeatureProposalReference proposal;
 
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.centerLeft,
     child: OutlinedButton(
       key: chatOpenStudioButtonKey,
-      onPressed: () => context.go(route),
-      child: const Text('Open Studio'),
+      onPressed: () => context.go(proposal.route),
+      child: Text(proposal.label),
     ),
   );
 }
