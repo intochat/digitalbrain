@@ -335,7 +335,7 @@ public sealed class HybridCapabilityResolver(
                 Lexical(query, SearchDocument(descriptor)),
                 vectorEnabled ? Cosine(queryVector, generated[index + 1].Vector.Span) : 0))
             .Select(x => x with { Score = vectorEnabled
-                ? 0.45 * x.Exact + 0.20 * x.Lexical + 0.35 * x.Vector
+                ? Math.Max(0.65 * x.Exact + 0.35 * x.Lexical, 0.70 * x.Vector + 0.30 * x.Lexical)
                 : 0.65 * x.Exact + 0.35 * x.Lexical })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Descriptor.Id, StringComparer.Ordinal)

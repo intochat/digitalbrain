@@ -11,6 +11,7 @@ using DigitalBrain.Kernel.Memory;
 using DigitalBrain.Kernel.Features;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -176,6 +177,8 @@ internal static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton<FeatureCapabilityGrantSource>();
         builder.Services.AddSingleton<ICapabilityGrantSource>(services => services.GetRequiredService<FeatureCapabilityGrantSource>());
         builder.Services.AddSingleton<ICapabilityDispatcher, CapabilityDispatcher>();
+        builder.Services.TryAddSingleton<ICapabilityCatalog, BuiltInCapabilityCatalog>();
+        builder.Services.TryAddSingleton<ICapabilityResolver, HybridCapabilityResolver>();
         builder.Services.AddHostedService<CapabilityDispatcherStartupValidation>();
         builder.Services.AddSingleton<IAgentWorkflowRunner, AgentFrameworkWorkflowRunner>();
         BlobServiceClient? integrationConfigBlobs = null;
