@@ -39,7 +39,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(FSwitch));
+    await tester.tap(find.text('Notify'));
     await tester.pumpAndSettle();
     expect(c.values['notify'], 'true');
   });
