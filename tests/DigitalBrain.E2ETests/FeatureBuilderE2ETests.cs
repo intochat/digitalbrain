@@ -7,6 +7,12 @@ using Xunit;
 
 namespace DigitalBrain.E2ETests;
 
+[CollectionDefinition("FeatureBuilder process tests", DisableParallelization = true)]
+public sealed class FeatureBuilderProcessCollection
+{
+}
+
+[Collection("FeatureBuilder process tests")]
 public sealed class FeatureBuilderReleaseE2ETests : FeatureBuilderE2ETestBase
 {
     [Fact]
@@ -44,6 +50,7 @@ public sealed class FeatureBuilderReleaseE2ETests : FeatureBuilderE2ETestBase
     }
 }
 
+[Collection("FeatureBuilder process tests")]
 public sealed class FeatureBuilderBddE2ETests : FeatureBuilderE2ETestBase
 {
     [Theory]
@@ -65,6 +72,7 @@ public sealed class FeatureBuilderBddE2ETests : FeatureBuilderE2ETestBase
     }
 }
 
+[Collection("FeatureBuilder process tests")]
 public sealed class FeatureBuilderSecurityE2ETests : FeatureBuilderE2ETestBase
 {
     [Fact]
@@ -99,6 +107,7 @@ public sealed class FeatureBuilderSecurityE2ETests : FeatureBuilderE2ETestBase
 
 }
 
+[Collection("FeatureBuilder process tests")]
 public sealed class FeatureBuilderDeadlineE2ETests : FeatureBuilderE2ETestBase
 {
     [Fact]
