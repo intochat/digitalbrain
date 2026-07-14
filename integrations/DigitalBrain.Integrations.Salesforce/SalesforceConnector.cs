@@ -1,6 +1,6 @@
+using System.Globalization;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Configuration;
-using System.Globalization;
 namespace DigitalBrain.Integrations.Salesforce;
 
 public class SalesforceConnector : IConnector

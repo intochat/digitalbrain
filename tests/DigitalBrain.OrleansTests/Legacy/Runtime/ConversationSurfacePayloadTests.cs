@@ -1,7 +1,7 @@
+using System.Text;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
-using System.Text;
 
 namespace DigitalBrain.Tests.Runtime;
 

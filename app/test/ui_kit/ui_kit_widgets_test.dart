@@ -11,7 +11,7 @@ import 'package:digitalbrain_flutter/ui_kit/ui_panel.dart';
 import 'package:digitalbrain_flutter/widgets/neuron_vector_logo.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
-  builder: (_, w) => FTheme(data: FThemes.neutral.light.touch, child: w!),
+  builder: (_, w) => FTheme(data: FTheme.neutral.light.touch, child: w!),
   home: Scaffold(body: child),
 );
 
@@ -76,7 +76,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           builder: (_, w) =>
-              FTheme(data: FThemes.neutral.light.touch, child: w!),
+              FTheme(data: FTheme.neutral.light.touch, child: w!),
           home: Scaffold(
             body: UiKitFormScope(
               controller: controller,
@@ -110,7 +110,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           builder: (_, w) =>
-              FTheme(data: FThemes.neutral.light.touch, child: w!),
+              FTheme(data: FTheme.neutral.light.touch, child: w!),
           home: Scaffold(
             body: UiKitFormScope(
               controller: controller,

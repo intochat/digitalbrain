@@ -1,5 +1,5 @@
-using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Config;
+using DigitalBrain.Kernel.Contracts;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace DigitalBrain.Tests.Runtime;

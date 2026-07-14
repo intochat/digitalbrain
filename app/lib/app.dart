@@ -18,12 +18,14 @@ class DigitalBrainApp extends StatelessWidget {
       darkTheme: theme,
       routerConfig: digitalbrainRouter,
       builder: (context, child) {
-        final foruiTheme = FThemes.neutral.dark.desktop.copyWith(
-          colors: FThemes.neutral.dark.desktop.colors.copyWith(
+        final foruiBaseTheme = FTheme.neutral.dark.desktop;
+        final foruiTheme = FThemeData(
+          colors: foruiBaseTheme.colors.copyWith(
             background: DigitalBrainColors.pitchBlack,
             foreground: DigitalBrainColors.ink,
             card: DigitalBrainColors.obsidian,
           ),
+          touch: false,
         );
         return FTheme(
           data: foruiTheme,

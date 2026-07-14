@@ -5,7 +5,7 @@ version: 0.1.0
 
 environment:
   sdk: ^3.11.0
-  flutter: ">=3.41.0"
+  flutter: ">=3.44.0"
 
 dependencies:
   flutter:
@@ -31,11 +31,11 @@ dependencies:
 
   rfw: ^1.0.0
   graphic: ^2.7.0
-  forui: ^0.21.3
+  forui: ^0.24.0
 
 
 
-  lottie: ^3.3.3
+  lottie: ^3.5.1
   flutter_earth_globe: ^2.2.1
   shared_preferences: ^2.5.5
   flutter_web_plugins:
@@ -49,13 +49,15 @@ dependencies:
   digital_brain_sdk_flutter:
     path: packages/digital_brain_sdk_flutter
 
-  widgetbook: any
+  widgetbook: 3.25.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   bloc_test: ^10.0.0
 
+dependency_overrides:
+  jose: ^0.3.5+1
 
 flutter:
   uses-material-design: true

@@ -16,7 +16,6 @@ class WidgetCensusSnapshot {
 class WidgetCensus {
   static Type? glowIconType;
 
-
   static WidgetCensusSnapshot capture(WidgetsBinding binding) {
     final root = binding.rootElement;
     if (root == null) return WidgetCensusSnapshot.empty;
@@ -26,7 +25,6 @@ class WidgetCensus {
     while (stack.isNotEmpty) {
       final e = stack.removeLast();
       widgetCount++;
-
 
       final type = e.widget.runtimeType;
       if (glowIconType != null) {

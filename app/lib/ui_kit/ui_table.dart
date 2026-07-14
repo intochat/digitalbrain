@@ -18,8 +18,8 @@ class UiKitTable extends StatelessWidget {
           text,
           overflow: TextOverflow.ellipsis,
           style: header
-              ? t.typography.sm.copyWith(fontWeight: FontWeight.w600)
-              : t.typography.sm,
+              ? t.typography.body.sm.copyWith(fontWeight: FontWeight.w600)
+              : t.typography.body.sm,
         ),
       ),
     );

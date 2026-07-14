@@ -13,7 +13,7 @@ import 'package:digitalbrain_flutter/ui_kit/ui_text_field.dart';
 import 'package:digitalbrain_flutter/rfw_host/rfw_runtime_host.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
-  builder: (_, w) => FTheme(data: FThemes.neutral.light.touch, child: w!),
+  builder: (_, w) => FTheme(data: FTheme.neutral.light.touch, child: w!),
   home: Scaffold(body: child),
 );
 

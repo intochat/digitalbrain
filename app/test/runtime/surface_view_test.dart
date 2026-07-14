@@ -1247,7 +1247,7 @@ Future<void> _pumpInoRevision(
 Widget _host(Widget child, {ThemeData? theme}) => MaterialApp(
   theme: theme,
   home: FTheme(
-    data: FThemes.neutral.light.touch,
+    data: FTheme.neutral.light.touch,
     child: Scaffold(body: SizedBox.expand(child: child)),
   ),
 );

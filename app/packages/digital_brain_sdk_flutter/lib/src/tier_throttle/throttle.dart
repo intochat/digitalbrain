@@ -14,8 +14,6 @@ double glowPainterBlurSigma(PerfTier tier) => switch (tier) {
 
 bool rimGlowEnabled(PerfTier tier) => tier != PerfTier.red;
 
-
-
 int sceneTickMinIntervalMs(PerfTier tier) => switch (tier) {
   PerfTier.smooth => 33,
   PerfTier.strained => 125,

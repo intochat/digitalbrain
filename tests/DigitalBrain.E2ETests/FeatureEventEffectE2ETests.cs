@@ -1,11 +1,11 @@
-using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Integrations.Google;
-using DigitalBrain.Kernel.Capabilities;
-using DigitalBrain.Kernel.Contracts;
-using DigitalBrain.Kernel.Features;
-using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Integrations.Salesforce.Grains;
+using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
+using DigitalBrain.Kernel.Features;
+using DigitalBrain.Kernel.Runtime;
 using Xunit;
 
 namespace DigitalBrain.E2ETests;

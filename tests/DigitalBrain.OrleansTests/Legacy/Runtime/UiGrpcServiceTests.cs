@@ -1,14 +1,13 @@
 extern alias McpProject;
-
 using System.Diagnostics;
 using System.Text.Json;
 using DigitalBrain.Integrations.Google;
 using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Integrations.Salesforce.Contracts;
+using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts.Runtime;
-using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Features;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.TestSupport;

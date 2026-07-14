@@ -1,5 +1,5 @@
-using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Kernel.Runtime;
 namespace DigitalBrain.Integrations.Google;
 
 internal enum GmailLatestIncomingState

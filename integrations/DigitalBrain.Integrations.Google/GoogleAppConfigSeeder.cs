@@ -1,8 +1,8 @@
+using DigitalBrain.Integrations.Google;
+using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Configuration;
 using DigitalBrain.Kernel.Contracts.Runtime;
-using DigitalBrain.Integrations.Google;
-using DigitalBrain.Kernel.Contracts;
-using DigitalBrain.Kernel.Capabilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

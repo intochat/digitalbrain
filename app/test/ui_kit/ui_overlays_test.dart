@@ -6,12 +6,11 @@ import 'package:digitalbrain_flutter/ui_kit/ui_sheet.dart';
 import 'package:digitalbrain_flutter/ui_kit/ui_toast.dart';
 
 Widget _forUiHost(Widget child) => MaterialApp(
-  home: FToaster(
-    child: FTheme(
-      data: FThemes.neutral.light.touch,
-      child: FScaffold(child: child),
-    ),
+  builder: (_, appChild) => FTheme(
+    data: FTheme.neutral.light.touch,
+    child: FToaster(child: appChild!),
   ),
+  home: FScaffold(child: child),
 );
 
 void main() {

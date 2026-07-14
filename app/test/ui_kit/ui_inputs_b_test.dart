@@ -64,7 +64,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: FTheme(
-          data: FThemes.neutral.light.touch,
+          data: FTheme.neutral.light.touch,
           child: FScaffold(child: UiKitSlider(name: 'level', min: 0, max: 10)),
         ),
       ),
@@ -80,7 +80,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: FTheme(
-          data: FThemes.neutral.light.touch,
+          data: FTheme.neutral.light.touch,
           child: FScaffold(
             child: UiKitFormScope(
               controller: controller,
@@ -108,7 +108,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: FTheme(
-          data: FThemes.neutral.light.touch,
+          data: FTheme.neutral.light.touch,
           child: Scaffold(
             body: SizedBox(
               width: 400,
@@ -148,7 +148,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: FTheme(
-            data: FThemes.neutral.light.touch,
+            data: FTheme.neutral.light.touch,
             child: FScaffold(
               child: UiKitFormScope(
                 controller: controller,
