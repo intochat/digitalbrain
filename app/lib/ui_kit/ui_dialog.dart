@@ -24,12 +24,13 @@ class _UiKitDialogState extends State<UiKitDialog> with PresentOnce {
       showFDialog<void>(
         context: context,
         builder: (context, style, animation) => FDialog(
-          title: Text(widget.title),
-          body: Column(
+          builder: (context, style) => Column(
             mainAxisSize: MainAxisSize.min,
-            children: widget.children,
+            children: [
+              if (widget.title.isNotEmpty) Text(widget.title),
+              ...widget.children,
+            ],
           ),
-          actions: const [],
         ),
       );
     });

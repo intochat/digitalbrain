@@ -5,7 +5,7 @@ class UiKitIcon extends StatelessWidget {
   const UiKitIcon({super.key, required this.name});
   final String name;
 
-  static const Map<String, IconData> _icons = {
+  static final Map<String, IconData> _icons = {
     'star': FIcons.star,
     'check': FIcons.check,
     'list': FIcons.list,

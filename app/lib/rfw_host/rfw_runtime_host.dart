@@ -288,9 +288,14 @@ class UiSurfaceTreeRenderer {
             )
           : null;
       return FCard(
-        title: Text(title),
-        subtitle: sub.isEmpty ? null : Text(sub),
-        child: childWidgets,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (title.isNotEmpty) Text(title),
+            if (sub.isNotEmpty) Text(sub),
+            if (childWidgets != null) childWidgets,
+          ],
+        ),
       );
     }
 
@@ -332,8 +337,13 @@ class UiSurfaceTreeRenderer {
             if (t != null && t.isNotEmpty) onNavSelected?.call(t);
           },
           child: FCard(
-            title: Text(lbl),
-            subtitle: sub.isEmpty ? null : Text(sub),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (lbl.isNotEmpty) Text(lbl),
+                if (sub.isNotEmpty) Text(sub),
+              ],
+            ),
           ),
         );
       }).toList();
@@ -624,7 +634,7 @@ class _ForuiBuddySearchState extends State<_ForuiBuddySearch> {
             .map(
               (s) => FTappable(
                 onPress: () => widget.onSelect(s),
-                child: FCard(title: Text(s)),
+                child: FCard(child: Text(s)),
               ),
             ),
       ],
@@ -635,7 +645,7 @@ class _ForuiBuddySearchState extends State<_ForuiBuddySearch> {
 TextStyle _sidebarTitleStyle() {
   final ctx = navigatorKey.currentContext;
   if (ctx != null) {
-    return FTheme.of(ctx).typography.lg;
+    return FTheme.of(ctx).typography.body.lg;
   }
   return const TextStyle(fontSize: 16, color: Color(0xFFE0E0E0));
 }
@@ -747,14 +757,25 @@ class _NeuronFormState extends State<_NeuronForm> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: FCard(
-          title: Text(title.isEmpty ? 'Form' : title),
-          subtitle: error == null || error.isEmpty
-              ? null
-              : Text(error, style: const TextStyle(color: Colors.redAccent)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (title.isNotEmpty || (error != null && error.isNotEmpty))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (title.isNotEmpty) Text(title),
+                      if (error != null && error.isNotEmpty)
+                        Text(
+                          error,
+                          style: const TextStyle(color: Colors.redAccent),
+                        ),
+                    ],
+                  ),
+                ),
               for (var i = 0; i < fields.length; i++) ...[
                 _field(fields[i], i == fields.length - 1),
                 if (i != fields.length - 1) const SizedBox(height: 12),

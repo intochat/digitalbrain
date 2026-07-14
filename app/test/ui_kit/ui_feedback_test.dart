@@ -8,7 +8,7 @@ import 'package:digitalbrain_flutter/ui_kit/ui_tooltip.dart';
 
 Widget _host(Widget child) => MaterialApp(
   home: FTheme(
-    data: FThemes.neutral.light.touch,
+    data: FTheme.neutral.light.touch,
     child: FScaffold(child: child),
   ),
 );
