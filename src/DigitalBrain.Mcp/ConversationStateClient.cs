@@ -295,7 +295,10 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
                 null,
                 operation.Version,
                 operation.Workflow,
-                operation.Status == ConversationOperationStatus.AwaitingApproval ? operation.Approval?.ApprovalId : null);
+                operation.Status == ConversationOperationStatus.AwaitingApproval ? operation.Approval?.ApprovalId : null,
+                Phase: null,
+                Capability: operation.Capability,
+                Proposal: operation.Proposal);
         }).ToArray();
         var turns = state.Turns.Select(turn => new InoConversationTurn(
             turn.IdempotencyKey,

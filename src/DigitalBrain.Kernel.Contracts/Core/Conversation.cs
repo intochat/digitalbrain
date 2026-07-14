@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DigitalBrain.Kernel.Capabilities;
 namespace DigitalBrain.Kernel.Contracts.Runtime;
 
 public static class InoConversationIdentity
@@ -38,7 +39,9 @@ public sealed record InoConversationOperation(
     long Version = 0,
     WorkflowReference? Workflow = null,
     string? ApprovalId = null,
-    InoOperationPhase? Phase = null)
+    InoOperationPhase? Phase = null,
+    CapabilityResolutionReceipt? Capability = null,
+    FeatureDraftReference? Proposal = null)
 {
     public InoConversationOperation(
             string commandId,

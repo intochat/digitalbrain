@@ -67,7 +67,9 @@ public sealed record OperationFeedView(
     [property: Id(3)] string? SafeReason,
     [property: Id(4)] string? ApprovalId,
     [property: Id(5)] ToolAction? Action,
-    [property: Id(6)] OperationFeedTurn[] Turns);
+    [property: Id(6)] OperationFeedTurn[] Turns,
+    [property: Id(7)] CapabilityResolutionReceipt? Capability = null,
+    [property: Id(8)] FeatureDraftReference? Proposal = null);
 [GenerateSerializer, Alias("digitalbrain.runtime.operation-outbox-record")]
 public sealed record OperationOutboxRecord(
     [property: Id(0)] string EventId,
@@ -189,7 +191,9 @@ public sealed record OperationOutboxRecord(
                 OperationVersion,
                 Workflow,
                 view.ApprovalId,
-                Phase)]);
+                Phase,
+                view.Capability,
+                view.Proposal)]);
     }
     private bool IsCurrent() =>
         ProjectionSchemaVersion == CurrentProjectionSchemaVersion && string.Equals(EventType, PhaseEventType, StringComparison.Ordinal) &&

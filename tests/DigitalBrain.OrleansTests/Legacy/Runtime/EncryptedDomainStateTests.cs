@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel;
@@ -517,6 +518,58 @@ public sealed class EncryptedDomainStateTests
             "The request completed.",
             new ConversationOutboxEntry("completed-operation", "surface-feed", [], now, null),
             now));
+    }
+
+    [Fact]
+    public void Terminal_completion_rejects_a_feature_proposal_route_outside_the_proposals_namespace()
+    {
+        var now = Utc(0);
+        var state = ConversationTransitions.Initialize(ConversationState.Empty(), 0, new(
+            new("owner"), new("principal"), "conversation"));
+        state = ConversationTransitions.BeginOperation(
+            state,
+            state.Revision,
+            "command",
+            Hash("input"),
+            "operation",
+            "answer the request",
+            "request-command",
+            AcceptedOutbox("operation", now),
+            now);
+        var claim = ConversationTransitions.TryClaimOperation(
+            state,
+            state.Revision,
+            "operation",
+            "worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        var leaseFence = new ConversationLeaseFence("worker", claim.Operation!.Attempt);
+
+        Assert.Throws<ArgumentException>(() => ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "The request completed.",
+            new ConversationOutboxEntry("completed-operation-external", "surface-feed", [], now, null),
+            now,
+            leaseFence: leaseFence,
+            proposal: new FeatureDraftReference("proposal-0123456789abcdef0123456789abcdef", "Open Studio", "https://example.com")));
+
+        Assert.Throws<ArgumentException>(() => ConversationTransitions.CompleteWithAssistant(
+            claim.State,
+            claim.State.Revision,
+            "operation",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            "The request completed.",
+            new ConversationOutboxEntry("completed-operation-other", "surface-feed", [], now, null),
+            now,
+            leaseFence: leaseFence,
+            proposal: new FeatureDraftReference("proposal-0123456789abcdef0123456789abcdef", "Open Studio", "/other")));
     }
 
     [Fact]

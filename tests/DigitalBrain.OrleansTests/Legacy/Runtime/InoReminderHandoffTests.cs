@@ -8,6 +8,7 @@ using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
@@ -101,6 +102,134 @@ public sealed class InoReminderHandoffTests : NeuronTestBase
         Assert.True(
             Volatile.Read(ref _workflowCalls) == 1,
             $"A reminder handoff must execute one claimed workflow; calls={Volatile.Read(ref _workflowCalls)}, attempt={completed.Attempt}, version={completed.Version}.");
+    }
+
+    [Fact]
+    public async Task Conversation_operation_retains_capability_and_proposal_receipts_after_reload()
+    {
+        Interlocked.Exchange(ref _workflowCalls, 0);
+        var owner = new BrainOwnerId("owner");
+        var actor = new ActorId("principal");
+        var identity = new ConversationIdentity(
+            owner,
+            actor,
+            "conversation-receipt-handoff");
+        var conversationKey = RuntimeStateKeys.Conversation(owner, actor, identity.ConversationId);
+        var conversation = Grain<IConversationNeuron>(conversationKey);
+        var now = DateTimeOffset.UtcNow;
+        var acceptedOutboxId = "accepted-receipt-handoff";
+        var acceptedProjection = OperationOutboxRecord.Create(
+            acceptedOutboxId,
+            "operation-receipt-handoff",
+            InoOperationPhase.Accepted,
+            1,
+            now,
+            identity.ConversationId,
+            2,
+            "request-receipt-handoff",
+            conversationKey,
+            new OperationFeedView(
+                "command-receipt-handoff",
+                string.Empty,
+                false,
+                null,
+                null,
+                null,
+                [new OperationFeedTurn(
+                    "command-receipt-handoff",
+                    "user",
+                    "read my records",
+                    InoConversationStates.Queued)]));
+
+        var initialized = await conversation.InitializeAsync(0, identity);
+        var begun = await conversation.BeginOperationAsync(
+            initialized.Revision,
+            "command-receipt-handoff",
+            new string('e', 64),
+            "operation-receipt-handoff",
+            "read my records",
+            "request-receipt-handoff",
+            new ConversationOutboxEntry(acceptedOutboxId, "surface-feed", acceptedProjection.ToPayloadUtf8(), now, null),
+            now);
+        var claim = await conversation.TryClaimOperationAsync(
+            begun.Revision,
+            "operation-receipt-handoff",
+            "test-worker",
+            now,
+            TimeSpan.FromMinutes(1));
+        Assert.True(claim.Acquired);
+
+        var capability = new CapabilityResolutionReceipt(
+            CapabilityResolutionKind.Match,
+            "salesforce.record.read.v1",
+            "Read Salesforce records",
+            [],
+            0.92);
+        var proposal = new FeatureDraftReference(
+            "proposal-0123456789abcdef0123456789abcdef",
+            "Open Studio",
+            "/features/proposals/proposal-0123456789abcdef0123456789abcdef");
+        var terminalOutboxId = "terminal-receipt-handoff";
+        var assistantText = "I can help with that using Read Salesforce records.";
+        var terminalProjection = OperationOutboxRecord.Create(
+            terminalOutboxId,
+            "operation-receipt-handoff",
+            InoOperationPhase.Succeeded,
+            claim.Operation!.Version + 1,
+            now,
+            identity.ConversationId,
+            claim.State.Revision + 1,
+            "request-receipt-handoff",
+            conversationKey,
+            new OperationFeedView(
+                "command-receipt-handoff",
+                string.Empty,
+                false,
+                null,
+                null,
+                null,
+                [
+                    new OperationFeedTurn(
+                        "command-receipt-handoff",
+                        "user",
+                        "read my records",
+                        InoConversationStates.Succeeded),
+                    new OperationFeedTurn(
+                        "operation-receipt-handoff",
+                        "assistant",
+                        assistantText,
+                        InoConversationStates.Succeeded)
+                ],
+                capability,
+                proposal));
+
+        await conversation.CompleteWithAssistantAsync(
+            claim.State.Revision,
+            "operation-receipt-handoff",
+            ConversationOperationStatus.Succeeded,
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            assistantText,
+            new ConversationOutboxEntry(terminalOutboxId, "surface-feed", terminalProjection.ToPayloadUtf8(), now, null),
+            now,
+            leaseFence: new ConversationLeaseFence("test-worker", claim.Operation.Attempt),
+            capability: capability,
+            proposal: proposal);
+
+        await Cluster.DeactivateAsync((IAddressable)conversation);
+
+        var reloaded = Grain<IConversationNeuron>(conversationKey);
+        var state = await reloaded.ReadAsync();
+        var operation = state.Operations.Single(candidate =>
+            string.Equals(candidate.OperationId, "operation-receipt-handoff", StringComparison.Ordinal));
+
+        Assert.NotNull(operation.Capability);
+        Assert.Equal(capability.Kind, operation.Capability!.Kind);
+        Assert.Equal(capability.CapabilityId, operation.Capability.CapabilityId);
+        Assert.Equal(capability.CapabilityName, operation.Capability.CapabilityName);
+        Assert.Equal(capability.CandidateIds, operation.Capability.CandidateIds);
+        Assert.Equal(capability.Confidence, operation.Capability.Confidence);
+        Assert.Equal(proposal, operation.Proposal);
     }
 
     [Fact]

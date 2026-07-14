@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using Orleans;
@@ -63,7 +64,9 @@ public sealed record ConversationOperation(
     [property: Id(13)] string RequestId = "",
     [property: Id(14)] ApprovalRecord? Approval = null,
     [property: Id(15)] EffectRecord? Effect = null,
-    [property: Id(16)] string[]? Grants = null);
+    [property: Id(16)] string[]? Grants = null,
+    [property: Id(17)] CapabilityResolutionReceipt? Capability = null,
+    [property: Id(18)] FeatureDraftReference? Proposal = null);
 [GenerateSerializer, Alias("digitalbrain.runtime.conversation-outbox-entry")]
 public sealed record ConversationOutboxEntry(
     [property: Id(0)] string OutboxId,
@@ -198,7 +201,9 @@ public interface IConversationNeuron : IGrainWithStringKey
         ConversationOutboxEntry feedOutbox,
         DateTimeOffset now,
         WorkflowReference? workflow = null,
-        ConversationLeaseFence? leaseFence = null);
+        ConversationLeaseFence? leaseFence = null,
+        CapabilityResolutionReceipt? capability = null,
+        FeatureDraftReference? proposal = null);
     [Alias("digitalbrain.runtime.conversation.complete-effect-with-assistant")]
     Task<ConversationState> CompleteEffectWithAssistantAsync(
         long expectedRevision,
@@ -631,12 +636,16 @@ public static class ConversationTransitions
         ConversationOutboxEntry feedOutbox,
         DateTimeOffset now,
         WorkflowReference? workflow = null,
-        ConversationLeaseFence? leaseFence = null)
+        ConversationLeaseFence? leaseFence = null,
+        CapabilityResolutionReceipt? capability = null,
+        FeatureDraftReference? proposal = null)
     {
         DemandMutable(state, expectedRevision);
         ValidateTerminal(terminalStatus, safeReason);
         ValidateTurnText(assistantText, nameof(assistantText));
         ValidatePendingOutbox(feedOutbox);
+        ValidateCapabilityReceipt(capability);
+        ValidateFeatureProposal(proposal);
         var operation = RequiredOperation(state, operationId);
         if (operation.Effect is not null)
             throw new InvalidOperationException("An approved external effect must complete through the effect transition.");
@@ -665,6 +674,8 @@ public static class ConversationTransitions
             LeaseExpiresAt = null,
             SuspendedInvocation = null,
             Workflow = workflow ?? operation.Workflow,
+            Capability = capability,
+            Proposal = proposal,
             UpdatedAt = now,
             Version = checked(operation.Version + 1)
         };
@@ -1129,6 +1140,8 @@ public static class ConversationTransitions
             throw new ArgumentException("Conversation approval metadata is invalid.", nameof(operation));
         if (operation.Grants is { } operationGrants && !operationGrants.SequenceEqual(ValidateAndCanonicalizeGrants(operationGrants), StringComparer.Ordinal))
             throw new ArgumentException("Conversation operation metadata is invalid.", nameof(operation));
+        ValidateCapabilityReceipt(operation.Capability);
+        ValidateFeatureProposal(operation.Proposal);
         if (operation.SuspendedInvocation is not { } invocation) return;
         ValidateInvocationMetadata(invocation);
         if (invocation.InputUtf8 is null || invocation.InputUtf8.Length > 64 * 1024)
@@ -1191,5 +1204,25 @@ public static class ConversationTransitions
                 string.IsNullOrWhiteSpace(grant) || grant.Length > 128 || grant.Any(char.IsControl)))
             throw new ArgumentException("Conversation grants must be unique, bounded capability names.", nameof(grants));
         return canonical;
+    }
+    private static void ValidateCapabilityReceipt(CapabilityResolutionReceipt? receipt)
+    {
+        if (receipt is null) return;
+        if (!Enum.IsDefined(receipt.Kind) ||
+            receipt.CapabilityId is { } capabilityId && (string.IsNullOrWhiteSpace(capabilityId) || capabilityId.Length > 128 || capabilityId.Any(char.IsControl)) ||
+            receipt.CapabilityName is { } capabilityName && (string.IsNullOrWhiteSpace(capabilityName) || capabilityName.Length > 80 || capabilityName.Any(char.IsControl)) ||
+            receipt.CandidateIds is null || receipt.CandidateIds.Length > 5 ||
+            receipt.CandidateIds.Any(static candidate => string.IsNullOrWhiteSpace(candidate) || candidate.Length > 128 || candidate.Any(char.IsControl)) ||
+            !double.IsFinite(receipt.Confidence) || receipt.Confidence < 0 || receipt.Confidence > 1)
+            throw new ArgumentException("A capability resolution receipt must be bounded and well-formed.", nameof(receipt));
+    }
+    private static void ValidateFeatureProposal(FeatureDraftReference? proposal)
+    {
+        if (proposal is null) return;
+        if (string.IsNullOrWhiteSpace(proposal.ProposalId) || proposal.ProposalId.Length > 128 || proposal.ProposalId.Any(char.IsControl) ||
+            string.IsNullOrWhiteSpace(proposal.Label) || proposal.Label.Length > 80 || proposal.Label.Any(char.IsControl) ||
+            string.IsNullOrWhiteSpace(proposal.Route) || proposal.Route.Length > 256 || proposal.Route.Any(char.IsControl) ||
+            !proposal.Route.StartsWith("/features/proposals/proposal-", StringComparison.Ordinal))
+            throw new ArgumentException("A feature draft reference must be bounded and route to a proposal.", nameof(proposal));
     }
 }
