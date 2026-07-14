@@ -459,7 +459,11 @@ public sealed class FeatureSdkBoundaryTests
         var actual = XDocument.Load(projectPath)
             .Descendants("ProjectReference")
             .Select(reference => Path.GetFullPath(
-                Path.Combine(projectDirectory, reference.Attribute("Include")!.Value)))
+                Path.Combine(
+                    projectDirectory,
+                    reference.Attribute("Include")!.Value
+                        .Replace('\\', Path.DirectorySeparatorChar)
+                        .Replace('/', Path.DirectorySeparatorChar))))
             .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
             .Order(StringComparer.Ordinal)
             .ToArray();

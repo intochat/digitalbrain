@@ -16,7 +16,9 @@ public sealed class FeatureHostBoundaryTests
             "DigitalBrain.FeatureHost.csproj");
         var project = XDocument.Load(projectPath);
         var projectReferences = project.Descendants("ProjectReference")
-            .Select(element => Path.GetFileNameWithoutExtension((string)element.Attribute("Include")!))
+            .Select(element => (string)element.Attribute("Include")!)
+            .Select(path => path.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar))
+            .Select(path => Path.GetFileNameWithoutExtension(path)!)
             .Order(StringComparer.Ordinal)
             .ToArray();
         var packages = project.Descendants("PackageReference")

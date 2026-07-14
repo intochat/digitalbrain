@@ -324,8 +324,9 @@ public sealed class MemoryCapabilityContractTests
     }
 
     private sealed class RecordingTableClient() : TableClient(
-        "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=;EndpointSuffix=core.windows.net",
-        "memoryfacts")
+        new Uri("https://test.table.core.windows.net"),
+        "memoryfacts",
+        new TableSharedKeyCredential("test", Convert.ToBase64String(new byte[32])))
     {
         private readonly object _gate = new();
         private readonly Dictionary<(string PartitionKey, string RowKey), ITableEntity> _entities = [];

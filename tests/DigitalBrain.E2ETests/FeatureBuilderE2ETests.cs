@@ -184,7 +184,7 @@ public sealed class FeatureBuilderDeadlineE2ETests : FeatureBuilderE2ETestBase
 public abstract class FeatureBuilderE2ETestBase
 {
     protected static FeatureBuildRequest Request(FeatureSourceSnapshot snapshot, string output) =>
-        new(snapshot, OfflineFeed(), output, DateTimeOffset.UtcNow.AddSeconds(60));
+        new(snapshot, OfflineFeed(), output, DateTimeOffset.UtcNow.Add(FeatureBuildPipeline.MaximumRequestDuration));
 
     protected static string OfflineFeed()
     {
