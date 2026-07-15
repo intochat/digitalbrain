@@ -3,6 +3,9 @@ enum TransportErrorCode {
   unauthenticated,
   permissionDenied,
   invalidArgument,
+  failedPrecondition,
+  notFound,
+  aborted,
   unavailable,
   protocol,
   unknown,
@@ -17,6 +20,8 @@ class TransportException implements Exception {
   bool get isTerminal => switch (code) {
     TransportErrorCode.permissionDenied ||
     TransportErrorCode.invalidArgument ||
+    TransportErrorCode.failedPrecondition ||
+    TransportErrorCode.notFound ||
     TransportErrorCode.protocol => true,
     _ => false,
   };
@@ -36,10 +41,10 @@ class ProtocolException extends TransportException {
     : super(TransportErrorCode.protocol, message);
 }
 
-class PreconditionException extends ProtocolException {
+class PreconditionException extends TransportException {
   const PreconditionException([
-    super.message = 'UI action is stale. Refresh and try again.',
-  ]);
+    String message = 'UI action is stale. Refresh and try again.',
+  ]) : super(TransportErrorCode.failedPrecondition, message);
 }
 
 class ScopeViolation extends ProtocolException {

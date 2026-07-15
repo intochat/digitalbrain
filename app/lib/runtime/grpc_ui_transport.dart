@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:grpc/grpc_or_grpcweb.dart';
 
+import '../core/session/digitalbrain_client.dart';
 import '../grpc/ui.pb.dart' as wire;
 import '../grpc/ui.pbgrpc.dart';
 import 'protocol/surface_protocol.dart';
@@ -11,6 +12,8 @@ import 'runtime_configuration.dart';
 import 'runtime.dart';
 
 const Duration unaryRequestTimeout = Duration(seconds: 10);
+const Duration featureSuggestionRequestTimeout = Duration(seconds: 65);
+const Duration featureVerificationRequestTimeout = Duration(seconds: 65);
 
 abstract interface class GrpcClientPort {
   GrpcUnaryResponse<wire.SessionReply> bootstrapSession(
@@ -42,6 +45,26 @@ abstract interface class GrpcClientPort {
     wire.SubmitActionRequest request,
     CallOptions options,
   );
+
+  GrpcUnaryResponse<wire.FeatureDraftReply> getFeatureDraft(
+    wire.GetFeatureDraftRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.FeatureDraftReply> reviseFeatureDraft(
+    wire.ReviseFeatureDraftRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.FeatureDraftPatchReply> suggestFeatureChange(
+    wire.SuggestFeatureChangeRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.FeatureReleaseReviewReply> verifyFeatureDraft(
+    wire.VerifyFeatureDraftRequest request,
+    CallOptions options,
+  );
 }
 
 abstract interface class GrpcUnaryResponse<T> {
@@ -54,7 +77,12 @@ abstract interface class GrpcFeedResponse {
   Future<void> cancel();
 }
 
-class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
+class GrpcUiTransport
+    implements
+        UiTransport,
+        ExternalSessionTransport,
+        DigitalBrainTransport,
+        SessionProductCallCancellation {
   GrpcUiTransport.forTesting({
     required GrpcClientPort client,
     Future<void> Function()? close,
@@ -86,6 +114,8 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
   final GrpcClientPort _client;
   final Future<void> Function() _close;
   final Set<GrpcUnaryResponse<dynamic>> _activeUnaryResponses = {};
+  final Set<GrpcUnaryResponse<dynamic>> _activeProductUnaryResponses = {};
+  int _productCallEpoch = 0;
   bool _closed = false;
 
   @override
@@ -248,16 +278,104 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
   }
 
   @override
+  Future<wire.FeatureDraftReply> getFeatureDraft({
+    required String accessToken,
+    required wire.GetFeatureDraftRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.getFeatureDraft(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.FeatureDraftReply> reviseFeatureDraft({
+    required String accessToken,
+    required wire.ReviseFeatureDraftRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.reviseFeatureDraft(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.FeatureDraftPatchReply> suggestFeatureChange({
+    required String accessToken,
+    required wire.SuggestFeatureChangeRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.suggestFeatureChange(
+          request,
+          _authenticatedOptions(
+            accessToken,
+            timeout: featureSuggestionRequestTimeout,
+          ),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.FeatureReleaseReviewReply> verifyFeatureDraft({
+    required String accessToken,
+    required wire.VerifyFeatureDraftRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.verifyFeatureDraft(
+          request,
+          _authenticatedOptions(
+            accessToken,
+            timeout: featureVerificationRequestTimeout,
+          ),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    final pending = _activeUnaryResponses.toList(growable: false);
+    await cancelProductCalls();
+    final pending = _activeUnaryResponses
+        .where((response) => !_activeProductUnaryResponses.contains(response))
+        .toList(growable: false);
     for (final response in pending) {
       try {
         await response.cancel();
       } catch (_) {}
     }
     await _close();
+  }
+
+  @override
+  Future<void> cancelProductCalls() async {
+    _productCallEpoch++;
+    final pending = _activeProductUnaryResponses.toList(growable: false);
+    for (final response in pending) {
+      try {
+        await response.cancel();
+      } catch (_) {}
+    }
   }
 
   Future<T> _awaitUnary<T>(GrpcUnaryResponse<T> call) async {
@@ -272,6 +390,43 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
     try {
       return await call.response;
     } finally {
+      _activeUnaryResponses.remove(call);
+    }
+  }
+
+  Future<T> _awaitProductUnary<T>(GrpcUnaryResponse<T> call) async {
+    if (_closed) {
+      await call.cancel();
+      throw const TransportException(
+        TransportErrorCode.cancelled,
+        'UI request was cancelled.',
+      );
+    }
+    final epoch = _productCallEpoch;
+    _activeUnaryResponses.add(call);
+    _activeProductUnaryResponses.add(call);
+    try {
+      late final T result;
+      try {
+        result = await call.response;
+      } catch (_) {
+        if (epoch != _productCallEpoch) {
+          throw const TransportException(
+            TransportErrorCode.cancelled,
+            'UI request was cancelled.',
+          );
+        }
+        rethrow;
+      }
+      if (epoch != _productCallEpoch) {
+        throw const TransportException(
+          TransportErrorCode.cancelled,
+          'UI request was cancelled.',
+        );
+      }
+      return result;
+    } finally {
+      _activeProductUnaryResponses.remove(call);
       _activeUnaryResponses.remove(call);
     }
   }
@@ -395,6 +550,38 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
   ) => _GeneratedGrpcUnaryResponse(
     client.submitAction(request, options: options),
   );
+
+  @override
+  GrpcUnaryResponse<wire.FeatureDraftReply> getFeatureDraft(
+    wire.GetFeatureDraftRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.getFeatureDraft(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.FeatureDraftReply> reviseFeatureDraft(
+    wire.ReviseFeatureDraftRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.reviseFeatureDraft(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.FeatureDraftPatchReply> suggestFeatureChange(
+    wire.SuggestFeatureChangeRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.suggestFeatureChange(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.FeatureReleaseReviewReply> verifyFeatureDraft(
+    wire.VerifyFeatureDraftRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.verifyFeatureDraft(request, options: options),
+  );
 }
 
 class _GeneratedGrpcUnaryResponse<T> implements GrpcUnaryResponse<T> {
@@ -482,6 +669,14 @@ TransportException _safeTransportError(Object error) {
       StatusCode.invalidArgument => const TransportException(
         TransportErrorCode.invalidArgument,
         'UI request was invalid.',
+      ),
+      StatusCode.notFound => const TransportException(
+        TransportErrorCode.notFound,
+        'Draft was not found.',
+      ),
+      StatusCode.aborted => const TransportException(
+        TransportErrorCode.aborted,
+        'Draft changed on the server.',
       ),
       StatusCode.alreadyExists => const TransportException(
         TransportErrorCode.permissionDenied,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:digitalbrain_flutter/core/session/digitalbrain_client.dart';
 import 'package:digitalbrain_flutter/grpc/ui.pb.dart' as wire;
 import 'package:digitalbrain_flutter/runtime/runtime_configuration.dart';
 import 'package:digitalbrain_flutter/runtime/grpc_ui_transport.dart';
@@ -221,6 +222,151 @@ void main() {
       expect(result.operationId, 'operation-a');
     });
 
+    test(
+      'feature draft load uses the signed session and ten second deadline',
+      () async {
+        final reply = wire.FeatureDraftReply();
+        final port = _FakeGrpcClientPort()..featureDraftReply = reply;
+        final transport = GrpcUiTransport.forTesting(client: port);
+        final request = wire.GetFeatureDraftRequest(draftId: 'draft-a');
+
+        final result = await transport.getFeatureDraft(
+          accessToken: 'signed-session',
+          request: request,
+        );
+
+        expect(result, same(reply));
+        expect(port.getFeatureDraftRequest, same(request));
+        expect(port.getFeatureDraftOptions?.metadata, {
+          'x-v2-session': 'signed-session',
+          'x-v2-audience': digitalBrainUiAudience,
+        });
+        expect(port.getFeatureDraftOptions?.timeout, unaryRequestTimeout);
+      },
+    );
+
+    test(
+      'feature draft mutations use bounded authenticated deadlines',
+      () async {
+        final port = _FakeGrpcClientPort();
+        final transport = GrpcUiTransport.forTesting(client: port);
+        final revision = wire.ReviseFeatureDraftRequest(
+          draftId: 'draft-a',
+          expectedRevision: Int64(4),
+          idempotencyId: 'revision-a',
+        );
+        final suggestion = wire.SuggestFeatureChangeRequest(
+          draftId: 'draft-a',
+          expectedRevision: Int64(4),
+          guidance: 'Make the expected outcome measurable.',
+          suggestionId: 'suggestion-a',
+        );
+        final verification = wire.VerifyFeatureDraftRequest(
+          draftId: 'draft-a',
+          expectedRevision: Int64(4),
+          idempotencyId: 'verification-a',
+        );
+
+        await transport.reviseFeatureDraft(
+          accessToken: 'signed-session',
+          request: revision,
+        );
+        await transport.suggestFeatureChange(
+          accessToken: 'signed-session',
+          request: suggestion,
+        );
+        await transport.verifyFeatureDraft(
+          accessToken: 'signed-session',
+          request: verification,
+        );
+
+        expect(port.reviseFeatureDraftRequest, same(revision));
+        expect(port.suggestFeatureChangeRequest, same(suggestion));
+        expect(port.verifyFeatureDraftRequest, same(verification));
+        for (final options in [
+          port.reviseFeatureDraftOptions,
+          port.suggestFeatureChangeOptions,
+          port.verifyFeatureDraftOptions,
+        ]) {
+          expect(options?.metadata, {
+            'x-v2-session': 'signed-session',
+            'x-v2-audience': digitalBrainUiAudience,
+          });
+        }
+        expect(port.reviseFeatureDraftOptions?.timeout, unaryRequestTimeout);
+        expect(
+          port.suggestFeatureChangeOptions?.timeout,
+          featureSuggestionRequestTimeout,
+        );
+        expect(
+          port.verifyFeatureDraftOptions?.timeout,
+          featureVerificationRequestTimeout,
+        );
+        expect(
+          featureSuggestionRequestTimeout,
+          lessThanOrEqualTo(const Duration(seconds: 70)),
+        );
+        expect(
+          featureVerificationRequestTimeout,
+          lessThanOrEqualTo(const Duration(seconds: 70)),
+        );
+      },
+    );
+
+    test(
+      'preserves safe draft not found and revision conflict codes',
+      () async {
+        final port = _FakeGrpcClientPort();
+        final transport = GrpcUiTransport.forTesting(client: port);
+
+        port.getFeatureDraftError = GrpcError.notFound(
+          'owner-a/draft-secret must not escape',
+        );
+        await expectLater(
+          transport.getFeatureDraft(
+            accessToken: 'signed-session',
+            request: wire.GetFeatureDraftRequest(draftId: 'draft-a'),
+          ),
+          throwsA(
+            isA<TransportException>()
+                .having(
+                  (error) => error.code,
+                  'code',
+                  TransportErrorCode.notFound,
+                )
+                .having(
+                  (error) => error.safeMessage,
+                  'safeMessage',
+                  'Draft was not found.',
+                ),
+          ),
+        );
+
+        port.getFeatureDraftError = GrpcError.aborted(
+          'expected revision 4 but found 9 must not escape',
+        );
+        await expectLater(
+          transport.getFeatureDraft(
+            accessToken: 'signed-session',
+            request: wire.GetFeatureDraftRequest(draftId: 'draft-a'),
+          ),
+          throwsA(
+            isA<TransportException>()
+                .having(
+                  (error) => error.code,
+                  'code',
+                  TransportErrorCode.aborted,
+                )
+                .having(
+                  (error) => error.safeMessage,
+                  'safeMessage',
+                  'Draft changed on the server.',
+                ),
+          ),
+        );
+      },
+    );
+
     test('maps a stale action precondition to a safe rejection', () async {
       final port = _FakeGrpcClientPort()
         ..actionError = GrpcError.failedPrecondition(
@@ -236,11 +382,17 @@ void main() {
           input: const {'confirmed': true},
         ),
         throwsA(
-          isA<PreconditionException>().having(
-            (error) => error.safeMessage,
-            'safeMessage',
-            'UI action is stale. Refresh and try again.',
-          ),
+          isA<PreconditionException>()
+              .having(
+                (error) => error.code,
+                'code',
+                TransportErrorCode.failedPrecondition,
+              )
+              .having(
+                (error) => error.safeMessage,
+                'safeMessage',
+                'UI action is stale. Refresh and try again.',
+              ),
         ),
       );
     });
@@ -280,6 +432,138 @@ void main() {
 
       expect(response.cancelled, isTrue);
     });
+
+    test(
+      'sign out cancels product calls before logout and rejects late results',
+      () async {
+        final revisePending = Completer<wire.FeatureDraftReply>();
+        final suggestPending = Completer<wire.FeatureDraftPatchReply>();
+        final verifyPending = Completer<wire.FeatureReleaseReviewReply>();
+        final port = _FakeGrpcClientPort();
+        final reviseResponse = _FakeGrpcUnaryResponse(
+          revisePending.future,
+          onCancel: () async => port.events.add('cancel-revise'),
+        );
+        final suggestResponse = _FakeGrpcUnaryResponse(
+          suggestPending.future,
+          onCancel: () async => port.events.add('cancel-suggest'),
+        );
+        final verifyResponse = _FakeGrpcUnaryResponse(
+          verifyPending.future,
+          onCancel: () async => port.events.add('cancel-verify'),
+        );
+        port
+          ..reviseFeatureDraftResponse = reviseResponse
+          ..suggestFeatureChangeResponse = suggestResponse
+          ..verifyFeatureDraftResponse = verifyResponse;
+        var closeCalls = 0;
+        final transport = GrpcUiTransport.forTesting(
+          client: port,
+          close: () async {
+            closeCalls++;
+          },
+        );
+        final session = SessionController(now: () => testNow)
+          ..establish(testSession());
+        final revise = transport.reviseFeatureDraft(
+          accessToken: 'access-token',
+          request: wire.ReviseFeatureDraftRequest(
+            draftId: 'draft-a',
+            expectedRevision: Int64(4),
+            idempotencyId: 'mutation-a',
+          ),
+        );
+        final suggest = transport.suggestFeatureChange(
+          accessToken: 'access-token',
+          request: wire.SuggestFeatureChangeRequest(
+            draftId: 'draft-a',
+            expectedRevision: Int64(4),
+            guidance: 'Make the outcome measurable.',
+            suggestionId: 'suggestion-a',
+          ),
+        );
+        final verify = transport.verifyFeatureDraft(
+          accessToken: 'access-token',
+          request: wire.VerifyFeatureDraftRequest(
+            draftId: 'draft-a',
+            expectedRevision: Int64(4),
+            idempotencyId: 'verification-a',
+          ),
+        );
+        final cancellation = isA<TransportException>().having(
+          (error) => error.code,
+          'code',
+          TransportErrorCode.cancelled,
+        );
+        final expectations = [
+          expectLater(revise, throwsA(cancellation)),
+          expectLater(suggest, throwsA(cancellation)),
+          expectLater(verify, throwsA(cancellation)),
+        ];
+        await Future<void>.delayed(Duration.zero);
+
+        await session.signOut(transport);
+        revisePending.complete(wire.FeatureDraftReply());
+        suggestPending.complete(wire.FeatureDraftPatchReply());
+        verifyPending.complete(wire.FeatureReleaseReviewReply());
+        await Future.wait(expectations);
+        expect(port.events, [
+          'cancel-revise',
+          'cancel-suggest',
+          'cancel-verify',
+          'logout',
+        ]);
+        expect(reviseResponse.cancelled, isTrue);
+        expect(suggestResponse.cancelled, isTrue);
+        expect(verifyResponse.cancelled, isTrue);
+        expect(closeCalls, 0);
+      },
+    );
+
+    test(
+      'sign out maps a late product authentication error to cancellation',
+      () async {
+        final pending = Completer<wire.FeatureDraftReply>();
+        final response = _FakeGrpcUnaryResponse(pending.future);
+        final port = _FakeGrpcClientPort()
+          ..reviseFeatureDraftResponse = response;
+        final transport = GrpcUiTransport.forTesting(client: port);
+        final session = SessionController(now: () => testNow)
+          ..establish(testSession());
+        var authenticationRequiredCalls = 0;
+        final client = DigitalBrainClient(
+          session: session,
+          transport: transport,
+          onAuthenticationRequired: () async {
+            authenticationRequiredCalls++;
+          },
+        );
+
+        final revision = client.reviseFeatureDraft(
+          wire.ReviseFeatureDraftRequest(
+            draftId: 'draft-a',
+            expectedRevision: Int64(4),
+            idempotencyId: 'mutation-a',
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        await session.signOut(transport);
+        pending.completeError(GrpcError.unauthenticated('late rejection'));
+
+        await expectLater(
+          revision,
+          throwsA(
+            isA<TransportException>().having(
+              (error) => error.code,
+              'code',
+              TransportErrorCode.cancelled,
+            ),
+          ),
+        );
+        expect(authenticationRequiredCalls, 0);
+        expect(session.status, SessionStatus.signedOut);
+      },
+    );
 
     test(
       'rejects anonymous calls and private fields in action input',
@@ -398,6 +682,7 @@ Future<void> _eventually(bool Function() condition) async {
 }
 
 class _FakeGrpcClientPort implements GrpcClientPort {
+  final List<String> events = [];
   wire.BootstrapSessionRequest? bootstrapRequest;
   CallOptions? bootstrapOptions;
   wire.RefreshSessionRequest? refreshRequest;
@@ -414,6 +699,19 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   Object? actionError;
   GrpcFeedResponse? feedResponse;
   GrpcUnaryResponse<wire.AcknowledgeSurfaceFeedReply>? ackResponse;
+  wire.GetFeatureDraftRequest? getFeatureDraftRequest;
+  CallOptions? getFeatureDraftOptions;
+  wire.FeatureDraftReply? featureDraftReply;
+  Object? getFeatureDraftError;
+  wire.ReviseFeatureDraftRequest? reviseFeatureDraftRequest;
+  CallOptions? reviseFeatureDraftOptions;
+  GrpcUnaryResponse<wire.FeatureDraftReply>? reviseFeatureDraftResponse;
+  wire.SuggestFeatureChangeRequest? suggestFeatureChangeRequest;
+  CallOptions? suggestFeatureChangeOptions;
+  GrpcUnaryResponse<wire.FeatureDraftPatchReply>? suggestFeatureChangeResponse;
+  wire.VerifyFeatureDraftRequest? verifyFeatureDraftRequest;
+  CallOptions? verifyFeatureDraftOptions;
+  GrpcUnaryResponse<wire.FeatureReleaseReviewReply>? verifyFeatureDraftResponse;
 
   wire.SessionReply get sessionReply => wire.SessionReply(
     accessToken: 'access-token',
@@ -459,6 +757,7 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   ) {
     logoutRequest = request;
     logoutOptions = options;
+    events.add('logout');
     return _FakeGrpcUnaryResponse(Future.value(wire.LogoutSessionReply()));
   }
 
@@ -506,6 +805,59 @@ class _FakeGrpcClientPort implements GrpcClientPort {
           idempotencyKey: 'idempotency-a',
         ),
       ),
+    );
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureDraftReply> getFeatureDraft(
+    wire.GetFeatureDraftRequest request,
+    CallOptions options,
+  ) {
+    getFeatureDraftRequest = request;
+    getFeatureDraftOptions = options;
+    if (getFeatureDraftError case final error?) {
+      return _FakeGrpcUnaryResponse(Future.error(error));
+    }
+    return _FakeGrpcUnaryResponse(
+      Future.value(featureDraftReply ?? wire.FeatureDraftReply()),
+    );
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureDraftReply> reviseFeatureDraft(
+    wire.ReviseFeatureDraftRequest request,
+    CallOptions options,
+  ) {
+    reviseFeatureDraftRequest = request;
+    reviseFeatureDraftOptions = options;
+    final response = reviseFeatureDraftResponse;
+    if (response != null) return response;
+    return _FakeGrpcUnaryResponse(Future.value(wire.FeatureDraftReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureDraftPatchReply> suggestFeatureChange(
+    wire.SuggestFeatureChangeRequest request,
+    CallOptions options,
+  ) {
+    suggestFeatureChangeRequest = request;
+    suggestFeatureChangeOptions = options;
+    final response = suggestFeatureChangeResponse;
+    if (response != null) return response;
+    return _FakeGrpcUnaryResponse(Future.value(wire.FeatureDraftPatchReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureReleaseReviewReply> verifyFeatureDraft(
+    wire.VerifyFeatureDraftRequest request,
+    CallOptions options,
+  ) {
+    verifyFeatureDraftRequest = request;
+    verifyFeatureDraftOptions = options;
+    final response = verifyFeatureDraftResponse;
+    if (response != null) return response;
+    return _FakeGrpcUnaryResponse(
+      Future.value(wire.FeatureReleaseReviewReply()),
     );
   }
 }

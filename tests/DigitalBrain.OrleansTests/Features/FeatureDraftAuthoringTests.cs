@@ -139,6 +139,35 @@ public sealed class FeatureDraftAuthoringTests
             new ReviseFeatureSource(created.Draft.DraftId, source, 0, "source-invalid", Now.AddMinutes(1))));
     }
 
+    [Theory]
+    [InlineData("src/COM¹/Feature.csproj")]
+    [InlineData("src/com¹.txt/Feature.csproj")]
+    [InlineData("src/COM²/Feature.csproj")]
+    [InlineData("src/cOm².json/Feature.csproj")]
+    [InlineData("src/COM³/Feature.csproj")]
+    [InlineData("src/Com³.cs/Feature.csproj")]
+    [InlineData("src/LPT¹/Feature.csproj")]
+    [InlineData("src/lpt¹.txt/Feature.csproj")]
+    [InlineData("src/LPT²/Feature.csproj")]
+    [InlineData("src/lPt².json/Feature.csproj")]
+    [InlineData("src/LPT³/Feature.csproj")]
+    [InlineData("src/Lpt³.cs/Feature.csproj")]
+    public void ReviseFeatureSource_rejects_Windows_reserved_device_aliases(string invalidPath)
+    {
+        var created = Create();
+        var source = new FeatureSourceSnapshot(
+            invalidPath,
+            "tests/Feature.Scenarios/Feature.Scenarios.csproj",
+            [
+                new FeatureSourceFile(invalidPath, "implementation"),
+                new FeatureSourceFile("tests/Feature.Scenarios/Feature.Scenarios.csproj", "scenarios")
+            ]);
+
+        Assert.Throws<ArgumentException>(() => FeatureDraftAuthoringTransitions.ReviseSource(
+            created.State,
+            new ReviseFeatureSource(created.Draft.DraftId, source, 0, "source-reserved-device", Now.AddMinutes(1))));
+    }
+
     [Fact]
     public void ReviseFeatureSource_rejects_a_Source_Snapshot_missing_an_entry_project()
     {

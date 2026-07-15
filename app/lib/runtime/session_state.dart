@@ -5,6 +5,8 @@ enum SessionStatus {
   authenticating,
   authenticated,
   refreshing,
+  expiring,
+  signingOut,
   expired,
 }
 
@@ -50,6 +52,28 @@ class SessionBundle {
   String toString() => 'SessionBundle([private])';
 }
 
+class SessionAccessLease {
+  const SessionAccessLease._({
+    required this.accessToken,
+    required SessionController session,
+    required SessionBundle bundle,
+    required int bundleVersion,
+    required int authenticationGeneration,
+  }) : _session = session,
+       _bundle = bundle,
+       _bundleVersion = bundleVersion,
+       _authenticationGeneration = authenticationGeneration;
+
+  final String accessToken;
+  final SessionController _session;
+  final SessionBundle _bundle;
+  final int _bundleVersion;
+  final int _authenticationGeneration;
+
+  @override
+  String toString() => 'SessionAccessLease([REDACTED])';
+}
+
 abstract interface class SessionTransport {
   Future<SessionBundle> login({
     required String username,
@@ -63,6 +87,10 @@ abstract interface class SessionTransport {
 
 abstract interface class ExternalSessionTransport {
   Future<SessionBundle> loginExternal(String identityToken);
+}
+
+abstract interface class SessionProductCallCancellation {
+  Future<void> cancelProductCalls();
 }
 
 class SessionController {
@@ -84,7 +112,9 @@ class SessionController {
   String? get ownerId => identity?.ownerId;
   String? get actorId => identity?.actorId;
   bool get isAuthenticated =>
-      status == SessionStatus.authenticated && _bundle != null;
+      (status == SessionStatus.authenticated ||
+          status == SessionStatus.refreshing) &&
+      _bundle != null;
 
   void begin() {
     lastError = null;
@@ -153,6 +183,10 @@ class SessionController {
     SessionTransport transport, {
     Duration refreshSkew = const Duration(seconds: 30),
   }) async {
+    if (status == SessionStatus.expiring ||
+        status == SessionStatus.signingOut) {
+      throw const AuthenticationException();
+    }
     var bundle = _bundle;
     if (bundle == null) throw const AuthenticationException();
     final refreshInFlight = _currentRefresh;
@@ -160,7 +194,7 @@ class SessionController {
     final now = _now().toUtc();
     if (bundle.credentials.refreshExpiresAt.isBefore(now) ||
         bundle.credentials.refreshExpiresAt.isAtSameMomentAs(now)) {
-      expire();
+      await expireAfterCancellingProductCalls(transport);
       throw const AuthenticationException('Runtime session refresh expired.');
     }
     if (bundle.credentials.accessExpiresAt.isAfter(now.add(refreshSkew))) {
@@ -170,7 +204,57 @@ class SessionController {
     return refreshAccessToken(transport);
   }
 
+  Future<SessionAccessLease> accessLease(
+    SessionTransport transport, {
+    Duration refreshSkew = const Duration(seconds: 30),
+  }) async {
+    final accessToken = await this.accessToken(
+      transport,
+      refreshSkew: refreshSkew,
+    );
+    final lease = currentAccessLease();
+    if (lease.accessToken != accessToken) {
+      throw const AuthenticationException();
+    }
+    return lease;
+  }
+
+  SessionAccessLease currentAccessLease() {
+    final bundle = _bundle;
+    if (bundle == null ||
+        (status != SessionStatus.authenticated &&
+            status != SessionStatus.refreshing)) {
+      throw const AuthenticationException();
+    }
+    return SessionAccessLease._(
+      accessToken: bundle.credentials.accessToken,
+      session: this,
+      bundle: bundle,
+      bundleVersion: _bundleVersion,
+      authenticationGeneration: _authenticationGeneration,
+    );
+  }
+
+  void validateAccessLease(SessionAccessLease lease) {
+    if (!isAccessLeaseCurrent(lease)) {
+      throw const AuthenticationException();
+    }
+  }
+
+  bool isAccessLeaseCurrent(SessionAccessLease lease) =>
+      identical(lease._session, this) &&
+      identical(lease._bundle, _bundle) &&
+      lease._bundleVersion == _bundleVersion &&
+      lease._authenticationGeneration == _authenticationGeneration &&
+      (status == SessionStatus.authenticated ||
+          status == SessionStatus.refreshing) &&
+      lease._bundle.credentials.accessToken == lease.accessToken;
+
   Future<String> refreshAccessToken(SessionTransport transport) async {
+    if (status == SessionStatus.expiring ||
+        status == SessionStatus.signingOut) {
+      throw const AuthenticationException();
+    }
     final refreshInFlight = _currentRefresh;
     if (refreshInFlight != null) return refreshInFlight;
 
@@ -178,7 +262,7 @@ class SessionController {
     if (bundle == null) throw const AuthenticationException();
     final now = _now().toUtc();
     if (!bundle.credentials.refreshExpiresAt.isAfter(now)) {
-      expire();
+      await expireAfterCancellingProductCalls(transport);
       throw const AuthenticationException('Runtime session refresh expired.');
     }
 
@@ -213,7 +297,9 @@ class SessionController {
       }
       if (!_isCurrent(bundle, bundleVersion)) {
         final current = _bundle;
-        if (current == null ||
+        if (status == SessionStatus.expiring ||
+            status == SessionStatus.signingOut ||
+            current == null ||
             !_sameIdentity(bundle.identity, current.identity)) {
           throw const AuthenticationException();
         }
@@ -224,7 +310,11 @@ class SessionController {
     } catch (error) {
       if (_isCurrent(bundle, bundleVersion)) {
         lastError = error;
-        expire();
+        if (error is AuthenticationException || error is ProtocolException) {
+          await expireAfterCancellingProductCalls(transport);
+        } else {
+          status = SessionStatus.authenticated;
+        }
       }
       rethrow;
     }
@@ -243,10 +333,21 @@ class SessionController {
     status = SessionStatus.expired;
   }
 
+  void beginExpiration() {
+    if (status == SessionStatus.expired || status == SessionStatus.expiring) {
+      return;
+    }
+    _authenticationGeneration++;
+    _bundleVersion++;
+    status = SessionStatus.expiring;
+  }
+
   Future<void> signOut(SessionTransport transport) async {
     final bundle = _bundle;
     final refreshToken = bundle?.credentials.refreshToken;
     _authenticationGeneration++;
+    _bundleVersion++;
+    status = SessionStatus.signingOut;
     if (refreshToken == null) {
       _bundle = null;
       _bundleVersion++;
@@ -255,6 +356,7 @@ class SessionController {
       return;
     }
     try {
+      await _cancelProductCalls(transport);
       await transport.logout(refreshToken: refreshToken);
     } catch (error) {
       if (identical(_bundle, bundle)) {
@@ -291,4 +393,30 @@ class SessionController {
       left.sessionId == right.sessionId &&
       left.ownerId == right.ownerId &&
       left.actorId == right.actorId;
+
+  Future<bool> expireAfterCancellingProductCalls(
+    SessionTransport transport,
+  ) async {
+    beginExpiration();
+    final authenticationGeneration = _authenticationGeneration;
+    final bundleVersion = _bundleVersion;
+    var completed = false;
+    try {
+      await _cancelProductCalls(transport);
+    } finally {
+      if (status == SessionStatus.expiring &&
+          _authenticationGeneration == authenticationGeneration &&
+          _bundleVersion == bundleVersion) {
+        expire();
+        completed = true;
+      }
+    }
+    return completed;
+  }
+
+  static Future<void> _cancelProductCalls(SessionTransport transport) async {
+    if (transport case final SessionProductCallCancellation cancellation) {
+      await cancellation.cancelProductCalls();
+    }
+  }
 }

@@ -7,7 +7,11 @@ using DigitalBrain.Kernel.Contracts.Runtime;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using DigitalBrainUiEndpoints = McpProject::DigitalBrain.Mcp.DigitalBrainUiEndpoints;
+using GrpcFeatureSourceFile = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureSourceFile;
+using GrpcFeatureSourceSnapshot = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureSourceSnapshot;
 using GetFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureDraftRequest;
+using ReviseFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureDraftRequest;
+using ReviseFeatureSourceInput = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureSourceInput;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 
 namespace DigitalBrain.Tests.Runtime;
@@ -57,6 +61,53 @@ public sealed class DigitalBrainUiEndpointBoundaryTests
         Assert.Equal("The Feature request could not be completed.", mappingUnexpected.Status.Detail);
         Assert.Same(existing, preserved);
         Assert.DoesNotContain(logger.Messages, message => message.Contains("canary", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("src/COM¹/Feature.csproj")]
+    [InlineData("src/com¹.txt/Feature.csproj")]
+    [InlineData("src/COM²/Feature.csproj")]
+    [InlineData("src/cOm².json/Feature.csproj")]
+    [InlineData("src/COM³/Feature.csproj")]
+    [InlineData("src/Com³.cs/Feature.csproj")]
+    [InlineData("src/LPT¹/Feature.csproj")]
+    [InlineData("src/lpt¹.txt/Feature.csproj")]
+    [InlineData("src/LPT²/Feature.csproj")]
+    [InlineData("src/lPt².json/Feature.csproj")]
+    [InlineData("src/LPT³/Feature.csproj")]
+    [InlineData("src/Lpt³.cs/Feature.csproj")]
+    public async Task Public_revision_mapping_rejects_Windows_reserved_device_aliases(string invalidPath)
+    {
+        var logger = new CapturingLogger<DigitalBrainUiEndpoints>();
+        var endpoints = new DigitalBrainUiEndpoints(null!, null!, logger);
+        var source = new GrpcFeatureSourceSnapshot
+        {
+            ImplementationProjectPath = invalidPath,
+            ScenarioProjectPath = "tests/Feature.Scenarios/Feature.Scenarios.csproj"
+        };
+        source.Files.Add([
+            new GrpcFeatureSourceFile { Path = invalidPath, Content = "implementation" },
+            new GrpcFeatureSourceFile
+            {
+                Path = source.ScenarioProjectPath,
+                Content = "scenarios"
+            }
+        ]);
+        var request = new ReviseFeatureDraftRequest
+        {
+            DraftId = "draft-reserved-device",
+            ExpectedRevision = 0,
+            IdempotencyId = "source-reserved-device",
+            ReviseSource = new ReviseFeatureSourceInput { Source = source }
+        };
+
+        var rejected = await Assert.ThrowsAsync<RpcException>(() => endpoints.ReviseFeatureDraftAsync(
+            Context(new HashSet<string>(["feature.manage"], StringComparer.Ordinal)),
+            request,
+            CancellationToken.None));
+
+        Assert.Equal(StatusCode.InvalidArgument, rejected.StatusCode);
+        Assert.Equal("The Feature request is invalid.", rejected.Status.Detail);
     }
 
     [Fact]

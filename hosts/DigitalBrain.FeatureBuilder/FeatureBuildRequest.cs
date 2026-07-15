@@ -46,6 +46,10 @@ public sealed class FeatureSourceFile
 }
 public sealed class FeatureSourceSnapshot
 {
+    private static readonly char[] InvalidPathCharacters = ['<', '>', ':', '"', '|', '?', '*'];
+    private static readonly HashSet<string> ReservedPathSegments = new(
+        ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM¹", "COM²", "COM³", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³"],
+        StringComparer.OrdinalIgnoreCase);
     public const int MaximumFileCount = 64;
     public const int MaximumFileBytes = 1_048_576;
     public const int MaximumTotalBytes = 4_194_304;
@@ -97,12 +101,22 @@ public sealed class FeatureSourceSnapshot
             path.StartsWith('/', StringComparison.Ordinal) ||
             Path.IsPathRooted(path) ||
             (path.Length >= 2 && char.IsAsciiLetter(path[0]) && path[1] == ':') ||
-            path.Split('/').Any(static segment =>
-                segment.Length == 0 || segment is "." or ".."))
+            path.Split('/').Any(static segment => !IsPortablePathSegment(segment)))
         {
             throw new ArgumentException("A bounded canonical relative path is required.", parameterName);
         }
         return path;
+    }
+
+    private static bool IsPortablePathSegment(string segment)
+    {
+        if (segment.Length == 0 || segment is "." or ".." ||
+            !string.Equals(segment, segment.Trim(), StringComparison.Ordinal) ||
+            segment.Any(char.IsControl) ||
+            segment.IndexOfAny(InvalidPathCharacters) >= 0 ||
+            segment.EndsWith('.'))
+            return false;
+        return !ReservedPathSegments.Contains(segment.Split('.', 2)[0]);
     }
 }
 public sealed class FeatureBuildRequest

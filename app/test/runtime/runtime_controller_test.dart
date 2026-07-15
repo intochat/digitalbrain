@@ -341,6 +341,35 @@ void main() {
     );
 
     test(
+      'transient refresh failure after feed authentication rejection reconnects',
+      () async {
+        final first = _FakeFeedCall.error(
+          const AuthenticationException('Access session expired.'),
+        );
+        final second = _FakeFeedCall.open();
+        final transport = _FakeUiTransport(
+          [first, second],
+          refreshError: const TransportException(
+            TransportErrorCode.unavailable,
+            'Session refresh is temporarily unavailable.',
+          ),
+        );
+        final runtime = _runtime(transport);
+
+        await _login(runtime, 'bootstrap-once');
+        await _eventually(() => transport.watchAfter.length == 2);
+
+        expect(transport.refreshCount, 1);
+        expect(runtime.session.isAuthenticated, isTrue);
+        expect(runtime.status, RuntimeStatus.streaming);
+        expect(runtime.retainAuthenticatedContentForReauthentication, isFalse);
+        expect(transport.watchAccessTokens, ['access-token', 'access-token']);
+
+        await runtime.stop();
+      },
+    );
+
+    test(
       'terminal stream error is never overwritten by subsequent done',
       () async {
         const original = TransportException(

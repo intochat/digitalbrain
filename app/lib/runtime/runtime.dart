@@ -107,12 +107,15 @@ class RuntimeController extends ChangeNotifier {
   bool _stopRequested = false;
   bool _forceSnapshot = false;
   bool _disposed = false;
+  bool _retainAuthenticatedContentForReauthentication = false;
   int _generation = 0;
   int _scopeEpoch = 0;
   int _authenticationGeneration = 0;
 
   bool get hasSurface => latestSurface != null;
   int get scopeEpoch => _scopeEpoch;
+  bool get retainAuthenticatedContentForReauthentication =>
+      _retainAuthenticatedContentForReauthentication;
   bool get _isTerminated => _disposed || _terminalShutdownFuture != null;
 
   bool canSubmitActionsFrom(SurfaceEnvelope surface) =>
@@ -179,6 +182,7 @@ class RuntimeController extends ChangeNotifier {
       }
       final identity = session.identity!;
       feed.bindIdentity(identity);
+      _retainAuthenticatedContentForReauthentication = false;
       _launchLoop();
     } catch (error) {
       if (_isTerminated ||
@@ -193,14 +197,15 @@ class RuntimeController extends ChangeNotifier {
 
   Future<void> signOut() async {
     if (_isTerminated) return;
+    _retainAuthenticatedContentForReauthentication = false;
     final authenticationGeneration = ++_authenticationGeneration;
-    await stop(closeTransport: false, invalidateAuthentication: false);
-    if (_isTerminated ||
-        authenticationGeneration != _authenticationGeneration) {
-      return;
-    }
+    final revocation = session.signOut(transport);
+    final stopping = stop(
+      closeTransport: false,
+      invalidateAuthentication: false,
+    );
     try {
-      await session.signOut(transport);
+      await Future.wait([revocation, stopping]);
       if (_isTerminated ||
           authenticationGeneration != _authenticationGeneration) {
         return;
@@ -224,6 +229,24 @@ class RuntimeController extends ChangeNotifier {
       }
       rethrow;
     }
+  }
+
+  Future<void> requireAuthentication() async {
+    if (_isTerminated) return;
+    _retainAuthenticatedContentForReauthentication = true;
+    final authenticationGeneration = ++_authenticationGeneration;
+    session.beginExpiration();
+    await _cancelProductCalls();
+    await stop(closeTransport: false, invalidateAuthentication: false);
+    if (_isTerminated ||
+        authenticationGeneration != _authenticationGeneration) {
+      return;
+    }
+    session.expire();
+    terminalError = null;
+    transientError = null;
+    _clearProtectedState(clearFeedIdentity: true);
+    _setStatus(RuntimeStatus.awaitingSignIn);
   }
 
   void _launchLoop() {
@@ -363,12 +386,18 @@ class RuntimeController extends ChangeNotifier {
           if (!_isCurrentRun(generation)) return;
           transientError = null;
           reconnectImmediately = true;
-        } catch (_) {
+        } catch (error) {
           if (!_isCurrentRun(generation)) return;
-          terminalError ??= connectionError;
-          _clearProtectedState(clearFeedIdentity: true);
-          _setStatus(RuntimeStatus.awaitingSignIn);
-          return;
+          if (session.isAuthenticated) {
+            transientError = error;
+            reconnectImmediately = false;
+          } else {
+            _retainAuthenticatedContentForReauthentication = true;
+            terminalError ??= connectionError;
+            _clearProtectedState(clearFeedIdentity: true);
+            _setStatus(RuntimeStatus.awaitingSignIn);
+            return;
+          }
         }
       }
       if (connectionError == null && !reconnectImmediately) {
@@ -485,6 +514,8 @@ class RuntimeController extends ChangeNotifier {
   Future<void> _startTerminalShutdown() {
     final completion = Completer<void>();
     _terminalShutdownFuture = completion.future;
+    session.beginExpiration();
+    unawaited(_cancelProductCalls());
     session.expire();
     final restartableStops = List<Future<void>>.of(_restartableStops);
     final work = _captureStopWork();
@@ -503,6 +534,12 @@ class RuntimeController extends ChangeNotifier {
       ),
     );
     return completion.future;
+  }
+
+  Future<void> _cancelProductCalls() async {
+    if (transport case final SessionProductCallCancellation cancellation) {
+      await cancellation.cancelProductCalls();
+    }
   }
 
   _StopWork _captureStopWork() {

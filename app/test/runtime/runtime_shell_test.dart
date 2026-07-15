@@ -192,6 +192,210 @@ void main() {
     await runtime.stop();
   });
 
+  testWidgets('silent refresh keeps authenticated content mounted', (
+    tester,
+  ) async {
+    final refresh = Completer<SessionBundle>();
+    final transport = _ShellTransport(
+      _ShellFeedCall.open(),
+      pendingRefresh: refresh,
+    );
+    final runtime = _runtime(transport);
+    final owner = _RefreshableSessionOwner(runtime);
+    await tester.pumpWidget(
+      _retainedContentHost(owner: owner, child: const _RetainedContent()),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(_retainedContentFieldKey).evaluate().isNotEmpty,
+    );
+    await tester.enterText(
+      find.byKey(_retainedContentFieldKey),
+      'Unsaved Studio behavior',
+    );
+    final originalField = tester.element(find.byKey(_retainedContentFieldKey));
+
+    final refreshing = runtime.session.refreshAccessToken(transport);
+    owner.refresh();
+    await tester.pump();
+
+    expect(runtime.session.status, SessionStatus.refreshing);
+    expect(find.byKey(_retainedContentFieldKey), findsOneWidget);
+    expect(
+      tester.element(find.byKey(_retainedContentFieldKey)),
+      same(originalField),
+    );
+    expect(find.text('Unsaved Studio behavior'), findsOneWidget);
+    refresh.complete(testSession(accessToken: 'access-refreshed'));
+    await refreshing;
+    owner.refresh();
+    await tester.pump();
+    expect(
+      tester.element(find.byKey(_retainedContentFieldKey)),
+      same(originalField),
+    );
+    await runtime.stop();
+  });
+
+  testWidgets(
+    'authentication challenge hides and restores the same content subtree',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final transport = _ShellTransport(_ShellFeedCall.open());
+      final runtime = _runtime(transport);
+      final owner = _RefreshableSessionOwner(runtime);
+      await tester.pumpWidget(
+        _retainedContentHost(owner: owner, child: const _RetainedContent()),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(_retainedContentFieldKey).evaluate().isNotEmpty,
+      );
+      await tester.enterText(
+        find.byKey(_retainedContentFieldKey),
+        'Unsaved Studio behavior',
+      );
+      final originalField = tester.element(
+        find.byKey(_retainedContentFieldKey),
+      );
+
+      await runtime.requireAuthentication();
+      owner.refresh();
+      await _pumpUntil(
+        tester,
+        () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+      );
+
+      expect(find.byKey(_retainedContentFieldKey), findsNothing);
+      final retainedField = find.byKey(
+        _retainedContentFieldKey,
+        skipOffstage: false,
+      );
+      expect(retainedField, findsOneWidget);
+      final offstage = find.ancestor(
+        of: retainedField,
+        matching: find.byType(Offstage, skipOffstage: false),
+      );
+      final excluded = find.ancestor(
+        of: retainedField,
+        matching: find.byType(ExcludeSemantics, skipOffstage: false),
+      );
+      final excludedFocus = find.ancestor(
+        of: retainedField,
+        matching: find.byType(ExcludeFocus, skipOffstage: false),
+      );
+      final tickerMode = find.ancestor(
+        of: retainedField,
+        matching: find.byType(TickerMode, skipOffstage: false),
+      );
+      expect(
+        tester.widgetList<Offstage>(offstage).any((w) => w.offstage),
+        isTrue,
+      );
+      expect(
+        tester.widgetList<ExcludeSemantics>(excluded).any((w) => w.excluding),
+        isTrue,
+      );
+      expect(
+        tester.widgetList<ExcludeFocus>(excludedFocus).any((w) => w.excluding),
+        isTrue,
+      );
+      expect(
+        tester.widgetList<TickerMode>(tickerMode).any((w) => !w.enabled),
+        isTrue,
+      );
+      expect(find.bySemanticsLabel('Protected Studio draft'), findsNothing);
+      tester.testTextInput.enterText('Injected while signed out');
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(retainedField).controller?.text,
+        'Unsaved Studio behavior',
+      );
+
+      await tester.tap(find.byKey(runtimeSignInButtonKey));
+      await _pumpUntil(
+        tester,
+        () => find.byKey(_retainedContentFieldKey).evaluate().isNotEmpty,
+      );
+
+      expect(
+        tester.element(find.byKey(_retainedContentFieldKey)),
+        same(originalField),
+      );
+      expect(find.text('Unsaved Studio behavior'), findsOneWidget);
+      await tester.tap(find.byKey(_retainedContentFieldKey));
+      await tester.pump();
+      expect(
+        Focus.of(tester.element(find.byKey(_retainedContentFieldKey))).hasFocus,
+        isTrue,
+      );
+      semantics.dispose();
+      await runtime.stop();
+    },
+  );
+
+  testWidgets('explicit sign out discards content before an owner switch', (
+    tester,
+  ) async {
+    final transport = _ShellTransport(
+      _ShellFeedCall.open(),
+      loginResults: [
+        testSession(
+          identity: testIdentity(
+            owner: 'owner-b',
+            actor: 'actor-b',
+            session: 'session-b',
+          ),
+        ),
+      ],
+    );
+    final runtime = _runtime(transport);
+    final owner = _RefreshableSessionOwner(runtime);
+    await tester.pumpWidget(
+      _retainedContentHost(owner: owner, child: const _RetainedContent()),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(_retainedContentFieldKey).evaluate().isNotEmpty,
+    );
+    await tester.enterText(
+      find.byKey(_retainedContentFieldKey),
+      'Owner A private draft',
+    );
+    final ownerAField = tester.element(find.byKey(_retainedContentFieldKey));
+
+    owner.signOut();
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+
+    expect(
+      find.byKey(_retainedContentFieldKey, skipOffstage: false),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.byKey(_retainedContentFieldKey).evaluate().isNotEmpty,
+    );
+
+    expect(
+      tester.element(find.byKey(_retainedContentFieldKey)),
+      isNot(same(ownerAField)),
+    );
+    expect(find.text('Owner A private draft'), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(_retainedContentFieldKey))
+          .controller
+          ?.text,
+      isEmpty,
+    );
+    expect(runtime.session.ownerId, 'owner-b');
+    await runtime.stop();
+  });
+
   testWidgets('rejected login is generic and restores development defaults', (
     tester,
   ) async {
@@ -616,7 +820,7 @@ void main() {
     },
   );
 
-  testWidgets('Open Studio navigates to the safe Feature Studio placeholder', (
+  testWidgets('Open Studio navigates to the Feature Studio route', (
     tester,
   ) async {
     final feed = _ShellFeedCall.open();
@@ -664,10 +868,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Feature Studio'), findsWidgets);
-    expect(find.text('Draft created from Chat'), findsOneWidget);
+    expect(find.text('Feature Studio is unavailable.'), findsOneWidget);
     expect(
       find.text('proposal-0123456789abcdef0123456789abcdef'),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.byKey(runtimeSurfaceKey), findsNothing);
 
@@ -710,6 +914,16 @@ Widget _runtimeHost({
     ),
   );
 }
+
+Widget _retainedContentHost({
+  required RuntimeSessionOwner owner,
+  required Widget child,
+}) => _ScopedSessionHost(
+  owner: owner,
+  child: MaterialApp(
+    home: WindowSizeScope(child: RuntimeShell(child: child)),
+  ),
+);
 
 UiTransport _unexpectedTransport(Uri endpoint) =>
     throw StateError('Unexpected transport construction for $endpoint.');
@@ -774,11 +988,15 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 class _ShellTransport implements UiTransport {
-  _ShellTransport(this.feed, {Iterable<Object>? loginResults})
-    : _loginResults = [...?loginResults];
+  _ShellTransport(
+    this.feed, {
+    Iterable<Object>? loginResults,
+    this.pendingRefresh,
+  }) : _loginResults = [...?loginResults];
 
   final _ShellFeedCall feed;
   final List<Object> _loginResults;
+  final Completer<SessionBundle>? pendingRefresh;
   final List<List<String>> loginAttempts = [];
   String? loginUsername;
   String? loginPassword;
@@ -804,8 +1022,8 @@ class _ShellTransport implements UiTransport {
   }
 
   @override
-  Future<SessionBundle> refreshSession({required String refreshToken}) async =>
-      testSession();
+  Future<SessionBundle> refreshSession({required String refreshToken}) =>
+      pendingRefresh?.future ?? Future.value(testSession());
 
   @override
   Future<void> logout({required String refreshToken}) async {}
@@ -894,4 +1112,32 @@ class _ShellFeedCall implements FeedCall {
   Future<void> cancel() async {
     if (!_controller.isClosed) await _controller.close();
   }
+}
+
+const Key _retainedContentFieldKey = Key('retained-content-field');
+
+class _RetainedContent extends StatefulWidget {
+  const _RetainedContent();
+
+  @override
+  State<_RetainedContent> createState() => _RetainedContentState();
+}
+
+class _RetainedContentState extends State<_RetainedContent> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: TextField(
+      key: _retainedContentFieldKey,
+      controller: _controller,
+      decoration: const InputDecoration(labelText: 'Protected Studio draft'),
+    ),
+  );
 }

@@ -115,7 +115,7 @@ class DigitalBrainTypography {
   }
 }
 
-ThemeData buildDigitalBrainTheme() {
+ThemeData buildDigitalBrainTheme({bool useGoogleFonts = true}) {
   final scheme = const ColorScheme.dark(
     primary: DigitalBrainColors.indigoSoft,
     onPrimary: Color(0xFF09090B),
@@ -152,7 +152,9 @@ ThemeData buildDigitalBrainTheme() {
     ),
   );
 
-  final interText = GoogleFonts.interTextTheme(base.textTheme);
+  final interText = useGoogleFonts
+      ? GoogleFonts.interTextTheme(base.textTheme)
+      : base.textTheme;
 
   return base.copyWith(
     textTheme: interText.copyWith(

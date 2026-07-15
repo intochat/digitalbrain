@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../core/session/digitalbrain_client.dart';
 import 'external_identity.dart';
 import 'protocol/surface_protocol.dart';
 import 'runtime_configuration.dart';
@@ -35,6 +36,7 @@ class RuntimeSessionOwner extends ChangeNotifier {
   final bool _autoStart;
 
   RuntimeController? _controller;
+  DigitalBrainClient? _digitalBrainClient;
   Object? _initializationError;
   bool _initialized = false;
   bool _ownsController = false;
@@ -43,6 +45,7 @@ class RuntimeSessionOwner extends ChangeNotifier {
   ExternalIdentityTokenSource? _externalIdentity;
 
   RuntimeController? get controller => _controller;
+  DigitalBrainClient? get digitalBrainClient => _digitalBrainClient;
   Object? get initializationError => _initializationError;
   bool get hasExternalIdentity => _externalIdentity != null;
 
@@ -56,6 +59,13 @@ class RuntimeSessionOwner extends ChangeNotifier {
           _providedController ?? _createController(configuration);
       _controller = controller;
       _ownsController = _providedController == null;
+      if (controller.transport case final DigitalBrainTransport transport) {
+        _digitalBrainClient ??= DigitalBrainClient(
+          session: controller.session,
+          transport: transport,
+          onAuthenticationRequired: controller.requireAuthentication,
+        );
+      }
       final externalConfiguration = configuration.externalIdentity;
       if (externalConfiguration != null) {
         _externalIdentity = _externalIdentityTokenSourceFactory(

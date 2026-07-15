@@ -31,6 +31,9 @@ class _RuntimeShellState extends State<RuntimeShell> {
   final TextEditingController _password = TextEditingController(
     text: developmentPassword,
   );
+  bool _authenticatedContentMounted = false;
+  SessionIdentity? _authenticatedContentIdentity;
+  int _authenticatedContentGeneration = 0;
 
   @override
   void dispose() {
@@ -52,17 +55,68 @@ class _RuntimeShellState extends State<RuntimeShell> {
     if (controller == null) {
       return _buildLoading('Preparing your workspace…');
     }
-    if (!controller.session.isAuthenticated) {
-      if (controller.status == RuntimeStatus.awaitingSignIn) {
-        return _buildSignIn(session, controller);
+    final authenticated = controller.session.isAuthenticated;
+    _updateAuthenticatedContent(controller, authenticated);
+    final overlay = authenticated
+        ? null
+        : controller.status == RuntimeStatus.awaitingSignIn
+        ? _buildSignIn(session, controller)
+        : _buildLoading(
+            controller.status == RuntimeStatus.authenticating
+                ? 'Signing you in…'
+                : 'Preparing your workspace…',
+          );
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (_authenticatedContentMounted)
+          Offstage(
+            offstage: !authenticated,
+            child: TickerMode(
+              enabled: authenticated,
+              child: ExcludeFocus(
+                excluding: !authenticated,
+                child: ExcludeSemantics(
+                  excluding: !authenticated,
+                  child: IgnorePointer(
+                    ignoring: !authenticated,
+                    child: KeyedSubtree(
+                      key: ValueKey(_authenticatedContentGeneration),
+                      child: widget.child,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ?overlay,
+      ],
+    );
+  }
+
+  void _updateAuthenticatedContent(
+    RuntimeController controller,
+    bool authenticated,
+  ) {
+    if (authenticated) {
+      final identity = controller.session.identity!;
+      if (!_authenticatedContentMounted) {
+        _authenticatedContentMounted = true;
+        _authenticatedContentIdentity = identity;
+        return;
       }
-      return _buildLoading(
-        controller.status == RuntimeStatus.authenticating
-            ? 'Signing you in…'
-            : 'Preparing your workspace…',
-      );
+      final mountedIdentity = _authenticatedContentIdentity!;
+      if (mountedIdentity.ownerId != identity.ownerId ||
+          mountedIdentity.actorId != identity.actorId) {
+        _authenticatedContentGeneration++;
+      }
+      _authenticatedContentIdentity = identity;
+      return;
     }
-    return widget.child;
+    if (controller.retainAuthenticatedContentForReauthentication) return;
+    if (_authenticatedContentMounted) _authenticatedContentGeneration++;
+    _authenticatedContentMounted = false;
+    _authenticatedContentIdentity = null;
   }
 
   Widget _buildLoading(String message) => Scaffold(

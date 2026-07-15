@@ -17,6 +17,76 @@ public sealed class FeatureBuilderBoundaryTests
         Assert.Throws<ArgumentException>(() => new FeatureSourceFile(path, "source"));
     }
 
+    [Theory]
+    [InlineData("src/COM¹/Feature.cs")]
+    [InlineData("src/com¹.txt/Feature.cs")]
+    [InlineData("src/COM²/Feature.cs")]
+    [InlineData("src/cOm².json/Feature.cs")]
+    [InlineData("src/COM³/Feature.cs")]
+    [InlineData("src/Com³.cs/Feature.cs")]
+    [InlineData("src/LPT¹/Feature.cs")]
+    [InlineData("src/lpt¹.txt/Feature.cs")]
+    [InlineData("src/LPT²/Feature.cs")]
+    [InlineData("src/lPt².json/Feature.cs")]
+    [InlineData("src/LPT³/Feature.cs")]
+    [InlineData("src/Lpt³.cs/Feature.cs")]
+    public void Windows_reserved_device_aliases_cannot_enter_the_source_snapshot(string path)
+    {
+        Assert.Throws<ArgumentException>(() => new FeatureSourceFile(path, "source"));
+    }
+
+    [Theory]
+    [InlineData(" src/Feature.cs")]
+    [InlineData("src /Feature.cs")]
+    [InlineData("src/ Feature.cs")]
+    [InlineData("src/Feature.cs ")]
+    public void Source_path_segments_cannot_have_boundary_whitespace(string path)
+    {
+        Assert.Throws<ArgumentException>(() => new FeatureSourceFile(path, "source"));
+    }
+
+    [Theory]
+    [InlineData("src./Feature.cs")]
+    [InlineData("src/Feature.cs.")]
+    public void Source_path_segments_cannot_end_with_a_dot(string path)
+    {
+        Assert.Throws<ArgumentException>(() => new FeatureSourceFile(path, "source"));
+    }
+
+    [Theory]
+    [InlineData("src/Feature\u0001.cs")]
+    [InlineData("src/Feature\u001F.cs")]
+    [InlineData("src/Feature\u007F.cs")]
+    [InlineData("src/Feature\u0085.cs")]
+    [InlineData("src/Feature\u009F.cs")]
+    public void Source_path_segments_cannot_contain_control_characters(string path)
+    {
+        Assert.Throws<ArgumentException>(() => new FeatureSourceFile(path, "source"));
+    }
+
+    [Theory]
+    [InlineData("src/Feature<Name.cs")]
+    [InlineData("src/Feature>Name.cs")]
+    [InlineData("src/Feature:Name.cs")]
+    [InlineData("src/Feature\"Name.cs")]
+    [InlineData("src/Feature|Name.cs")]
+    [InlineData("src/Feature?Name.cs")]
+    [InlineData("src/Feature*Name.cs")]
+    public void Source_path_segments_cannot_contain_windows_invalid_characters(string path)
+    {
+        Assert.Throws<ArgumentException>(() => new FeatureSourceFile(path, "source"));
+    }
+
+    [Theory]
+    [InlineData("src/Feature.cs")]
+    [InlineData("src/Δοκιμή/功能.cs")]
+    public void Portable_source_paths_are_preserved(string path)
+    {
+        var file = new FeatureSourceFile(path, "source");
+
+        Assert.Equal(path, file.Path);
+    }
+
     [Fact]
     public void Source_snapshot_enforces_file_count_and_byte_limits()
     {
