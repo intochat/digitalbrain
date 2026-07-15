@@ -2,9 +2,11 @@ using System.Text.Json;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace DigitalBrain.OrleansTests.Features;
 
@@ -14,6 +16,101 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
     private static readonly BrainOwnerId Owner = new("owner-1");
     private static readonly ReleaseDigest ReleaseOne = new(new string('a', 64));
     private static readonly ReleaseDigest ReleaseTwo = new(new string('b', 64));
+
+    [Fact]
+    public async Task Feature_Draft_authoring_operations_persist_replay_and_remain_owner_local()
+    {
+        var owner = new BrainOwnerId("owner-draft-authoring-grain");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var otherHub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(new BrainOwnerId("owner-draft-authoring-other")));
+        var createdAt = fixture.Time.GetUtcNow();
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-draft-authoring",
+            "Create an owner-local Feature",
+            createdAt,
+            "conversation-draft-authoring"));
+        var behavior = new FeatureBehavior([
+            new FeatureScenario(
+                "scenario-grain",
+                "Create an outcome",
+                "the owner has a request",
+                "the Feature runs",
+                "the outcome is available")
+        ]);
+        var reviseBehavior = new ReviseFeatureBehavior(
+            draft.DraftId,
+            behavior,
+            0,
+            "behavior-grain",
+            createdAt.AddMinutes(1));
+
+        var behaviorResult = await hub.ReviseBehaviorAsync(reviseBehavior);
+        var sourceResult = await hub.ReviseSourceAsync(new ReviseFeatureSource(
+            draft.DraftId,
+            GrainSource(),
+            1,
+            "source-grain",
+            createdAt.AddMinutes(2)));
+        var verification = new FeatureVerification(ReleaseOne, 1, 1, 0, 0, createdAt.AddMinutes(3));
+        var verificationResult = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            verification,
+            2,
+            "verification-grain"));
+
+        Assert.Equal(draft.DraftId, (await hub.ReadDraftAsync(draft.DraftId))?.DraftId);
+        Assert.Null(await otherHub.ReadDraftAsync(draft.DraftId));
+        Assert.Equal(1, behaviorResult.Revision);
+        Assert.Equal(2, sourceResult.Revision);
+        Assert.Equal(3, verificationResult.Revision);
+
+        await fixture.Cluster.DeactivateAsync((IAddressable)hub);
+
+        var replay = await hub.ReviseBehaviorAsync(reviseBehavior);
+        Assert.Equal(1, replay.Revision);
+        Assert.Equal(3, (await hub.ReadDraftAsync(draft.DraftId))?.Revision);
+
+        var installed = await hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
+            draft.DraftId,
+            new FeatureInstallationId("installation-draft-authoring"),
+            ReleaseOne,
+            3,
+            "installed-grain",
+            createdAt.AddMinutes(4)));
+        Assert.Equal("installed", installed.Status);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => hub.ReviseSourceAsync(new ReviseFeatureSource(
+            draft.DraftId,
+            GrainSource(),
+            4,
+            "source-after-install",
+            createdAt.AddMinutes(5))));
+    }
+
+    [Fact]
+    public async Task Feature_Draft_authoring_reconciles_a_deep_cloned_durable_write_after_an_acknowledgement_failure()
+    {
+        var owner = new BrainOwnerId("owner-draft-authoring-reconciliation");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var createdAt = fixture.Time.GetUtcNow();
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-draft-reconciliation",
+            "Create a reconciled Feature",
+            createdAt,
+            "conversation-draft-reconciliation"));
+        fixture.Storage.CommitCompetingStateThenFailNextWrite(state => DeepClone((FeatureHubState)state));
+
+        var revised = await hub.ReviseBehaviorAsync(new ReviseFeatureBehavior(
+            draft.DraftId,
+            new FeatureBehavior([
+                new FeatureScenario("scenario-reconciled", "Reconcile", "a write commits", "the acknowledgement fails", "the durable state is retained")
+            ]),
+            0,
+            "behavior-reconciled",
+            createdAt.AddMinutes(1)));
+
+        Assert.Equal(1, revised.Revision);
+        Assert.Equal(1, (await hub.ReadDraftAsync(draft.DraftId))?.Revision);
+    }
 
     [Fact]
     public async Task Duplicate_delivery_and_ambiguous_commit_survive_reactivation()
@@ -363,6 +460,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         Type[] persistedTypes =
         [
             typeof(FeatureHubState),
+            typeof(FeatureDraftCommandReplay),
             typeof(FeatureFanOutState),
             typeof(FeatureFanOutDeliveryState),
             typeof(FeatureInstallationState),
@@ -389,6 +487,25 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
     private IFeatureInstallationGrain Installation(string installationId) =>
         fixture.Grain<IFeatureInstallationGrain>(
             FeatureGrainIds.Installation(Owner, new FeatureInstallationId(installationId)));
+
+    private static FeatureSourceSnapshot GrainSource() => new(
+        "src/Feature/Feature.csproj",
+        "tests/Feature.Scenarios/Feature.Scenarios.csproj",
+        [
+            new FeatureSourceFile("src/Feature/Feature.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>"),
+            new FeatureSourceFile("tests/Feature.Scenarios/Feature.Scenarios.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>")
+        ]);
+
+    private static FeatureHubState DeepClone(FeatureHubState state)
+    {
+        var services = new ServiceCollection();
+        services.AddSerializer(builder => builder
+            .AddAssembly(typeof(FeatureDraft).Assembly)
+            .AddAssembly(typeof(FeatureHubState).Assembly));
+        using var provider = services.BuildServiceProvider();
+        var serializer = provider.GetRequiredService<Serializer<FeatureHubState>>();
+        return serializer.Deserialize(serializer.SerializeToArray(state));
+    }
 
     private static FeatureInput Input(string inputId) => new(
         inputId,

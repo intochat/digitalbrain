@@ -235,20 +235,43 @@ internal static class FeatureHubTransitions
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Goal);
         if (request.Goal.Length > FeatureLimits.DraftGoalCharacters || request.Goal.Any(char.IsControl))
             throw new ArgumentException("A bounded control-character-free feature draft goal is required.", nameof(request));
+        var legacyMissingConversation = request.ConversationId is null;
+        var conversationId = legacyMissingConversation ? FeatureDraft.LegacyMissingConversationId : request.ConversationId!;
+        if (!legacyMissingConversation)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
+            if (conversationId.Length > FeatureLimits.DraftConversationIdCharacters || conversationId.Any(char.IsControl))
+                throw new ArgumentException("A bounded canonical conversation id is required.", nameof(request));
+        }
         if (request.RequestedAt.Offset != TimeSpan.Zero)
             throw new ArgumentException("Feature draft timestamps must be UTC.", nameof(request));
         var drafts = state.Drafts ?? [];
-        var existing = drafts.FirstOrDefault(draft => string.Equals(draft.OperationId, request.OperationId, StringComparison.Ordinal));
+        var existing = drafts.FirstOrDefault(draft => string.Equals(draft.OriginatingRequest.OperationId, request.OperationId, StringComparison.Ordinal));
         if (existing is not null)
         {
-            if (!string.Equals(existing.Goal, request.Goal, StringComparison.Ordinal))
+            if (!string.Equals(existing.Goal, request.Goal, StringComparison.Ordinal) ||
+                existing.OriginatingRequest.ConversationId != FeatureDraft.LegacyMissingConversationId &&
+                !string.Equals(existing.OriginatingRequest.ConversationId, conversationId, StringComparison.Ordinal))
                 throw new FeatureConcurrencyException("The operation id is already bound to a different feature draft goal.");
             return new FeatureCreateDraftTransition(state, existing);
         }
         if (drafts.Length >= FeatureLimits.DraftsPerOwner)
             throw new FeatureLimitExceededException("An owner can have at most 100 feature drafts.");
-        var draft = new FeatureDraftProposal(DraftProposalId(ownerScope, request.OperationId), request.OperationId, request.Goal, "draft", request.RequestedAt);
-        var nextState = state with { Drafts = [.. drafts, draft], Revision = checked(state.Revision + 1) };
+        var draft = new FeatureDraft(
+            new FeatureDraftId(DraftProposalId(ownerScope, request.OperationId)),
+            new OriginatingRequest(request.OperationId, conversationId, request.Goal),
+            request.Goal,
+            "draft",
+            SeedBehavior(),
+            SeedSource(),
+            null,
+            null,
+            0,
+            request.RequestedAt,
+            request.RequestedAt);
+        FeatureDraft[] nextDrafts = [.. drafts, draft];
+        FeatureDraftAuthoringTransitions.DemandOwnerDraftBudget(nextDrafts);
+        var nextState = state with { Drafts = nextDrafts, Revision = checked(state.Revision + 1) };
         return new FeatureCreateDraftTransition(nextState, draft);
     }
     public static FeatureHubState BeginFanOut(FeatureHubState state, FeatureInput input)
@@ -405,6 +428,26 @@ internal static class FeatureHubTransitions
             values.Distinct(StringComparer.Ordinal).Count() != values.Length)
             throw new ArgumentException($"Canonical unique {kind} identifiers are required.", nameof(values));
         return values.Order(StringComparer.Ordinal).ToArray();
+    }
+    private static FeatureBehavior SeedBehavior() => new([
+        new FeatureScenario(
+            "scenario-1",
+            "Describe the intended outcome",
+            "the Feature Draft is editable",
+            "the Behavior is revised",
+            "the intended outcome is recorded")
+    ]);
+    private static FeatureSourceSnapshot SeedSource()
+    {
+        const string implementationProject = "src/RuntimeAuthoredFeature/RuntimeAuthoredFeature.csproj";
+        const string scenarioProject = "tests/RuntimeAuthoredFeature.Scenarios/RuntimeAuthoredFeature.Scenarios.csproj";
+        return new FeatureSourceSnapshot(
+            implementationProject,
+            scenarioProject,
+            [
+                new FeatureSourceFile(implementationProject, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>"),
+                new FeatureSourceFile(scenarioProject, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>")
+            ]);
     }
     private static string ApprovalId(FeatureInstallationId installationId, ReleaseDigest release, long revision) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"digitalbrain.v3.feature-approval\0{installationId.Value}\0{release.Value}\0{revision}")));
     private static string DraftProposalId(string ownerScope, string operationId) =>

@@ -125,10 +125,43 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         await WriteAsync(registered);
         return AuthoritySnapshot(authority);
     }
-    public async Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request)
+    public async Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request)
     {
         using var activity = Start("create-draft");
         var result = Domain(() => FeatureHubTransitions.CreateDraft(State, this.GetPrimaryKeyString(), request));
+        if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
+        return result.Draft;
+    }
+    public Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId)
+    {
+        using var activity = Start("read-draft");
+        return Task.FromResult(Domain(() => FeatureDraftAuthoringTransitions.ReadDraft(State, draftId)));
+    }
+    public async Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command)
+    {
+        using var activity = Start("revise-behavior");
+        var result = Domain(() => FeatureDraftAuthoringTransitions.ReviseBehavior(State, command));
+        if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
+        return result.Draft;
+    }
+    public async Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command)
+    {
+        using var activity = Start("revise-source");
+        var result = Domain(() => FeatureDraftAuthoringTransitions.ReviseSource(State, command));
+        if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
+        return result.Draft;
+    }
+    public async Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command)
+    {
+        using var activity = Start("record-verification");
+        var result = Domain(() => FeatureDraftAuthoringTransitions.RecordVerification(State, command));
+        if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
+        return result.Draft;
+    }
+    public async Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command)
+    {
+        using var activity = Start("mark-draft-installed");
+        var result = Domain(() => FeatureDraftAuthoringTransitions.MarkInstalled(State, command));
         if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
         return result.Draft;
     }

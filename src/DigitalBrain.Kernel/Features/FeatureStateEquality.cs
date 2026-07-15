@@ -25,7 +25,8 @@ internal static class FeatureStateEquality
         Same(left.Approvals, right.Approvals) &&
         Same(left.Authorities, right.Authorities) &&
         left.Alerts.SequenceEqual(right.Alerts) &&
-        (left.Drafts ?? []).SequenceEqual(right.Drafts ?? []);
+        Same(left.Drafts ?? [], right.Drafts ?? []) &&
+        Same(left.DraftReplays ?? [], right.DraftReplays ?? []);
     private static bool Same(IReadOnlyList<FeatureInstallationRegistration> left, IReadOnlyList<FeatureInstallationRegistration> right) =>
         left.Count == right.Count && left.Zip(right).All(pair =>
             pair.First.InstallationId == pair.Second.InstallationId && pair.First.Release == pair.Second.Release &&
@@ -73,4 +74,33 @@ internal static class FeatureStateEquality
             pair.First.ProviderConnectionId == pair.Second.ProviderConnectionId &&
             string.Equals(pair.First.ConstraintsJson, pair.Second.ConstraintsJson, StringComparison.Ordinal) &&
             string.Equals(pair.First.Provider, pair.Second.Provider, StringComparison.Ordinal));
+    private static bool Same(IReadOnlyList<FeatureDraft> left, IReadOnlyList<FeatureDraft> right) =>
+        left.Count == right.Count && left.Zip(right).All(pair => Same(pair.First, pair.Second));
+    private static bool Same(FeatureDraft left, FeatureDraft right) =>
+        left.DraftId == right.DraftId && left.OriginatingRequest == right.OriginatingRequest &&
+        string.Equals(left.Goal, right.Goal, StringComparison.Ordinal) &&
+        string.Equals(left.Status, right.Status, StringComparison.Ordinal) &&
+        Same(left.Behavior, right.Behavior) && Same(left.Source, right.Source) &&
+        left.Verification == right.Verification && left.InstallationId == right.InstallationId &&
+        left.Revision == right.Revision && left.CreatedAt == right.CreatedAt && left.UpdatedAt == right.UpdatedAt;
+    private static bool Same(FeatureBehavior left, FeatureBehavior right) =>
+        left.Scenarios.Length == right.Scenarios.Length && left.Scenarios.Zip(right.Scenarios).All(pair => pair.First == pair.Second);
+    private static bool Same(FeatureSourceSnapshot left, FeatureSourceSnapshot right) =>
+        string.Equals(left.ImplementationProjectPath, right.ImplementationProjectPath, StringComparison.Ordinal) &&
+        string.Equals(left.ScenarioProjectPath, right.ScenarioProjectPath, StringComparison.Ordinal) &&
+        left.Files.Length == right.Files.Length && left.Files.Zip(right.Files).All(pair => pair.First == pair.Second);
+    private static bool Same(IReadOnlyList<FeatureDraftCommandReplay> left, IReadOnlyList<FeatureDraftCommandReplay> right) =>
+        left.Count == right.Count && left.Zip(right).All(pair =>
+            pair.First.DraftId == pair.Second.DraftId &&
+            string.Equals(pair.First.IdempotencyId, pair.Second.IdempotencyId, StringComparison.Ordinal) &&
+            string.Equals(pair.First.Kind, pair.Second.Kind, StringComparison.Ordinal) &&
+            string.Equals(pair.First.PayloadDigest, pair.Second.PayloadDigest, StringComparison.Ordinal) &&
+            string.Equals(pair.First.ResultStatus, pair.Second.ResultStatus, StringComparison.Ordinal) &&
+            Same(pair.First.ResultBehavior, pair.Second.ResultBehavior) &&
+            Same(pair.First.ResultSource, pair.Second.ResultSource) &&
+            pair.First.ResultVerification == pair.Second.ResultVerification &&
+            pair.First.ResultInstallationId == pair.Second.ResultInstallationId &&
+            pair.First.ResultRevision == pair.Second.ResultRevision &&
+            pair.First.ResultUpdatedAt == pair.Second.ResultUpdatedAt &&
+            pair.First.Utf8Bytes == pair.Second.Utf8Bytes);
 }

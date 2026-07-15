@@ -338,8 +338,8 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         Assert.Equal(accepted.OperationId, replayAccepted.OperationId);
         var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(context.OwnerId));
         var replayRequestedAt = DateTimeOffset.UtcNow.AddMinutes(5);
-        var replayDraft = await hub.CreateDraftAsync(new CreateFeatureDraft(accepted.OperationId, Prompt, replayRequestedAt));
-        Assert.Equal(completed.Proposal.ProposalId, replayDraft.ProposalId);
+        var replayDraft = await hub.CreateDraftAsync(new CreateFeatureDraft(accepted.OperationId, Prompt, replayRequestedAt, state.Identity!.ConversationId));
+        Assert.Equal(completed.Proposal.ProposalId, replayDraft.DraftId.Value);
         Assert.NotEqual(replayRequestedAt, replayDraft.CreatedAt);
         Assert.Equal(0, _chatClient!.CallCount);
 

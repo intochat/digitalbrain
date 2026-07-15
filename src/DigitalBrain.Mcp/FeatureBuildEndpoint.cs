@@ -7,6 +7,8 @@ using Azure.Storage.Blobs.Models;
 using DigitalBrain.FeatureBuilder;
 using DigitalBrain.Kernel.Contracts;
 using Microsoft.Extensions.DependencyInjection;
+using BuilderFeatureSourceFile = DigitalBrain.FeatureBuilder.FeatureSourceFile;
+using BuilderFeatureSourceSnapshot = DigitalBrain.FeatureBuilder.FeatureSourceSnapshot;
 namespace DigitalBrain.Mcp;
 
 public sealed record FeatureSourceInput(string Path, string Content);
@@ -19,10 +21,10 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
     {
         ArgumentNullException.ThrowIfNull(submission);
         ArgumentNullException.ThrowIfNull(submission.Files);
-        var source = new FeatureSourceSnapshot(
+        var source = new BuilderFeatureSourceSnapshot(
             submission.ImplementationProjectPath,
             submission.ScenarioProjectPath,
-            submission.Files.Select(file => new FeatureSourceFile(file.Path, file.Content)).ToArray());
+            submission.Files.Select(file => new BuilderFeatureSourceFile(file.Path, file.Content)).ToArray());
         var root = Path.Combine(Path.GetTempPath(), "digitalbrain-feature-endpoint", Guid.NewGuid().ToString("N"));
         var output = Path.Combine(root, "releases");
         var requestPath = Path.Combine(root, "request.json");

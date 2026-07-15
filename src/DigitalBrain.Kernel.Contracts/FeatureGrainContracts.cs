@@ -265,17 +265,151 @@ public sealed record FeatureHubSnapshot(
     [property: Id(5)] FeatureAuthoritySnapshot[] Authorities,
     [property: Id(6)] FeatureBackpressureAlert[] Alerts);
 [GenerateSerializer, Alias("digitalbrain.feature.draft-proposal.v1")]
-public sealed record FeatureDraftProposal(
-    [property: Id(0)] string ProposalId,
-    [property: Id(1)] string OperationId,
-    [property: Id(2)] string Goal,
-    [property: Id(3)] string Status,
-    [property: Id(4)] DateTimeOffset CreatedAt);
+public sealed record FeatureDraft
+{
+    internal const string LegacyMissingConversationId = "\0digitalbrain-legacy-missing";
+
+    [Id(0)] private readonly string _draftIdentifier = string.Empty;
+    [Id(1)] private readonly string _operationIdentifier = string.Empty;
+    [Id(2)] private readonly string _goal = string.Empty;
+    [Id(3)] private readonly string _status = string.Empty;
+    [Id(4)] private readonly DateTimeOffset _createdAt;
+    [Id(5)] private readonly OriginatingRequest? _originatingRequest;
+    [Id(6)] private readonly FeatureBehavior? _behavior;
+    [Id(7)] private readonly FeatureSourceSnapshot? _source;
+    [Id(8)] private readonly FeatureVerification? _verification;
+    [Id(9)] private readonly FeatureInstallationId? _installationId;
+    [Id(10)] private readonly long _revision;
+    [Id(11)] private readonly DateTimeOffset _updatedAt;
+
+    public FeatureDraft(
+        FeatureDraftId draftId,
+        OriginatingRequest originatingRequest,
+        string goal,
+        string status,
+        FeatureBehavior behavior,
+        FeatureSourceSnapshot source,
+        FeatureVerification? verification,
+        FeatureInstallationId? installationId,
+        long revision,
+        DateTimeOffset createdAt,
+        DateTimeOffset updatedAt)
+    {
+        _draftIdentifier = draftId.Value;
+        _operationIdentifier = originatingRequest.OperationId;
+        _goal = goal;
+        _status = status;
+        _createdAt = createdAt;
+        _originatingRequest = originatingRequest;
+        _behavior = behavior;
+        _source = source;
+        _verification = verification;
+        _installationId = installationId;
+        _revision = revision;
+        _updatedAt = updatedAt;
+    }
+
+    public FeatureDraftId DraftId => new(_draftIdentifier);
+    public OriginatingRequest OriginatingRequest => _originatingRequest ?? new(_operationIdentifier, LegacyMissingConversationId, _goal);
+    public string Goal => _goal;
+    public string Status => _status;
+    public FeatureBehavior Behavior => _behavior ?? SeedBehavior();
+    public FeatureSourceSnapshot Source => _source ?? SeedSource();
+    public FeatureVerification? Verification => _verification;
+    public FeatureInstallationId? InstallationId => _installationId;
+    public long Revision => _revision;
+    public DateTimeOffset CreatedAt => _createdAt;
+    public DateTimeOffset UpdatedAt => _updatedAt == default ? _createdAt : _updatedAt;
+
+    private static FeatureBehavior SeedBehavior() => new([
+        new FeatureScenario(
+            "scenario-1",
+            "Describe the intended outcome",
+            "the Feature Draft is editable",
+            "the Behavior is revised",
+            "the intended outcome is recorded")
+    ]);
+
+    private static FeatureSourceSnapshot SeedSource()
+    {
+        const string implementationProject = "src/RuntimeAuthoredFeature/RuntimeAuthoredFeature.csproj";
+        const string scenarioProject = "tests/RuntimeAuthoredFeature.Scenarios/RuntimeAuthoredFeature.Scenarios.csproj";
+        return new FeatureSourceSnapshot(
+            implementationProject,
+            scenarioProject,
+            [
+                new FeatureSourceFile(implementationProject, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>"),
+                new FeatureSourceFile(scenarioProject, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>")
+            ]);
+    }
+}
+[GenerateSerializer, Alias("digitalbrain.feature.draft-id.v1")]
+public sealed record FeatureDraftId([property: Id(0)] string Value);
+[GenerateSerializer, Alias("digitalbrain.feature.originating-request.v1")]
+public sealed record OriginatingRequest(
+    [property: Id(0)] string OperationId,
+    [property: Id(1)] string ConversationId,
+    [property: Id(2)] string Text);
+[GenerateSerializer, Alias("digitalbrain.feature.scenario.v1")]
+public sealed record FeatureScenario(
+    [property: Id(0)] string ScenarioId,
+    [property: Id(1)] string Name,
+    [property: Id(2)] string Given,
+    [property: Id(3)] string When,
+    [property: Id(4)] string Then);
+[GenerateSerializer, Alias("digitalbrain.feature.behavior.v1")]
+public sealed record FeatureBehavior([property: Id(0)] FeatureScenario[] Scenarios);
+[GenerateSerializer, Alias("digitalbrain.feature.source-file.v1")]
+public sealed record FeatureSourceFile(
+    [property: Id(0)] string Path,
+    [property: Id(1)] string Content);
+[GenerateSerializer, Alias("digitalbrain.feature.source-snapshot.v1")]
+public sealed record FeatureSourceSnapshot(
+    [property: Id(0)] string ImplementationProjectPath,
+    [property: Id(1)] string ScenarioProjectPath,
+    [property: Id(2)] FeatureSourceFile[] Files);
+[GenerateSerializer, Alias("digitalbrain.feature.verification.v1")]
+public sealed record FeatureVerification(
+    [property: Id(0)] ReleaseDigest Release,
+    [property: Id(1)] int Total,
+    [property: Id(2)] int Passed,
+    [property: Id(3)] int Failed,
+    [property: Id(4)] int Skipped,
+    [property: Id(5)] DateTimeOffset VerifiedAt);
 [GenerateSerializer, Alias("digitalbrain.feature.create-draft.v1")]
 public sealed record CreateFeatureDraft(
     [property: Id(0)] string OperationId,
     [property: Id(1)] string Goal,
-    [property: Id(2)] DateTimeOffset RequestedAt);
+    [property: Id(2)] DateTimeOffset RequestedAt,
+    [property: Id(3)] string ConversationId);
+[GenerateSerializer, Alias("digitalbrain.feature.revise-behavior.v1")]
+public sealed record ReviseFeatureBehavior(
+    [property: Id(0)] FeatureDraftId DraftId,
+    [property: Id(1)] FeatureBehavior Behavior,
+    [property: Id(2)] long ExpectedRevision,
+    [property: Id(3)] string IdempotencyId,
+    [property: Id(4)] DateTimeOffset RevisedAt);
+[GenerateSerializer, Alias("digitalbrain.feature.revise-source.v1")]
+public sealed record ReviseFeatureSource(
+    [property: Id(0)] FeatureDraftId DraftId,
+    [property: Id(1)] FeatureSourceSnapshot Source,
+    [property: Id(2)] long ExpectedRevision,
+    [property: Id(3)] string IdempotencyId,
+    [property: Id(4)] DateTimeOffset RevisedAt);
+[GenerateSerializer, Alias("digitalbrain.feature.record-verification.v1")]
+public sealed record RecordFeatureVerification(
+    [property: Id(0)] FeatureDraftId DraftId,
+    [property: Id(1)] FeatureVerification Verification,
+    [property: Id(2)] long ExpectedRevision,
+    [property: Id(3)] string IdempotencyId);
+[GenerateSerializer, Alias("digitalbrain.feature.mark-installed.v1")]
+public sealed record MarkFeatureDraftInstalled(
+    [property: Id(0)] FeatureDraftId DraftId,
+    [property: Id(1)] FeatureInstallationId InstallationId,
+    [property: Id(2)] ReleaseDigest Release,
+    [property: Id(3)] long ExpectedRevision,
+    [property: Id(4)] string IdempotencyId,
+    [property: Id(5)] DateTimeOffset InstalledAt);
 public interface IFeatureGrainResolver
 {
     IFeatureHubGrain Hub(BrainOwnerId ownerId);
@@ -287,7 +421,17 @@ public interface IFeatureHubGrain : IGrainWithStringKey
     [Alias("register")]
     Task RegisterAsync(FeatureInstallationRegistration registration);
     [Alias("create-draft")]
-    Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request);
+    Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request);
+    [Alias("read-draft")]
+    Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId);
+    [Alias("revise-behavior")]
+    Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command);
+    [Alias("revise-source")]
+    Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command);
+    [Alias("record-verification")]
+    Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command);
+    [Alias("mark-draft-installed")]
+    Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command);
     [Alias("publish")]
     Task<FeatureFanOutResult> PublishAsync(FeatureInput input);
     [Alias("read")]

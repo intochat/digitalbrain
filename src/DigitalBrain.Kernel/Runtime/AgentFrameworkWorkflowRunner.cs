@@ -132,12 +132,12 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         try
         {
             var draft = await resolver.Hub(ownerId).CreateDraftAsync(
-                new CreateFeatureDraft(request.OperationId, normalizedPrompt, ResolveNow())).ConfigureAwait(false);
+                new CreateFeatureDraft(request.OperationId, normalizedPrompt, ResolveNow(), request.ConversationId)).ConfigureAwait(false);
             return new InoWorkflowResult(
                 "I don’t have a trusted capability for that yet. I created a Feature draft. Open Studio to define and verify its behavior?",
                 workflow,
                 Capability: receipt,
-                Proposal: new FeatureDraftReference(draft.ProposalId, "Open Studio", "/features/proposals/" + draft.ProposalId));
+                Proposal: new FeatureDraftReference(draft.DraftId.Value, "Open Studio", "/features/proposals/" + draft.DraftId.Value));
         }
         catch (InvalidOperationException)
         {

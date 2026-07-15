@@ -4,6 +4,8 @@ using DigitalBrain.FeatureHost;
 using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Kernel.Contracts;
 using Xunit;
+using BuilderFeatureSourceFile = DigitalBrain.FeatureBuilder.FeatureSourceFile;
+using BuilderFeatureSourceSnapshot = DigitalBrain.FeatureBuilder.FeatureSourceSnapshot;
 
 namespace DigitalBrain.E2ETests;
 
@@ -21,7 +23,7 @@ public sealed class FeatureBuilderReleaseE2ETests : FeatureBuilderE2ETestBase
         using var firstOutput = new TemporaryDirectory();
         using var secondOutput = new TemporaryDirectory();
         var snapshot = EmailSummarizerSnapshot();
-        var reversed = new FeatureSourceSnapshot(
+        var reversed = new BuilderFeatureSourceSnapshot(
             snapshot.ImplementationProjectPath,
             snapshot.ScenarioProjectPath,
             snapshot.Files.Reverse().ToArray());
@@ -192,7 +194,7 @@ public sealed class FeatureBuilderDeadlineE2ETests : FeatureBuilderE2ETestBase
 
 public abstract class FeatureBuilderE2ETestBase
 {
-    protected static FeatureBuildRequest Request(FeatureSourceSnapshot snapshot, string output) =>
+    protected static FeatureBuildRequest Request(BuilderFeatureSourceSnapshot snapshot, string output) =>
         new(snapshot, OfflineFeed(), output, DateTimeOffset.UtcNow.Add(FeatureBuildPipeline.MaximumRequestDuration));
 
     protected static string OfflineFeed()
@@ -203,7 +205,7 @@ public abstract class FeatureBuilderE2ETestBase
             : configured;
     }
 
-    protected static FeatureSourceSnapshot EmailSummarizerSnapshot()
+    protected static BuilderFeatureSourceSnapshot EmailSummarizerSnapshot()
     {
         var root = RepositoryRoot();
         string[] paths =
@@ -232,18 +234,18 @@ public abstract class FeatureBuilderE2ETestBase
             "features/EmailSummarizer.Tests/reqnroll.json"
         ];
         var files = paths
-            .Select(path => new FeatureSourceFile(
+            .Select(path => new BuilderFeatureSourceFile(
                 path,
                 File.ReadAllBytes(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar)))))
             .ToArray();
-        return new FeatureSourceSnapshot(
+        return new BuilderFeatureSourceSnapshot(
             "features/EmailSummarizer/DigitalBrain.Features.EmailSummarizer.csproj",
             "features/EmailSummarizer.Tests/DigitalBrain.Features.EmailSummarizer.Tests.csproj",
             files);
     }
 
-    protected static FeatureSourceSnapshot WithScenarioFailure(
-        FeatureSourceSnapshot snapshot,
+    protected static BuilderFeatureSourceSnapshot WithScenarioFailure(
+        BuilderFeatureSourceSnapshot snapshot,
         ScenarioFailure failure)
     {
         var feature = failure switch
@@ -272,14 +274,14 @@ public abstract class FeatureBuilderE2ETestBase
             : AddFile(updated, "features/EmailSummarizer.Tests/BuilderFailureSteps.cs", bindings);
     }
 
-    protected static FeatureSourceSnapshot AddFile(
-        FeatureSourceSnapshot snapshot,
+    protected static BuilderFeatureSourceSnapshot AddFile(
+        BuilderFeatureSourceSnapshot snapshot,
         string path,
         string content) =>
         new(
             snapshot.ImplementationProjectPath,
             snapshot.ScenarioProjectPath,
-            [.. snapshot.Files, new FeatureSourceFile(path, content)]);
+            [.. snapshot.Files, new BuilderFeatureSourceFile(path, content)]);
 
     protected static void AssertReleaseFilesEqual(string first, string second)
     {

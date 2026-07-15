@@ -11,9 +11,38 @@ internal sealed record FeatureHubState(
     [property: Id(4)] FeatureApprovalState[] Approvals,
     [property: Id(5)] FeatureInstallationAuthorityState[] Authorities,
     [property: Id(6)] FeatureBackpressureAlert[] Alerts,
-    [property: Id(7)] FeatureDraftProposal[]? Drafts = null)
+    [property: Id(7)] FeatureDraft[]? Drafts = null,
+    [property: Id(8)] FeatureDraftCommandReplay[]? DraftReplays = null)
 {
-    public static FeatureHubState Empty { get; } = new([], 0, [], [], [], [], [], []);
+    public static FeatureHubState Empty { get; } = new([], 0, [], [], [], [], [], [], []);
+}
+[GenerateSerializer, Alias("digitalbrain.feature.draft-command-replay.v1")]
+internal sealed record FeatureDraftCommandReplay(
+    [property: Id(0)] FeatureDraftId DraftId,
+    [property: Id(1)] string IdempotencyId,
+    [property: Id(2)] string Kind,
+    [property: Id(3)] string PayloadDigest,
+    [property: Id(4)] string ResultStatus,
+    [property: Id(5)] FeatureBehavior ResultBehavior,
+    [property: Id(6)] FeatureSourceSnapshot ResultSource,
+    [property: Id(7)] FeatureVerification? ResultVerification,
+    [property: Id(8)] FeatureInstallationId? ResultInstallationId,
+    [property: Id(9)] long ResultRevision,
+    [property: Id(10)] DateTimeOffset ResultUpdatedAt,
+    [property: Id(11)] int Utf8Bytes)
+{
+    public FeatureDraft Result(FeatureDraft current) => new(
+        current.DraftId,
+        current.OriginatingRequest,
+        current.Goal,
+        ResultStatus,
+        ResultBehavior,
+        ResultSource,
+        ResultVerification,
+        ResultInstallationId,
+        ResultRevision,
+        current.CreatedAt,
+        ResultUpdatedAt);
 }
 [GenerateSerializer, Alias("digitalbrain.v3.feature-approval-state")]
 internal sealed record FeatureApprovalState(
@@ -101,7 +130,8 @@ internal sealed record FeatureInstallationState(
     public static FeatureInstallationState Create(ReleaseDigest release, FeatureInstallationId? installationId = null) =>
         new(installationId ?? new FeatureInstallationId("unbound"), release, null, "{}", false, [], null, [], [], 0, 0, null, []);
 }
-internal sealed record FeatureCreateDraftTransition(FeatureHubState State, FeatureDraftProposal Draft);
+internal sealed record FeatureCreateDraftTransition(FeatureHubState State, FeatureDraft Draft);
+internal sealed record FeatureDraftAuthoringTransition(FeatureHubState State, FeatureDraft Draft);
 internal sealed record FeatureAppendTransition(FeatureInstallationState State, FeatureAppendStatus Status);
 internal sealed record FeatureClaimTransition(FeatureInstallationState State, FeatureRunClaim? Claim);
 internal sealed record FeatureCommitTransition(FeatureInstallationState State, FeatureCompletion Completion);

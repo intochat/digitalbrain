@@ -69,6 +69,7 @@ public sealed class CapabilityWorkflowRunnerTests
 
         Assert.Equal(1, hub.CreateDraftCallCount);
         Assert.Equal(expectedGoal, hub.LastCreateDraftRequest?.Goal);
+        Assert.Equal("conversation-1", hub.LastCreateDraftRequest?.ConversationId);
         Assert.False(hub.LastCreateDraftRequest?.Goal.Any(char.IsControl));
         Assert.Equal("Open Studio", result.Proposal?.Label);
     }
@@ -302,7 +303,7 @@ public sealed class CapabilityWorkflowRunnerTests
         public int DraftCount => (_state.Drafts ?? []).Length;
         public CreateFeatureDraft? LastCreateDraftRequest { get; private set; }
 
-        public Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request)
+        public Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request)
         {
             CreateDraftCallCount++;
             LastCreateDraftRequest = request;
@@ -312,6 +313,11 @@ public sealed class CapabilityWorkflowRunnerTests
         }
 
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
+        public Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command) => throw new NotSupportedException();
+        public Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command) => throw new NotSupportedException();
+        public Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command) => throw new NotSupportedException();
+        public Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command) => throw new NotSupportedException();
         public Task<FeatureFanOutResult> PublishAsync(FeatureInput input) => throw new NotSupportedException();
         public Task<FeatureHubSnapshot> ReadAsync() => throw new NotSupportedException();
         public Task<FeatureApprovalSnapshot> ProposeAsync(FeatureReleaseProposal proposal, long expectedRevision) => throw new NotSupportedException();
@@ -327,9 +333,14 @@ public sealed class CapabilityWorkflowRunnerTests
 
     private sealed class ThrowingFeatureHubGrain(Exception exception) : IFeatureHubGrain
     {
-        public Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request) => throw exception;
+        public Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request) => throw exception;
 
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
+        public Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command) => throw new NotSupportedException();
+        public Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command) => throw new NotSupportedException();
+        public Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command) => throw new NotSupportedException();
+        public Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command) => throw new NotSupportedException();
         public Task<FeatureFanOutResult> PublishAsync(FeatureInput input) => throw new NotSupportedException();
         public Task<FeatureHubSnapshot> ReadAsync() => throw new NotSupportedException();
         public Task<FeatureApprovalSnapshot> ProposeAsync(FeatureReleaseProposal proposal, long expectedRevision) => throw new NotSupportedException();

@@ -82,7 +82,7 @@ public sealed class CapabilityWorkflowRunnerRealResolverTests
         private FeatureHubState _state = FeatureHubState.Empty;
         public int CreateDraftCallCount { get; private set; }
 
-        public Task<FeatureDraftProposal> CreateDraftAsync(CreateFeatureDraft request)
+        public Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request)
         {
             CreateDraftCallCount++;
             var transition = FeatureHubTransitions.CreateDraft(_state, "owner-scope-1", request);
@@ -91,6 +91,11 @@ public sealed class CapabilityWorkflowRunnerRealResolverTests
         }
 
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
+        public Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command) => throw new NotSupportedException();
+        public Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command) => throw new NotSupportedException();
+        public Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command) => throw new NotSupportedException();
+        public Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command) => throw new NotSupportedException();
         public Task<FeatureFanOutResult> PublishAsync(FeatureInput input) => throw new NotSupportedException();
         public Task<FeatureHubSnapshot> ReadAsync() => throw new NotSupportedException();
         public Task<FeatureApprovalSnapshot> ProposeAsync(FeatureReleaseProposal proposal, long expectedRevision) => throw new NotSupportedException();
