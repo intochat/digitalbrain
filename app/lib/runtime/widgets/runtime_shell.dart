@@ -6,11 +6,7 @@ import '../runtime_session_owner.dart';
 import 'chat_page.dart';
 
 export 'chat_page.dart'
-    show
-        runtimeLoadingKey,
-        runtimeSignOutButtonKey,
-        runtimeSurfaceKey,
-        runtimeTerminalErrorKey;
+    show runtimeLoadingKey, runtimeSurfaceKey, runtimeTerminalErrorKey;
 
 const Key runtimeSignInKey = Key('v2-runtime-sign-in');
 const String developmentUsername = 'admin';

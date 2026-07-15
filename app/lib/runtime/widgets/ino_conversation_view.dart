@@ -758,7 +758,7 @@ class _OpenStudioButton extends StatelessWidget {
     alignment: Alignment.centerLeft,
     child: OutlinedButton(
       key: chatOpenStudioButtonKey,
-      onPressed: () => context.go(proposal.route),
+      onPressed: () => context.push(proposal.route),
       child: Text(proposal.label),
     ),
   );

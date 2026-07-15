@@ -275,6 +275,46 @@ void main() {
       },
     );
 
+    test('UiSurfaceTreeRenderer rejects a backend app shell at the root', () {
+      final renderer = UiSurfaceTreeRenderer();
+
+      expect(
+        () => renderer.build(
+          <String, Object?>{
+            'Type': 'app-shell',
+            'Props': <String, Object?>{'title': 'Untrusted shell'},
+            'Children': <Object?>[],
+          },
+          (_, _) {},
+          rfwHost: RfwRuntimeHost(),
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('UiSurfaceTreeRenderer rejects a nested backend app shell', () {
+      final renderer = UiSurfaceTreeRenderer();
+
+      expect(
+        () => renderer.build(
+          <String, Object?>{
+            'Type': 'ui:Screen',
+            'Props': <String, Object?>{},
+            'Children': <Object?>[
+              <String, Object?>{
+                'Type': 'AppShell',
+                'Props': <String, Object?>{'title': 'Nested shell'},
+                'Children': <Object?>[],
+              },
+            ],
+          },
+          (_, _) {},
+          rfwHost: RfwRuntimeHost(),
+        ),
+        throwsFormatException,
+      );
+    });
+
     testWidgets('ui:button fires event with correct payload', (tester) async {
       Map<String, Object?>? capturedArgs;
 

@@ -37,7 +37,13 @@ class FeatureProposalPlaceholder extends StatelessWidget {
                 const SizedBox(height: 24),
                 OutlinedButton(
                   key: featureProposalBackToChatButtonKey,
-                  onPressed: () => context.go('/chat'),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                      return;
+                    }
+                    context.go('/chat');
+                  },
                   child: const Text('Back to Chat'),
                 ),
               ],

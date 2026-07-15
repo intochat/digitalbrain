@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:digitalbrain_flutter/core/session/app_session_scope.dart';
+import 'package:digitalbrain_flutter/digital_brain_ui/digital_brain_ui.dart';
 import 'package:digitalbrain_flutter/router.dart';
 import 'package:digitalbrain_flutter/runtime/external_identity.dart';
 import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
@@ -12,6 +13,7 @@ import 'package:digitalbrain_flutter/runtime/widgets/ino_composer.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_conversation_view.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/runtime_shell.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/surface_view.dart';
+import 'package:digitalbrain_flutter/shell/digitalbrain_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -143,7 +145,9 @@ void main() {
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport, authenticated: false);
 
-    await tester.pumpWidget(_runtimeHost(controller: runtime));
+    await tester.pumpWidget(
+      _runtimeHost(controller: runtime, trustedShell: true),
+    );
     await _pumpUntil(
       tester,
       () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
@@ -168,7 +172,7 @@ void main() {
 
     feed.add(FeedSurfaceJson(surfaceJsonString(sequence: 1)));
     await _pumpUntil(tester, () => runtime.latestSurface != null);
-    await tester.tap(find.byKey(runtimeSignOutButtonKey));
+    await tester.tap(find.byKey(digitalBrainSignOutButtonKey));
     await _pumpUntil(
       tester,
       () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
@@ -629,7 +633,11 @@ void main() {
     await tester.pumpWidget(
       _ScopedSessionHost(
         owner: owner,
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) =>
+              WindowSizeScope(child: child ?? const SizedBox.shrink()),
+        ),
       ),
     );
     await _pumpUntil(tester, () => transport.watchStarted);
@@ -655,7 +663,7 @@ void main() {
     await tester.tap(find.byKey(chatOpenStudioButtonKey));
     await tester.pumpAndSettle();
 
-    expect(find.text('Feature Studio'), findsOneWidget);
+    expect(find.text('Feature Studio'), findsWidgets);
     expect(find.text('Draft created from Chat'), findsOneWidget);
     expect(
       find.text('proposal-0123456789abcdef0123456789abcdef'),
@@ -674,6 +682,7 @@ Widget _runtimeHost({
   UiTransportFactory? transportFactory,
   ExternalIdentityTokenSourceFactory? externalIdentityTokenSourceFactory,
   bool autoStart = true,
+  bool trustedShell = false,
   DateTime Function()? now,
 }) {
   final owner =
@@ -686,9 +695,19 @@ Widget _runtimeHost({
         autoStart: autoStart,
       );
   final chat = now == null ? const ChatPage() : ChatPage(now: now);
+  final authenticatedChild = trustedShell
+      ? DigitalBrainShell(
+          location: Uri.parse('/chat'),
+          onDestinationSelected: (_) {},
+          onSignOut: owner.signOut,
+          child: chat,
+        )
+      : chat;
   return _ScopedSessionHost(
     owner: owner,
-    child: MaterialApp(home: RuntimeShell(child: chat)),
+    child: MaterialApp(
+      home: WindowSizeScope(child: RuntimeShell(child: authenticatedChild)),
+    ),
   );
 }
 

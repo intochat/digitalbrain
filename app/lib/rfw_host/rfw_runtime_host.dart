@@ -70,6 +70,11 @@ class UiSurfaceTreeRenderer {
     final type = (node['Type'] ?? node['type'] ?? 'Container')
         .toString()
         .toLowerCase();
+    if (type == 'app-shell' || type == 'appshell') {
+      throw const FormatException(
+        'Backend surfaces cannot define the product shell.',
+      );
+    }
     final props =
         (node['Props'] ?? node['props'] ?? const <String, Object?>{})
             as Map<String, Object?>;
@@ -205,50 +210,6 @@ class UiSurfaceTreeRenderer {
         );
       }
       return const SizedBox.shrink();
-    }
-
-    if (type == 'app-shell' || type == 'appshell') {
-      Widget sidebarWidget = const SizedBox.shrink();
-      Widget headerWidget = FHeader(
-        title: Text((props['title'] ?? '').toString()),
-      );
-      Widget body = Center(child: const SizedBox.shrink());
-
-      for (final child in childrenList) {
-        final c = child as Map<String, Object?>;
-        final cType = (c['Type'] ?? c['type'] ?? '').toString().toLowerCase();
-        if (cType.contains('sidebar') || cType.contains('menu')) {
-          sidebarWidget = build(
-            c,
-            onEvent,
-            rfwHost: rfwHost,
-            onNavSelected: onNavSelected,
-            activeTarget: activeTarget,
-          );
-        } else if (cType.contains('header')) {
-          headerWidget = build(
-            c,
-            onEvent,
-            rfwHost: rfwHost,
-            onNavSelected: onNavSelected,
-            activeTarget: activeTarget,
-          );
-        } else {
-          body = build(
-            c,
-            onEvent,
-            rfwHost: rfwHost,
-            onNavSelected: onNavSelected,
-            activeTarget: activeTarget,
-          );
-        }
-      }
-
-      return FScaffold(
-        sidebar: sidebarWidget,
-        header: headerWidget,
-        child: body,
-      );
     }
 
     if (type == 'sidebar' || type == 'forui:sidebar') {

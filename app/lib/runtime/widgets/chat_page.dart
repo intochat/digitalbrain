@@ -10,7 +10,6 @@ import 'surface_view.dart';
 DateTime _utcNow() => DateTime.now().toUtc();
 
 const Key runtimeLoadingKey = Key('v2-runtime-loading');
-const Key runtimeSignOutButtonKey = Key('v2-runtime-sign-out-button');
 const Key runtimeSurfaceKey = Key('v2-runtime-surface');
 const Key runtimeTerminalErrorKey = Key('v2-runtime-terminal-error');
 
@@ -44,8 +43,7 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final session = AppSessionScope.of(context);
-    final controller = session.controller!;
+    final controller = AppSessionScope.of(context).controller!;
     final surface = _renderableSurface(controller);
     if (controller.status == RuntimeStatus.terminalError && surface == null) {
       return _errorScaffold(
@@ -71,19 +69,6 @@ class _ChatPageState extends State<ChatPage> {
                 reconnecting: controller.status == RuntimeStatus.reconnecting,
                 connectionUnavailable:
                     controller.status == RuntimeStatus.terminalError,
-              ),
-            ),
-          if (controller.session.isAuthenticated)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Tooltip(
-                message: 'Sign out',
-                child: IconButton.filledTonal(
-                  key: runtimeSignOutButtonKey,
-                  onPressed: session.signOut,
-                  icon: const Icon(Icons.logout),
-                ),
               ),
             ),
         ],
