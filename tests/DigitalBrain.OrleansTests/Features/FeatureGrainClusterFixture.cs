@@ -66,6 +66,13 @@ public sealed class FeatureGrainClusterFixture : IAsyncLifetime
 public sealed class TestFeaturePublicationVerifier : IFeaturePublicationVerifier
 {
     private readonly ConcurrentDictionary<PublicationKey, byte> allowed = new();
+    private readonly ConcurrentDictionary<string, Exception> failures = new(StringComparer.Ordinal);
+
+    public void Fail(BrainOwnerId ownerId, Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        failures[ownerId.Value] = exception;
+    }
 
     public void Allow(
         BrainOwnerId ownerId,
@@ -90,12 +97,18 @@ public sealed class TestFeaturePublicationVerifier : IFeaturePublicationVerifier
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (failures.TryRemove(ownerId.Value, out var failure))
+            return Task.FromException(failure);
         if (!allowed.ContainsKey(Key(ownerId, receipt)))
-            throw new InvalidOperationException("The exact active Feature publication was not produced by the test publisher.");
+            throw new FeatureConcurrencyException(
+                "The exact active Feature publication was not produced by the test publisher.",
+                FeatureCommandRejectionReason.Precondition);
         var digest = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
             FeaturePublicationManifestCodec.Serialize(ownerId, ticket)));
         if (!string.Equals(digest, receipt.ManifestDigest, StringComparison.Ordinal))
-            throw new InvalidOperationException("The test publication does not match the current ticket.");
+            throw new FeatureConcurrencyException(
+                "The test publication does not match the current ticket.",
+                FeatureCommandRejectionReason.Precondition);
         return Task.CompletedTask;
     }
 

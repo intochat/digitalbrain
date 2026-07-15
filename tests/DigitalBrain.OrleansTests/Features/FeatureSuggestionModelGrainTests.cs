@@ -35,6 +35,33 @@ public sealed class FeatureSuggestionModelGrainTests(FeatureGrainClusterFixture 
     }
 
     [Fact]
+    public async Task Patch_identity_binds_the_full_validated_model_content()
+    {
+        var owner = new BrainOwnerId("owner-suggestion-content-identity");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-suggestion-content-identity",
+            "Bind Suggested Change identity to content",
+            fixture.Time.GetUtcNow(),
+            "conversation-suggestion-content-identity"));
+        var model = fixture.Grain<IFeatureSuggestionModelGrain>(FeatureGrainIds.Hub(owner));
+        var command = new SuggestFeatureChange(
+            draft.DraftId,
+            draft.Revision,
+            "Produce a complete Suggested Change",
+            "suggestion-content-identity");
+        fixture.SuggestionModel.RespondWith(Response("first"));
+        var first = await model.SuggestAsync(command);
+        fixture.SuggestionModel.RespondWith(Response("second"));
+
+        var second = await model.SuggestAsync(command);
+
+        Assert.NotEqual(first.PatchId, second.PatchId);
+        Assert.Equal(first.DraftId, second.DraftId);
+        Assert.Equal(first.BaseRevision, second.BaseRevision);
+    }
+
+    [Fact]
     public async Task The_RuntimeHost_suggestion_seam_independently_rejects_cross_Owner_and_stale_Draft_lookups()
     {
         var owner = new BrainOwnerId("owner-suggestion-authority");
@@ -61,7 +88,8 @@ public sealed class FeatureSuggestionModelGrainTests(FeatureGrainClusterFixture 
             fixture.Time.GetUtcNow().AddMinutes(1)));
         var model = fixture.Grain<IFeatureSuggestionModelGrain>(FeatureGrainIds.Hub(owner));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => model.SuggestAsync(command));
+        var stale = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => model.SuggestAsync(command));
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, stale.Reason);
         Assert.Equal(0, fixture.SuggestionModel.CallCount);
     }
 
@@ -88,12 +116,13 @@ public sealed class FeatureSuggestionModelGrainTests(FeatureGrainClusterFixture 
         });
         var model = fixture.Grain<IFeatureSuggestionModelGrain>(FeatureGrainIds.Hub(owner));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => model.SuggestAsync(new SuggestFeatureChange(
+        var stale = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => model.SuggestAsync(new SuggestFeatureChange(
             draft.DraftId,
             draft.Revision,
             "Do not return a stale patch",
             "suggestion-model-race")));
 
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, stale.Reason);
         Assert.Equal(1, fixture.SuggestionModel.CallCount);
         Assert.Equal(draft.Revision + 1, (await hub.ReadDraftAsync(draft.DraftId))?.Revision);
     }
@@ -111,11 +140,13 @@ public sealed class FeatureSuggestionModelGrainTests(FeatureGrainClusterFixture 
         fixture.SuggestionModel.RespondWith(Response("untrusted").TrimEnd('}') + ",\"patchId\":\"model-selected\"}");
         var model = fixture.Grain<IFeatureSuggestionModelGrain>(FeatureGrainIds.Hub(owner));
 
-        await Assert.ThrowsAnyAsync<Exception>(() => model.SuggestAsync(new SuggestFeatureChange(
+        var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => model.SuggestAsync(new SuggestFeatureChange(
             draft.DraftId,
             draft.Revision,
             "Do not trust model coordinates",
             "suggestion-untrusted-coordinate")));
+
+        Assert.Equal(FeatureCommandRejectionReason.Unavailable, rejected.Reason);
     }
 
     [Fact]
@@ -143,11 +174,12 @@ public sealed class FeatureSuggestionModelGrainTests(FeatureGrainClusterFixture 
         foreach (var response in invalidResponses)
         {
             fixture.SuggestionModel.RespondWith(response);
-            await Assert.ThrowsAnyAsync<Exception>(() => model.SuggestAsync(new SuggestFeatureChange(
+            var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => model.SuggestAsync(new SuggestFeatureChange(
                 draft.DraftId,
                 draft.Revision,
                 "Return only a safe complete patch",
                 "suggestion-invalid-output")));
+            Assert.Equal(FeatureCommandRejectionReason.Unavailable, rejected.Reason);
         }
 
         var unchanged = Assert.IsType<FeatureDraft>(await hub.ReadDraftAsync(draft.DraftId));

@@ -11,6 +11,21 @@ service DigitalBrainV2Ui {
   rpc AcknowledgeSurfaceFeed(AcknowledgeSurfaceFeedRequest) returns (AcknowledgeSurfaceFeedReply);
   rpc SubmitAction(SubmitActionRequest) returns (SubmitActionReply);
   rpc LogoutSession(LogoutSessionRequest) returns (LogoutSessionReply);
+  rpc GetFeatureDraft(GetFeatureDraftRequest) returns (FeatureDraftReply);
+  rpc ReviseFeatureDraft(ReviseFeatureDraftRequest) returns (FeatureDraftReply);
+  rpc SuggestFeatureChange(SuggestFeatureChangeRequest) returns (FeatureDraftPatchReply);
+  rpc VerifyFeatureDraft(VerifyFeatureDraftRequest) returns (FeatureReleaseReviewReply);
+  rpc InstallFeatureVersion(InstallFeatureVersionRequest) returns (FeatureInstallReply);
+  rpc ResumeOriginatingRequest(ResumeOriginatingRequestRequest) returns (ResumeOriginatingRequestReply);
+  rpc ListFeatures(ListFeaturesRequest) returns (ListFeaturesReply);
+  rpc GetFeature(GetFeatureRequest) returns (FeatureReply);
+  rpc ListConnections(ListConnectionsRequest) returns (ListConnectionsReply);
+  rpc GetConnection(GetConnectionRequest) returns (ConnectionReply);
+  rpc ListActivity(ListActivityRequest) returns (ListActivityReply);
+  rpc GetRun(GetRunRequest) returns (RunReply);
+  rpc ListMemoryItems(ListMemoryItemsRequest) returns (ListMemoryItemsReply);
+  rpc GetMemoryItem(GetMemoryItemRequest) returns (MemoryItemReply);
+  rpc GetHomeSummary(GetHomeSummaryRequest) returns (HomeSummaryReply);
 }
 
 message BootstrapSessionRequest {
@@ -87,3 +102,297 @@ message LogoutSessionRequest {
 }
 
 message LogoutSessionReply {}
+
+enum FeatureDraftStatus {
+  FEATURE_DRAFT_STATUS_UNSPECIFIED = 0;
+  FEATURE_DRAFT_STATUS_DRAFT = 1;
+  FEATURE_DRAFT_STATUS_INSTALLED = 2;
+}
+
+enum FeatureSourceKind {
+  FEATURE_SOURCE_KIND_UNSPECIFIED = 0;
+  FEATURE_SOURCE_KIND_REPOSITORY = 1;
+  FEATURE_SOURCE_KIND_RUNTIME_AUTHORED = 2;
+}
+
+message GetFeatureDraftRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string draft_id = 3;
+}
+
+message ReviseFeatureDraftRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string draft_id = 3;
+  optional int64 expected_revision = 4;
+  string idempotency_id = 5;
+  oneof command {
+    ReviseFeatureBehaviorInput revise_behavior = 6;
+    ReviseFeatureSourceInput revise_source = 7;
+    AcceptSuggestedChangeInput accept_suggested_change = 8;
+    RejectSuggestedChangeInput reject_suggested_change = 9;
+  }
+}
+
+message SuggestFeatureChangeRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string draft_id = 3;
+  optional int64 expected_revision = 4;
+  string guidance = 5;
+  string suggestion_id = 6;
+}
+
+message VerifyFeatureDraftRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string draft_id = 3;
+  optional int64 expected_revision = 4;
+  string idempotency_id = 5;
+}
+
+message InstallFeatureVersionRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string draft_id = 3;
+  optional int64 expected_revision = 4;
+  string installation_id = 5;
+  string release_digest = 6;
+  repeated FeatureGrant grants = 7;
+  repeated string subscriptions = 8;
+  string decision_id = 9;
+  string idempotency_id = 10;
+}
+
+message ReviseFeatureBehaviorInput {
+  reserved "owner_id", "actor_id";
+  FeatureBehavior behavior = 1;
+}
+
+message ReviseFeatureSourceInput {
+  reserved "owner_id", "actor_id";
+  FeatureSourceSnapshot source = 1;
+}
+
+message AcceptSuggestedChangeInput {
+  reserved "owner_id", "actor_id";
+  FeatureDraftPatch patch = 1;
+}
+
+message RejectSuggestedChangeInput {
+  reserved "owner_id", "actor_id";
+  string patch_id = 1;
+  optional int64 base_revision = 2;
+}
+
+message OriginatingRequest {
+  reserved "owner_id", "actor_id";
+  string operation_id = 1;
+  optional string conversation_id = 2;
+  string text = 3;
+}
+
+message FeatureScenario {
+  reserved "owner_id", "actor_id";
+  string scenario_id = 1;
+  string name = 2;
+  string given = 3;
+  string when = 4;
+  string then = 5;
+}
+
+message FeatureBehavior {
+  reserved "owner_id", "actor_id";
+  repeated FeatureScenario scenarios = 1;
+}
+
+message FeatureSourceFile {
+  reserved "owner_id", "actor_id";
+  string path = 1;
+  string content = 2;
+}
+
+message FeatureSourceSnapshot {
+  reserved "owner_id", "actor_id";
+  string implementation_project_path = 1;
+  string scenario_project_path = 2;
+  repeated FeatureSourceFile files = 3;
+}
+
+message FeatureVerification {
+  reserved "owner_id", "actor_id";
+  string release_digest = 1;
+  int32 total = 2;
+  int32 passed = 3;
+  int32 failed = 4;
+  int32 skipped = 5;
+  int64 verified_at_unix_ms = 6;
+}
+
+message FeatureDraft {
+  reserved "owner_id", "actor_id";
+  string draft_id = 1;
+  OriginatingRequest originating_request = 2;
+  string goal = 3;
+  FeatureDraftStatus status = 4;
+  FeatureBehavior behavior = 5;
+  FeatureSourceSnapshot source = 6;
+  optional FeatureVerification verification = 7;
+  optional string installation_id = 8;
+  int64 revision = 9;
+  int64 created_at_unix_ms = 10;
+  int64 updated_at_unix_ms = 11;
+}
+
+message FeatureDraftPatch {
+  reserved "owner_id", "actor_id";
+  string patch_id = 1;
+  string draft_id = 2;
+  optional int64 base_revision = 3;
+  string summary = 4;
+  FeatureBehavior replacement_behavior = 5;
+  FeatureSourceSnapshot replacement_source = 6;
+}
+
+message FeatureRelease {
+  reserved "owner_id", "actor_id";
+  string digest = 1;
+  FeatureSourceKind source_kind = 2;
+  repeated string requested_capability_ids = 3;
+  repeated string dependencies = 4;
+}
+
+message FeatureGrant {
+  reserved "owner_id", "actor_id";
+  string capability_id = 1;
+  int32 capability_version = 2;
+  optional string connection_id = 3;
+  string constraints_json = 4;
+  optional string provider = 5;
+}
+
+message FeatureDraftReply {
+  reserved "owner_id", "actor_id";
+  FeatureDraft draft = 1;
+}
+
+message FeatureDraftPatchReply {
+  reserved "owner_id", "actor_id";
+  FeatureDraftPatch patch = 1;
+}
+
+message FeatureReleaseReviewReply {
+  reserved "owner_id", "actor_id";
+  FeatureDraft draft = 1;
+  FeatureRelease release = 2;
+}
+
+message FeatureInstallReply {
+  reserved "owner_id", "actor_id";
+  FeatureDraft draft = 1;
+  FeatureRelease release = 2;
+  string installation_id = 3;
+  repeated FeatureGrant active_grants = 4;
+  repeated string subscriptions = 5;
+  bool rollback_available = 6;
+  bool paused = 7;
+  optional string pause_reason = 8;
+}
+
+message ResumeOriginatingRequestRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string draft_id = 3;
+  optional int64 expected_revision = 4;
+  string idempotency_id = 5;
+}
+
+message ResumeOriginatingRequestReply {
+  reserved "owner_id", "actor_id";
+}
+
+message ListFeaturesRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+}
+
+message ListFeaturesReply {
+  reserved "owner_id", "actor_id";
+}
+
+message GetFeatureRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string feature_id = 3;
+}
+
+message FeatureReply {
+  reserved "owner_id", "actor_id";
+}
+
+message ListConnectionsRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+}
+
+message ListConnectionsReply {
+  reserved "owner_id", "actor_id";
+}
+
+message GetConnectionRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string connection_id = 3;
+}
+
+message ConnectionReply {
+  reserved "owner_id", "actor_id";
+}
+
+message ListActivityRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+}
+
+message ListActivityReply {
+  reserved "owner_id", "actor_id";
+}
+
+message GetRunRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string run_id = 3;
+}
+
+message RunReply {
+  reserved "owner_id", "actor_id";
+}
+
+message ListMemoryItemsRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+}
+
+message ListMemoryItemsReply {
+  reserved "owner_id", "actor_id";
+}
+
+message GetMemoryItemRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string memory_item_id = 3;
+}
+
+message MemoryItemReply {
+  reserved "owner_id", "actor_id";
+}
+
+message GetHomeSummaryRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+}
+
+message HomeSummaryReply {
+  reserved "owner_id", "actor_id";
+}

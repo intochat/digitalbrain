@@ -117,10 +117,37 @@ public sealed class UiGrpcService(
     ConversationStateClient conversations,
     UiDeliveryOptions deliveryOptions,
     ILogger<UiGrpcService> logger,
+    DigitalBrainUiEndpoints endpoints,
     FeatureLifecycleRail? featureLifecycle = null) : DigitalBrainV2Ui.DigitalBrainV2UiBase
 {
     private const int MaximumInputBytes = 64 * 1024;
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Mcp");
+    private readonly DigitalBrainUiEndpoints productEndpoints = endpoints ?? throw new ArgumentNullException(nameof(endpoints));
+    public override async Task<FeatureDraftReply> GetFeatureDraft(GetFeatureDraftRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.GetFeatureDraftAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
+    public override async Task<FeatureDraftReply> ReviseFeatureDraft(ReviseFeatureDraftRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.ReviseFeatureDraftAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
+    public override async Task<FeatureDraftPatchReply> SuggestFeatureChange(SuggestFeatureChangeRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.SuggestFeatureChangeAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
+    public override async Task<FeatureReleaseReviewReply> VerifyFeatureDraft(VerifyFeatureDraftRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.VerifyFeatureDraftAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
+    public override async Task<FeatureInstallReply> InstallFeatureVersion(InstallFeatureVersionRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.InstallFeatureVersionAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
     public override async Task<SessionReply> BootstrapSession(BootstrapSessionRequest request, ServerCallContext context)
     {
         DemandAudience(context);

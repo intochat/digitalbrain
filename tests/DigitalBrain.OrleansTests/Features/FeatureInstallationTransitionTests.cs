@@ -592,7 +592,7 @@ public sealed class FeatureInstallationTransitionTests
             Now);
         var approval = Assert.Single(proposed.Approvals);
 
-        Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Decide(
+        var wrongDigest = Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Decide(
             proposed,
             new FeatureApprovalDecision(approval.ApprovalId, ReleaseTwo, true, "decision-wrong-digest"),
             proposed.Revision,
@@ -603,7 +603,20 @@ public sealed class FeatureInstallationTransitionTests
             new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-1"),
             proposed.Revision,
             Now.AddSeconds(1));
-        Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Grant(
+        var alreadyDecided = Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Decide(
+            approved,
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-repeated"),
+            approved.Revision,
+            Now.AddSeconds(2)));
+        var missingApproval = Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Grant(
+            FeatureHubState.Empty,
+            new FeatureGrantRequest(
+                InstallationId,
+                ReleaseOne,
+                new ActorId("actor-1"),
+                grants),
+            0));
+        var incompleteGrantSet = Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Grant(
             approved,
             new FeatureGrantRequest(
                 InstallationId,
@@ -611,6 +624,72 @@ public sealed class FeatureInstallationTransitionTests
                 new ActorId("actor-1"),
                 [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), Constraints("gmail.message.read.v1"), "google")]),
             approved.Revision));
+
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, missingApproval.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, incompleteGrantSet.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, wrongDigest.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, alreadyDecided.Reason);
+    }
+
+    [Fact]
+    public void Activation_without_an_exact_staged_grant_set_is_a_precondition_failure()
+    {
+        FeatureGrantSpec[] grants = [new("capability.active", 1, null, Constraints("capability.active"))];
+        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, grants), grants);
+
+        var rejected = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureHubTransitions.Activate(active, InstallationId, active.Revision));
+
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
+    }
+
+    [Fact]
+    public void Confirmed_publication_reservation_failures_distinguish_actor_authority_from_expected_state()
+    {
+        FeatureGrantSpec[] grants = [new("capability.active", 1, null, Constraints("capability.active"))];
+        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, grants), grants);
+        var registered = FeatureHubTransitions.Register(
+            active,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["manual"]));
+        var prepared = FeaturePublicationTransitions.Prepare(registered, InstallationId);
+        var receipt = new FeaturePublicationReceipt(
+            InstallationId,
+            prepared.Ticket.PublicationFence,
+            prepared.Ticket.AuthorityDigest,
+            prepared.Ticket.AccessDigest,
+            new string('f', 64));
+        var confirmed = FeaturePublicationTransitions.Confirm(prepared.State, receipt).State;
+        var approval = confirmed.Approvals.Single(candidate => candidate.Release.Digest == ReleaseOne);
+        var reservation = new FeatureDraftInstallationReservation(
+            new FeatureDraftId("draft-publication-reasons"),
+            1,
+            InstallationId,
+            ReleaseOne,
+            "install-publication-reasons",
+            new string('c', 64),
+            prepared.Ticket.AccessDigest,
+            approval.DecisionId!,
+            new ActorId("actor-1"));
+
+        var missingPublication = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeaturePublicationTransitions.DemandConfirmedReservation(registered, reservation));
+        var mismatchedAccess = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeaturePublicationTransitions.DemandConfirmedReservation(
+                confirmed,
+                reservation with { AccessDigest = new string('0', 64) }));
+        var mismatchedDecision = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeaturePublicationTransitions.DemandConfirmedReservation(
+                confirmed,
+                reservation with { DecisionId = "decision-other" }));
+        var actorMismatch = Assert.Throws<FeatureAuthorityRejectedException>(() =>
+            FeaturePublicationTransitions.DemandConfirmedReservation(
+                confirmed,
+                reservation with { ActorId = new ActorId("actor-other") }));
+
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, missingPublication.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, mismatchedAccess.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, mismatchedDecision.Reason);
+        Assert.Equal(FeatureAuthorityRejectionReason.ActorMismatch, actorMismatch.Reason);
     }
 
     [Fact]

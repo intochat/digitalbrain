@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
 
@@ -233,6 +235,98 @@ public sealed class FeatureDraftAuthoringTests
         Assert.Equal(first.Draft, replay.Draft);
         Assert.Same(later.State, replay.State);
         Assert.Equal(2, FeatureDraftAuthoringTransitions.ReadDraft(later.State, created.Draft.DraftId)?.Revision);
+    }
+
+    [Fact]
+    public void Behavior_lost_response_replay_ignores_a_later_server_timestamp()
+    {
+        var created = Create();
+        var command = new ReviseFeatureBehavior(
+            created.Draft.DraftId,
+            Behavior("server-time"),
+            0,
+            "behavior-server-time",
+            Now.AddMinutes(1));
+        var first = FeatureDraftAuthoringTransitions.ReviseBehavior(created.State, command);
+
+        var replay = FeatureDraftAuthoringTransitions.ReviseBehavior(
+            first.State,
+            command with { RevisedAt = Now.AddMinutes(2) });
+
+        Assert.Equal(first.Draft, replay.Draft);
+        Assert.Same(first.State, replay.State);
+        Assert.Equal(Now.AddMinutes(1), replay.Draft.UpdatedAt);
+    }
+
+    [Fact]
+    public void Source_lost_response_replay_ignores_a_later_server_timestamp()
+    {
+        var created = Create();
+        var command = new ReviseFeatureSource(
+            created.Draft.DraftId,
+            Source(),
+            0,
+            "source-server-time",
+            Now.AddMinutes(1));
+        var first = FeatureDraftAuthoringTransitions.ReviseSource(created.State, command);
+
+        var replay = FeatureDraftAuthoringTransitions.ReviseSource(
+            first.State,
+            command with { RevisedAt = Now.AddMinutes(2) });
+
+        Assert.Equal(first.Draft, replay.Draft);
+        Assert.Same(first.State, replay.State);
+        Assert.Equal(Now.AddMinutes(1), replay.Draft.UpdatedAt);
+    }
+
+    [Fact]
+    public void Suggested_change_lost_response_replay_ignores_a_later_server_timestamp()
+    {
+        var created = Create();
+        var patch = new FeatureDraftPatch(
+            "patch-server-time",
+            created.Draft.DraftId,
+            0,
+            "Replace the authored feature",
+            Behavior("patch-server-time"),
+            Source());
+        var command = new AcceptSuggestedChange(patch, 0, "accept-server-time", Now.AddMinutes(1));
+        var first = FeatureDraftAuthoringTransitions.AcceptSuggestedChange(created.State, command);
+
+        var replay = FeatureDraftAuthoringTransitions.AcceptSuggestedChange(
+            first.State,
+            command with { AcceptedAt = Now.AddMinutes(2) });
+
+        Assert.Equal(first.Draft, replay.Draft);
+        Assert.Same(first.State, replay.State);
+        Assert.Equal(Now.AddMinutes(1), replay.Draft.UpdatedAt);
+    }
+
+    [Fact]
+    public void Legacy_timestamp_bound_replay_digest_remains_compatible()
+    {
+        var created = Create();
+        var original = new ReviseFeatureBehavior(
+            created.Draft.DraftId,
+            Behavior("legacy-replay"),
+            0,
+            "legacy-behavior-replay",
+            Now.AddMinutes(1));
+        var first = FeatureDraftAuthoringTransitions.ReviseBehavior(created.State, original);
+        var legacyDigest = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(original)));
+        var legacyState = first.State with
+        {
+            DraftReplays = first.State.DraftReplays!
+                .Select(replay => replay with { PayloadDigest = legacyDigest })
+                .ToArray()
+        };
+
+        var replayed = FeatureDraftAuthoringTransitions.ReviseBehavior(
+            legacyState,
+            original with { RevisedAt = Now.AddMinutes(2) });
+
+        Assert.Equal(first.Draft, replayed.Draft);
+        Assert.Same(legacyState, replayed.State);
     }
 
     [Fact]
@@ -536,7 +630,7 @@ public sealed class FeatureDraftAuthoringTests
             command,
             new ActorId("actor-b"));
 
-        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.MarkInstalled(
+        var rejected = Assert.Throws<FeatureAuthorityRejectedException>(() => FeatureDraftAuthoringTransitions.MarkInstalled(
             publishedByAnotherActor,
             new MarkFeatureDraftInstalled(
                 command.DraftId,
@@ -545,6 +639,7 @@ public sealed class FeatureDraftAuthoringTests
                 command.ExpectedRevision,
                 command.IdempotencyId,
                 Now.AddMinutes(2))));
+        Assert.Equal(FeatureAuthorityRejectionReason.ActorMismatch, rejected.Reason);
         Assert.Single(publishedByAnotherActor.DraftInstallationReservations ?? []);
     }
 
@@ -599,6 +694,59 @@ public sealed class FeatureDraftAuthoringTests
                 new FeatureVerification(default, 1, 1, 0, 0, Now.AddMinutes(1)),
                 0,
                 "verification-default-release")));
+    }
+
+    [Fact]
+    public void Incrementing_Draft_commands_reject_MaxValue_revision_as_a_typed_conflict_while_rejection_remains_a_no_write()
+    {
+        var created = Create();
+        var draft = new FeatureDraft(
+            created.Draft.DraftId,
+            created.Draft.OriginatingRequest,
+            created.Draft.Goal,
+            created.Draft.Status,
+            created.Draft.Behavior,
+            created.Draft.Source,
+            created.Draft.Verification,
+            created.Draft.InstallationId,
+            long.MaxValue,
+            created.Draft.CreatedAt,
+            created.Draft.UpdatedAt);
+        var state = created.State with { Drafts = [draft] };
+        var patch = new FeatureDraftPatch(
+            "patch-max-revision",
+            draft.DraftId,
+            long.MaxValue,
+            "Max revision",
+            Behavior("max-patch"),
+            Source());
+
+        FeatureConcurrencyException[] rejected =
+        [
+            Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.ReviseBehavior(
+                state,
+                new ReviseFeatureBehavior(draft.DraftId, Behavior("max-behavior"), long.MaxValue, "behavior-max", Now.AddMinutes(1)))),
+            Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.ReviseSource(
+                state,
+                new ReviseFeatureSource(draft.DraftId, Source(), long.MaxValue, "source-max", Now.AddMinutes(1)))),
+            Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.AcceptSuggestedChange(
+                state,
+                new AcceptSuggestedChange(patch, long.MaxValue, "accept-max", Now.AddMinutes(1)))),
+            Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.RecordVerification(
+                state,
+                new RecordFeatureVerification(
+                    draft.DraftId,
+                    Verification() with { VerifiedAt = Now.AddMinutes(1) },
+                    long.MaxValue,
+                    "verification-max")))
+        ];
+        var noWrite = FeatureDraftAuthoringTransitions.RejectSuggestedChange(
+            state,
+            new RejectSuggestedChange(draft.DraftId, patch.PatchId, long.MaxValue, long.MaxValue));
+
+        Assert.All(rejected, exception => Assert.Equal(FeatureCommandRejectionReason.Conflict, exception.Reason));
+        Assert.Same(state, noWrite.State);
+        Assert.Same(draft, noWrite.Draft);
     }
 
     private static FeatureCreateDraftTransition Create(string owner = "owner-1") =>

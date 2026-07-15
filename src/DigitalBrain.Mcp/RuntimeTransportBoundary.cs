@@ -31,12 +31,15 @@ public sealed class RuntimeTransportBoundary(RequestDelegate next, RuntimeTransp
             context.Response.StatusCode = StatusCodes.Status426UpgradeRequired;
             return;
         }
-        var bodyFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
-        if (bodyFeature is { IsReadOnly: false }) bodyFeature.MaxRequestBodySize = options.MaximumBodyBytes;
-        if (context.Request.ContentLength is < 0 || context.Request.ContentLength > options.MaximumBodyBytes)
+        if (!IsUiGrpcPath(context.Request.Path))
         {
-            context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
-            return;
+            var bodyFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (bodyFeature is { IsReadOnly: false }) bodyFeature.MaxRequestBodySize = options.MaximumBodyBytes;
+            if (context.Request.ContentLength is < 0 || context.Request.ContentLength > options.MaximumBodyBytes)
+            {
+                context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+                return;
+            }
         }
         if (!TryTakeRateSlot() || !await _concurrency.WaitAsync(0, context.RequestAborted).ConfigureAwait(false))
         {
@@ -95,6 +98,8 @@ public sealed class RuntimeTransportBoundary(RequestDelegate next, RuntimeTransp
     private static bool IsRuntimePath(PathString path) =>
         path.StartsWithSegments("/mcp") || path.StartsWithSegments("/digitalbrain.v2.ui.DigitalBrainV2Ui") ||
         path.StartsWithSegments("/oauth/start");
+    private static bool IsUiGrpcPath(PathString path) =>
+        path.StartsWithSegments("/digitalbrain.v2.ui.DigitalBrainV2Ui");
     private static bool IsLongLivedFeed(PathString path) =>
         path.Value?.EndsWith("/WatchSurfaceFeed", StringComparison.Ordinal) == true;
 }

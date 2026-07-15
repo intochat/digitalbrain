@@ -265,11 +265,11 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             }
             var existingFence = PublicationFence(existing);
             if (existingFence > ticket.PublicationFence)
-                throw new InvalidOperationException("A newer active Feature publication already exists.");
+                throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Conflict);
             if (existingFence == ticket.PublicationFence)
             {
                 if (existing.AsSpan().SequenceEqual(manifest)) return receipt;
-                throw new InvalidOperationException("The active Feature publication fence has conflicting content.");
+                throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
             }
             try
             {
@@ -283,7 +283,7 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             {
             }
         }
-        throw new InvalidOperationException("The active Feature publication changed too many times.");
+        throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
     }
     private static async Task UploadImmutableAsync(BlobClient blob, string sourcePath, CancellationToken cancellationToken)
     {

@@ -21,7 +21,7 @@ public sealed class FeatureSuggestionService(IClusterClient cluster)
             .ConfigureAwait(false)
             ?? throw new KeyNotFoundException("The Feature Draft was not found.");
         if (draft.Revision != command.ExpectedRevision)
-            throw new InvalidOperationException("The Feature Draft revision is stale.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Conflict);
         return await cluster.GetGrain<IFeatureSuggestionModelGrain>(key)
             .SuggestAsync(command, cancellationToken)
             .WaitAsync(cancellationToken)
@@ -36,9 +36,9 @@ public sealed class FeatureSuggestionService(IClusterClient cluster)
             string.IsNullOrWhiteSpace(context.SessionId.Value) ||
             context.Assurance == AuthAssurance.None ||
             !Enum.IsDefined(context.Assurance))
-            throw new UnauthorizedAccessException("An authenticated owner-scoped actor is required.");
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.MissingGrant);
         if (context.Grants is null || !context.Grants.Any(grant =>
                 string.Equals(grant, "feature.manage", StringComparison.Ordinal)))
-            throw new UnauthorizedAccessException("The authenticated principal lacks Feature management authority.");
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.MissingGrant);
     }
 }

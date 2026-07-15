@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Azure;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
@@ -25,6 +26,61 @@ public sealed class FeatureAuthoringService(
         return await ReadDraftAsync(Hub(context), draftId, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<FeatureDraft> ReviseBehaviorAsync(
+        RuntimeRequestContext context,
+        FeatureDraftId draftId,
+        FeatureBehavior behavior,
+        long expectedRevision,
+        string idempotencyId,
+        CancellationToken cancellationToken = default)
+    {
+        FeatureSuggestionService.DemandFeatureAuthor(context);
+        DemandIncrementableRevision(expectedRevision);
+        return await Hub(context).ReviseBehaviorAsync(new ReviseFeatureBehavior(
+                draftId,
+                behavior,
+                expectedRevision,
+                idempotencyId,
+                timeProvider.GetUtcNow()))
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<FeatureDraft> ReviseSourceAsync(
+        RuntimeRequestContext context,
+        FeatureDraftId draftId,
+        FeatureSourceSnapshot source,
+        long expectedRevision,
+        string idempotencyId,
+        CancellationToken cancellationToken = default)
+    {
+        FeatureSuggestionService.DemandFeatureAuthor(context);
+        DemandIncrementableRevision(expectedRevision);
+        return await Hub(context).ReviseSourceAsync(new ReviseFeatureSource(
+                draftId,
+                source,
+                expectedRevision,
+                idempotencyId,
+                timeProvider.GetUtcNow()))
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public Task<FeatureDraft> AcceptSuggestedChangeAsync(
+        RuntimeRequestContext context,
+        FeatureDraftPatch patch,
+        long expectedRevision,
+        string idempotencyId,
+        CancellationToken cancellationToken = default) =>
+        AcceptSuggestedChangeAsync(
+            context,
+            new AcceptSuggestedChange(
+                patch,
+                expectedRevision,
+                idempotencyId,
+                timeProvider.GetUtcNow()),
+            cancellationToken);
+
     public async Task<FeatureDraft> AcceptSuggestedChangeAsync(
         RuntimeRequestContext context,
         AcceptSuggestedChange command,
@@ -32,6 +88,7 @@ public sealed class FeatureAuthoringService(
     {
         FeatureSuggestionService.DemandFeatureAuthor(context);
         ArgumentNullException.ThrowIfNull(command);
+        DemandIncrementableRevision(command.ExpectedRevision);
         return await Hub(context).AcceptSuggestedChangeAsync(command)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -56,15 +113,16 @@ public sealed class FeatureAuthoringService(
     {
         FeatureSuggestionService.DemandFeatureAuthor(context);
         ArgumentNullException.ThrowIfNull(command);
+        DemandIncrementableRevision(command.ExpectedRevision);
         var hub = Hub(context);
         var draft = await ReadDraftAsync(hub, command.DraftId, cancellationToken).ConfigureAwait(false);
-        var verificationReplay = draft.Revision == checked(command.ExpectedRevision + 1) && draft.Verification is not null;
+        var verificationReplay = IsSingleRevisionReplay(command.ExpectedRevision, draft.Revision) && draft.Verification is not null;
         if (draft.Revision != command.ExpectedRevision && !verificationReplay)
-            throw new InvalidOperationException("The Feature Draft revision is stale.");
+            throw Rejected(FeatureCommandRejectionReason.Conflict);
         if (!string.Equals(draft.Status, "draft", StringComparison.Ordinal))
-            throw new InvalidOperationException("Only an editable Feature Draft can be verified.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         var source = draft.Source;
-        var artifact = await builds.BuildAsync(
+        var artifact = await BuildAsync(
             new FeatureBuildSubmission(
                 source.ImplementationProjectPath,
                 source.ScenarioProjectPath,
@@ -105,7 +163,7 @@ public sealed class FeatureAuthoringService(
             command.Subscriptions,
             allowInstalledReplay: false,
             cancellationToken).ConfigureAwait(false);
-        var inspection = await lifecycle.InspectAsync(context, cancellationToken).ConfigureAwait(false);
+        var inspection = await LifecycleAsync(() => lifecycle.InspectAsync(context, cancellationToken)).ConfigureAwait(false);
         DemandExistingCoordinate(context, reviewed, inspection);
         return new FeatureAccessReview(
             new VerifiedFeatureCandidate(reviewed.Draft, reviewed.Release),
@@ -120,6 +178,8 @@ public sealed class FeatureAuthoringService(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        FeatureSuggestionService.DemandFeatureAuthor(context);
+        DemandIncrementableRevision(command.ExpectedRevision);
         DemandIdentifier(command.DecisionId, nameof(command.DecisionId));
         DemandIdentifier(command.IdempotencyId, nameof(command.IdempotencyId));
         var reviewed = await ReviewAsync(
@@ -136,15 +196,16 @@ public sealed class FeatureAuthoringService(
             reviewed.InstallationId,
             reviewed.Release.Digest,
             reviewed.Subscriptions);
-        var inspection = await lifecycle.InspectAsync(context, cancellationToken).ConfigureAwait(false);
+        var inspection = await LifecycleAsync(() => lifecycle.InspectAsync(context, cancellationToken)).ConfigureAwait(false);
         DemandExistingCoordinate(context, reviewed, inspection);
         if (reviewed.InstalledReplay)
         {
             DemandApprovedDecision(reviewed, inspection, command.DecisionId);
             DemandExactActiveInstallation(context, reviewed, inspection);
-            var replayedAuthority = await lifecycle.RepublishAsync(context, registration, cancellationToken).ConfigureAwait(false);
+            var replayedAuthority = await LifecycleAsync(() =>
+                lifecycle.RepublishAsync(context, registration, cancellationToken)).ConfigureAwait(false);
             DemandExactAuthority(context, reviewed, replayedAuthority);
-            inspection = await lifecycle.InspectAsync(context, cancellationToken).ConfigureAwait(false);
+            inspection = await LifecycleAsync(() => lifecycle.InspectAsync(context, cancellationToken)).ConfigureAwait(false);
             DemandExistingCoordinate(context, reviewed, inspection);
             var replayed = DemandExactActiveInstallation(context, reviewed, inspection);
             var replayedDraft = await Hub(context).MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
@@ -167,75 +228,77 @@ public sealed class FeatureAuthoringService(
         await Hub(context).AcquireDraftInstallationReservationAsync(canonicalCommand, context.ActorId)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
-        inspection = await lifecycle.InspectAsync(context, cancellationToken).ConfigureAwait(false);
+        inspection = await LifecycleAsync(() => lifecycle.InspectAsync(context, cancellationToken)).ConfigureAwait(false);
         DemandExistingCoordinate(context, reviewed, inspection);
         var approval = ExactApproval(reviewed, inspection);
         if (approval is null)
         {
-            approval = await lifecycle.ProposeAsync(
+            approval = await LifecycleAsync(() => lifecycle.ProposeAsync(
                 context,
                 new FeatureReleaseProposal(reviewed.InstallationId, reviewed.Release, reviewed.Grants),
                 inspection.Revision,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken)).ConfigureAwait(false);
         }
 
-        inspection = await lifecycle.InspectAsync(context, cancellationToken).ConfigureAwait(false);
+        inspection = await LifecycleAsync(() => lifecycle.InspectAsync(context, cancellationToken)).ConfigureAwait(false);
         DemandExistingCoordinate(context, reviewed, inspection);
         approval = ExactApproval(reviewed, inspection)
-            ?? throw new InvalidOperationException("The Feature approval was not durably recorded.");
+            ?? throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (approval.Status == FeatureApprovalStatus.Pending)
         {
-            approval = await lifecycle.DecideAsync(
+            approval = await LifecycleAsync(() => lifecycle.DecideAsync(
                 context,
                 new FeatureApprovalDecision(approval.ApprovalId, reviewed.Release.Digest, true, command.DecisionId),
                 inspection.Revision,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken)).ConfigureAwait(false);
         }
         else if (approval.Status != FeatureApprovalStatus.Approved ||
                  !string.Equals(approval.DecisionId, command.DecisionId, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("The Feature approval decision conflicts with the reviewed installation.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         }
 
-        inspection = await lifecycle.InspectAsync(context, cancellationToken).ConfigureAwait(false);
+        inspection = await LifecycleAsync(() => lifecycle.InspectAsync(context, cancellationToken)).ConfigureAwait(false);
         DemandExistingCoordinate(context, reviewed, inspection);
         approval = ExactApproval(reviewed, inspection)
-            ?? throw new InvalidOperationException("The Feature approval was not found.");
+            ?? throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (approval.Status != FeatureApprovalStatus.Approved ||
             !string.Equals(approval.DecisionId, command.DecisionId, StringComparison.Ordinal))
-            throw new InvalidOperationException("The exact Feature approval is required before granting access.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         var installation = ExactInstallation(reviewed.InstallationId, inspection);
         if (!HasReviewedAuthority(context, reviewed, installation))
         {
-            await lifecycle.GrantAsync(
+            await LifecycleAsync(() => lifecycle.GrantAsync(
                 context,
                 reviewed.InstallationId,
                 reviewed.Release.Digest,
                 reviewed.Grants,
                 inspection.Revision,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken)).ConfigureAwait(false);
         }
 
-        inspection = await lifecycle.InspectAsync(context, cancellationToken).ConfigureAwait(false);
+        inspection = await LifecycleAsync(() => lifecycle.InspectAsync(context, cancellationToken)).ConfigureAwait(false);
         DemandExistingCoordinate(context, reviewed, inspection);
         installation = ExactInstallation(reviewed.InstallationId, inspection)
-            ?? throw new InvalidOperationException("The Feature grant was not durably staged.");
+            ?? throw Rejected(FeatureCommandRejectionReason.Precondition);
         FeatureAuthoritySnapshot authority;
         if (installation.Authority.ActiveRelease == reviewed.Release.Digest)
         {
             DemandSameGrants(installation.Authority.ActiveGrants, reviewed.Grants);
             DemandSameRegistration(installation.Registration, registration);
-            authority = await lifecycle.RepublishAsync(context, registration, cancellationToken).ConfigureAwait(false);
+            authority = await LifecycleAsync(() =>
+                lifecycle.RepublishAsync(context, registration, cancellationToken)).ConfigureAwait(false);
         }
         else
         {
             if (installation.Authority.PendingRelease != reviewed.Release.Digest)
-                throw new InvalidOperationException("The pending Feature grant does not match the verified release.");
+                throw Rejected(FeatureCommandRejectionReason.Precondition);
             DemandSameGrants(installation.Authority.PendingGrants, reviewed.Grants);
-            authority = await lifecycle.InstallAsync(context, registration, inspection.Revision, cancellationToken).ConfigureAwait(false);
+            authority = await LifecycleAsync(() =>
+                lifecycle.InstallAsync(context, registration, inspection.Revision, cancellationToken)).ConfigureAwait(false);
         }
         DemandExactAuthority(context, reviewed, authority);
-        inspection = await lifecycle.InspectAsync(context, cancellationToken).ConfigureAwait(false);
+        inspection = await LifecycleAsync(() => lifecycle.InspectAsync(context, cancellationToken)).ConfigureAwait(false);
         DemandExistingCoordinate(context, reviewed, inspection);
         var active = DemandExactActiveInstallation(context, reviewed, inspection);
         var installedDraft = await Hub(context).MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
@@ -263,7 +326,7 @@ public sealed class FeatureAuthoringService(
     private static void DemandRevision(FeatureDraft draft, long expectedRevision)
     {
         if (draft.Revision != expectedRevision)
-            throw new InvalidOperationException("The Feature Draft revision is stale.");
+            throw Rejected(FeatureCommandRejectionReason.Conflict);
     }
 
     private static void DemandPassingArtifact(FeatureBuildArtifact artifact)
@@ -278,7 +341,7 @@ public sealed class FeatureAuthoringService(
             artifact.Scenarios.Passed != artifact.Scenarios.Total ||
             artifact.Scenarios.Failed != 0 ||
             artifact.Scenarios.Skipped != 0)
-            throw new InvalidOperationException("Feature verification scenarios did not all pass.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
     }
 
     private async Task<ReviewedInstallation> ReviewAsync(
@@ -299,26 +362,27 @@ public sealed class FeatureAuthoringService(
         var installedReplay = string.Equals(draft.Status, "installed", StringComparison.Ordinal);
         if (installedReplay)
         {
-            if (!allowInstalledReplay ||
-                draft.Revision != checked(expectedRevision + 1) ||
-                draft.InstallationId != installationId)
-                throw new InvalidOperationException("The installed Feature Draft does not match this command.");
+            if (!allowInstalledReplay || draft.InstallationId != installationId)
+                throw Rejected(FeatureCommandRejectionReason.Precondition);
+            if (!IsSingleRevisionReplay(expectedRevision, draft.Revision))
+                throw Rejected(FeatureCommandRejectionReason.Conflict);
         }
         else
         {
             DemandRevision(draft, expectedRevision);
             if (!string.Equals(draft.Status, "draft", StringComparison.Ordinal))
-                throw new InvalidOperationException("Only a verified Feature Draft can be reviewed for installation.");
+                throw Rejected(FeatureCommandRejectionReason.Precondition);
             if (draft.InstallationId is { } existingInstallation && existingInstallation != installationId)
-                throw new InvalidOperationException("The Feature Draft is already bound to another installation.");
+                throw Rejected(FeatureCommandRejectionReason.Precondition);
         }
         var verification = draft.Verification
-            ?? throw new InvalidOperationException("The Feature Draft has no current Verification.");
+            ?? throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (verification.Release != releaseDigest)
-            throw new InvalidOperationException("The reviewed release does not match the Feature Draft Verification.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (verification.Total <= 0 || verification.Passed != verification.Total || verification.Failed != 0 || verification.Skipped != 0)
-            throw new InvalidOperationException("The Feature Draft Verification did not fully pass.");
-        var release = await artifacts.DemandReleaseAsync(releaseDigest, cancellationToken).ConfigureAwait(false);
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
+        var release = await ArtifactAsync(() =>
+            artifacts.DemandReleaseAsync(releaseDigest, cancellationToken)).ConfigureAwait(false);
         if (release.Digest != releaseDigest || release.SourceKind != FeatureSourceKind.RuntimeAuthored)
             throw new InvalidDataException("The published Feature release does not match the verified runtime-authored digest.");
         var reviewedGrants = ValidateGrants(release, grants);
@@ -398,21 +462,21 @@ public sealed class FeatureAuthoringService(
             candidate.Release.Digest == reviewed.Release.Digest).ToArray();
         var registrations = inspection.Registrations.Where(candidate => candidate.InstallationId == reviewed.InstallationId).ToArray();
         if (registrations.Length > 1)
-            throw new InvalidOperationException("The Feature registration identity is ambiguous.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         var matching = inspection.Installations.Where(candidate => candidate.Authority.InstallationId == reviewed.InstallationId).ToArray();
         if (matching.Length > 1)
-            throw new InvalidOperationException("The Feature installation identity is ambiguous.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         var hasCurrentReleaseCoordinate = registrations.Length == 1 || matching.Any(candidate =>
             candidate.Authority.ActiveRelease is not null || candidate.Authority.PendingRelease is not null);
         if (!hasCurrentReleaseCoordinate && installationApprovals.Length > 0 &&
             installationApprovals.OrderByDescending(candidate => candidate.Revision).First().Release.Digest != reviewed.Release.Digest)
-            throw new InvalidOperationException("The Feature installation identity is already bound to another release.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (approvals.Length > 1)
-            throw new InvalidOperationException("The Feature release has duplicate approval coordinates.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (approvals.Length == 1)
         {
             if (!SameRelease(approvals[0].Release, reviewed.Release))
-                throw new InvalidOperationException("The Feature approval has conflicting release metadata.");
+                throw Rejected(FeatureCommandRejectionReason.Precondition);
             DemandSameGrants(approvals[0].Grants, reviewed.Grants);
         }
         if (inspection.Approvals.Any(candidate =>
@@ -422,11 +486,11 @@ public sealed class FeatureAuthoringService(
                 (candidate.Authority.ActiveRelease == reviewed.Release.Digest || candidate.Authority.PendingRelease == reviewed.Release.Digest)) ||
             inspection.Registrations.Any(candidate =>
                 candidate.Release == reviewed.Release.Digest && candidate.InstallationId != reviewed.InstallationId))
-            throw new InvalidOperationException("The verified Feature release is already bound to another installation identity.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (registrations.Length == 1)
         {
             if (registrations[0].Release != reviewed.Release.Digest)
-                throw new InvalidOperationException("The Feature installation identity is already bound to another release.");
+                throw Rejected(FeatureCommandRejectionReason.Precondition);
             DemandSameRegistration(
                 registrations[0],
                 new FeatureInstallationRegistration(reviewed.InstallationId, reviewed.Release.Digest, reviewed.Subscriptions));
@@ -434,10 +498,10 @@ public sealed class FeatureAuthoringService(
         if (matching.Length == 0) return;
         var installation = matching[0];
         if (installation.Authority.ActorId != context.ActorId)
-            throw new UnauthorizedAccessException("The Feature installation belongs to another actor.");
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
         if (installation.Authority.ActiveRelease is { } activeRelease && activeRelease != reviewed.Release.Digest ||
             installation.Authority.PendingRelease is { } pendingRelease && pendingRelease != reviewed.Release.Digest)
-            throw new InvalidOperationException("The Feature installation identity is already bound to another release.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (installation.Authority.PendingRelease == reviewed.Release.Digest)
             DemandSameGrants(installation.Authority.PendingGrants, reviewed.Grants);
         if (installation.Authority.ActiveRelease == reviewed.Release.Digest)
@@ -454,7 +518,7 @@ public sealed class FeatureAuthoringService(
         var approval = inspection.Approvals.SingleOrDefault(candidate =>
             candidate.InstallationId == reviewed.InstallationId && candidate.Release.Digest == reviewed.Release.Digest);
         if (approval is not null && approval.Status == FeatureApprovalStatus.Rejected)
-            throw new InvalidOperationException("The reviewed Feature release was rejected.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         return approval;
     }
 
@@ -469,10 +533,10 @@ public sealed class FeatureAuthoringService(
         string decisionId)
     {
         var approval = ExactApproval(reviewed, inspection)
-            ?? throw new InvalidOperationException("The exact Feature approval was not found.");
+            ?? throw Rejected(FeatureCommandRejectionReason.Precondition);
         if (approval.Status != FeatureApprovalStatus.Approved ||
             !string.Equals(approval.DecisionId, decisionId, StringComparison.Ordinal))
-            throw new InvalidOperationException("The exact approved Feature decision is required.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
     }
 
     private static FeatureInstallationInspection DemandExactActiveInstallation(
@@ -481,19 +545,19 @@ public sealed class FeatureAuthoringService(
         FeatureLifecycleInspection inspection)
     {
         var installation = ExactInstallation(reviewed.InstallationId, inspection)
-            ?? throw new InvalidOperationException("The exact Feature installation was not found.");
+            ?? throw Rejected(FeatureCommandRejectionReason.Precondition);
         DemandExactAuthority(context, reviewed, installation.Authority);
         if (installation.Authority.PendingRelease is not null ||
             installation.Authority.PendingGrantRevision is not null ||
             installation.Authority.PendingGrants.Length != 0)
-            throw new InvalidOperationException("The Feature installation has a conflicting pending release.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         DemandSameRegistration(
             installation.Registration,
             new FeatureInstallationRegistration(reviewed.InstallationId, reviewed.Release.Digest, reviewed.Subscriptions));
         if (installation.Runtime is null ||
             installation.Runtime.InstallationId != reviewed.InstallationId ||
             installation.Runtime.ActiveRelease != reviewed.Release.Digest)
-            throw new InvalidOperationException("The Feature runtime does not expose the exact active release.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         return installation;
     }
 
@@ -502,11 +566,12 @@ public sealed class FeatureAuthoringService(
         ReviewedInstallation reviewed,
         FeatureAuthoritySnapshot authority)
     {
+        if (authority.ActorId != context.ActorId)
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
         if (authority.InstallationId != reviewed.InstallationId ||
-            authority.ActorId != context.ActorId ||
             authority.ActiveRelease != reviewed.Release.Digest ||
             authority.ActiveGrantRevision is null)
-            throw new InvalidOperationException("The active Feature authority does not match the reviewed installation.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         DemandSameGrants(authority.ActiveGrants, reviewed.Grants);
     }
 
@@ -517,7 +582,7 @@ public sealed class FeatureAuthoringService(
     {
         if (installation is null) return false;
         if (installation.Authority.ActorId != context.ActorId)
-            throw new UnauthorizedAccessException("The Feature installation belongs to another actor.");
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
         if (installation.Authority.ActiveRelease == reviewed.Release.Digest)
         {
             DemandSameGrants(installation.Authority.ActiveGrants, reviewed.Grants);
@@ -529,7 +594,7 @@ public sealed class FeatureAuthoringService(
             return true;
         }
         if (installation.Authority.PendingRelease is not null)
-            throw new InvalidOperationException("Another Feature release is already pending for this installation.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
         return false;
     }
 
@@ -542,7 +607,7 @@ public sealed class FeatureAuthoringService(
             actual.Release != expected.Release ||
             !actual.Subscriptions.Order(StringComparer.Ordinal)
                 .SequenceEqual(expected.Subscriptions.Order(StringComparer.Ordinal), StringComparer.Ordinal))
-            throw new InvalidOperationException("The active Feature registration conflicts with the reviewed installation.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
     }
 
     private static void DemandSameGrants(IReadOnlyList<FeatureGrantSpec> actual, IReadOnlyList<FeatureGrantSpec> expected)
@@ -555,7 +620,7 @@ public sealed class FeatureAuthoringService(
                 pair.First.ProviderConnectionId != pair.Second.ProviderConnectionId ||
                 !string.Equals(pair.First.ConstraintsJson, pair.Second.ConstraintsJson, StringComparison.Ordinal) ||
                 !string.Equals(pair.First.Provider, pair.Second.Provider, StringComparison.Ordinal)))
-            throw new InvalidOperationException("The durable Feature grants conflict with the reviewed access set.");
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
     }
 
     private static bool SameRelease(FeatureReleaseMetadata left, FeatureReleaseMetadata right) =>
@@ -571,6 +636,131 @@ public sealed class FeatureAuthoringService(
             !string.Equals(value, value.Trim(), StringComparison.Ordinal))
             throw new ArgumentException("A bounded canonical command identifier is required.", parameterName);
     }
+
+    private static void DemandIncrementableRevision(long revision)
+    {
+        if (revision == long.MaxValue)
+            throw Rejected(FeatureCommandRejectionReason.Conflict);
+    }
+
+    private async Task<FeatureBuildArtifact> BuildAsync(
+        FeatureBuildSubmission submission,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await builds.BuildAsync(submission, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (FeatureCommandRejectedException)
+        {
+            throw;
+        }
+        catch (InvalidOperationException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (RequestFailedException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (IOException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (TimeoutException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (OrleansException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+    }
+
+    private static async Task<T> ArtifactAsync<T>(Func<Task<T>> operation)
+    {
+        try
+        {
+            return await operation().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (FeatureCommandRejectedException)
+        {
+            throw;
+        }
+        catch (KeyNotFoundException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (RequestFailedException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (IOException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (TimeoutException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (OrleansException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+    }
+
+    private static async Task<T> LifecycleAsync<T>(Func<Task<T>> operation)
+    {
+        try
+        {
+            return await operation().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (FeatureCommandRejectedException)
+        {
+            throw;
+        }
+        catch (FeatureAuthorityRejectedException)
+        {
+            throw;
+        }
+        catch (KeyNotFoundException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Precondition);
+        }
+        catch (RequestFailedException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (IOException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (TimeoutException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (OrleansException)
+        {
+            throw Rejected(FeatureCommandRejectionReason.Unavailable);
+        }
+    }
+
+    private static bool IsSingleRevisionReplay(long expectedRevision, long actualRevision) =>
+        expectedRevision != long.MaxValue && actualRevision == expectedRevision + 1;
+
+    private static FeatureCommandRejectedException Rejected(FeatureCommandRejectionReason reason) => new(reason);
 
     private sealed record ReviewedInstallation(
         FeatureDraft Draft,

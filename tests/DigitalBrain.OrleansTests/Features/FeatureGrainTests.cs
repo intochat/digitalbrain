@@ -113,7 +113,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             "installed-grain",
             createdAt.AddMinutes(4)));
         Assert.Equal("installed", installed.Status);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => hub.ReviseSourceAsync(new ReviseFeatureSource(
+        await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => hub.ReviseSourceAsync(new ReviseFeatureSource(
             draft.DraftId,
             GrainSource(),
             4,
@@ -146,7 +146,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             [],
             ["manual"],
             "decision-forged-publication",
-            "install-forged-publication"), new ActorId("actor-forged-publication"));
+            "install-forged-publication"), new ActorId("actor-reservation"));
         var snapshot = await hub.ReadAsync();
         var approval = await hub.ProposeAsync(
             new FeatureReleaseProposal(
@@ -175,8 +175,32 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
                 FeaturePublicationManifestCodec.Serialize(owner, ticket))));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => hub.ConfirmActivePublicationAsync(forged));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
+        var nullReceipt = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            hub.ConfirmActivePublicationAsync(null!));
+        var forgedReceipt = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            hub.ConfirmActivePublicationAsync(forged));
+        fixture.PublicationVerifier.Allow(owner, ticket, forged);
+        fixture.PublicationVerifier.Fail(owner, new FeatureConcurrencyException(
+            "publication-precondition-canary",
+            FeatureCommandRejectionReason.Precondition));
+        var verifierPrecondition = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            hub.ConfirmActivePublicationAsync(forged));
+        fixture.PublicationVerifier.Fail(owner, new FeatureConcurrencyException(
+            "publication-conflict-canary",
+            FeatureCommandRejectionReason.Conflict));
+        var verifierConflict = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            hub.ConfirmActivePublicationAsync(forged));
+        fixture.PublicationVerifier.Fail(owner, new ArgumentException("publication-argument-canary"));
+        var verifierArgument = await Assert.ThrowsAsync<ArgumentException>(() =>
+            hub.ConfirmActivePublicationAsync(forged));
+        fixture.PublicationVerifier.Fail(owner, new InvalidOperationException("publication-invalid-operation-canary"));
+        var verifierInvalidOperation = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            hub.ConfirmActivePublicationAsync(forged));
+        fixture.PublicationVerifier.Fail(owner, new IOException("publication-verifier-canary"));
+        var verifierUnavailable = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            hub.ConfirmActivePublicationAsync(forged));
+        Assert.Equal(forged, await hub.ConfirmActivePublicationAsync(forged));
+        var actorMismatch = await Assert.ThrowsAsync<FeatureAuthorityRejectedException>(() => hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
             draft.DraftId,
             installationId,
             ReleaseOne,
@@ -184,6 +208,14 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             "install-forged-publication",
             now.AddMinutes(1))));
 
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, nullReceipt.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, forgedReceipt.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, verifierPrecondition.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, verifierConflict.Reason);
+        Assert.DoesNotContain("FeatureCommandRejectedException", verifierArgument.GetType().Name, StringComparison.Ordinal);
+        Assert.DoesNotContain("FeatureCommandRejectedException", verifierInvalidOperation.GetType().Name, StringComparison.Ordinal);
+        Assert.Equal(FeatureCommandRejectionReason.Unavailable, verifierUnavailable.Reason);
+        Assert.Equal(FeatureAuthorityRejectionReason.ActorMismatch, actorMismatch.Reason);
         Assert.Equal("draft", (await hub.ReadDraftAsync(draft.DraftId))?.Status);
         Assert.NotNull(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
     }
@@ -257,7 +289,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
 
         Assert.Equal(2, recovered.Attempt);
         Assert.True(recovered.Fence.Fence > abandoned.Fence.Fence);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => installation.CommitAsync(
+        await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => installation.CommitAsync(
             new FeatureRunCommit(
                 abandoned.Fence,
                 "{}",
@@ -539,6 +571,53 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             installationId));
         await installation.InitializeAsync(ReleaseTwo);
         Assert.Equal(ReleaseTwo, (await installation.ReadAsync()).ActiveRelease);
+    }
+
+    [Fact]
+    public async Task Installation_grain_expected_state_failures_are_typed_preconditions()
+    {
+        var owner = new BrainOwnerId("owner-installation-preconditions");
+        var installation = fixture.Grain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(
+            owner,
+            new FeatureInstallationId("installation-preconditions")));
+
+        var uninitialized = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => installation.ReadAsync());
+        await installation.InitializeAsync(ReleaseOne);
+        var anotherRelease = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            installation.InitializeAsync(ReleaseTwo));
+
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, uninitialized.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, anotherRelease.Reason);
+    }
+
+    [Fact]
+    public async Task Hub_install_rejects_a_staged_release_mismatch_as_a_typed_precondition()
+    {
+        var owner = new BrainOwnerId("owner-install-release-precondition");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var installationId = new FeatureInstallationId("installation-release-precondition");
+        var release = new FeatureReleaseMetadata(
+            ReleaseOne,
+            "sha256:" + ReleaseOne.Value,
+            FeatureSourceKind.RuntimeAuthored,
+            [],
+            []);
+        var approval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(installationId, release, []),
+            (await hub.ReadAsync()).Revision);
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-release-precondition"),
+            (await hub.ReadAsync()).Revision);
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, ReleaseOne, new ActorId("actor-release-precondition"), []),
+            (await hub.ReadAsync()).Revision);
+        var revision = (await hub.ReadAsync()).Revision;
+
+        var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => hub.InstallAsync(
+            new FeatureInstallationRegistration(installationId, ReleaseTwo, ["manual"]),
+            revision));
+
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
     }
 
     [Fact]

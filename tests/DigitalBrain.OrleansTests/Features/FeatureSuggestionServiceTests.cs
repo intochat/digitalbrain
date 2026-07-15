@@ -52,15 +52,18 @@ public sealed class FeatureSuggestionServiceTests(FeatureGrainClusterFixture fix
         var command = new SuggestFeatureChange(draft.DraftId, draft.Revision, "Stay owner-local", "suggestion-authority");
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.SuggestAsync(Context("owner-suggestion-service-other"), command));
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SuggestAsync(Context(context.OwnerId.Value, []), command));
+        var unauthorized = await Assert.ThrowsAsync<FeatureAuthorityRejectedException>(() =>
+            service.SuggestAsync(Context(context.OwnerId.Value, []), command));
         await hub.ReviseBehaviorAsync(new ReviseFeatureBehavior(
             draft.DraftId,
             new FeatureBehavior([new FeatureScenario("scenario-stale", "Stale", "a Draft exists", "it changes", "the revision advances")]),
             draft.Revision,
             "suggestion-service-stale",
             fixture.Time.GetUtcNow().AddMinutes(1)));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SuggestAsync(context, command));
+        var stale = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => service.SuggestAsync(context, command));
 
+        Assert.Equal(FeatureAuthorityRejectionReason.MissingGrant, unauthorized.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, stale.Reason);
         Assert.Equal(0, fixture.SuggestionModel.CallCount);
     }
 
@@ -78,7 +81,11 @@ public sealed class FeatureSuggestionServiceTests(FeatureGrainClusterFixture fix
         ];
 
         foreach (var candidate in rejected)
-            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SuggestAsync(candidate, command));
+        {
+            var exception = await Assert.ThrowsAsync<FeatureAuthorityRejectedException>(() =>
+                service.SuggestAsync(candidate, command));
+            Assert.Equal(FeatureAuthorityRejectionReason.MissingGrant, exception.Reason);
+        }
     }
 
     private static RuntimeRequestContext Context(string owner, string[]? grants = null) => new(

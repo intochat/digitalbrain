@@ -30,6 +30,68 @@ class FeedAudienceKind extends $pb.ProtobufEnum {
   const FeedAudienceKind._(super.value, super.name);
 }
 
+class FeatureDraftStatus extends $pb.ProtobufEnum {
+  static const FeatureDraftStatus FEATURE_DRAFT_STATUS_UNSPECIFIED =
+      FeatureDraftStatus._(
+        0,
+        _omitEnumNames ? '' : 'FEATURE_DRAFT_STATUS_UNSPECIFIED',
+      );
+  static const FeatureDraftStatus FEATURE_DRAFT_STATUS_DRAFT =
+      FeatureDraftStatus._(
+        1,
+        _omitEnumNames ? '' : 'FEATURE_DRAFT_STATUS_DRAFT',
+      );
+  static const FeatureDraftStatus FEATURE_DRAFT_STATUS_INSTALLED =
+      FeatureDraftStatus._(
+        2,
+        _omitEnumNames ? '' : 'FEATURE_DRAFT_STATUS_INSTALLED',
+      );
+
+  static const $core.List<FeatureDraftStatus> values = <FeatureDraftStatus>[
+    FEATURE_DRAFT_STATUS_UNSPECIFIED,
+    FEATURE_DRAFT_STATUS_DRAFT,
+    FEATURE_DRAFT_STATUS_INSTALLED,
+  ];
+
+  static final $core.List<FeatureDraftStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static FeatureDraftStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FeatureDraftStatus._(super.value, super.name);
+}
+
+class FeatureSourceKind extends $pb.ProtobufEnum {
+  static const FeatureSourceKind FEATURE_SOURCE_KIND_UNSPECIFIED =
+      FeatureSourceKind._(
+        0,
+        _omitEnumNames ? '' : 'FEATURE_SOURCE_KIND_UNSPECIFIED',
+      );
+  static const FeatureSourceKind FEATURE_SOURCE_KIND_REPOSITORY =
+      FeatureSourceKind._(
+        1,
+        _omitEnumNames ? '' : 'FEATURE_SOURCE_KIND_REPOSITORY',
+      );
+  static const FeatureSourceKind FEATURE_SOURCE_KIND_RUNTIME_AUTHORED =
+      FeatureSourceKind._(
+        2,
+        _omitEnumNames ? '' : 'FEATURE_SOURCE_KIND_RUNTIME_AUTHORED',
+      );
+
+  static const $core.List<FeatureSourceKind> values = <FeatureSourceKind>[
+    FEATURE_SOURCE_KIND_UNSPECIFIED,
+    FEATURE_SOURCE_KIND_REPOSITORY,
+    FEATURE_SOURCE_KIND_RUNTIME_AUTHORED,
+  ];
+
+  static final $core.List<FeatureSourceKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static FeatureSourceKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FeatureSourceKind._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames = $core.bool.fromEnvironment(
   'protobuf.omit_enum_names',
 );

@@ -14,7 +14,7 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
         if (persistentState.RecordExists)
         {
             if (RequiredState().ActiveRelease != release)
-                throw new InvalidOperationException("The feature installation is already initialized with another release.");
+                throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
             return;
         }
         await WriteAsync(FeatureInstallationState.Create(release, installationId));
@@ -122,7 +122,7 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
     private FeatureInstallationState RequiredState() =>
         persistentState.RecordExists && persistentState.State is not null
             ? persistentState.State
-            : throw new InvalidOperationException("The feature installation has not been initialized.");
+            : throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
     private (BrainOwnerId OwnerId, FeatureInstallationId InstallationId) ParseKey() =>
         FeatureGrainIds.ParseInstallation(this.GetPrimaryKeyString());
     private Activity? Start(string operation, FeatureInput? input = null, string? correlationId = null, string? traceId = null)
@@ -144,11 +144,11 @@ internal sealed class FeatureInstallationGrain([PersistentState("feature-install
         }
         catch (FeatureConcurrencyException exception)
         {
-            throw new InvalidOperationException(exception.Message);
+            throw new FeatureCommandRejectedException(exception.Reason);
         }
-        catch (FeatureLimitExceededException exception)
+        catch (FeatureLimitExceededException)
         {
-            throw new InvalidOperationException(exception.Message);
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Limit);
         }
     }
 }

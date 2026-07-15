@@ -27,7 +27,7 @@ public sealed class FeatureArtifactPublisherTests
         var winner = await publisher.PublishActiveAsync(Owner, Ticket(3, 'c'));
         blobs.Container.ReleaseBlockedFence();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => stale);
+        var superseded = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => stale);
         var manifest = JsonDocument.Parse(blobs.Container.Read()).RootElement;
         Assert.Equal(3, manifest.GetProperty("publicationFence").GetInt64());
         Assert.Equal(new string('c', 64), manifest.GetProperty("releaseDigest").GetString());
@@ -35,9 +35,25 @@ public sealed class FeatureArtifactPublisherTests
         Assert.Equal(winner, await publisher.PublishActiveAsync(
             Owner,
             Ticket(3, 'c') with { Subscriptions = ["a-event", "z-event"] }));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => publisher.PublishActiveAsync(
+        var conflictingContent = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => publisher.PublishActiveAsync(
             Owner,
             Ticket(3, 'c') with { AuthorityDigest = new string('d', 64) }));
+
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, superseded.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, conflictingContent.Reason);
+    }
+
+    [Fact]
+    public async Task Publication_retry_exhaustion_is_a_typed_unavailable_rejection()
+    {
+        var blobs = new BarrierBlobServiceClient();
+        blobs.Container.ConflictEveryWrite();
+        var publisher = new FeatureArtifactPublisher(blobs);
+
+        var unavailable = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            publisher.PublishActiveAsync(Owner, Ticket(1, 'a')));
+
+        Assert.Equal(FeatureCommandRejectionReason.Unavailable, unavailable.Reason);
     }
 
     private static FeaturePublicationTicket Ticket(long fence, char digestCharacter) => new(
@@ -66,6 +82,7 @@ public sealed class FeatureArtifactPublisherTests
         private bool blocked;
         private TaskCompletionSource blockedSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource releaseSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool conflictEveryWrite;
 
         public override Task<Response<BlobContainerInfo>> CreateIfNotExistsAsync(
             PublicAccessType publicAccessType = PublicAccessType.None,
@@ -94,6 +111,8 @@ public sealed class FeatureArtifactPublisherTests
 
         public void ReleaseBlockedFence() => releaseSignal.TrySetResult();
 
+        public void ConflictEveryWrite() => conflictEveryWrite = true;
+
         public byte[] Read()
         {
             lock (gate) return (entry ?? throw new InvalidOperationException()).Content.ToArray();
@@ -110,6 +129,8 @@ public sealed class FeatureArtifactPublisherTests
 
         public async Task WriteAsync(byte[] content, BlobRequestConditions? conditions, CancellationToken cancellationToken)
         {
+            if (conflictEveryWrite)
+                throw new RequestFailedException(412, "The blob changed concurrently.");
             var fence = JsonDocument.Parse(content).RootElement.GetProperty("publicationFence").GetInt64();
             Task? wait = null;
             lock (gate)

@@ -35,11 +35,15 @@ internal sealed class BlobFeaturePublicationVerifier(
             ticket.PublicationFence != receipt.PublicationFence ||
             !string.Equals(ticket.AuthorityDigest, receipt.AuthorityDigest, StringComparison.Ordinal) ||
             !string.Equals(ticket.AccessDigest, receipt.AccessDigest, StringComparison.Ordinal))
-            throw new FeatureConcurrencyException("The Feature publication receipt does not match the active publication ticket.");
+            throw new FeatureConcurrencyException(
+                "The Feature publication receipt does not match the active publication ticket.",
+                FeatureCommandRejectionReason.Precondition);
         var expected = FeaturePublicationManifestCodec.Serialize(ownerId, ticket);
         var expectedDigest = Convert.ToHexStringLower(SHA256.HashData(expected));
         if (!string.Equals(expectedDigest, receipt.ManifestDigest, StringComparison.Ordinal))
-            throw new FeatureConcurrencyException("The Feature publication receipt has another manifest digest.");
+            throw new FeatureConcurrencyException(
+                "The Feature publication receipt has another manifest digest.",
+                FeatureCommandRejectionReason.Precondition);
         var blob = container.GetBlobClient(FeaturePublicationManifestCodec.Path(ownerId, ticket.InstallationId));
         BlobProperties properties;
         try
@@ -48,10 +52,14 @@ internal sealed class BlobFeaturePublicationVerifier(
         }
         catch (RequestFailedException exception) when (exception.Status == 404)
         {
-            throw new FeatureConcurrencyException("The exact active Feature publication does not exist.");
+            throw new FeatureConcurrencyException(
+                "The exact active Feature publication does not exist.",
+                FeatureCommandRejectionReason.Precondition);
         }
         if (properties.ContentLength < 2 || properties.ContentLength > MaximumManifestBytes)
-            throw new FeatureConcurrencyException("The active Feature publication manifest is invalid.");
+            throw new FeatureConcurrencyException(
+                "The active Feature publication manifest is invalid.",
+                FeatureCommandRejectionReason.Precondition);
         var options = new BlobDownloadOptions
         {
             Conditions = new BlobRequestConditions { IfMatch = properties.ETag }
@@ -67,16 +75,26 @@ internal sealed class BlobFeaturePublicationVerifier(
                 var read = await download.Content.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
                 if (read == 0) break;
                 if (output.Length + read > MaximumManifestBytes)
-                    throw new FeatureConcurrencyException("The active Feature publication manifest is invalid.");
+                    throw new FeatureConcurrencyException(
+                        "The active Feature publication manifest is invalid.",
+                        FeatureCommandRejectionReason.Precondition);
                 await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             }
             actual = output.ToArray();
         }
-        catch (RequestFailedException exception) when (exception.Status is 404 or 412)
+        catch (RequestFailedException exception) when (exception.Status == 404)
+        {
+            throw new FeatureConcurrencyException(
+                "The exact active Feature publication does not exist.",
+                FeatureCommandRejectionReason.Precondition);
+        }
+        catch (RequestFailedException exception) when (exception.Status == 412)
         {
             throw new FeatureConcurrencyException("The active Feature publication changed during verification.");
         }
         if (!actual.AsSpan().SequenceEqual(expected))
-            throw new FeatureConcurrencyException("The active Feature publication does not match the exact authority ticket.");
+            throw new FeatureConcurrencyException(
+                "The active Feature publication does not match the exact authority ticket.",
+                FeatureCommandRejectionReason.Precondition);
     }
 }

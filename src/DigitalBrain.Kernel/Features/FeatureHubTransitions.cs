@@ -60,9 +60,13 @@ internal static class FeatureHubTransitions
             throw new KeyNotFoundException("The feature approval does not exist.");
         var approval = state.Approvals[index];
         if (approval.Release.Digest != decision.Release)
-            throw new FeatureConcurrencyException("Approval is bound to another release digest.");
+            throw new FeatureConcurrencyException(
+                "Approval is bound to another release digest.",
+                FeatureCommandRejectionReason.Precondition);
         if (approval.Status != FeatureApprovalStatus.Pending)
-            throw new FeatureConcurrencyException("The feature approval already has a decision.");
+            throw new FeatureConcurrencyException(
+                "The feature approval already has a decision.",
+                FeatureCommandRejectionReason.Precondition);
         var nextRevision = checked(state.Revision + 1);
         var approvals = state.Approvals.ToArray();
         approvals[index] = approval with
@@ -82,10 +86,14 @@ internal static class FeatureHubTransitions
         var approval = state.Approvals.LastOrDefault(candidate =>
             candidate.InstallationId == request.InstallationId && candidate.Release.Digest == request.Release &&
             candidate.Status == FeatureApprovalStatus.Approved)
-            ?? throw new FeatureConcurrencyException("The exact release digest has not been approved.");
+            ?? throw new FeatureConcurrencyException(
+                "The exact release digest has not been approved.",
+                FeatureCommandRejectionReason.Precondition);
         var grants = ValidateGrants(request.Grants);
         if (!SameGrants(grants, approval.Grants))
-            throw new FeatureConcurrencyException("The exact approved capability grants are required.");
+            throw new FeatureConcurrencyException(
+                "The exact approved capability grants are required.",
+                FeatureCommandRejectionReason.Precondition);
         var index = Array.FindIndex(state.Authorities, candidate =>
             candidate.InstallationId == request.InstallationId);
         var current = index >= 0 ? state.Authorities[index] : null;
@@ -115,7 +123,9 @@ internal static class FeatureHubTransitions
         var index = AuthorityIndex(state, installationId);
         var authority = state.Authorities[index];
         if (authority.PendingRelease is not { } pendingRelease || authority.PendingGrantRevision is not { } pendingRevision)
-            throw new FeatureConcurrencyException("The installation has no approved grant set staged.");
+            throw new FeatureConcurrencyException(
+                "The installation has no approved grant set staged.",
+                FeatureCommandRejectionReason.Precondition);
         var authorities = state.Authorities.ToArray();
         authorities[index] = FeaturePublicationTransitions.Invalidate(authority with
         {

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Azure;
 using DigitalBrain.Kernel.Contracts;
 using Orleans.Runtime;
 namespace DigitalBrain.Kernel.Features;
@@ -84,7 +85,7 @@ internal sealed class FeatureHubGrain(
         var authority = activated.Authorities.Single(candidate =>
             candidate.InstallationId == registration.InstallationId);
         if (authority.ActiveRelease != registration.Release)
-            throw new InvalidOperationException("The staged grant release does not match the installation release.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
         var registered = Domain(() => FeatureHubTransitions.Register(activated, registration));
         var ownerId = ParseKey();
         var installation = Resolver.Installation(ownerId, registration.InstallationId);
@@ -105,12 +106,50 @@ internal sealed class FeatureHubGrain(
     public async Task<FeaturePublicationReceipt> ConfirmActivePublicationAsync(FeaturePublicationReceipt receipt)
     {
         using var activity = Start("confirm-active-publication");
-        var confirmed = Domain(() => FeaturePublicationTransitions.Confirm(State, receipt));
+        if (receipt is null)
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
         if (publicationVerifier is null)
-            throw new InvalidOperationException("Feature publication verification is unavailable.");
-        await publicationVerifier.VerifyAsync(ParseKey(), confirmed.Ticket, receipt);
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+        var confirmed = Domain(() => FeaturePublicationTransitions.Confirm(State, receipt));
+        try
+        {
+            await publicationVerifier.VerifyAsync(ParseKey(), confirmed.Ticket, receipt);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (FeatureCommandRejectedException)
+        {
+            throw;
+        }
+        catch (FeatureAuthorityRejectedException)
+        {
+            throw;
+        }
+        catch (FeatureConcurrencyException exception)
+        {
+            throw new FeatureCommandRejectedException(exception.Reason);
+        }
+        catch (RequestFailedException)
+        {
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (IOException)
+        {
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (TimeoutException)
+        {
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+        }
+        catch (OrleansException)
+        {
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+        }
         if (!ReferenceEquals(confirmed.State, State)) await WriteAsync(confirmed.State);
-        return confirmed.Receipt ?? throw new InvalidOperationException("The Feature publication receipt was not confirmed.");
+        return confirmed.Receipt
+            ?? throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
     }
     public async Task RevokeAsync(FeatureGrantRevocation revocation, long expectedRevision)
     {
@@ -280,11 +319,11 @@ internal sealed class FeatureHubGrain(
         }
         catch (FeatureConcurrencyException exception)
         {
-            throw new InvalidOperationException(exception.Message);
+            throw new FeatureCommandRejectedException(exception.Reason);
         }
-        catch (FeatureLimitExceededException exception)
+        catch (FeatureLimitExceededException)
         {
-            throw new InvalidOperationException(exception.Message);
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Limit);
         }
     }
 }

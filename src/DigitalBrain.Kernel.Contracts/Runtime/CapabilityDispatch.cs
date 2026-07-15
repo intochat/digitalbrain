@@ -54,6 +54,35 @@ public static class CapabilityGrantConstraintPolicy
 {
     private const int MaximumAllowedValues = 256;
     private const int MaximumObjectProperties = 128;
+    private static readonly HashSet<string> CredentialPropertyNames = new(StringComparer.Ordinal)
+    {
+        "password",
+        "accesstoken",
+        "refreshtoken",
+        "authorization",
+        "apikey",
+        "privatekey",
+        "credential",
+        "credentials",
+        "token",
+        "clientsecret",
+        "secret",
+        "secretvalue",
+        "actiontoken",
+        "authtoken",
+        "bearertoken",
+        "idtoken",
+        "sessiontoken",
+        "secretkey",
+        "connectionstring",
+        "passphrase",
+        "authorizationcode",
+        "codeverifier",
+        "secretaccesskey",
+        "privatekeypem",
+        "sastoken",
+        "sessionid"
+    };
     public static JsonElement CopyValidated(JsonElement constraints)
     {
         var copy = CapabilityPayload.CopyBounded(constraints, nameof(constraints));
@@ -108,12 +137,15 @@ public static class CapabilityGrantConstraintPolicy
         var count = 0;
         foreach (var property in value.EnumerateObject())
         {
-            if (++count > MaximumObjectProperties || !names.Add(property.Name) || root &&
+            if (CredentialPropertyNames.Contains(NormalizePropertyName(property.Name)) ||
+                ++count > MaximumObjectProperties || !names.Add(property.Name) || root &&
                 !string.Equals(property.Name, "allowedToolIds", StringComparison.Ordinal) &&
                 !string.Equals(property.Name, "payload", StringComparison.Ordinal))
                 throw new ArgumentException("Capability constraints contain duplicate, unknown, or excessive properties.", nameof(value));
         }
     }
+    private static string NormalizePropertyName(string value) =>
+        string.Concat(value.Where(char.IsLetterOrDigit)).ToLowerInvariant();
     private static bool Matches(JsonElement constraint, JsonElement value)
     {
         if (constraint.ValueKind == JsonValueKind.Object)

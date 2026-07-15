@@ -12,8 +12,8 @@ public static class UiHostingExtensions
     {
         services.AddGrpc(options =>
         {
-            options.MaxReceiveMessageSize = 128 * 1024;
-            options.MaxSendMessageSize = 2 * 1024 * 1024;
+            options.MaxReceiveMessageSize = 8 * 1024 * 1024;
+            options.MaxSendMessageSize = 8 * 1024 * 1024;
             options.EnableDetailedErrors = false;
         });
         services.AddCors(options => options.AddPolicy(CorsPolicy, policy => ConfigureCors(policy, configuration, profile)));
@@ -48,6 +48,7 @@ public static class UiHostingExtensions
         services.AddSingleton(new UiDeliveryOptions(renewal, revalidation).Validate());
         services.AddSingleton<RuntimeSurfaceFeed>();
         services.AddSingleton<SurfaceEnvelopeWriter>();
+        services.AddSingleton<DigitalBrainUiEndpoints>();
         services.AddSingleton<UiGrpcService>();
         services.AddHealthChecks().AddCheck<UiTransportHealthCheck>("runtime-ui-transport", tags: ["ready"]);
         return services;
@@ -72,13 +73,18 @@ public static class UiHostingExtensions
         policy.AllowAnyMethod().AllowAnyHeader().WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
     }
 }
-public sealed class UiTransportHealthCheck(RuntimeSurfaceFeed feed, SurfaceEnvelopeWriter envelopeWriter, UiGrpcService service) : IHealthCheck
+public sealed class UiTransportHealthCheck(
+    RuntimeSurfaceFeed feed,
+    SurfaceEnvelopeWriter envelopeWriter,
+    DigitalBrainUiEndpoints endpoints,
+    UiGrpcService service) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _ = feed;
         _ = envelopeWriter;
+        _ = endpoints;
         _ = service;
         return Task.FromResult(HealthCheckResult.Healthy("UI transport composition is ready."));
     }

@@ -16,14 +16,22 @@ internal static class FeaturePublicationTransitions
             throw new KeyNotFoundException("The Feature installation authority was not found.");
         var authority = state.Authorities[authorityIndex];
         if (authority.ActiveRelease is not { } release || authority.ActiveGrantRevision is not { } grantRevision)
-            throw new FeatureConcurrencyException("The Feature installation has no active authority to publish.");
+            throw new FeatureConcurrencyException(
+                "The Feature installation has no active authority to publish.",
+                FeatureCommandRejectionReason.Precondition);
         if (authority.PendingRelease is not null || authority.PendingGrantRevision is not null || authority.PendingGrants.Length != 0)
-            throw new FeatureConcurrencyException("A Feature publication cannot be prepared while another grant is pending.");
+            throw new FeatureConcurrencyException(
+                "A Feature publication cannot be prepared while another grant is pending.",
+                FeatureCommandRejectionReason.Precondition);
         if (authority.Paused)
-            throw new FeatureConcurrencyException("A paused Feature installation cannot be published as active.");
+            throw new FeatureConcurrencyException(
+                "A paused Feature installation cannot be published as active.",
+                FeatureCommandRejectionReason.Precondition);
         var registrations = state.Installations.Where(candidate => candidate.InstallationId == installationId).ToArray();
         if (registrations.Length != 1 || registrations[0].Release != release)
-            throw new FeatureConcurrencyException("The active Feature registration does not match the authority release.");
+            throw new FeatureConcurrencyException(
+                "The active Feature registration does not match the authority release.",
+                FeatureCommandRejectionReason.Precondition);
         var registration = registrations[0];
         var next = state;
         if (authority.PublicationFence == 0)
@@ -135,26 +143,37 @@ internal static class FeaturePublicationTransitions
         }
         catch (KeyNotFoundException)
         {
-            throw new FeatureConcurrencyException("The Feature installation has no confirmed active publication.");
+            throw new FeatureConcurrencyException(
+                "The Feature installation has no confirmed active publication.",
+                FeatureCommandRejectionReason.Precondition);
         }
         if (!ReferenceEquals(prepared.State, state))
-            throw new FeatureConcurrencyException("The Feature installation has no confirmed active publication.");
+            throw new FeatureConcurrencyException(
+                "The Feature installation has no confirmed active publication.",
+                FeatureCommandRejectionReason.Precondition);
         var receipt = prepared.Receipt
-            ?? throw new FeatureConcurrencyException("The Feature installation has no confirmed active publication.");
+            ?? throw new FeatureConcurrencyException(
+                "The Feature installation has no confirmed active publication.",
+                FeatureCommandRejectionReason.Precondition);
         if (receipt.PublicationFence != prepared.Ticket.PublicationFence ||
             !string.Equals(receipt.AuthorityDigest, prepared.Ticket.AuthorityDigest, StringComparison.Ordinal) ||
             !string.Equals(receipt.AccessDigest, prepared.Ticket.AccessDigest, StringComparison.Ordinal) ||
             !string.Equals(receipt.AccessDigest, reservation.AccessDigest, StringComparison.Ordinal))
-            throw new FeatureConcurrencyException("The confirmed Feature publication does not match the reserved access review.");
+            throw new FeatureConcurrencyException(
+                "The confirmed Feature publication does not match the reserved access review.",
+                FeatureCommandRejectionReason.Precondition);
         var approval = state.Approvals.SingleOrDefault(candidate =>
             candidate.InstallationId == reservation.InstallationId &&
             candidate.Release.Digest == reservation.Release);
         var authority = state.Authorities.Single(candidate => candidate.InstallationId == reservation.InstallationId);
-        if (authority.ActorId != reservation.ActorId ||
-            approval is null || approval.Status != FeatureApprovalStatus.Approved ||
+        if (authority.ActorId != reservation.ActorId)
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
+        if (approval is null || approval.Status != FeatureApprovalStatus.Approved ||
             !string.Equals(approval.DecisionId, reservation.DecisionId, StringComparison.Ordinal) ||
             !SameGrants(approval.Grants, authority.ActiveGrants))
-            throw new FeatureConcurrencyException("The confirmed Feature publication is not bound to the reserved approval decision.");
+            throw new FeatureConcurrencyException(
+                "The confirmed Feature publication is not bound to the reserved approval decision.",
+                FeatureCommandRejectionReason.Precondition);
     }
 
     private static string AuthorityDigest(

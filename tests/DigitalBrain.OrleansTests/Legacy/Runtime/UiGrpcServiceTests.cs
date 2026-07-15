@@ -1,6 +1,8 @@
 extern alias McpProject;
 using System.Diagnostics;
+using System.Reflection;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Json;
 using DigitalBrain.Integrations.Google;
 using DigitalBrain.Integrations.Google.Contracts;
@@ -8,34 +10,57 @@ using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Integrations.Salesforce.Contracts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Features;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.TestSupport;
+using DigitalBrain.OrleansTests.Features;
 using DigitalBrain.Tests.TestSupport;
 using Grpc.Core;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
 using BootstrapSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.BootstrapSessionRequest;
 using ConversationStateClient = McpProject::DigitalBrain.Mcp.ConversationStateClient;
+using DigitalBrainUiEndpoints = McpProject::DigitalBrain.Mcp.DigitalBrainUiEndpoints;
 using FeedAudienceKind = McpProject::DigitalBrain.V2.Ui.Grpc.FeedAudienceKind;
+using FeatureArtifactCatalog = McpProject::DigitalBrain.Mcp.IFeatureArtifactCatalog;
+using FeatureAuthoringService = McpProject::DigitalBrain.Mcp.FeatureAuthoringService;
+using FeatureBuildArtifact = McpProject::DigitalBrain.Mcp.FeatureBuildArtifact;
+using FeatureBuildEndpoint = McpProject::DigitalBrain.Mcp.IFeatureBuildEndpoint;
+using FeatureBuildSubmission = McpProject::DigitalBrain.Mcp.FeatureBuildSubmission;
+using FeatureInstallationInspection = McpProject::DigitalBrain.Mcp.FeatureInstallationInspection;
+using FeatureLifecycleInspection = McpProject::DigitalBrain.Mcp.FeatureLifecycleInspection;
+using FeatureLifecycleRail = McpProject::DigitalBrain.Mcp.IFeatureLifecycleRail;
+using FeatureSuggestionService = McpProject::DigitalBrain.Mcp.FeatureSuggestionService;
+using GetFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureDraftRequest;
+using GrpcFeatureBehavior = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureBehavior;
+using GrpcFeatureDraft = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureDraft;
+using GrpcFeatureGrant = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureGrant;
+using GrpcFeatureScenario = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureScenario;
+using InstallFeatureVersionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.InstallFeatureVersionRequest;
 using LogoutSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.LogoutSessionRequest;
 using McpInoCommandHandler = McpProject::DigitalBrain.Mcp.McpInoCommandHandler;
 using RefreshSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.RefreshSessionRequest;
+using ReviseFeatureBehaviorInput = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureBehaviorInput;
+using ReviseFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureDraftRequest;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 using RuntimeSessionAuthority = McpProject::DigitalBrain.Mcp.RuntimeSessionAuthority;
 using RuntimeSurfaceFeed = McpProject::DigitalBrain.Mcp.RuntimeSurfaceFeed;
 using SubmitActionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.SubmitActionRequest;
+using SuggestFeatureChangeRequest = McpProject::DigitalBrain.V2.Ui.Grpc.SuggestFeatureChangeRequest;
 using UiDeliveryOptions = McpProject::DigitalBrain.Mcp.UiDeliveryOptions;
 using UiDevelopmentLoginAuthenticator = McpProject::DigitalBrain.Mcp.UiDevelopmentLoginAuthenticator;
 using UiDevelopmentLoginOptions = McpProject::DigitalBrain.Mcp.UiDevelopmentLoginOptions;
 using UiExternalIdentityAuthenticator = McpProject::DigitalBrain.Mcp.UiExternalIdentityAuthenticator;
 using UiExternalIdentityOptions = McpProject::DigitalBrain.Mcp.UiExternalIdentityOptions;
 using UiGrpcService = McpProject::DigitalBrain.Mcp.UiGrpcService;
+using VerifyFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.VerifyFeatureDraftRequest;
 using WatchSurfaceFeedRequest = McpProject::DigitalBrain.V2.Ui.Grpc.WatchSurfaceFeedRequest;
 
 namespace DigitalBrain.Tests.Runtime;
@@ -45,6 +70,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     private const string LoginUsername = "admin";
     private const string LoginPassword = "admin";
     private RecordingChatClient? _chatClient;
+    private readonly TestFeaturePublicationVerifier _publicationVerifier = new();
 
     protected override void ConfigureSilo(ISiloBuilder builder)
     {
@@ -63,6 +89,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
                 services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
                 services.AddSingleton(new EncryptedRuntimeStateProtector(keyRing));
                 services.AddSingleton<IChatClient>(_chatClient);
+                services.AddSingleton<IFeaturePublicationVerifier>(_publicationVerifier);
                 services.AddSingleton<ICapabilityDescriptorSource, GoogleCapabilityDescriptorSource>();
                 services.AddSingleton<ICapabilityDescriptorSource, SalesforceCapabilityDescriptorSource>();
                 services.AddSingleton<ICapabilityCatalog, BuiltInCapabilityCatalog>();
@@ -238,6 +265,405 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task Product_authoring_methods_share_authentication_and_Feature_authority_checks()
+    {
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var (service, _) = CreateService();
+        var unauthenticatedCalls = ProductCalls(service, TestServerCallContext.WithHeaders(audience));
+
+        foreach (var call in unauthenticatedCalls)
+        {
+            var exception = await Assert.ThrowsAsync<RpcException>(call);
+            Assert.Equal(StatusCode.Unauthenticated, exception.StatusCode);
+            Assert.Equal(
+                "A valid UI session for the exact transport audience is required.",
+                exception.Status.Detail);
+        }
+
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var deniedContext = TestServerCallContext.WithHeaders(
+            ("x-v2-session", bootstrap.AccessToken),
+            audience);
+
+        foreach (var call in ProductCalls(service, deniedContext))
+        {
+            var exception = await Assert.ThrowsAsync<RpcException>(call);
+            Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+            Assert.Equal("Feature management authority is required.", exception.Status.Detail);
+        }
+    }
+
+    [Fact]
+    public async Task GetFeatureDraft_returns_only_the_authenticated_Owner_scope()
+    {
+        var owner = new BrainOwnerId("owner");
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-get-draft",
+            "Read the owner-local Feature Draft",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-get-draft"));
+        var otherHub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(new BrainOwnerId("other-owner")));
+        var otherDraft = await otherHub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-get-other-draft",
+            "Keep another owner's Draft private",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-get-other-draft"));
+        var (service, _) = CreateService(grants: new HashSet<string>(["brain.read", "ui.action", "feature.manage"], StringComparer.Ordinal));
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+
+        var reply = await service.GetFeatureDraft(new GetFeatureDraftRequest { DraftId = draft.DraftId.Value }, call);
+        var crossOwner = await Assert.ThrowsAsync<RpcException>(() => service.GetFeatureDraft(
+            new GetFeatureDraftRequest { DraftId = otherDraft.DraftId.Value },
+            call));
+        var absent = await Assert.ThrowsAsync<RpcException>(() => service.GetFeatureDraft(
+            new GetFeatureDraftRequest { DraftId = "proposal-absent" },
+            call));
+
+        Assert.Equal(draft.DraftId.Value, reply.Draft.DraftId);
+        Assert.Equal(draft.Goal, reply.Draft.Goal);
+        Assert.Equal(draft.Revision, reply.Draft.Revision);
+        Assert.Equal(StatusCode.NotFound, crossOwner.StatusCode);
+        Assert.Equal(absent.Status, crossOwner.Status);
+    }
+
+    [Fact]
+    public void Legacy_Feature_Draft_projection_omits_the_missing_conversation_marker()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var draft = new FeatureDraft(
+            new FeatureDraftId("proposal-ui-legacy"),
+            new OriginatingRequest(
+                "operation-ui-legacy",
+                FeatureDraft.LegacyMissingConversationId,
+                "Read a migrated Feature Draft"),
+            "Read a migrated Feature Draft",
+            "draft",
+            new FeatureBehavior([
+                new FeatureScenario("legacy-scenario", "Legacy", "a Draft was migrated", "it is read", "the sentinel stays private")
+            ]),
+            new FeatureSourceSnapshot(
+                "src/Legacy/Legacy.csproj",
+                "tests/Legacy.Scenarios/Legacy.Scenarios.csproj",
+                [
+                    new FeatureSourceFile("src/Legacy/Legacy.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>"),
+                    new FeatureSourceFile("tests/Legacy.Scenarios/Legacy.Scenarios.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>")
+                ]),
+            null,
+            null,
+            0,
+            now,
+            now);
+        var projection = typeof(DigitalBrainUiEndpoints)
+            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(method => method.Name == "ToReply" && method.GetParameters() is [{ ParameterType: var type }] &&
+                type == typeof(FeatureDraft));
+
+        var reply = Assert.IsType<GrpcFeatureDraft>(projection.Invoke(null, [draft]));
+        var presence = reply.OriginatingRequest.GetType().GetProperty("HasConversationId");
+
+        Assert.NotNull(presence);
+        Assert.False(Assert.IsType<bool>(presence.GetValue(reply.OriginatingRequest)));
+        Assert.DoesNotContain(FeatureDraft.LegacyMissingConversationId, reply.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReviseFeatureDraft_replays_and_maps_stale_or_malformed_commands_safely()
+    {
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(new BrainOwnerId("owner")));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-revise-draft",
+            "Revise a Feature Draft through the typed endpoint",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-revise-draft"));
+        var (service, _) = CreateService(grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal));
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+        var request = new ReviseFeatureDraftRequest
+        {
+            DraftId = draft.DraftId.Value,
+            ExpectedRevision = draft.Revision,
+            IdempotencyId = "ui-revise-replay",
+            ReviseBehavior = new ReviseFeatureBehaviorInput
+            {
+                Behavior = new GrpcFeatureBehavior
+                {
+                    Scenarios =
+                    {
+                        new GrpcFeatureScenario
+                        {
+                            ScenarioId = "ui-revise",
+                            Name = "Typed revision",
+                            Given = "an authenticated owner",
+                            When = "Behavior is revised",
+                            Then = "the exact command replays"
+                        }
+                    }
+                }
+            }
+        };
+
+        var first = await service.ReviseFeatureDraft(request, call);
+        var replay = await service.ReviseFeatureDraft(request, call);
+        var stale = request.Clone();
+        stale.IdempotencyId = "ui-revise-stale";
+        var staleException = await Assert.ThrowsAsync<RpcException>(() => service.ReviseFeatureDraft(stale, call));
+        var maximumRevision = request.Clone();
+        maximumRevision.ExpectedRevision = long.MaxValue;
+        maximumRevision.IdempotencyId = "ui-revise-max";
+        var maximumRevisionException = await Assert.ThrowsAsync<RpcException>(() =>
+            service.ReviseFeatureDraft(maximumRevision, call));
+        var missingRevision = request.Clone();
+        missingRevision.ClearExpectedRevision();
+        var missingRevisionException = await Assert.ThrowsAsync<RpcException>(() => service.ReviseFeatureDraft(missingRevision, call));
+        var missingCommand = request.Clone();
+        missingCommand.ClearCommand();
+        var missingCommandException = await Assert.ThrowsAsync<RpcException>(() => service.ReviseFeatureDraft(missingCommand, call));
+
+        Assert.Equal(1, first.Draft.Revision);
+        Assert.Equal(request.ReviseBehavior.Behavior, first.Draft.Behavior);
+        Assert.Equal(first.Draft.UpdatedAtUnixMs, replay.Draft.UpdatedAtUnixMs);
+        Assert.Equal(StatusCode.Aborted, staleException.StatusCode);
+        Assert.Equal("The Feature Draft changed. Reload it and retry.", staleException.Status.Detail);
+        Assert.Equal(StatusCode.Aborted, maximumRevisionException.StatusCode);
+        Assert.Equal("The Feature Draft changed. Reload it and retry.", maximumRevisionException.Status.Detail);
+        Assert.Equal(StatusCode.InvalidArgument, missingRevisionException.StatusCode);
+        Assert.Equal(StatusCode.InvalidArgument, missingCommandException.StatusCode);
+    }
+
+    [Fact]
+    public async Task Suggest_verify_and_install_live_product_Rpcs_succeed_and_replay_through_the_full_service_boundary()
+    {
+        var ownerId = new BrainOwnerId("owner");
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-live-product",
+            "Ship the live typed Feature product",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-live-product"));
+        var release = new FeatureReleaseMetadata(
+            new ReleaseDigest(new string('a', 64)),
+            $"sha256:{new string('a', 64)}",
+            FeatureSourceKind.RuntimeAuthored,
+            ["capability.read"],
+            []);
+        var builds = new RecordingFeatureBuildEndpoint(
+            new FeatureBuildArtifact(release, new DigitalBrain.FeatureBuilder.FeatureScenarioResult(1, 1, 0, 0)));
+        var catalog = new RecordingFeatureArtifactCatalog(release);
+        var lifecycle = new LiveFeatureLifecycleRail(
+            Cluster.Client,
+            ownerId,
+            _publicationVerifier);
+        var authoring = new FeatureAuthoringService(
+            Cluster.Client,
+            builds,
+            catalog,
+            lifecycle,
+            TimeProvider.System);
+        _chatClient!.Response = LiveSuggestionResponse();
+        var (service, _) = CreateService(
+            grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal),
+            authoring: authoring);
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+
+        var suggestion = await service.SuggestFeatureChange(
+            new SuggestFeatureChangeRequest
+            {
+                DraftId = draft.DraftId.Value,
+                ExpectedRevision = draft.Revision,
+                Guidance = new string('g', 4096),
+                SuggestionId = "suggestion-ui-live"
+            },
+            call);
+        var afterSuggestion = Assert.IsType<FeatureDraft>(await hub.ReadDraftAsync(draft.DraftId));
+        var verifyRequest = new VerifyFeatureDraftRequest
+        {
+            DraftId = draft.DraftId.Value,
+            ExpectedRevision = draft.Revision,
+            IdempotencyId = "verify-ui-live"
+        };
+        var verified = await service.VerifyFeatureDraft(verifyRequest, call);
+        var verifiedReplay = await service.VerifyFeatureDraft(verifyRequest, call);
+        var installRequest = ValidInstallRequest(verified.Draft, release);
+        var installed = await service.InstallFeatureVersion(installRequest, call);
+        var installedReplay = await service.InstallFeatureVersion(installRequest, call);
+
+        Assert.Equal(draft.DraftId.Value, suggestion.Patch.DraftId);
+        Assert.Equal(draft.Revision, suggestion.Patch.BaseRevision);
+        Assert.Equal(draft.Revision, afterSuggestion.Revision);
+        Assert.Null(afterSuggestion.Verification);
+        Assert.Equal(verified, verifiedReplay);
+        Assert.Equal(draft.Revision + 1, verified.Draft.Revision);
+        Assert.Equal(release.Digest.Value, verified.Release.Digest);
+        Assert.Equal(installed, installedReplay);
+        Assert.Equal("installation-ui-live", installed.InstallationId);
+        Assert.Equal(McpProject::DigitalBrain.V2.Ui.Grpc.FeatureDraftStatus.Installed, installed.Draft.Status);
+        Assert.Equal(release.Digest.Value, installed.Release.Digest);
+        Assert.Equal("capability.read", Assert.Single(installed.ActiveGrants).CapabilityId);
+        Assert.Equal("conversation.completed", Assert.Single(installed.Subscriptions));
+        Assert.Equal(1, _chatClient.CallCount);
+        Assert.Equal(2, builds.CallCount);
+        Assert.Equal(2, catalog.CallCount);
+        Assert.Equal(1, lifecycle.InstallCount);
+        Assert.Equal(1, lifecycle.RepublishCount);
+    }
+
+    [Fact]
+    public async Task Install_proto_validation_rejects_malformed_and_credential_bearing_requests_before_application_persistence()
+    {
+        var ownerId = new BrainOwnerId("owner");
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-invalid-install",
+            "Reject malformed typed installation requests",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-invalid-install"));
+        var release = new FeatureReleaseMetadata(
+            new ReleaseDigest(new string('b', 64)),
+            $"sha256:{new string('b', 64)}",
+            FeatureSourceKind.RuntimeAuthored,
+            ["capability.read"],
+            []);
+        var builds = new RecordingFeatureBuildEndpoint(
+            new FeatureBuildArtifact(release, new DigitalBrain.FeatureBuilder.FeatureScenarioResult(1, 1, 0, 0)));
+        var catalog = new RecordingFeatureArtifactCatalog(release);
+        var lifecycle = new LiveFeatureLifecycleRail(Cluster.Client, ownerId, _publicationVerifier);
+        var authoring = new FeatureAuthoringService(Cluster.Client, builds, catalog, lifecycle, TimeProvider.System);
+        var logger = new CapturingLogger<DigitalBrainUiEndpoints>();
+        var (service, _) = CreateService(
+            grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal),
+            authoring: authoring,
+            endpointLogger: logger);
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+        var valid = ValidInstallRequest(draft, release);
+        var uppercaseDigest = valid.Clone();
+        uppercaseDigest.ReleaseDigest = new string('A', 64);
+        var excessiveGrants = valid.Clone();
+        excessiveGrants.Grants.Clear();
+        excessiveGrants.Grants.Add(Enumerable.Range(0, 33).Select(index => new GrpcFeatureGrant
+        {
+            CapabilityId = $"capability.{index}",
+            CapabilityVersion = 1,
+            ConstraintsJson = "{}"
+        }));
+        var excessiveSubscriptions = valid.Clone();
+        excessiveSubscriptions.Subscriptions.Clear();
+        excessiveSubscriptions.Subscriptions.Add(Enumerable.Range(0, 65).Select(index => $"subscription.{index}"));
+        var credentialConstraint = valid.Clone();
+        credentialConstraint.Grants[0].ConstraintsJson =
+            "{\"allowedToolIds\":[\"capability.read\"],\"payload\":{\"secret_access_key\":\"credential-canary\"}}";
+
+        foreach (var request in new[] { uppercaseDigest, excessiveGrants, excessiveSubscriptions, credentialConstraint })
+        {
+            var rejected = await Assert.ThrowsAsync<RpcException>(() => service.InstallFeatureVersion(request, call));
+            Assert.Equal(StatusCode.InvalidArgument, rejected.StatusCode);
+            Assert.Equal("The Feature request is invalid.", rejected.Status.Detail);
+            Assert.DoesNotContain("canary", rejected.Status.Detail, StringComparison.Ordinal);
+        }
+        var notReady = await Assert.ThrowsAsync<RpcException>(() => service.InstallFeatureVersion(valid, call));
+
+        Assert.Equal(StatusCode.FailedPrecondition, notReady.StatusCode);
+        Assert.Equal("The Feature Draft is not ready for this operation.", notReady.Status.Detail);
+        Assert.Equal(0, builds.CallCount);
+        Assert.Equal(0, catalog.CallCount);
+        Assert.Equal(0, lifecycle.MutationCount);
+        Assert.Null(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
+        var unchanged = Assert.IsType<FeatureDraft>(await hub.ReadDraftAsync(draft.DraftId));
+        Assert.Equal(draft.Revision, unchanged.Revision);
+        Assert.DoesNotContain(logger.Messages, message => message.Contains("canary", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Install_actor_mismatch_is_a_fixed_failed_precondition_without_reservation()
+    {
+        var ownerId = new BrainOwnerId("owner");
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
+        var release = new FeatureReleaseMetadata(
+            new ReleaseDigest(new string('c', 64)),
+            $"sha256:{new string('c', 64)}",
+            FeatureSourceKind.RuntimeAuthored,
+            ["capability.read"],
+            []);
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-actor-mismatch",
+            "Reject a different installation actor",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-actor-mismatch"));
+        draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            new FeatureVerification(release.Digest, 1, 1, 0, 0, DateTimeOffset.UtcNow),
+            draft.Revision,
+            "verify-ui-actor-mismatch"));
+        var request = ValidInstallRequest(draft, release);
+        var grant = new FeatureGrantSpec(
+            "capability.read",
+            1,
+            new ProviderConnectionId("connection-ui-live"),
+            "{\"allowedToolIds\":[\"capability.read\"]}",
+            "google");
+        var registration = new FeatureInstallationRegistration(
+            new FeatureInstallationId(request.InstallationId),
+            release.Digest,
+            request.Subscriptions.ToArray());
+        var authority = new FeatureAuthoritySnapshot(
+            registration.InstallationId,
+            new ActorId("different-actor"),
+            release.Digest,
+            null,
+            new GrantRevision(1),
+            [grant],
+            null,
+            null,
+            [],
+            false,
+            null);
+        var lifecycle = new FixedInspectionLifecycleRail(new FeatureLifecycleInspection(
+            1,
+            [release],
+            [],
+            [new FeatureInstallationInspection(authority, registration, null)],
+            [registration]));
+        var authoring = new FeatureAuthoringService(
+            Cluster.Client,
+            new RecordingFeatureBuildEndpoint(new InvalidOperationException("must not build")),
+            new RecordingFeatureArtifactCatalog(release),
+            lifecycle,
+            TimeProvider.System);
+        var (service, _) = CreateService(
+            grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal),
+            authoring: authoring);
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+
+        var rejected = await Assert.ThrowsAsync<RpcException>(() => service.InstallFeatureVersion(request, call));
+
+        Assert.Equal(StatusCode.FailedPrecondition, rejected.StatusCode);
+        Assert.Equal("The Feature Draft is not ready for this operation.", rejected.Status.Detail);
+        Assert.Equal(0, lifecycle.MutationCount);
+        Assert.Null(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
+    }
+
+    [Fact]
     public void Wrong_revision_is_mapped_to_failed_precondition()
     {
         Assert.Equal(
@@ -375,6 +801,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     private sealed class RecordingChatClient : IChatClient
     {
         public int CallCount { get; private set; }
+        public string Response { get; set; } = "safe response";
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
@@ -382,7 +809,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             CancellationToken cancellationToken = default)
         {
             CallCount++;
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "safe response"))
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, Response))
             {
                 ConversationId = "provider-conversation"
             });
@@ -400,12 +827,26 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     }
 
     private (UiGrpcService Service, RuntimeSessionAuthority Sessions) CreateService(
-        UiExternalIdentityOptions? externalOptions = null)
+        UiExternalIdentityOptions? externalOptions = null,
+        IReadOnlySet<string>? grants = null,
+        FeatureAuthoringService? authoring = null,
+        FeatureSuggestionService? suggestion = null,
+        ILogger<DigitalBrainUiEndpoints>? endpointLogger = null)
     {
         var timeProvider = TimeProvider.System;
         var tokens = new SessionTokenService(Enumerable.Repeat((byte)13, 32).ToArray(), timeProvider);
         var sessions = new RuntimeSessionAuthority(Cluster.Client, tokens, timeProvider);
         var conversations = new ConversationStateClient(Cluster.Client, timeProvider);
+        authoring ??= new FeatureAuthoringService(
+            Cluster.Client,
+            new UnusedBuildEndpoint(),
+            new UnusedArtifactCatalog(),
+            new UnusedFeatureLifecycleRail(),
+            timeProvider);
+        var endpoints = new DigitalBrainUiEndpoints(
+            authoring,
+            suggestion ?? new FeatureSuggestionService(Cluster.Client),
+            endpointLogger ?? NullLogger<DigitalBrainUiEndpoints>.Instance);
         var service = new UiGrpcService(
             new UiDevelopmentLoginAuthenticator(new UiDevelopmentLoginOptions(
                 LoginUsername,
@@ -413,7 +854,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
                 new BrainOwnerId("owner"),
                 new ActorId("principal"),
                 TimeSpan.FromMinutes(15),
-                new HashSet<string>(["brain.read", "ui.action"], StringComparer.Ordinal))),
+                grants ?? new HashSet<string>(["brain.read", "ui.action"], StringComparer.Ordinal))),
             new UiExternalIdentityAuthenticator(externalOptions ?? new UiExternalIdentityOptions(
                 false,
                 string.Empty,
@@ -428,8 +869,348 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             new McpInoCommandHandler(conversations),
             conversations,
             UiDeliveryOptions.Default,
-            NullLogger<UiGrpcService>.Instance);
+            NullLogger<UiGrpcService>.Instance,
+            endpoints);
         return (service, sessions);
+    }
+
+    private static Func<Task>[] ProductCalls(UiGrpcService service, ServerCallContext context) =>
+    [
+        () => service.GetFeatureDraft(new GetFeatureDraftRequest(), context),
+        () => service.ReviseFeatureDraft(new ReviseFeatureDraftRequest(), context),
+        () => service.SuggestFeatureChange(new SuggestFeatureChangeRequest(), context),
+        () => service.VerifyFeatureDraft(new VerifyFeatureDraftRequest(), context),
+        () => service.InstallFeatureVersion(new InstallFeatureVersionRequest(), context)
+    ];
+
+    private static InstallFeatureVersionRequest ValidInstallRequest(
+        GrpcFeatureDraft draft,
+        FeatureReleaseMetadata release) => ValidInstallRequest(draft.DraftId, draft.Revision, release);
+
+    private static InstallFeatureVersionRequest ValidInstallRequest(
+        FeatureDraft draft,
+        FeatureReleaseMetadata release) => ValidInstallRequest(draft.DraftId.Value, draft.Revision, release);
+
+    private static InstallFeatureVersionRequest ValidInstallRequest(
+        string draftId,
+        long revision,
+        FeatureReleaseMetadata release)
+    {
+        var request = new InstallFeatureVersionRequest
+        {
+            DraftId = draftId,
+            ExpectedRevision = revision,
+            InstallationId = "installation-ui-live",
+            ReleaseDigest = release.Digest.Value,
+            DecisionId = "decision-ui-live",
+            IdempotencyId = "install-ui-live"
+        };
+        request.Grants.Add(new GrpcFeatureGrant
+        {
+            CapabilityId = "capability.read",
+            CapabilityVersion = 1,
+            ConnectionId = "connection-ui-live",
+            ConstraintsJson = "{\"allowedToolIds\":[\"capability.read\"]}",
+            Provider = "google"
+        });
+        request.Subscriptions.Add("conversation.completed");
+        return request;
+    }
+
+    private static string LiveSuggestionResponse() => """
+        {
+          "summary": "Review the live typed change",
+          "replacementBehavior": {
+            "scenarios": [
+              {
+                "scenarioId": "scenario-ui-live",
+                "name": "Ship the typed Feature",
+                "given": "an owner has a Draft",
+                "when": "the change is reviewed",
+                "then": "the typed patch remains explicit"
+              }
+            ]
+          },
+          "replacementSource": {
+            "implementationProjectPath": "src/UiLive/UiLive.csproj",
+            "scenarioProjectPath": "tests/UiLive.Scenarios/UiLive.Scenarios.csproj",
+            "files": [
+              { "path": "src/UiLive/UiLive.csproj", "content": "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>" },
+              { "path": "src/UiLive/Feature.cs", "content": "namespace RuntimeAuthored; public sealed class Feature;" },
+              { "path": "tests/UiLive.Scenarios/UiLive.Scenarios.csproj", "content": "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>" }
+            ]
+          }
+        }
+        """;
+
+    private sealed class RecordingFeatureBuildEndpoint : FeatureBuildEndpoint
+    {
+        private readonly FeatureBuildArtifact? _artifact;
+        private readonly Exception? _failure;
+
+        public RecordingFeatureBuildEndpoint(FeatureBuildArtifact artifact) => _artifact = artifact;
+        public RecordingFeatureBuildEndpoint(Exception failure) => _failure = failure;
+        public int CallCount { get; private set; }
+
+        public Task<FeatureBuildArtifact> BuildAsync(
+            FeatureBuildSubmission submission,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return _failure is null
+                ? Task.FromResult(_artifact!)
+                : Task.FromException<FeatureBuildArtifact>(_failure);
+        }
+    }
+
+    private sealed class RecordingFeatureArtifactCatalog(FeatureReleaseMetadata release) : FeatureArtifactCatalog
+    {
+        public int CallCount { get; private set; }
+
+        public Task<FeatureReleaseMetadata> DemandReleaseAsync(
+            ReleaseDigest digest,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(release);
+        }
+    }
+
+    private sealed class LiveFeatureLifecycleRail(
+        IClusterClient cluster,
+        BrainOwnerId ownerId,
+        TestFeaturePublicationVerifier verifier) : FeatureLifecycleRail
+    {
+        public int ProposeCount { get; private set; }
+        public int DecideCount { get; private set; }
+        public int GrantCount { get; private set; }
+        public int InstallCount { get; private set; }
+        public int RepublishCount { get; private set; }
+        public int MutationCount => ProposeCount + DecideCount + GrantCount + InstallCount;
+
+        public async Task<FeatureLifecycleInspection> InspectAsync(
+            RuntimeRequestContext context,
+            CancellationToken cancellationToken = default)
+        {
+            var snapshot = await Hub.ReadAsync().WaitAsync(cancellationToken);
+            var installations = new List<FeatureInstallationInspection>();
+            foreach (var authority in snapshot.Authorities)
+            {
+                var registration = snapshot.Installations.SingleOrDefault(candidate =>
+                    candidate.InstallationId == authority.InstallationId);
+                var runtime = registration is null
+                    ? null
+                    : await cluster.GetGrain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(ownerId, authority.InstallationId))
+                        .ReadAsync()
+                        .WaitAsync(cancellationToken);
+                installations.Add(new FeatureInstallationInspection(authority, registration, runtime));
+            }
+            return new FeatureLifecycleInspection(
+                snapshot.Revision,
+                snapshot.Releases,
+                snapshot.Approvals,
+                installations,
+                snapshot.Installations);
+        }
+
+        public async Task<FeatureApprovalSnapshot> ProposeAsync(
+            RuntimeRequestContext context,
+            FeatureReleaseProposal proposal,
+            long expectedRevision,
+            CancellationToken cancellationToken = default)
+        {
+            ProposeCount++;
+            return await Hub.ProposeAsync(proposal, expectedRevision).WaitAsync(cancellationToken);
+        }
+
+        public async Task<FeatureApprovalSnapshot> DecideAsync(
+            RuntimeRequestContext context,
+            FeatureApprovalDecision decision,
+            long expectedRevision,
+            CancellationToken cancellationToken = default)
+        {
+            DecideCount++;
+            return await Hub.DecideAsync(decision, expectedRevision).WaitAsync(cancellationToken);
+        }
+
+        public async Task<FeatureAuthoritySnapshot> GrantAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationId installationId,
+            ReleaseDigest release,
+            FeatureGrantSpec[] grants,
+            long expectedRevision,
+            CancellationToken cancellationToken = default)
+        {
+            GrantCount++;
+            return await Hub.GrantAsync(
+                new FeatureGrantRequest(installationId, release, context.ActorId, grants),
+                expectedRevision).WaitAsync(cancellationToken);
+        }
+
+        public async Task<FeatureAuthoritySnapshot> InstallAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationRegistration registration,
+            long expectedRevision,
+            CancellationToken cancellationToken = default)
+        {
+            InstallCount++;
+            var authority = await Hub.InstallAsync(registration, expectedRevision).WaitAsync(cancellationToken);
+            await PublishAsync(registration.InstallationId, cancellationToken);
+            return authority;
+        }
+
+        public async Task<FeatureAuthoritySnapshot> RepublishAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationRegistration registration,
+            CancellationToken cancellationToken = default)
+        {
+            RepublishCount++;
+            var snapshot = await Hub.ReadAsync().WaitAsync(cancellationToken);
+            var authority = snapshot.Authorities.Single(candidate =>
+                candidate.InstallationId == registration.InstallationId &&
+                candidate.ActiveRelease == registration.Release);
+            var durable = snapshot.Installations.Single(candidate =>
+                candidate.InstallationId == registration.InstallationId);
+            Assert.Equal(registration.InstallationId, durable.InstallationId);
+            Assert.Equal(registration.Release, durable.Release);
+            Assert.Equal(registration.Subscriptions, durable.Subscriptions);
+            await PublishAsync(registration.InstallationId, cancellationToken);
+            return authority;
+        }
+
+        private async Task PublishAsync(
+            FeatureInstallationId installationId,
+            CancellationToken cancellationToken)
+        {
+            var ticket = await Hub.PrepareActivePublicationAsync(installationId).WaitAsync(cancellationToken);
+            var receipt = new FeaturePublicationReceipt(
+                installationId,
+                ticket.PublicationFence,
+                ticket.AuthorityDigest,
+                ticket.AccessDigest,
+                Convert.ToHexStringLower(SHA256.HashData(
+                    FeaturePublicationManifestCodec.Serialize(ownerId, ticket))));
+            verifier.Allow(ownerId, ticket, receipt);
+            await Hub.ConfirmActivePublicationAsync(receipt).WaitAsync(cancellationToken);
+        }
+
+        private IFeatureHubGrain Hub => cluster.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
+    }
+
+    private sealed class FixedInspectionLifecycleRail(FeatureLifecycleInspection inspection) : FeatureLifecycleRail
+    {
+        public int MutationCount { get; private set; }
+
+        public Task<FeatureLifecycleInspection> InspectAsync(
+            RuntimeRequestContext context,
+            CancellationToken cancellationToken = default) => Task.FromResult(inspection);
+
+        public Task<FeatureApprovalSnapshot> ProposeAsync(
+            RuntimeRequestContext context,
+            FeatureReleaseProposal proposal,
+            long expectedRevision,
+            CancellationToken cancellationToken = default) => Unexpected<FeatureApprovalSnapshot>();
+
+        public Task<FeatureApprovalSnapshot> DecideAsync(
+            RuntimeRequestContext context,
+            FeatureApprovalDecision decision,
+            long expectedRevision,
+            CancellationToken cancellationToken = default) => Unexpected<FeatureApprovalSnapshot>();
+
+        public Task<FeatureAuthoritySnapshot> GrantAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationId installationId,
+            ReleaseDigest release,
+            FeatureGrantSpec[] grants,
+            long expectedRevision,
+            CancellationToken cancellationToken = default) => Unexpected<FeatureAuthoritySnapshot>();
+
+        public Task<FeatureAuthoritySnapshot> InstallAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationRegistration registration,
+            long expectedRevision,
+            CancellationToken cancellationToken = default) => Unexpected<FeatureAuthoritySnapshot>();
+
+        public Task<FeatureAuthoritySnapshot> RepublishAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationRegistration registration,
+            CancellationToken cancellationToken = default) => Unexpected<FeatureAuthoritySnapshot>();
+
+        private Task<T> Unexpected<T>()
+        {
+            MutationCount++;
+            return Task.FromException<T>(new InvalidOperationException("Unexpected lifecycle mutation."));
+        }
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
+    }
+
+    private sealed class UnusedBuildEndpoint : FeatureBuildEndpoint
+    {
+        public Task<FeatureBuildArtifact> BuildAsync(
+            FeatureBuildSubmission submission,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class UnusedArtifactCatalog : FeatureArtifactCatalog
+    {
+        public Task<FeatureReleaseMetadata> DemandReleaseAsync(
+            ReleaseDigest digest,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class UnusedFeatureLifecycleRail : FeatureLifecycleRail
+    {
+        public Task<FeatureApprovalSnapshot> ProposeAsync(
+            RuntimeRequestContext context,
+            FeatureReleaseProposal proposal,
+            long expectedRevision,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<FeatureApprovalSnapshot> DecideAsync(
+            RuntimeRequestContext context,
+            FeatureApprovalDecision decision,
+            long expectedRevision,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<FeatureAuthoritySnapshot> GrantAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationId installationId,
+            ReleaseDigest release,
+            FeatureGrantSpec[] grants,
+            long expectedRevision,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<FeatureAuthoritySnapshot> InstallAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationRegistration registration,
+            long expectedRevision,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<FeatureAuthoritySnapshot> RepublishAsync(
+            RuntimeRequestContext context,
+            FeatureInstallationRegistration registration,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<FeatureLifecycleInspection> InspectAsync(
+            RuntimeRequestContext context,
+            CancellationToken cancellationToken = default) => Task.FromResult(new FeatureLifecycleInspection(
+                0,
+                [],
+                [],
+                Array.Empty<FeatureInstallationInspection>(),
+                Array.Empty<FeatureInstallationRegistration>()));
     }
 
     private sealed class FixedAuthenticationService(ClaimsPrincipal principal) : IAuthenticationService

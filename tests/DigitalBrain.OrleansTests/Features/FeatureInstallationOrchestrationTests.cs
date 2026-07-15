@@ -1,5 +1,6 @@
 extern alias McpProject;
 
+using Azure;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using FeatureArtifactCatalog = McpProject::DigitalBrain.Mcp.IFeatureArtifactCatalog;
@@ -39,18 +40,79 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
     }
 
     [Fact]
+    public async Task Azure_artifact_and_lifecycle_failures_are_typed_unavailable_rejections()
+    {
+        var artifactSetup = await SetupAsync("azure-artifact-unavailable");
+        artifactSetup.Catalog.Failure = new RequestFailedException(503, "azure-artifact-canary");
+        var artifactUnavailable = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            artifactSetup.Service.PrepareAccessReviewAsync(
+                artifactSetup.Context,
+                new PrepareFeatureAccessReview(
+                    artifactSetup.Draft.DraftId,
+                    artifactSetup.Draft.Revision,
+                    artifactSetup.InstallationId,
+                    artifactSetup.Release.Digest,
+                    artifactSetup.Grants,
+                    artifactSetup.Subscriptions)));
+
+        var lifecycleSetup = await SetupAsync("azure-lifecycle-unavailable");
+        lifecycleSetup.Lifecycle.Failure = new RequestFailedException(503, "azure-lifecycle-canary");
+        var lifecycleUnavailable = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            lifecycleSetup.Service.PrepareAccessReviewAsync(
+                lifecycleSetup.Context,
+                new PrepareFeatureAccessReview(
+                    lifecycleSetup.Draft.DraftId,
+                    lifecycleSetup.Draft.Revision,
+                    lifecycleSetup.InstallationId,
+                    lifecycleSetup.Release.Digest,
+                    lifecycleSetup.Grants,
+                    lifecycleSetup.Subscriptions)));
+
+        Assert.Equal(FeatureCommandRejectionReason.Unavailable, artifactUnavailable.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Unavailable, lifecycleUnavailable.Reason);
+        Assert.Equal(0, artifactSetup.Lifecycle.MutationCount);
+        Assert.Equal(0, lifecycleSetup.Lifecycle.MutationCount);
+    }
+
+    [Theory]
+    [InlineData(FeatureCommandRejectionReason.Conflict)]
+    [InlineData(FeatureCommandRejectionReason.Precondition)]
+    [InlineData(FeatureCommandRejectionReason.Unavailable)]
+    public async Task Typed_publication_outcomes_cross_the_application_lifecycle_boundary_unchanged(
+        FeatureCommandRejectionReason reason)
+    {
+        var setup = await SetupAsync($"publication-reason-{reason}");
+        setup.Lifecycle.Failure = new FeatureCommandRejectedException(reason);
+
+        var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            setup.Service.PrepareAccessReviewAsync(
+                setup.Context,
+                new PrepareFeatureAccessReview(
+                    setup.Draft.DraftId,
+                    setup.Draft.Revision,
+                    setup.InstallationId,
+                    setup.Release.Digest,
+                    setup.Grants,
+                    setup.Subscriptions)));
+
+        Assert.Equal(reason, rejected.Reason);
+        Assert.Equal(0, setup.Lifecycle.MutationCount);
+    }
+
+    [Fact]
     public async Task Digest_and_complete_grant_mismatches_are_rejected_before_lifecycle_mutation()
     {
         var setup = await SetupAsync("mismatch");
         var otherDigest = Digest('b');
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => setup.Service.PrepareAccessReviewAsync(setup.Context, new PrepareFeatureAccessReview(
+        var digestMismatch = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => setup.Service.PrepareAccessReviewAsync(setup.Context, new PrepareFeatureAccessReview(
             setup.Draft.DraftId,
             setup.Draft.Revision,
             setup.InstallationId,
             otherDigest,
             setup.Grants,
             setup.Subscriptions)));
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, digestMismatch.Reason);
         Assert.Equal(0, setup.Catalog.CallCount);
 
         var mismatches = new[]
@@ -98,7 +160,7 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
             setup.Release.Digest,
             setup.Subscriptions);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => setup.Service.PrepareAccessReviewAsync(setup.Context, new PrepareFeatureAccessReview(
+        var retargeted = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => setup.Service.PrepareAccessReviewAsync(setup.Context, new PrepareFeatureAccessReview(
             setup.Draft.DraftId,
             setup.Draft.Revision,
             setup.InstallationId,
@@ -106,6 +168,7 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
             setup.Grants,
             setup.Subscriptions)));
 
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, retargeted.Reason);
         Assert.Equal(0, setup.Lifecycle.MutationCount);
     }
 
@@ -125,7 +188,7 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
             setup.Subscriptions,
             setup.Context.ActorId);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => setup.Service.InstallAsync(
+        var retargeted = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => setup.Service.InstallAsync(
             setup.Context,
             new InstallFeatureVersion(
                 setup.Draft.DraftId,
@@ -137,6 +200,7 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
                 "decision-retargeted",
                 "install-retargeted")));
 
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, retargeted.Reason);
         Assert.Equal(0, setup.Lifecycle.MutationCount);
         Assert.Null(await setup.Hub.ReadDraftInstallationReservationAsync(setup.Draft.DraftId));
     }
@@ -147,7 +211,9 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
         var setup = await SetupAsync("grant-conflict");
         var command = Command(setup);
         setup.Lifecycle.FailAfter = "propose";
-        await Assert.ThrowsAsync<IOException>(() => setup.Service.InstallAsync(setup.Context, command));
+        var unavailable = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            setup.Service.InstallAsync(setup.Context, command));
+        Assert.Equal(FeatureCommandRejectionReason.Unavailable, unavailable.Reason);
 
         await Assert.ThrowsAnyAsync<Exception>(() => setup.Service.InstallAsync(setup.Context, command with
         {
@@ -206,7 +272,9 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
 
         var installed = await setup.Service.InstallAsync(setup.Context, Command(setup));
 
-        Assert.IsType<InvalidOperationException>(editFailure);
+        Assert.Equal(
+            FeatureCommandRejectionReason.Precondition,
+            Assert.IsType<FeatureCommandRejectedException>(editFailure).Reason);
         Assert.Equal("installed", installed.Draft.Status);
         Assert.Equal(setup.Release.Digest, installed.Draft.Verification?.Release);
     }
@@ -319,7 +387,7 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
         var command = Command(setup);
         var installed = await setup.Service.InstallAsync(setup.Context, command);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => setup.Service.InstallAsync(
+        await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => setup.Service.InstallAsync(
             setup.Context,
             command with { IdempotencyId = "install-different-identity" }));
 
@@ -366,8 +434,9 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
         var newerRelease = setup.Release.Digest == Digest('f') ? Digest('e') : Digest('f');
         setup.Lifecycle.SwitchActiveRelease(newerRelease);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => setup.Service.InstallAsync(setup.Context, command));
+        var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => setup.Service.InstallAsync(setup.Context, command));
 
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
         Assert.Equal(newerRelease, setup.Lifecycle.ActiveRelease);
         Assert.Equal(1, setup.Lifecycle.GrantCount);
         Assert.Equal(1, setup.Lifecycle.InstallCount);
@@ -380,12 +449,15 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
         var setup = await SetupAsync("republish-race");
         var command = Command(setup);
         setup.Lifecycle.FailAfter = "publish";
-        await Assert.ThrowsAsync<IOException>(() => setup.Service.InstallAsync(setup.Context, command));
+        var unavailable = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            setup.Service.InstallAsync(setup.Context, command));
+        Assert.Equal(FeatureCommandRejectionReason.Unavailable, unavailable.Reason);
         var racedRelease = setup.Release.Digest == Digest('f') ? Digest('e') : Digest('f');
         setup.Lifecycle.SwitchToOnRepublish = racedRelease;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => setup.Service.InstallAsync(setup.Context, command));
+        var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => setup.Service.InstallAsync(setup.Context, command));
 
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
         var draft = await setup.Hub.ReadDraftAsync(setup.Draft.DraftId);
         Assert.Equal("draft", draft?.Status);
         Assert.Equal(racedRelease, setup.Lifecycle.ActiveRelease);
@@ -539,11 +611,14 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
     private sealed class RecordingArtifactCatalog(FeatureReleaseMetadata release) : FeatureArtifactCatalog
     {
         public int CallCount { get; private set; }
+        public Exception? Failure { get; set; }
 
         public Task<FeatureReleaseMetadata> DemandReleaseAsync(ReleaseDigest digest, CancellationToken cancellationToken = default)
         {
             CallCount++;
-            return Task.FromResult(release);
+            return Failure is null
+                ? Task.FromResult(release)
+                : Task.FromException<FeatureReleaseMetadata>(Failure);
         }
     }
 
@@ -561,6 +636,7 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
         private long _revision;
 
         public string? FailAfter { get; set; }
+        public Exception? Failure { get; set; }
         public int ProposeCount { get; private set; }
         public int DecideCount { get; private set; }
         public int GrantCount { get; private set; }
@@ -648,6 +724,8 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
 
         public Task<FeatureLifecycleInspection> InspectAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default)
         {
+            if (Failure is not null)
+                return Task.FromException<FeatureLifecycleInspection>(Failure);
             var runtime = _authority?.ActiveRelease is { } activeRelease && _registration is not null
                 ? new FeatureInstallationSnapshot(
                     _registration.InstallationId,

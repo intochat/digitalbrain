@@ -25,32 +25,57 @@ public sealed class FeatureSuggestionModelGrain(IGrainFactory grainFactory, ICha
         var draft = await hub.ReadDraftAsync(command.DraftId).WaitAsync(cancellationToken)
             ?? throw new KeyNotFoundException("The Feature Draft does not exist in this Owner Scope.");
         if (!string.Equals(draft.Status, "draft", StringComparison.Ordinal))
-            throw new InvalidOperationException("An installed Feature Draft cannot receive Suggested Changes.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
         if (draft.Revision != command.ExpectedRevision)
-            throw new InvalidOperationException("The Draft Revision changed.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Conflict);
         var prompt = BuildPrompt(draft, command.Guidance);
         if (Encoding.UTF8.GetByteCount(prompt) > FeatureLimits.DraftSuggestionPayloadUtf8Bytes)
-            throw new InvalidOperationException("The Feature suggestion prompt exceeds its bound.");
-        var response = await chatClient.GetResponseAsync<FeatureSuggestionContent>(
-            new ChatMessage(ChatRole.User, prompt),
-            StructuredJson,
-            useJsonSchemaResponseFormat: true,
-            cancellationToken: cancellationToken);
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Limit);
+        ChatResponse<FeatureSuggestionContent> response;
+        try
+        {
+            response = await chatClient.GetResponseAsync<FeatureSuggestionContent>(
+                new ChatMessage(ChatRole.User, prompt),
+                StructuredJson,
+                useJsonSchemaResponseFormat: true,
+                cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (FeatureCommandRejectedException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+        }
         if (Encoding.UTF8.GetByteCount(response.Text) > FeatureLimits.DraftSuggestionPayloadUtf8Bytes)
-            throw new InvalidOperationException("The Feature suggestion response exceeds its bound.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
         if (!response.TryGetResult(out var content) || content is null)
-            throw new InvalidOperationException("The Feature suggestion model returned no structured patch.");
-        var patch = FeatureDraftAuthoringTransitions.ValidatePatch(new FeatureDraftPatch(
-            PatchId(ownerId, draft, command.SuggestionId),
-            draft.DraftId,
-            draft.Revision,
-            content.Summary,
-            content.ReplacementBehavior,
-            content.ReplacementSource));
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+        FeatureDraftPatch patch;
+        try
+        {
+            patch = FeatureDraftAuthoringTransitions.ValidatePatch(new FeatureDraftPatch(
+                "patch-pending",
+                draft.DraftId,
+                draft.Revision,
+                content.Summary,
+                content.ReplacementBehavior,
+                content.ReplacementSource));
+        }
+        catch (ArgumentException)
+        {
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+        }
+        patch = patch with { PatchId = PatchId(ownerId, draft, command.SuggestionId, patch) };
         var current = await hub.ReadDraftAsync(command.DraftId).WaitAsync(cancellationToken)
-            ?? throw new KeyNotFoundException("The Feature Draft does not exist in this Owner Scope.");
+            ?? throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
         if (!string.Equals(current.Status, "draft", StringComparison.Ordinal) || current.Revision != draft.Revision)
-            throw new InvalidOperationException("The Draft Revision changed while producing the Suggested Change.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Conflict);
         return patch;
     }
 
@@ -75,9 +100,22 @@ public sealed class FeatureSuggestionModelGrain(IGrainFactory grainFactory, ICha
         User guidance: {{guidance}}
         """;
 
-    private static string PatchId(BrainOwnerId ownerId, FeatureDraft draft, string suggestionId)
+    private static string PatchId(
+        BrainOwnerId ownerId,
+        FeatureDraft draft,
+        string suggestionId,
+        FeatureDraftPatch patch)
     {
-        var canonical = Encoding.UTF8.GetBytes($"digitalbrain.feature.patch\0{ownerId.Value}\0{draft.DraftId.Value}\0{draft.Revision}\0{suggestionId}");
+        var canonical = JsonSerializer.SerializeToUtf8Bytes(
+            new FeaturePatchIdentity(
+                ownerId.Value,
+                draft.DraftId.Value,
+                draft.Revision,
+                suggestionId,
+                patch.Summary,
+                patch.ReplacementBehavior,
+                patch.ReplacementSource),
+            StructuredJson);
         return "patch-" + Convert.ToHexStringLower(SHA256.HashData(canonical))[..32];
     }
 
@@ -89,6 +127,15 @@ public sealed class FeatureSuggestionModelGrain(IGrainFactory grainFactory, ICha
             throw new ArgumentException("A bounded canonical value is required.", parameterName);
     }
 }
+
+internal sealed record FeaturePatchIdentity(
+    string OwnerId,
+    string DraftId,
+    long Revision,
+    string SuggestionId,
+    string Summary,
+    FeatureBehavior ReplacementBehavior,
+    FeatureSourceSnapshot ReplacementSource);
 
 internal sealed record FeatureSuggestionContent(
     string Summary,

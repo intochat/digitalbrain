@@ -162,20 +162,22 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
             cancellationToken).ConfigureAwait(false);
         var confirmed = await hub.ConfirmActivePublicationAsync(receipt).WaitAsync(cancellationToken).ConfigureAwait(false);
         if (confirmed != receipt)
-            throw new InvalidOperationException("The Feature publication confirmation changed the exact receipt.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
     }
     private static void DemandExactAuthority(RuntimeRequestContext context, FeatureAuthoritySnapshot authority, FeatureInstallationRegistration registration)
     {
-        if (authority.InstallationId != registration.InstallationId || authority.ActorId != context.ActorId ||
+        if (authority.ActorId != context.ActorId)
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
+        if (authority.InstallationId != registration.InstallationId ||
             authority.ActiveRelease != registration.Release || authority.ActiveGrantRevision is null)
-            throw new InvalidOperationException("The active Feature authority does not match the expected installation.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
     }
     private static void DemandSameRegistration(FeatureInstallationRegistration? actual, FeatureInstallationRegistration expected)
     {
         if (actual is null || actual.InstallationId != expected.InstallationId || actual.Release != expected.Release ||
             !actual.Subscriptions.Order(StringComparer.Ordinal)
                 .SequenceEqual(expected.Subscriptions.Order(StringComparer.Ordinal), StringComparer.Ordinal))
-            throw new InvalidOperationException("The active Feature registration does not match the expected installation.");
+            throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
     }
     private static FeatureInstallationRegistration CanonicalRegistration(FeatureInstallationRegistration registration)
     {

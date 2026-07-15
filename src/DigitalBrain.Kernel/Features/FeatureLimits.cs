@@ -1,3 +1,5 @@
+using DigitalBrain.Kernel.Contracts;
+
 namespace DigitalBrain.Kernel.Features;
 
 internal static class FeatureLimits
@@ -36,4 +38,9 @@ internal static class FeatureLimits
     public static readonly TimeSpan RunDeadline = TimeSpan.FromSeconds(60);
 }
 internal sealed class FeatureLimitExceededException(string message) : InvalidOperationException(message);
-internal sealed class FeatureConcurrencyException(string message) : InvalidOperationException(message);
+internal sealed class FeatureConcurrencyException(
+    string message,
+    FeatureCommandRejectionReason reason = FeatureCommandRejectionReason.Conflict) : InvalidOperationException(message)
+{
+    public FeatureCommandRejectionReason Reason { get; } = reason;
+}

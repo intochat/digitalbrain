@@ -80,12 +80,18 @@ internal static class FeatureDraftAuthoringTransitions
         }
         var draft = DemandEditableDraft(state, command.DraftId, command.ExpectedRevision);
         var verification = draft.Verification
-            ?? throw new FeatureConcurrencyException("The Feature Draft has no Verification to reserve for installation.");
+            ?? throw new FeatureConcurrencyException(
+                "The Feature Draft has no Verification to reserve for installation.",
+                FeatureCommandRejectionReason.Precondition);
         if (verification.Release != command.Release || verification.Total <= 0 ||
             verification.Passed != verification.Total || verification.Failed != 0 || verification.Skipped != 0)
-            throw new FeatureConcurrencyException("Only the exact fully verified Feature release can be reserved for installation.");
+            throw new FeatureConcurrencyException(
+                "Only the exact fully verified Feature release can be reserved for installation.",
+                FeatureCommandRejectionReason.Precondition);
         if (draft.InstallationId is { } installationId && installationId != command.InstallationId)
-            throw new FeatureConcurrencyException("The Feature Draft is bound to another installation identity.");
+            throw new FeatureConcurrencyException(
+                "The Feature Draft is bound to another installation identity.",
+                FeatureCommandRejectionReason.Precondition);
         if (reservations.Any(candidate =>
                 candidate.InstallationId == command.InstallationId ||
                 candidate.Release == command.Release && candidate.InstallationId != command.InstallationId))
@@ -106,7 +112,7 @@ internal static class FeatureDraftAuthoringTransitions
             state with
             {
                 DraftInstallationReservations = [.. reservations, reservation],
-                Revision = checked(state.Revision + 1)
+                Revision = NextRevision(state.Revision)
             },
             reservation);
     }
@@ -117,8 +123,14 @@ internal static class FeatureDraftAuthoringTransitions
         DemandDraftId(command.DraftId);
         DemandMutation(command.IdempotencyId, command.RevisedAt);
         var behavior = ValidateBehavior(command.Behavior);
-        var digest = Fingerprint(command);
-        if (Replay(state, command.DraftId, command.IdempotencyId, "behavior", digest) is { } replay)
+        var digest = Fingerprint(command with { RevisedAt = default });
+        if (Replay(
+                state,
+                command.DraftId,
+                command.IdempotencyId,
+                "behavior",
+                digest,
+                at => Fingerprint(command with { RevisedAt = at })) is { } replay)
             return replay;
         var draft = DemandEditableDraft(state, command.DraftId, command.ExpectedRevision);
         return Replace(
@@ -133,7 +145,7 @@ internal static class FeatureDraftAuthoringTransitions
                 draft.Source,
                 null,
                 draft.InstallationId,
-                checked(draft.Revision + 1),
+                NextRevision(draft.Revision),
                 draft.CreatedAt,
                 command.RevisedAt),
             command.IdempotencyId,
@@ -147,8 +159,14 @@ internal static class FeatureDraftAuthoringTransitions
         DemandDraftId(command.DraftId);
         DemandMutation(command.IdempotencyId, command.RevisedAt);
         var source = ValidateSource(command.Source);
-        var digest = Fingerprint(command);
-        if (Replay(state, command.DraftId, command.IdempotencyId, "source", digest) is { } replay)
+        var digest = Fingerprint(command with { RevisedAt = default });
+        if (Replay(
+                state,
+                command.DraftId,
+                command.IdempotencyId,
+                "source",
+                digest,
+                at => Fingerprint(command with { RevisedAt = at })) is { } replay)
             return replay;
         var draft = DemandEditableDraft(state, command.DraftId, command.ExpectedRevision);
         return Replace(
@@ -163,7 +181,7 @@ internal static class FeatureDraftAuthoringTransitions
                 source,
                 null,
                 draft.InstallationId,
-                checked(draft.Revision + 1),
+                NextRevision(draft.Revision),
                 draft.CreatedAt,
                 command.RevisedAt),
             command.IdempotencyId,
@@ -179,8 +197,14 @@ internal static class FeatureDraftAuthoringTransitions
         DemandMutation(command.IdempotencyId, command.AcceptedAt);
         if (patch.BaseRevision != command.ExpectedRevision)
             throw new FeatureConcurrencyException("The Suggested Change does not target the expected Draft Revision.");
-        var digest = Fingerprint(command);
-        if (Replay(state, patch.DraftId, command.IdempotencyId, "suggested-change", digest) is { } replay)
+        var digest = Fingerprint(command with { AcceptedAt = default });
+        if (Replay(
+                state,
+                patch.DraftId,
+                command.IdempotencyId,
+                "suggested-change",
+                digest,
+                at => Fingerprint(command with { AcceptedAt = at })) is { } replay)
             return replay;
         var draft = DemandEditableDraft(state, patch.DraftId, command.ExpectedRevision);
         return Replace(
@@ -195,7 +219,7 @@ internal static class FeatureDraftAuthoringTransitions
                 patch.ReplacementSource,
                 null,
                 draft.InstallationId,
-                checked(draft.Revision + 1),
+                NextRevision(draft.Revision),
                 draft.CreatedAt,
                 command.AcceptedAt),
             command.IdempotencyId,
@@ -237,7 +261,7 @@ internal static class FeatureDraftAuthoringTransitions
                 draft.Source,
                 verification,
                 draft.InstallationId,
-                checked(draft.Revision + 1),
+                NextRevision(draft.Revision),
                 draft.CreatedAt,
                 verification.VerifiedAt),
             command.IdempotencyId,
@@ -256,18 +280,26 @@ internal static class FeatureDraftAuthoringTransitions
         if (Replay(state, command.DraftId, command.IdempotencyId, "installed", digest) is { } replay)
             return replay;
         var reservation = ReadInstallationReservation(state, command.DraftId)
-            ?? throw new FeatureConcurrencyException("The Feature Draft has no active installation reservation.");
+            ?? throw new FeatureConcurrencyException(
+                "The Feature Draft has no active installation reservation.",
+                FeatureCommandRejectionReason.Precondition);
         if (reservation.DraftRevision != command.ExpectedRevision ||
             reservation.InstallationId != command.InstallationId ||
             reservation.Release != command.Release ||
             !string.Equals(reservation.IdempotencyId, command.IdempotencyId, StringComparison.Ordinal))
             throw new FeatureConcurrencyException("The Feature Draft installation reservation does not match this completion.");
         var draft = DemandEditableDraft(state, command.DraftId, command.ExpectedRevision, allowReserved: true);
-        var verification = draft.Verification ?? throw new FeatureConcurrencyException("The Feature Draft has no Verification to install.");
+        var verification = draft.Verification ?? throw new FeatureConcurrencyException(
+            "The Feature Draft has no Verification to install.",
+            FeatureCommandRejectionReason.Precondition);
         if (verification.Release != command.Release)
-            throw new FeatureConcurrencyException("The installed release must match the exact verified release.");
+            throw new FeatureConcurrencyException(
+                "The installed release must match the exact verified release.",
+                FeatureCommandRejectionReason.Precondition);
         if (verification.Failed != 0 || verification.Skipped != 0 || verification.Passed != verification.Total)
-            throw new FeatureConcurrencyException("Only a fully successful Verification can be installed.");
+            throw new FeatureConcurrencyException(
+                "Only a fully successful Verification can be installed.",
+                FeatureCommandRejectionReason.Precondition);
         FeaturePublicationTransitions.DemandConfirmedReservation(state, reservation);
         var installed = Replace(
             state,
@@ -281,7 +313,7 @@ internal static class FeatureDraftAuthoringTransitions
                 draft.Source,
                 verification,
                 command.InstallationId,
-                checked(draft.Revision + 1),
+                NextRevision(draft.Revision),
                 draft.CreatedAt,
                 command.InstalledAt),
             command.IdempotencyId,
@@ -306,11 +338,15 @@ internal static class FeatureDraftAuthoringTransitions
     {
         var draft = ReadDraft(state, draftId) ?? throw new KeyNotFoundException("The Feature Draft does not exist in this Owner Scope.");
         if (!string.Equals(draft.Status, "draft", StringComparison.Ordinal))
-            throw new FeatureConcurrencyException("An installed Feature Draft is immutable.");
+            throw new FeatureConcurrencyException(
+                "An installed Feature Draft is immutable.",
+                FeatureCommandRejectionReason.Precondition);
         if (draft.Revision != expectedRevision)
             throw new FeatureConcurrencyException("The Draft Revision changed.");
         if (!allowReserved && (state.DraftInstallationReservations ?? []).Any(candidate => candidate.DraftId == draftId))
-            throw new FeatureConcurrencyException("The Feature Draft is reserved for installation.");
+            throw new FeatureConcurrencyException(
+                "The Feature Draft is reserved for installation.",
+                FeatureCommandRejectionReason.Precondition);
         return draft;
     }
 
@@ -352,8 +388,15 @@ internal static class FeatureDraftAuthoringTransitions
         while (replays.Count > 1 && replays.Sum(candidate => (long)candidate.Utf8Bytes) > FeatureLimits.DraftReplayUtf8Bytes)
             replays.RemoveAt(0);
         return new FeatureDraftAuthoringTransition(
-            state with { Drafts = drafts, DraftReplays = replays.ToArray(), Revision = checked(state.Revision + 1) },
+            state with { Drafts = drafts, DraftReplays = replays.ToArray(), Revision = NextRevision(state.Revision) },
             replacement);
+    }
+
+    private static long NextRevision(long revision)
+    {
+        if (revision == long.MaxValue)
+            throw new FeatureConcurrencyException("The Feature Draft Revision cannot advance.");
+        return revision + 1;
     }
 
     private static FeatureDraftAuthoringTransition? Replay(
@@ -361,15 +404,20 @@ internal static class FeatureDraftAuthoringTransitions
         FeatureDraftId draftId,
         string idempotencyId,
         string kind,
-        string payloadDigest)
+        string payloadDigest,
+        Func<DateTimeOffset, string>? legacyFingerprint = null)
     {
         DemandDraftId(draftId);
         var replay = (state.DraftReplays ?? []).FirstOrDefault(candidate =>
             candidate.DraftId == draftId && string.Equals(candidate.IdempotencyId, idempotencyId, StringComparison.Ordinal));
         if (replay is null)
             return null;
+        var legacyPayloadMatches = legacyFingerprint is not null && string.Equals(
+            replay.PayloadDigest,
+            legacyFingerprint(replay.ResultUpdatedAt),
+            StringComparison.Ordinal);
         if (!string.Equals(replay.Kind, kind, StringComparison.Ordinal) ||
-            !string.Equals(replay.PayloadDigest, payloadDigest, StringComparison.Ordinal))
+            !string.Equals(replay.PayloadDigest, payloadDigest, StringComparison.Ordinal) && !legacyPayloadMatches)
             throw new FeatureConcurrencyException("The idempotency identifier is already bound to a different authoring command.");
         var current = (state.Drafts ?? []).FirstOrDefault(candidate => candidate.DraftId == draftId)
             ?? throw new KeyNotFoundException("The Feature Draft does not exist in this Owner Scope.");
