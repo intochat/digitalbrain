@@ -72,7 +72,7 @@ internal sealed class InoEffectPlanNeuron(
                 string.Equals(decision.DecisionId, decisionId, StringComparison.Ordinal) &&
                 string.Equals(decision.ActorScope, actorScope, StringComparison.Ordinal))
                 return new InoToolEffectResult(terminal.Disposition, terminal.SafeResult);
-            throw new RuntimeStateIntegrityException("effect plan already has a different terminal decision");
+            throw new InoEffectDecisionConflictException(current.Decision?.TerminalKind ?? InoEffectTerminalKind.None);
         }
         var result = new InoToolEffectResult(
             InoToolEffectDisposition.Failed,

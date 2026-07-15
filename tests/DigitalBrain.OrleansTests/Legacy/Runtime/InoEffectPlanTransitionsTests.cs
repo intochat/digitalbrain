@@ -58,7 +58,7 @@ public sealed class InoEffectPlanTransitionsTests
     [InlineData(InoEffectTerminalKind.Expired)]
     [InlineData(InoEffectTerminalKind.Failed)]
     [InlineData(InoEffectTerminalKind.OutcomeUnknown)]
-    public async Task Every_terminal_path_scrubs_the_plan_payload(InoEffectTerminalKind kind)
+    public void Every_terminal_path_scrubs_the_plan_payload(InoEffectTerminalKind kind)
     {
         var stored = InoEffectPlanTransitions.Put(InoEffectPlanState.Empty(), PlanId, Plan());
         var disposition = kind == InoEffectTerminalKind.OutcomeUnknown
@@ -72,7 +72,6 @@ public sealed class InoEffectPlanTransitionsTests
 
         Assert.Empty(terminal.Plan!.PayloadUtf8);
         Assert.Equal(kind, terminal.Decision!.TerminalKind);
-        await Task.CompletedTask;
     }
 
     [Theory]

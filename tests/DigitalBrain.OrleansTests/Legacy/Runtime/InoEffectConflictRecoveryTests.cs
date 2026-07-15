@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading;
 using DigitalBrain.Kernel;
@@ -6,8 +7,12 @@ using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
+using Orleans.Storage;
 
 namespace DigitalBrain.Tests.Runtime;
 
@@ -16,6 +21,7 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
     private readonly PostEffectResultBarrierTimeProvider _timeProvider = new();
     private readonly EffectCallCounter _effectCalls = new();
     private readonly EffectCallCounter _planEffectCalls = new();
+    private readonly OutcomeUnknownGrainStorage _conversationStorage = new();
     private readonly RuntimeStateKeyRing _keyRing = new(
         1,
         new Dictionary<int, byte[]> { [1] = Enumerable.Repeat((byte)1, 32).ToArray() },
@@ -25,12 +31,12 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
     {
         builder
             .UseInMemoryReminderService()
-            .AddMemoryGrainStorage(RuntimeStateStorageProviders.Conversations)
             .AddMemoryGrainStorage(RuntimeStateStorageProviders.SurfaceFeeds)
             .Configure<ReminderOptions>(options => options.MinimumReminderPeriod = TimeSpan.FromSeconds(1))
             .Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(10))
             .ConfigureServices(services =>
             {
+                services.AddGrainStorage(RuntimeStateStorageProviders.Conversations, (_, _) => _conversationStorage);
                 services.AddSingleton<IRuntimeStateKeyRing>(_keyRing);
                 services.AddSingleton(new EncryptedRuntimeStateProtector(_keyRing));
                 services.AddSingleton<InoEffectPlanAuthority>();
@@ -88,12 +94,50 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
             "provider-approval-first");
 
         Assert.Equal(InoToolEffectDisposition.Succeeded, approved.Disposition);
-        await Assert.ThrowsAnyAsync<Exception>(() =>
+        var conflict = await Assert.ThrowsAsync<InoEffectDecisionConflictException>(() =>
             approvalFirst.Grain.DeclineAsync(actorScope, "decision-decline-late"));
+        Assert.Equal(InoEffectTerminalKind.Approved, conflict.ExistingTerminalKind);
         var approvalDecision = await approvalFirst.Grain.ReadDecisionAsync(actorScope);
         Assert.Equal(InoEffectTerminalKind.Approved, approvalDecision!.TerminalKind);
         Assert.Equal("effect-approval-first", approvalDecision.DecisionId);
         Assert.Equal(1, _planEffectCalls.Count);
+    }
+
+    [Fact]
+    public async Task Terminal_decision_survives_a_storage_write_outcome_unknown_without_reexecuting_provider()
+    {
+        const string actorScope = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+        const string toolId = "test.effect";
+        const string summary = "apply the bounded test effect";
+        var authority = new InoEffectPlanAuthority(_keyRing);
+        var prepared = await PreparePlanAsync(
+            "3333333333333333333333333333333333333333333333333333333333333333",
+            "operation-outcome-unknown",
+            actorScope,
+            toolId,
+            summary);
+        _conversationStorage.CommitThenLoseWriteAndRecoveryResponses();
+
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() =>
+            prepared.Grain.DeclineAsync(actorScope, "decision-outcome-unknown"));
+
+        Assert.Contains("PersistedStateWriteOutcomeUnknownException", failure.ToString(), StringComparison.Ordinal);
+        Assert.Equal(1, _conversationStorage.AmbiguousWriteCount);
+        Assert.Equal(1, _conversationStorage.RecoveryReadFailureCount);
+        await Cluster.DeactivateAsync(prepared.Grain);
+        var recovered = Grain<IInoEffectPlanNeuron>(prepared.Plan.PlanId);
+        var replay = await ExecuteAsync(
+            recovered,
+            prepared.Plan,
+            authority,
+            "effect-outcome-unknown-retry",
+            "provider-outcome-unknown-retry");
+        var decision = await recovered.ReadDecisionAsync(actorScope);
+
+        Assert.Equal(InoToolEffectDisposition.Failed, replay.Disposition);
+        Assert.Equal(InoEffectTerminalKind.Declined, decision!.TerminalKind);
+        Assert.Equal("decision-outcome-unknown", decision.DecisionId);
+        Assert.Equal(0, _planEffectCalls.Count);
     }
 
     private async Task<(IInoEffectPlanNeuron Grain, InoEffectPlan Plan)> PreparePlanAsync(
@@ -372,6 +416,71 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
                 InoToolEffectDisposition.Succeeded,
                 "The bounded test effect completed."));
         }
+    }
+
+    private sealed class OutcomeUnknownGrainStorage : IGrainStorage
+    {
+        private readonly ConcurrentDictionary<string, Entry> _states = new(StringComparer.Ordinal);
+        private long _version;
+        private int _ambiguousWriteArmed;
+        private int _ambiguousWriteCount;
+        private int _recoveryReadArmed;
+        private int _recoveryReadFailureCount;
+
+        public int AmbiguousWriteCount => Volatile.Read(ref _ambiguousWriteCount);
+        public int RecoveryReadFailureCount => Volatile.Read(ref _recoveryReadFailureCount);
+
+        public void CommitThenLoseWriteAndRecoveryResponses() =>
+            Interlocked.Exchange(ref _ambiguousWriteArmed, 1);
+
+        public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+        {
+            if (Interlocked.Exchange(ref _recoveryReadArmed, 0) == 1)
+            {
+                Interlocked.Increment(ref _recoveryReadFailureCount);
+                throw new IOException("Injected lost storage recovery read response.");
+            }
+            if (_states.TryGetValue(Key(stateName, grainId), out var entry))
+            {
+                grainState.State = (T)entry.State;
+                grainState.ETag = entry.ETag;
+                grainState.RecordExists = true;
+            }
+            else
+            {
+                grainState.State = Activator.CreateInstance<T>();
+                grainState.ETag = null;
+                grainState.RecordExists = false;
+            }
+            return Task.CompletedTask;
+        }
+
+        public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+        {
+            var etag = Interlocked.Increment(ref _version).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            _states[Key(stateName, grainId)] = new Entry(grainState.State!, etag);
+            grainState.ETag = etag;
+            grainState.RecordExists = true;
+            if (Interlocked.Exchange(ref _ambiguousWriteArmed, 0) == 1)
+            {
+                Interlocked.Increment(ref _ambiguousWriteCount);
+                Interlocked.Exchange(ref _recoveryReadArmed, 1);
+                throw new IOException("Injected lost storage write response.");
+            }
+            return Task.CompletedTask;
+        }
+
+        public Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+        {
+            _states.TryRemove(Key(stateName, grainId), out _);
+            grainState.ETag = null;
+            grainState.RecordExists = false;
+            return Task.CompletedTask;
+        }
+
+        private static string Key(string stateName, GrainId grainId) => $"{stateName}|{grainId}";
+
+        private sealed record Entry(object State, string ETag);
     }
 
     private sealed class PostEffectResultBarrierTimeProvider : TimeProvider

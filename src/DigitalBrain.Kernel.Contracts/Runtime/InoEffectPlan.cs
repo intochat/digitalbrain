@@ -23,6 +23,12 @@ public enum InoEffectTerminalKind
     Failed = 4,
     OutcomeUnknown = 5
 }
+[GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-decision-conflict")]
+public sealed class InoEffectDecisionConflictException(InoEffectTerminalKind existingTerminalKind)
+    : InvalidOperationException("The effect plan already has a different terminal decision.")
+{
+    [Id(0)] public InoEffectTerminalKind ExistingTerminalKind { get; } = existingTerminalKind;
+}
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-decision")]
 public sealed record InoEffectDecision(
     [property: Id(0)] string DecisionId,
