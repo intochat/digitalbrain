@@ -409,6 +409,389 @@ void main() {
       expect(transport.watchAfter, [0]);
     });
 
+    test('stop followed by dispose closes the transport once', () async {
+      final transport = _FakeUiTransport([]);
+      final runtime = _runtime(transport);
+
+      await runtime.stop();
+      runtime.dispose();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(transport.closeCount, 1);
+    });
+
+    test('concurrent stops await one complete shutdown', () async {
+      final cancellationGate = Completer<void>();
+      final call = _FakeFeedCall.open(cancelCompletionGate: cancellationGate);
+      final transport = _FakeUiTransport([call]);
+      final runtime = _runtime(transport);
+
+      await _login(runtime, 'bootstrap-once');
+      await _eventually(() => runtime.status == RuntimeStatus.streaming);
+
+      var firstCompleted = false;
+      var secondCompleted = false;
+      final first = runtime.stop().whenComplete(() => firstCompleted = true);
+      await _eventually(() => call.cancelled && transport.closeCount == 1);
+      final second = runtime.stop().whenComplete(() => secondCompleted = true);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(transport.closeCount, 1);
+      expect(firstCompleted, isFalse);
+      expect(secondCompleted, isFalse);
+      expect(runtime.status, isNot(RuntimeStatus.stopped));
+
+      cancellationGate.complete();
+      await Future.wait([first, second]);
+
+      expect(transport.closeCount, 1);
+      expect(firstCompleted, isTrue);
+      expect(secondCompleted, isTrue);
+      expect(runtime.status, RuntimeStatus.stopped);
+      runtime.dispose();
+      await Future<void>.delayed(Duration.zero);
+      expect(transport.closeCount, 1);
+    });
+
+    test('closing stop upgrades and awaits a restartable stop', () async {
+      final cancellationGate = Completer<void>();
+      final call = _FakeFeedCall.open(cancelCompletionGate: cancellationGate);
+      final transport = _FakeUiTransport([call]);
+      final runtime = _runtime(transport);
+
+      await _login(runtime, 'bootstrap-once');
+      await _eventually(() => runtime.status == RuntimeStatus.streaming);
+
+      var restartableCompleted = false;
+      var closingCompleted = false;
+      final restartable = runtime
+          .stop(closeTransport: false, invalidateAuthentication: false)
+          .whenComplete(() => restartableCompleted = true);
+      await _eventually(() => call.cancelled);
+      final closing = runtime.stop().whenComplete(
+        () => closingCompleted = true,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(transport.closeCount, 1);
+      expect(restartableCompleted, isFalse);
+      expect(closingCompleted, isFalse);
+      expect(runtime.status, isNot(RuntimeStatus.stopped));
+
+      cancellationGate.complete();
+      await Future.wait([restartable, closing]);
+
+      expect(transport.closeCount, 1);
+      expect(restartableCompleted, isTrue);
+      expect(closingCompleted, isTrue);
+      expect(runtime.status, RuntimeStatus.stopped);
+      runtime.dispose();
+      await Future<void>.delayed(Duration.zero);
+      expect(transport.closeCount, 1);
+    });
+
+    test('async close failure still completes shared shutdown', () async {
+      final failure = StateError('Async close failed.');
+      final cancellationGate = Completer<void>();
+      final call = _FakeFeedCall.open(cancelCompletionGate: cancellationGate);
+      final transport = _FakeUiTransport([call], closeError: failure);
+      final runtime = _runtime(transport);
+
+      await _login(runtime, 'bootstrap-once');
+      await _eventually(() => runtime.status == RuntimeStatus.streaming);
+
+      final first = expectLater(runtime.stop(), throwsA(same(failure)));
+      final second = expectLater(runtime.stop(), throwsA(same(failure)));
+      await _eventually(() => call.cancelled && transport.closeCount == 1);
+
+      expect(runtime.status, isNot(RuntimeStatus.stopped));
+
+      cancellationGate.complete();
+      await Future.wait([first, second]);
+      runtime.dispose();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(call.cancelled, isTrue);
+      expect(transport.closeCount, 1);
+      expect(runtime.status, RuntimeStatus.stopped);
+    });
+
+    test('synchronous close failure is acquired once', () async {
+      final failure = StateError('Synchronous close failed.');
+      final transport = _FakeUiTransport(
+        [],
+        closeError: failure,
+        closeSynchronously: true,
+      );
+      final runtime = _runtime(transport);
+
+      final first = expectLater(runtime.stop(), throwsA(same(failure)));
+      final second = expectLater(runtime.stop(), throwsA(same(failure)));
+      await Future.wait([first, second]);
+      runtime.dispose();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(transport.closeCount, 1);
+      expect(runtime.status, RuntimeStatus.stopped);
+    });
+
+    test('terminal shutdown prevents a later start', () async {
+      final initialCall = _FakeFeedCall.open();
+      final forbiddenCall = _FakeFeedCall.open();
+      final transport = _FakeUiTransport([initialCall, forbiddenCall]);
+      addTearDown(() async {
+        if (transport.watchAfter.length > 1) await forbiddenCall.cancel();
+      });
+      final runtime = _runtime(
+        transport,
+        reconnectPolicy: const ReconnectPolicy(
+          delays: [Duration.zero],
+          maxAttempts: 0,
+        ),
+      );
+
+      await _login(runtime, 'bootstrap-once');
+      await _eventually(() => runtime.status == RuntimeStatus.streaming);
+      await runtime.stop();
+      await runtime.start();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(transport.watchAfter, [0]);
+      expect(transport.closeCount, 1);
+      expect(runtime.status, RuntimeStatus.stopped);
+    });
+
+    test('terminal shutdown prevents a later login', () async {
+      final forbiddenCall = _FakeFeedCall.open();
+      final transport = _FakeUiTransport([forbiddenCall]);
+      addTearDown(() async {
+        if (transport.watchAfter.isNotEmpty) await forbiddenCall.cancel();
+      });
+      final runtime = _runtime(
+        transport,
+        reconnectPolicy: const ReconnectPolicy(
+          delays: [Duration.zero],
+          maxAttempts: 0,
+        ),
+      );
+
+      await runtime.stop();
+      await runtime.authenticateWithPassword(
+        username: 'local-owner',
+        password: 'must-not-run',
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(transport.loginPasswords, isEmpty);
+      expect(transport.watchAfter, isEmpty);
+      expect(runtime.session.isAuthenticated, isFalse);
+      expect(runtime.status, RuntimeStatus.stopped);
+    });
+
+    test('terminal shutdown prevents a later sign out', () async {
+      final call = _FakeFeedCall.open();
+      final transport = _FakeUiTransport([call]);
+      final runtime = _runtime(transport);
+
+      await _login(runtime, 'bootstrap-once');
+      await _eventually(() => runtime.status == RuntimeStatus.streaming);
+      await runtime.stop();
+      await runtime.signOut();
+
+      expect(transport.logoutRefreshTokens, isEmpty);
+      expect(runtime.session.isAuthenticated, isFalse);
+      expect(runtime.status, RuntimeStatus.stopped);
+    });
+
+    test('terminal shutdown invalidates an in-flight login', () async {
+      final pendingLogin = Completer<SessionBundle>();
+      final transport = _FakeUiTransport(
+        [],
+        loginResults: [pendingLogin.future],
+      );
+      final runtime = _runtime(transport);
+
+      final authentication = runtime.authenticateWithPassword(
+        username: 'local-owner',
+        password: 'pending-login',
+      );
+      await _eventually(() => transport.loginPasswords.isNotEmpty);
+      await runtime.stop();
+      pendingLogin.complete(testSession());
+      await authentication;
+
+      expect(runtime.session.isAuthenticated, isFalse);
+      expect(runtime.status, RuntimeStatus.stopped);
+      expect(transport.watchAfter, isEmpty);
+      expect(transport.closeCount, 1);
+    });
+
+    test('terminal stop cancels a feed acquired after close', () async {
+      final pendingFeed = Completer<_FakeFeedCall>();
+      final lateCall = _FakeFeedCall.open();
+      final transport = _FakeUiTransport([pendingFeed.future]);
+      final runtime = _runtime(transport);
+
+      await _login(runtime, 'bootstrap-once');
+      await _eventually(() => transport.watchAfter.isNotEmpty);
+
+      var stopCompleted = false;
+      final stopping = runtime.stop().whenComplete(() => stopCompleted = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(stopCompleted, isFalse);
+
+      pendingFeed.complete(lateCall);
+      await Future<void>.delayed(Duration.zero);
+      final cancelledBeforeCleanup = lateCall.cancelled;
+      if (!cancelledBeforeCleanup) await lateCall.cancel();
+      await stopping;
+
+      expect(cancelledBeforeCleanup, isTrue);
+      expect(transport.closeCount, 1);
+      expect(runtime.status, RuntimeStatus.stopped);
+    });
+
+    test('superseded run cancels a late feed acquisition', () async {
+      final pendingFeed = Completer<_FakeFeedCall>();
+      final staleCall = _FakeFeedCall.open();
+      final currentCall = _FakeFeedCall.open();
+      final transport = _FakeUiTransport(
+        [pendingFeed.future, currentCall],
+        loginResults: [
+          testSession(),
+          testSession(
+            identity: testIdentity(session: 'session-later'),
+            accessToken: 'access-later',
+            refreshToken: 'refresh-later',
+          ),
+        ],
+      );
+      final runtime = _runtime(
+        transport,
+        reconnectPolicy: const ReconnectPolicy(
+          delays: [Duration.zero],
+          maxAttempts: 0,
+        ),
+      );
+
+      await _login(runtime, 'initial');
+      await _eventually(() => transport.watchAfter.length == 1);
+
+      final olderAuthentication = _login(runtime, 'older');
+      await Future<void>.delayed(Duration.zero);
+      final laterAuthentication = _login(runtime, 'later');
+      await laterAuthentication;
+      await _eventually(
+        () =>
+            transport.watchAfter.length == 2 &&
+            runtime.status == RuntimeStatus.streaming,
+      );
+
+      pendingFeed.complete(staleCall);
+      await Future<void>.delayed(Duration.zero);
+      final cancelledBeforeCleanup = staleCall.cancelled;
+      final currentCancelledBeforeCleanup = currentCall.cancelled;
+      if (!cancelledBeforeCleanup) await staleCall.cancel();
+      await olderAuthentication;
+      if (!currentCall.cancelled) await currentCall.cancel();
+      await runtime.stop();
+
+      expect(cancelledBeforeCleanup, isTrue);
+      expect(currentCancelledBeforeCleanup, isFalse);
+      expect(transport.loginPasswords, ['initial', 'later']);
+      expect(transport.watchAccessTokens, ['access-token', 'access-later']);
+      expect(transport.closeCount, 1);
+    });
+
+    test('superseded run ignores a stale acknowledgement completion', () async {
+      final acknowledgementGate = Completer<void>();
+      final staleCall = _FakeFeedCall.open();
+      final currentCall = _FakeFeedCall.open();
+      final feed = _RecordingFeedController();
+      final transport = _FakeUiTransport(
+        [staleCall, currentCall],
+        loginResults: [
+          testSession(),
+          testSession(
+            identity: testIdentity(session: 'session-later'),
+            accessToken: 'access-later',
+            refreshToken: 'refresh-later',
+          ),
+        ],
+        acknowledgementGate: acknowledgementGate,
+      );
+      final runtime = _runtime(transport, feed: feed);
+
+      await _login(runtime, 'initial');
+      await _eventually(() => runtime.status == RuntimeStatus.streaming);
+      staleCall.add(FeedSurfaceJson(surfaceJsonString(sequence: 1)));
+      await _eventually(() => transport.acknowledged.length == 1);
+
+      final olderAuthentication = _login(runtime, 'older');
+      await _eventually(() => staleCall.cancelled);
+      final laterAuthentication = _login(runtime, 'later');
+      await laterAuthentication;
+      await _eventually(
+        () =>
+            transport.watchAfter.length == 2 &&
+            runtime.status == RuntimeStatus.streaming,
+      );
+
+      acknowledgementGate.complete();
+      await olderAuthentication;
+      final statusBeforeCleanup = runtime.status;
+      await runtime.stop();
+
+      expect(feed.acknowledged, isEmpty);
+      expect(statusBeforeCleanup, RuntimeStatus.streaming);
+    });
+
+    test('superseded run ignores a stale refresh failure', () async {
+      final pendingRefresh = Completer<SessionBundle>();
+      final currentCall = _FakeFeedCall.open();
+      final transport = _FakeUiTransport(
+        [
+          _FakeFeedCall.error(
+            const AuthenticationException('Initial access expired.'),
+          ),
+          currentCall,
+        ],
+        loginResults: [
+          testSession(),
+          testSession(
+            identity: testIdentity(session: 'session-later'),
+            accessToken: 'access-later',
+            refreshToken: 'refresh-later',
+          ),
+        ],
+        refreshResult: pendingRefresh.future,
+      );
+      final runtime = _runtime(transport);
+
+      await _login(runtime, 'initial');
+      await _eventually(() => transport.refreshCount == 1);
+
+      final olderAuthentication = _login(runtime, 'older');
+      final laterAuthentication = _login(runtime, 'later');
+      await laterAuthentication;
+      await _eventually(
+        () =>
+            transport.watchAfter.length == 2 &&
+            runtime.status == RuntimeStatus.streaming,
+      );
+
+      pendingRefresh.complete(testSession());
+      await olderAuthentication;
+      final statusBeforeCleanup = runtime.status;
+      final terminalErrorBeforeCleanup = runtime.terminalError;
+      final sessionBeforeCleanup = runtime.session.sessionId;
+      await runtime.stop();
+
+      expect(statusBeforeCleanup, RuntimeStatus.streaming);
+      expect(terminalErrorBeforeCleanup, isNull);
+      expect(sessionBeforeCleanup, 'session-later');
+    });
+
     test(
       'submits only the current action binding and its signed token',
       () async {
@@ -766,12 +1149,14 @@ void main() {
 
 RuntimeController _runtime(
   _FakeUiTransport transport, {
+  FeedController? feed,
   ReconnectPolicy reconnectPolicy = const ReconnectPolicy(
     delays: [Duration.zero],
     maxAttempts: 3,
   ),
 }) => RuntimeController(
   transport: transport,
+  feed: feed,
   reconnectPolicy: reconnectPolicy,
   delay: (_) async {},
 );
@@ -789,21 +1174,27 @@ Future<void> _eventually(bool Function() condition) async {
 
 class _FakeUiTransport implements UiTransport, ExternalSessionTransport {
   _FakeUiTransport(
-    Iterable<_FakeFeedCall> calls, {
+    Iterable<Object> calls, {
     Iterable<Object>? loginResults,
     this.refreshError,
+    this.refreshResult,
     this.actionResult,
     this.acknowledgementGate,
     this.logoutError,
+    this.closeError,
+    this.closeSynchronously = false,
   }) : _calls = Queue.of(calls),
        _loginResults = Queue.of(loginResults ?? <Object>[testSession()]);
 
-  final Queue<_FakeFeedCall> _calls;
+  final Queue<Object> _calls;
   final Queue<Object> _loginResults;
   final Object? refreshError;
+  final Future<SessionBundle>? refreshResult;
   final Future<ActionResult>? actionResult;
   final Completer<void>? acknowledgementGate;
   final Object? logoutError;
+  final Object? closeError;
+  final bool closeSynchronously;
   final List<int> watchAfter = [];
   final List<String> watchAccessTokens = [];
   final List<int> acknowledged = [];
@@ -814,6 +1205,7 @@ class _FakeUiTransport implements UiTransport, ExternalSessionTransport {
   UiActionRef? submittedAction;
   Map<String, Object?>? submittedInput;
   bool closed = false;
+  int closeCount = 0;
   int refreshCount = 0;
 
   @override
@@ -847,6 +1239,8 @@ class _FakeUiTransport implements UiTransport, ExternalSessionTransport {
     refreshCount++;
     final error = refreshError;
     if (error != null) throw error;
+    final result = refreshResult;
+    if (result != null) return result;
     return testSession(
       accessToken: 'access-refreshed',
       refreshToken: 'refresh-rotated',
@@ -876,7 +1270,10 @@ class _FakeUiTransport implements UiTransport, ExternalSessionTransport {
         'No fake feed is available.',
       );
     }
-    return _calls.removeFirst();
+    final result = _calls.removeFirst();
+    if (result is _FakeFeedCall) return result;
+    if (result is Future<_FakeFeedCall>) return await result;
+    throw result;
   }
 
   @override
@@ -907,10 +1304,25 @@ class _FakeUiTransport implements UiTransport, ExternalSessionTransport {
   }
 
   @override
-  Future<void> close() async {
+  Future<void> close() {
+    closeCount++;
     closed = true;
     final gate = acknowledgementGate;
     if (gate != null && !gate.isCompleted) gate.complete();
+    final failure = closeError;
+    if (failure == null) return Future<void>.value();
+    if (closeSynchronously) throw failure;
+    return Future<void>.error(failure);
+  }
+}
+
+class _RecordingFeedController extends FeedController {
+  final List<int> acknowledged = [];
+
+  @override
+  void acknowledge(int sequence) {
+    acknowledged.add(sequence);
+    super.acknowledge(sequence);
   }
 }
 
@@ -954,7 +1366,11 @@ class _FakeFeedCall implements FeedCall {
   @override
   Future<void> cancel() async {
     cancelled = true;
-    if (!_controller.isClosed) await _controller.close();
+    if (!_controller.isClosed) {
+      final hadListener = _controller.hasListener;
+      final closing = _controller.close();
+      if (hadListener) await closing;
+    }
     final gate = _cancelCompletionGate;
     if (gate != null) await gate.future;
   }

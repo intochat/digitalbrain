@@ -44,6 +44,25 @@ class ReconnectPolicy {
 
 typedef Delay = Future<void> Function(Duration duration);
 
+final class _StopWork {
+  const _StopWork({
+    required this.generation,
+    required this.cancellation,
+    required this.loop,
+  });
+
+  final int generation;
+  final Future<void>? cancellation;
+  final Future<void>? loop;
+}
+
+final class _CloseFailure {
+  const _CloseFailure(this.error, this.stackTrace);
+
+  final Object error;
+  final StackTrace stackTrace;
+}
+
 class RuntimeController extends ChangeNotifier {
   RuntimeController({
     required this.transport,
@@ -82,6 +101,9 @@ class RuntimeController extends ChangeNotifier {
 
   FeedCall? _activeCall;
   Future<void>? _loop;
+  final Set<Future<void>> _restartableStops = {};
+  Future<void>? _terminalShutdownFuture;
+  Future<_CloseFailure?>? _transportCloseOutcome;
   bool _stopRequested = false;
   bool _forceSnapshot = false;
   bool _disposed = false;
@@ -91,13 +113,18 @@ class RuntimeController extends ChangeNotifier {
 
   bool get hasSurface => latestSurface != null;
   int get scopeEpoch => _scopeEpoch;
+  bool get _isTerminated => _disposed || _terminalShutdownFuture != null;
 
   bool canSubmitActionsFrom(SurfaceEnvelope surface) =>
       status == RuntimeStatus.streaming &&
       identical(feed.surface(surface.surfaceId), surface);
 
   Future<void> start() async {
-    if (_loop != null || status == RuntimeStatus.authenticating) return;
+    if (_isTerminated ||
+        _loop != null ||
+        status == RuntimeStatus.authenticating) {
+      return;
+    }
     _stopRequested = false;
     terminalError = null;
     transientError = null;
@@ -119,6 +146,7 @@ class RuntimeController extends ChangeNotifier {
   }
 
   Future<void> authenticateWithExternalIdentityToken(String token) async {
+    if (_isTerminated) return;
     final externalTransport = transport;
     if (externalTransport is! ExternalSessionTransport) {
       throw const AuthenticationException(
@@ -130,9 +158,13 @@ class RuntimeController extends ChangeNotifier {
   }
 
   Future<void> _authenticate(Future<bool> Function() establishSession) async {
+    if (_isTerminated) return;
     final authenticationGeneration = ++_authenticationGeneration;
     await stop(closeTransport: false, invalidateAuthentication: false);
-    if (authenticationGeneration != _authenticationGeneration) return;
+    if (_isTerminated ||
+        authenticationGeneration != _authenticationGeneration) {
+      return;
+    }
     _stopRequested = false;
     terminalError = null;
     transientError = null;
@@ -140,14 +172,19 @@ class RuntimeController extends ChangeNotifier {
     _setStatus(RuntimeStatus.authenticating);
     try {
       final applied = await establishSession();
-      if (!applied || authenticationGeneration != _authenticationGeneration) {
+      if (_isTerminated ||
+          !applied ||
+          authenticationGeneration != _authenticationGeneration) {
         return;
       }
       final identity = session.identity!;
       feed.bindIdentity(identity);
       _launchLoop();
     } catch (error) {
-      if (authenticationGeneration != _authenticationGeneration) return;
+      if (_isTerminated ||
+          authenticationGeneration != _authenticationGeneration) {
+        return;
+      }
       transientError = error;
       _setStatus(RuntimeStatus.awaitingSignIn);
       rethrow;
@@ -155,18 +192,28 @@ class RuntimeController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    if (_isTerminated) return;
     final authenticationGeneration = ++_authenticationGeneration;
     await stop(closeTransport: false, invalidateAuthentication: false);
-    if (authenticationGeneration != _authenticationGeneration) return;
+    if (_isTerminated ||
+        authenticationGeneration != _authenticationGeneration) {
+      return;
+    }
     try {
       await session.signOut(transport);
-      if (authenticationGeneration != _authenticationGeneration) return;
+      if (_isTerminated ||
+          authenticationGeneration != _authenticationGeneration) {
+        return;
+      }
       terminalError = null;
       transientError = null;
       _clearProtectedState(clearFeedIdentity: true);
       _setStatus(RuntimeStatus.awaitingSignIn);
     } catch (error) {
-      if (authenticationGeneration != _authenticationGeneration) return;
+      if (_isTerminated ||
+          authenticationGeneration != _authenticationGeneration) {
+        return;
+      }
       transientError = error;
       if (session.isAuthenticated) {
         _bindIdentity(session.identity!);
@@ -180,24 +227,30 @@ class RuntimeController extends ChangeNotifier {
   }
 
   void _launchLoop() {
+    if (_isTerminated) return;
     final generation = ++_generation;
     _loop = _run(generation).whenComplete(() {
       if (_generation == generation) _loop = null;
     });
   }
 
+  bool _isCurrentRun(int generation) =>
+      !_isTerminated && !_stopRequested && generation == _generation;
+
   Future<void> _run(int generation) async {
     var reconnectAttempt = 0;
     var firstConnection = true;
-    while (!_stopRequested && generation == _generation) {
+    while (_isCurrentRun(generation)) {
       _setStatus(
         firstConnection ? RuntimeStatus.connecting : RuntimeStatus.reconnecting,
       );
       firstConnection = false;
       Object? connectionError;
       var reconnectImmediately = false;
+      FeedCall? ownedCall;
       try {
         final accessToken = await session.accessToken(transport);
+        if (!_isCurrentRun(generation)) return;
         final call = await transport.watchSurfaceFeed(
           accessToken: accessToken,
           afterSequence: _forceSnapshot ? 0 : feed.lastSequence,
@@ -205,11 +258,18 @@ class RuntimeController extends ChangeNotifier {
           clientCapabilities: capabilities.names,
           maxBatchSize: maxBatchSize,
         );
+        if (!_isCurrentRun(generation)) {
+          try {
+            await call.cancel();
+          } catch (_) {}
+          return;
+        }
+        ownedCall = call;
         _forceSnapshot = false;
         _activeCall = call;
         _setStatus(RuntimeStatus.streaming);
         await for (final event in call.events) {
-          if (_stopRequested || generation != _generation) break;
+          if (!_isCurrentRun(generation)) break;
           if (event is FeedResetEvent) {
             final snapshots = event.snapshotJson.map(_decodeSurface).toList();
             feed.applyServerReset(event, snapshots);
@@ -225,11 +285,13 @@ class RuntimeController extends ChangeNotifier {
             );
             if (event.resumeSequence > 0) {
               final freshToken = await session.accessToken(transport);
+              if (!_isCurrentRun(generation)) return;
               await transport.acknowledgeSurfaceFeed(
                 accessToken: freshToken,
                 audience: audience,
                 sequence: event.resumeSequence,
               );
+              if (!_isCurrentRun(generation)) return;
               feed.acknowledge(event.resumeSequence);
             }
             transientError = null;
@@ -254,11 +316,13 @@ class RuntimeController extends ChangeNotifier {
           if (result is FeedSurface) latestSurface = result.envelope;
           if (envelope.feedSequence == feed.lastSequence) {
             final freshToken = await session.accessToken(transport);
+            if (!_isCurrentRun(generation)) return;
             await transport.acknowledgeSurfaceFeed(
               accessToken: freshToken,
               audience: audience,
               sequence: envelope.feedSequence,
             );
+            if (!_isCurrentRun(generation)) return;
             feed.acknowledge(envelope.feedSequence);
           }
           transientError = null;
@@ -266,22 +330,22 @@ class RuntimeController extends ChangeNotifier {
           _notifyListeners();
         }
       } catch (error) {
-        if (!_stopRequested && generation == _generation) {
+        if (_isCurrentRun(generation)) {
           connectionError = error;
           transientError = error;
           _notifyListeners();
         }
       } finally {
-        final call = _activeCall;
-        _activeCall = null;
-        if (call != null) {
+        final call = ownedCall;
+        if (call != null && identical(_activeCall, call)) {
+          _activeCall = null;
           try {
             await call.cancel();
           } catch (_) {}
         }
       }
 
-      if (_stopRequested || generation != _generation) return;
+      if (!_isCurrentRun(generation)) return;
       if (!session.isAuthenticated) {
         terminalError ??= connectionError;
         _clearProtectedState(clearFeedIdentity: true);
@@ -296,9 +360,11 @@ class RuntimeController extends ChangeNotifier {
       if (connectionError is AuthenticationException) {
         try {
           await session.refreshAccessToken(transport);
+          if (!_isCurrentRun(generation)) return;
           transientError = null;
           reconnectImmediately = true;
         } catch (_) {
+          if (!_isCurrentRun(generation)) return;
           terminalError ??= connectionError;
           _clearProtectedState(clearFeedIdentity: true);
           _setStatus(RuntimeStatus.awaitingSignIn);
@@ -391,8 +457,55 @@ class RuntimeController extends ChangeNotifier {
   Future<void> stop({
     bool closeTransport = true,
     bool invalidateAuthentication = true,
-  }) async {
+  }) {
     if (invalidateAuthentication) _authenticationGeneration++;
+    final terminalShutdown = _terminalShutdownFuture;
+    if (terminalShutdown != null) return terminalShutdown;
+    if (!closeTransport) return _startRestartableStop();
+    return _startTerminalShutdown();
+  }
+
+  Future<void> _startRestartableStop() {
+    final operation = _completeStopWork(
+      _captureStopWork(),
+      publishStopped: true,
+    );
+    _restartableStops.add(operation);
+    unawaited(
+      operation.then<void>(
+        (_) => _restartableStops.remove(operation),
+        onError: (Object _, StackTrace _) {
+          _restartableStops.remove(operation);
+        },
+      ),
+    );
+    return operation;
+  }
+
+  Future<void> _startTerminalShutdown() {
+    final completion = Completer<void>();
+    _terminalShutdownFuture = completion.future;
+    session.expire();
+    final restartableStops = List<Future<void>>.of(_restartableStops);
+    final work = _captureStopWork();
+    final closeOutcome = _transportCloseOutcome ??= _acquireTransportClose();
+    final operation = _completeTerminalShutdown(
+      work,
+      restartableStops,
+      closeOutcome,
+    );
+    unawaited(
+      operation.then<void>(
+        (_) => completion.complete(),
+        onError: (Object error, StackTrace stackTrace) {
+          completion.completeError(error, stackTrace);
+        },
+      ),
+    );
+    return completion.future;
+  }
+
+  _StopWork _captureStopWork() {
     _stopRequested = true;
     final stopGeneration = ++_generation;
     final call = _activeCall;
@@ -405,20 +518,66 @@ class RuntimeController extends ChangeNotifier {
         cancellation = call.cancel();
       } catch (_) {}
     }
-    if (closeTransport) await transport.close();
-    if (cancellation != null) {
-      try {
-        await cancellation;
-      } catch (_) {}
+    return _StopWork(
+      generation: stopGeneration,
+      cancellation: cancellation,
+      loop: loop,
+    );
+  }
+
+  Future<_CloseFailure?> _acquireTransportClose() =>
+      Future<void>.sync(transport.close).then<_CloseFailure?>(
+        (_) => null,
+        onError: (Object error, StackTrace stackTrace) =>
+            _CloseFailure(error, stackTrace),
+      );
+
+  Future<void> _completeStopWork(
+    _StopWork work, {
+    required bool publishStopped,
+  }) async {
+    try {
+      final cancellation = work.cancellation;
+      if (cancellation != null) {
+        try {
+          await cancellation;
+        } catch (_) {}
+      }
+      final loop = work.loop;
+      if (loop != null) {
+        try {
+          await loop;
+        } catch (_) {}
+      }
+    } finally {
+      if (publishStopped &&
+          _generation == work.generation &&
+          status != RuntimeStatus.awaitingSignIn) {
+        _setStatus(RuntimeStatus.stopped);
+      }
     }
-    if (loop != null) {
-      try {
-        await loop;
-      } catch (_) {}
+  }
+
+  Future<void> _completeTerminalShutdown(
+    _StopWork work,
+    List<Future<void>> restartableStops,
+    Future<_CloseFailure?> closeOutcome,
+  ) async {
+    _CloseFailure? closeFailure;
+    try {
+      await Future.wait<void>([
+        ...restartableStops,
+        _completeStopWork(work, publishStopped: false),
+      ]);
+      closeFailure = await closeOutcome;
+    } finally {
+      if (_generation == work.generation &&
+          status != RuntimeStatus.awaitingSignIn) {
+        _setStatus(RuntimeStatus.stopped);
+      }
     }
-    if (_generation == stopGeneration &&
-        status != RuntimeStatus.awaitingSignIn) {
-      _setStatus(RuntimeStatus.stopped);
+    if (closeFailure != null) {
+      Error.throwWithStackTrace(closeFailure.error, closeFailure.stackTrace);
     }
   }
 
@@ -435,7 +594,13 @@ class RuntimeController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    unawaited(stop());
+    unawaited(_stopForDispose());
     super.dispose();
+  }
+
+  Future<void> _stopForDispose() async {
+    try {
+      await stop();
+    } catch (_) {}
   }
 }

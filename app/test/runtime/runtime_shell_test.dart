@@ -1,17 +1,19 @@
 import 'dart:async';
 
+import 'package:digitalbrain_flutter/core/session/app_session_scope.dart';
+import 'package:digitalbrain_flutter/router.dart';
 import 'package:digitalbrain_flutter/runtime/external_identity.dart';
 import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
 import 'package:digitalbrain_flutter/runtime/runtime_configuration.dart';
 import 'package:digitalbrain_flutter/runtime/runtime.dart';
-import 'package:digitalbrain_flutter/runtime/widgets/feature_proposal_placeholder.dart';
+import 'package:digitalbrain_flutter/runtime/runtime_session_owner.dart';
+import 'package:digitalbrain_flutter/runtime/widgets/chat_page.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_composer.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_conversation_view.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/runtime_shell.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/surface_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 
 import 'test_fixtures.dart';
 
@@ -23,9 +25,7 @@ void main() {
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport);
 
-    await tester.pumpWidget(
-      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
-    );
+    await tester.pumpWidget(_runtimeHost(controller: runtime));
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(
       FeedSurfaceJson(
@@ -51,9 +51,7 @@ void main() {
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport);
 
-    await tester.pumpWidget(
-      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
-    );
+    await tester.pumpWidget(_runtimeHost(controller: runtime));
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(
       FeedSurfaceJson(
@@ -91,21 +89,18 @@ void main() {
     await runtime.stop();
   });
 
-  testWidgets('shell owns and asynchronously closes its generated transport', (
+  testWidgets('app session owner asynchronously closes its transport', (
     tester,
   ) async {
     final transport = _ShellTransport(_ShellFeedCall.open());
     Uri? connectedEndpoint;
 
     await tester.pumpWidget(
-      _host(
-        RuntimeShell(
-          configuration: _configuration(),
-          transportFactory: (endpoint) {
-            connectedEndpoint = endpoint;
-            return transport;
-          },
-        ),
+      _runtimeHost(
+        transportFactory: (endpoint) {
+          connectedEndpoint = endpoint;
+          return transport;
+        },
       ),
     );
     await _pumpUntil(
@@ -120,16 +115,13 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpUntil(tester, () => transport.closeCount > 0);
 
-    expect(transport.closeCount, greaterThanOrEqualTo(1));
+    expect(transport.closeCount, 1);
   });
 
   testWidgets('shell hides transport construction failures', (tester) async {
     await tester.pumpWidget(
-      _host(
-        RuntimeShell(
-          configuration: _configuration(),
-          transportFactory: (_) => throw StateError('private transport error'),
-        ),
+      _runtimeHost(
+        transportFactory: (_) => throw StateError('private transport error'),
       ),
     );
     await _pumpUntil(
@@ -151,9 +143,7 @@ void main() {
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport, authenticated: false);
 
-    await tester.pumpWidget(
-      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
-    );
+    await tester.pumpWidget(_runtimeHost(controller: runtime));
     await _pumpUntil(
       tester,
       () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
@@ -209,9 +199,7 @@ void main() {
     );
     final runtime = _runtime(transport, authenticated: false);
 
-    await tester.pumpWidget(
-      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
-    );
+    await tester.pumpWidget(_runtimeHost(controller: runtime));
     await _pumpUntil(
       tester,
       () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
@@ -257,11 +245,7 @@ void main() {
     for (final key in [runtimeUsernameFieldKey, runtimePasswordFieldKey]) {
       final transport = _ShellTransport(_ShellFeedCall.open());
       final runtime = _runtime(transport, authenticated: false);
-      await tester.pumpWidget(
-        _host(
-          RuntimeShell(configuration: _configuration(), controller: runtime),
-        ),
-      );
+      await tester.pumpWidget(_runtimeHost(controller: runtime));
       await _pumpUntil(
         tester,
         () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
@@ -285,17 +269,15 @@ void main() {
     final runtime = _runtime(transport, authenticated: false);
 
     await tester.pumpWidget(
-      _host(
-        RuntimeShell(
-          configuration: _configuration(
-            externalIdentity: ExternalIdentityConfiguration(
-              issuer: Uri.parse('https://identity.example'),
-              clientId: 'digitalbrain-ui',
-            ),
+      _runtimeHost(
+        configuration: _configuration(
+          externalIdentity: ExternalIdentityConfiguration(
+            issuer: Uri.parse('https://identity.example'),
+            clientId: 'digitalbrain-ui',
           ),
-          controller: runtime,
-          externalIdentityTokenSourceFactory: (_) => _ExternalTokenSource(),
         ),
+        controller: runtime,
+        externalIdentityTokenSourceFactory: (_) => _ExternalTokenSource(),
       ),
     );
     await _pumpUntil(
@@ -322,9 +304,7 @@ void main() {
     );
     final runtime = _runtime(_ShellTransport(feed));
 
-    await tester.pumpWidget(
-      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
-    );
+    await tester.pumpWidget(_runtimeHost(controller: runtime));
     await _pumpUntil(
       tester,
       () => find.byKey(runtimeTerminalErrorKey).evaluate().isNotEmpty,
@@ -347,15 +327,7 @@ void main() {
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport);
 
-    await tester.pumpWidget(
-      _host(
-        RuntimeShell(
-          configuration: _configuration(),
-          controller: runtime,
-          now: () => now,
-        ),
-      ),
-    );
+    await tester.pumpWidget(_runtimeHost(controller: runtime, now: () => now));
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(FeedSurfaceJson(surfaceJsonString(sequence: 1)));
     await _pumpUntil(tester, () => runtime.latestSurface != null);
@@ -373,11 +345,10 @@ void main() {
     final first = _ShellFeedCall.open();
     final transport = _ShellTransport(first);
     final runtime = _runtime(transport);
-    Widget shell() => _host(
-      RuntimeShell(configuration: _configuration(), controller: runtime),
-    );
+    final owner = _RefreshableSessionOwner(runtime);
+    final shell = _runtimeHost(sessionOwner: owner);
 
-    await tester.pumpWidget(shell());
+    await tester.pumpWidget(shell);
     await _pumpUntil(tester, () => transport.watchStarted);
     first.add(
       FeedSurfaceJson(
@@ -395,7 +366,7 @@ void main() {
     );
 
     runtime.status = RuntimeStatus.reconnecting;
-    await tester.pumpWidget(shell());
+    owner.refresh();
     await tester.pump();
 
     expect(find.byKey(inoReconnectBannerKey), findsOneWidget);
@@ -412,7 +383,7 @@ void main() {
     );
 
     runtime.status = RuntimeStatus.streaming;
-    await tester.pumpWidget(shell());
+    owner.refresh();
     await tester.pump();
     expect(find.byKey(inoReconnectBannerKey), findsNothing);
     expect(
@@ -431,11 +402,10 @@ void main() {
     final feed = _ShellFeedCall.open();
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport);
-    Widget shell() => _host(
-      RuntimeShell(configuration: _configuration(), controller: runtime),
-    );
+    final owner = _RefreshableSessionOwner(runtime);
+    final shell = _runtimeHost(sessionOwner: owner);
 
-    await tester.pumpWidget(shell());
+    await tester.pumpWidget(shell);
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(
       FeedSurfaceJson(
@@ -453,7 +423,7 @@ void main() {
     );
 
     runtime.status = RuntimeStatus.terminalError;
-    await tester.pumpWidget(shell());
+    owner.refresh();
     await tester.pump();
 
     expect(find.byKey(inoConnectionUnavailableBannerKey), findsOneWidget);
@@ -472,9 +442,7 @@ void main() {
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport);
 
-    await tester.pumpWidget(
-      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
-    );
+    await tester.pumpWidget(_runtimeHost(controller: runtime));
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(
       FeedSurfaceJson(
@@ -503,11 +471,7 @@ void main() {
       final transport = _ShellTransport(feed);
       final runtime = _runtime(transport);
 
-      await tester.pumpWidget(
-        _host(
-          RuntimeShell(configuration: _configuration(), controller: runtime),
-        ),
-      );
+      await tester.pumpWidget(_runtimeHost(controller: runtime));
       await _pumpUntil(tester, () => transport.watchStarted);
       feed.add(
         FeedSurfaceJson(
@@ -542,11 +506,7 @@ void main() {
       final transport = _ShellTransport(feed);
       final runtime = _runtime(transport);
 
-      await tester.pumpWidget(
-        _host(
-          RuntimeShell(configuration: _configuration(), controller: runtime),
-        ),
-      );
+      await tester.pumpWidget(_runtimeHost(controller: runtime));
       await _pumpUntil(tester, () => transport.watchStarted);
       feed.add(
         FeedSurfaceJson(
@@ -589,11 +549,7 @@ void main() {
       final transport = _ShellTransport(feed);
       final runtime = _runtime(transport);
 
-      await tester.pumpWidget(
-        _host(
-          RuntimeShell(configuration: _configuration(), controller: runtime),
-        ),
-      );
+      await tester.pumpWidget(_runtimeHost(controller: runtime));
       await _pumpUntil(tester, () => transport.watchStarted);
       feed.add(
         FeedSurfaceJson(
@@ -622,11 +578,7 @@ void main() {
       final transport = _ShellTransport(feed);
       final runtime = _runtime(transport);
 
-      await tester.pumpWidget(
-        _host(
-          RuntimeShell(configuration: _configuration(), controller: runtime),
-        ),
-      );
+      await tester.pumpWidget(_runtimeHost(controller: runtime));
       await _pumpUntil(tester, () => transport.watchStarted);
       feed.add(
         FeedSurfaceJson(
@@ -666,26 +618,20 @@ void main() {
     final feed = _ShellFeedCall.open();
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport);
-    final router = GoRouter(
-      initialLocation: '/chat',
-      routes: [
-        GoRoute(
-          path: '/chat',
-          builder: (context, state) => RuntimeShell(
-            configuration: _configuration(),
-            controller: runtime,
-          ),
-        ),
-        GoRoute(
-          path: '/features/proposals/:proposalId',
-          builder: (context, state) => FeatureProposalPlaceholder(
-            proposalId: state.pathParameters['proposalId']!,
-          ),
-        ),
-      ],
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      controller: runtime,
+      transportFactory: _unexpectedTransport,
     );
+    final router = createDigitalBrainRouter();
+    addTearDown(router.dispose);
 
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpWidget(
+      _ScopedSessionHost(
+        owner: owner,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(
       FeedSurfaceJson(
@@ -721,7 +667,61 @@ void main() {
   });
 }
 
-Widget _host(Widget child) => MaterialApp(home: child);
+Widget _runtimeHost({
+  RuntimeSessionOwner? sessionOwner,
+  RuntimeConfiguration? configuration,
+  RuntimeController? controller,
+  UiTransportFactory? transportFactory,
+  ExternalIdentityTokenSourceFactory? externalIdentityTokenSourceFactory,
+  bool autoStart = true,
+  DateTime Function()? now,
+}) {
+  final owner =
+      sessionOwner ??
+      RuntimeSessionOwner(
+        configuration: configuration ?? _configuration(),
+        controller: controller,
+        transportFactory: transportFactory ?? _unexpectedTransport,
+        externalIdentityTokenSourceFactory: externalIdentityTokenSourceFactory,
+        autoStart: autoStart,
+      );
+  final chat = now == null ? const ChatPage() : ChatPage(now: now);
+  return _ScopedSessionHost(
+    owner: owner,
+    child: MaterialApp(home: RuntimeShell(child: chat)),
+  );
+}
+
+UiTransport _unexpectedTransport(Uri endpoint) =>
+    throw StateError('Unexpected transport construction for $endpoint.');
+
+class _ScopedSessionHost extends StatefulWidget {
+  const _ScopedSessionHost({required this.owner, required this.child});
+
+  final RuntimeSessionOwner owner;
+  final Widget child;
+
+  @override
+  State<_ScopedSessionHost> createState() => _ScopedSessionHostState();
+}
+
+class _ScopedSessionHostState extends State<_ScopedSessionHost> {
+  @override
+  void initState() {
+    super.initState();
+    scheduleMicrotask(widget.owner.initialize);
+  }
+
+  @override
+  void dispose() {
+    unawaited(widget.owner.close());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      AppSessionScope(owner: widget.owner, child: widget.child);
+}
 
 RuntimeConfiguration _configuration({
   ExternalIdentityConfiguration? externalIdentity,
@@ -828,6 +828,17 @@ class _ShellTransport implements UiTransport {
   Future<void> close() async {
     closeCount++;
   }
+}
+
+class _RefreshableSessionOwner extends RuntimeSessionOwner {
+  _RefreshableSessionOwner(RuntimeController controller)
+    : super(
+        configuration: _configuration(),
+        controller: controller,
+        transportFactory: _unexpectedTransport,
+      );
+
+  void refresh() => notifyListeners();
 }
 
 class _ExternalTokenSource implements ExternalIdentityTokenSource {
