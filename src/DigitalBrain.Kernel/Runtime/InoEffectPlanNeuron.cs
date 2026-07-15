@@ -48,6 +48,7 @@ internal sealed class InoEffectPlanNeuron(
         }
         catch (PersistedStateWriteOutcomeUnknownException)
         {
+            DeactivateOnIdle();
             throw;
         }
         catch
@@ -55,6 +56,46 @@ internal sealed class InoEffectPlanNeuron(
             await TryStopExpiryReminderAsync();
             throw;
         }
+    }
+    public async Task<InoToolEffectResult> DeclineAsync(
+        string actorScope,
+        string decisionId,
+        CancellationToken cancellationToken = default)
+    {
+        var current = await State.ReadAsync(cancellationToken);
+        var plan = current.Plan ?? throw new RuntimeStateIntegrityException("effect plan is missing");
+        if (!string.Equals(plan.ActorScope, actorScope, StringComparison.Ordinal))
+            throw new RuntimeStateIntegrityException("effect plan decline binding is invalid");
+        if (current.Completion is { } terminal)
+        {
+            if (current.Decision is { TerminalKind: InoEffectTerminalKind.Declined } decision &&
+                string.Equals(decision.DecisionId, decisionId, StringComparison.Ordinal) &&
+                string.Equals(decision.ActorScope, actorScope, StringComparison.Ordinal))
+                return new InoToolEffectResult(terminal.Disposition, terminal.SafeResult);
+            throw new RuntimeStateIntegrityException("effect plan already has a different terminal decision");
+        }
+        var result = new InoToolEffectResult(
+            InoToolEffectDisposition.Failed,
+            "The external action was not approved. No external action was performed.");
+        var completion = new InoEffectPlanCompletion(result.Disposition, result.SafeResult);
+        var decisionToStore = new InoEffectDecision(
+            decisionId,
+            actorScope,
+            InoEffectTerminalKind.Declined,
+            timeProvider.GetUtcNow());
+        await ResolveAsync(current, decisionToStore, completion);
+        await TryStopExpiryReminderAsync();
+        return result;
+    }
+    public async Task<InoEffectDecision?> ReadDecisionAsync(
+        string actorScope,
+        CancellationToken cancellationToken = default)
+    {
+        var current = await State.ReadAsync(cancellationToken);
+        var plan = current.Plan ?? throw new RuntimeStateIntegrityException("effect plan is missing");
+        if (!string.Equals(plan.ActorScope, actorScope, StringComparison.Ordinal))
+            throw new RuntimeStateIntegrityException("effect plan decision binding is invalid");
+        return current.Decision;
     }
     public async Task<InoToolEffectResult> ExecuteAsync(
         string actorScope,
@@ -78,31 +119,40 @@ internal sealed class InoEffectPlanNeuron(
         if (current.Completion is { } completed)
             return new InoToolEffectResult(completed.Disposition, completed.SafeResult);
         InoToolEffectResult result;
+        InoEffectTerminalKind terminalKind;
         if (plan.ExpiresAt <= timeProvider.GetUtcNow())
         {
             result = new InoToolEffectResult(InoToolEffectDisposition.Failed, "This approval expired before execution. No external action was performed.");
+            terminalKind = InoEffectTerminalKind.Expired;
         }
         else
         {
             try
             {
                 result = await ExecuteRegisteredEffectAsync(plan, cancellationToken);
+                terminalKind = result.Disposition switch
+                {
+                    InoToolEffectDisposition.Succeeded => InoEffectTerminalKind.Approved,
+                    InoToolEffectDisposition.Failed => InoEffectTerminalKind.Failed,
+                    InoToolEffectDisposition.OutcomeUnknown => InoEffectTerminalKind.OutcomeUnknown,
+                    _ => throw new RuntimeStateIntegrityException("effect handler returned an invalid disposition")
+                };
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 result = new InoToolEffectResult(InoToolEffectDisposition.OutcomeUnknown, "The approved external action timed out before its result could be confirmed.");
+                terminalKind = InoEffectTerminalKind.OutcomeUnknown;
             }
             catch (Exception ex)
             {
                 logger.LogWarning("INO effect plan {PlanId} failed with {ExceptionType} after execution began.", PlanId, ex.GetType().Name);
                 result = new InoToolEffectResult(InoToolEffectDisposition.OutcomeUnknown, "The approved external action could not be confirmed. Review it before trying again.");
+                terminalKind = InoEffectTerminalKind.OutcomeUnknown;
             }
         }
         var completion = new InoEffectPlanCompletion(result.Disposition, result.SafeResult);
-        await State.UpdateAsync(
-            current.Revision,
-            state => InoEffectPlanTransitions.Complete(state, completion),
-            CancellationToken.None);
+        var decision = new InoEffectDecision(effectId, actorScope, terminalKind, timeProvider.GetUtcNow());
+        await ResolveAsync(current, decision, completion);
         await TryStopExpiryReminderAsync();
         return result;
     }
@@ -126,10 +176,30 @@ internal sealed class InoEffectPlanNeuron(
             _expiryReminder = await this.RegisterOrUpdateReminder(ExpiryReminderName, ReminderDueTime(plan.ExpiresAt), ExpiryReminderPeriod);
             return;
         }
-        await State.UpdateAsync(
-            current.Revision,
-            state => InoEffectPlanTransitions.Complete(state, new InoEffectPlanCompletion(InoToolEffectDisposition.Failed, "This approval expired. No external action was performed.")));
+        var resolvedAt = timeProvider.GetUtcNow();
+        await ResolveAsync(
+            current,
+            new InoEffectDecision("expiry-" + PlanId, plan.ActorScope, InoEffectTerminalKind.Expired, resolvedAt),
+            new InoEffectPlanCompletion(InoToolEffectDisposition.Failed, "This approval expired. No external action was performed."));
         await StopExpiryReminderAsync();
+    }
+    private async Task ResolveAsync(
+        InoEffectPlanState current,
+        InoEffectDecision decision,
+        InoEffectPlanCompletion completion)
+    {
+        try
+        {
+            await State.UpdateAsync(
+                current.Revision,
+                state => InoEffectPlanTransitions.Resolve(state, decision, completion),
+                CancellationToken.None);
+        }
+        catch (PersistedStateWriteOutcomeUnknownException)
+        {
+            DeactivateOnIdle();
+            throw;
+        }
     }
     private TimeSpan ReminderDueTime(DateTimeOffset expiresAt)
     {

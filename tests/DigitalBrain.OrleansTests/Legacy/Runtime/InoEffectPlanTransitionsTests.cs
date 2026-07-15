@@ -32,23 +32,47 @@ public sealed class InoEffectPlanTransitionsTests
     }
 
     [Fact]
-    public void Complete_scrubs_the_provider_payload_and_is_idempotent()
+    public void Resolve_scrubs_the_provider_payload_and_is_idempotent()
     {
         var stored = InoEffectPlanTransitions.Put(InoEffectPlanState.Empty(), PlanId, Plan());
+        var decision = Decision(InoEffectTerminalKind.Approved);
         var completion = new InoEffectPlanCompletion(
             InoToolEffectDisposition.Succeeded,
             "The approved email was sent.");
 
-        var completed = InoEffectPlanTransitions.Complete(stored, completion);
+        var completed = InoEffectPlanTransitions.Resolve(stored, decision, completion);
 
         Assert.Equal(2, completed.Revision);
         Assert.Empty(completed.Plan!.PayloadUtf8);
+        Assert.Equal(decision, completed.Decision);
         Assert.Equal(completion, completed.Completion);
         InoEffectPlanTransitions.ValidateState(completed);
-        Assert.Same(completed, InoEffectPlanTransitions.Complete(completed, completion));
-        Assert.Throws<RuntimeStateIntegrityException>(() => InoEffectPlanTransitions.Complete(
+        Assert.Same(completed, InoEffectPlanTransitions.Resolve(completed, decision, completion));
+        Assert.Throws<RuntimeStateIntegrityException>(() => InoEffectPlanTransitions.Resolve(
             completed,
+            decision with { DecisionId = "decision-2", TerminalKind = InoEffectTerminalKind.Failed },
             completion with { Disposition = InoToolEffectDisposition.Failed }));
+    }
+
+    [Theory]
+    [InlineData(InoEffectTerminalKind.Expired)]
+    [InlineData(InoEffectTerminalKind.Failed)]
+    [InlineData(InoEffectTerminalKind.OutcomeUnknown)]
+    public async Task Every_terminal_path_scrubs_the_plan_payload(InoEffectTerminalKind kind)
+    {
+        var stored = InoEffectPlanTransitions.Put(InoEffectPlanState.Empty(), PlanId, Plan());
+        var disposition = kind == InoEffectTerminalKind.OutcomeUnknown
+            ? InoToolEffectDisposition.OutcomeUnknown
+            : InoToolEffectDisposition.Failed;
+
+        var terminal = InoEffectPlanTransitions.Resolve(
+            stored,
+            Decision(kind),
+            new InoEffectPlanCompletion(disposition, "No external action remains pending."));
+
+        Assert.Empty(terminal.Plan!.PayloadUtf8);
+        Assert.Equal(kind, terminal.Decision!.TerminalKind);
+        await Task.CompletedTask;
     }
 
     [Theory]
@@ -70,6 +94,12 @@ public sealed class InoEffectPlanTransitionsTests
         "{\"safe\":true}"u8.ToArray(),
         "send an email to the approved test recipient",
         ExpiresAt);
+
+    private static InoEffectDecision Decision(InoEffectTerminalKind kind) => new(
+        "decision-1",
+        ActorScope,
+        kind,
+        ExpiresAt.AddMinutes(-1));
 
     private const string PlanId = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private const string ActorScope = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";

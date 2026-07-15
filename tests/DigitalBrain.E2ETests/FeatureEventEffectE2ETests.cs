@@ -146,7 +146,7 @@ public sealed class FeatureEventEffectE2ETests
     }
 
     [Fact]
-    public async Task Declined_Salesforce_approval_resolves_the_intent_without_executing_and_emits_an_outcome()
+    public async Task Decline_wins_a_later_approval_without_provider_execution()
     {
         var payload = SalesforceFeatureEffectPayload.Create(
             new SalesforcePreparedUpdate("{\"version\":1}"u8.ToArray()),
@@ -159,13 +159,14 @@ public sealed class FeatureEventEffectE2ETests
             payload.ToJson(),
             null));
         var hub = new RecordingHub();
-        var effects = new RecordingEffectExecutor();
+        var plans = new RecordingPlanStore();
+        var effects = new RecordingEffectExecutor(plans);
         var rail = new SalesforceFeatureEffectRail(
             new FeatureGrains(hub, new Dictionary<FeatureInstallationId, IFeatureInstallationGrain>
             {
                 [InstallationId] = installation
             }),
-            new RecordingPlanStore(),
+            plans,
             effects,
             new FixedTimeProvider(Now));
         var proposal = await rail.ProposeAsync(new SalesforceFeatureEffectRequest(
@@ -178,8 +179,11 @@ public sealed class FeatureEventEffectE2ETests
             "trace-declined"));
 
         var outcome = await rail.ApplyAsync(proposal, approved: false);
+        var replay = await rail.ApplyAsync(proposal, approved: true);
 
         Assert.Equal(InoToolEffectDisposition.Failed, outcome.Disposition);
+        Assert.Equal(outcome, replay);
+        Assert.Equal(1, plans.Declines);
         Assert.Equal(0, effects.Executions);
         Assert.Null(installation.AppliedOperationKey);
         Assert.Equal(persistedOperationKey, installation.DeclinedOperationKey);
@@ -335,6 +339,8 @@ public sealed class FeatureEventEffectE2ETests
     {
         private readonly Dictionary<string, PlanBinding> _requests = new(StringComparer.Ordinal);
         public int PlanCount => _requests.Count;
+        public int Declines { get; private set; }
+        public InoToolEffectResult? TerminalResult { get; private set; }
 
         public Task<InoToolRequest> PrepareAsync(string actorScope, string operationId, string toolId, byte[] payloadUtf8, string safeSummary, DateTimeOffset expiresAt, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -359,6 +365,35 @@ public sealed class FeatureEventEffectE2ETests
             return Task.FromResult(existing.Request!);
         }
 
+        public Task<InoToolEffectResult> DeclineAsync(
+            InoToolRequest request,
+            string actorScope,
+            string decisionId,
+            CancellationToken cancellationToken = default)
+        {
+            if (TerminalResult is null)
+            {
+                Declines++;
+                TerminalResult = new InoToolEffectResult(
+                    InoToolEffectDisposition.Failed,
+                    "The Salesforce update was not approved. No external action was performed.");
+                TerminalDecision = new InoEffectDecision(
+                    decisionId,
+                    actorScope,
+                    InoEffectTerminalKind.Declined,
+                    Now);
+            }
+            return Task.FromResult(TerminalResult);
+        }
+
+        public InoEffectDecision? TerminalDecision { get; private set; }
+
+        public Task<InoEffectDecision?> ReadDecisionAsync(
+            InoToolRequest request,
+            string actorScope,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(TerminalDecision);
+
         private sealed record PlanBinding(
             string ActorScope,
             string OperationId,
@@ -371,7 +406,7 @@ public sealed class FeatureEventEffectE2ETests
         }
     }
 
-    private sealed class RecordingEffectExecutor : IInoEffectExecutor
+    private sealed class RecordingEffectExecutor(RecordingPlanStore? plans = null) : IInoEffectExecutor
     {
         public int Executions { get; private set; }
 
@@ -383,6 +418,8 @@ public sealed class FeatureEventEffectE2ETests
 
         public Task<InoToolEffectResult> ExecuteAsync(InoToolEffectRequest request, CancellationToken cancellationToken = default)
         {
+            if (plans?.TerminalResult is { } terminal)
+                return Task.FromResult(terminal);
             Executions++;
             return Task.FromResult(new InoToolEffectResult(InoToolEffectDisposition.Succeeded, "verified"));
         }

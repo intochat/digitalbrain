@@ -13,12 +13,29 @@ public sealed record InoEffectPlan(
     [property: Id(6)] DateTimeOffset ExpiresAt);
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-plan-completion")]
 public sealed record InoEffectPlanCompletion([property: Id(0)] InoToolEffectDisposition Disposition, [property: Id(1)] string SafeResult);
+[GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-terminal-kind")]
+public enum InoEffectTerminalKind
+{
+    None = 0,
+    Approved = 1,
+    Declined = 2,
+    Expired = 3,
+    Failed = 4,
+    OutcomeUnknown = 5
+}
+[GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-decision")]
+public sealed record InoEffectDecision(
+    [property: Id(0)] string DecisionId,
+    [property: Id(1)] string ActorScope,
+    [property: Id(2)] InoEffectTerminalKind TerminalKind,
+    [property: Id(3)] DateTimeOffset ResolvedAt);
 [GenerateSerializer, Alias("digitalbrain.runtime.ino-effect-plan-state")]
 public sealed record InoEffectPlanState(
     [property: Id(0)] int SchemaVersion,
     [property: Id(1)] long Revision,
     [property: Id(2)] InoEffectPlan? Plan,
-    [property: Id(3)] InoEffectPlanCompletion? Completion)
+    [property: Id(3)] InoEffectPlanCompletion? Completion,
+    [property: Id(4)] InoEffectDecision? Decision = null)
 {
     public static InoEffectPlanState Empty() => new(RuntimeStateSchemas.InoEffectPlan, 0, null, null);
 }
@@ -27,6 +44,15 @@ public interface IInoEffectPlanNeuron : IGrainWithStringKey
 {
     [Alias("digitalbrain.runtime.ino-effect-plan.put")]
     Task PutAsync(InoEffectPlan plan);
+    [Alias("digitalbrain.runtime.ino-effect-plan.decline")]
+    Task<InoToolEffectResult> DeclineAsync(
+        string actorScope,
+        string decisionId,
+        CancellationToken cancellationToken = default);
+    [Alias("digitalbrain.runtime.ino-effect-plan.read-decision")]
+    Task<InoEffectDecision?> ReadDecisionAsync(
+        string actorScope,
+        CancellationToken cancellationToken = default);
     [Alias("digitalbrain.runtime.ino-effect-plan.execute")]
     Task<InoToolEffectResult> ExecuteAsync(
         string actorScope,
@@ -54,26 +80,36 @@ public static class InoEffectPlanTransitions
         if (state.Completion is null && SamePlan(state.Plan, plan)) return state;
         throw new RuntimeStateIntegrityException("immutable effect plan changed");
     }
-    public static InoEffectPlanState Complete(InoEffectPlanState state, InoEffectPlanCompletion completion)
+    public static InoEffectPlanState Resolve(
+        InoEffectPlanState state,
+        InoEffectDecision decision,
+        InoEffectPlanCompletion completion)
     {
         ValidateState(state);
+        ValidateDecision(decision, completion);
         ValidateCompletion(completion);
         if (state.Plan is null)
             throw new InvalidOperationException("An effect plan must be stored before it can complete.");
         if (state.Completion is not null)
         {
-            if (state.Completion == completion) return state;
-            throw new RuntimeStateIntegrityException("immutable effect plan completion changed");
+            if (state.Decision == decision && state.Completion == completion) return state;
+            throw new RuntimeStateIntegrityException("immutable effect plan decision changed");
         }
-        var completed = state with { Revision = checked(state.Revision + 1), Plan = state.Plan with { PayloadUtf8 = [] }, Completion = completion };
+        var completed = state with
+        {
+            Revision = checked(state.Revision + 1),
+            Plan = state.Plan with { PayloadUtf8 = [] },
+            Completion = completion,
+            Decision = decision
+        };
         ValidateState(completed);
         return completed;
     }
     public static void ValidateState(InoEffectPlanState state)
     {
         if (state.SchemaVersion != RuntimeStateSchemas.InoEffectPlan || state.Revision is < 0 or > 2 ||
-            state.Revision == 0 && (state.Plan is not null || state.Completion is not null) ||
-            state.Revision == 1 && (state.Plan is null || state.Completion is not null) ||
+            state.Revision == 0 && (state.Plan is not null || state.Completion is not null || state.Decision is not null) ||
+            state.Revision == 1 && (state.Plan is null || state.Completion is not null || state.Decision is not null) ||
             state.Revision == 2 && (state.Plan is null || state.Completion is null))
             throw new RuntimeStateIntegrityException("invalid effect plan state");
         if (state.Plan is not null)
@@ -83,6 +119,8 @@ public static class InoEffectPlanTransitions
             if (state.Plan!.PayloadUtf8.Length != 0)
                 throw new RuntimeStateIntegrityException("completed effect plan retained provider payload");
             ValidateCompletion(state.Completion);
+            if (state.Decision is not null)
+                ValidateDecision(state.Decision, state.Completion);
         }
     }
     public static void ValidatePlan(InoEffectPlan plan, bool requirePayload)
@@ -97,6 +135,20 @@ public static class InoEffectPlanTransitions
     {
         if (!Enum.IsDefined(completion.Disposition) || !IsBounded(completion.SafeResult, MaximumSafeTextLength))
             throw new ArgumentException("Effect plan completion is invalid.", nameof(completion));
+    }
+    private static void ValidateDecision(InoEffectDecision decision, InoEffectPlanCompletion completion)
+    {
+        var matchingDisposition = decision.TerminalKind switch
+        {
+            InoEffectTerminalKind.Approved => completion.Disposition == InoToolEffectDisposition.Succeeded,
+            InoEffectTerminalKind.Declined or InoEffectTerminalKind.Expired or InoEffectTerminalKind.Failed =>
+                completion.Disposition == InoToolEffectDisposition.Failed,
+            InoEffectTerminalKind.OutcomeUnknown => completion.Disposition == InoToolEffectDisposition.OutcomeUnknown,
+            _ => false
+        };
+        if (!IsBounded(decision.DecisionId, 256) || !RuntimeStateKeys.IsScopeHash(decision.ActorScope) ||
+            decision.ResolvedAt == default || decision.ResolvedAt.Offset != TimeSpan.Zero || !matchingDisposition)
+            throw new ArgumentException("Effect plan decision is invalid.", nameof(decision));
     }
     private static bool SamePlan(InoEffectPlan first, InoEffectPlan second) =>
         string.Equals(first.PlanId, second.PlanId, StringComparison.Ordinal) &&

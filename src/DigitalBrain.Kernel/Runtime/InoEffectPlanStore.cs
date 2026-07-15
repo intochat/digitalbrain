@@ -33,6 +33,23 @@ internal sealed class InoEffectPlanStore(IGrainFactory grainFactory, InoEffectPl
         var planId = Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("feature-effect:" + idempotencyKey)));
         return PrepareAsync(planId, actorScope, operationId, toolId, payloadUtf8, safeSummary, expiresAt, cancellationToken);
     }
+    public Task<InoToolEffectResult> DeclineAsync(
+        InoToolRequest request,
+        string actorScope,
+        string decisionId,
+        CancellationToken cancellationToken = default)
+    {
+        var plan = ResolvePlan(request, actorScope);
+        return grainFactory.GetGrain<IInoEffectPlanNeuron>(plan).DeclineAsync(actorScope, decisionId, cancellationToken);
+    }
+    public Task<InoEffectDecision?> ReadDecisionAsync(
+        InoToolRequest request,
+        string actorScope,
+        CancellationToken cancellationToken = default)
+    {
+        var plan = ResolvePlan(request, actorScope);
+        return grainFactory.GetGrain<IInoEffectPlanNeuron>(plan).ReadDecisionAsync(actorScope, cancellationToken);
+    }
     private async Task<InoToolRequest> PrepareAsync(
         string planId,
         string actorScope,
@@ -47,5 +64,14 @@ internal sealed class InoEffectPlanStore(IGrainFactory grainFactory, InoEffectPl
         InoEffectPlanTransitions.ValidatePlan(plan, requirePayload: true);
         await grainFactory.GetGrain<IInoEffectPlanNeuron>(planId).PutAsync(plan).WaitAsync(cancellationToken);
         return new InoToolRequest(toolId, InoToolAccess.Mutation, authority.Issue(planId, actorScope, toolId, safeSummary), safeSummary);
+    }
+    private string ResolvePlan(InoToolRequest request, string actorScope)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorScope);
+        if (request.Access != InoToolAccess.Mutation ||
+            !authority.TryValidate(request.Scope, actorScope, request.ToolId, request.SafeSummary, out var planId))
+            throw new UnauthorizedAccessException("Signed effect plan evidence is required.");
+        return planId;
     }
 }

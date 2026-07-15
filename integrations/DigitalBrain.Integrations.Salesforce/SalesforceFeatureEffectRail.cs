@@ -65,6 +65,7 @@ internal sealed record SalesforceFeatureEffectProposal(
     InoToolRequest Approval,
     string ActorScope,
     string OperationId,
+    string DecisionId,
     string EffectId,
     string ProviderIdempotencyKey,
     string PersistedOperationKey);
@@ -90,16 +91,26 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
         var identity = Digest(request.OwnerId.Value, request.ActorId.Value, request.InstallationId.Value, request.InputId, request.LogicalOperationKey);
         var operationId = "feature-" + identity;
         var approval = await plans.PrepareIdempotentAsync(identity, actorScope, operationId, SalesforceTools.UpdateRecord, prepared.Payload, payload.SafeSummary, payload.ExpiresAt, cancellationToken);
-        return new SalesforceFeatureEffectProposal(request, approval, actorScope, operationId, "effect-" + identity, "provider-" + identity, persistedOperationKey);
+        return new SalesforceFeatureEffectProposal(
+            request,
+            approval,
+            actorScope,
+            operationId,
+            "decision-" + identity,
+            "effect-" + identity,
+            "provider-" + identity,
+            persistedOperationKey);
     }
     public async Task<InoToolEffectResult> ApplyAsync(SalesforceFeatureEffectProposal proposal, bool approved, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(proposal);
         if (!approved)
         {
-            var declined = new InoToolEffectResult(
-                InoToolEffectDisposition.Failed,
-                "The Salesforce update was not approved. No external action was performed.");
+            var declined = await plans.DeclineAsync(
+                proposal.Approval,
+                proposal.ActorScope,
+                proposal.DecisionId,
+                cancellationToken);
             var declinedRequest = proposal.Request;
             await grains.Installation(declinedRequest.OwnerId, declinedRequest.InstallationId)
                 .DeclineIntentAsync(proposal.PersistedOperationKey)
@@ -114,7 +125,12 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
             throw new UnauthorizedAccessException("Signed Salesforce approval evidence is required.");
         var result = await effects.ExecuteAsync(new InoToolEffectRequest(proposal.OperationId, proposal.EffectId, SalesforceTools.UpdateRecord, proposal.Approval.Scope, proposal.ActorScope, proposal.ProviderIdempotencyKey), cancellationToken);
         var request = proposal.Request;
-        await grains.Installation(request.OwnerId, request.InstallationId).ApplyIntentAsync(proposal.PersistedOperationKey).WaitAsync(cancellationToken);
+        var terminalDecision = await plans.ReadDecisionAsync(proposal.Approval, proposal.ActorScope, cancellationToken);
+        var installation = grains.Installation(request.OwnerId, request.InstallationId);
+        if (terminalDecision?.TerminalKind == InoEffectTerminalKind.Declined)
+            await installation.DeclineIntentAsync(proposal.PersistedOperationKey).WaitAsync(cancellationToken);
+        else
+            await installation.ApplyIntentAsync(proposal.PersistedOperationKey).WaitAsync(cancellationToken);
         await PublishOutcomeAsync(proposal, result, cancellationToken);
         return result;
     }

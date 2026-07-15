@@ -15,14 +15,14 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
 {
     private readonly PostEffectResultBarrierTimeProvider _timeProvider = new();
     private readonly EffectCallCounter _effectCalls = new();
+    private readonly EffectCallCounter _planEffectCalls = new();
+    private readonly RuntimeStateKeyRing _keyRing = new(
+        1,
+        new Dictionary<int, byte[]> { [1] = Enumerable.Repeat((byte)1, 32).ToArray() },
+        Enumerable.Repeat((byte)2, 32).ToArray());
 
     protected override void ConfigureSilo(ISiloBuilder builder)
     {
-        var keyRing = new RuntimeStateKeyRing(
-            1,
-            new Dictionary<int, byte[]> { [1] = Enumerable.Repeat((byte)1, 32).ToArray() },
-            Enumerable.Repeat((byte)2, 32).ToArray());
-
         builder
             .UseInMemoryReminderService()
             .AddMemoryGrainStorage(RuntimeStateStorageProviders.Conversations)
@@ -31,11 +31,13 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
             .Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(10))
             .ConfigureServices(services =>
             {
-                services.AddSingleton<IRuntimeStateKeyRing>(keyRing);
-                services.AddSingleton(new EncryptedRuntimeStateProtector(keyRing));
+                services.AddSingleton<IRuntimeStateKeyRing>(_keyRing);
+                services.AddSingleton(new EncryptedRuntimeStateProtector(_keyRing));
+                services.AddSingleton<InoEffectPlanAuthority>();
                 services.AddSingleton<TimeProvider>(_timeProvider);
                 services.AddSingleton(_timeProvider);
                 services.AddSingleton(_effectCalls);
+                services.AddSingleton<IInoEffectHandler>(new CountingPlanEffectHandler(_planEffectCalls));
                 services.AddSingleton<IAgentWorkflowRunner, UnusedWorkflowRunner>();
                 services.AddSingleton<IInoEffectExecutor, SucceedingEffectGateway>();
             });
@@ -43,6 +45,102 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
 
     protected override void ConfigureClient(IClientBuilder builder) =>
         builder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(10));
+
+    [Fact]
+    public async Task Racing_approval_and_decline_produce_one_terminal_decision()
+    {
+        const string actorScope = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+        const string toolId = "test.effect";
+        const string summary = "apply the bounded test effect";
+        var authority = new InoEffectPlanAuthority(_keyRing);
+
+        var declineFirst = await PreparePlanAsync(
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            "operation-decline-first",
+            actorScope,
+            toolId,
+            summary);
+        var declined = await declineFirst.Grain.DeclineAsync(actorScope, "decision-decline-first");
+        await Cluster.DeactivateAsync(declineFirst.Grain);
+        var recoveredDecline = Grain<IInoEffectPlanNeuron>(declineFirst.Plan.PlanId);
+        var declineReplay = await ExecuteAsync(
+            recoveredDecline,
+            declineFirst.Plan,
+            authority,
+            "effect-decline-first",
+            "provider-decline-first");
+
+        Assert.Equal(declined, declineReplay);
+        Assert.Equal(InoEffectTerminalKind.Declined, (await recoveredDecline.ReadDecisionAsync(actorScope))!.TerminalKind);
+        Assert.Equal(0, _planEffectCalls.Count);
+
+        var approvalFirst = await PreparePlanAsync(
+            "2222222222222222222222222222222222222222222222222222222222222222",
+            "operation-approval-first",
+            actorScope,
+            toolId,
+            summary);
+        var approved = await ExecuteAsync(
+            approvalFirst.Grain,
+            approvalFirst.Plan,
+            authority,
+            "effect-approval-first",
+            "provider-approval-first");
+
+        Assert.Equal(InoToolEffectDisposition.Succeeded, approved.Disposition);
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            approvalFirst.Grain.DeclineAsync(actorScope, "decision-decline-late"));
+        var approvalDecision = await approvalFirst.Grain.ReadDecisionAsync(actorScope);
+        Assert.Equal(InoEffectTerminalKind.Approved, approvalDecision!.TerminalKind);
+        Assert.Equal("effect-approval-first", approvalDecision.DecisionId);
+        Assert.Equal(1, _planEffectCalls.Count);
+    }
+
+    private async Task<(IInoEffectPlanNeuron Grain, InoEffectPlan Plan)> PreparePlanAsync(
+        string planId,
+        string operationId,
+        string actorScope,
+        string toolId,
+        string summary)
+    {
+        var plan = new InoEffectPlan(
+            planId,
+            actorScope,
+            operationId,
+            toolId,
+            "{\"safe\":true}"u8.ToArray(),
+            summary,
+            DateTimeOffset.UtcNow.AddHours(1));
+        var grain = Grain<IInoEffectPlanNeuron>(planId);
+        await grain.PutAsync(plan);
+        return (grain, plan);
+    }
+
+    private static Task<InoToolEffectResult> ExecuteAsync(
+        IInoEffectPlanNeuron grain,
+        InoEffectPlan plan,
+        InoEffectPlanAuthority authority,
+        string effectId,
+        string providerKey)
+    {
+        var scope = authority.Issue(plan.PlanId, plan.ActorScope, plan.ToolId, plan.SafeSummary);
+        Assert.True(authority.TryValidateToken(scope, plan.ActorScope, plan.ToolId, out _, out var summaryDigest));
+        var proof = authority.IssueExecutionProof(
+            plan.PlanId,
+            plan.ActorScope,
+            plan.OperationId,
+            plan.ToolId,
+            effectId,
+            providerKey);
+        return grain.ExecuteAsync(
+            plan.ActorScope,
+            plan.OperationId,
+            plan.ToolId,
+            summaryDigest,
+            effectId,
+            providerKey,
+            proof);
+    }
 
     [Fact]
     public async Task Worker_reconciles_a_post_effect_result_revision_conflict_without_reexecuting_the_effect()
@@ -258,6 +356,22 @@ public sealed class InoEffectConflictRecoveryTests : NeuronTestBase
 
         public int Count => Volatile.Read(ref _count);
         public void Increment() => Interlocked.Increment(ref _count);
+    }
+
+    private sealed class CountingPlanEffectHandler(EffectCallCounter calls) : IInoEffectHandler
+    {
+        public string ToolId => "test.effect";
+
+        public Task<InoToolEffectResult> ApplyAsync(
+            string actorScope,
+            byte[] payloadUtf8,
+            CancellationToken cancellationToken = default)
+        {
+            calls.Increment();
+            return Task.FromResult(new InoToolEffectResult(
+                InoToolEffectDisposition.Succeeded,
+                "The bounded test effect completed."));
+        }
     }
 
     private sealed class PostEffectResultBarrierTimeProvider : TimeProvider
