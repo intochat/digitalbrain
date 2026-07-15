@@ -5,7 +5,6 @@ namespace DigitalBrain.AppHost;
 internal static class FlutterAspireExtensions
 {
     public const string TransportEndpointEnvironmentVariable = "DIGITALBRAIN_V2_UI_ENDPOINT";
-    public const string BootstrapSecretEnvironmentVariable = "DIGITALBRAIN_V2_UI_BOOTSTRAP_SECRET";
     public const string OidcIssuerEnvironmentVariable = "DIGITALBRAIN_OIDC_ISSUER";
     public const string OidcClientIdEnvironmentVariable = "DIGITALBRAIN_OIDC_CLIENT_ID";
     private static readonly string[] DesktopTargets = ["windows", "linux", "macos"];
@@ -14,7 +13,6 @@ internal static class FlutterAspireExtensions
             string name,
             string flutterAppPath,
             IResourceBuilder<ProjectResource> transport,
-            IResourceBuilder<ParameterResource> bootstrapSecret,
             string endpointName = "https",
             string target = "windows")
     {
@@ -22,15 +20,13 @@ internal static class FlutterAspireExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(flutterAppPath);
         ArgumentNullException.ThrowIfNull(transport);
-        ArgumentNullException.ThrowIfNull(bootstrapSecret);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
         ArgumentException.ThrowIfNullOrWhiteSpace(target);
         if (!DesktopTargets.Contains(target, StringComparer.OrdinalIgnoreCase))
-            throw new ArgumentException("The secret-bearing Flutter client supports desktop targets only.", nameof(target));
+            throw new ArgumentException("The Flutter client supports desktop targets only.", nameof(target));
         var cmd = ctx.ApplicationBuilder.Configuration["DigitalBrain:FlutterCommand"]
             ?? Environment.GetEnvironmentVariable("FLUTTER_COMMAND") ?? "flutter";
         return ctx.ApplicationBuilder.AddExecutable(name, cmd, flutterAppPath, "run", "-d", target).WithEnvironment(TransportEndpointEnvironmentVariable, transport.GetEndpoint(endpointName))
-            .WithEnvironment(BootstrapSecretEnvironmentVariable, bootstrapSecret)
             .WithReference(transport.GetEndpoint(endpointName))
             .WaitFor(transport);
     }
@@ -80,7 +76,6 @@ internal static class FlutterAspireExtensions
     public static IResourceBuilder<ExecutableResource>? AddDefaultDevFlutterClient(
             this DigitalBrainContext ctx,
             IResourceBuilder<ProjectResource> transport,
-            IResourceBuilder<ParameterResource> bootstrapSecret,
             string endpointName = "https")
     {
         var flutterPath = ResolveDevFlutterAppPath(ctx.ApplicationBuilder.AppHostDirectory);
@@ -88,7 +83,7 @@ internal static class FlutterAspireExtensions
         {
             return null;
         }
-        return ctx.AddFlutterClient("flutter-ui", flutterPath, transport, bootstrapSecret, endpointName, "windows");
+        return ctx.AddFlutterClient("flutter-ui", flutterPath, transport, endpointName, "windows");
     }
     public static IResourceBuilder<ExecutableResource>? AddDefaultDevFlutterWebClient(
             this DigitalBrainContext ctx,

@@ -142,9 +142,7 @@ public sealed class AppHostTopologyTests
         var mcp = Assert.Single(builder.Resources, r => r.Name == "mcp");
         var flutter = Assert.Single(builder.Resources, r => r.Name == "flutter-ui");
         var flutterWeb = Assert.Single(builder.Resources, r => r.Name == "flutter-web");
-        var bootstrapSecret = Assert.IsType<ParameterResource>(
-            Assert.Single(builder.Resources, r => r.Name == "runtime-ui-bootstrap-secret"));
-        Assert.True(bootstrapSecret.Secret);
+        Assert.DoesNotContain(builder.Resources, r => r.Name == "runtime-ui-bootstrap-secret");
 
         var httpsEndpoint = Assert.Single(
             mcp.Annotations.OfType<EndpointAnnotation>(),
@@ -172,9 +170,11 @@ public sealed class AppHostTopologyTests
             flutterEnvironment[FlutterAspireExtensions.TransportEndpointEnvironmentVariable]);
         Assert.Same(mcp, endpointReference.Resource);
         Assert.Equal("https", endpointReference.EndpointName);
-        Assert.Same(
-            bootstrapSecret,
-            flutterEnvironment[FlutterAspireExtensions.BootstrapSecretEnvironmentVariable]);
+        Assert.DoesNotContain(
+            flutterEnvironment,
+            pair => pair.Key.Contains("BootstrapSecret", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.Contains("DevelopmentUsername", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.Contains("DevelopmentPassword", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain("DIGITALBRAIN_SALESFORCE_OAUTH_CALLBACK", flutterEnvironment.Keys);
 
         var mcpEnvironment = await EvaluateEnvironmentAsync(builder, mcp);
@@ -182,7 +182,11 @@ public sealed class AppHostTopologyTests
         Assert.Equal(DigitalBrain.Kernel.Contracts.Runtime.SessionAudiences.Ui, mcpEnvironment["DigitalBrain__Runtime__Ui__Audience"]);
         Assert.Equal("6291456", mcpEnvironment["DigitalBrain__Runtime__Mcp__MaxBodyBytes"]);
         Assert.Equal("6291456", mcpEnvironment["DigitalBrain__Runtime__Transport__MaxBodyBytes"]);
-        Assert.Same(bootstrapSecret, mcpEnvironment["DigitalBrain__Runtime__Ui__BootstrapSecret"]);
+        Assert.DoesNotContain(
+            mcpEnvironment,
+            pair => pair.Key.Contains("BootstrapSecret", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.Contains("DevelopmentUsername", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.Contains("DevelopmentPassword", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain("DigitalBrain__Runtime__StorageNamespace", mcpEnvironment.Keys);
         Assert.DoesNotContain(
             mcpEnvironment,
@@ -205,12 +209,10 @@ public sealed class AppHostTopologyTests
 
         var relationships = flutter.Annotations.OfType<ResourceRelationshipAnnotation>().ToArray();
         Assert.Contains(relationships, relationship => ReferenceEquals(relationship.Resource, mcp));
-        Assert.Contains(relationships, relationship => ReferenceEquals(relationship.Resource, bootstrapSecret));
         Assert.All(
             relationships,
             relationship => Assert.True(
-                ReferenceEquals(relationship.Resource, mcp)
-                || ReferenceEquals(relationship.Resource, bootstrapSecret),
+                ReferenceEquals(relationship.Resource, mcp),
                 $"flutter-ui unexpectedly references '{relationship.Resource.Name}'."));
         Assert.DoesNotContain(builder.Resources, resource => resource.Name.Contains("gateway", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(
@@ -231,11 +233,11 @@ public sealed class AppHostTopologyTests
                           annotation.WaitType == WaitType.WaitUntilHealthy);
 
         var webEnvironment = await EvaluateEnvironmentAsync(builder, flutterWeb);
-        Assert.DoesNotContain(FlutterAspireExtensions.BootstrapSecretEnvironmentVariable, webEnvironment.Keys);
         Assert.DoesNotContain(
             webEnvironment,
-            pair => ReferenceEquals(pair.Value, bootstrapSecret) ||
-                    pair.Key.Contains("secret", StringComparison.OrdinalIgnoreCase));
+            pair => pair.Key.Contains("DevelopmentUsername", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.Contains("DevelopmentPassword", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.Contains("BootstrapSecret", StringComparison.OrdinalIgnoreCase));
 
         var webArgs = await EvaluateArgumentsAsync(builder, flutterWeb);
         Assert.Contains("web-server", webArgs);
@@ -259,17 +261,17 @@ public sealed class AppHostTopologyTests
         Assert.DoesNotContain(
             webArgs,
             argument => argument.ToString()?.Contains(
-                FlutterAspireExtensions.BootstrapSecretEnvironmentVariable,
-                StringComparison.OrdinalIgnoreCase) == true ||
-                        argument.ToString()?.Contains(
-                            bootstrapSecret.Name,
-                            StringComparison.OrdinalIgnoreCase) == true);
+                "BootstrapSecret",
+                StringComparison.OrdinalIgnoreCase) == true
+                || argument.ToString()?.Contains(
+                    "DevelopmentPassword",
+                    StringComparison.OrdinalIgnoreCase) == true
+                || argument.ToString()?.Contains(
+                    "DevelopmentUsername",
+                    StringComparison.OrdinalIgnoreCase) == true);
 
         var webRelationships = flutterWeb.Annotations.OfType<ResourceRelationshipAnnotation>().ToArray();
         Assert.Contains(webRelationships, relationship => ReferenceEquals(relationship.Resource, mcp));
-        Assert.DoesNotContain(
-            webRelationships,
-            relationship => ReferenceEquals(relationship.Resource, bootstrapSecret));
 
         Assert.Equal(oidcIssuer, mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__Issuer"]);
         Assert.Equal(oidcAudience, mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__Audience"]);

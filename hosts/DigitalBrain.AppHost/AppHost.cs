@@ -24,12 +24,6 @@ var hasAnyUiOidcConfiguration = !string.IsNullOrEmpty(uiOidcIssuer) || !string.I
 if (enableDevFlutter && hasAnyUiOidcConfiguration && (string.IsNullOrEmpty(uiOidcIssuer) || string.IsNullOrEmpty(uiOidcAudience)))
     throw new InvalidOperationException("DigitalBrain:Runtime:Ui:Oidc:Issuer and Audience must be configured together for the local browser UI.");
 var flutterWebPort = ParseOptionalPort(builder.Configuration["DigitalBrain:Runtime:Ui:WebPort"]);
-IResourceBuilder<ParameterResource>? uiBootstrapSecret = enableDevFlutter
-    ? builder.AddParameter(
-        "runtime-ui-bootstrap-secret",
-        () => builder.Configuration["Parameters:runtime-ui-bootstrap-secret"] ?? Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
-        secret: true)
-    : null;
 var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 {
     options.WithLLM<OllamaModels.Llama31_8B>().AsBalanced().WithEmbedding<OllamaModels.MxbaiEmbedLarge>();
@@ -78,11 +72,10 @@ if (ctx.EnableMcp)
     mcp.WaitFor(ctx.SessionStateBlobs);
     mcp.WaitFor(ctx.FeatureArtifacts);
     mcp.WaitFor(kernel);
-    if (uiBootstrapSecret is not null)
+    if (enableDevFlutter)
     {
-        mcp.WithEnvironment("DigitalBrain__Runtime__Ui__BootstrapSecret", uiBootstrapSecret);
-        var flutter = ctx.AddDefaultDevFlutterClient(mcp, uiBootstrapSecret, endpointName: "https")
-                    ?? throw new InvalidOperationException("Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+        _ = ctx.AddDefaultDevFlutterClient(mcp, endpointName: "https")
+            ?? throw new InvalidOperationException("Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
         if (uiOidcIssuer is not null && uiOidcAudience is not null)
         {
             mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Issuer", uiOidcIssuer);
