@@ -33,7 +33,7 @@ internal sealed class HybridCapabilityResolver(
             throw new ArgumentException("Capability search bounds are invalid.", nameof(request));
         cancellationToken.ThrowIfCancellationRequested();
 
-        var candidates = catalog.Snapshot()
+        var candidates = (request.Descriptors ?? catalog.Snapshot())
             .Where(x => x.Available)
             .Where(x => x.RequiredGrants.All(request.Grants.Contains))
             .Where(x => x.RequiredConnections.All(request.Connections.Contains))
@@ -166,8 +166,16 @@ internal sealed class HybridCapabilityResolver(
     {
         if (generated is null || generated.Count != expectedCount || generated[0].Vector.Length == 0) return false;
         var dimensions = generated[0].Vector.Length;
-        return generated[0].Vector.Span.IndexOfAnyExcept(0f) >= 0
-            && generated.All(embedding => embedding.Vector.Length == dimensions);
+        if (generated[0].Vector.Span.IndexOfAnyExcept(0f) < 0) return false;
+        foreach (var embedding in generated)
+        {
+            if (embedding.Vector.Length != dimensions) return false;
+            foreach (var component in embedding.Vector.Span)
+            {
+                if (!float.IsFinite(component)) return false;
+            }
+        }
+        return true;
     }
 
     private static HashSet<string> Tokenize(string value) =>
@@ -183,9 +191,11 @@ internal sealed class HybridCapabilityResolver(
         double rightNorm = 0;
         for (var index = 0; index < left.Length; index++)
         {
-            dot += left[index] * right[index];
-            leftNorm += left[index] * left[index];
-            rightNorm += right[index] * right[index];
+            var leftComponent = (double)left[index];
+            var rightComponent = (double)right[index];
+            dot += leftComponent * rightComponent;
+            leftNorm += leftComponent * leftComponent;
+            rightNorm += rightComponent * rightComponent;
         }
         if (leftNorm <= 0 || rightNorm <= 0) return 0;
         return Math.Clamp(dot / (Math.Sqrt(leftNorm) * Math.Sqrt(rightNorm)), 0, 1);

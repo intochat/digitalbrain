@@ -206,9 +206,9 @@ internal sealed class InoOperationWorkerGrain(
             await ExecuteApprovedEffectAsync(conversation, state, claimed, activity);
             return;
         }
-        var prompt = state.Turns.LastOrDefault(turn =>
-            turn.Kind == ConversationTurnKind.User && string.Equals(turn.OperationId, operationId, StringComparison.Ordinal))?.Text;
-        if (string.IsNullOrWhiteSpace(prompt) || state.Identity is null)
+        var originatingTurn = state.Turns.LastOrDefault(turn =>
+            turn.Kind == ConversationTurnKind.User && string.Equals(turn.OperationId, operationId, StringComparison.Ordinal));
+        if (originatingTurn is null || string.IsNullOrWhiteSpace(originatingTurn.Text) || state.Identity is null)
         {
             await RecordUnknownAsync(conversation, state, claimed, "The accepted request could not be recovered safely.", LeaseFence(claimed));
             return;
@@ -224,7 +224,7 @@ internal sealed class InoOperationWorkerGrain(
             result = await workflowRunner.ExecuteAsync(new(
                 operationId,
                 state.Identity.ConversationId,
-                prompt,
+                originatingTurn.Text,
                 history,
                 requestId,
                 authorizationResume,
@@ -232,7 +232,20 @@ internal sealed class InoOperationWorkerGrain(
                 RequestScope.Id(state.Identity.OwnerId, state.Identity.ActorId),
                 state.Identity.OwnerId,
                 state.Identity.ActorId,
-                claimed.Grants), deadline.Token);
+                claimed.Grants,
+                originatingTurn.CreatedAt), deadline.Token);
+        }
+        catch (FeatureCapabilityOutcomeUnknownException)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "feature-outcome-unknown");
+            activity?.SetTag("db.ino.outcome", "outcome-unknown");
+            await RecordUnknownAsync(
+                conversation,
+                await conversation.ReadAsync(),
+                claimed,
+                "The Feature may already have received this request. Check its results before trying again.",
+                LeaseFence(claimed));
+            return;
         }
         catch (OperationCanceledException)
         {
@@ -853,27 +866,34 @@ internal sealed class InoOperationWorkerGrain(
         string safeReason,
         ConversationLeaseFence? leaseFence = null)
     {
-        var current = state.Operations.FirstOrDefault(candidate =>
-            string.Equals(candidate.OperationId, claimed.OperationId, StringComparison.Ordinal));
-        if (current is null || IsTerminal(current.Status)) return;
-        var now = timeProvider.GetUtcNow();
-        try
+        var text = BoundedSafeText(safeReason, SafeFailure);
+        var fence = leaseFence ?? LeaseFence(claimed);
+        for (var attempt = 0; attempt < MaximumWorkflowResultPersistenceAttempts; attempt++)
         {
-            await conversation.CompleteWithAssistantAsync(
-                state.Revision,
-                current.OperationId,
-                ConversationOperationStatus.OutcomeUnknown,
-                ConversationTerminalPolicy.VerifyBeforeRetry,
-                safeReason,
-                safeReason,
-                CreateOutbox(state, current, current.OperationId, InoOperationPhase.OutcomeUnknown, checked(current.Version + 1), safeReason, now),
-                now,
-                workflow: null,
-                leaseFence: leaseFence);
+            var currentState = attempt == 0 ? state : await conversation.ReadAsync();
+            var current = LeaseOwnedRunningOperation(currentState, claimed.OperationId, fence);
+            if (current is null || current.Effect is not null) return;
+            var now = timeProvider.GetUtcNow();
+            try
+            {
+                await conversation.CompleteWithAssistantAsync(
+                    currentState.Revision,
+                    current.OperationId,
+                    ConversationOperationStatus.OutcomeUnknown,
+                    ConversationTerminalPolicy.VerifyBeforeRetry,
+                    text,
+                    text,
+                    CreateOutbox(currentState, current, current.OperationId, InoOperationPhase.OutcomeUnknown, checked(current.Version + 1), text, now),
+                    now,
+                    workflow: null,
+                    leaseFence: fence);
+                return;
+            }
+            catch (RuntimeStateConflictException)
+            {
+            }
         }
-        catch (RuntimeStateConflictException)
-        {
-        }
+        logger.LogWarning("INO outcome-unknown state for operation {OperationId} could not be recorded after bounded reconciliation.", claimed.OperationId);
     }
     private static ConversationOutboxEntry CreateOutbox(
         ConversationState state,

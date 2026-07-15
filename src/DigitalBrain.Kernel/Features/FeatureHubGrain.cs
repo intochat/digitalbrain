@@ -308,6 +308,27 @@ internal sealed class FeatureHubGrain(
         using var activity = Start("read-installed-draft");
         return Task.FromResult(Domain(() => FeatureDraftAuthoringTransitions.ReadInstalledDraft(State, installationId, release)));
     }
+    public async Task<FeatureCapabilityProjection[]> ReadCapabilityCatalogAsync(ActorId actorId)
+    {
+        using var activity = Start("read-capability-catalog");
+        var projected = FeatureHubTransitions.ProjectCapabilities(State, ParseKey(), actorId);
+        var executable = new List<FeatureCapabilityProjection>(projected.Length);
+        foreach (var projection in projected)
+        {
+            if (await HasExecutableRuntimeAsync(projection))
+                executable.Add(projection);
+        }
+        return executable.ToArray();
+    }
+    public async Task<FeatureAppendStatus> StartFeatureRunAsync(StartFeatureRun command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        using var activity = Start("start-feature-run", command.Input);
+        var ownerId = ParseKey();
+        var projection = Domain(() => FeatureHubTransitions.DemandFeatureRun(State, ownerId, command));
+        return await Resolver.Installation(ownerId, projection.InstallationId)
+            .AppendExactAsync(projection.Release, command.Input);
+    }
     public async Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command)
     {
         using var activity = Start("revise-behavior");
@@ -486,6 +507,10 @@ internal sealed class FeatureHubGrain(
     private IFeatureGrainResolver Resolver => new OrleansFeatureGrainResolver(grainFactory);
     private IFeatureInstallationGrain Installation(FeatureInstallationId installationId) =>
         Resolver.Installation(ParseKey(), installationId);
+    private async Task<bool> HasExecutableRuntimeAsync(FeatureCapabilityProjection projection)
+        => await FeatureRuntimeEligibility.IsExecutableAsync(
+            Installation(projection.InstallationId),
+            projection);
     private async Task AlignRuntimeRollbackAsync(RollbackFeatureInstallation command)
     {
         var installation = Installation(command.InstallationId);

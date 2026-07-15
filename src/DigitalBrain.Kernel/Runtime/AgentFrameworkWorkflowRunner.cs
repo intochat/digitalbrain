@@ -57,21 +57,24 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         activity?.SetTag("db.ino.request_id", request.RequestId);
         if (services.GetService<ICapabilityResolver>() is not { } resolver)
             return await RunGeneralAgentAsync(request, workflow, capability: null, cancellationToken).ConfigureAwait(false);
-        var catalog = services.GetRequiredService<ICapabilityCatalog>();
         var normalizedPrompt = NormalizeCapabilityPrompt(request.Prompt);
+        var snapshot = await ReadCapabilitySnapshotAsync(request, cancellationToken).ConfigureAwait(false);
+        if (snapshot is null)
+            return CapabilityCatalogUnavailableResult(workflow);
         var resolution = await resolver.ResolveAsync(
             new CapabilitySearchRequest(
                 normalizedPrompt,
                 (request.Grants ?? []).ToHashSet(StringComparer.Ordinal),
-                ComposedConnections(catalog),
-                MaximumCapabilityMatches),
+                snapshot.HealthyConnections,
+                MaximumCapabilityMatches,
+                snapshot.Descriptors),
             cancellationToken).ConfigureAwait(false);
         return resolution.Receipt.Kind switch
         {
             CapabilityResolutionKind.Ambiguous => AmbiguousResult(workflow, resolution),
             CapabilityResolutionKind.Missing => await CreateMissingCapabilityResultAsync(request, normalizedPrompt, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
             CapabilityResolutionKind.Match when !string.Equals(resolution.Receipt.CapabilityId, BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, StringComparison.Ordinal) =>
-                await AcknowledgeSelectedCapabilityAsync(normalizedPrompt, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
+                await ExecuteSelectedCapabilityAsync(request, normalizedPrompt, workflow, resolution, snapshot, cancellationToken).ConfigureAwait(false),
             _ => await RunGeneralAgentAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false)
         };
     }
@@ -105,19 +108,68 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         var normalized = WhitespaceRun.Replace(ControlCharacters.Replace(name, " "), " ").Trim();
         return normalized.Length > MaximumCandidateNameLength ? normalized[..MaximumCandidateNameLength] : normalized;
     }
-    private async Task<InoWorkflowResult> AcknowledgeSelectedCapabilityAsync(
+    private async Task<InoWorkflowResult> ExecuteSelectedCapabilityAsync(
+        InoWorkflowRequest request,
         string normalizedPrompt,
         WorkflowReference workflow,
-        CapabilityResolutionReceipt receipt,
+        CapabilityResolution resolution,
+        OwnerCapabilityCatalogSnapshot snapshot,
         CancellationToken cancellationToken)
     {
+        var descriptor = resolution.Selected
+            ?? throw new InvalidOperationException("A matched capability must include its selected descriptor.");
+        FeatureCapabilityBinding? featureBinding = null;
+        IFeatureCapabilityInvoker? featureInvoker = null;
+        if (descriptor.Origin == CapabilityOrigin.Feature)
+        {
+            featureBinding = snapshot.Bind(descriptor)?.Feature;
+            featureInvoker = services.GetService<IFeatureCapabilityInvoker>();
+            if (request.OwnerId is null || request.ActorId is null || request.OccurredAt is null ||
+                featureBinding is null || featureInvoker is null)
+                return FeatureUnavailableResult(workflow, resolution.Receipt);
+        }
         var parameterModel = services.GetRequiredService<ICapabilityParameterModel>();
-        await parameterModel.ExtractAsync(new CapabilityParameterRequest(receipt.CapabilityId!, normalizedPrompt), cancellationToken).ConfigureAwait(false);
+        var payload = await parameterModel.ExtractAsync(
+            new CapabilityParameterRequest(descriptor, normalizedPrompt),
+            cancellationToken).ConfigureAwait(false);
+        if (descriptor.Origin == CapabilityOrigin.Feature)
+        {
+            var result = await featureInvoker!.InvokeAsync(
+                new FeatureCapabilityInvocation(
+                    descriptor,
+                    featureBinding!,
+                    request.OwnerId!.Value,
+                    request.ActorId!.Value,
+                    request.OperationId,
+                    request.ConversationId,
+                    request.RequestId,
+                    request.OccurredAt!.Value,
+                    payload),
+                cancellationToken).ConfigureAwait(false);
+            return result.Status switch
+            {
+                FeatureCapabilityInvocationStatus.Started => new InoWorkflowResult(
+                    $"Started {resolution.Receipt.CapabilityName}.",
+                    workflow,
+                    Capability: resolution.Receipt),
+                FeatureCapabilityInvocationStatus.Busy => new InoWorkflowResult(
+                    $"{resolution.Receipt.CapabilityName} is busy right now. Try again shortly.",
+                    workflow,
+                    Capability: resolution.Receipt),
+                _ => FeatureUnavailableResult(workflow, resolution.Receipt)
+            };
+        }
         return new InoWorkflowResult(
-            $"I can help with that using {receipt.CapabilityName}.",
+            $"I can help with that using {resolution.Receipt.CapabilityName}.",
             workflow,
-            Capability: receipt);
+            Capability: resolution.Receipt);
     }
+    private static InoWorkflowResult FeatureUnavailableResult(
+        WorkflowReference workflow,
+        CapabilityResolutionReceipt receipt) =>
+        new("That Feature is not available right now. Check its access and connection, then try again.", workflow, Capability: receipt);
+    private static InoWorkflowResult CapabilityCatalogUnavailableResult(WorkflowReference workflow) =>
+        new("Capabilities are not available right now. Try again shortly.", workflow);
     private async Task<InoWorkflowResult> CreateMissingCapabilityResultAsync(
         InoWorkflowRequest request,
         string normalizedPrompt,
@@ -201,8 +253,30 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
             throw new InvalidOperationException("The workflow returned an empty response.");
         return new InoWorkflowResult(text, workflow, Capability: capability);
     }
-    private static IReadOnlySet<string> ComposedConnections(ICapabilityCatalog catalog) =>
-        catalog.Snapshot().SelectMany(static descriptor => descriptor.RequiredConnections).ToHashSet(StringComparer.Ordinal);
+    private async Task<OwnerCapabilityCatalogSnapshot?> ReadCapabilitySnapshotAsync(
+        InoWorkflowRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.OwnerId is { } ownerId && request.ActorId is { } actorId &&
+            services.GetService<IOwnerCapabilityCatalog>() is { } ownerCatalog)
+        {
+            try
+            {
+                return await ownerCatalog.ReadAsync(ownerId, actorId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
+        }
+        var entries = services.GetRequiredService<ICapabilityCatalog>().Snapshot()
+            .Where(static descriptor => descriptor.Available &&
+                descriptor.Origin == CapabilityOrigin.Platform &&
+                descriptor.RequiredConnections.Length == 0)
+            .Select(static descriptor => new CapabilityCatalogEntry(descriptor))
+            .ToArray();
+        return new OwnerCapabilityCatalogSnapshot(entries, new HashSet<string>(StringComparer.Ordinal));
+    }
     private static WorkflowReference ResolveWorkflowReference(InoWorkflowRequest request)
     {
         var workflowId = RunnerName + "-" + request.OperationId;

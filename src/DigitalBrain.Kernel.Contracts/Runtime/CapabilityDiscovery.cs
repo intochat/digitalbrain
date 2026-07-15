@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel.Contracts;
 using Orleans;
 
 namespace DigitalBrain.Kernel.Capabilities;
@@ -47,12 +48,60 @@ public sealed record CapabilitySearchRequest(
     string Prompt,
     IReadOnlySet<string> Grants,
     IReadOnlySet<string> Connections,
-    int MaximumMatches = 3);
+    int MaximumMatches = 3,
+    IReadOnlyList<CapabilityDescriptor>? Descriptors = null);
 
 public sealed record CapabilityResolution(
     CapabilityResolutionReceipt Receipt,
     CapabilityDescriptor? Selected,
     IReadOnlyList<CapabilityDescriptor> Candidates);
+
+public sealed record FeatureCapabilityBinding(
+    BrainOwnerId OwnerId,
+    ActorId ActorId,
+    FeatureInstallationId InstallationId,
+    ReleaseDigest Release,
+    GrantRevision GrantRevision,
+    string InputKind,
+    long PublicationFence,
+    string AuthorityDigest,
+    string AccessDigest,
+    CapabilityConnectionBinding[] RequiredConnections);
+
+public sealed record CapabilityConnectionBinding(
+    string Provider,
+    ProviderConnectionId? ConnectionId);
+
+public sealed record CapabilityCatalogEntry(
+    CapabilityDescriptor Descriptor,
+    FeatureCapabilityBinding? Feature = null);
+
+public sealed record OwnerCapabilityCatalogSnapshot(
+    IReadOnlyList<CapabilityCatalogEntry> Entries,
+    IReadOnlySet<string> HealthyConnections)
+{
+    public IReadOnlyList<CapabilityDescriptor> Descriptors => Entries.Select(static entry => entry.Descriptor).ToArray();
+
+    public CapabilityCatalogEntry? Bind(CapabilityDescriptor descriptor) => Entries.SingleOrDefault(entry =>
+        string.Equals(entry.Descriptor.Id, descriptor.Id, StringComparison.Ordinal) &&
+        entry.Descriptor.Version == descriptor.Version &&
+        string.Equals(entry.Descriptor.Name, descriptor.Name, StringComparison.Ordinal) &&
+        string.Equals(entry.Descriptor.Description, descriptor.Description, StringComparison.Ordinal) &&
+        entry.Descriptor.Examples.SequenceEqual(descriptor.Examples, StringComparer.Ordinal) &&
+        entry.Descriptor.RequiredGrants.SequenceEqual(descriptor.RequiredGrants, StringComparer.Ordinal) &&
+        entry.Descriptor.RequiredConnections.SequenceEqual(descriptor.RequiredConnections, StringComparer.Ordinal) &&
+        entry.Descriptor.Origin == descriptor.Origin &&
+        entry.Descriptor.Kind == descriptor.Kind &&
+        entry.Descriptor.Available == descriptor.Available);
+}
+
+public interface IOwnerCapabilityCatalog
+{
+    Task<OwnerCapabilityCatalogSnapshot> ReadAsync(
+        BrainOwnerId ownerId,
+        ActorId actorId,
+        CancellationToken cancellationToken = default);
+}
 
 public interface ICapabilityCatalog
 {

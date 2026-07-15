@@ -13,6 +13,157 @@ public sealed class FeatureInstallationTransitionTests
     private static readonly DateTimeOffset Now = new(2026, 7, 13, 8, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Exact_append_rejects_stale_and_unconfirmed_releases_before_acknowledging_a_duplicate()
+    {
+        var input = Input("input-exact-release");
+        var accepted = FeatureInstallationTransitions.AppendExact(State(), ReleaseOne, input, Now);
+        var duplicate = FeatureInstallationTransitions.AppendExact(
+            accepted.State,
+            ReleaseOne,
+            input,
+            Now.AddSeconds(1));
+        var switched = FeatureInstallationTransitions.SwitchRelease(accepted.State, ReleaseTwo);
+        var unconfirmed = accepted.State with
+        {
+            UnconfirmedReleaseSwitch = new FeatureReleaseSwitch(
+                "operation-exact-release",
+                ReleaseOne,
+                null,
+                ReleaseOne,
+                accepted.State.Revision,
+                accepted.State.Revision)
+        };
+
+        var stale = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureInstallationTransitions.AppendExact(switched, ReleaseOne, input, Now.AddSeconds(2)));
+        var unpublished = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureInstallationTransitions.AppendExact(unconfirmed, ReleaseOne, input, Now.AddSeconds(2)));
+
+        Assert.Equal(FeatureAppendStatus.Accepted, accepted.Status);
+        Assert.Equal(FeatureAppendStatus.Duplicate, duplicate.Status);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, stale.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, unpublished.Reason);
+    }
+
+    [Fact]
+    public void Exact_append_retains_the_accepted_release_when_claimed_after_an_update()
+    {
+        var accepted = FeatureInstallationTransitions.AppendExact(
+            State(),
+            ReleaseOne,
+            Input("input-before-update"),
+            Now);
+        var updated = FeatureInstallationTransitions.SwitchRelease(accepted.State, ReleaseTwo);
+
+        var claimed = FeatureInstallationTransitions.Claim(
+            updated,
+            "host-after-update",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+
+        Assert.Equal(ReleaseOne, Assert.IsType<FeatureRunClaim>(claimed.Claim).Release);
+    }
+
+    [Fact]
+    public void Ambiguous_legacy_inbox_entries_are_parked_instead_of_guessed_across_release_mutations()
+    {
+        var acceptedBeforeUpdate = FeatureInstallationTransitions.Append(
+            State(),
+            Input("legacy-before-update"),
+            Now).State;
+        var legacyBeforeUpdate = acceptedBeforeUpdate with
+        {
+            Inbox = [acceptedBeforeUpdate.Inbox[0] with { AcceptedRelease = null }]
+        };
+        var updated = FeatureInstallationTransitions.SwitchRelease(legacyBeforeUpdate, ReleaseTwo);
+
+        var updateClaim = FeatureInstallationTransitions.Claim(
+            updated,
+            "host-legacy-update",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+
+        var acceptedBeforeRollback = FeatureInstallationTransitions.Append(
+            FeatureInstallationState.Create(ReleaseTwo, InstallationId) with { PreviousRelease = ReleaseOne },
+            Input("legacy-before-rollback"),
+            Now).State;
+        var legacyBeforeRollback = acceptedBeforeRollback with
+        {
+            Inbox = [acceptedBeforeRollback.Inbox[0] with { AcceptedRelease = null }]
+        };
+        var rolledBack = FeatureInstallationTransitions.Rollback(legacyBeforeRollback);
+
+        var rollbackClaim = FeatureInstallationTransitions.Claim(
+            rolledBack,
+            "host-legacy-rollback",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+
+        Assert.Null(updateClaim.Claim);
+        Assert.Null(rollbackClaim.Claim);
+        Assert.True(Assert.Single(updateClaim.State.Inbox).Parked);
+        Assert.True(Assert.Single(rollbackClaim.State.Inbox).Parked);
+        Assert.Null(Assert.Single(updateClaim.State.Inbox).AcceptedRelease);
+        Assert.Null(Assert.Single(rollbackClaim.State.Inbox).AcceptedRelease);
+    }
+
+    [Fact]
+    public void Ambiguous_legacy_inbox_entries_are_parked_during_and_after_an_old_schema_switch()
+    {
+        var accepted = FeatureInstallationTransitions.Append(
+            State(),
+            Input("legacy-mid-switch"),
+            Now).State;
+        var legacy = accepted with
+        {
+            ActiveRelease = ReleaseTwo,
+            PreviousRelease = ReleaseOne,
+            Inbox = [accepted.Inbox[0] with { AcceptedRelease = null }],
+            UnconfirmedReleaseSwitch = new FeatureReleaseSwitch(
+                "legacy-switch",
+                ReleaseOne,
+                null,
+                ReleaseTwo,
+                accepted.Revision,
+                checked(accepted.Revision + 1)),
+            Revision = checked(accepted.Revision + 1)
+        };
+
+        var duringSwitch = FeatureInstallationTransitions.Claim(
+            legacy,
+            "host-legacy-mid-switch",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var afterSwitch = FeatureInstallationTransitions.Claim(
+            legacy with { UnconfirmedReleaseSwitch = null },
+            "host-legacy-after-switch",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+
+        Assert.Null(duringSwitch.Claim);
+        Assert.Null(afterSwitch.Claim);
+        Assert.True(Assert.Single(duringSwitch.State.Inbox).Parked);
+        Assert.True(Assert.Single(afterSwitch.State.Inbox).Parked);
+    }
+
+    [Fact]
+    public void Exact_append_keeps_the_first_payload_when_a_model_retry_extracts_different_arguments()
+    {
+        var firstInput = Input("input-model-retry");
+        var changedRetry = firstInput with { PayloadJson = "{\"changed\":true}" };
+        var accepted = FeatureInstallationTransitions.AppendExact(State(), ReleaseOne, firstInput, Now);
+
+        var duplicate = FeatureInstallationTransitions.AppendExact(
+            accepted.State,
+            ReleaseOne,
+            changedRetry,
+            Now.AddSeconds(1));
+
+        Assert.Equal(FeatureAppendStatus.Duplicate, duplicate.Status);
+        Assert.Equal(firstInput, Assert.Single(duplicate.State.Inbox).Input);
+    }
+
+    [Fact]
     public void Duplicate_input_is_acknowledged_without_growing_the_inbox()
     {
         var state = State();
@@ -23,6 +174,27 @@ public sealed class FeatureInstallationTransitionTests
         Assert.Equal(FeatureAppendStatus.Duplicate, duplicate.Status);
         Assert.Single(duplicate.State.Inbox);
         Assert.Equal(first.State.Revision, duplicate.State.Revision);
+    }
+
+    [Fact]
+    public void A_parked_duplicate_is_not_acknowledged_as_runnable()
+    {
+        var input = Input("input-parked-duplicate");
+        var accepted = FeatureInstallationTransitions.AppendExact(State(), ReleaseOne, input, Now);
+        var parked = accepted.State with
+        {
+            Paused = true,
+            PauseReason = "attempt limit reached",
+            Inbox = [accepted.State.Inbox[0] with { Parked = true }]
+        };
+
+        var duplicate = FeatureInstallationTransitions.AppendExact(
+            parked,
+            ReleaseOne,
+            input,
+            Now.AddSeconds(1));
+
+        Assert.Equal(FeatureAppendStatus.Paused, duplicate.Status);
     }
 
     [Fact]
@@ -583,7 +755,7 @@ public sealed class FeatureInstallationTransitionTests
         Assert.Equal("connection-new", Assert.Single(authority.ActiveGrants).ProviderConnectionId?.Value);
         Assert.Equal(ReleaseOne, authority.PreviousRelease);
         Assert.Equal("capability.previous", Assert.Single(authority.PreviousGrants).CapabilityId);
-        Assert.Equal(["previous-event"], authority.PreviousSubscriptions);
+        Assert.Equal(["previous-event"], authority.PreviousSubscriptions!);
         Assert.Null(authority.PendingRelease);
     }
 

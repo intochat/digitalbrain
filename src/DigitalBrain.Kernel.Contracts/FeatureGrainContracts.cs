@@ -155,6 +155,31 @@ public sealed record FeatureGrantSnapshot(
     [property: Id(3)] GrantRevision Revision,
     [property: Id(4)] ActorId ActorId,
     [property: Id(5)] bool Paused);
+[GenerateSerializer, Alias("digitalbrain.feature.capability-projection.v1")]
+public sealed record FeatureCapabilityProjection(
+    [property: Id(0)] BrainOwnerId OwnerId,
+    [property: Id(1)] FeatureInstallationId InstallationId,
+    [property: Id(2)] ActorId ActorId,
+    [property: Id(3)] ReleaseDigest Release,
+    [property: Id(4)] GrantRevision GrantRevision,
+    [property: Id(5)] string Goal,
+    [property: Id(6)] FeatureScenario[] Scenarios,
+    [property: Id(7)] FeatureGrantSpec[] Grants,
+    [property: Id(8)] string InputKind,
+    [property: Id(9)] long PublicationFence,
+    [property: Id(10)] string AuthorityDigest,
+    [property: Id(11)] string AccessDigest);
+[GenerateSerializer, Alias("digitalbrain.feature.start-run.v1")]
+public sealed record StartFeatureRun(
+    [property: Id(0)] BrainOwnerId OwnerId,
+    [property: Id(1)] ActorId ActorId,
+    [property: Id(2)] FeatureInstallationId InstallationId,
+    [property: Id(3)] ReleaseDigest Release,
+    [property: Id(4)] GrantRevision GrantRevision,
+    [property: Id(5)] long PublicationFence,
+    [property: Id(6)] string AuthorityDigest,
+    [property: Id(7)] string AccessDigest,
+    [property: Id(8)] FeatureInput Input);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-input")]
 public sealed record FeatureInput(
     [property: Id(0)] string InputId,
@@ -500,6 +525,13 @@ public interface IFeatureHubGrain : IGrainWithStringKey
     Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId);
     [Alias("read-installed-draft")]
     Task<FeatureDraft?> ReadInstalledDraftAsync(FeatureInstallationId installationId, ReleaseDigest release);
+    [Alias("read-capability-catalog")]
+    Task<FeatureCapabilityProjection[]> ReadCapabilityCatalogAsync(ActorId actorId) =>
+        Task.FromResult(Array.Empty<FeatureCapabilityProjection>());
+    [Alias("start-feature-run")]
+    Task<FeatureAppendStatus> StartFeatureRunAsync(StartFeatureRun command) =>
+        Task.FromException<FeatureAppendStatus>(
+            new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
     [Alias("revise-behavior")]
     Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command);
     [Alias("revise-source")]
@@ -560,6 +592,10 @@ public interface IFeatureInstallationGrain : IGrainWithStringKey
     Task InitializeAsync(ReleaseDigest release);
     [Alias("append")]
     Task<FeatureAppendStatus> AppendAsync(FeatureInput input);
+    [Alias("append-exact")]
+    Task<FeatureAppendStatus> AppendExactAsync(ReleaseDigest expectedRelease, FeatureInput input) =>
+        Task.FromException<FeatureAppendStatus>(
+            new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
     [Alias("claim")]
     Task<FeatureRunClaim?> ClaimAsync(string hostId, TimeSpan leaseDuration);
     [Alias("fail")]

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Capabilities;
@@ -6,6 +7,7 @@ using DigitalBrain.Kernel.Contracts.Runtime;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
@@ -71,6 +73,66 @@ public sealed class InoWorkflowFailureTests : NeuronTestBase
         Assert.Equal(1, _workflowRunner.CallCount);
     }
 
+    [Fact]
+    public async Task Feature_invocation_conflict_is_outcome_unknown_and_requires_verification()
+    {
+        _workflowRunner.SetFailure(new FeatureCapabilityOutcomeUnknownException());
+
+        var (operation, state) = await SubmitAndWaitForTransitionAsync("feature-outcome-unknown");
+
+        Assert.Equal(ConversationOperationStatus.OutcomeUnknown, operation.Status);
+        Assert.Equal(ConversationTerminalPolicy.VerifyBeforeRetry, operation.TerminalPolicy);
+        Assert.Equal(1, _workflowRunner.CallCount);
+        Assert.Contains(state.Outbox, entry =>
+            OperationOutboxRecord.TryRead(entry.PayloadUtf8, out var record) &&
+            record is { Phase: InoOperationPhase.OutcomeUnknown });
+    }
+
+    [Fact]
+    public async Task Feature_outcome_unknown_reconciles_a_concurrent_revision_before_returning()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var fence = new ConversationLeaseFence("lease-owner", 1);
+        var operation = new ConversationOperation(
+            "operation-conflict",
+            "command-conflict",
+            ConversationOperationStatus.Running,
+            fence.Attempt,
+            null,
+            fence.LeaseOwner,
+            now.AddMinutes(1),
+            ConversationTerminalPolicy.NeverRetry,
+            null,
+            null,
+            now,
+            2,
+            RequestId: "request-conflict");
+        var stale = RunningState(4, operation, now);
+        var current = RunningState(5, operation, now);
+        var conversation = DispatchProxy.Create<IConversationNeuron, ConflictingConversationProxy>();
+        var proxy = (ConflictingConversationProxy)(object)conversation;
+        proxy.Current = current;
+        var worker = new InoOperationWorkerGrain(
+            null!,
+            _workflowRunner,
+            new DisabledInoEffectExecutor(),
+            [],
+            TimeProvider.System,
+            NullLogger<InoOperationWorkerGrain>.Instance);
+        var method = typeof(InoOperationWorkerGrain).GetMethod(
+            "RecordUnknownAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new Xunit.Sdk.XunitException("RecordUnknownAsync was not found.");
+
+        await (Task)(method.Invoke(
+            worker,
+            [conversation, stale, operation, "Verify the Feature result before retrying.", fence])
+            ?? throw new Xunit.Sdk.XunitException("RecordUnknownAsync returned no task."));
+
+        Assert.Equal(2, proxy.CompleteCalls);
+        Assert.Equal(1, proxy.ReadCalls);
+    }
+
     private async Task<(ConversationOperation Operation, ConversationState State)> SubmitAndWaitForTransitionAsync(string suffix)
     {
         var owner = new BrainOwnerId("owner");
@@ -121,12 +183,53 @@ public sealed class InoWorkflowFailureTests : NeuronTestBase
         {
             var operation = (await conversation.ReadAsync()).Operations.Single(candidate =>
                 string.Equals(candidate.OperationId, operationId, StringComparison.Ordinal));
-            if (operation.Status is ConversationOperationStatus.Failed or ConversationOperationStatus.RetryScheduled)
+            if (operation.Status is ConversationOperationStatus.Failed or ConversationOperationStatus.RetryScheduled or ConversationOperationStatus.OutcomeUnknown)
                 return operation;
             await Task.Delay(TimeSpan.FromMilliseconds(50));
         }
 
         throw new Xunit.Sdk.XunitException("The workflow did not leave its running state.");
+    }
+
+    private static ConversationState RunningState(
+        long revision,
+        ConversationOperation operation,
+        DateTimeOffset now) =>
+        new(
+            RuntimeStateSchemas.Conversation,
+            revision,
+            ConversationLifecycle.Active,
+            new ConversationIdentity(new BrainOwnerId("owner"), new ActorId("principal"), "conversation-conflict"),
+            [new ConversationTurn(1, "user", "run the Feature", now, operation.OperationId, ConversationTurnKind.User, operation.CommandId)],
+            [],
+            [operation],
+            [],
+            null,
+            null,
+            []);
+
+    public class ConflictingConversationProxy : DispatchProxy
+    {
+        public ConversationState Current { get; set; } = null!;
+        public int CompleteCalls { get; private set; }
+        public int ReadCalls { get; private set; }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IConversationNeuron.ReadAsync))
+            {
+                ReadCalls++;
+                return Task.FromResult(Current);
+            }
+            if (targetMethod?.Name == nameof(IConversationNeuron.CompleteWithAssistantAsync))
+            {
+                CompleteCalls++;
+                return CompleteCalls == 1
+                    ? Task.FromException<ConversationState>(new RuntimeStateConflictException(4, 5))
+                    : Task.FromResult(Current);
+            }
+            throw new NotSupportedException(targetMethod?.Name);
+        }
     }
 
     private sealed class FailingWorkflowRunner : IAgentWorkflowRunner

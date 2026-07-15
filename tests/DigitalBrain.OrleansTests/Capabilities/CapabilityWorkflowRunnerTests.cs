@@ -13,6 +13,8 @@ namespace DigitalBrain.OrleansTests.Capabilities;
 public sealed class CapabilityWorkflowRunnerTests
 {
     private static readonly BrainOwnerId Owner = new("owner-1");
+    private static readonly ActorId Actor = new("actor-1");
+    private static readonly DateTimeOffset OccurredAt = new(2026, 7, 15, 9, 0, 0, TimeSpan.Zero);
     private readonly RecordingChatClient _chat = new();
     private readonly RecordingCapabilityParameterModel _parameterModel = new();
 
@@ -233,7 +235,118 @@ public sealed class CapabilityWorkflowRunnerTests
         Assert.Equal(0, _parameterModel.CallCount);
     }
 
-    private AgentFrameworkWorkflowRunner Runner(ICapabilityResolver resolver, IFeatureGrainResolver? featureGrainResolver = null)
+    [Fact]
+    public async Task ExecuteAsync_uses_one_owner_snapshot_to_select_extract_and_invoke_a_feature()
+    {
+        var descriptor = new CapabilityDescriptor(
+            "feature.opaque",
+            1,
+            "Inbox brief",
+            "Summarize the selected inbox",
+            [],
+            [],
+            [],
+            CapabilityOrigin.Feature,
+            CapabilityOperationKind.InternalWrite,
+            true);
+        var binding = new FeatureCapabilityBinding(
+            Owner,
+            Actor,
+            new FeatureInstallationId("inbox-brief"),
+            new ReleaseDigest(new string('a', 64)),
+            new GrantRevision(2),
+            "manual",
+            3,
+            "authority-digest",
+            "access-digest",
+            []);
+        var snapshot = new OwnerCapabilityCatalogSnapshot(
+            [new CapabilityCatalogEntry(descriptor, binding)],
+            new HashSet<string>(StringComparer.Ordinal));
+        var ownerCatalog = new RecordingOwnerCapabilityCatalog(snapshot);
+        var resolver = new RecordingCapabilityResolver(new CapabilityResolution(
+            new CapabilityResolutionReceipt(CapabilityResolutionKind.Match, descriptor.Id, descriptor.Name, [descriptor.Id], 1),
+            descriptor,
+            [descriptor]));
+        var invoker = new RecordingFeatureCapabilityInvoker(FeatureCapabilityInvocationStatus.Started);
+        var runner = Runner(resolver, ownerCatalog: ownerCatalog, featureInvoker: invoker);
+
+        var result = await runner.ExecuteAsync(Request("summarize my inbox", Owner, Actor, OccurredAt));
+
+        Assert.Equal(1, ownerCatalog.CallCount);
+        Assert.Same(descriptor, Assert.Single(resolver.LastRequest!.Descriptors!));
+        Assert.Same(descriptor, _parameterModel.LastRequest?.Descriptor);
+        Assert.Same(binding, invoker.LastInvocation?.Binding);
+        Assert.Equal(OccurredAt, invoker.LastInvocation?.OccurredAt);
+        Assert.Equal("Started Inbox brief.", result.Text);
+        Assert.Equal(0, _chat.CallCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_does_not_claim_a_feature_started_when_the_invoker_is_busy()
+    {
+        var descriptor = new CapabilityDescriptor(
+            "feature.opaque",
+            1,
+            "Inbox brief",
+            "Summarize the selected inbox",
+            [],
+            [],
+            [],
+            CapabilityOrigin.Feature,
+            CapabilityOperationKind.InternalWrite,
+            true);
+        var binding = new FeatureCapabilityBinding(
+            Owner,
+            Actor,
+            new FeatureInstallationId("inbox-brief"),
+            new ReleaseDigest(new string('a', 64)),
+            new GrantRevision(2),
+            "manual",
+            3,
+            "authority-digest",
+            "access-digest",
+            []);
+        var snapshot = new OwnerCapabilityCatalogSnapshot(
+            [new CapabilityCatalogEntry(descriptor, binding)],
+            new HashSet<string>(StringComparer.Ordinal));
+        var invoker = new RecordingFeatureCapabilityInvoker(FeatureCapabilityInvocationStatus.Busy);
+        var runner = Runner(
+            new RecordingCapabilityResolver(new CapabilityResolution(
+                new CapabilityResolutionReceipt(CapabilityResolutionKind.Match, descriptor.Id, descriptor.Name, [descriptor.Id], 1),
+                descriptor,
+                [descriptor])),
+            ownerCatalog: new RecordingOwnerCapabilityCatalog(snapshot),
+            featureInvoker: invoker);
+
+        var result = await runner.ExecuteAsync(Request("summarize my inbox", Owner, Actor, OccurredAt));
+
+        Assert.Contains("busy", result.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Started", result.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_does_not_create_a_draft_when_the_owner_catalog_is_unavailable()
+    {
+        var resolver = new RecordingCapabilityResolver(Missing());
+        var hub = new RecordingFeatureHubGrain();
+        var runner = Runner(
+            resolver,
+            new RecordingFeatureGrainResolver(hub),
+            new ThrowingOwnerCapabilityCatalog());
+
+        var result = await runner.ExecuteAsync(Request("schedule a quarterly review", Owner, Actor, OccurredAt));
+
+        Assert.Contains("not available", result.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, resolver.CallCount);
+        Assert.Equal(0, hub.CreateDraftCallCount);
+    }
+
+    private AgentFrameworkWorkflowRunner Runner(
+        ICapabilityResolver resolver,
+        IFeatureGrainResolver? featureGrainResolver = null,
+        IOwnerCapabilityCatalog? ownerCatalog = null,
+        IFeatureCapabilityInvoker? featureInvoker = null)
     {
         var services = new ServiceCollection()
             .AddSingleton<IChatClient>(_chat)
@@ -242,16 +355,26 @@ public sealed class CapabilityWorkflowRunnerTests
             .AddSingleton<ICapabilityCatalog>(new StubCapabilityCatalog());
         if (featureGrainResolver is not null)
             services.AddSingleton(featureGrainResolver);
+        if (ownerCatalog is not null)
+            services.AddSingleton(ownerCatalog);
+        if (featureInvoker is not null)
+            services.AddSingleton(featureInvoker);
         return new AgentFrameworkWorkflowRunner(services.BuildServiceProvider());
     }
 
-    private static InoWorkflowRequest Request(string prompt, BrainOwnerId? ownerId = null) => new(
+    private static InoWorkflowRequest Request(
+        string prompt,
+        BrainOwnerId? ownerId = null,
+        ActorId? actorId = null,
+        DateTimeOffset? occurredAt = null) => new(
         "operation-1",
         "conversation-1",
         prompt,
         [],
         "request-1",
-        OwnerId: ownerId);
+        OwnerId: ownerId,
+        ActorId: actorId,
+        OccurredAt: occurredAt);
 
     private static CapabilityResolution Match(string capabilityId, string name) => new(
         new CapabilityResolutionReceipt(CapabilityResolutionKind.Match, capabilityId, name, [capabilityId], 0.9),
@@ -293,6 +416,45 @@ public sealed class CapabilityWorkflowRunnerTests
             CallCount++;
             LastRequest = request;
             return Task.FromResult(result);
+        }
+    }
+
+    private sealed class RecordingOwnerCapabilityCatalog(OwnerCapabilityCatalogSnapshot snapshot)
+        : IOwnerCapabilityCatalog
+    {
+        public int CallCount { get; private set; }
+
+        public Task<OwnerCapabilityCatalogSnapshot> ReadAsync(
+            BrainOwnerId ownerId,
+            ActorId actorId,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(snapshot);
+        }
+    }
+
+    private sealed class ThrowingOwnerCapabilityCatalog : IOwnerCapabilityCatalog
+    {
+        public Task<OwnerCapabilityCatalogSnapshot> ReadAsync(
+            BrainOwnerId ownerId,
+            ActorId actorId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<OwnerCapabilityCatalogSnapshot>(
+                new InvalidOperationException("owner catalog unavailable"));
+    }
+
+    private sealed class RecordingFeatureCapabilityInvoker(FeatureCapabilityInvocationStatus status)
+        : IFeatureCapabilityInvoker
+    {
+        public FeatureCapabilityInvocation? LastInvocation { get; private set; }
+
+        public Task<FeatureCapabilityInvocationResult> InvokeAsync(
+            FeatureCapabilityInvocation invocation,
+            CancellationToken cancellationToken = default)
+        {
+            LastInvocation = invocation;
+            return Task.FromResult(new FeatureCapabilityInvocationResult(status));
         }
     }
 

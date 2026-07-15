@@ -240,7 +240,8 @@ public sealed record InoWorkflowRequest(
     string? ActorScope = null,
     BrainOwnerId? OwnerId = null,
     ActorId? ActorId = null,
-    IReadOnlyList<string>? Grants = null);
+    IReadOnlyList<string>? Grants = null,
+    DateTimeOffset? OccurredAt = null);
 public enum InoToolAccess { Read, Mutation }
 public sealed record InoToolRequest(string ToolId, InoToolAccess Access, string Scope, string SafeSummary);
 public sealed record InoApprovedTool(string ToolId, string Scope, string SafeSummary);

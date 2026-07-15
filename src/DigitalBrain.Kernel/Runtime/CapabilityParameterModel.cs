@@ -12,33 +12,31 @@ public sealed record CapabilityParameterRequest
 {
     internal const int MaximumPromptLength = 4096;
 
-    public CapabilityParameterRequest(string capabilityId, string prompt)
+    public CapabilityParameterRequest(CapabilityDescriptor descriptor, string prompt)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(capabilityId);
+        ArgumentNullException.ThrowIfNull(descriptor);
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         if (prompt.Length > MaximumPromptLength || prompt.Any(char.IsControl))
             throw new ArgumentException("Capability extraction prompts must be at most 4096 characters and contain no control characters.", nameof(prompt));
-        CapabilityId = capabilityId;
+        Descriptor = descriptor;
         Prompt = prompt;
     }
 
-    public string CapabilityId { get; }
+    public CapabilityDescriptor Descriptor { get; }
+    public string CapabilityId => Descriptor.Id;
     public string Prompt { get; }
 }
 
-public sealed class CapabilityParameterModel(IChatClient chatClient, ICapabilityCatalog catalog) : ICapabilityParameterModel
+public sealed class CapabilityParameterModel(IChatClient chatClient) : ICapabilityParameterModel
 {
     private static readonly JsonElement ExtractionSchema = CreateExtractionSchema();
 
     public async Task<RetainedInoCapabilityPayload> ExtractAsync(CapabilityParameterRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var descriptor = catalog.Snapshot().FirstOrDefault(candidate =>
-                string.Equals(candidate.Id, request.CapabilityId, StringComparison.Ordinal))
-            ?? throw new ArgumentException($"Unknown capability '{request.CapabilityId}'.", nameof(request));
 
         var response = await chatClient.GetResponseAsync(
-            [new ChatMessage(ChatRole.User, BuildExtractionGuidance(descriptor, request.Prompt))],
+            [new ChatMessage(ChatRole.User, BuildExtractionGuidance(request.Descriptor, request.Prompt))],
             new ChatOptions
             {
                 ResponseFormat = ChatResponseFormat.ForJsonSchema(

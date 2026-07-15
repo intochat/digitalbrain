@@ -95,6 +95,29 @@ public sealed class HybridCapabilityResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_uses_the_supplied_owner_snapshot_instead_of_the_global_catalog()
+    {
+        var descriptor = new CapabilityDescriptor(
+            "feature.opaque",
+            1,
+            "Daily inbox brief",
+            "Summarize the selected inbox",
+            ["summarize my inbox"],
+            [],
+            [],
+            CapabilityOrigin.Feature,
+            CapabilityOperationKind.InternalWrite,
+            true);
+        var request = Request("Daily inbox brief") with { Descriptors = [descriptor] };
+
+        var result = await ResolverWithZeroVectors().ResolveAsync(request);
+
+        Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
+        Assert.Same(descriptor, result.Selected);
+        Assert.Equal("feature.opaque", result.Receipt.CapabilityId);
+    }
+
+    [Fact]
     public async Task ResolveAsync_falls_back_to_deterministic_scoring_when_the_embedder_fails()
     {
         var resolver = new HybridCapabilityResolver(Catalog(), new ThrowingEmbeddingGenerator());
@@ -103,6 +126,42 @@ public sealed class HybridCapabilityResolverTests
 
         Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
         Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Receipt.CapabilityId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_rejects_non_finite_embeddings_before_owner_feature_selection()
+    {
+        var first = new CapabilityDescriptor(
+            "feature.first",
+            1,
+            "Daily inbox brief",
+            "Summarize messages from the selected inbox",
+            ["summarize my inbox"],
+            [],
+            [],
+            CapabilityOrigin.Feature,
+            CapabilityOperationKind.InternalWrite,
+            true);
+        var second = first with
+        {
+            Id = "feature.second",
+            Name = "Company research brief",
+            Description = "Research a selected company",
+            Examples = ["research this company"]
+        };
+        const string prompt = "transcode the lunar archive";
+        var resolver = Resolver(new Dictionary<string, float[]>
+        {
+            [prompt] = [float.NaN, 1],
+            [HybridCapabilityResolver.SearchDocument(first)] = [1, 0],
+            [HybridCapabilityResolver.SearchDocument(second)] = [0, 1]
+        });
+        var request = Request(prompt) with { Descriptors = [first, second] };
+
+        var result = await resolver.ResolveAsync(request);
+
+        Assert.Equal(CapabilityResolutionKind.Missing, result.Receipt.Kind);
+        Assert.Null(result.Selected);
     }
 
     [Fact]

@@ -1,10 +1,14 @@
 extern alias McpProject;
 
+using System.Text.Json;
 using Azure;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
+using DigitalBrain.Kernel.Features;
+using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.OrleansTests.Capabilities;
+using Microsoft.Extensions.AI;
 using FeatureArtifactCatalog = McpProject::DigitalBrain.Mcp.IFeatureArtifactCatalog;
 using FeatureAuthoringService = McpProject::DigitalBrain.Mcp.FeatureAuthoringService;
 using FeatureBuildArtifact = McpProject::DigitalBrain.Mcp.FeatureBuildArtifact;
@@ -1037,6 +1041,56 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
             lifecycle,
             fixture.Time,
             capabilityCatalog);
+        var grainResolver = new OrleansFeatureGrainResolver(fixture.Cluster.Client);
+        var connectionHealth = new PassThroughConnectionHealth();
+        var staticCatalog = new BuiltInCapabilityCatalog([]);
+        var ownerCatalog = new OwnerCapabilityCatalog(
+            staticCatalog,
+            new FeatureCapabilityProjectionSource(grainResolver),
+            connectionHealth);
+        var resolver = new HybridCapabilityResolver(staticCatalog, new UnexpectedEmbeddingGenerator());
+        var invoker = new FeatureCapabilityInvoker(new FeatureRunGateway(grainResolver), connectionHealth);
+        var installation = fixture.Grain<IFeatureInstallationGrain>(
+            FeatureGrainIds.Installation(context.OwnerId, installationId));
+
+        async Task<FeatureRunClaim> ResolveInvokeAndClaimAsync(string suffix, ReleaseDigest expectedRelease)
+        {
+            var snapshot = await ownerCatalog.ReadAsync(context.OwnerId, context.ActorId);
+            var entry = Assert.Single(snapshot.Entries, candidate =>
+                candidate.Descriptor.Origin == CapabilityOrigin.Feature);
+            var resolution = await resolver.ResolveAsync(new CapabilitySearchRequest(
+                entry.Descriptor.Name,
+                new HashSet<string>(StringComparer.Ordinal),
+                snapshot.HealthyConnections,
+                Descriptors: snapshot.Descriptors));
+            Assert.Equal(CapabilityResolutionKind.Match, resolution.Receipt.Kind);
+            Assert.Same(entry.Descriptor, resolution.Selected);
+            var arguments = JsonSerializer.Deserialize<JsonElement>("{\"request\":\"" + suffix + "\"}");
+            var invocation = await invoker.InvokeAsync(new FeatureCapabilityInvocation(
+                entry.Descriptor,
+                Assert.IsType<FeatureCapabilityBinding>(entry.Feature),
+                context.OwnerId,
+                context.ActorId,
+                "operation-" + suffix,
+                "conversation-governed-update",
+                "request-" + suffix,
+                fixture.Time.GetUtcNow(),
+                new RetainedInoCapabilityPayload(entry.Descriptor.Id, arguments)));
+            Assert.Equal(FeatureCapabilityInvocationStatus.Started, invocation.Status);
+            var claim = Assert.IsType<FeatureRunClaim>(
+                await installation.ClaimAsync("host-" + suffix, TimeSpan.FromSeconds(60)));
+            Assert.Equal(expectedRelease, claim.Release);
+            return claim;
+        }
+
+        async Task CompleteAsync(FeatureRunClaim claim) =>
+            await installation.CommitAsync(new FeatureRunCommit(
+                claim.Fence,
+                "{}",
+                [],
+                new FeatureResourceUsage(0, 0),
+                "{\"ok\":true}"));
+
         var draftA = await VerifiedDraftAsync(hub, "governed-update-a", releaseA);
         var reviewA = await service.PrepareAccessReviewAsync(context, new PrepareFeatureAccessReview(
             draftA.DraftId,
@@ -1054,6 +1108,8 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
             reviewA.Subscriptions,
             "decision-governed-a",
             "install-governed-a"));
+        var projectedA = Assert.Single(await hub.ReadCapabilityCatalogAsync(context.ActorId));
+        await CompleteAsync(await ResolveInvokeAndClaimAsync("governed-a", releaseA.Digest));
         var draftB = await VerifiedDraftAsync(hub, "governed-update-b", releaseB);
 
         var review = await service.PrepareAccessReviewAsync(context, new PrepareFeatureAccessReview(
@@ -1072,12 +1128,27 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
             review.Subscriptions,
             "decision-governed-b",
             "install-governed-b"));
+        await CompleteAsync(await ResolveInvokeAndClaimAsync("governed-b", releaseB.Digest));
+        var revisionBeforePause = (await hub.ReadAsync()).Revision;
+        await hub.PauseInstallationAsync(installationId, "operator hold", revisionBeforePause);
+        Assert.DoesNotContain(
+            (await ownerCatalog.ReadAsync(context.OwnerId, context.ActorId)).Entries,
+            entry => entry.Descriptor.Origin == CapabilityOrigin.Feature);
+        var revisionBeforeResume = (await hub.ReadAsync()).Revision;
+        await hub.ResumeInstallationAsync(installationId, revisionBeforeResume);
+        await fixture.PublishActiveAsync(context.OwnerId, hub, installationId);
+        await CompleteAsync(await ResolveInvokeAndClaimAsync("governed-resumed", releaseB.Digest));
         var detailB = await service.ReadInstalledAsync(context, draftB.DraftId);
         var recoveredB = Assert.IsType<FeatureInstallationRecoverySnapshot>(
             (await service.ReadWithRecoveryAsync(context, draftB.DraftId)).Recovery);
         var historicalA = await service.ReadWithRecoveryAsync(context, draftA.DraftId);
         var recoveredHistoricalA = Assert.IsType<FeatureInstallationRecoverySnapshot>(historicalA.Recovery);
+        var projectedB = Assert.Single(await hub.ReadCapabilityCatalogAsync(context.ActorId));
 
+        Assert.Equal(releaseA.Digest, projectedA.Release);
+        Assert.Equal(draftA.Goal, projectedA.Goal);
+        Assert.Equal(releaseB.Digest, projectedB.Release);
+        Assert.Equal(draftB.Goal, projectedB.Goal);
         Assert.Equal(sourceA, review.PreviousRelease?.Source);
         Assert.Equal(sourceB, review.Candidate.Release.Source);
         Assert.Equal(releaseB.Digest, installedB.Release.Digest);
@@ -1118,6 +1189,10 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
             service.RollbackAsync(context, command));
         Assert.Equal(releaseB.Digest, publication.ActiveRelease);
         Assert.False(Assert.Single((await hub.ReadAsync()).Authorities).PublicationConfirmed);
+        Assert.Empty(await hub.ReadCapabilityCatalogAsync(context.ActorId));
+        Assert.DoesNotContain(
+            (await ownerCatalog.ReadAsync(context.OwnerId, context.ActorId)).Entries,
+            entry => entry.Descriptor.Origin == CapabilityOrigin.Feature);
 
         var freshLifecycle = new HubLifecycleRail(fixture, context, publication);
         var freshService = new FeatureAuthoringService(
@@ -1135,7 +1210,11 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
         var replayed = await freshService.RollbackAsync(context, command);
         var runtime = await fixture.Grain<IFeatureInstallationGrain>(
             FeatureGrainIds.Installation(context.OwnerId, installationId)).ReadAsync();
+        var projectedRollback = Assert.Single(await hub.ReadCapabilityCatalogAsync(context.ActorId));
+        await CompleteAsync(await ResolveInvokeAndClaimAsync("governed-rollback", releaseA.Digest));
 
+        Assert.Equal(releaseA.Digest, projectedRollback.Release);
+        Assert.Equal(draftA.Goal, projectedRollback.Goal);
         Assert.Equal(releaseA.Digest, rolledBack.ActiveRelease.Digest);
         Assert.Equal(FeatureCommandRejectionReason.Conflict, stale.Reason);
         Assert.Equal(FeatureCommandRejectionReason.Unavailable, publicationFailure.Reason);
@@ -2015,6 +2094,31 @@ public sealed class FeatureInstallationOrchestrationTests(FeatureGrainClusterFix
         public ReleaseDigest? ActiveRelease { get; private set; }
 
         public void Publish(ReleaseDigest release) => ActiveRelease = release;
+    }
+
+    private sealed class PassThroughConnectionHealth : IOwnerConnectionHealth
+    {
+        public Task<IReadOnlySet<CapabilityConnectionBinding>> ReadHealthyAsync(
+            BrainOwnerId ownerId,
+            IReadOnlyCollection<CapabilityConnectionBinding> connections,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlySet<CapabilityConnectionBinding>>(connections.ToHashSet());
+        }
+    }
+
+    private sealed class UnexpectedEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
+    {
+        public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+            IEnumerable<string> values,
+            EmbeddingGenerationOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Exact Feature resolution must not call embeddings.");
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
     }
 
     private sealed class HubLifecycleRail(

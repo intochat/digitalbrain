@@ -146,6 +146,29 @@ public sealed class FeatureAuthoringContractTests
             (2, "AuthorityDigest", typeof(string)),
             (3, "AccessDigest", typeof(string)),
             (4, "ManifestDigest", typeof(string)));
+        AssertShape<FeatureCapabilityProjection>("digitalbrain.feature.capability-projection.v1",
+            (0, "OwnerId", typeof(BrainOwnerId)),
+            (1, "InstallationId", typeof(FeatureInstallationId)),
+            (2, "ActorId", typeof(ActorId)),
+            (3, "Release", typeof(ReleaseDigest)),
+            (4, "GrantRevision", typeof(GrantRevision)),
+            (5, "Goal", typeof(string)),
+            (6, "Scenarios", typeof(FeatureScenario[])),
+            (7, "Grants", typeof(FeatureGrantSpec[])),
+            (8, "InputKind", typeof(string)),
+            (9, "PublicationFence", typeof(long)),
+            (10, "AuthorityDigest", typeof(string)),
+            (11, "AccessDigest", typeof(string)));
+        AssertShape<StartFeatureRun>("digitalbrain.feature.start-run.v1",
+            (0, "OwnerId", typeof(BrainOwnerId)),
+            (1, "ActorId", typeof(ActorId)),
+            (2, "InstallationId", typeof(FeatureInstallationId)),
+            (3, "Release", typeof(ReleaseDigest)),
+            (4, "GrantRevision", typeof(GrantRevision)),
+            (5, "PublicationFence", typeof(long)),
+            (6, "AuthorityDigest", typeof(string)),
+            (7, "AccessDigest", typeof(string)),
+            (8, "Input", typeof(FeatureInput)));
         AssertShape<InstalledFeatureVersion>("digitalbrain.feature.installed-version.v1",
             (0, "Draft", typeof(FeatureDraft)),
             (1, "Release", typeof(FeatureReleaseMetadata)),
@@ -231,6 +254,9 @@ public sealed class FeatureAuthoringContractTests
         AssertMethodAlias(typeof(IFeatureHubGrain), nameof(IFeatureHubGrain.ReadDraftInstallationReservationAsync), "read-draft-installation-reservation");
         AssertMethodAlias(typeof(IFeatureHubGrain), nameof(IFeatureHubGrain.PrepareActivePublicationAsync), "prepare-active-publication");
         AssertMethodAlias(typeof(IFeatureHubGrain), nameof(IFeatureHubGrain.ConfirmActivePublicationAsync), "confirm-active-publication");
+        AssertMethodAlias(typeof(IFeatureHubGrain), nameof(IFeatureHubGrain.ReadCapabilityCatalogAsync), "read-capability-catalog");
+        AssertMethodAlias(typeof(IFeatureHubGrain), nameof(IFeatureHubGrain.StartFeatureRunAsync), "start-feature-run");
+        AssertMethodAlias(typeof(IFeatureInstallationGrain), nameof(IFeatureInstallationGrain.AppendExactAsync), "append-exact");
         Assert.Equal(
             "digitalbrain.capability-catalog-projection-grain.v1",
             typeof(ICapabilityCatalogProjectionGrain).GetCustomAttribute<AliasAttribute>()?.Alias);
@@ -265,6 +291,17 @@ public sealed class FeatureAuthoringContractTests
         var confirmPublication = typeof(IFeatureHubGrain).GetMethod(nameof(IFeatureHubGrain.ConfirmActivePublicationAsync))!;
         Assert.Equal(typeof(Task<FeaturePublicationReceipt>), confirmPublication.ReturnType);
         Assert.Equal([typeof(FeaturePublicationReceipt)], confirmPublication.GetParameters().Select(parameter => parameter.ParameterType));
+        var readCapabilities = typeof(IFeatureHubGrain).GetMethod(nameof(IFeatureHubGrain.ReadCapabilityCatalogAsync))!;
+        Assert.Equal(typeof(Task<FeatureCapabilityProjection[]>), readCapabilities.ReturnType);
+        Assert.Equal([typeof(ActorId)], readCapabilities.GetParameters().Select(parameter => parameter.ParameterType));
+        var startRun = typeof(IFeatureHubGrain).GetMethod(nameof(IFeatureHubGrain.StartFeatureRunAsync))!;
+        Assert.Equal(typeof(Task<FeatureAppendStatus>), startRun.ReturnType);
+        Assert.Equal([typeof(StartFeatureRun)], startRun.GetParameters().Select(parameter => parameter.ParameterType));
+        var appendExact = typeof(IFeatureInstallationGrain).GetMethod(nameof(IFeatureInstallationGrain.AppendExactAsync))!;
+        Assert.Equal(typeof(Task<FeatureAppendStatus>), appendExact.ReturnType);
+        Assert.Equal(
+            [typeof(ReleaseDigest), typeof(FeatureInput)],
+            appendExact.GetParameters().Select(parameter => parameter.ParameterType));
     }
 
     private static void AssertShape<T>(string alias, params (uint Id, string Name, Type Type)[] expected)

@@ -7,6 +7,116 @@ namespace DigitalBrain.Kernel.Features;
 
 internal static class FeatureHubTransitions
 {
+    public static FeatureCapabilityProjection[] ProjectCapabilities(
+        FeatureHubState state,
+        BrainOwnerId ownerId,
+        ActorId actorId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (string.IsNullOrWhiteSpace(ownerId.Value) || string.IsNullOrWhiteSpace(actorId.Value))
+            return [];
+        var projections = new List<FeatureCapabilityProjection>();
+        foreach (var authority in state.Authorities
+                     .Where(candidate => candidate.ActorId == actorId)
+                     .OrderBy(candidate => candidate.InstallationId.Value, StringComparer.Ordinal))
+        {
+            if (authority.ActiveRelease is not { } release || authority.ActiveGrantRevision is not { } grantRevision ||
+                authority.Paused || authority.PendingRelease is not null || authority.PendingGrantRevision is not null ||
+                authority.PendingGrants.Length != 0)
+                continue;
+            FeaturePublicationTransition prepared;
+            FeatureDraft? draft;
+            try
+            {
+                prepared = FeaturePublicationTransitions.Prepare(state, authority.InstallationId);
+                draft = FeatureDraftAuthoringTransitions.ReadInstalledDraft(state, authority.InstallationId, release);
+            }
+            catch (Exception exception) when (exception is KeyNotFoundException or FeatureConcurrencyException or ArgumentException)
+            {
+                continue;
+            }
+            if (!ReferenceEquals(prepared.State, state) || prepared.Receipt is not { } receipt || draft is null ||
+                receipt.PublicationFence != prepared.Ticket.PublicationFence ||
+                !string.Equals(receipt.AuthorityDigest, prepared.Ticket.AuthorityDigest, StringComparison.Ordinal) ||
+                !string.Equals(receipt.AccessDigest, prepared.Ticket.AccessDigest, StringComparison.Ordinal) ||
+                prepared.Ticket.ActorId != actorId || prepared.Ticket.Release != release ||
+                prepared.Ticket.GrantRevision != grantRevision)
+                continue;
+            var releaseMetadata = state.Releases.SingleOrDefault(candidate => candidate.Digest == release);
+            if (releaseMetadata is null || !releaseMetadata.RequestedCapabilities
+                    .Order(StringComparer.Ordinal)
+                    .SequenceEqual(
+                        prepared.Ticket.ActiveGrants.Select(grant => grant.CapabilityId).Order(StringComparer.Ordinal),
+                        StringComparer.Ordinal))
+                continue;
+            var inputKind = prepared.Ticket.Subscriptions.Contains("manual", StringComparer.Ordinal)
+                ? "manual"
+                : prepared.Ticket.Subscriptions.Order(StringComparer.Ordinal).FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(inputKind) || inputKind.Length > 128)
+                continue;
+            projections.Add(new FeatureCapabilityProjection(
+                ownerId,
+                authority.InstallationId,
+                actorId,
+                release,
+                grantRevision,
+                draft.Goal,
+                draft.Behavior.Scenarios.ToArray(),
+                prepared.Ticket.ActiveGrants.ToArray(),
+                inputKind,
+                prepared.Ticket.PublicationFence,
+                prepared.Ticket.AuthorityDigest,
+                prepared.Ticket.AccessDigest));
+        }
+        return projections.ToArray();
+    }
+
+    public static FeatureCapabilityProjection DemandFeatureRun(
+        FeatureHubState state,
+        BrainOwnerId ownerId,
+        StartFeatureRun command)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(command.Input);
+        if (ownerId != command.OwnerId)
+            throw new FeatureConcurrencyException(
+                "The Feature owner scope does not match the command.",
+                FeatureCommandRejectionReason.Precondition);
+        var authorities = state.Authorities
+            .Where(candidate => candidate.InstallationId == command.InstallationId)
+            .Take(2)
+            .ToArray();
+        if (authorities.Length != 1)
+            throw new FeatureConcurrencyException(
+                "The Feature installation authority is unavailable.",
+                FeatureCommandRejectionReason.Precondition);
+        if (authorities[0].ActorId != command.ActorId)
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
+        if (HasInstallationReservationOrReset(state, command.InstallationId))
+            throw new FeatureConcurrencyException(
+                "The Feature installation has an authoring reservation or reset in progress.",
+                FeatureCommandRejectionReason.Precondition);
+        var projections = ProjectCapabilities(state, ownerId, command.ActorId)
+            .Where(candidate => candidate.InstallationId == command.InstallationId)
+            .Take(2)
+            .ToArray();
+        if (projections.Length != 1)
+            throw new FeatureConcurrencyException(
+                "The Feature capability is not currently executable.",
+                FeatureCommandRejectionReason.Precondition);
+        var projection = projections[0];
+        if (projection.Release != command.Release || projection.GrantRevision != command.GrantRevision ||
+            projection.PublicationFence != command.PublicationFence ||
+            !string.Equals(projection.AuthorityDigest, command.AuthorityDigest, StringComparison.Ordinal) ||
+            !string.Equals(projection.AccessDigest, command.AccessDigest, StringComparison.Ordinal) ||
+            !string.Equals(projection.InputKind, command.Input.Kind, StringComparison.Ordinal))
+            throw new FeatureConcurrencyException(
+                "The Feature capability binding is stale or conflicts with the active authority.",
+                FeatureCommandRejectionReason.Precondition);
+        return projection;
+    }
+
     public static FeatureHubState Propose(FeatureHubState state, FeatureReleaseProposal proposal, long expectedRevision, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(state);

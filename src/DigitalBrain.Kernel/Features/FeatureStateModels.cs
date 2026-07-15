@@ -117,7 +117,8 @@ internal sealed record FeatureInboxEntry(
     [property: Id(1)] int Attempts,
     [property: Id(2)] DateTimeOffset NotBefore,
     [property: Id(3)] bool Parked,
-    [property: Id(4)] string? LastFailure);
+    [property: Id(4)] string? LastFailure,
+    [property: Id(5)] ReleaseDigest? AcceptedRelease = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease")]
 internal sealed record FeatureLease(
     [property: Id(0)] string HostId,

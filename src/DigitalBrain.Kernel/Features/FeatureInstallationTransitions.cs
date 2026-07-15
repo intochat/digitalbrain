@@ -6,7 +6,31 @@ namespace DigitalBrain.Kernel.Features;
 
 internal static class FeatureInstallationTransitions
 {
-    public static FeatureAppendTransition Append(FeatureInstallationState state, FeatureInput input, DateTimeOffset now)
+    public static FeatureAppendTransition AppendExact(
+        FeatureInstallationState state,
+        ReleaseDigest expectedRelease,
+        FeatureInput input,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (state.ActiveRelease != expectedRelease || state.UnconfirmedReleaseSwitch is not null)
+            throw new FeatureConcurrencyException(
+                "The Feature release is stale or not confirmed.",
+                FeatureCommandRejectionReason.Precondition);
+        return AppendCore(state, input, now, keepExistingContent: true);
+    }
+
+    public static FeatureAppendTransition Append(
+        FeatureInstallationState state,
+        FeatureInput input,
+        DateTimeOffset now) =>
+        AppendCore(state, input, now, keepExistingContent: false);
+
+    private static FeatureAppendTransition AppendCore(
+        FeatureInstallationState state,
+        FeatureInput input,
+        DateTimeOffset now,
+        bool keepExistingContent)
     {
         ArgumentNullException.ThrowIfNull(state);
         ValidateInput(input);
@@ -14,15 +38,17 @@ internal static class FeatureInstallationTransitions
         var completion = state.Completions.FirstOrDefault(entry => Same(entry.InputId, input.InputId));
         if (completion is not null)
         {
-            if (!Same(completion.InputDigest, inputDigest))
+            if (!keepExistingContent && !Same(completion.InputDigest, inputDigest))
                 throw new FeatureConcurrencyException("The input id is already bound to different content.");
             return new(state, FeatureAppendStatus.Duplicate);
         }
         var pending = state.Inbox.FirstOrDefault(entry => Same(entry.Input.InputId, input.InputId));
         if (pending is not null)
         {
-            if (!Same(InputDigest(pending.Input), inputDigest))
+            if (!keepExistingContent && !Same(InputDigest(pending.Input), inputDigest))
                 throw new FeatureConcurrencyException("The input id is already bound to different content.");
+            if (state.Paused || pending.Parked || pending.AcceptedRelease is null)
+                return new(state, FeatureAppendStatus.Paused);
             return new(state, FeatureAppendStatus.Duplicate);
         }
         if (state.Paused)
@@ -31,7 +57,7 @@ internal static class FeatureInstallationTransitions
         {
             return new(state with { Paused = true, PauseReason = "feature inbox full", Revision = checked(state.Revision + 1) }, FeatureAppendStatus.Full);
         }
-        var entry = new FeatureInboxEntry(input, 0, now, false, null);
+        var entry = new FeatureInboxEntry(input, 0, now, false, null, state.ActiveRelease);
         return new(state with { Inbox = [.. state.Inbox, entry], Revision = checked(state.Revision + 1) }, FeatureAppendStatus.Accepted);
     }
     public static FeatureClaimTransition Claim(FeatureInstallationState state, string hostId, DateTimeOffset now, TimeSpan leaseDuration)
@@ -44,37 +70,61 @@ internal static class FeatureInstallationTransitions
             return new(state, null);
         if (state.Lease is { ExpiresAt: var expiresAt } && expiresAt > now)
             return new(state, null);
+        var legacyEntries = state.Inbox.ToArray();
+        var parkedLegacy = false;
+        for (var legacyIndex = 0; legacyIndex < legacyEntries.Length; legacyIndex++)
+        {
+            if (legacyEntries[legacyIndex].AcceptedRelease is not null || legacyEntries[legacyIndex].Parked)
+                continue;
+            legacyEntries[legacyIndex] = legacyEntries[legacyIndex] with
+            {
+                Parked = true,
+                LastFailure = "The input predates release pinning and requires review."
+            };
+            parkedLegacy = true;
+        }
+        var current = parkedLegacy
+            ? state with { Inbox = legacyEntries, Revision = checked(state.Revision + 1) }
+            : state;
         var index = Array.FindIndex(
-            state.Inbox,
+            current.Inbox,
             entry => !entry.Parked && entry.NotBefore <= now);
         if (index < 0)
         {
-            return state.Lease is null ? new(state, null) : new(state with { Lease = null, Revision = checked(state.Revision + 1) }, null);
+            return current.Lease is null
+                ? new(current, null)
+                : new(current with { Lease = null, Revision = checked(current.Revision + 1) }, null);
         }
-        var entries = state.Inbox.ToArray();
+        var entries = current.Inbox.ToArray();
         var entry = entries[index];
         if (entry.Attempts >= FeatureLimits.AttemptsPerInput)
         {
             entries[index] = entry with { Parked = true, LastFailure = "The feature host attempt limit was reached." };
             return new(
-                state with
+                current with
                 {
                     Inbox = entries,
                     Lease = null,
                     Paused = true,
                     PauseReason = "The feature host attempt limit was reached.",
-                    Revision = checked(state.Revision + 1)
+                    Revision = checked(current.Revision + 1)
                 },
                 null);
         }
         var attempt = checked(entry.Attempts + 1);
         entries[index] = entry with { Attempts = attempt };
-        var fenceNumber = checked(state.NextFence + 1);
+        var fenceNumber = checked(current.NextFence + 1);
         var fence = new FeatureLeaseFence(entry.Input.InputId, fenceNumber);
         var expires = now.Add(leaseDuration);
         var lease = new FeatureLease(hostId, fence, expires, attempt);
-        var next = state with { Inbox = entries, Lease = lease, NextFence = fenceNumber, Revision = checked(state.Revision + 1) };
-        return new(next, new FeatureRunClaim(entry.Input, fence, state.ActiveRelease, state.StateJson, expires, attempt));
+        var next = current with { Inbox = entries, Lease = lease, NextFence = fenceNumber, Revision = checked(current.Revision + 1) };
+        return new(next, new FeatureRunClaim(
+            entry.Input,
+            fence,
+            entry.AcceptedRelease!.Value,
+            current.StateJson,
+            expires,
+            attempt));
     }
     public static FeatureInstallationState Fail(FeatureInstallationState state, FeatureLeaseFence fence, DateTimeOffset now, DateTimeOffset retryAt, string safeFailure)
     {

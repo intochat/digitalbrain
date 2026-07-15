@@ -43,6 +43,7 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
     public async Task Worker_trace_carries_capability_resolution_and_proposal_identifiers()
     {
         TraceWorkflowRunner.LastActorScope = null;
+        TraceWorkflowRunner.LastOccurredAt = null;
         var proposalId = "proposal-" + new string('a', 32);
         TraceWorkflowRunner.NextCapability = new CapabilityResolutionReceipt(
             CapabilityResolutionKind.Missing,
@@ -121,6 +122,7 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
     public async Task Worker_trace_carries_durable_request_operation_grain_workflow_and_tool_correlation()
     {
         TraceWorkflowRunner.LastActorScope = null;
+        TraceWorkflowRunner.LastOccurredAt = null;
         TraceWorkflowRunner.NextCapability = null;
         TraceWorkflowRunner.NextProposal = null;
         var completed = new ConcurrentQueue<Activity>();
@@ -187,6 +189,7 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
         Assert.Equal("session-trace-correlation", activity.GetTagItem("db.ino.workflow_session_id"));
         Assert.Equal("safe.read", activity.GetTagItem("db.ino.tool_id"));
         Assert.Equal(RequestScope.Id(owner, actor), TraceWorkflowRunner.LastActorScope);
+        Assert.Equal(now, TraceWorkflowRunner.LastOccurredAt);
         Assert.DoesNotContain(activity.TagObjects, tag =>
             tag.Key.Contains("prompt", StringComparison.OrdinalIgnoreCase) ||
             tag.Key.Contains("token", StringComparison.OrdinalIgnoreCase) ||
@@ -220,6 +223,7 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
     private sealed class TraceWorkflowRunner : IAgentWorkflowRunner
     {
         public static string? LastActorScope { get; set; }
+        public static DateTimeOffset? LastOccurredAt { get; set; }
         public static CapabilityResolutionReceipt? NextCapability { get; set; }
         public static FeatureDraftReference? NextProposal { get; set; }
 
@@ -228,6 +232,7 @@ public sealed class InoTraceCorrelationTests : NeuronTestBase
             CancellationToken cancellationToken = default)
         {
             LastActorScope = request.ActorScope;
+            LastOccurredAt = request.OccurredAt;
             return Task.FromResult(new InoWorkflowResult(
                 "The configured read tool cannot run in this test.",
                 new WorkflowReference("test", "workflow-trace-correlation", "session-trace-correlation"),

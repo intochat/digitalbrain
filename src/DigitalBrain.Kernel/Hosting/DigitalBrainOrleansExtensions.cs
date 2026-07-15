@@ -178,8 +178,13 @@ internal static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton<ICapabilityGrantSource>(services => services.GetRequiredService<FeatureCapabilityGrantSource>());
         builder.Services.AddSingleton<ICapabilityDispatcher, CapabilityDispatcher>();
         builder.Services.TryAddSingleton<ICapabilityCatalog, BuiltInCapabilityCatalog>();
+        builder.Services.TryAddSingleton<IOwnerConnectionHealth, OwnerConnectionHealth>();
+        builder.Services.TryAddSingleton<IFeatureCapabilityProjectionSource, FeatureCapabilityProjectionSource>();
+        builder.Services.TryAddSingleton<IOwnerCapabilityCatalog, OwnerCapabilityCatalog>();
         builder.Services.TryAddSingleton<ICapabilityResolver, HybridCapabilityResolver>();
         builder.Services.TryAddSingleton<ICapabilityParameterModel, CapabilityParameterModel>();
+        builder.Services.TryAddSingleton<IFeatureRunGateway, FeatureRunGateway>();
+        builder.Services.TryAddSingleton<IFeatureCapabilityInvoker, FeatureCapabilityInvoker>();
         builder.Services.AddHostedService<CapabilityDispatcherStartupValidation>();
         builder.Services.AddSingleton<IAgentWorkflowRunner, AgentFrameworkWorkflowRunner>();
         BlobServiceClient? integrationConfigBlobs = null;

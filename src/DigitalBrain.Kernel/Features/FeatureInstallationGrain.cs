@@ -41,6 +41,26 @@ internal sealed class FeatureInstallationGrain(
         }
         return transition.Status;
     }
+    public async Task<FeatureAppendStatus> AppendExactAsync(ReleaseDigest expectedRelease, FeatureInput input)
+    {
+        using var activity = Start("append-exact", input);
+        if (HasReservation)
+        {
+            FeatureInstallationTransitions.ValidateInput(input);
+            return FeatureAppendStatus.Paused;
+        }
+        var current = RequiredState();
+        var transition = Domain(() => FeatureInstallationTransitions.AppendExact(
+            current,
+            expectedRelease,
+            input,
+            timeProvider.GetUtcNow()));
+        if (!ReferenceEquals(transition.State, persistentState.State))
+        {
+            await WriteAsync(transition.State);
+        }
+        return transition.Status;
+    }
     public async Task<FeatureRunClaim?> ClaimAsync(string hostId, TimeSpan leaseDuration)
     {
         using var activity = Start("claim");
