@@ -11,16 +11,28 @@ using Microsoft.Extensions.Logging;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 namespace DigitalBrain.Mcp;
 
-public sealed record UiBootstrapOptions(string Secret, BrainOwnerId OwnerId, ActorId ActorId, TimeSpan AccessLifetime, IReadOnlySet<string> Grants, bool Enabled = true)
+public sealed record UiDevelopmentLoginOptions(
+    string Username,
+    string Password,
+    BrainOwnerId OwnerId,
+    ActorId ActorId,
+    TimeSpan AccessLifetime,
+    IReadOnlySet<string> Grants,
+    bool Enabled = true)
 {
-    public static UiBootstrapOptions FromConfiguration(IConfiguration configuration, RuntimeProfile profile)
+    private const string UsernameKey = "DigitalBrain:Runtime:Ui:DevelopmentUsername";
+    private const string PasswordKey = "DigitalBrain:Runtime:Ui:DevelopmentPassword";
+    private const int MaximumCredentialLength = 256;
+    public static UiDevelopmentLoginOptions FromConfiguration(IConfiguration configuration, RuntimeProfile profile)
     {
-        var secret = configuration["DigitalBrain:Runtime:Ui:BootstrapSecret"] ?? string.Empty;
+        var configuredUsername = configuration[UsernameKey];
+        var configuredPassword = configuration[PasswordKey];
         if (profile == RuntimeProfile.Production)
         {
-            if (!string.IsNullOrWhiteSpace(secret))
-                throw new InvalidOperationException("DigitalBrain:Runtime:Ui:BootstrapSecret is forbidden in Production.");
+            if (configuredUsername is not null || configuredPassword is not null)
+                throw new InvalidOperationException("Development UI credentials are forbidden in Production.");
             return new(
+                string.Empty,
                 string.Empty,
                 new BrainOwnerId("disabled"),
                 new ActorId("disabled"),
@@ -28,14 +40,19 @@ public sealed record UiBootstrapOptions(string Secret, BrainOwnerId OwnerId, Act
                 new HashSet<string>(StringComparer.Ordinal),
                 Enabled: false);
         }
+        var username = configuredUsername ?? "admin";
+        var password = configuredPassword ?? "admin";
         var owner = configuration["DigitalBrain:Runtime:Ui:OwnerId"] ?? "local-owner";
         var actor = configuration["DigitalBrain:Runtime:Ui:ActorId"] ?? "flutter-ui";
+        if (!ValidCredential(username) || !ValidCredential(password))
+            throw new InvalidOperationException("Development UI credential configuration must be complete and bounded.");
         if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(actor) || owner.Length > 256 || actor.Length > 256)
-            throw new InvalidOperationException("UI bootstrap identity configuration must be complete.");
-        return new(secret, new(owner), new(actor), TimeSpan.FromMinutes(15),
+            throw new InvalidOperationException("UI login identity configuration must be complete.");
+        return new(username, password, new(owner), new(actor), TimeSpan.FromMinutes(15),
             new HashSet<string>(StringComparer.Ordinal)
             { "brain.read", "ui.action", "feature.manage", "gmail.read", "gmail.send", "salesforce.read", "salesforce.write" });
     }
+    private static bool ValidCredential(string value) => value.Length is > 0 and <= MaximumCredentialLength;
 }
 public sealed record UiDeliveryOptions(TimeSpan ActionTokenRenewalInterval, TimeSpan AuthenticationRevalidationInterval)
 {
@@ -49,13 +66,14 @@ public sealed record UiDeliveryOptions(TimeSpan ActionTokenRenewalInterval, Time
         return this;
     }
 }
-public sealed class UiBootstrapAuthenticator(UiBootstrapOptions options)
+public sealed class UiDevelopmentLoginAuthenticator(UiDevelopmentLoginOptions options)
 {
-    public bool TryAuthenticate(string suppliedSecret, out RuntimeRequestContext context)
+    private const int MaximumCredentialLength = 256;
+    public bool TryAuthenticate(string suppliedUsername, string suppliedPassword, out RuntimeRequestContext context)
     {
         context = default!;
-        if (!options.Enabled || string.IsNullOrEmpty(options.Secret) || string.IsNullOrEmpty(suppliedSecret) ||
-            !FixedTimeEquals(options.Secret, suppliedSecret)) return false;
+        if (!options.Enabled || !ValidCredential(suppliedUsername) || !ValidCredential(suppliedPassword) ||
+            !FixedTimeEquals(options.Username, options.Password, suppliedUsername, suppliedPassword)) return false;
         context = new RuntimeRequestContext(
             options.OwnerId,
             options.ActorId,
@@ -66,15 +84,31 @@ public sealed class UiBootstrapAuthenticator(UiBootstrapOptions options)
             options.Grants);
         return true;
     }
-    private static bool FixedTimeEquals(string expected, string actual)
+    private static bool ValidCredential(string value) => value.Length is > 0 and <= MaximumCredentialLength;
+    private static bool FixedTimeEquals(
+        string expectedUsername,
+        string expectedPassword,
+        string actualUsername,
+        string actualPassword)
     {
-        var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
-        var actualHash = SHA256.HashData(Encoding.UTF8.GetBytes(actual));
+        var expectedHash = DigestPair(expectedUsername, expectedPassword);
+        var actualHash = DigestPair(actualUsername, actualPassword);
         return CryptographicOperations.FixedTimeEquals(expectedHash, actualHash);
+    }
+    private static byte[] DigestPair(string username, string password)
+    {
+        var usernameBytes = Encoding.UTF8.GetBytes(username);
+        var passwordBytes = Encoding.UTF8.GetBytes(password);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData(BitConverter.GetBytes(usernameBytes.Length));
+        hash.AppendData(usernameBytes);
+        hash.AppendData(BitConverter.GetBytes(passwordBytes.Length));
+        hash.AppendData(passwordBytes);
+        return hash.GetHashAndReset();
     }
 }
 public sealed class UiGrpcService(
-    UiBootstrapAuthenticator bootstrap,
+    UiDevelopmentLoginAuthenticator developmentLogin,
     UiExternalIdentityAuthenticator externalIdentity,
     RuntimeSessionAuthority sessions,
     RuntimeSurfaceFeed feed,
@@ -92,22 +126,23 @@ public sealed class UiGrpcService(
         DemandAudience(context);
         var external = await externalIdentity.AuthenticateAsync(context).ConfigureAwait(false);
         RuntimeRequestContext bootstrapContext;
-        var authenticationKind = "bootstrap";
+        var authenticationKind = "password";
         if (external.Status == UiExternalAuthenticationStatus.Authenticated)
         {
             bootstrapContext = external.Context!;
             authenticationKind = "oidc";
         }
-        else if (external.Status == UiExternalAuthenticationStatus.Rejected || !bootstrap.TryAuthenticate(request.Secret, out bootstrapContext))
+        else if (external.Status == UiExternalAuthenticationStatus.Rejected ||
+                 !developmentLogin.TryAuthenticate(request.Username, request.Password, out bootstrapContext))
         {
-            logger.LogWarning("UI bootstrap was denied.");
+            logger.LogWarning("UI session login was denied.");
             throw Unauthenticated();
         }
         var issued = await sessions.CreateAsync(bootstrapContext, TimeSpan.FromMinutes(15), SessionAudiences.Ui, context.CancellationToken).ConfigureAwait(false);
         using var activity = ActivitySource.StartActivity("v2.ui.session.bootstrap", ActivityKind.Internal);
         activity?.SetTag("db.v2.ui.outcome", "success");
         activity?.SetTag("db.v2.ui.authentication_kind", authenticationKind);
-        logger.LogInformation("UI bootstrap issued an owner-scoped session.");
+        logger.LogInformation("UI login issued an owner-scoped session.");
         return ToReply(issued.Context, issued.Pair);
     }
     public override async Task<SessionReply> RefreshSession(RefreshSessionRequest request, ServerCallContext context)

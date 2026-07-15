@@ -14,7 +14,9 @@ service DigitalBrainV2Ui {
 }
 
 message BootstrapSessionRequest {
-  string secret = 1;
+  reserved 1;
+  string username = 2;
+  string password = 3;
 }
 
 message RefreshSessionRequest {

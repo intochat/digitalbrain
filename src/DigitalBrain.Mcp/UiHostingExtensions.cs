@@ -29,10 +29,10 @@ public static class UiHostingExtensions
                 options.KnownProxies.Clear();
             }
         });
-        var bootstrap = UiBootstrapOptions.FromConfiguration(configuration, profile);
+        var developmentLogin = UiDevelopmentLoginOptions.FromConfiguration(configuration, profile);
         var externalIdentity = UiExternalIdentityOptions.FromConfiguration(configuration, profile);
-        services.AddSingleton(bootstrap);
-        services.AddSingleton<UiBootstrapAuthenticator>();
+        services.AddSingleton(developmentLogin);
+        services.AddSingleton<UiDevelopmentLoginAuthenticator>();
         services.AddSingleton(externalIdentity);
         services.AddSingleton<UiExternalIdentityAuthenticator>();
         var authentication = services.AddAuthentication();

@@ -4,8 +4,8 @@ using System.Security.Claims;
 using DigitalBrain.Kernel.Contracts.Runtime;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
-using UiBootstrapAuthenticator = McpProject::DigitalBrain.Mcp.UiBootstrapAuthenticator;
-using UiBootstrapOptions = McpProject::DigitalBrain.Mcp.UiBootstrapOptions;
+using UiDevelopmentLoginAuthenticator = McpProject::DigitalBrain.Mcp.UiDevelopmentLoginAuthenticator;
+using UiDevelopmentLoginOptions = McpProject::DigitalBrain.Mcp.UiDevelopmentLoginOptions;
 using UiExternalIdentityOptions = McpProject::DigitalBrain.Mcp.UiExternalIdentityOptions;
 
 namespace DigitalBrain.Tests.Runtime;
@@ -13,14 +13,21 @@ namespace DigitalBrain.Tests.Runtime;
 public sealed class UiExternalIdentityTests
 {
     [Fact]
-    public void Production_forbids_shared_bootstrap_and_requires_complete_external_oidc_configuration()
+    public void Production_forbids_development_login_configuration_and_requires_complete_external_oidc_configuration()
     {
-        var bootstrapConfiguration = Configuration(new Dictionary<string, string?>
+        var usernameConfiguration = Configuration(new Dictionary<string, string?>
         {
-            ["DigitalBrain:Runtime:Ui:BootstrapSecret"] = "shared-secret"
+            ["DigitalBrain:Runtime:Ui:DevelopmentUsername"] = "developer"
         });
         Assert.Throws<InvalidOperationException>(() =>
-            UiBootstrapOptions.FromConfiguration(bootstrapConfiguration, RuntimeProfile.Production));
+            UiDevelopmentLoginOptions.FromConfiguration(usernameConfiguration, RuntimeProfile.Production));
+
+        var passwordConfiguration = Configuration(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:Runtime:Ui:DevelopmentPassword"] = string.Empty
+        });
+        Assert.Throws<InvalidOperationException>(() =>
+            UiDevelopmentLoginOptions.FromConfiguration(passwordConfiguration, RuntimeProfile.Production));
 
         var missingOidc = Configuration(new Dictionary<string, string?>());
         Assert.Throws<InvalidOperationException>(() =>
@@ -43,25 +50,75 @@ public sealed class UiExternalIdentityTests
     }
 
     [Fact]
-    public void Development_bootstrap_remains_compatible_but_production_authenticator_is_disabled()
+    public void Development_login_defaults_are_bounded_exact_and_production_authenticator_is_disabled()
     {
-        var development = Configuration(new Dictionary<string, string?>
+        var defaults = UiDevelopmentLoginOptions.FromConfiguration(
+            Configuration(new Dictionary<string, string?>()),
+            RuntimeProfile.Development);
+        var authenticator = new UiDevelopmentLoginAuthenticator(defaults);
+
+        Assert.True(authenticator.TryAuthenticate("admin", "admin", out var defaultContext));
+        Assert.Equal("local-owner", defaultContext.OwnerId.Value);
+        Assert.Equal("flutter-ui", defaultContext.ActorId.Value);
+        Assert.False(authenticator.TryAuthenticate("wrong", "admin", out _));
+        Assert.False(authenticator.TryAuthenticate("admin", "wrong", out _));
+        Assert.False(authenticator.TryAuthenticate(string.Empty, "admin", out _));
+        Assert.False(authenticator.TryAuthenticate("admin", string.Empty, out _));
+        Assert.False(authenticator.TryAuthenticate(new string('a', 257), "admin", out _));
+        Assert.False(authenticator.TryAuthenticate("admin", new string('a', 257), out _));
+
+        var configured = Configuration(new Dictionary<string, string?>
         {
-            ["DigitalBrain:Runtime:Ui:BootstrapSecret"] = "development-secret",
+            ["DigitalBrain:Runtime:Ui:DevelopmentUsername"] = "developer",
+            ["DigitalBrain:Runtime:Ui:DevelopmentPassword"] = "password",
             ["DigitalBrain:Runtime:Ui:OwnerId"] = "owner",
             ["DigitalBrain:Runtime:Ui:ActorId"] = "developer"
         });
-        var developmentOptions = UiBootstrapOptions.FromConfiguration(development, RuntimeProfile.Development);
-        Assert.True(new UiBootstrapAuthenticator(developmentOptions)
-            .TryAuthenticate("development-secret", out var developmentContext));
-        Assert.Equal("owner", developmentContext.OwnerId.Value);
+        var configuredAuthenticator = new UiDevelopmentLoginAuthenticator(
+            UiDevelopmentLoginOptions.FromConfiguration(configured, RuntimeProfile.Test));
+        Assert.True(configuredAuthenticator.TryAuthenticate("developer", "password", out var configuredContext));
+        Assert.Equal("owner", configuredContext.OwnerId.Value);
+        Assert.Equal("developer", configuredContext.ActorId.Value);
 
-        var productionOptions = UiBootstrapOptions.FromConfiguration(
+        var productionOptions = UiDevelopmentLoginOptions.FromConfiguration(
             Configuration(new Dictionary<string, string?>()),
             RuntimeProfile.Production);
         Assert.False(productionOptions.Enabled);
-        Assert.False(new UiBootstrapAuthenticator(productionOptions)
-            .TryAuthenticate("development-secret", out _));
+        Assert.False(new UiDevelopmentLoginAuthenticator(productionOptions)
+            .TryAuthenticate("admin", "admin", out _));
+    }
+
+    [Theory]
+    [InlineData("", "admin")]
+    [InlineData("admin", "")]
+    public void Development_login_configuration_rejects_empty_credentials(string username, string password)
+    {
+        var configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:Runtime:Ui:DevelopmentUsername"] = username,
+            ["DigitalBrain:Runtime:Ui:DevelopmentPassword"] = password
+        });
+
+        Assert.Throws<InvalidOperationException>(() =>
+            UiDevelopmentLoginOptions.FromConfiguration(configuration, RuntimeProfile.Development));
+    }
+
+    [Fact]
+    public void Development_login_configuration_rejects_oversized_credentials()
+    {
+        var oversizedUsername = Configuration(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:Runtime:Ui:DevelopmentUsername"] = new string('a', 257)
+        });
+        var oversizedPassword = Configuration(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:Runtime:Ui:DevelopmentPassword"] = new string('a', 257)
+        });
+
+        Assert.Throws<InvalidOperationException>(() =>
+            UiDevelopmentLoginOptions.FromConfiguration(oversizedUsername, RuntimeProfile.Development));
+        Assert.Throws<InvalidOperationException>(() =>
+            UiDevelopmentLoginOptions.FromConfiguration(oversizedPassword, RuntimeProfile.Development));
     }
 
     [Fact]

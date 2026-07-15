@@ -1,3 +1,6 @@
+
+
+
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -10,40 +13,39 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 export 'ui.pbenum.dart';
 
 class BootstrapSessionRequest extends $pb.GeneratedMessage {
-  factory BootstrapSessionRequest({$core.String? secret}) {
+  factory BootstrapSessionRequest({
+    $core.String? username,
+    $core.String? password,
+  }) {
     final result = create();
-    if (secret != null) result.secret = secret;
+    if (username != null) result.username = username;
+    if (password != null) result.password = password;
     return result;
   }
 
   BootstrapSessionRequest._();
 
-  factory BootstrapSessionRequest.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory BootstrapSessionRequest.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory BootstrapSessionRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BootstrapSessionRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'BootstrapSessionRequest',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aOS(1, _omitFieldNames ? '' : 'secret')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BootstrapSessionRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aOS(2, _omitFieldNames ? '' : 'username')
+    ..aOS(3, _omitFieldNames ? '' : 'password')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   BootstrapSessionRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   BootstrapSessionRequest copyWith(
-    void Function(BootstrapSessionRequest) updates,
-  ) =>
+          void Function(BootstrapSessionRequest) updates) =>
       super.copyWith((message) => updates(message as BootstrapSessionRequest))
           as BootstrapSessionRequest;
 
@@ -59,18 +61,29 @@ class BootstrapSessionRequest extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<BootstrapSessionRequest>(create);
   static BootstrapSessionRequest? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.String get secret => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set secret($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSecret() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSecret() => $_clearField(1);
+  @$pb.TagNumber(2)
+  $core.String get username => $_getSZ(0);
+  @$pb.TagNumber(2)
+  set username($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUsername() => $_has(0);
+  @$pb.TagNumber(2)
+  void clearUsername() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get password => $_getSZ(1);
+  @$pb.TagNumber(3)
+  set password($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPassword() => $_has(1);
+  @$pb.TagNumber(3)
+  void clearPassword() => $_clearField(3);
 }
 
 class RefreshSessionRequest extends $pb.GeneratedMessage {
-  factory RefreshSessionRequest({$core.String? refreshToken}) {
+  factory RefreshSessionRequest({
+    $core.String? refreshToken,
+  }) {
     final result = create();
     if (refreshToken != null) result.refreshToken = refreshToken;
     return result;
@@ -78,32 +91,26 @@ class RefreshSessionRequest extends $pb.GeneratedMessage {
 
   RefreshSessionRequest._();
 
-  factory RefreshSessionRequest.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory RefreshSessionRequest.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory RefreshSessionRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RefreshSessionRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'RefreshSessionRequest',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aOS(1, _omitFieldNames ? '' : 'refreshToken')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshSessionRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'refreshToken')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   RefreshSessionRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   RefreshSessionRequest copyWith(
-    void Function(RefreshSessionRequest) updates,
-  ) =>
+          void Function(RefreshSessionRequest) updates) =>
       super.copyWith((message) => updates(message as RefreshSessionRequest))
           as RefreshSessionRequest;
 
@@ -154,31 +161,26 @@ class SessionReply extends $pb.GeneratedMessage {
 
   SessionReply._();
 
-  factory SessionReply.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory SessionReply.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory SessionReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SessionReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'SessionReply',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aOS(1, _omitFieldNames ? '' : 'accessToken')
-        ..aOS(2, _omitFieldNames ? '' : 'refreshToken')
-        ..aInt64(3, _omitFieldNames ? '' : 'accessExpiresAtUnixMs')
-        ..aInt64(4, _omitFieldNames ? '' : 'refreshExpiresAtUnixMs')
-        ..aOS(5, _omitFieldNames ? '' : 'sessionId')
-        ..aOS(6, _omitFieldNames ? '' : 'ownerId')
-        ..aOS(7, _omitFieldNames ? '' : 'actorId')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SessionReply',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'accessToken')
+    ..aOS(2, _omitFieldNames ? '' : 'refreshToken')
+    ..aInt64(3, _omitFieldNames ? '' : 'accessExpiresAtUnixMs')
+    ..aInt64(4, _omitFieldNames ? '' : 'refreshExpiresAtUnixMs')
+    ..aOS(5, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(6, _omitFieldNames ? '' : 'ownerId')
+    ..aOS(7, _omitFieldNames ? '' : 'actorId')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   SessionReply clone() => deepCopy();
@@ -281,39 +283,30 @@ class WatchSurfaceFeedRequest extends $pb.GeneratedMessage {
 
   WatchSurfaceFeedRequest._();
 
-  factory WatchSurfaceFeedRequest.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory WatchSurfaceFeedRequest.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory WatchSurfaceFeedRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory WatchSurfaceFeedRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'WatchSurfaceFeedRequest',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aInt64(1, _omitFieldNames ? '' : 'afterSequence')
-        ..aE<FeedAudienceKind>(
-          2,
-          _omitFieldNames ? '' : 'audience',
-          enumValues: FeedAudienceKind.values,
-        )
-        ..pPS(3, _omitFieldNames ? '' : 'clientCapabilities')
-        ..aI(4, _omitFieldNames ? '' : 'maxBatchSize')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WatchSurfaceFeedRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'afterSequence')
+    ..aE<FeedAudienceKind>(2, _omitFieldNames ? '' : 'audience',
+        enumValues: FeedAudienceKind.values)
+    ..pPS(3, _omitFieldNames ? '' : 'clientCapabilities')
+    ..aI(4, _omitFieldNames ? '' : 'maxBatchSize')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   WatchSurfaceFeedRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   WatchSurfaceFeedRequest copyWith(
-    void Function(WatchSurfaceFeedRequest) updates,
-  ) =>
+          void Function(WatchSurfaceFeedRequest) updates) =>
       super.copyWith((message) => updates(message as WatchSurfaceFeedRequest))
           as WatchSurfaceFeedRequest;
 
@@ -375,37 +368,29 @@ class SurfaceFeedEvent extends $pb.GeneratedMessage {
 
   SurfaceFeedEvent._();
 
-  factory SurfaceFeedEvent.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory SurfaceFeedEvent.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory SurfaceFeedEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SurfaceFeedEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
   static const $core.Map<$core.int, SurfaceFeedEvent_Event>
-  _SurfaceFeedEvent_EventByTag = {
+      _SurfaceFeedEvent_EventByTag = {
     1: SurfaceFeedEvent_Event.surfaceJson,
     2: SurfaceFeedEvent_Event.reset,
-    0: SurfaceFeedEvent_Event.notSet,
+    0: SurfaceFeedEvent_Event.notSet
   };
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'SurfaceFeedEvent',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..oo(0, [1, 2])
-        ..aOS(1, _omitFieldNames ? '' : 'surfaceJson')
-        ..aOM<SurfaceFeedReset>(
-          2,
-          _omitFieldNames ? '' : 'reset',
-          subBuilder: SurfaceFeedReset.create,
-        )
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SurfaceFeedEvent',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..oo(0, [1, 2])
+    ..aOS(1, _omitFieldNames ? '' : 'surfaceJson')
+    ..aOM<SurfaceFeedReset>(2, _omitFieldNames ? '' : 'reset',
+        subBuilder: SurfaceFeedReset.create)
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   SurfaceFeedEvent clone() => deepCopy();
@@ -470,27 +455,22 @@ class SurfaceFeedReset extends $pb.GeneratedMessage {
 
   SurfaceFeedReset._();
 
-  factory SurfaceFeedReset.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory SurfaceFeedReset.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory SurfaceFeedReset.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SurfaceFeedReset.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'SurfaceFeedReset',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aOS(1, _omitFieldNames ? '' : 'reason')
-        ..aInt64(2, _omitFieldNames ? '' : 'resumeSequence')
-        ..pPS(3, _omitFieldNames ? '' : 'snapshotJson')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SurfaceFeedReset',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'reason')
+    ..aInt64(2, _omitFieldNames ? '' : 'resumeSequence')
+    ..pPS(3, _omitFieldNames ? '' : 'snapshotJson')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   SurfaceFeedReset clone() => deepCopy();
@@ -546,40 +526,30 @@ class AcknowledgeSurfaceFeedRequest extends $pb.GeneratedMessage {
 
   AcknowledgeSurfaceFeedRequest._();
 
-  factory AcknowledgeSurfaceFeedRequest.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory AcknowledgeSurfaceFeedRequest.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory AcknowledgeSurfaceFeedRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory AcknowledgeSurfaceFeedRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'AcknowledgeSurfaceFeedRequest',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aE<FeedAudienceKind>(
-          1,
-          _omitFieldNames ? '' : 'audience',
-          enumValues: FeedAudienceKind.values,
-        )
-        ..aInt64(2, _omitFieldNames ? '' : 'sequence')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AcknowledgeSurfaceFeedRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aE<FeedAudienceKind>(1, _omitFieldNames ? '' : 'audience',
+        enumValues: FeedAudienceKind.values)
+    ..aInt64(2, _omitFieldNames ? '' : 'sequence')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   AcknowledgeSurfaceFeedRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   AcknowledgeSurfaceFeedRequest copyWith(
-    void Function(AcknowledgeSurfaceFeedRequest) updates,
-  ) =>
+          void Function(AcknowledgeSurfaceFeedRequest) updates) =>
       super.copyWith(
-            (message) => updates(message as AcknowledgeSurfaceFeedRequest),
-          )
+              (message) => updates(message as AcknowledgeSurfaceFeedRequest))
           as AcknowledgeSurfaceFeedRequest;
 
   @$core.override
@@ -615,7 +585,9 @@ class AcknowledgeSurfaceFeedRequest extends $pb.GeneratedMessage {
 }
 
 class AcknowledgeSurfaceFeedReply extends $pb.GeneratedMessage {
-  factory AcknowledgeSurfaceFeedReply({$fixnum.Int64? acknowledgedSequence}) {
+  factory AcknowledgeSurfaceFeedReply({
+    $fixnum.Int64? acknowledgedSequence,
+  }) {
     final result = create();
     if (acknowledgedSequence != null)
       result.acknowledgedSequence = acknowledgedSequence;
@@ -624,35 +596,28 @@ class AcknowledgeSurfaceFeedReply extends $pb.GeneratedMessage {
 
   AcknowledgeSurfaceFeedReply._();
 
-  factory AcknowledgeSurfaceFeedReply.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory AcknowledgeSurfaceFeedReply.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory AcknowledgeSurfaceFeedReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory AcknowledgeSurfaceFeedReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'AcknowledgeSurfaceFeedReply',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aInt64(1, _omitFieldNames ? '' : 'acknowledgedSequence')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AcknowledgeSurfaceFeedReply',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'acknowledgedSequence')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   AcknowledgeSurfaceFeedReply clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   AcknowledgeSurfaceFeedReply copyWith(
-    void Function(AcknowledgeSurfaceFeedReply) updates,
-  ) =>
+          void Function(AcknowledgeSurfaceFeedReply) updates) =>
       super.copyWith(
-            (message) => updates(message as AcknowledgeSurfaceFeedReply),
-          )
+              (message) => updates(message as AcknowledgeSurfaceFeedReply))
           as AcknowledgeSurfaceFeedReply;
 
   @$core.override
@@ -697,29 +662,24 @@ class SubmitActionRequest extends $pb.GeneratedMessage {
 
   SubmitActionRequest._();
 
-  factory SubmitActionRequest.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory SubmitActionRequest.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory SubmitActionRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SubmitActionRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'SubmitActionRequest',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aOS(1, _omitFieldNames ? '' : 'bindingId')
-        ..aOS(2, _omitFieldNames ? '' : 'actionToken')
-        ..aOS(3, _omitFieldNames ? '' : 'surfaceId')
-        ..aI(4, _omitFieldNames ? '' : 'surfaceRevision')
-        ..aOS(5, _omitFieldNames ? '' : 'inputJson')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SubmitActionRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'bindingId')
+    ..aOS(2, _omitFieldNames ? '' : 'actionToken')
+    ..aOS(3, _omitFieldNames ? '' : 'surfaceId')
+    ..aI(4, _omitFieldNames ? '' : 'surfaceRevision')
+    ..aOS(5, _omitFieldNames ? '' : 'inputJson')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   SubmitActionRequest clone() => deepCopy();
@@ -799,26 +759,21 @@ class SubmitActionReply extends $pb.GeneratedMessage {
 
   SubmitActionReply._();
 
-  factory SubmitActionReply.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory SubmitActionReply.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory SubmitActionReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SubmitActionReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'SubmitActionReply',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aOS(1, _omitFieldNames ? '' : 'operationId')
-        ..aOS(2, _omitFieldNames ? '' : 'idempotencyKey')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SubmitActionReply',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'operationId')
+    ..aOS(2, _omitFieldNames ? '' : 'idempotencyKey')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   SubmitActionReply clone() => deepCopy();
@@ -859,7 +814,9 @@ class SubmitActionReply extends $pb.GeneratedMessage {
 }
 
 class LogoutSessionRequest extends $pb.GeneratedMessage {
-  factory LogoutSessionRequest({$core.String? refreshToken}) {
+  factory LogoutSessionRequest({
+    $core.String? refreshToken,
+  }) {
     final result = create();
     if (refreshToken != null) result.refreshToken = refreshToken;
     return result;
@@ -867,25 +824,20 @@ class LogoutSessionRequest extends $pb.GeneratedMessage {
 
   LogoutSessionRequest._();
 
-  factory LogoutSessionRequest.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory LogoutSessionRequest.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory LogoutSessionRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LogoutSessionRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i =
-      $pb.BuilderInfo(
-          _omitMessageNames ? '' : 'LogoutSessionRequest',
-          package: const $pb.PackageName(
-            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-          ),
-          createEmptyInstance: create,
-        )
-        ..aOS(1, _omitFieldNames ? '' : 'refreshToken')
-        ..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LogoutSessionRequest',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'refreshToken')
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   LogoutSessionRequest clone() => deepCopy();
@@ -921,22 +873,19 @@ class LogoutSessionReply extends $pb.GeneratedMessage {
 
   LogoutSessionReply._();
 
-  factory LogoutSessionReply.fromBuffer(
-    $core.List<$core.int> data, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromBuffer(data, registry);
-  factory LogoutSessionReply.fromJson(
-    $core.String json, [
-    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
-  ]) => create()..mergeFromJson(json, registry);
+  factory LogoutSessionReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LogoutSessionReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'LogoutSessionReply',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+      _omitMessageNames ? '' : 'LogoutSessionReply',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'digitalbrain.v2.ui'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   LogoutSessionReply clone() => deepCopy();
@@ -958,9 +907,7 @@ class LogoutSessionReply extends $pb.GeneratedMessage {
   static LogoutSessionReply? _defaultInstance;
 }
 
-const $core.bool _omitFieldNames = $core.bool.fromEnvironment(
-  'protobuf.omit_field_names',
-);
-const $core.bool _omitMessageNames = $core.bool.fromEnvironment(
-  'protobuf.omit_message_names',
-);
+const $core.bool _omitFieldNames =
+    $core.bool.fromEnvironment('protobuf.omit_field_names');
+const $core.bool _omitMessageNames =
+    $core.bool.fromEnvironment('protobuf.omit_message_names');

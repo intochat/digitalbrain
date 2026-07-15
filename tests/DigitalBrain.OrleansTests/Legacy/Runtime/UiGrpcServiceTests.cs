@@ -1,4 +1,5 @@
 extern alias McpProject;
+using System.Security.Claims;
 using System.Diagnostics;
 using System.Text.Json;
 using DigitalBrain.Integrations.Google;
@@ -14,6 +15,8 @@ using DigitalBrain.OrleansTests.TestSupport;
 using DigitalBrain.Tests.TestSupport;
 using Grpc.Core;
 using Microsoft.Extensions.AI;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
@@ -27,8 +30,8 @@ using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestConte
 using RuntimeSessionAuthority = McpProject::DigitalBrain.Mcp.RuntimeSessionAuthority;
 using RuntimeSurfaceFeed = McpProject::DigitalBrain.Mcp.RuntimeSurfaceFeed;
 using SubmitActionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.SubmitActionRequest;
-using UiBootstrapAuthenticator = McpProject::DigitalBrain.Mcp.UiBootstrapAuthenticator;
-using UiBootstrapOptions = McpProject::DigitalBrain.Mcp.UiBootstrapOptions;
+using UiDevelopmentLoginAuthenticator = McpProject::DigitalBrain.Mcp.UiDevelopmentLoginAuthenticator;
+using UiDevelopmentLoginOptions = McpProject::DigitalBrain.Mcp.UiDevelopmentLoginOptions;
 using UiDeliveryOptions = McpProject::DigitalBrain.Mcp.UiDeliveryOptions;
 using UiExternalIdentityAuthenticator = McpProject::DigitalBrain.Mcp.UiExternalIdentityAuthenticator;
 using UiExternalIdentityOptions = McpProject::DigitalBrain.Mcp.UiExternalIdentityOptions;
@@ -39,7 +42,8 @@ namespace DigitalBrain.Tests.Runtime;
 
 public sealed class UiGrpcServiceTests : NeuronTestBase
 {
-    private const string BootstrapSecret = "task-3-bootstrap-secret";
+    private const string LoginUsername = "admin";
+    private const string LoginPassword = "admin";
     private RecordingChatClient? _chatClient;
 
     protected override void ConfigureSilo(ISiloBuilder builder)
@@ -76,12 +80,20 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         var (service, sessions) = CreateService();
         var audience = ("x-v2-audience", SessionAudiences.Ui);
         var bootstrap = await service.BootstrapSession(
-            new BootstrapSessionRequest { Secret = BootstrapSecret },
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
             TestServerCallContext.WithHeaders(audience));
 
         var bootstrapped = await sessions.ValidateAccessAsync(bootstrap.AccessToken, SessionAudiences.Ui);
         Assert.NotNull(bootstrapped);
         Assert.Equal(bootstrap.SessionId, bootstrapped.Context.SessionId.Value);
+        Assert.Equal("owner", bootstrapped.Context.OwnerId.Value);
+        Assert.Equal("principal", bootstrapped.Context.ActorId.Value);
+        Assert.Equal(AuthAssurance.Password, bootstrapped.Context.Assurance);
+        Assert.Equal(["brain.read", "ui.action"], bootstrapped.Context.Grants.Order(StringComparer.Ordinal).ToArray());
+        Assert.InRange(
+            bootstrapped.AccessExpiresAt,
+            DateTimeOffset.UtcNow.AddMinutes(14),
+            DateTimeOffset.UtcNow.AddMinutes(16));
 
         var refreshed = await service.RefreshSession(
             new RefreshSessionRequest { RefreshToken = bootstrap.RefreshToken },
@@ -144,7 +156,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         var (service, sessions) = CreateService();
         var audience = ("x-v2-audience", SessionAudiences.Ui);
         var bootstrap = await service.BootstrapSession(
-            new BootstrapSessionRequest { Secret = BootstrapSecret },
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
             TestServerCallContext.WithHeaders(audience));
         var refreshed = await service.RefreshSession(
             new RefreshSessionRequest { RefreshToken = bootstrap.RefreshToken },
@@ -160,6 +172,69 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             new RefreshSessionRequest { RefreshToken = refreshed.RefreshToken },
             TestServerCallContext.WithHeaders(audience)));
         Assert.Equal(StatusCode.Unauthenticated, rotatedRefresh.StatusCode);
+    }
+
+    [Fact]
+    public async Task V2_invalid_development_credentials_fail_with_the_same_safe_status()
+    {
+        var (service, _) = CreateService();
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var pairs = new[]
+        {
+            ("wrong", LoginPassword),
+            (LoginUsername, "wrong"),
+            (string.Empty, LoginPassword),
+            (LoginUsername, string.Empty),
+            (new string('a', 257), LoginPassword),
+            (LoginUsername, new string('a', 257))
+        };
+
+        foreach (var (username, password) in pairs)
+        {
+            var exception = await Assert.ThrowsAsync<RpcException>(() => service.BootstrapSession(
+                new BootstrapSessionRequest { Username = username, Password = password },
+                TestServerCallContext.WithHeaders(audience)));
+
+            Assert.Equal(StatusCode.Unauthenticated, exception.StatusCode);
+            Assert.Equal(
+                "A valid UI session for the exact transport audience is required.",
+                exception.Status.Detail);
+        }
+    }
+
+    [Fact]
+    public async Task V2_oidc_login_accepts_an_empty_credential_body()
+    {
+        var externalOptions = new UiExternalIdentityOptions(
+            true,
+            "https://issuer.example/tenant",
+            "digitalbrain-ui",
+            "sub",
+            "digitalbrain_grants",
+            new HashSet<string>(["brain.read", "ui.action"], StringComparer.Ordinal),
+            true);
+        var (service, sessions) = CreateService(externalOptions);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim("sub", "subject"),
+                new Claim("digitalbrain_grants", "brain.read ui.action")
+            ],
+            "oidc"));
+        var services = new ServiceCollection()
+            .AddSingleton<IAuthenticationService>(new FixedAuthenticationService(principal))
+            .BuildServiceProvider();
+        var call = TestServerCallContext.WithHeaders(
+            ("x-v2-audience", SessionAudiences.Ui));
+        var httpContext = call.GetHttpContext();
+        httpContext.RequestServices = services;
+        httpContext.Request.Headers.Authorization = "Bearer header.payload.signature";
+
+        var reply = await service.BootstrapSession(new BootstrapSessionRequest(), call);
+        var validated = await sessions.ValidateAccessAsync(reply.AccessToken, SessionAudiences.Ui);
+
+        Assert.NotNull(validated);
+        Assert.Equal(AuthAssurance.Oidc, validated.Context.Assurance);
+        Assert.Equal(["brain.read", "ui.action"], validated.Context.Grants.Order(StringComparer.Ordinal).ToArray());
     }
 
     [Fact]
@@ -324,20 +399,22 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         public void Dispose() { }
     }
 
-    private (UiGrpcService Service, RuntimeSessionAuthority Sessions) CreateService()
+    private (UiGrpcService Service, RuntimeSessionAuthority Sessions) CreateService(
+        UiExternalIdentityOptions? externalOptions = null)
     {
         var timeProvider = TimeProvider.System;
         var tokens = new SessionTokenService(Enumerable.Repeat((byte)13, 32).ToArray(), timeProvider);
         var sessions = new RuntimeSessionAuthority(Cluster.Client, tokens, timeProvider);
         var conversations = new ConversationStateClient(Cluster.Client, timeProvider);
         var service = new UiGrpcService(
-            new UiBootstrapAuthenticator(new UiBootstrapOptions(
-                BootstrapSecret,
+            new UiDevelopmentLoginAuthenticator(new UiDevelopmentLoginOptions(
+                LoginUsername,
+                LoginPassword,
                 new BrainOwnerId("owner"),
                 new ActorId("principal"),
                 TimeSpan.FromMinutes(15),
                 new HashSet<string>(["brain.read", "ui.action"], StringComparer.Ordinal))),
-            new UiExternalIdentityAuthenticator(new UiExternalIdentityOptions(
+            new UiExternalIdentityAuthenticator(externalOptions ?? new UiExternalIdentityOptions(
                 false,
                 string.Empty,
                 string.Empty,
@@ -353,5 +430,32 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             UiDeliveryOptions.Default,
             NullLogger<UiGrpcService>.Instance);
         return (service, sessions);
+    }
+
+    private sealed class FixedAuthenticationService(ClaimsPrincipal principal) : IAuthenticationService
+    {
+        public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme) =>
+            Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, scheme!)));
+
+        public Task ChallengeAsync(
+            HttpContext context,
+            string? scheme,
+            AuthenticationProperties? properties) => Task.CompletedTask;
+
+        public Task ForbidAsync(
+            HttpContext context,
+            string? scheme,
+            AuthenticationProperties? properties) => Task.CompletedTask;
+
+        public Task SignInAsync(
+            HttpContext context,
+            string? scheme,
+            ClaimsPrincipal principal,
+            AuthenticationProperties? properties) => Task.CompletedTask;
+
+        public Task SignOutAsync(
+            HttpContext context,
+            string? scheme,
+            AuthenticationProperties? properties) => Task.CompletedTask;
     }
 }
