@@ -304,7 +304,10 @@ void main() {
         'x-v2-session': 'signed-session',
         'x-v2-audience': digitalBrainUiAudience,
       });
-      expect(port.resumeOriginatingRequestOptions?.timeout, unaryRequestTimeout);
+      expect(
+        port.resumeOriginatingRequestOptions?.timeout,
+        unaryRequestTimeout,
+      );
     });
 
     test(
@@ -465,6 +468,29 @@ void main() {
         );
       },
     );
+
+    test('Activity and Run queries use signed bounded calls', () async {
+      final port = _FakeGrpcClientPort();
+      final transport = GrpcUiTransport.forTesting(client: port);
+      final list = wire.ListActivityRequest(featureId: 'feature-a', limit: 100);
+      final run = wire.GetRunRequest(runId: 'run-a');
+
+      await transport.listActivity(
+        accessToken: 'signed-session',
+        request: list,
+      );
+      await transport.getRun(accessToken: 'signed-session', request: run);
+
+      expect(port.listActivityRequest, same(list));
+      expect(port.getRunRequest, same(run));
+      for (final options in [port.listActivityOptions, port.getRunOptions]) {
+        expect(options?.metadata, {
+          'x-v2-session': 'signed-session',
+          'x-v2-audience': digitalBrainUiAudience,
+        });
+        expect(options?.timeout, unaryRequestTimeout);
+      }
+    });
 
     test(
       'preserves safe draft not found and revision conflict codes',
@@ -881,6 +907,10 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   CallOptions? getFeatureReleaseSourceOptions;
   wire.RollbackFeatureVersionRequest? rollbackFeatureVersionRequest;
   CallOptions? rollbackFeatureVersionOptions;
+  wire.ListActivityRequest? listActivityRequest;
+  CallOptions? listActivityOptions;
+  wire.GetRunRequest? getRunRequest;
+  CallOptions? getRunOptions;
 
   wire.SessionReply get sessionReply => wire.SessionReply(
     accessToken: 'access-token',
@@ -1065,7 +1095,8 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   }
 
   @override
-  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest(
+  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply>
+  resumeOriginatingRequest(
     wire.ResumeOriginatingRequestRequest request,
     CallOptions options,
   ) {
@@ -1108,6 +1139,26 @@ class _FakeGrpcClientPort implements GrpcClientPort {
     rollbackFeatureVersionRequest = request;
     rollbackFeatureVersionOptions = options;
     return _FakeGrpcUnaryResponse(Future.value(wire.FeatureReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.ListActivityReply> listActivity(
+    wire.ListActivityRequest request,
+    CallOptions options,
+  ) {
+    listActivityRequest = request;
+    listActivityOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.ListActivityReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.RunReply> getRun(
+    wire.GetRunRequest request,
+    CallOptions options,
+  ) {
+    getRunRequest = request;
+    getRunOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.RunReply()));
   }
 }
 

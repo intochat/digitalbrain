@@ -180,6 +180,71 @@ public sealed record StartFeatureRun(
     [property: Id(6)] string AuthorityDigest,
     [property: Id(7)] string AccessDigest,
     [property: Id(8)] FeatureInput Input);
+[Alias("digitalbrain.feature.run-origin.v1")]
+public enum FeatureRunOrigin
+{
+    Unspecified,
+    Chat,
+    Direct,
+    Schedule,
+    Event
+}
+[GenerateSerializer, Alias("digitalbrain.feature.run-origin-reference.v1")]
+public sealed record FeatureRunOriginReference(
+    [property: Id(0)] string? ConversationId,
+    [property: Id(1)] string? RequestId,
+    [property: Id(2)] string? AutomationId);
+[Alias("digitalbrain.feature.run-status.v1")]
+public enum FeatureRunStatus
+{
+    Queued,
+    Running,
+    WaitingForApproval,
+    Completed,
+    Failed,
+    Parked
+}
+[Alias("digitalbrain.feature.run-authority-state.v1")]
+public enum FeatureRunAuthorityState
+{
+    Authorized,
+    WaitingForApproval,
+    Paused
+}
+[GenerateSerializer, Alias("digitalbrain.feature.run-snapshot.v1")]
+public sealed record FeatureRunSnapshot(
+    [property: Id(0)] string RunId,
+    [property: Id(1)] FeatureInstallationId InstallationId,
+    [property: Id(2)] ReleaseDigest Release,
+    [property: Id(3)] string InputKind,
+    [property: Id(4)] FeatureRunOrigin Origin,
+    [property: Id(5)] FeatureRunOriginReference? OriginReference,
+    [property: Id(6)] FeatureRunStatus Status,
+    [property: Id(7)] FeatureRunAuthorityState AuthorityState,
+    [property: Id(8)] DateTimeOffset OccurredAt,
+    [property: Id(9)] DateTimeOffset? StartedAt,
+    [property: Id(10)] DateTimeOffset? CompletedAt,
+    [property: Id(11)] DateTimeOffset? RetryAt,
+    [property: Id(12)] int Attempts,
+    [property: Id(13)] string? ResultSurfaceReference,
+    [property: Id(14)] string? SafeFailure,
+    [property: Id(15)] string? FailureGuidance,
+    [property: Id(16)] string TraceReference);
+[GenerateSerializer, Alias("digitalbrain.feature.run-read-request.v1")]
+public sealed record FeatureRunReadRequest(
+    [property: Id(0)] int Limit,
+    [property: Id(1)] FeatureRunStatus? Status = null,
+    [property: Id(2)] FeatureRunOrigin? Origin = null,
+    [property: Id(3)] string? RunId = null)
+{
+    public const int MaximumLimit = 200;
+}
+[GenerateSerializer, Alias("digitalbrain.feature.run-collection-snapshot.v1")]
+public sealed record FeatureRunCollectionSnapshot(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ReleaseDigest ActiveRelease,
+    [property: Id(2)] long Revision,
+    [property: Id(3)] FeatureRunSnapshot[] Runs);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-input")]
 public sealed record FeatureInput(
     [property: Id(0)] string InputId,
@@ -188,7 +253,9 @@ public sealed record FeatureInput(
     [property: Id(3)] DateTimeOffset OccurredAt,
     [property: Id(4)] string CorrelationId,
     [property: Id(5)] string TraceId,
-    [property: Id(6)] string? CausationId = null);
+    [property: Id(6)] string? CausationId = null,
+    [property: Id(7)] FeatureRunOrigin Origin = FeatureRunOrigin.Unspecified,
+    [property: Id(8)] FeatureRunOriginReference? OriginReference = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease-fence")]
 public sealed record FeatureLeaseFence([property: Id(0)] string InputId, [property: Id(1)] long Fence);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-run-claim")]
@@ -257,7 +324,9 @@ public sealed record FeatureIntentStatus(
     [property: Id(0)] string OperationKey,
     [property: Id(1)] FeatureIntentKind Kind,
     [property: Id(2)] string PayloadJson,
-    [property: Id(3)] DateTimeOffset? AppliedAt);
+    [property: Id(3)] DateTimeOffset? AppliedAt,
+    [property: Id(4)] string? InputId = null,
+    [property: Id(5)] DateTimeOffset? DeclinedAt = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-schedule-status")]
 public sealed record FeatureScheduleStatus([property: Id(0)] string ScheduleId, [property: Id(1)] DateTimeOffset LastOccurrenceAt, [property: Id(2)] DateTimeOffset NextOccurrenceAt);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease-status")]
@@ -281,7 +350,8 @@ public sealed record FeatureInstallationSnapshot(
     [property: Id(10)] FeatureScheduleStatus[] Schedules,
     [property: Id(11)] long Revision,
     [property: Id(12)] FeatureParkedInput[] Parked,
-    [property: Id(13)] FeatureReleaseSwitchSnapshot? UnconfirmedReleaseSwitch = null);
+    [property: Id(13)] FeatureReleaseSwitchSnapshot? UnconfirmedReleaseSwitch = null,
+    [property: Id(14)] FeatureRunSnapshot[]? Runs = null);
 [GenerateSerializer, Alias("digitalbrain.feature.release-switch-snapshot.v1")]
 public sealed record FeatureReleaseSwitchSnapshot(
     [property: Id(0)] string OperationToken,
@@ -608,6 +678,9 @@ public interface IFeatureInstallationGrain : IGrainWithStringKey
     Task<FeatureIntentStatus[]> ListPendingIntentsAsync();
     [Alias("apply-intent")]
     Task ApplyIntentAsync(string operationKey);
+    [Alias("decline-intent")]
+    Task DeclineIntentAsync(string operationKey) =>
+        Task.FromException(new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
     [Alias("pause")]
     Task PauseAsync(string reason);
     [Alias("resume")]
@@ -642,4 +715,8 @@ public interface IFeatureInstallationGrain : IGrainWithStringKey
     Task RollbackAsync();
     [Alias("read")]
     Task<FeatureInstallationSnapshot> ReadAsync();
+    [Alias("read-runs")]
+    Task<FeatureRunCollectionSnapshot> ReadRunsAsync(FeatureRunReadRequest request) =>
+        Task.FromException<FeatureRunCollectionSnapshot>(
+            new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
 }

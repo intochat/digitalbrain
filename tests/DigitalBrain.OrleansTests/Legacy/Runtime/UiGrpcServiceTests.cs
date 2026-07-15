@@ -27,6 +27,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
 using BootstrapSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.BootstrapSessionRequest;
 using ConversationStateClient = McpProject::DigitalBrain.Mcp.ConversationStateClient;
+using DigitalBrainQueryService = McpProject::DigitalBrain.Mcp.DigitalBrainQueryService;
 using DigitalBrainUiEndpoints = McpProject::DigitalBrain.Mcp.DigitalBrainUiEndpoints;
 using FeedAudienceKind = McpProject::DigitalBrain.V2.Ui.Grpc.FeedAudienceKind;
 using FeatureArtifactCatalog = McpProject::DigitalBrain.Mcp.IFeatureArtifactCatalog;
@@ -38,7 +39,10 @@ using FeatureCapabilityCatalog = McpProject::DigitalBrain.Mcp.IFeatureCapability
 using FeatureInstallationInspection = McpProject::DigitalBrain.Mcp.FeatureInstallationInspection;
 using FeatureLifecycleInspection = McpProject::DigitalBrain.Mcp.FeatureLifecycleInspection;
 using FeatureLifecycleRail = McpProject::DigitalBrain.Mcp.IFeatureLifecycleRail;
+using FeatureRunInstallationInspection = McpProject::DigitalBrain.Mcp.FeatureRunInstallationInspection;
+using FeatureRunLifecycleInspection = McpProject::DigitalBrain.Mcp.FeatureRunLifecycleInspection;
 using FeatureSuggestionService = McpProject::DigitalBrain.Mcp.FeatureSuggestionService;
+using GetRunRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetRunRequest;
 using GetFeatureRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureRequest;
 using GetFeatureReleaseSourceRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureReleaseSourceRequest;
 using GetFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureDraftRequest;
@@ -47,6 +51,7 @@ using GrpcFeatureDraft = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureDraft;
 using GrpcFeatureGrant = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureGrant;
 using GrpcFeatureScenario = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureScenario;
 using InstallFeatureVersionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.InstallFeatureVersionRequest;
+using ListActivityRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ListActivityRequest;
 using LogoutSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.LogoutSessionRequest;
 using McpInoCommandHandler = McpProject::DigitalBrain.Mcp.McpInoCommandHandler;
 using RefreshSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.RefreshSessionRequest;
@@ -300,6 +305,165 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
             Assert.Equal("Feature management authority is required.", exception.Status.Detail);
         }
+    }
+
+    [Fact]
+    public async Task Activity_methods_require_a_UI_session_and_brain_read_authority()
+    {
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var (service, _) = CreateService(grants: new HashSet<string>(StringComparer.Ordinal));
+
+        foreach (var call in ActivityCalls(service, TestServerCallContext.WithHeaders(audience)))
+        {
+            var exception = await Assert.ThrowsAsync<RpcException>(call);
+            Assert.Equal(StatusCode.Unauthenticated, exception.StatusCode);
+            Assert.Equal(
+                "A valid UI session for the exact transport audience is required.",
+                exception.Status.Detail);
+        }
+
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var deniedContext = TestServerCallContext.WithHeaders(
+            ("x-v2-session", bootstrap.AccessToken),
+            audience);
+
+        foreach (var call in ActivityCalls(service, deniedContext))
+        {
+            var exception = await Assert.ThrowsAsync<RpcException>(call);
+            Assert.Equal(StatusCode.PermissionDenied, exception.StatusCode);
+            Assert.Equal("Activity read authority is required.", exception.Status.Detail);
+        }
+    }
+
+    [Fact]
+    public async Task Activity_list_and_detail_apply_typed_filters_and_project_only_safe_run_metadata()
+    {
+        var occurredAt = new DateTimeOffset(2026, 7, 15, 10, 0, 0, TimeSpan.Zero);
+        var installationId = new FeatureInstallationId("installation-ui-activity");
+        var release = new ReleaseDigest(new string('a', 64));
+        var matching = ActivityRun(
+            "run-ui-activity-event",
+            installationId,
+            release,
+            FeatureRunOrigin.Event,
+            FeatureRunStatus.Failed,
+            FeatureRunAuthorityState.Paused,
+            occurredAt,
+            2);
+        var other = ActivityRun(
+            "run-ui-activity-chat",
+            installationId,
+            release,
+            FeatureRunOrigin.Chat,
+            FeatureRunStatus.Completed,
+            FeatureRunAuthorityState.Authorized,
+            occurredAt.AddMinutes(-5),
+            1) with
+        {
+            CompletedAt = occurredAt.AddMinutes(-4)
+        };
+        var queries = ActivityQueries(installationId, release, matching, other);
+        var (service, _) = CreateService(
+            grants: new HashSet<string>(["brain.read"], StringComparer.Ordinal),
+            queries: queries);
+        var call = await AuthenticatedCallAsync(service);
+
+        var list = await service.ListActivity(
+            new ListActivityRequest
+            {
+                Status = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureRunStatus.Failed,
+                Origin = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureRunOrigin.Event,
+                FeatureId = "feature-ui-activity",
+                Limit = 1
+            },
+            call);
+        var projected = Assert.Single(list.Runs);
+        var detail = await service.GetRun(
+            new GetRunRequest { RunId = matching.RunId },
+            call);
+
+        Assert.Equal(projected, detail.Run);
+        Assert.Equal(matching.RunId, projected.RunId);
+        Assert.Equal("feature-ui-activity", projected.FeatureId);
+        Assert.Equal("Summarize safe Activity", projected.FeatureName);
+        Assert.Equal(installationId.Value, projected.InstallationId);
+        Assert.Equal(release.Value, projected.ReleaseDigest);
+        Assert.Equal("event.gmail", projected.InputKind);
+        Assert.Equal(McpProject::DigitalBrain.V2.Ui.Grpc.FeatureRunOrigin.Event, projected.Origin);
+        Assert.Equal("automation-ui-activity", projected.OriginReference.AutomationId);
+        Assert.Equal(McpProject::DigitalBrain.V2.Ui.Grpc.FeatureRunStatus.Failed, projected.Status);
+        Assert.Equal(McpProject::DigitalBrain.V2.Ui.Grpc.FeatureRunAuthorityState.Paused, projected.AuthorityState);
+        Assert.Equal(occurredAt.ToUnixTimeMilliseconds(), projected.OccurredAtUnixMs);
+        Assert.Equal(occurredAt.AddSeconds(1).ToUnixTimeMilliseconds(), projected.StartedAtUnixMs);
+        Assert.False(projected.HasCompletedAtUnixMs);
+        Assert.Equal(occurredAt.AddMinutes(1).ToUnixTimeMilliseconds(), projected.RetryAtUnixMs);
+        Assert.Equal(2, projected.Attempts);
+        Assert.Equal("surface-ui-activity", projected.ResultSurfaceReference);
+        Assert.Equal("The Feature could not complete.", projected.SafeFailure);
+        Assert.Equal("Review the Feature before retrying.", projected.FailureGuidance);
+        Assert.Equal("trace-ui-activity", projected.TraceReference);
+        Assert.DoesNotContain("provider-payload-secret", list.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("owner", list.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("principal", list.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Activity_requests_map_invalid_missing_and_unsafe_projection_failures_to_safe_statuses()
+    {
+        var occurredAt = new DateTimeOffset(2026, 7, 15, 10, 0, 0, TimeSpan.Zero);
+        var installationId = new FeatureInstallationId("installation-ui-activity-errors");
+        var release = new ReleaseDigest(new string('b', 64));
+        var invalidProjection = ActivityRun(
+            "run-ui-activity-invalid-projection",
+            installationId,
+            release,
+            FeatureRunOrigin.Direct,
+            FeatureRunStatus.Running,
+            FeatureRunAuthorityState.Authorized,
+            occurredAt,
+            6);
+        var logger = new CapturingLogger<DigitalBrainUiEndpoints>();
+        var (service, _) = CreateService(
+            grants: new HashSet<string>(["brain.read"], StringComparer.Ordinal),
+            endpointLogger: logger,
+            queries: ActivityQueries(installationId, release, invalidProjection));
+        var call = await AuthenticatedCallAsync(service);
+        var invalidRequests = new[]
+        {
+            new ListActivityRequest
+            {
+                Status = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureRunStatus.Unspecified
+            },
+            new ListActivityRequest
+            {
+                Origin = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureRunOrigin.Unspecified
+            },
+            new ListActivityRequest { FeatureId = " invalid-feature" },
+            new ListActivityRequest { Limit = DigitalBrainQueryService.MaximumListLimit + 1 }
+        };
+
+        foreach (var request in invalidRequests)
+        {
+            var invalid = await Assert.ThrowsAsync<RpcException>(() => service.ListActivity(request, call));
+            Assert.Equal(StatusCode.InvalidArgument, invalid.StatusCode);
+            Assert.Equal("The Activity request is invalid.", invalid.Status.Detail);
+        }
+
+        var missing = await Assert.ThrowsAsync<RpcException>(() => service.GetRun(
+            new GetRunRequest { RunId = "run-ui-activity-missing" },
+            call));
+        var unsafeProjection = await Assert.ThrowsAsync<RpcException>(() => service.GetRun(
+            new GetRunRequest { RunId = invalidProjection.RunId },
+            call));
+
+        Assert.Equal(StatusCode.NotFound, missing.StatusCode);
+        Assert.Equal("The requested Run was not found.", missing.Status.Detail);
+        Assert.Equal(StatusCode.Internal, unsafeProjection.StatusCode);
+        Assert.Equal("Activity could not be loaded.", unsafeProjection.Status.Detail);
+        Assert.DoesNotContain("provider-payload-secret", unsafeProjection.Status.Detail, StringComparison.Ordinal);
+        Assert.Contains("An Activity response projection failed safely.", logger.Messages);
     }
 
     [Fact]
@@ -1206,7 +1370,8 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         FeatureAuthoringService? authoring = null,
         FeatureSuggestionService? suggestion = null,
         ILogger<DigitalBrainUiEndpoints>? endpointLogger = null,
-        ActorId? actorId = null)
+        ActorId? actorId = null,
+        DigitalBrainQueryService? queries = null)
     {
         var timeProvider = TimeProvider.System;
         var tokens = new SessionTokenService(Enumerable.Repeat((byte)13, 32).ToArray(), timeProvider);
@@ -1221,7 +1386,8 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         var endpoints = new DigitalBrainUiEndpoints(
             authoring,
             suggestion ?? new FeatureSuggestionService(Cluster.Client),
-            endpointLogger ?? NullLogger<DigitalBrainUiEndpoints>.Instance);
+            endpointLogger ?? NullLogger<DigitalBrainUiEndpoints>.Instance,
+            queries);
         var service = new UiGrpcService(
             new UiDevelopmentLoginAuthenticator(new UiDevelopmentLoginOptions(
                 LoginUsername,
@@ -1249,6 +1415,17 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         return (service, sessions);
     }
 
+    private async Task<ServerCallContext> AuthenticatedCallAsync(UiGrpcService service)
+    {
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        return TestServerCallContext.WithHeaders(
+            ("x-v2-session", bootstrap.AccessToken),
+            audience);
+    }
+
     private static Func<Task>[] ProductCalls(UiGrpcService service, ServerCallContext context) =>
     [
         () => service.GetFeatureDraft(new GetFeatureDraftRequest(), context),
@@ -1263,6 +1440,143 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         () => service.GetFeatureReleaseSource(new GetFeatureReleaseSourceRequest(), context),
         () => service.RollbackFeatureVersion(new RollbackFeatureVersionRequest(), context)
     ];
+
+    private static Func<Task>[] ActivityCalls(UiGrpcService service, ServerCallContext context) =>
+    [
+        () => service.ListActivity(new ListActivityRequest(), context),
+        () => service.GetRun(new GetRunRequest(), context)
+    ];
+
+    private static DigitalBrainQueryService ActivityQueries(
+        FeatureInstallationId installationId,
+        ReleaseDigest release,
+        params FeatureRunSnapshot[] runs)
+    {
+        var authority = new FeatureAuthoritySnapshot(
+            installationId,
+            new ActorId("principal"),
+            release,
+            null,
+            new GrantRevision(1),
+            [],
+            null,
+            null,
+            [],
+            false,
+            null,
+            null,
+            false,
+            true);
+        var registration = new FeatureInstallationRegistration(installationId, release, ["manual"]);
+        var runtime = new FeatureInstallationSnapshot(
+            installationId,
+            release,
+            null,
+            "provider-payload-secret",
+            false,
+            null,
+            [],
+            null,
+            [],
+            [],
+            [],
+            1,
+            [],
+            null,
+            runs);
+        var inspection = new FeatureInstallationInspection(
+            authority,
+            registration,
+            runtime,
+            ActivityDraft(installationId, release));
+        return new DigitalBrainQueryService(new FixedInspectionLifecycleRail(new FeatureLifecycleInspection(
+            1,
+            [],
+            [],
+            [inspection],
+            [registration])));
+    }
+
+    private static FeatureDraft ActivityDraft(
+        FeatureInstallationId installationId,
+        ReleaseDigest release)
+    {
+        const string implementationProject = "src/UiActivityFeature/UiActivityFeature.csproj";
+        const string scenarioProject = "tests/UiActivityFeature.Scenarios/UiActivityFeature.Scenarios.csproj";
+        var now = new DateTimeOffset(2026, 7, 15, 9, 0, 0, TimeSpan.Zero);
+        return new FeatureDraft(
+            new FeatureDraftId("feature-ui-activity"),
+            new OriginatingRequest(
+                "operation-ui-activity",
+                "conversation-ui-activity",
+                "Summarize safe Activity"),
+            "Summarize safe Activity",
+            "Installed",
+            new FeatureBehavior([
+                new FeatureScenario(
+                    "scenario-ui-activity",
+                    "Project Activity",
+                    "an installed Feature has Runs",
+                    "Activity is requested",
+                    "safe Run metadata is returned")
+            ]),
+            new FeatureSourceSnapshot(
+                implementationProject,
+                scenarioProject,
+                [
+                    new FeatureSourceFile(implementationProject, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>"),
+                    new FeatureSourceFile(scenarioProject, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>")
+                ]),
+            new FeatureVerification(release, 1, 1, 0, 0, now),
+            installationId,
+            3,
+            now,
+            now.AddMinutes(1));
+    }
+
+    private static FeatureRunSnapshot ActivityRun(
+        string runId,
+        FeatureInstallationId installationId,
+        ReleaseDigest release,
+        FeatureRunOrigin origin,
+        FeatureRunStatus status,
+        FeatureRunAuthorityState authorityState,
+        DateTimeOffset occurredAt,
+        int attempts) => new(
+        runId,
+        installationId,
+        release,
+        origin switch
+        {
+            FeatureRunOrigin.Chat => "chat",
+            FeatureRunOrigin.Schedule => "schedule.daily",
+            FeatureRunOrigin.Event => "event.gmail",
+            _ => "manual"
+        },
+        origin,
+        origin switch
+        {
+            FeatureRunOrigin.Chat => new FeatureRunOriginReference(
+                "conversation-ui-activity",
+                "request-ui-activity",
+                null),
+            FeatureRunOrigin.Schedule or FeatureRunOrigin.Event => new FeatureRunOriginReference(
+                null,
+                null,
+                "automation-ui-activity"),
+            _ => null
+        },
+        status,
+        authorityState,
+        occurredAt,
+        occurredAt.AddSeconds(1),
+        null,
+        status == FeatureRunStatus.Failed ? occurredAt.AddMinutes(1) : null,
+        attempts,
+        "surface-ui-activity",
+        status == FeatureRunStatus.Failed ? "The Feature could not complete." : null,
+        status == FeatureRunStatus.Failed ? "Review the Feature before retrying." : null,
+        "trace-ui-activity");
 
     private async Task<InstalledResumeFixture> CreateInstalledResumeFixtureAsync(
         string? conversationId = null,
@@ -1630,6 +1944,19 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             RuntimeRequestContext context,
             CancellationToken cancellationToken = default) => Task.FromResult(inspection);
 
+        public Task<FeatureRunLifecycleInspection> InspectRunsAsync(
+            RuntimeRequestContext context,
+            FeatureRunReadRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var projected = inspection.Installations.Select(candidate => new FeatureRunInstallationInspection(
+                candidate.Authority,
+                candidate.Registration,
+                RunProjection(candidate.Runtime, request),
+                candidate.Draft)).ToArray();
+            return Task.FromResult(new FeatureRunLifecycleInspection(projected));
+        }
+
         public Task<FeatureApprovalSnapshot> ProposeAsync(
             RuntimeRequestContext context,
             FeatureReleaseProposal proposal,
@@ -1665,6 +1992,27 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         {
             MutationCount++;
             return Task.FromException<T>(new InvalidOperationException("Unexpected lifecycle mutation."));
+        }
+
+        private static FeatureRunCollectionSnapshot? RunProjection(
+            FeatureInstallationSnapshot? runtime,
+            FeatureRunReadRequest request)
+        {
+            if (runtime?.Runs is not { } runs)
+                return null;
+            return new FeatureRunCollectionSnapshot(
+                runtime.InstallationId,
+                runtime.ActiveRelease,
+                runtime.Revision,
+                runs
+                    .Where(candidate => request.Status is null || candidate.Status == request.Status)
+                    .Where(candidate => request.Origin is null || candidate.Origin == request.Origin)
+                    .Where(candidate => request.RunId is null || string.Equals(candidate.RunId, request.RunId, StringComparison.Ordinal))
+                    .OrderByDescending(candidate => candidate.CompletedAt ?? candidate.OccurredAt)
+                    .ThenByDescending(candidate => candidate.OccurredAt)
+                    .ThenBy(candidate => candidate.RunId, StringComparer.Ordinal)
+                    .Take(request.Limit)
+                    .ToArray());
         }
     }
 

@@ -82,7 +82,8 @@ abstract interface class GrpcClientPort {
     CallOptions options,
   );
 
-  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest(
+  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply>
+  resumeOriginatingRequest(
     wire.ResumeOriginatingRequestRequest request,
     CallOptions options,
   );
@@ -99,6 +100,16 @@ abstract interface class GrpcClientPort {
 
   GrpcUnaryResponse<wire.FeatureReply> rollbackFeatureVersion(
     wire.RollbackFeatureVersionRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.ListActivityReply> listActivity(
+    wire.ListActivityRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.RunReply> getRun(
+    wire.GetRunRequest request,
     CallOptions options,
   );
 }
@@ -516,6 +527,40 @@ class GrpcUiTransport
   }
 
   @override
+  Future<wire.ListActivityReply> listActivity({
+    required String accessToken,
+    required wire.ListActivityRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.listActivity(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.RunReply> getRun({
+    required String accessToken,
+    required wire.GetRunRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.getRun(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
@@ -772,7 +817,8 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
   );
 
   @override
-  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest(
+  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply>
+  resumeOriginatingRequest(
     wire.ResumeOriginatingRequestRequest request,
     CallOptions options,
   ) => _GeneratedGrpcUnaryResponse(
@@ -801,6 +847,20 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
   ) => _GeneratedGrpcUnaryResponse(
     client.rollbackFeatureVersion(request, options: options),
   );
+
+  @override
+  GrpcUnaryResponse<wire.ListActivityReply> listActivity(
+    wire.ListActivityRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.listActivity(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.RunReply> getRun(
+    wire.GetRunRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(client.getRun(request, options: options));
 }
 
 class _GeneratedGrpcUnaryResponse<T> implements GrpcUnaryResponse<T> {

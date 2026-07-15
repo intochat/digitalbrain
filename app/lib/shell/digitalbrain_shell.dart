@@ -105,6 +105,9 @@ class DigitalBrainShell extends StatelessWidget {
   }
 
   String _contextTitle(MainDestination? active) {
+    if (location.path.startsWith('/activity/')) {
+      return 'Run details';
+    }
     if (location.path.startsWith('/features/proposals/')) {
       return 'Feature Studio';
     }

@@ -31,6 +31,7 @@ builder.Services.AddSingleton<FeatureBuildEndpoint>();
 builder.Services.AddSingleton<IFeatureBuildEndpoint>(services => services.GetRequiredService<FeatureBuildEndpoint>());
 builder.Services.AddSingleton<FeatureLifecycleRail>();
 builder.Services.AddSingleton<IFeatureLifecycleRail>(services => services.GetRequiredService<FeatureLifecycleRail>());
+builder.Services.AddSingleton<DigitalBrainQueryService>();
 builder.Services.AddSingleton<FeatureSuggestionService>();
 builder.Services.AddFeatureCapabilityCatalog();
 builder.Services.AddSingleton<FeatureAuthoringService>();

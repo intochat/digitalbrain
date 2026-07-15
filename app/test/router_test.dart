@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:digitalbrain_flutter/app.dart';
 import 'package:digitalbrain_flutter/core/session/digitalbrain_client.dart';
+import 'package:digitalbrain_flutter/features/activity/activity_page.dart';
+import 'package:digitalbrain_flutter/features/activity/activity_run_page.dart';
 import 'package:digitalbrain_flutter/features/releases/feature_release_page.dart';
 import 'package:digitalbrain_flutter/features/studio/feature_studio_models.dart';
 import 'package:digitalbrain_flutter/features/studio/feature_studio_page.dart';
 import 'package:digitalbrain_flutter/grpc/ui.pb.dart' as wire;
+import 'package:digitalbrain_flutter/grpc/ui.pbenum.dart' as wire_enums;
 import 'package:digitalbrain_flutter/router.dart';
 import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
 import 'package:digitalbrain_flutter/runtime/runtime.dart';
@@ -1661,6 +1664,242 @@ void main() {
     await _pumpUntil(tester, () => transport.closeCalls > 0);
     expect(transport.closeCalls, 1);
   });
+
+  testWidgets('Activity list opens a canonical deep-linked Run detail', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 900);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final run = _wireActivityRun();
+    final transport = _RouterTransport(
+      _RouterFeedCall(),
+      activityReply: wire.ListActivityReply(runs: [run]),
+      runReply: wire.RunReply(run: run),
+    );
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(initialLocation: '/activity');
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(tester, () => transport.activityRequests.length == 1);
+    await _pumpUntil(
+      tester,
+      () => find.byType(ActivityPage).evaluate().isNotEmpty,
+    );
+
+    expect(transport.activityRequests.single.limit, 200);
+    expect(find.text('Research brief'), findsOneWidget);
+    expect(router.routeInformationProvider.value.uri.path, '/activity');
+
+    await tester.tap(find.byKey(activityStatusFilterKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Completed').last);
+    await _pumpUntil(tester, () => transport.activityRequests.length == 2);
+    await _pumpUntil(
+      tester,
+      () => find.byKey(activityRunCardKey('run-a')).evaluate().isNotEmpty,
+    );
+    expect(find.text('Status: Completed'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(activityRunCardKey('run-a')));
+    await tester.tap(find.byKey(activityRunCardKey('run-a')));
+    await _pumpUntil(tester, () => transport.runRequests.length == 1);
+    await _pumpUntil(
+      tester,
+      () => find.byType(ActivityRunPage).evaluate().isNotEmpty,
+    );
+
+    expect(transport.runRequests.single.runId, 'run-a');
+    expect(router.routeInformationProvider.value.uri.path, '/activity/run-a');
+    expect(router.canPop(), isTrue);
+    expect(find.byType(AppBar), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(digitalBrainCurrentContextKey),
+        matching: find.text('Run details'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(activityTechnicalDetailsKey), findsOneWidget);
+    expect(find.text('Back to Activity'), findsOneWidget);
+
+    await tester.tap(find.text('Back to Activity'));
+    await _pumpUntil(
+      tester,
+      () => router.routeInformationProvider.value.uri.path == '/activity',
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(ActivityPage).evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ActivityPage), findsOneWidget);
+    expect(find.text('Status: Completed'), findsOneWidget);
+    expect(transport.activityRequests, hasLength(2));
+
+    await tester.ensureVisible(find.byKey(activityRunCardKey('run-a')));
+    await tester.tap(find.byKey(activityRunCardKey('run-a')));
+    await _pumpUntil(tester, () => transport.runRequests.length == 2);
+    await _pumpUntil(
+      tester,
+      () => find.byKey(activityOpenChatButtonKey).evaluate().isNotEmpty,
+    );
+    await tester.ensureVisible(find.byKey(activityOpenChatButtonKey));
+    await tester.tap(find.byKey(activityOpenChatButtonKey));
+    await _pumpUntil(
+      tester,
+      () => router.routeInformationProvider.value.uri.path == '/chat',
+    );
+
+    expect(
+      router.routeInformationProvider.value.uri.queryParameters,
+      containsPair('conversationId', 'conversation-a'),
+    );
+    expect(find.byKey(chatActivityContextKey), findsOneWidget);
+    expect(find.text('Conversation conversation-a'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+    expect(transport.closeCalls, 1);
+  });
+
+  testWidgets('deep-linked Run has a real Back to Activity fallback', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 900);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final run = _wireActivityRun();
+    final transport = _RouterTransport(
+      _RouterFeedCall(),
+      activityReply: wire.ListActivityReply(runs: [run]),
+      runReply: wire.RunReply(run: run),
+    );
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(initialLocation: '/activity/run-a');
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(tester, () => transport.runRequests.length == 1);
+    await _pumpUntil(
+      tester,
+      () => find.byType(ActivityRunPage).evaluate().isNotEmpty,
+    );
+
+    expect(router.routeInformationProvider.value.uri.path, '/activity/run-a');
+    expect(router.canPop(), isFalse);
+    expect(find.byType(AppBar), findsOneWidget);
+    expect(find.text('Back to Activity'), findsOneWidget);
+
+    await tester.tap(find.text('Back to Activity'));
+    await _pumpUntil(
+      tester,
+      () => router.routeInformationProvider.value.uri.path == '/activity',
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byType(ActivityPage).evaluate().isNotEmpty,
+    );
+    await _pumpUntil(tester, () => transport.activityRequests.length == 1);
+
+    expect(find.byType(ActivityPage), findsOneWidget);
+    expect(transport.activityRequests, hasLength(1));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+    expect(transport.closeCalls, 1);
+  });
+
+  testWidgets('Activity Automation link focuses the matching Feature binding', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 900);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final run = _wireActivityRun()
+      ..runId = 'run-automation'
+      ..origin = wire_enums.FeatureRunOrigin.FEATURE_RUN_ORIGIN_SCHEDULE
+      ..originReference = wire.FeatureRunOriginReference(
+        automationId: 'schedule:weekday',
+      );
+    final transport = _RouterTransport(
+      _RouterFeedCall(),
+      runReply: wire.RunReply(run: run),
+      featureReply: wireReleaseDetails(),
+    );
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(
+      initialLocation: '/activity/run-automation',
+    );
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(tester, () => transport.runRequests.length == 1);
+    await _pumpUntil(
+      tester,
+      () => find.byKey(activityOpenAutomationButtonKey).evaluate().isNotEmpty,
+    );
+
+    await tester.ensureVisible(find.byKey(activityOpenAutomationButtonKey));
+    await tester.tap(find.byKey(activityOpenAutomationButtonKey));
+    await _pumpUntil(tester, () => transport.getFeatureRequests.length == 1);
+    await _pumpUntil(
+      tester,
+      () => find.byKey(featureReleaseReferencedAutomationKey).evaluate().isNotEmpty,
+    );
+
+    expect(router.routeInformationProvider.value.uri.path, '/features/feature-a');
+    expect(
+      router.routeInformationProvider.value.uri.queryParameters,
+      containsPair('automationId', 'schedule:weekday'),
+    );
+    expect(find.byKey(featureReleaseReferencedAutomationKey), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+    expect(transport.closeCalls, 1);
+  });
 }
 
 Future<void> _openCompactStudioCode(WidgetTester tester) async {
@@ -1726,6 +1965,8 @@ class _RouterTransport
     this.resumeReply,
     this.featureReply,
     this.rollbackReply,
+    this.activityReply,
+    this.runReply,
   });
 
   final _RouterFeedCall feed;
@@ -1735,6 +1976,8 @@ class _RouterTransport
   wire.ResumeOriginatingRequestReply? resumeReply;
   wire.FeatureReply? featureReply;
   final wire.FeatureReply? rollbackReply;
+  final wire.ListActivityReply? activityReply;
+  final wire.RunReply? runReply;
   int loginCalls = 0;
   int watchCalls = 0;
   int closeCalls = 0;
@@ -1747,6 +1990,8 @@ class _RouterTransport
   final List<wire.GetFeatureRequest> getFeatureRequests = [];
   final List<wire.GetFeatureReleaseSourceRequest> releaseSourceRequests = [];
   final List<wire.RollbackFeatureVersionRequest> rollbackRequests = [];
+  final List<wire.ListActivityRequest> activityRequests = [];
+  final List<wire.GetRunRequest> runRequests = [];
 
   @override
   Future<SessionBundle> login({
@@ -1916,7 +2161,49 @@ class _RouterTransport
     featureReply = reply;
     return reply;
   }
+
+  @override
+  Future<wire.ListActivityReply> listActivity({
+    required String accessToken,
+    required wire.ListActivityRequest request,
+  }) async {
+    activityRequests.add(request.deepCopy());
+    return activityReply ?? wire.ListActivityReply();
+  }
+
+  @override
+  Future<wire.RunReply> getRun({
+    required String accessToken,
+    required wire.GetRunRequest request,
+  }) async {
+    runRequests.add(request.deepCopy());
+    return runReply ?? wire.RunReply();
+  }
 }
+
+wire.FeatureRunSnapshot _wireActivityRun() => wire.FeatureRunSnapshot(
+  runId: 'run-a',
+  featureId: 'feature-a',
+  featureName: 'Research brief',
+  installationId: 'installation-a',
+  releaseDigest: 'a' * 64,
+  inputKind: 'chat.request',
+  origin: wire_enums.FeatureRunOrigin.FEATURE_RUN_ORIGIN_CHAT,
+  originReference: wire.FeatureRunOriginReference(
+    conversationId: 'conversation-a',
+    requestId: 'request-a',
+  ),
+  status: wire_enums.FeatureRunStatus.FEATURE_RUN_STATUS_COMPLETED,
+  authorityState: wire_enums
+      .FeatureRunAuthorityState
+      .FEATURE_RUN_AUTHORITY_STATE_AUTHORIZED,
+  occurredAtUnixMs: Int64(1784109600000),
+  startedAtUnixMs: Int64(1784109601000),
+  completedAtUnixMs: Int64(1784109602000),
+  attempts: 1,
+  resultSurfaceReference: 'result-${'b' * 64}',
+  traceReference: 'trace-${'c' * 64}',
+);
 
 wire.FeatureDraft _wireDraft(String draftId) => wire.FeatureDraft(
   draftId: draftId,

@@ -17,6 +17,10 @@ using GrpcFeatureSourceFile = DigitalBrain.V2.Ui.Grpc.FeatureSourceFile;
 using GrpcFeatureSourceKind = DigitalBrain.V2.Ui.Grpc.FeatureSourceKind;
 using GrpcFeatureSourceSnapshot = DigitalBrain.V2.Ui.Grpc.FeatureSourceSnapshot;
 using GrpcOriginatingRequest = DigitalBrain.V2.Ui.Grpc.OriginatingRequest;
+using GrpcFeatureRunAuthorityState = DigitalBrain.V2.Ui.Grpc.FeatureRunAuthorityState;
+using GrpcFeatureRunOrigin = DigitalBrain.V2.Ui.Grpc.FeatureRunOrigin;
+using GrpcFeatureRunSnapshot = DigitalBrain.V2.Ui.Grpc.FeatureRunSnapshot;
+using GrpcFeatureRunStatus = DigitalBrain.V2.Ui.Grpc.FeatureRunStatus;
 using DigitalBrain.V2.Ui.Grpc;
 
 namespace DigitalBrain.Mcp;
@@ -24,9 +28,11 @@ namespace DigitalBrain.Mcp;
 public sealed class DigitalBrainUiEndpoints(
     FeatureAuthoringService authoring,
     FeatureSuggestionService suggestions,
-    ILogger<DigitalBrainUiEndpoints> logger)
+    ILogger<DigitalBrainUiEndpoints> logger,
+    DigitalBrainQueryService? queries = null)
 {
     private const int MaximumVerificationEvidenceUtf8Bytes = 2 * 1024 * 1024;
+    private const int MaximumRunAttempts = 5;
     private static readonly char[] InvalidSourcePathCharacters = ['<', '>', ':', '"', '|', '?', '*'];
     private static readonly HashSet<string> ReservedSourcePathSegments = new(
         ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM¹", "COM²", "COM³", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³"],
@@ -246,6 +252,231 @@ public sealed class DigitalBrainUiEndpoints(
             Revision(request.HasExpectedRevision, request.ExpectedRevision)));
         var detail = await InvokeAsync(() => authoring.RollbackAsync(context, command, cancellationToken)).ConfigureAwait(false);
         return Project(() => ProjectFeature(command.DraftId, context.ActorId, detail));
+    }
+
+    public async Task<ListActivityReply> ListActivityAsync(
+        RuntimeRequestContext context,
+        ListActivityRequest request,
+        CancellationToken cancellationToken)
+    {
+        var input = MapActivityRequest(context, request);
+        var runs = await InvokeQueryAsync(() => QueryService.ListRunsAsync(
+                context,
+                input.Status,
+                input.Origin,
+                input.FeatureId,
+                input.Limit,
+                cancellationToken))
+            .ConfigureAwait(false);
+        return ProjectQuery(() =>
+        {
+            var reply = new ListActivityReply();
+            reply.Runs.Add(runs.Select(ToReply));
+            return reply;
+        });
+    }
+
+    public async Task<RunReply> GetRunAsync(
+        RuntimeRequestContext context,
+        GetRunRequest request,
+        CancellationToken cancellationToken)
+    {
+        DemandActivityAuthority(context);
+        string runId;
+        try
+        {
+            runId = Identifier(request.RunId, 256);
+        }
+        catch (ArgumentException)
+        {
+            throw Status(StatusCode.InvalidArgument, "The Activity request is invalid.");
+        }
+        var run = await InvokeQueryAsync(() => QueryService.GetRunAsync(context, runId, cancellationToken))
+            .ConfigureAwait(false);
+        return ProjectQuery(() => new RunReply { Run = ToReply(run) });
+    }
+
+    private DigitalBrainQueryService QueryService => queries ??
+        throw Status(StatusCode.Unavailable, "Activity is temporarily unavailable. Retry the same request.");
+
+    private static ActivityQueryInput MapActivityRequest(
+        RuntimeRequestContext context,
+        ListActivityRequest request)
+    {
+        DemandActivityAuthority(context);
+        try
+        {
+            DigitalBrain.Kernel.Contracts.FeatureRunStatus? status = request.HasStatus
+                ? request.Status switch
+                {
+                    GrpcFeatureRunStatus.Queued => DigitalBrain.Kernel.Contracts.FeatureRunStatus.Queued,
+                    GrpcFeatureRunStatus.Running => DigitalBrain.Kernel.Contracts.FeatureRunStatus.Running,
+                    GrpcFeatureRunStatus.WaitingForApproval => DigitalBrain.Kernel.Contracts.FeatureRunStatus.WaitingForApproval,
+                    GrpcFeatureRunStatus.Completed => DigitalBrain.Kernel.Contracts.FeatureRunStatus.Completed,
+                    GrpcFeatureRunStatus.Failed => DigitalBrain.Kernel.Contracts.FeatureRunStatus.Failed,
+                    GrpcFeatureRunStatus.Parked => DigitalBrain.Kernel.Contracts.FeatureRunStatus.Parked,
+                    _ => throw new ArgumentException("A concrete Run status is required.")
+                }
+                : null;
+            DigitalBrain.Kernel.Contracts.FeatureRunOrigin? origin = request.HasOrigin
+                ? request.Origin switch
+                {
+                    GrpcFeatureRunOrigin.Chat => DigitalBrain.Kernel.Contracts.FeatureRunOrigin.Chat,
+                    GrpcFeatureRunOrigin.Direct => DigitalBrain.Kernel.Contracts.FeatureRunOrigin.Direct,
+                    GrpcFeatureRunOrigin.Schedule => DigitalBrain.Kernel.Contracts.FeatureRunOrigin.Schedule,
+                    GrpcFeatureRunOrigin.Event => DigitalBrain.Kernel.Contracts.FeatureRunOrigin.Event,
+                    _ => throw new ArgumentException("A concrete Run origin is required.")
+                }
+                : null;
+            var featureId = request.HasFeatureId
+                ? new FeatureDraftId(Identifier(request.FeatureId, 128))
+                : null;
+            var limit = request.Limit == 0 ? DigitalBrainQueryService.DefaultListLimit : request.Limit;
+            if (limit is < 1 or > DigitalBrainQueryService.MaximumListLimit)
+                throw new ArgumentOutOfRangeException(nameof(request));
+            return new ActivityQueryInput(status, origin, featureId, limit);
+        }
+        catch (ArgumentException)
+        {
+            throw Status(StatusCode.InvalidArgument, "The Activity request is invalid.");
+        }
+    }
+
+    private static void DemandActivityAuthority(RuntimeRequestContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (!context.Grants.Contains("brain.read"))
+            throw Status(StatusCode.PermissionDenied, "Activity read authority is required.");
+    }
+
+    private async Task<T> InvokeQueryAsync<T>(Func<Task<T>> invocation)
+    {
+        try
+        {
+            return await invocation().ConfigureAwait(false);
+        }
+        catch (RpcException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (KeyNotFoundException)
+        {
+            throw Status(StatusCode.NotFound, "The requested Run was not found.");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw Status(StatusCode.PermissionDenied, "Activity read authority is required.");
+        }
+        catch (ArgumentException)
+        {
+            throw Status(StatusCode.InvalidArgument, "The Activity request is invalid.");
+        }
+        catch (TimeoutException)
+        {
+            throw Status(StatusCode.Unavailable, "Activity is temporarily unavailable. Retry the same request.");
+        }
+        catch (IOException)
+        {
+            throw Status(StatusCode.Unavailable, "Activity is temporarily unavailable. Retry the same request.");
+        }
+        catch (OrleansException)
+        {
+            throw Status(StatusCode.Unavailable, "Activity is temporarily unavailable. Retry the same request.");
+        }
+        catch (Exception)
+        {
+            logger.LogError("An Activity query failed safely.");
+            throw Status(StatusCode.Internal, "Activity could not be loaded.");
+        }
+    }
+
+    private T ProjectQuery<T>(Func<T> projection)
+    {
+        try
+        {
+            return projection();
+        }
+        catch (RpcException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            logger.LogError("An Activity response projection failed safely.");
+            throw Status(StatusCode.Internal, "Activity could not be loaded.");
+        }
+    }
+
+    private static GrpcFeatureRunSnapshot ToReply(DigitalBrainRun value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var run = value.Run;
+        var reply = new GrpcFeatureRunSnapshot
+        {
+            RunId = Identifier(run.RunId, 256),
+            FeatureId = Identifier(value.FeatureId.Value, 128),
+            FeatureName = Text(value.FeatureGoal, 4096),
+            InstallationId = Identifier(run.InstallationId.Value, 256),
+            ReleaseDigest = ReleaseDigest(run.Release.Value),
+            InputKind = Identifier(run.InputKind, 128),
+            Origin = run.Origin switch
+            {
+                DigitalBrain.Kernel.Contracts.FeatureRunOrigin.Chat => GrpcFeatureRunOrigin.Chat,
+                DigitalBrain.Kernel.Contracts.FeatureRunOrigin.Direct => GrpcFeatureRunOrigin.Direct,
+                DigitalBrain.Kernel.Contracts.FeatureRunOrigin.Schedule => GrpcFeatureRunOrigin.Schedule,
+                DigitalBrain.Kernel.Contracts.FeatureRunOrigin.Event => GrpcFeatureRunOrigin.Event,
+                _ => throw new InvalidDataException("Invalid Run origin.")
+            },
+            Status = run.Status switch
+            {
+                DigitalBrain.Kernel.Contracts.FeatureRunStatus.Queued => GrpcFeatureRunStatus.Queued,
+                DigitalBrain.Kernel.Contracts.FeatureRunStatus.Running => GrpcFeatureRunStatus.Running,
+                DigitalBrain.Kernel.Contracts.FeatureRunStatus.WaitingForApproval => GrpcFeatureRunStatus.WaitingForApproval,
+                DigitalBrain.Kernel.Contracts.FeatureRunStatus.Completed => GrpcFeatureRunStatus.Completed,
+                DigitalBrain.Kernel.Contracts.FeatureRunStatus.Failed => GrpcFeatureRunStatus.Failed,
+                DigitalBrain.Kernel.Contracts.FeatureRunStatus.Parked => GrpcFeatureRunStatus.Parked,
+                _ => throw new InvalidDataException("Invalid Run status.")
+            },
+            AuthorityState = run.AuthorityState switch
+            {
+                DigitalBrain.Kernel.Contracts.FeatureRunAuthorityState.Authorized => GrpcFeatureRunAuthorityState.Authorized,
+                DigitalBrain.Kernel.Contracts.FeatureRunAuthorityState.WaitingForApproval => GrpcFeatureRunAuthorityState.WaitingForApproval,
+                DigitalBrain.Kernel.Contracts.FeatureRunAuthorityState.Paused => GrpcFeatureRunAuthorityState.Paused,
+                _ => throw new InvalidDataException("Invalid Run authority state.")
+            },
+            OccurredAtUnixMs = run.OccurredAt.ToUnixTimeMilliseconds(),
+            Attempts = run.Attempts is >= 0 and <= MaximumRunAttempts
+                ? run.Attempts
+                : throw new InvalidDataException("Invalid Run attempt count."),
+            TraceReference = Identifier(run.TraceReference, 256)
+        };
+        if (run.OriginReference is { } reference)
+        {
+            reply.OriginReference = new DigitalBrain.V2.Ui.Grpc.FeatureRunOriginReference();
+            if (reference.ConversationId is { } conversationId)
+                reply.OriginReference.ConversationId = Identifier(conversationId, 256);
+            if (reference.RequestId is { } requestId)
+                reply.OriginReference.RequestId = Identifier(requestId, 256);
+            if (reference.AutomationId is { } automationId)
+                reply.OriginReference.AutomationId = Identifier(automationId, 256);
+        }
+        if (run.StartedAt is { } startedAt)
+            reply.StartedAtUnixMs = startedAt.ToUnixTimeMilliseconds();
+        if (run.CompletedAt is { } completedAt)
+            reply.CompletedAtUnixMs = completedAt.ToUnixTimeMilliseconds();
+        if (run.RetryAt is { } retryAt)
+            reply.RetryAtUnixMs = retryAt.ToUnixTimeMilliseconds();
+        if (run.ResultSurfaceReference is { } resultSurfaceReference)
+            reply.ResultSurfaceReference = Identifier(resultSurfaceReference, 256);
+        if (run.SafeFailure is { } safeFailure)
+            reply.SafeFailure = Text(safeFailure, 256);
+        if (run.FailureGuidance is { } failureGuidance)
+            reply.FailureGuidance = Text(failureGuidance, 512);
+        return reply;
     }
 
     private static RevisionInput MapRevision(ReviseFeatureDraftRequest request)
@@ -1445,6 +1676,12 @@ public sealed class DigitalBrainUiEndpoints(
         FeatureDraftId DraftId,
         long ExpectedRevision,
         string IdempotencyId);
+
+    private sealed record ActivityQueryInput(
+        DigitalBrain.Kernel.Contracts.FeatureRunStatus? Status,
+        DigitalBrain.Kernel.Contracts.FeatureRunOrigin? Origin,
+        FeatureDraftId? FeatureId,
+        int Limit);
 
     private abstract record RevisionCommand;
     private sealed record ReviseBehaviorCommand(DigitalBrain.Kernel.Contracts.FeatureBehavior Behavior) : RevisionCommand;

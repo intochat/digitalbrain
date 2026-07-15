@@ -63,7 +63,7 @@ public sealed class UiProductGrpcContractTests
     }
 
     [Fact]
-    public void Governed_authoring_installation_and_release_detail_methods_are_overridden()
+    public void Governed_authoring_release_and_Activity_methods_are_overridden()
     {
         var declaredProductMethods = typeof(UiGrpcService)
             .GetMethods()
@@ -86,7 +86,9 @@ public sealed class UiProductGrpcContractTests
                 "ResumeOriginatingRequest",
                 "GetFeature",
                 "GetFeatureReleaseSource",
-                "RollbackFeatureVersion"
+                "RollbackFeatureVersion",
+                "ListActivity",
+                "GetRun"
             }.Order(StringComparer.Ordinal),
             declaredProductMethods);
     }
@@ -130,7 +132,9 @@ public sealed class UiProductGrpcContractTests
                 "ResumeOriginatingRequest",
                 "GetFeature",
                 "GetFeatureReleaseSource",
-                "RollbackFeatureVersion"
+                "RollbackFeatureVersion",
+                "ListActivity",
+                "GetRun"
             ],
             StringComparer.Ordinal);
         var deferred = ProductMethods.Where(method => !implemented.Contains(method)).ToHashSet(StringComparer.Ordinal);
@@ -140,7 +144,6 @@ public sealed class UiProductGrpcContractTests
             "FeatureSummary",
             "FeatureReleaseSummary",
             "ConnectionSummary",
-            "FeatureRunSnapshot",
             "MemoryItemSummary",
             "MemoryItem",
             "HomeAttentionItem",
@@ -150,6 +153,57 @@ public sealed class UiProductGrpcContractTests
 
         Assert.All(methods, method => Assert.Empty(method.OutputType.Fields.InDeclarationOrder()));
         Assert.All(speculativeMessages, name => Assert.DoesNotContain(name, messageNames));
+    }
+
+    [Fact]
+    public void Activity_contract_exposes_only_safe_typed_Run_projection_fields()
+    {
+        var messages = DigitalBrainV2Ui.Descriptor.File.MessageTypes.ToDictionary(message => message.Name);
+        var list = messages["ListActivityRequest"];
+        var run = messages["FeatureRunSnapshot"];
+        var origin = messages["FeatureRunOriginReference"];
+
+        Assert.True(list.FindFieldByName("status").HasPresence);
+        Assert.True(list.FindFieldByName("origin").HasPresence);
+        Assert.Equal(5, list.FindFieldByName("feature_id").FieldNumber);
+        Assert.Equal(6, list.FindFieldByName("limit").FieldNumber);
+        Assert.Equal(
+            new[]
+            {
+                "run_id",
+                "feature_id",
+                "feature_name",
+                "installation_id",
+                "release_digest",
+                "input_kind",
+                "origin",
+                "origin_reference",
+                "status",
+                "authority_state",
+                "occurred_at_unix_ms",
+                "started_at_unix_ms",
+                "completed_at_unix_ms",
+                "retry_at_unix_ms",
+                "attempts",
+                "result_surface_reference",
+                "safe_failure",
+                "failure_guidance",
+                "trace_reference"
+            },
+            run.Fields.InDeclarationOrder().Select(field => field.Name));
+        Assert.Equal(
+            new[] { "conversation_id", "request_id", "automation_id" },
+            origin.Fields.InDeclarationOrder().Select(field => field.Name));
+        Assert.DoesNotContain(run.Fields.InDeclarationOrder(), field => field.Name.Contains("payload", StringComparison.Ordinal));
+        Assert.DoesNotContain(run.Fields.InDeclarationOrder(), field => field.Name.Contains("secret", StringComparison.Ordinal));
+        Assert.DoesNotContain(run.Fields.InDeclarationOrder(), field => field.Name.Contains("state_json", StringComparison.Ordinal));
+        Assert.True(run.FindFieldByName("origin_reference").HasPresence);
+        Assert.True(run.FindFieldByName("started_at_unix_ms").HasPresence);
+        Assert.True(run.FindFieldByName("completed_at_unix_ms").HasPresence);
+        Assert.True(run.FindFieldByName("retry_at_unix_ms").HasPresence);
+        Assert.True(run.FindFieldByName("result_surface_reference").HasPresence);
+        Assert.True(run.FindFieldByName("safe_failure").HasPresence);
+        Assert.True(run.FindFieldByName("failure_guidance").HasPresence);
     }
 
     [Fact]

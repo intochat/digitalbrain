@@ -15,6 +15,31 @@ const featureReleaseConfirmRollbackButtonKey = Key(
 const featureReleaseCancelRollbackButtonKey = Key(
   'feature-release-cancel-rollback',
 );
+const featureReleaseReferencedAutomationKey = Key(
+  'feature-release-referenced-automation',
+);
+const featureReleaseMissingAutomationKey = Key(
+  'feature-release-missing-automation',
+);
+
+class FeatureAutomationId {
+  const FeatureAutomationId._(this.value);
+
+  static FeatureAutomationId? tryParse(String? value) {
+    if (value == null ||
+        value.isEmpty ||
+        value.length > 256 ||
+        value.trim() != value ||
+        value.runes.any(
+          (character) => character < 32 || character >= 127 && character <= 159,
+        )) {
+      return null;
+    }
+    return FeatureAutomationId._(value);
+  }
+
+  final String value;
+}
 
 class FeatureReleasePage extends StatefulWidget {
   const FeatureReleasePage({
@@ -22,6 +47,7 @@ class FeatureReleasePage extends StatefulWidget {
     this.expectedReleaseDigest,
     this.onVersionRestored,
     this.restoredOnArrival = false,
+    this.automationId,
     required this.gateway,
     super.key,
   });
@@ -30,6 +56,7 @@ class FeatureReleasePage extends StatefulWidget {
   final String? expectedReleaseDigest;
   final ValueChanged<String>? onVersionRestored;
   final bool restoredOnArrival;
+  final FeatureAutomationId? automationId;
   final FeatureReleaseGateway gateway;
 
   @override
@@ -38,6 +65,8 @@ class FeatureReleasePage extends StatefulWidget {
 
 class _FeatureReleasePageState extends State<FeatureReleasePage> {
   late final FeatureReleaseController _controller;
+  final GlobalKey _automationSectionKey = GlobalKey();
+  bool _automationRevealed = false;
 
   @override
   void initState() {
@@ -56,6 +85,14 @@ class _FeatureReleasePageState extends State<FeatureReleasePage> {
       ..removeListener(_refresh)
       ..dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant FeatureReleasePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.automationId?.value != widget.automationId?.value) {
+      _automationRevealed = false;
+    }
   }
 
   void _refresh() {
@@ -83,6 +120,7 @@ class _FeatureReleasePageState extends State<FeatureReleasePage> {
       );
     }
     if (details == null) return const SizedBox.shrink();
+    _scheduleAutomationReveal();
     return SelectionArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
@@ -110,7 +148,11 @@ class _FeatureReleasePageState extends State<FeatureReleasePage> {
             const SizedBox(height: 16),
             _AccessCard(grants: details.activeGrants),
             const SizedBox(height: 16),
-            _AutomationCard(subscriptions: details.subscriptions),
+            _AutomationCard(
+              key: _automationSectionKey,
+              subscriptions: details.subscriptions,
+              automationId: widget.automationId,
+            ),
             const SizedBox(height: 16),
             _RollbackCard(
               previousVersion: details.previousVersion,
@@ -121,6 +163,23 @@ class _FeatureReleasePageState extends State<FeatureReleasePage> {
         ),
       ),
     );
+  }
+
+  void _scheduleAutomationReveal() {
+    if (widget.automationId == null || _automationRevealed) return;
+    _automationRevealed = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final automationContext = _automationSectionKey.currentContext;
+      if (automationContext == null) return;
+      unawaited(
+        Scrollable.ensureVisible(
+          automationContext,
+          alignment: 0.1,
+          duration: Duration.zero,
+        ),
+      );
+    });
   }
 
   Future<void> _confirmRollback() async {
@@ -287,26 +346,99 @@ class _AccessCard extends StatelessWidget {
 }
 
 class _AutomationCard extends StatelessWidget {
-  const _AutomationCard({required this.subscriptions});
+  const _AutomationCard({
+    required this.subscriptions,
+    required this.automationId,
+    super.key,
+  });
 
   final List<String> subscriptions;
+  final FeatureAutomationId? automationId;
 
   @override
   Widget build(BuildContext context) {
+    final requestedId = automationId?.value;
+    final containsRequestedId = subscriptions.contains(requestedId);
     return _SectionCard(
       title: 'Automation',
+      highlighted: requestedId != null,
       children: subscriptions.isEmpty
-          ? const [Text('No Automations are configured.')]
+          ? [
+              const Text('No Automations are configured.'),
+              if (requestedId != null) ...[
+                const SizedBox(height: 12),
+                _MissingAutomation(automationId: requestedId),
+              ],
+            ]
           : [
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   for (final subscription in subscriptions)
-                    Chip(label: Text(subscription)),
+                    _AutomationChip(
+                      subscription: subscription,
+                      referenced: subscription == requestedId,
+                    ),
                 ],
               ),
+              if (requestedId != null && !containsRequestedId) ...[
+                const SizedBox(height: 12),
+                _MissingAutomation(automationId: requestedId),
+              ],
             ],
+    );
+  }
+}
+
+class _AutomationChip extends StatelessWidget {
+  const _AutomationChip({required this.subscription, required this.referenced});
+
+  final String subscription;
+  final bool referenced;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final chip = Chip(
+      avatar: referenced ? const Icon(Icons.link, size: 18) : null,
+      backgroundColor: referenced ? colors.primaryContainer : null,
+      side: referenced ? BorderSide(color: colors.primary, width: 2) : null,
+      label: Text(subscription),
+    );
+    if (!referenced) return chip;
+    return Semantics(
+      key: featureReleaseReferencedAutomationKey,
+      container: true,
+      selected: true,
+      label: 'Referenced Automation $subscription',
+      child: ExcludeSemantics(child: chip),
+    );
+  }
+}
+
+class _MissingAutomation extends StatelessWidget {
+  const _MissingAutomation({required this.automationId});
+
+  final String automationId;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = 'Automation $automationId is not in the active Version.';
+    return Semantics(
+      key: featureReleaseMissingAutomationKey,
+      container: true,
+      label: message,
+      child: ExcludeSemantics(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info_outline, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -350,14 +482,27 @@ class _RollbackCard extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.children});
+  const _SectionCard({
+    required this.title,
+    required this.children,
+    this.highlighted = false,
+  });
 
   final String title;
   final List<Widget> children;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
+      color: highlighted ? colors.secondaryContainer : null,
+      shape: highlighted
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: colors.primary, width: 2),
+            )
+          : null,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

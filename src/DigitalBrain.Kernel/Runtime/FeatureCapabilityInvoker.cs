@@ -91,7 +91,9 @@ internal sealed class FeatureCapabilityInvoker(
             invocation.OccurredAt.ToUniversalTime(),
             StableId("ino-correlation-", invocation, includeOperation: false),
             StableId("ino-trace-", invocation, includeConversation: false),
-            StableId("ino-causation-", invocation, includeConversation: false, includeOperation: false));
+            StableId("ino-causation-", invocation, includeConversation: false, includeOperation: false),
+            FeatureRunOrigin.Chat,
+            new FeatureRunOriginReference(invocation.ConversationId, invocation.RequestId, null));
         var command = new StartFeatureRun(
             invocation.Binding.OwnerId,
             invocation.Binding.ActorId,

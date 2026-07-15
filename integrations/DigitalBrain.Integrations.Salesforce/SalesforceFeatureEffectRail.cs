@@ -96,7 +96,17 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
     {
         ArgumentNullException.ThrowIfNull(proposal);
         if (!approved)
-            return new InoToolEffectResult(InoToolEffectDisposition.Failed, "The Salesforce update was not approved. No external action was performed.");
+        {
+            var declined = new InoToolEffectResult(
+                InoToolEffectDisposition.Failed,
+                "The Salesforce update was not approved. No external action was performed.");
+            var declinedRequest = proposal.Request;
+            await grains.Installation(declinedRequest.OwnerId, declinedRequest.InstallationId)
+                .DeclineIntentAsync(proposal.PersistedOperationKey)
+                .WaitAsync(cancellationToken);
+            await PublishOutcomeAsync(proposal, declined, cancellationToken);
+            return declined;
+        }
         if (!effects.TryAuthorizeMutation(proposal.Approval, proposal.ActorScope, out var authorized) ||
             !string.Equals(authorized.ToolId, SalesforceTools.UpdateRecord, StringComparison.Ordinal) ||
             !string.Equals(authorized.Scope, proposal.Approval.Scope, StringComparison.Ordinal) ||
@@ -105,6 +115,15 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
         var result = await effects.ExecuteAsync(new InoToolEffectRequest(proposal.OperationId, proposal.EffectId, SalesforceTools.UpdateRecord, proposal.Approval.Scope, proposal.ActorScope, proposal.ProviderIdempotencyKey), cancellationToken);
         var request = proposal.Request;
         await grains.Installation(request.OwnerId, request.InstallationId).ApplyIntentAsync(proposal.PersistedOperationKey).WaitAsync(cancellationToken);
+        await PublishOutcomeAsync(proposal, result, cancellationToken);
+        return result;
+    }
+    private async Task PublishOutcomeAsync(
+        SalesforceFeatureEffectProposal proposal,
+        InoToolEffectResult result,
+        CancellationToken cancellationToken)
+    {
+        var request = proposal.Request;
         var outcomeInput = new FeatureInput(
             "salesforce-outcome-" + Digest(proposal.OperationId),
             OutcomeKind,
@@ -118,9 +137,10 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
             timeProvider.GetUtcNow(),
             request.CorrelationId,
             request.TraceId,
-            request.InputId);
+            request.InputId,
+            FeatureRunOrigin.Event,
+            new FeatureRunOriginReference(null, null, OutcomeKind));
         await grains.Hub(request.OwnerId).PublishAsync(outcomeInput).WaitAsync(cancellationToken);
-        return result;
     }
     private static void ValidateRequest(SalesforceFeatureEffectRequest request)
     {

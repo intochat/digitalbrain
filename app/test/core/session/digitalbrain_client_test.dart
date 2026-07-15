@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:digitalbrain_flutter/core/session/digitalbrain_client.dart';
 import 'package:digitalbrain_flutter/grpc/ui.pb.dart' as wire;
+import 'package:digitalbrain_flutter/grpc/ui.pbenum.dart' as wire_enums;
 import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
 import 'package:digitalbrain_flutter/runtime/runtime.dart';
 import 'package:digitalbrain_flutter/runtime/runtime_configuration.dart';
@@ -57,22 +58,25 @@ void main() {
     expect(transport.productAccessTokens, ['access-a']);
   });
 
-  test('originating request resume uses the shared authorized client', () async {
-    final session = _authenticatedSession();
-    final transport = _RecordingDigitalBrainTransport();
-    final client = DigitalBrainClient(session: session, transport: transport);
-    final request = wire.ResumeOriginatingRequestRequest(
-      draftId: 'draft-a',
-      expectedRevision: Int64(5),
-      idempotencyId: 'run-a',
-    );
+  test(
+    'originating request resume uses the shared authorized client',
+    () async {
+      final session = _authenticatedSession();
+      final transport = _RecordingDigitalBrainTransport();
+      final client = DigitalBrainClient(session: session, transport: transport);
+      final request = wire.ResumeOriginatingRequestRequest(
+        draftId: 'draft-a',
+        expectedRevision: Int64(5),
+        idempotencyId: 'run-a',
+      );
 
-    final reply = await client.resumeOriginatingRequest(request);
+      final reply = await client.resumeOriginatingRequest(request);
 
-    expect(reply, same(transport.resumeReply));
-    expect(transport.resumeRequests, [same(request)]);
-    expect(transport.productAccessTokens, ['access-a']);
-  });
+      expect(reply, same(transport.resumeReply));
+      expect(transport.resumeRequests, [same(request)]);
+      expect(transport.productAccessTokens, ['access-a']);
+    },
+  );
 
   test(
     'feature access review and install use the shared authorized client',
@@ -142,6 +146,31 @@ void main() {
         'access-a',
         'access-a',
       ]);
+    },
+  );
+
+  test(
+    'Activity list and Run detail use the shared authorized client',
+    () async {
+      final session = _authenticatedSession();
+      final transport = _RecordingDigitalBrainTransport();
+      final client = DigitalBrainClient(session: session, transport: transport);
+      final listRequest = wire.ListActivityRequest(
+        status: wire_enums.FeatureRunStatus.FEATURE_RUN_STATUS_FAILED,
+        origin: wire_enums.FeatureRunOrigin.FEATURE_RUN_ORIGIN_CHAT,
+        featureId: 'feature-a',
+        limit: 50,
+      );
+      final runRequest = wire.GetRunRequest(runId: 'run-a');
+
+      final activity = await client.listActivity(listRequest);
+      final run = await client.getRun(runRequest);
+
+      expect(activity, same(transport.activityReply));
+      expect(run, same(transport.runReply));
+      expect(transport.listActivityRequests, [same(listRequest)]);
+      expect(transport.getRunRequests, [same(runRequest)]);
+      expect(transport.productAccessTokens, ['access-a', 'access-a']);
     },
   );
 
@@ -794,6 +823,8 @@ class _RecordingDigitalBrainTransport
   final resumeReply = wire.ResumeOriginatingRequestReply();
   final featureReply = wire.FeatureReply();
   final sourceReply = wire.FeatureReleaseSourceReply();
+  final activityReply = wire.ListActivityReply();
+  final runReply = wire.RunReply();
   String? accessToken;
   wire.GetFeatureDraftRequest? getRequest;
   final List<String> productAccessTokens = [];
@@ -808,6 +839,8 @@ class _RecordingDigitalBrainTransport
   final List<wire.GetFeatureRequest> getFeatureRequests = [];
   final List<wire.GetFeatureReleaseSourceRequest> sourceRequests = [];
   final List<wire.RollbackFeatureVersionRequest> rollbackRequests = [];
+  final List<wire.ListActivityRequest> listActivityRequests = [];
+  final List<wire.GetRunRequest> getRunRequests = [];
   Future<SessionBundle>? refreshResult;
   Future<SessionBundle>? loginResult;
   FeedCall? feedCall;
@@ -942,6 +975,26 @@ class _RecordingDigitalBrainTransport
     productAccessTokens.add(accessToken);
     rollbackRequests.add(request);
     return featureReply;
+  }
+
+  @override
+  Future<wire.ListActivityReply> listActivity({
+    required String accessToken,
+    required wire.ListActivityRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    listActivityRequests.add(request);
+    return activityReply;
+  }
+
+  @override
+  Future<wire.RunReply> getRun({
+    required String accessToken,
+    required wire.GetRunRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    getRunRequests.add(request);
+    return runReply;
   }
 
   @override

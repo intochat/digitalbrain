@@ -38,14 +38,19 @@ internal static class FeatureInstallationTransitions
         var completion = state.Completions.FirstOrDefault(entry => Same(entry.InputId, input.InputId));
         if (completion is not null)
         {
-            if (!keepExistingContent && !Same(completion.InputDigest, inputDigest))
+            if (!keepExistingContent &&
+                !Same(completion.InputDigest, inputDigest) &&
+                !(completion.Run is null && Same(completion.InputDigest, LegacyInputDigest(input))))
                 throw new FeatureConcurrencyException("The input id is already bound to different content.");
             return new(state, FeatureAppendStatus.Duplicate);
         }
         var pending = state.Inbox.FirstOrDefault(entry => Same(entry.Input.InputId, input.InputId));
         if (pending is not null)
         {
-            if (!keepExistingContent && !Same(InputDigest(pending.Input), inputDigest))
+            if (!keepExistingContent &&
+                !Same(InputDigest(pending.Input), inputDigest) &&
+                !(pending.Input.Origin == FeatureRunOrigin.Unspecified &&
+                    Same(LegacyInputDigest(pending.Input), LegacyInputDigest(input))))
                 throw new FeatureConcurrencyException("The input id is already bound to different content.");
             if (state.Paused || pending.Parked || pending.AcceptedRelease is null)
                 return new(state, FeatureAppendStatus.Paused);
@@ -112,7 +117,12 @@ internal static class FeatureInstallationTransitions
                 null);
         }
         var attempt = checked(entry.Attempts + 1);
-        entries[index] = entry with { Attempts = attempt };
+        entries[index] = entry with
+        {
+            Attempts = attempt,
+            LastAttemptAt = now,
+            TotalAttempts = checked(VisibleAttempts(entry) + 1)
+        };
         var fenceNumber = checked(current.NextFence + 1);
         var fence = new FeatureLeaseFence(entry.Input.InputId, fenceNumber);
         var expires = now.Add(leaseDuration);
@@ -179,12 +189,28 @@ internal static class FeatureInstallationTransitions
             ArgumentNullException.ThrowIfNull(intent);
             ArgumentException.ThrowIfNullOrWhiteSpace(intent.LogicalOperationKey);
             ValidateJson(intent.PayloadJson, nameof(intent.PayloadJson), FeatureLimits.StateUtf8Bytes);
-            return new PersistedFeatureIntent(FeatureIntentKeys.Create(state.InstallationId, commit.Fence.InputId, intent.LogicalOperationKey), intent.Kind, intent.PayloadJson, null);
+            return new PersistedFeatureIntent(
+                FeatureIntentKeys.Create(state.InstallationId, commit.Fence.InputId, intent.LogicalOperationKey),
+                intent.Kind,
+                intent.PayloadJson,
+                null,
+                commit.Fence.InputId);
         }).ToArray();
         if (persistedIntents.Select(intent => intent.OperationKey).Distinct(StringComparer.Ordinal).Count() != persistedIntents.Length)
             throw new ArgumentException("Intent logical operation keys must be unique within a run.", nameof(commit));
         var retainedIntents = RetainIntentLedger(state.Intents, persistedIntents);
-        var completion = new FeatureCompletion(commit.Fence.InputId, commit.Fence.Fence, commit.ResultJson, now, commitDigest, InputDigest(leasedInput.Input));
+        var completion = new FeatureCompletion(
+            commit.Fence.InputId,
+            commit.Fence.Fence,
+            commit.ResultJson,
+            now,
+            commitDigest,
+            InputDigest(leasedInput.Input),
+            leasedInput.AcceptedRelease,
+            FeatureRunProjection.Identity(leasedInput.Input),
+            VisibleAttempts(leasedInput),
+            leasedInput.LastAttemptAt,
+            persistedIntents.Any(intent => intent.Kind == FeatureIntentKind.TextSurface));
         var completions = state.Completions.Length == FeatureLimits.InboxEntries
             ? [.. state.Completions.Skip(1), completion]
             : state.Completions.Append(completion).ToArray();
@@ -228,7 +254,15 @@ internal static class FeatureInstallationTransitions
         var inputId = ScheduledInputId(state.InstallationId, occurrence.ScheduleId, occurrence.ScheduledFor);
         var appended = Append(
             state,
-            new FeatureInput(inputId, $"schedule.{occurrence.ScheduleId}", occurrence.PayloadJson, occurrence.ScheduledFor, occurrence.CorrelationId, occurrence.TraceId),
+            new FeatureInput(
+                inputId,
+                $"schedule.{occurrence.ScheduleId}",
+                occurrence.PayloadJson,
+                occurrence.ScheduledFor,
+                occurrence.CorrelationId,
+                occurrence.TraceId,
+                Origin: FeatureRunOrigin.Schedule,
+                OriginReference: new FeatureRunOriginReference(null, null, occurrence.ScheduleId)),
             now);
         if (appended.Status is not FeatureAppendStatus.Accepted and not FeatureAppendStatus.Duplicate)
             return appended;
@@ -250,7 +284,7 @@ internal static class FeatureInstallationTransitions
     public static IReadOnlyList<PersistedFeatureIntent> ListPendingIntents(FeatureInstallationState state)
     {
         ArgumentNullException.ThrowIfNull(state);
-        return state.Intents.Where(intent => intent.AppliedAt is null).ToArray();
+        return state.Intents.Where(intent => intent.AppliedAt is null && intent.DeclinedAt is null).ToArray();
     }
     public static FeatureInstallationState ApplyIntent(FeatureInstallationState state, string operationKey, DateTimeOffset appliedAt)
     {
@@ -259,10 +293,27 @@ internal static class FeatureInstallationTransitions
         var index = Array.FindIndex(state.Intents, intent => Same(intent.OperationKey, operationKey));
         if (index < 0)
             throw new KeyNotFoundException("The feature intent does not exist.");
+        if (state.Intents[index].DeclinedAt is not null)
+            throw new FeatureConcurrencyException("The feature intent was already declined.");
         if (state.Intents[index].AppliedAt is not null)
             return state;
         var intents = state.Intents.ToArray();
         intents[index] = intents[index] with { AppliedAt = appliedAt };
+        return state with { Intents = intents, Revision = checked(state.Revision + 1) };
+    }
+    public static FeatureInstallationState DeclineIntent(FeatureInstallationState state, string operationKey, DateTimeOffset declinedAt)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationKey);
+        var index = Array.FindIndex(state.Intents, intent => Same(intent.OperationKey, operationKey));
+        if (index < 0)
+            throw new KeyNotFoundException("The feature intent does not exist.");
+        if (state.Intents[index].AppliedAt is not null)
+            throw new FeatureConcurrencyException("The feature intent was already applied.");
+        if (state.Intents[index].DeclinedAt is not null)
+            return state;
+        var intents = state.Intents.ToArray();
+        intents[index] = intents[index] with { DeclinedAt = declinedAt };
         return state with { Intents = intents, Revision = checked(state.Revision + 1) };
     }
     public static FeatureInstallationState Pause(FeatureInstallationState state, string reason)
@@ -279,7 +330,15 @@ internal static class FeatureInstallationTransitions
         ArgumentNullException.ThrowIfNull(state);
         if (!state.Paused)
             return state;
-        var inbox = state.Inbox.Select(entry => entry.Parked ? entry with { Parked = false, Attempts = 0, LastFailure = null } : entry).ToArray();
+        var inbox = state.Inbox.Select(entry => entry.Parked
+            ? entry with
+            {
+                Parked = false,
+                Attempts = 0,
+                LastFailure = null,
+                TotalAttempts = VisibleAttempts(entry)
+            }
+            : entry).ToArray();
         return state with { Paused = false, PauseReason = null, Inbox = inbox, Revision = checked(state.Revision + 1) };
     }
     public static FeatureInstallationState SwitchRelease(FeatureInstallationState state, ReleaseDigest release)
@@ -302,6 +361,9 @@ internal static class FeatureInstallationTransitions
             throw new FeatureConcurrencyException("The feature lease fence is stale.");
         return lease;
     }
+
+    private static int VisibleAttempts(FeatureInboxEntry entry) =>
+        Math.Max(entry.Attempts, entry.TotalAttempts);
     internal static void ValidateInput(FeatureInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -313,9 +375,20 @@ internal static class FeatureInstallationTransitions
             ValidateIdentifier(input.CausationId, nameof(input.CausationId));
         if (input.OccurredAt.Offset != TimeSpan.Zero)
             throw new ArgumentException("Feature input timestamps must be UTC.", nameof(input));
+        FeatureRunProjection.ValidateOrigin(input);
         ValidateJson(input.PayloadJson, nameof(input.PayloadJson), FeatureLimits.StateUtf8Bytes);
     }
     internal static string InputDigest(FeatureInput input)
+    {
+        var canonical = InputDigestCanonical(input);
+        FeatureRunProjection.AppendOriginDigest(canonical, input);
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
+    }
+
+    private static string LegacyInputDigest(FeatureInput input) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(InputDigestCanonical(input).ToString())));
+
+    private static StringBuilder InputDigestCanonical(FeatureInput input)
     {
         ValidateInput(input);
         var canonical = new StringBuilder();
@@ -326,7 +399,7 @@ internal static class FeatureInstallationTransitions
         AppendCanonical(canonical, input.CorrelationId);
         AppendCanonical(canonical, input.TraceId);
         AppendCanonical(canonical, input.CausationId ?? string.Empty);
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
+        return canonical;
     }
     private static void ValidateIdentifier(string value, string parameterName)
     {
@@ -370,7 +443,7 @@ internal static class FeatureInstallationTransitions
     }
     private static PersistedFeatureIntent[] RetainIntentLedger(IReadOnlyList<PersistedFeatureIntent> existing, IReadOnlyList<PersistedFeatureIntent> appended)
     {
-        var pending = existing.Where(intent => intent.AppliedAt is null).ToArray();
+        var pending = existing.Where(intent => ResolvedAt(intent) is null).ToArray();
         var requiredCount = checked(pending.Length + appended.Count);
         var requiredBytes = pending.Sum(IntentBytes) + appended.Sum(IntentBytes);
         if (requiredCount > FeatureLimits.IntentLedgerEntries || requiredBytes > FeatureLimits.IntentLedgerUtf8Bytes)
@@ -378,8 +451,8 @@ internal static class FeatureInstallationTransitions
         var remainingCount = FeatureLimits.IntentLedgerEntries - requiredCount;
         var remainingBytes = FeatureLimits.IntentLedgerUtf8Bytes - requiredBytes;
         var applied = new List<PersistedFeatureIntent>();
-        foreach (var intent in existing.Where(intent => intent.AppliedAt is not null)
-            .OrderByDescending(intent => intent.AppliedAt))
+        foreach (var intent in existing.Where(intent => ResolvedAt(intent) is not null)
+            .OrderByDescending(ResolvedAt))
         {
             var bytes = IntentBytes(intent);
             if (applied.Count >= remainingCount || bytes > remainingBytes)
@@ -390,6 +463,8 @@ internal static class FeatureInstallationTransitions
         applied.Reverse();
         return [.. applied, .. pending, .. appended];
     }
+    private static DateTimeOffset? ResolvedAt(PersistedFeatureIntent intent) =>
+        intent.AppliedAt ?? intent.DeclinedAt;
     private static int IntentBytes(PersistedFeatureIntent intent) =>
         Encoding.UTF8.GetByteCount(intent.OperationKey) + Encoding.UTF8.GetByteCount(intent.PayloadJson);
     private static void AppendCanonical(StringBuilder builder, string value) =>

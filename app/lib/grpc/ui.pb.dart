@@ -5153,7 +5153,19 @@ class ConnectionReply extends $pb.GeneratedMessage {
 }
 
 class ListActivityRequest extends $pb.GeneratedMessage {
-  factory ListActivityRequest() => create();
+  factory ListActivityRequest({
+    FeatureRunStatus? status,
+    FeatureRunOrigin? origin,
+    $core.String? featureId,
+    $core.int? limit,
+  }) {
+    final result = create();
+    if (status != null) result.status = status;
+    if (origin != null) result.origin = origin;
+    if (featureId != null) result.featureId = featureId;
+    if (limit != null) result.limit = limit;
+    return result;
+  }
 
   ListActivityRequest._();
 
@@ -5166,13 +5178,27 @@ class ListActivityRequest extends $pb.GeneratedMessage {
     $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
   ]) => create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'ListActivityRequest',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ListActivityRequest',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aE<FeatureRunStatus>(
+          3,
+          _omitFieldNames ? '' : 'status',
+          enumValues: FeatureRunStatus.values,
+        )
+        ..aE<FeatureRunOrigin>(
+          4,
+          _omitFieldNames ? '' : 'origin',
+          enumValues: FeatureRunOrigin.values,
+        )
+        ..aOS(5, _omitFieldNames ? '' : 'featureId')
+        ..aI(6, _omitFieldNames ? '' : 'limit')
+        ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   ListActivityRequest clone() => deepCopy();
@@ -5192,10 +5218,50 @@ class ListActivityRequest extends $pb.GeneratedMessage {
   static ListActivityRequest getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<ListActivityRequest>(create);
   static ListActivityRequest? _defaultInstance;
+
+  @$pb.TagNumber(3)
+  FeatureRunStatus get status => $_getN(0);
+  @$pb.TagNumber(3)
+  set status(FeatureRunStatus value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStatus() => $_has(0);
+  @$pb.TagNumber(3)
+  void clearStatus() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  FeatureRunOrigin get origin => $_getN(1);
+  @$pb.TagNumber(4)
+  set origin(FeatureRunOrigin value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasOrigin() => $_has(1);
+  @$pb.TagNumber(4)
+  void clearOrigin() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get featureId => $_getSZ(2);
+  @$pb.TagNumber(5)
+  set featureId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFeatureId() => $_has(2);
+  @$pb.TagNumber(5)
+  void clearFeatureId() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get limit => $_getIZ(3);
+  @$pb.TagNumber(6)
+  set limit($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(6)
+  $core.bool hasLimit() => $_has(3);
+  @$pb.TagNumber(6)
+  void clearLimit() => $_clearField(6);
 }
 
 class ListActivityReply extends $pb.GeneratedMessage {
-  factory ListActivityReply() => create();
+  factory ListActivityReply({$core.Iterable<FeatureRunSnapshot>? runs}) {
+    final result = create();
+    if (runs != null) result.runs.addAll(runs);
+    return result;
+  }
 
   ListActivityReply._();
 
@@ -5208,13 +5274,20 @@ class ListActivityReply extends $pb.GeneratedMessage {
     $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
   ]) => create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'ListActivityReply',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ListActivityReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..pPM<FeatureRunSnapshot>(
+          1,
+          _omitFieldNames ? '' : 'runs',
+          subBuilder: FeatureRunSnapshot.create,
+        )
+        ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   ListActivityReply clone() => deepCopy();
@@ -5234,6 +5307,9 @@ class ListActivityReply extends $pb.GeneratedMessage {
   static ListActivityReply getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<ListActivityReply>(create);
   static ListActivityReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<FeatureRunSnapshot> get runs => $_getList(0);
 }
 
 class GetRunRequest extends $pb.GeneratedMessage {
@@ -5295,7 +5371,11 @@ class GetRunRequest extends $pb.GeneratedMessage {
 }
 
 class RunReply extends $pb.GeneratedMessage {
-  factory RunReply() => create();
+  factory RunReply({FeatureRunSnapshot? run}) {
+    final result = create();
+    if (run != null) result.run = run;
+    return result;
+  }
 
   RunReply._();
 
@@ -5308,13 +5388,20 @@ class RunReply extends $pb.GeneratedMessage {
     $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
   ]) => create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'RunReply',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'RunReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOM<FeatureRunSnapshot>(
+          1,
+          _omitFieldNames ? '' : 'run',
+          subBuilder: FeatureRunSnapshot.create,
+        )
+        ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   RunReply clone() => deepCopy();
@@ -5333,6 +5420,398 @@ class RunReply extends $pb.GeneratedMessage {
   static RunReply getDefault() =>
       _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RunReply>(create);
   static RunReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  FeatureRunSnapshot get run => $_getN(0);
+  @$pb.TagNumber(1)
+  set run(FeatureRunSnapshot value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRun() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRun() => $_clearField(1);
+  @$pb.TagNumber(1)
+  FeatureRunSnapshot ensureRun() => $_ensure(0);
+}
+
+class FeatureRunOriginReference extends $pb.GeneratedMessage {
+  factory FeatureRunOriginReference({
+    $core.String? conversationId,
+    $core.String? requestId,
+    $core.String? automationId,
+  }) {
+    final result = create();
+    if (conversationId != null) result.conversationId = conversationId;
+    if (requestId != null) result.requestId = requestId;
+    if (automationId != null) result.automationId = automationId;
+    return result;
+  }
+
+  FeatureRunOriginReference._();
+
+  factory FeatureRunOriginReference.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory FeatureRunOriginReference.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'FeatureRunOriginReference',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'conversationId')
+        ..aOS(2, _omitFieldNames ? '' : 'requestId')
+        ..aOS(3, _omitFieldNames ? '' : 'automationId')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureRunOriginReference clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureRunOriginReference copyWith(
+    void Function(FeatureRunOriginReference) updates,
+  ) =>
+      super.copyWith((message) => updates(message as FeatureRunOriginReference))
+          as FeatureRunOriginReference;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FeatureRunOriginReference create() => FeatureRunOriginReference._();
+  @$core.override
+  FeatureRunOriginReference createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FeatureRunOriginReference getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FeatureRunOriginReference>(create);
+  static FeatureRunOriginReference? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get conversationId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set conversationId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasConversationId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearConversationId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get automationId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set automationId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAutomationId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAutomationId() => $_clearField(3);
+}
+
+class FeatureRunSnapshot extends $pb.GeneratedMessage {
+  factory FeatureRunSnapshot({
+    $core.String? runId,
+    $core.String? featureId,
+    $core.String? featureName,
+    $core.String? installationId,
+    $core.String? releaseDigest,
+    $core.String? inputKind,
+    FeatureRunOrigin? origin,
+    FeatureRunOriginReference? originReference,
+    FeatureRunStatus? status,
+    FeatureRunAuthorityState? authorityState,
+    $fixnum.Int64? occurredAtUnixMs,
+    $fixnum.Int64? startedAtUnixMs,
+    $fixnum.Int64? completedAtUnixMs,
+    $fixnum.Int64? retryAtUnixMs,
+    $core.int? attempts,
+    $core.String? resultSurfaceReference,
+    $core.String? safeFailure,
+    $core.String? failureGuidance,
+    $core.String? traceReference,
+  }) {
+    final result = create();
+    if (runId != null) result.runId = runId;
+    if (featureId != null) result.featureId = featureId;
+    if (featureName != null) result.featureName = featureName;
+    if (installationId != null) result.installationId = installationId;
+    if (releaseDigest != null) result.releaseDigest = releaseDigest;
+    if (inputKind != null) result.inputKind = inputKind;
+    if (origin != null) result.origin = origin;
+    if (originReference != null) result.originReference = originReference;
+    if (status != null) result.status = status;
+    if (authorityState != null) result.authorityState = authorityState;
+    if (occurredAtUnixMs != null) result.occurredAtUnixMs = occurredAtUnixMs;
+    if (startedAtUnixMs != null) result.startedAtUnixMs = startedAtUnixMs;
+    if (completedAtUnixMs != null) result.completedAtUnixMs = completedAtUnixMs;
+    if (retryAtUnixMs != null) result.retryAtUnixMs = retryAtUnixMs;
+    if (attempts != null) result.attempts = attempts;
+    if (resultSurfaceReference != null)
+      result.resultSurfaceReference = resultSurfaceReference;
+    if (safeFailure != null) result.safeFailure = safeFailure;
+    if (failureGuidance != null) result.failureGuidance = failureGuidance;
+    if (traceReference != null) result.traceReference = traceReference;
+    return result;
+  }
+
+  FeatureRunSnapshot._();
+
+  factory FeatureRunSnapshot.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory FeatureRunSnapshot.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'FeatureRunSnapshot',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'runId')
+        ..aOS(2, _omitFieldNames ? '' : 'featureId')
+        ..aOS(3, _omitFieldNames ? '' : 'featureName')
+        ..aOS(4, _omitFieldNames ? '' : 'installationId')
+        ..aOS(5, _omitFieldNames ? '' : 'releaseDigest')
+        ..aOS(6, _omitFieldNames ? '' : 'inputKind')
+        ..aE<FeatureRunOrigin>(
+          7,
+          _omitFieldNames ? '' : 'origin',
+          enumValues: FeatureRunOrigin.values,
+        )
+        ..aOM<FeatureRunOriginReference>(
+          8,
+          _omitFieldNames ? '' : 'originReference',
+          subBuilder: FeatureRunOriginReference.create,
+        )
+        ..aE<FeatureRunStatus>(
+          9,
+          _omitFieldNames ? '' : 'status',
+          enumValues: FeatureRunStatus.values,
+        )
+        ..aE<FeatureRunAuthorityState>(
+          10,
+          _omitFieldNames ? '' : 'authorityState',
+          enumValues: FeatureRunAuthorityState.values,
+        )
+        ..aInt64(11, _omitFieldNames ? '' : 'occurredAtUnixMs')
+        ..aInt64(12, _omitFieldNames ? '' : 'startedAtUnixMs')
+        ..aInt64(13, _omitFieldNames ? '' : 'completedAtUnixMs')
+        ..aInt64(14, _omitFieldNames ? '' : 'retryAtUnixMs')
+        ..aI(15, _omitFieldNames ? '' : 'attempts')
+        ..aOS(16, _omitFieldNames ? '' : 'resultSurfaceReference')
+        ..aOS(17, _omitFieldNames ? '' : 'safeFailure')
+        ..aOS(18, _omitFieldNames ? '' : 'failureGuidance')
+        ..aOS(19, _omitFieldNames ? '' : 'traceReference')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureRunSnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureRunSnapshot copyWith(void Function(FeatureRunSnapshot) updates) =>
+      super.copyWith((message) => updates(message as FeatureRunSnapshot))
+          as FeatureRunSnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FeatureRunSnapshot create() => FeatureRunSnapshot._();
+  @$core.override
+  FeatureRunSnapshot createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FeatureRunSnapshot getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FeatureRunSnapshot>(create);
+  static FeatureRunSnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get runId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set runId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRunId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRunId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get featureId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set featureId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFeatureId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFeatureId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get featureName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set featureName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFeatureName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFeatureName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get installationId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set installationId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasInstallationId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearInstallationId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get releaseDigest => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set releaseDigest($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasReleaseDigest() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearReleaseDigest() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get inputKind => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set inputKind($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasInputKind() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearInputKind() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  FeatureRunOrigin get origin => $_getN(6);
+  @$pb.TagNumber(7)
+  set origin(FeatureRunOrigin value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasOrigin() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearOrigin() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  FeatureRunOriginReference get originReference => $_getN(7);
+  @$pb.TagNumber(8)
+  set originReference(FeatureRunOriginReference value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasOriginReference() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearOriginReference() => $_clearField(8);
+  @$pb.TagNumber(8)
+  FeatureRunOriginReference ensureOriginReference() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  FeatureRunStatus get status => $_getN(8);
+  @$pb.TagNumber(9)
+  set status(FeatureRunStatus value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasStatus() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearStatus() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  FeatureRunAuthorityState get authorityState => $_getN(9);
+  @$pb.TagNumber(10)
+  set authorityState(FeatureRunAuthorityState value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasAuthorityState() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearAuthorityState() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $fixnum.Int64 get occurredAtUnixMs => $_getI64(10);
+  @$pb.TagNumber(11)
+  set occurredAtUnixMs($fixnum.Int64 value) => $_setInt64(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasOccurredAtUnixMs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearOccurredAtUnixMs() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $fixnum.Int64 get startedAtUnixMs => $_getI64(11);
+  @$pb.TagNumber(12)
+  set startedAtUnixMs($fixnum.Int64 value) => $_setInt64(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasStartedAtUnixMs() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearStartedAtUnixMs() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $fixnum.Int64 get completedAtUnixMs => $_getI64(12);
+  @$pb.TagNumber(13)
+  set completedAtUnixMs($fixnum.Int64 value) => $_setInt64(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasCompletedAtUnixMs() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearCompletedAtUnixMs() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $fixnum.Int64 get retryAtUnixMs => $_getI64(13);
+  @$pb.TagNumber(14)
+  set retryAtUnixMs($fixnum.Int64 value) => $_setInt64(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasRetryAtUnixMs() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearRetryAtUnixMs() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.int get attempts => $_getIZ(14);
+  @$pb.TagNumber(15)
+  set attempts($core.int value) => $_setSignedInt32(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasAttempts() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearAttempts() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.String get resultSurfaceReference => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set resultSurfaceReference($core.String value) => $_setString(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasResultSurfaceReference() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearResultSurfaceReference() => $_clearField(16);
+
+  @$pb.TagNumber(17)
+  $core.String get safeFailure => $_getSZ(16);
+  @$pb.TagNumber(17)
+  set safeFailure($core.String value) => $_setString(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasSafeFailure() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearSafeFailure() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.String get failureGuidance => $_getSZ(17);
+  @$pb.TagNumber(18)
+  set failureGuidance($core.String value) => $_setString(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasFailureGuidance() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearFailureGuidance() => $_clearField(18);
+
+  @$pb.TagNumber(19)
+  $core.String get traceReference => $_getSZ(18);
+  @$pb.TagNumber(19)
+  set traceReference($core.String value) => $_setString(18, value);
+  @$pb.TagNumber(19)
+  $core.bool hasTraceReference() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearTraceReference() => $_clearField(19);
 }
 
 class ListMemoryItemsRequest extends $pb.GeneratedMessage {

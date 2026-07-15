@@ -4,13 +4,24 @@ using Orleans;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 namespace DigitalBrain.Mcp;
 
-public sealed record FeatureInstallationInspection(FeatureAuthoritySnapshot Authority, FeatureInstallationRegistration? Registration, FeatureInstallationSnapshot? Runtime);
+public sealed record FeatureInstallationInspection(
+    FeatureAuthoritySnapshot Authority,
+    FeatureInstallationRegistration? Registration,
+    FeatureInstallationSnapshot? Runtime,
+    FeatureDraft? Draft = null);
 public sealed record FeatureLifecycleInspection(
     long Revision,
     IReadOnlyList<FeatureReleaseMetadata> Releases,
     IReadOnlyList<FeatureApprovalSnapshot> Approvals,
     IReadOnlyList<FeatureInstallationInspection> Installations,
     IReadOnlyList<FeatureInstallationRegistration> Registrations);
+public sealed record FeatureRunInstallationInspection(
+    FeatureAuthoritySnapshot Authority,
+    FeatureInstallationRegistration? Registration,
+    FeatureRunCollectionSnapshot? Runtime,
+    FeatureDraft? Draft);
+public sealed record FeatureRunLifecycleInspection(
+    IReadOnlyList<FeatureRunInstallationInspection> Installations);
 public interface IFeatureLifecycleRail
 {
     Task<FeatureApprovalSnapshot> ProposeAsync(RuntimeRequestContext context, FeatureReleaseProposal proposal, long expectedRevision, CancellationToken cancellationToken = default);
@@ -22,6 +33,9 @@ public interface IFeatureLifecycleRail
             new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
     Task<FeatureAuthoritySnapshot> RepublishAsync(RuntimeRequestContext context, FeatureInstallationRegistration registration, CancellationToken cancellationToken = default);
     Task<FeatureLifecycleInspection> InspectAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default);
+    Task<FeatureRunLifecycleInspection> InspectRunsAsync(RuntimeRequestContext context, FeatureRunReadRequest request, CancellationToken cancellationToken = default) =>
+        Task.FromException<FeatureRunLifecycleInspection>(
+            new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
 }
 public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifactPublisher artifacts, RuntimeSurfaceFeed surfaces) : IFeatureLifecycleRail
 {
@@ -147,22 +161,61 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
     public async Task<FeatureLifecycleInspection> InspectAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
-        var hub = await Hub(context).ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var grain = Hub(context);
+        var hub = await grain.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         var inspections = new List<FeatureInstallationInspection>(hub.Authorities.Length);
         foreach (var authority in hub.Authorities)
         {
             var registration = hub.Installations.FirstOrDefault(candidate =>
                 candidate.InstallationId == authority.InstallationId);
             FeatureInstallationSnapshot? runtime = null;
-            if (registration is not null)
+            FeatureDraft? draft = null;
+            if (registration is not null && authority.ActorId == context.ActorId)
             {
                 runtime = await cluster.GetGrain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(context.OwnerId, authority.InstallationId)).ReadAsync()
                     .WaitAsync(cancellationToken)
                     .ConfigureAwait(false);
+                draft = await grain.ReadInstalledDraftAsync(authority.InstallationId, registration.Release)
+                    .WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
             }
-            inspections.Add(new FeatureInstallationInspection(authority, registration, runtime));
+            inspections.Add(new FeatureInstallationInspection(authority, registration, runtime, draft));
         }
         return new FeatureLifecycleInspection(hub.Revision, hub.Releases, hub.Approvals, inspections, hub.Installations);
+    }
+    public async Task<FeatureRunLifecycleInspection> InspectRunsAsync(
+        RuntimeRequestContext context,
+        FeatureRunReadRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        DemandActor(context);
+        ArgumentNullException.ThrowIfNull(request);
+        var grain = Hub(context);
+        var hub = await grain.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var inspections = new List<FeatureRunInstallationInspection>(hub.Authorities.Length);
+        foreach (var authority in hub.Authorities)
+        {
+            if (authority.ActorId != context.ActorId)
+                continue;
+            var registration = hub.Installations.FirstOrDefault(candidate =>
+                candidate.InstallationId == authority.InstallationId);
+            if (registration is null)
+            {
+                inspections.Add(new FeatureRunInstallationInspection(authority, null, null, null));
+                continue;
+            }
+            var runtime = await cluster.GetGrain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(context.OwnerId, authority.InstallationId))
+                .ReadRunsAsync(request)
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (runtime.Runs.Length == 0)
+                continue;
+            var draft = await grain.ReadInstalledDraftAsync(authority.InstallationId, registration.Release)
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+            inspections.Add(new FeatureRunInstallationInspection(authority, registration, runtime, draft));
+        }
+        return new FeatureRunLifecycleInspection(inspections);
     }
     private IFeatureHubGrain Hub(RuntimeRequestContext context) =>
         cluster.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(context.OwnerId));

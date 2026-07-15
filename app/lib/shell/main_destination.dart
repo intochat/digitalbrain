@@ -6,6 +6,12 @@ enum MainDestination {
     location: '/chat',
     icon: Icons.chat_bubble_outline,
     selectedIcon: Icons.chat_bubble,
+  ),
+  activity(
+    label: 'Activity',
+    location: '/activity',
+    icon: Icons.history_outlined,
+    selectedIcon: Icons.history,
   );
 
   const MainDestination({
@@ -22,7 +28,10 @@ enum MainDestination {
 
   static MainDestination? forLocation(Uri location) {
     for (final destination in values) {
-      if (location.path == destination.location) return destination;
+      if (location.path == destination.location ||
+          location.path.startsWith('${destination.location}/')) {
+        return destination;
+      }
     }
     return null;
   }

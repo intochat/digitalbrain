@@ -126,6 +126,15 @@ internal sealed class FeatureInstallationGrain(
             return;
         await WriteAsync(next);
     }
+    public async Task DeclineIntentAsync(string operationKey)
+    {
+        using var activity = Start("decline-intent");
+        DemandNoReservation();
+        var next = Domain(() => FeatureInstallationTransitions.DeclineIntent(RequiredState(), operationKey, timeProvider.GetUtcNow()));
+        if (ReferenceEquals(next, persistentState.State))
+            return;
+        await WriteAsync(next);
+    }
     public Task PauseAsync(string reason) => PersistAsync("pause", state => !HasReservation && state.UnconfirmedReleaseSwitch is null
         ? FeatureInstallationTransitions.Pause(state, reason)
         : throw new FeatureConcurrencyException("The Feature runtime is reserved or has an unconfirmed release switch."));
@@ -504,7 +513,42 @@ internal sealed class FeatureInstallationGrain(
                     state.UnconfirmedReleaseSwitch.FromPreviousRelease,
                     state.UnconfirmedReleaseSwitch.ToRelease,
                     state.UnconfirmedReleaseSwitch.FromRevision,
-                    state.UnconfirmedReleaseSwitch.SwitchRevision)));
+                    state.UnconfirmedReleaseSwitch.SwitchRevision),
+            FeatureRunProjection.Project(state)));
+    }
+    public Task<FeatureRunCollectionSnapshot> ReadRunsAsync(FeatureRunReadRequest request)
+    {
+        using var activity = Start("read-runs");
+        DemandRunReadRequest(request);
+        var state = RequiredState();
+        var runs = FeatureRunProjection.Project(state)
+            .Where(candidate => request.Status is null || candidate.Status == request.Status)
+            .Where(candidate => request.Origin is null || candidate.Origin == request.Origin)
+            .Where(candidate => request.RunId is null || string.Equals(candidate.RunId, request.RunId, StringComparison.Ordinal))
+            .OrderByDescending(candidate => candidate.CompletedAt ?? candidate.OccurredAt)
+            .ThenByDescending(candidate => candidate.OccurredAt)
+            .ThenBy(candidate => candidate.RunId, StringComparer.Ordinal)
+            .Take(request.Limit)
+            .ToArray();
+        return Task.FromResult(new FeatureRunCollectionSnapshot(
+            state.InstallationId,
+            state.ActiveRelease,
+            state.Revision,
+            runs));
+    }
+    private static void DemandRunReadRequest(FeatureRunReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Limit is < 1 or > FeatureRunReadRequest.MaximumLimit)
+            throw new ArgumentOutOfRangeException(nameof(request));
+        if (request.Status is { } status && !Enum.IsDefined(status))
+            throw new ArgumentOutOfRangeException(nameof(request));
+        if (request.Origin is { } origin && (!Enum.IsDefined(origin) || origin == FeatureRunOrigin.Unspecified))
+            throw new ArgumentOutOfRangeException(nameof(request));
+        if (request.RunId is { } runId &&
+            (string.IsNullOrWhiteSpace(runId) || runId.Length > 256 || runId.Any(char.IsControl) ||
+             !string.Equals(runId, runId.Trim(), StringComparison.Ordinal)))
+            throw new ArgumentException("A bounded canonical Run identifier is required.", nameof(request));
     }
     private async Task PersistAsync(string operation, Func<FeatureInstallationState, FeatureInstallationState> transition)
     {
@@ -691,7 +735,8 @@ internal sealed class FeatureInstallationGrain(
         return activity;
     }
     private static FeatureCompletionReceipt Receipt(FeatureCompletion completion) => new(completion.InputId, completion.Fence, completion.ResultJson, completion.CompletedAt, completion.CommitDigest, completion.InputDigest);
-    private static FeatureIntentStatus IntentStatus(PersistedFeatureIntent intent) => new(intent.OperationKey, intent.Kind, intent.PayloadJson, intent.AppliedAt);
+    private static FeatureIntentStatus IntentStatus(PersistedFeatureIntent intent) =>
+        new(intent.OperationKey, intent.Kind, intent.PayloadJson, intent.AppliedAt, intent.InputId, intent.DeclinedAt);
     private static T Domain<T>(Func<T> transition)
     {
         try

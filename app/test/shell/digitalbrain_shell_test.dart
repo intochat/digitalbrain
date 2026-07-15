@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('compact width uses a drawer with only Chat available', (
+  testWidgets('compact width uses a drawer with Chat and Activity', (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
@@ -19,7 +19,7 @@ void main() {
     await tester.tap(find.byKey(digitalBrainOpenNavigationKey));
     await tester.pumpAndSettle();
     expect(find.byType(NavigationDrawer), findsOneWidget);
-    _expectOnlyChatDestination();
+    _expectProductDestinations();
     final chat = tester.getSemantics(
       find.descendant(
         of: find.byType(NavigationDrawer),
@@ -38,7 +38,7 @@ void main() {
       expect(rail.extended, isFalse);
       expect(rail.selectedIndex, 0);
       expect(find.byType(NavigationDrawer), findsNothing);
-      _expectOnlyChatDestination();
+      _expectProductDestinations();
     }
   });
 
@@ -49,7 +49,7 @@ void main() {
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
     expect(rail.extended, isTrue);
     expect(rail.selectedIndex, 0);
-    _expectOnlyChatDestination();
+    _expectProductDestinations();
     expect(
       tester.getSemantics(find.byTooltip('Chat')).flagsCollection.isSelected,
       Tristate.isTrue,
@@ -85,7 +85,7 @@ void main() {
     expect(find.text('Home'), findsNothing);
     expect(find.text('Features'), findsNothing);
     expect(find.text('Connections'), findsNothing);
-    expect(find.text('Activity'), findsNothing);
+    expect(find.text('Activity'), findsWidgets);
     expect(find.text('Memory'), findsNothing);
 
     await tester.tap(find.byKey(digitalBrainSignOutButtonKey));
@@ -126,6 +126,28 @@ void main() {
 
     expect(selected, MainDestination.chat);
     semantics.dispose();
+  });
+
+  testWidgets('Run detail keeps Activity selected and announces its context', (
+    tester,
+  ) async {
+    await _pumpShell(
+      tester,
+      width: 1200,
+      location: Uri.parse('/activity/run-a'),
+    );
+
+    expect(
+      tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+      MainDestination.values.indexOf(MainDestination.activity),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(digitalBrainCurrentContextKey),
+        matching: find.text('Run details'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('global sign out is keyboard usable in every shell mode', (
@@ -182,12 +204,12 @@ Future<void> _pumpShell(
   await tester.pump();
 }
 
-void _expectOnlyChatDestination() {
+void _expectProductDestinations() {
   expect(find.text('Chat'), findsWidgets);
   expect(find.text('Home'), findsNothing);
   expect(find.text('Features'), findsNothing);
   expect(find.text('Connections'), findsNothing);
-  expect(find.text('Activity'), findsNothing);
+  expect(find.text('Activity'), findsWidgets);
   expect(find.text('Memory'), findsNothing);
 }
 

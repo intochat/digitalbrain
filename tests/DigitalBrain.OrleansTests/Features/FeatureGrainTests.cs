@@ -834,6 +834,38 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
     }
 
     [Fact]
+    public async Task Declined_external_effect_resolution_and_terminal_Run_survive_reactivation()
+    {
+        var installation = Installation("declined-effect");
+        await installation.InitializeAsync(ReleaseOne);
+        await installation.AppendAsync(Input("input-declined-effect"));
+        var claim = Assert.IsType<FeatureRunClaim>(
+            await installation.ClaimAsync("host-declined-effect", TimeSpan.FromSeconds(60)));
+        await installation.CommitAsync(new FeatureRunCommit(
+            claim.Fence,
+            "{}",
+            [new FeatureIntent("salesforce-update", FeatureIntentKind.ExternalEffect, "{\"secret\":\"never-project\"}")],
+            new FeatureResourceUsage(0, 0),
+            "{}"));
+        var intent = Assert.Single(await installation.ListPendingIntentsAsync());
+
+        await installation.DeclineIntentAsync(intent.OperationKey);
+        await fixture.Cluster.DeactivateAsync((IAddressable)installation);
+
+        Assert.Empty(await installation.ListPendingIntentsAsync());
+        var snapshot = await installation.ReadAsync();
+        var persistedIntent = Assert.Single(snapshot.Intents);
+        var run = Assert.Single(snapshot.Runs!);
+        Assert.Null(persistedIntent.AppliedAt);
+        Assert.NotNull(persistedIntent.DeclinedAt);
+        Assert.Equal(FeatureRunStatus.Failed, run.Status);
+        Assert.NotNull(run.CompletedAt);
+        Assert.NotNull(run.SafeFailure);
+        Assert.NotNull(run.FailureGuidance);
+        Assert.DoesNotContain("never-project", run.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Lease_expiry_recovers_a_crashed_claim_and_rejects_its_stale_fence()
     {
         var installation = Installation("lease-expiry");

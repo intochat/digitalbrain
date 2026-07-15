@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
@@ -11,6 +13,315 @@ public sealed class FeatureInstallationTransitionTests
     private static readonly ReleaseDigest ReleaseOne = new(new string('a', 64));
     private static readonly ReleaseDigest ReleaseTwo = new(new string('b', 64));
     private static readonly DateTimeOffset Now = new(2026, 7, 13, 8, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void Run_projection_uses_one_stable_identity_for_every_origin()
+    {
+        var cases = new[]
+        {
+            Input("run-chat") with
+            {
+                Origin = FeatureRunOrigin.Chat,
+                OriginReference = new FeatureRunOriginReference("conversation-1", "request-1", null)
+            },
+            Input("run-direct") with { Origin = FeatureRunOrigin.Direct },
+            Input("run-schedule") with
+            {
+                Origin = FeatureRunOrigin.Schedule,
+                OriginReference = new FeatureRunOriginReference(null, null, "schedule-1")
+            },
+            Input("run-event") with
+            {
+                Origin = FeatureRunOrigin.Event,
+                OriginReference = new FeatureRunOriginReference(null, null, "gmail.message.received.v1")
+            }
+        };
+
+        var state = State();
+        foreach (var input in cases)
+            state = FeatureInstallationTransitions.Append(state, input, Now).State;
+
+        var runs = FeatureRunProjection.Project(state);
+
+        Assert.Equal(cases.Length, runs.Select(run => run.RunId).Distinct(StringComparer.Ordinal).Count());
+        Assert.All(runs, run =>
+        {
+            Assert.StartsWith("run-", run.RunId, StringComparison.Ordinal);
+            Assert.Equal(68, run.RunId.Length);
+        });
+        Assert.Equal(
+            new[] { FeatureRunOrigin.Chat, FeatureRunOrigin.Direct, FeatureRunOrigin.Schedule, FeatureRunOrigin.Event },
+            runs.Select(run => run.Origin));
+        Assert.All(runs, run =>
+        {
+            Assert.Equal(ReleaseOne, run.Release);
+            Assert.Equal(FeatureRunStatus.Queued, run.Status);
+            Assert.Equal(FeatureRunAuthorityState.Authorized, run.AuthorityState);
+            Assert.Equal(Now, run.OccurredAt);
+            Assert.Equal(0, run.Attempts);
+            Assert.DoesNotContain("payload", run.ToString(), StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
+    public void Run_projection_identity_is_stable_within_an_installation_and_unique_across_fan_out_targets()
+    {
+        var input = Input("shared-event") with
+        {
+            Origin = FeatureRunOrigin.Event,
+            OriginReference = new FeatureRunOriginReference(null, null, "gmail.message.received.v1")
+        };
+        var firstQueued = FeatureInstallationTransitions.Append(State(), input, Now).State;
+        var secondQueued = FeatureInstallationTransitions.Append(
+            FeatureInstallationState.Create(ReleaseOne, new FeatureInstallationId("installation-2")),
+            input,
+            Now).State;
+        var firstClaim = FeatureInstallationTransitions.Claim(
+            firstQueued,
+            "host-shared-event",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var firstCompleted = FeatureInstallationTransitions.Commit(
+            firstClaim.State,
+            Commit(Assert.IsType<FeatureRunClaim>(firstClaim.Claim).Fence),
+            Now.AddSeconds(2)).State;
+
+        var firstQueuedId = Assert.Single(FeatureRunProjection.Project(firstQueued)).RunId;
+        var firstRunningId = Assert.Single(FeatureRunProjection.Project(firstClaim.State)).RunId;
+        var firstCompletedId = Assert.Single(FeatureRunProjection.Project(firstCompleted)).RunId;
+        var secondQueuedId = Assert.Single(FeatureRunProjection.Project(secondQueued)).RunId;
+
+        Assert.Equal(firstQueuedId, firstRunningId);
+        Assert.Equal(firstQueuedId, firstCompletedId);
+        Assert.NotEqual(firstQueuedId, secondQueuedId);
+    }
+
+    [Fact]
+    public void Run_projection_supplies_safe_legacy_attempt_timing_when_the_additive_timestamp_is_absent()
+    {
+        var claim = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.Append(State(), Input("legacy-attempt-time"), Now).State,
+            "host-legacy-attempt-time",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var failed = FeatureInstallationTransitions.Fail(
+            claim.State,
+            Assert.IsType<FeatureRunClaim>(claim.Claim).Fence,
+            Now.AddSeconds(2),
+            Now.AddMinutes(1),
+            "The provider was temporarily unavailable.") with
+        {
+            Inbox = [claim.State.Inbox[0] with
+            {
+                Attempts = 1,
+                LastFailure = "The provider was temporarily unavailable.",
+                LastAttemptAt = null
+            }],
+            Lease = null
+        };
+
+        var run = Assert.Single(FeatureRunProjection.Project(failed));
+        var parkedSource = FeatureInstallationTransitions.Append(
+            State(),
+            Input("legacy-parked-failure"),
+            Now).State;
+        var parked = parkedSource with
+        {
+            Inbox =
+            [
+                parkedSource.Inbox[0] with
+                {
+                    Attempts = FeatureLimits.AttemptsPerInput,
+                    Parked = true,
+                    LastFailure = null,
+                    LastAttemptAt = null
+                }
+            ]
+        };
+        var parkedRun = Assert.Single(FeatureRunProjection.Project(parked));
+
+        Assert.Equal(FeatureRunStatus.Failed, run.Status);
+        Assert.Equal(Now, run.StartedAt);
+        Assert.Equal(FeatureRunStatus.Parked, parkedRun.Status);
+        Assert.NotNull(parkedRun.SafeFailure);
+        Assert.NotNull(parkedRun.FailureGuidance);
+        Assert.Equal(Now, parkedRun.StartedAt);
+    }
+
+    [Fact]
+    public void Failed_Run_guidance_does_not_promise_an_automatic_retry_while_the_installation_is_paused()
+    {
+        var claim = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.Append(State(), Input("run-failed-paused"), Now).State,
+            "host-failed-paused",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var failed = FeatureInstallationTransitions.Fail(
+            claim.State,
+            Assert.IsType<FeatureRunClaim>(claim.Claim).Fence,
+            Now.AddSeconds(2),
+            Now.AddMinutes(1),
+            "The provider was temporarily unavailable.") with
+        {
+            Paused = true
+        };
+
+        var run = Assert.Single(FeatureRunProjection.Project(failed));
+
+        Assert.Equal(FeatureRunStatus.Failed, run.Status);
+        Assert.Equal(FeatureRunAuthorityState.Paused, run.AuthorityState);
+        Assert.NotNull(run.FailureGuidance);
+        Assert.DoesNotContain("retry automatically", run.FailureGuidance, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("resume", run.FailureGuidance, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Retrying_Run_does_not_project_the_prior_attempt_failure_as_a_current_failure()
+    {
+        var firstClaim = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.Append(State(), Input("run-retrying"), Now).State,
+            "host-first-attempt",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var retryAt = Now.AddMinutes(1);
+        var failed = FeatureInstallationTransitions.Fail(
+            firstClaim.State,
+            Assert.IsType<FeatureRunClaim>(firstClaim.Claim).Fence,
+            Now.AddSeconds(2),
+            retryAt,
+            "The provider was temporarily unavailable.");
+        var retrying = FeatureInstallationTransitions.Claim(
+            failed,
+            "host-retry-attempt",
+            retryAt,
+            TimeSpan.FromSeconds(60));
+
+        var run = Assert.Single(FeatureRunProjection.Project(retrying.State));
+
+        Assert.Equal(FeatureRunStatus.Running, run.Status);
+        Assert.Null(run.SafeFailure);
+        Assert.Null(run.FailureGuidance);
+    }
+
+    [Fact]
+    public void Run_projection_derives_all_six_product_statuses_from_durable_state()
+    {
+        var queuedState = FeatureInstallationTransitions.Append(State(), Input("run-queued"), Now).State;
+        var runningState = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.Append(State(), Input("run-running"), Now).State,
+            "host-running",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60)).State;
+        var failedClaim = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.Append(State(), Input("run-failed"), Now).State,
+            "host-failed",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var failedState = FeatureInstallationTransitions.Fail(
+            failedClaim.State,
+            Assert.IsType<FeatureRunClaim>(failedClaim.Claim).Fence,
+            Now.AddSeconds(2),
+            Now.AddMinutes(1),
+            "The provider was temporarily unavailable.");
+        var parkedState = queuedState with
+        {
+            Inbox =
+            [
+                queuedState.Inbox[0] with
+                {
+                    Attempts = FeatureLimits.AttemptsPerInput,
+                    Parked = true,
+                    LastFailure = "The attempt limit was reached.",
+                    LastAttemptAt = Now.AddSeconds(1)
+                }
+            ]
+        };
+        var completedClaim = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.Append(State(), Input("run-completed"), Now).State,
+            "host-completed",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var completedState = FeatureInstallationTransitions.Commit(
+            completedClaim.State,
+            Commit(
+                Assert.IsType<FeatureRunClaim>(completedClaim.Claim).Fence,
+                intents: [new FeatureIntent("result", FeatureIntentKind.TextSurface, "{\"title\":\"Safe result\"}")]),
+            Now.AddSeconds(2)).State;
+        var waitingClaim = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.Append(State(), Input("run-waiting"), Now).State,
+            "host-waiting",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var waitingState = FeatureInstallationTransitions.Commit(
+            waitingClaim.State,
+            Commit(
+                Assert.IsType<FeatureRunClaim>(waitingClaim.Claim).Fence,
+                intents: [new FeatureIntent("approval", FeatureIntentKind.ExternalEffect, "{\"secret\":\"never-project\"}")]),
+            Now.AddSeconds(2)).State;
+
+        Assert.Equal(FeatureRunStatus.Queued, Assert.Single(FeatureRunProjection.Project(queuedState)).Status);
+        Assert.Equal(FeatureRunStatus.Running, Assert.Single(FeatureRunProjection.Project(runningState)).Status);
+        var failed = Assert.Single(FeatureRunProjection.Project(failedState));
+        Assert.Equal(FeatureRunStatus.Failed, failed.Status);
+        Assert.Equal(Now.AddMinutes(1), failed.RetryAt);
+        Assert.Equal("The provider was temporarily unavailable.", failed.SafeFailure);
+        Assert.NotNull(failed.FailureGuidance);
+        var parked = Assert.Single(FeatureRunProjection.Project(parkedState));
+        Assert.Equal(FeatureRunStatus.Parked, parked.Status);
+        Assert.Equal(FeatureRunAuthorityState.Paused, parked.AuthorityState);
+        Assert.NotNull(parked.FailureGuidance);
+        var completed = Assert.Single(FeatureRunProjection.Project(completedState));
+        Assert.Equal(FeatureRunStatus.Completed, completed.Status);
+        Assert.NotNull(completed.ResultSurfaceReference);
+        var projectedAfterIntentRetention = Assert.Single(
+            FeatureRunProjection.Project(completedState with { Intents = [] }));
+        Assert.Equal(completed.ResultSurfaceReference, projectedAfterIntentRetention.ResultSurfaceReference);
+        var waiting = Assert.Single(FeatureRunProjection.Project(waitingState));
+        Assert.Equal(FeatureRunStatus.WaitingForApproval, waiting.Status);
+        Assert.Equal(FeatureRunAuthorityState.WaitingForApproval, waiting.AuthorityState);
+        Assert.DoesNotContain("never-project", waiting.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Completed_Run_only_projects_a_result_reference_when_a_text_surface_exists()
+    {
+        var claim = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.Append(State(), Input("run-without-surface"), Now).State,
+            "host-without-surface",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var completed = FeatureInstallationTransitions.Commit(
+            claim.State,
+            Commit(Assert.IsType<FeatureRunClaim>(claim.Claim).Fence),
+            Now.AddSeconds(2)).State;
+
+        Assert.Null(Assert.Single(FeatureRunProjection.Project(completed)).ResultSurfaceReference);
+    }
+
+    [Fact]
+    public void Completed_Run_keeps_its_accepted_release_after_update_and_rollback()
+    {
+        var claim = FeatureInstallationTransitions.Claim(
+            FeatureInstallationTransitions.AppendExact(
+                State(),
+                ReleaseOne,
+                Input("run-historical-release"),
+                Now).State,
+            "host-history",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var completed = FeatureInstallationTransitions.Commit(
+            claim.State,
+            Commit(Assert.IsType<FeatureRunClaim>(claim.Claim).Fence),
+            Now.AddSeconds(2)).State;
+
+        var updated = FeatureInstallationTransitions.SwitchRelease(completed, ReleaseTwo);
+        var rolledBack = FeatureInstallationTransitions.Rollback(updated);
+
+        Assert.Equal(ReleaseOne, Assert.Single(FeatureRunProjection.Project(completed)).Release);
+        Assert.Equal(ReleaseOne, Assert.Single(FeatureRunProjection.Project(updated)).Release);
+        Assert.Equal(ReleaseOne, Assert.Single(FeatureRunProjection.Project(rolledBack)).Release);
+    }
 
     [Fact]
     public void Exact_append_rejects_stale_and_unconfirmed_releases_before_acknowledging_a_duplicate()
@@ -62,6 +373,48 @@ public sealed class FeatureInstallationTransitionTests
             TimeSpan.FromSeconds(60));
 
         Assert.Equal(ReleaseOne, Assert.IsType<FeatureRunClaim>(claimed.Claim).Release);
+    }
+
+    [Fact]
+    public void Schedule_replay_accepts_a_pre_origin_digest_as_the_same_completed_input()
+    {
+        var occurrence = new FeatureScheduleOccurrence(
+            "weekly-risk",
+            Now,
+            Now.AddHours(2),
+            "{}",
+            "correlation-weekly-risk",
+            "trace-weekly-risk");
+        var recorded = FeatureInstallationTransitions.RecordScheduleOccurrence(State(), occurrence, Now);
+        var claim = FeatureInstallationTransitions.Claim(
+            recorded.State,
+            "host-weekly-risk",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var completed = FeatureInstallationTransitions.Commit(
+            claim.State,
+            Commit(Assert.IsType<FeatureRunClaim>(claim.Claim).Fence),
+            Now.AddSeconds(2)).State;
+        var legacy = completed with
+        {
+            Completions =
+            [
+                completed.Completions[0] with
+                {
+                    InputDigest = LegacyInputDigest(Assert.IsType<FeatureRunClaim>(claim.Claim).Input),
+                    Run = null
+                }
+            ]
+        };
+
+        var replay = FeatureInstallationTransitions.RecordScheduleOccurrence(
+            legacy,
+            occurrence,
+            Now.AddMinutes(1));
+
+        Assert.Equal(FeatureAppendStatus.Duplicate, replay.Status);
+        Assert.Equal(legacy.Revision, replay.State.Revision);
+        Assert.Equal(legacy.Completions, replay.State.Completions);
     }
 
     [Fact]
@@ -216,6 +569,38 @@ public sealed class FeatureInstallationTransitionTests
     }
 
     [Fact]
+    public void New_schema_inputs_with_the_same_legacy_content_but_different_origins_are_rejected()
+    {
+        var eventInput = Input("input-origin-conflict") with
+        {
+            Origin = FeatureRunOrigin.Event,
+            OriginReference = new FeatureRunOriginReference(null, null, "email.received")
+        };
+        var directInput = eventInput with
+        {
+            Origin = FeatureRunOrigin.Direct,
+            OriginReference = null
+        };
+        var pending = FeatureInstallationTransitions.Append(State(), eventInput, Now);
+
+        Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureInstallationTransitions.Append(pending.State, directInput, Now.AddSeconds(1)));
+
+        var claim = FeatureInstallationTransitions.Claim(
+            pending.State,
+            "host-origin-conflict",
+            Now.AddSeconds(1),
+            TimeSpan.FromSeconds(60));
+        var completed = FeatureInstallationTransitions.Commit(
+            claim.State,
+            Commit(Assert.IsType<FeatureRunClaim>(claim.Claim).Fence),
+            Now.AddSeconds(2));
+
+        Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureInstallationTransitions.Append(completed.State, directInput, Now.AddSeconds(3)));
+    }
+
+    [Fact]
     public void Expired_lease_can_be_reclaimed_and_the_old_fence_is_rejected()
     {
         var appended = FeatureInstallationTransitions.Append(State(), Input("input-1"), Now);
@@ -266,6 +651,42 @@ public sealed class FeatureInstallationTransitionTests
         Assert.True(parked.State.Paused);
         Assert.True(Assert.Single(parked.State.Inbox).Parked);
         Assert.Equal(FeatureLimits.AttemptsPerInput, parked.State.Inbox[0].Attempts);
+    }
+
+    [Fact]
+    public void Resuming_a_parked_Run_preserves_its_monotonic_visible_attempt_history()
+    {
+        var queued = FeatureInstallationTransitions.Append(State(), Input("run-resumed"), Now).State;
+        var parked = queued with
+        {
+            Paused = true,
+            PauseReason = "attempt limit reached",
+            Inbox =
+            [
+                queued.Inbox[0] with
+                {
+                    Attempts = FeatureLimits.AttemptsPerInput,
+                    Parked = true,
+                    LastFailure = "The attempt limit was reached.",
+                    LastAttemptAt = Now.AddSeconds(1)
+                }
+            ]
+        };
+
+        var resumed = FeatureInstallationTransitions.Resume(parked);
+        var queuedAgain = Assert.Single(FeatureRunProjection.Project(resumed));
+        var claimed = FeatureInstallationTransitions.Claim(
+            resumed,
+            "host-after-resume",
+            Now.AddSeconds(2),
+            TimeSpan.FromSeconds(60));
+        var runningAgain = Assert.Single(FeatureRunProjection.Project(claimed.State));
+
+        Assert.Equal(FeatureRunStatus.Queued, queuedAgain.Status);
+        Assert.Equal(FeatureLimits.AttemptsPerInput, queuedAgain.Attempts);
+        Assert.Equal(Now.AddSeconds(1), queuedAgain.StartedAt);
+        Assert.Equal(FeatureRunStatus.Running, runningAgain.Status);
+        Assert.Equal(FeatureLimits.AttemptsPerInput + 1, runningAgain.Attempts);
     }
 
     [Fact]
@@ -496,6 +917,44 @@ public sealed class FeatureInstallationTransitionTests
 
         Assert.Empty(FeatureInstallationTransitions.ListPendingIntents(repeated));
         Assert.Equal(applied, repeated);
+    }
+
+    [Fact]
+    public void Declining_an_external_effect_resolves_the_waiting_Run_with_safe_terminal_guidance()
+    {
+        var claimed = Claimed();
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                "{}",
+                [new FeatureIntent("salesforce-update", FeatureIntentKind.ExternalEffect, "{\"secret\":\"never-project\"}")]),
+            Now.AddSeconds(1));
+        var intent = Assert.Single(FeatureInstallationTransitions.ListPendingIntents(committed.State));
+        var waiting = Assert.Single(FeatureRunProjection.Project(committed.State));
+        var declinedAt = Now.AddSeconds(2);
+
+        var declined = FeatureInstallationTransitions.DeclineIntent(
+            committed.State,
+            intent.OperationKey,
+            declinedAt);
+        var replay = FeatureInstallationTransitions.DeclineIntent(
+            declined,
+            intent.OperationKey,
+            declinedAt.AddSeconds(1));
+        var run = Assert.Single(FeatureRunProjection.Project(declined));
+
+        Assert.Equal(FeatureRunStatus.WaitingForApproval, waiting.Status);
+        Assert.Empty(FeatureInstallationTransitions.ListPendingIntents(declined));
+        Assert.Equal(declined, replay);
+        Assert.Equal(FeatureRunStatus.Failed, run.Status);
+        Assert.Equal(declinedAt, run.CompletedAt);
+        Assert.Null(run.RetryAt);
+        Assert.NotNull(run.SafeFailure);
+        Assert.NotNull(run.FailureGuidance);
+        Assert.DoesNotContain("never-project", run.ToString(), StringComparison.Ordinal);
+        Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureInstallationTransitions.ApplyIntent(declined, intent.OperationKey, declinedAt.AddSeconds(2)));
     }
 
     [Fact]
@@ -1502,6 +1961,21 @@ public sealed class FeatureInstallationTransitionTests
 
     private static FeatureInstallationState State() =>
         FeatureInstallationState.Create(ReleaseOne, InstallationId);
+
+    private static string LegacyInputDigest(FeatureInput input)
+    {
+        var canonical = new StringBuilder();
+        Append(input.InputId);
+        Append(input.Kind);
+        Append(input.PayloadJson);
+        canonical.Append(input.OccurredAt.UtcTicks).Append(';');
+        Append(input.CorrelationId);
+        Append(input.TraceId);
+        Append(input.CausationId ?? string.Empty);
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
+
+        void Append(string value) => canonical.Append(value.Length).Append(':').Append(value).Append(';');
+    }
 
     private static (FeatureInstallationState State, FeatureRunClaim Claim) Claimed()
     {

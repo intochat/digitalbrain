@@ -130,6 +130,135 @@ class FeatureScenarioOutcome extends $pb.ProtobufEnum {
   const FeatureScenarioOutcome._(super.value, super.name);
 }
 
+class FeatureRunOrigin extends $pb.ProtobufEnum {
+  static const FeatureRunOrigin FEATURE_RUN_ORIGIN_UNSPECIFIED =
+      FeatureRunOrigin._(
+        0,
+        _omitEnumNames ? '' : 'FEATURE_RUN_ORIGIN_UNSPECIFIED',
+      );
+  static const FeatureRunOrigin FEATURE_RUN_ORIGIN_CHAT = FeatureRunOrigin._(
+    1,
+    _omitEnumNames ? '' : 'FEATURE_RUN_ORIGIN_CHAT',
+  );
+  static const FeatureRunOrigin FEATURE_RUN_ORIGIN_DIRECT = FeatureRunOrigin._(
+    2,
+    _omitEnumNames ? '' : 'FEATURE_RUN_ORIGIN_DIRECT',
+  );
+  static const FeatureRunOrigin FEATURE_RUN_ORIGIN_SCHEDULE =
+      FeatureRunOrigin._(
+        3,
+        _omitEnumNames ? '' : 'FEATURE_RUN_ORIGIN_SCHEDULE',
+      );
+  static const FeatureRunOrigin FEATURE_RUN_ORIGIN_EVENT = FeatureRunOrigin._(
+    4,
+    _omitEnumNames ? '' : 'FEATURE_RUN_ORIGIN_EVENT',
+  );
+
+  static const $core.List<FeatureRunOrigin> values = <FeatureRunOrigin>[
+    FEATURE_RUN_ORIGIN_UNSPECIFIED,
+    FEATURE_RUN_ORIGIN_CHAT,
+    FEATURE_RUN_ORIGIN_DIRECT,
+    FEATURE_RUN_ORIGIN_SCHEDULE,
+    FEATURE_RUN_ORIGIN_EVENT,
+  ];
+
+  static final $core.List<FeatureRunOrigin?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static FeatureRunOrigin? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FeatureRunOrigin._(super.value, super.name);
+}
+
+class FeatureRunStatus extends $pb.ProtobufEnum {
+  static const FeatureRunStatus FEATURE_RUN_STATUS_UNSPECIFIED =
+      FeatureRunStatus._(
+        0,
+        _omitEnumNames ? '' : 'FEATURE_RUN_STATUS_UNSPECIFIED',
+      );
+  static const FeatureRunStatus FEATURE_RUN_STATUS_QUEUED = FeatureRunStatus._(
+    1,
+    _omitEnumNames ? '' : 'FEATURE_RUN_STATUS_QUEUED',
+  );
+  static const FeatureRunStatus FEATURE_RUN_STATUS_RUNNING = FeatureRunStatus._(
+    2,
+    _omitEnumNames ? '' : 'FEATURE_RUN_STATUS_RUNNING',
+  );
+  static const FeatureRunStatus FEATURE_RUN_STATUS_WAITING_FOR_APPROVAL =
+      FeatureRunStatus._(
+        3,
+        _omitEnumNames ? '' : 'FEATURE_RUN_STATUS_WAITING_FOR_APPROVAL',
+      );
+  static const FeatureRunStatus FEATURE_RUN_STATUS_COMPLETED =
+      FeatureRunStatus._(
+        4,
+        _omitEnumNames ? '' : 'FEATURE_RUN_STATUS_COMPLETED',
+      );
+  static const FeatureRunStatus FEATURE_RUN_STATUS_FAILED = FeatureRunStatus._(
+    5,
+    _omitEnumNames ? '' : 'FEATURE_RUN_STATUS_FAILED',
+  );
+  static const FeatureRunStatus FEATURE_RUN_STATUS_PARKED = FeatureRunStatus._(
+    6,
+    _omitEnumNames ? '' : 'FEATURE_RUN_STATUS_PARKED',
+  );
+
+  static const $core.List<FeatureRunStatus> values = <FeatureRunStatus>[
+    FEATURE_RUN_STATUS_UNSPECIFIED,
+    FEATURE_RUN_STATUS_QUEUED,
+    FEATURE_RUN_STATUS_RUNNING,
+    FEATURE_RUN_STATUS_WAITING_FOR_APPROVAL,
+    FEATURE_RUN_STATUS_COMPLETED,
+    FEATURE_RUN_STATUS_FAILED,
+    FEATURE_RUN_STATUS_PARKED,
+  ];
+
+  static final $core.List<FeatureRunStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static FeatureRunStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FeatureRunStatus._(super.value, super.name);
+}
+
+class FeatureRunAuthorityState extends $pb.ProtobufEnum {
+  static const FeatureRunAuthorityState
+  FEATURE_RUN_AUTHORITY_STATE_UNSPECIFIED = FeatureRunAuthorityState._(
+    0,
+    _omitEnumNames ? '' : 'FEATURE_RUN_AUTHORITY_STATE_UNSPECIFIED',
+  );
+  static const FeatureRunAuthorityState FEATURE_RUN_AUTHORITY_STATE_AUTHORIZED =
+      FeatureRunAuthorityState._(
+        1,
+        _omitEnumNames ? '' : 'FEATURE_RUN_AUTHORITY_STATE_AUTHORIZED',
+      );
+  static const FeatureRunAuthorityState
+  FEATURE_RUN_AUTHORITY_STATE_WAITING_FOR_APPROVAL = FeatureRunAuthorityState._(
+    2,
+    _omitEnumNames ? '' : 'FEATURE_RUN_AUTHORITY_STATE_WAITING_FOR_APPROVAL',
+  );
+  static const FeatureRunAuthorityState FEATURE_RUN_AUTHORITY_STATE_PAUSED =
+      FeatureRunAuthorityState._(
+        3,
+        _omitEnumNames ? '' : 'FEATURE_RUN_AUTHORITY_STATE_PAUSED',
+      );
+
+  static const $core.List<FeatureRunAuthorityState> values =
+      <FeatureRunAuthorityState>[
+        FEATURE_RUN_AUTHORITY_STATE_UNSPECIFIED,
+        FEATURE_RUN_AUTHORITY_STATE_AUTHORIZED,
+        FEATURE_RUN_AUTHORITY_STATE_WAITING_FOR_APPROVAL,
+        FEATURE_RUN_AUTHORITY_STATE_PAUSED,
+      ];
+
+  static final $core.List<FeatureRunAuthorityState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static FeatureRunAuthorityState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FeatureRunAuthorityState._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames = $core.bool.fromEnvironment(
   'protobuf.omit_enum_names',
 );

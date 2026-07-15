@@ -17,6 +17,49 @@ const Key runtimeSurfaceKey = Key('v2-runtime-surface');
 const Key runtimeTerminalErrorKey = Key('v2-runtime-terminal-error');
 const Key runtimeResumeErrorKey = Key('v2-runtime-resume-error');
 const Key runtimeResumeRetryKey = Key('v2-runtime-resume-retry');
+const Key chatActivityContextKey = Key('chat-activity-context');
+
+class ChatActivityReference {
+  const ChatActivityReference._({this.conversationId, this.requestId});
+
+  static ChatActivityReference? tryCreate({
+    String? conversationId,
+    String? requestId,
+  }) {
+    if (conversationId == null && requestId == null) return null;
+    if (!_isSafeActivityCoordinate(conversationId) ||
+        !_isSafeActivityCoordinate(requestId)) {
+      return null;
+    }
+    return ChatActivityReference._(
+      conversationId: conversationId,
+      requestId: requestId,
+    );
+  }
+
+  final String? conversationId;
+  final String? requestId;
+
+  String get semanticsLabel => [
+    'Opened from Activity.',
+    if (conversationId case final value?) 'Conversation $value.',
+    if (requestId case final value?) 'Request $value.',
+  ].join(' ');
+
+  String get detailLabel => [
+    if (conversationId case final value?) 'Conversation $value',
+    if (requestId case final value?) 'Request $value',
+  ].join(' · ');
+}
+
+bool _isSafeActivityCoordinate(String? value) =>
+    value == null ||
+    value.isNotEmpty &&
+        value.length <= 256 &&
+        value.trim() == value &&
+        !value.runes.any(
+          (character) => character < 32 || character >= 127 && character <= 159,
+        );
 
 class ResumeOriginatingRequestIntent {
   ResumeOriginatingRequestIntent({
@@ -43,11 +86,13 @@ class ChatPage extends StatefulWidget {
     this.now = _utcNow,
     this.resumeIntent,
     this.invalidResumeIntent = false,
+    this.activityReference,
   });
 
   final DateTime Function() now;
   final ResumeOriginatingRequestIntent? resumeIntent;
   final bool invalidResumeIntent;
+  final ChatActivityReference? activityReference;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -97,8 +142,8 @@ class _ChatPageState extends State<ChatPage> {
       );
     }
 
-    return Scaffold(
-      body: Stack(
+    return _buildScaffold(
+      Stack(
         fit: StackFit.expand,
         children: [
           if (surface == null)
@@ -117,6 +162,19 @@ class _ChatPageState extends State<ChatPage> {
               ),
             ),
           if (_resumeFailed) _buildResumeFailure(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScaffold(Widget body) {
+    final reference = widget.activityReference;
+    if (reference == null) return Scaffold(body: body);
+    return Scaffold(
+      body: Column(
+        children: [
+          _ChatActivityContextBanner(reference: reference),
+          Expanded(child: body),
         ],
       ),
     );
@@ -270,8 +328,8 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _errorScaffold(String message, {required Key key}) => Scaffold(
-    body: Center(
+  Widget _errorScaffold(String message, {required Key key}) => _buildScaffold(
+    Center(
       child: Padding(
         key: key,
         padding: const EdgeInsets.all(24),
@@ -279,4 +337,56 @@ class _ChatPageState extends State<ChatPage> {
       ),
     ),
   );
+}
+
+class _ChatActivityContextBanner extends StatelessWidget {
+  const _ChatActivityContextBanner({required this.reference});
+
+  final ChatActivityReference reference;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      key: chatActivityContextKey,
+      container: true,
+      label: reference.semanticsLabel,
+      child: ExcludeSemantics(
+        child: Material(
+          color: colors.secondaryContainer,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(Icons.history, color: colors.onSecondaryContainer),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Opened from Activity',
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(color: colors.onSecondaryContainer),
+                        ),
+                        Text(
+                          reference.detailLabel,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: colors.onSecondaryContainer),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

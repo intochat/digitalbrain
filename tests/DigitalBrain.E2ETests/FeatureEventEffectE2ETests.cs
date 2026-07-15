@@ -146,6 +146,50 @@ public sealed class FeatureEventEffectE2ETests
     }
 
     [Fact]
+    public async Task Declined_Salesforce_approval_resolves_the_intent_without_executing_and_emits_an_outcome()
+    {
+        var payload = SalesforceFeatureEffectPayload.Create(
+            new SalesforcePreparedUpdate("{\"version\":1}"u8.ToArray()),
+            "update the approved Salesforce field",
+            Now.AddHours(24));
+        var persistedOperationKey = FeatureIntentKeys.Create(InstallationId, "event-declined", "update-account");
+        var installation = new IntentInstallation(new FeatureIntentStatus(
+            persistedOperationKey,
+            FeatureIntentKind.ExternalEffect,
+            payload.ToJson(),
+            null));
+        var hub = new RecordingHub();
+        var effects = new RecordingEffectExecutor();
+        var rail = new SalesforceFeatureEffectRail(
+            new FeatureGrains(hub, new Dictionary<FeatureInstallationId, IFeatureInstallationGrain>
+            {
+                [InstallationId] = installation
+            }),
+            new RecordingPlanStore(),
+            effects,
+            new FixedTimeProvider(Now));
+        var proposal = await rail.ProposeAsync(new SalesforceFeatureEffectRequest(
+            Owner,
+            Actor,
+            InstallationId,
+            "event-declined",
+            "update-account",
+            "correlation-declined",
+            "trace-declined"));
+
+        var outcome = await rail.ApplyAsync(proposal, approved: false);
+
+        Assert.Equal(InoToolEffectDisposition.Failed, outcome.Disposition);
+        Assert.Equal(0, effects.Executions);
+        Assert.Null(installation.AppliedOperationKey);
+        Assert.Equal(persistedOperationKey, installation.DeclinedOperationKey);
+        var outcomeInput = Assert.Single(hub.Inputs);
+        Assert.Equal(SalesforceFeatureEffectRail.OutcomeKind, outcomeInput.Kind);
+        Assert.Equal("event-declined", outcomeInput.CausationId);
+        Assert.Contains("Failed", outcomeInput.PayloadJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Salesforce_effect_handler_requires_connector_verification()
     {
         var gateway = new RecordingSalesforceMutationGateway();
@@ -248,6 +292,7 @@ public sealed class FeatureEventEffectE2ETests
         public Task<FeatureCompletionReceipt> CommitAsync(FeatureRunCommit commit) => throw new NotSupportedException();
         public virtual Task<FeatureIntentStatus[]> ListPendingIntentsAsync() => throw new NotSupportedException();
         public virtual Task ApplyIntentAsync(string operationKey) => throw new NotSupportedException();
+        public virtual Task DeclineIntentAsync(string operationKey) => throw new NotSupportedException();
         public Task PauseAsync(string reason) => Task.CompletedTask;
         public Task ResumeAsync() => throw new NotSupportedException();
         public Task SwitchReleaseAsync(ReleaseDigest release) => throw new NotSupportedException();
@@ -272,10 +317,16 @@ public sealed class FeatureEventEffectE2ETests
     private sealed class IntentInstallation(FeatureIntentStatus intent) : ControlledInstallation
     {
         public string? AppliedOperationKey { get; private set; }
+        public string? DeclinedOperationKey { get; private set; }
         public override Task<FeatureIntentStatus[]> ListPendingIntentsAsync() => Task.FromResult(new[] { intent });
         public override Task ApplyIntentAsync(string operationKey)
         {
             AppliedOperationKey = operationKey;
+            return Task.CompletedTask;
+        }
+        public override Task DeclineIntentAsync(string operationKey)
+        {
+            DeclinedOperationKey = operationKey;
             return Task.CompletedTask;
         }
     }

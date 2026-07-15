@@ -193,6 +193,16 @@ public sealed class UiGrpcService(
         var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
         return await productEndpoints.RollbackFeatureVersionAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
     }
+    public override async Task<ListActivityReply> ListActivity(ListActivityRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.ListActivityAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
+    public override async Task<RunReply> GetRun(GetRunRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.GetRunAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
     public override async Task<SessionReply> BootstrapSession(BootstrapSessionRequest request, ServerCallContext context)
     {
         DemandAudience(context);

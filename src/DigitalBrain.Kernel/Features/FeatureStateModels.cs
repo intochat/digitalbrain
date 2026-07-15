@@ -118,7 +118,17 @@ internal sealed record FeatureInboxEntry(
     [property: Id(2)] DateTimeOffset NotBefore,
     [property: Id(3)] bool Parked,
     [property: Id(4)] string? LastFailure,
-    [property: Id(5)] ReleaseDigest? AcceptedRelease = null);
+    [property: Id(5)] ReleaseDigest? AcceptedRelease = null,
+    [property: Id(6)] DateTimeOffset? LastAttemptAt = null,
+    [property: Id(7)] int TotalAttempts = 0);
+[GenerateSerializer, Alias("digitalbrain.feature.run-identity.v1")]
+internal sealed record FeatureRunIdentity(
+    [property: Id(0)] string RunId,
+    [property: Id(1)] string InputKind,
+    [property: Id(2)] FeatureRunOrigin Origin,
+    [property: Id(3)] FeatureRunOriginReference? OriginReference,
+    [property: Id(4)] DateTimeOffset OccurredAt,
+    [property: Id(5)] string TraceReference);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease")]
 internal sealed record FeatureLease(
     [property: Id(0)] string HostId,
@@ -132,13 +142,20 @@ internal sealed record FeatureCompletion(
     [property: Id(2)] string ResultJson,
     [property: Id(3)] DateTimeOffset CompletedAt,
     [property: Id(4)] string CommitDigest,
-    [property: Id(5)] string InputDigest);
+    [property: Id(5)] string InputDigest,
+    [property: Id(6)] ReleaseDigest? Release = null,
+    [property: Id(7)] FeatureRunIdentity? Run = null,
+    [property: Id(8)] int Attempts = 0,
+    [property: Id(9)] DateTimeOffset? StartedAt = null,
+    [property: Id(10)] bool HasResultSurface = false);
 [GenerateSerializer, Alias("digitalbrain.v3.persisted-feature-intent")]
 internal sealed record PersistedFeatureIntent(
     [property: Id(0)] string OperationKey,
     [property: Id(1)] FeatureIntentKind Kind,
     [property: Id(2)] string PayloadJson,
-    [property: Id(3)] DateTimeOffset? AppliedAt);
+    [property: Id(3)] DateTimeOffset? AppliedAt,
+    [property: Id(4)] string? InputId = null,
+    [property: Id(5)] DateTimeOffset? DeclinedAt = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-schedule-cursor")]
 internal sealed record FeatureScheduleCursor([property: Id(0)] string ScheduleId, [property: Id(1)] DateTimeOffset LastOccurrenceAt, [property: Id(2)] DateTimeOffset NextOccurrenceAt);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-release-switch")]

@@ -32,7 +32,16 @@ internal sealed class GmailWatchEventHandler(IFeatureGrainResolver grains) : IGm
         if (message.OccurredAt.Offset != TimeSpan.Zero)
             throw new ArgumentException("Gmail event timestamps must be UTC.", nameof(message));
         var payload = JsonSerializer.Serialize(new GmailMessageFacts(message.MessageId, message.ThreadId, message.HistoryId));
-        var input = new FeatureInput(message.EventId, EventKind, payload, message.OccurredAt, message.CorrelationId, message.TraceId, message.CausationId);
+        var input = new FeatureInput(
+            message.EventId,
+            EventKind,
+            payload,
+            message.OccurredAt,
+            message.CorrelationId,
+            message.TraceId,
+            message.CausationId,
+            FeatureRunOrigin.Event,
+            new FeatureRunOriginReference(null, null, EventKind));
         return grains.Hub(message.OwnerId).PublishAsync(input).WaitAsync(cancellationToken);
     }
     private static void Validate(string value, string parameterName)

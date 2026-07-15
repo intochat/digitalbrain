@@ -41,10 +41,76 @@ void main() {
     await _pumpUntil(tester, () => runtime.latestSurface != null);
 
     expect(find.byKey(runtimeSurfaceKey), findsOneWidget);
+    expect(find.byKey(chatActivityContextKey), findsNothing);
     expect(find.text('Ask INO about this workspace.'), findsOneWidget);
     expect(find.byKey(inoComposerFieldKey), findsOneWidget);
     await runtime.stop();
   });
+
+  testWidgets(
+    'Activity reference is bounded and keeps the authenticated Chat usable',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final feed = _ShellFeedCall.open();
+      final transport = _ShellTransport(feed);
+      final runtime = _runtime(transport);
+      final reference = ChatActivityReference.tryCreate(
+        conversationId: 'conversation-42',
+        requestId: 'request-17',
+      );
+
+      expect(reference, isNotNull);
+      expect(
+        ChatActivityReference.tryCreate(
+          conversationId: List.filled(257, 'c').join(),
+        ),
+        isNull,
+      );
+      expect(
+        ChatActivityReference.tryCreate(requestId: 'unsafe\nrequest'),
+        isNull,
+      );
+
+      await tester.pumpWidget(
+        _runtimeHost(
+          controller: runtime,
+          chatPage: ChatPage(activityReference: reference),
+        ),
+      );
+      await _pumpUntil(tester, () => transport.watchStarted);
+      feed.add(
+        FeedSurfaceJson(
+          surfaceJsonString(
+            sequence: 1,
+            payload: inoConversationPayload(),
+            actions: [testInoActionJson()],
+          ),
+        ),
+      );
+      await _pumpUntil(tester, () => runtime.latestSurface != null);
+
+      expect(find.byKey(chatActivityContextKey), findsOneWidget);
+      expect(find.text('Opened from Activity'), findsOneWidget);
+      expect(find.textContaining('conversation-42'), findsOneWidget);
+      expect(find.textContaining('request-17'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.label ==
+                  'Opened from Activity. Conversation conversation-42. '
+                      'Request request-17.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(runtimeSurfaceKey), findsOneWidget);
+      expect(find.byKey(inoComposerFieldKey), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await runtime.stop();
+      semantics.dispose();
+    },
+  );
 
   testWidgets('feature approval stays on the authenticated chat feed route', (
     tester,
@@ -888,6 +954,7 @@ Widget _runtimeHost({
   bool autoStart = true,
   bool trustedShell = false,
   DateTime Function()? now,
+  ChatPage? chatPage,
 }) {
   final owner =
       sessionOwner ??
@@ -898,7 +965,8 @@ Widget _runtimeHost({
         externalIdentityTokenSourceFactory: externalIdentityTokenSourceFactory,
         autoStart: autoStart,
       );
-  final chat = now == null ? const ChatPage() : ChatPage(now: now);
+  final chat =
+      chatPage ?? (now == null ? const ChatPage() : ChatPage(now: now));
   final authenticatedChild = trustedShell
       ? DigitalBrainShell(
           location: Uri.parse('/chat'),

@@ -51,6 +51,86 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Activity Automation reference reveals and highlights the active subscription',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final gateway = _PageGateway(releaseDetails());
+      final automationId = FeatureAutomationId.tryParse('schedule:weekday');
+
+      expect(automationId, isNotNull);
+      expect(
+        FeatureAutomationId.tryParse(List.filled(257, 'a').join()),
+        isNull,
+      );
+      expect(FeatureAutomationId.tryParse('unsafe\nautomation'), isNull);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FeatureReleasePage(
+            featureId: 'feature-a',
+            automationId: automationId,
+            gateway: gateway,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(featureReleaseReferencedAutomationKey), findsOneWidget);
+      expect(find.text('schedule:weekday'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.selected == true &&
+              widget.properties.label ==
+                  'Referenced Automation schedule:weekday',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getRect(find.byKey(featureReleaseReferencedAutomationKey)).top,
+        lessThan(tester.view.physicalSize.height),
+      );
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'Activity Automation reference explains when it is not in the active Version',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final gateway = _PageGateway(releaseDetails());
+      final automationId = FeatureAutomationId.tryParse('event:customer-won');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FeatureReleasePage(
+            featureId: 'feature-a',
+            automationId: automationId,
+            gateway: gateway,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      const message =
+          'Automation event:customer-won is not in the active Version.';
+      expect(find.byKey(featureReleaseMissingAutomationKey), findsOneWidget);
+      expect(find.text(message), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == message,
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(featureReleaseReferencedAutomationKey), findsNothing);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
   testWidgets('binds a deep-linked Version to the rendered authority', (
     tester,
   ) async {

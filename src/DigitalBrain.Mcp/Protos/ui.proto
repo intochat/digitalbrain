@@ -475,10 +475,15 @@ message ConnectionReply {
 message ListActivityRequest {
   reserved 1, 2;
   reserved "owner_id", "actor_id";
+  optional FeatureRunStatus status = 3;
+  optional FeatureRunOrigin origin = 4;
+  optional string feature_id = 5;
+  int32 limit = 6;
 }
 
 message ListActivityReply {
   reserved "owner_id", "actor_id";
+  repeated FeatureRunSnapshot runs = 1;
 }
 
 message GetRunRequest {
@@ -489,6 +494,62 @@ message GetRunRequest {
 
 message RunReply {
   reserved "owner_id", "actor_id";
+  FeatureRunSnapshot run = 1;
+}
+
+enum FeatureRunOrigin {
+  FEATURE_RUN_ORIGIN_UNSPECIFIED = 0;
+  FEATURE_RUN_ORIGIN_CHAT = 1;
+  FEATURE_RUN_ORIGIN_DIRECT = 2;
+  FEATURE_RUN_ORIGIN_SCHEDULE = 3;
+  FEATURE_RUN_ORIGIN_EVENT = 4;
+}
+
+enum FeatureRunStatus {
+  FEATURE_RUN_STATUS_UNSPECIFIED = 0;
+  FEATURE_RUN_STATUS_QUEUED = 1;
+  FEATURE_RUN_STATUS_RUNNING = 2;
+  FEATURE_RUN_STATUS_WAITING_FOR_APPROVAL = 3;
+  FEATURE_RUN_STATUS_COMPLETED = 4;
+  FEATURE_RUN_STATUS_FAILED = 5;
+  FEATURE_RUN_STATUS_PARKED = 6;
+}
+
+enum FeatureRunAuthorityState {
+  FEATURE_RUN_AUTHORITY_STATE_UNSPECIFIED = 0;
+  FEATURE_RUN_AUTHORITY_STATE_AUTHORIZED = 1;
+  FEATURE_RUN_AUTHORITY_STATE_WAITING_FOR_APPROVAL = 2;
+  FEATURE_RUN_AUTHORITY_STATE_PAUSED = 3;
+}
+
+message FeatureRunOriginReference {
+  reserved "owner_id", "actor_id";
+  optional string conversation_id = 1;
+  optional string request_id = 2;
+  optional string automation_id = 3;
+}
+
+message FeatureRunSnapshot {
+  reserved "owner_id", "actor_id";
+  string run_id = 1;
+  string feature_id = 2;
+  string feature_name = 3;
+  string installation_id = 4;
+  string release_digest = 5;
+  string input_kind = 6;
+  FeatureRunOrigin origin = 7;
+  optional FeatureRunOriginReference origin_reference = 8;
+  FeatureRunStatus status = 9;
+  FeatureRunAuthorityState authority_state = 10;
+  int64 occurred_at_unix_ms = 11;
+  optional int64 started_at_unix_ms = 12;
+  optional int64 completed_at_unix_ms = 13;
+  optional int64 retry_at_unix_ms = 14;
+  int32 attempts = 15;
+  optional string result_surface_reference = 16;
+  optional string safe_failure = 17;
+  optional string failure_guidance = 18;
+  string trace_reference = 19;
 }
 
 message ListMemoryItemsRequest {
