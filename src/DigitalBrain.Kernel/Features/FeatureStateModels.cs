@@ -12,7 +12,8 @@ internal sealed record FeatureHubState(
     [property: Id(5)] FeatureInstallationAuthorityState[] Authorities,
     [property: Id(6)] FeatureBackpressureAlert[] Alerts,
     [property: Id(7)] FeatureDraft[]? Drafts = null,
-    [property: Id(8)] FeatureDraftCommandReplay[]? DraftReplays = null)
+    [property: Id(8)] FeatureDraftCommandReplay[]? DraftReplays = null,
+    [property: Id(9)] FeatureDraftInstallationReservation[]? DraftInstallationReservations = null)
 {
     public static FeatureHubState Empty { get; } = new([], 0, [], [], [], [], [], [], []);
 }
@@ -77,7 +78,9 @@ internal sealed record FeatureInstallationAuthorityState(
     [property: Id(9)] GrantRevision? PendingGrantRevision,
     [property: Id(10)] FeatureGrantState[] PendingGrants,
     [property: Id(11)] bool Paused,
-    [property: Id(12)] string? PauseReason);
+    [property: Id(12)] string? PauseReason,
+    [property: Id(13)] long PublicationFence = 0,
+    [property: Id(14)] FeaturePublicationReceipt? PublicationReceipt = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-fanout-delivery-state")]
 internal sealed record FeatureFanOutDeliveryState([property: Id(0)] FeatureInstallationId InstallationId, [property: Id(1)] bool Delivered);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-fanout-state")]
@@ -132,6 +135,7 @@ internal sealed record FeatureInstallationState(
 }
 internal sealed record FeatureCreateDraftTransition(FeatureHubState State, FeatureDraft Draft);
 internal sealed record FeatureDraftAuthoringTransition(FeatureHubState State, FeatureDraft Draft);
+internal sealed record FeatureDraftInstallationReservationTransition(FeatureHubState State, FeatureDraftInstallationReservation Reservation);
 internal sealed record FeatureAppendTransition(FeatureInstallationState State, FeatureAppendStatus Status);
 internal sealed record FeatureClaimTransition(FeatureInstallationState State, FeatureRunClaim? Claim);
 internal sealed record FeatureCommitTransition(FeatureInstallationState State, FeatureCompletion Completion);

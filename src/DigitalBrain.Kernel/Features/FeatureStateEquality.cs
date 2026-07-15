@@ -26,7 +26,8 @@ internal static class FeatureStateEquality
         Same(left.Authorities, right.Authorities) &&
         left.Alerts.SequenceEqual(right.Alerts) &&
         Same(left.Drafts ?? [], right.Drafts ?? []) &&
-        Same(left.DraftReplays ?? [], right.DraftReplays ?? []);
+        Same(left.DraftReplays ?? [], right.DraftReplays ?? []) &&
+        Same(left.DraftInstallationReservations ?? [], right.DraftInstallationReservations ?? []);
     private static bool Same(IReadOnlyList<FeatureInstallationRegistration> left, IReadOnlyList<FeatureInstallationRegistration> right) =>
         left.Count == right.Count && left.Zip(right).All(pair =>
             pair.First.InstallationId == pair.Second.InstallationId && pair.First.Release == pair.Second.Release &&
@@ -66,7 +67,9 @@ internal static class FeatureStateEquality
             pair.First.PendingGrantRevision == pair.Second.PendingGrantRevision &&
             Same(pair.First.PendingGrants, pair.Second.PendingGrants) &&
             pair.First.Paused == pair.Second.Paused &&
-            string.Equals(pair.First.PauseReason, pair.Second.PauseReason, StringComparison.Ordinal));
+            string.Equals(pair.First.PauseReason, pair.Second.PauseReason, StringComparison.Ordinal) &&
+            pair.First.PublicationFence == pair.Second.PublicationFence &&
+            pair.First.PublicationReceipt == pair.Second.PublicationReceipt);
     private static bool Same(IReadOnlyList<FeatureGrantState> left, IReadOnlyList<FeatureGrantState> right) =>
         left.Count == right.Count && left.Zip(right).All(pair =>
             string.Equals(pair.First.CapabilityId, pair.Second.CapabilityId, StringComparison.Ordinal) &&
@@ -103,4 +106,15 @@ internal static class FeatureStateEquality
             pair.First.ResultRevision == pair.Second.ResultRevision &&
             pair.First.ResultUpdatedAt == pair.Second.ResultUpdatedAt &&
             pair.First.Utf8Bytes == pair.Second.Utf8Bytes);
+    private static bool Same(IReadOnlyList<FeatureDraftInstallationReservation> left, IReadOnlyList<FeatureDraftInstallationReservation> right) =>
+        left.Count == right.Count && left.Zip(right).All(pair =>
+            pair.First.DraftId == pair.Second.DraftId &&
+            pair.First.DraftRevision == pair.Second.DraftRevision &&
+            pair.First.InstallationId == pair.Second.InstallationId &&
+            pair.First.Release == pair.Second.Release &&
+            string.Equals(pair.First.IdempotencyId, pair.Second.IdempotencyId, StringComparison.Ordinal) &&
+            string.Equals(pair.First.CommandDigest, pair.Second.CommandDigest, StringComparison.Ordinal) &&
+            string.Equals(pair.First.AccessDigest, pair.Second.AccessDigest, StringComparison.Ordinal) &&
+            string.Equals(pair.First.DecisionId, pair.Second.DecisionId, StringComparison.Ordinal) &&
+            pair.First.ActorId == pair.Second.ActorId);
 }

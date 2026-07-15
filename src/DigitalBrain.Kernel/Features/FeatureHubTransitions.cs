@@ -102,6 +102,7 @@ internal static class FeatureHubTransitions
             PendingGrantRevision = new GrantRevision(checked(greatestRevision + 1)),
             PendingGrants = grants
         };
+        authority = FeaturePublicationTransitions.Invalidate(authority);
         var authorities = state.Authorities.ToArray();
         if (index >= 0) authorities[index] = authority;
         else authorities = [.. authorities, authority];
@@ -116,7 +117,7 @@ internal static class FeatureHubTransitions
         if (authority.PendingRelease is not { } pendingRelease || authority.PendingGrantRevision is not { } pendingRevision)
             throw new FeatureConcurrencyException("The installation has no approved grant set staged.");
         var authorities = state.Authorities.ToArray();
-        authorities[index] = authority with
+        authorities[index] = FeaturePublicationTransitions.Invalidate(authority with
         {
             PreviousRelease = authority.ActiveRelease,
             PreviousGrantRevision = authority.ActiveGrantRevision,
@@ -127,7 +128,7 @@ internal static class FeatureHubTransitions
             PendingRelease = null,
             PendingGrantRevision = null,
             PendingGrants = []
-        };
+        });
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
     public static FeatureHubState PauseAuthority(FeatureHubState state, FeatureInstallationId installationId, string reason, long expectedRevision)
@@ -141,7 +142,8 @@ internal static class FeatureHubTransitions
         if (state.Authorities[index].Paused && string.Equals(state.Authorities[index].PauseReason, reason, StringComparison.Ordinal))
             return state;
         var authorities = state.Authorities.ToArray();
-        authorities[index] = authorities[index] with { Paused = true, PauseReason = reason };
+        authorities[index] = FeaturePublicationTransitions.Invalidate(
+            authorities[index] with { Paused = true, PauseReason = reason });
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
     public static FeatureHubState ResumeAuthority(FeatureHubState state, FeatureInstallationId installationId, long expectedRevision)
@@ -151,7 +153,8 @@ internal static class FeatureHubTransitions
         var index = AuthorityIndex(state, installationId);
         if (!state.Authorities[index].Paused) return state;
         var authorities = state.Authorities.ToArray();
-        authorities[index] = authorities[index] with { Paused = false, PauseReason = null };
+        authorities[index] = FeaturePublicationTransitions.Invalidate(
+            authorities[index] with { Paused = false, PauseReason = null });
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
     public static FeatureHubState Revoke(FeatureHubState state, FeatureGrantRevocation revocation, long expectedRevision)
@@ -164,7 +167,7 @@ internal static class FeatureHubTransitions
         var next = RemoveGrant(authority, revocation);
         if (ReferenceEquals(next, authority)) return state;
         var authorities = state.Authorities.ToArray();
-        authorities[index] = next;
+        authorities[index] = FeaturePublicationTransitions.Invalidate(next);
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
     public static FeatureHubState RollbackAuthority(FeatureHubState state, FeatureInstallationId installationId, long expectedRevision)
@@ -176,7 +179,7 @@ internal static class FeatureHubTransitions
         if (authority.PreviousRelease is not { } previousRelease || authority.PreviousGrantRevision is not { } previousRevision)
             return state;
         var authorities = state.Authorities.ToArray();
-        authorities[index] = authority with
+        authorities[index] = FeaturePublicationTransitions.Invalidate(authority with
         {
             ActiveRelease = previousRelease,
             ActiveGrantRevision = previousRevision,
@@ -184,7 +187,7 @@ internal static class FeatureHubTransitions
             PreviousRelease = authority.ActiveRelease,
             PreviousGrantRevision = authority.ActiveGrantRevision,
             PreviousGrants = authority.ActiveGrants
-        };
+        });
         return state with { Authorities = authorities, Revision = checked(state.Revision + 1) };
     }
     public static FeatureGrantState? ReadGrant(FeatureHubState state, FeatureGrantLookup lookup)
@@ -211,18 +214,26 @@ internal static class FeatureHubTransitions
                 !string.Equals(subscription, subscription.Trim(), StringComparison.Ordinal)) ||
             registration.Subscriptions.Distinct(StringComparer.Ordinal).Count() != registration.Subscriptions.Length)
             throw new ArgumentException("Canonical unique feature subscriptions are required.", nameof(registration));
+        registration = registration with
+        {
+            Subscriptions = registration.Subscriptions.Order(StringComparer.Ordinal).ToArray()
+        };
         var existing = Array.FindIndex(
             state.Installations,
             candidate => candidate.InstallationId == registration.InstallationId);
         if (existing >= 0)
         {
+            var current = state.Installations[existing];
+            if (current.Release == registration.Release &&
+                current.Subscriptions.SequenceEqual(registration.Subscriptions, StringComparer.Ordinal))
+                return state;
             var replaced = state.Installations.ToArray();
             replaced[existing] = registration;
-            return state with { Installations = replaced, Revision = checked(state.Revision + 1) };
+            return WithRegistrationChange(state, replaced, registration.InstallationId);
         }
         if (state.Installations.Length >= FeatureLimits.InstallationsPerOwner)
             throw new FeatureLimitExceededException("An owner can have at most 100 feature installations.");
-        return state with { Installations = [.. state.Installations, registration], Revision = checked(state.Revision + 1) };
+        return WithRegistrationChange(state, [.. state.Installations, registration], registration.InstallationId);
     }
     public static FeatureCreateDraftTransition CreateDraft(FeatureHubState state, string ownerScope, CreateFeatureDraft request)
     {
@@ -349,7 +360,10 @@ internal static class FeatureHubTransitions
         if (alerts.Count > FeatureLimits.FanOutBatches)
             alerts = alerts.TakeLast(FeatureLimits.FanOutBatches).ToList();
         var authorities = next.Authorities.Select(authority =>
-            full.Contains(authority.InstallationId) ? authority with { Paused = true, PauseReason = "feature inbox full" } : authority).ToArray();
+            full.Contains(authority.InstallationId) &&
+            (!authority.Paused || !string.Equals(authority.PauseReason, "feature inbox full", StringComparison.Ordinal))
+                ? FeaturePublicationTransitions.Invalidate(authority with { Paused = true, PauseReason = "feature inbox full" })
+                : authority).ToArray();
         return next with { Alerts = alerts.ToArray(), Authorities = authorities, Revision = checked(next.Revision + 1) };
     }
     private static FeatureReleaseMetadata ValidateRelease(FeatureReleaseMetadata release)
@@ -362,7 +376,7 @@ internal static class FeatureHubTransitions
         var dependencies = CanonicalValues(release.Dependencies, "dependency");
         return release with { RequestedCapabilities = capabilities, Dependencies = dependencies };
     }
-    private static FeatureGrantState[] ValidateGrants(FeatureGrantSpec[] grants)
+    internal static FeatureGrantState[] ValidateGrants(FeatureGrantSpec[] grants)
     {
         ArgumentNullException.ThrowIfNull(grants);
         if (grants.Length > 32)
@@ -493,4 +507,22 @@ internal static class FeatureHubTransitions
     private static bool Matches(FeatureGrantState grant, FeatureGrantRevocation revocation) =>
         string.Equals(grant.CapabilityId, revocation.CapabilityId, StringComparison.Ordinal) &&
         grant.CapabilityVersion == revocation.CapabilityVersion;
+
+    private static FeatureHubState WithRegistrationChange(
+        FeatureHubState state,
+        FeatureInstallationRegistration[] installations,
+        FeatureInstallationId installationId)
+    {
+        var authorityIndex = Array.FindIndex(state.Authorities, candidate => candidate.InstallationId == installationId);
+        if (authorityIndex < 0)
+            return state with { Installations = installations, Revision = checked(state.Revision + 1) };
+        var authorities = state.Authorities.ToArray();
+        authorities[authorityIndex] = FeaturePublicationTransitions.Invalidate(authorities[authorityIndex]);
+        return state with
+        {
+            Installations = installations,
+            Authorities = authorities,
+            Revision = checked(state.Revision + 1)
+        };
+    }
 }

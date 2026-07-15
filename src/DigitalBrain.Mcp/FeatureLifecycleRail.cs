@@ -9,8 +9,18 @@ public sealed record FeatureLifecycleInspection(
     long Revision,
     IReadOnlyList<FeatureReleaseMetadata> Releases,
     IReadOnlyList<FeatureApprovalSnapshot> Approvals,
-    IReadOnlyList<FeatureInstallationInspection> Installations);
-public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifactPublisher artifacts, RuntimeSurfaceFeed surfaces)
+    IReadOnlyList<FeatureInstallationInspection> Installations,
+    IReadOnlyList<FeatureInstallationRegistration> Registrations);
+public interface IFeatureLifecycleRail
+{
+    Task<FeatureApprovalSnapshot> ProposeAsync(RuntimeRequestContext context, FeatureReleaseProposal proposal, long expectedRevision, CancellationToken cancellationToken = default);
+    Task<FeatureApprovalSnapshot> DecideAsync(RuntimeRequestContext context, FeatureApprovalDecision decision, long expectedRevision, CancellationToken cancellationToken = default);
+    Task<FeatureAuthoritySnapshot> GrantAsync(RuntimeRequestContext context, FeatureInstallationId installationId, ReleaseDigest release, FeatureGrantSpec[] grants, long expectedRevision, CancellationToken cancellationToken = default);
+    Task<FeatureAuthoritySnapshot> InstallAsync(RuntimeRequestContext context, FeatureInstallationRegistration registration, long expectedRevision, CancellationToken cancellationToken = default);
+    Task<FeatureAuthoritySnapshot> RepublishAsync(RuntimeRequestContext context, FeatureInstallationRegistration registration, CancellationToken cancellationToken = default);
+    Task<FeatureLifecycleInspection> InspectAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default);
+}
+public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifactPublisher artifacts, RuntimeSurfaceFeed surfaces) : IFeatureLifecycleRail
 {
     public async Task<FeatureApprovalSnapshot> ProposeAsync(RuntimeRequestContext context, FeatureReleaseProposal proposal, long expectedRevision, CancellationToken cancellationToken = default)
     {
@@ -42,6 +52,7 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
     public async Task<FeatureAuthoritySnapshot> InstallAsync(RuntimeRequestContext context, FeatureInstallationRegistration registration, long expectedRevision, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
+        registration = CanonicalRegistration(registration);
         var hub = Hub(context);
         var current = await hub.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         var existing = current.Authorities.FirstOrDefault(candidate =>
@@ -50,11 +61,13 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
         if (current.Revision != expectedRevision && existing is not null && installed is not null &&
             installed.Release == registration.Release && installed.Subscriptions.SequenceEqual(registration.Subscriptions, StringComparer.Ordinal))
         {
-            await PublishAuthorityAsync(context.OwnerId, existing, cancellationToken);
+            DemandExactAuthority(context, existing, registration);
+            await PublishCurrentAsync(context.OwnerId, hub, registration.InstallationId, cancellationToken);
             return existing;
         }
         var authority = await hub.InstallAsync(registration, expectedRevision).WaitAsync(cancellationToken).ConfigureAwait(false);
-        await PublishAuthorityAsync(context.OwnerId, authority, cancellationToken);
+        DemandExactAuthority(context, authority, registration);
+        await PublishCurrentAsync(context.OwnerId, hub, registration.InstallationId, cancellationToken);
         return authority;
     }
     public async Task RevokeAsync(RuntimeRequestContext context, FeatureGrantRevocation revocation, long expectedRevision, CancellationToken cancellationToken = default)
@@ -80,17 +93,39 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
     public async Task<FeatureAuthoritySnapshot> RollbackAsync(RuntimeRequestContext context, FeatureInstallationId installationId, long expectedRevision, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
-        var authority = await Hub(context).RollbackInstallationAsync(installationId, expectedRevision).WaitAsync(cancellationToken).ConfigureAwait(false);
-        await PublishAuthorityAsync(context.OwnerId, authority, cancellationToken);
+        var hub = Hub(context);
+        var authority = await hub.RollbackInstallationAsync(installationId, expectedRevision).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await PublishCurrentAsync(context.OwnerId, hub, installationId, cancellationToken);
         return authority;
     }
     public async Task<FeatureAuthoritySnapshot> RepublishAsync(RuntimeRequestContext context, FeatureInstallationId installationId, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
-        var snapshot = await Hub(context).ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var hub = Hub(context);
+        var snapshot = await hub.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         var authority = snapshot.Authorities.FirstOrDefault(candidate => candidate.InstallationId == installationId && candidate.ActiveRelease is not null)
             ?? throw new KeyNotFoundException("The Feature installation has no active release to publish.");
-        await PublishAuthorityAsync(context.OwnerId, authority, cancellationToken);
+        await PublishCurrentAsync(context.OwnerId, hub, installationId, cancellationToken);
+        return authority;
+    }
+    public async Task<FeatureAuthoritySnapshot> RepublishAsync(RuntimeRequestContext context, FeatureInstallationRegistration registration, CancellationToken cancellationToken = default)
+    {
+        DemandActor(context);
+        registration = CanonicalRegistration(registration);
+        var hub = Hub(context);
+        var snapshot = await hub.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var authority = snapshot.Authorities.SingleOrDefault(candidate => candidate.InstallationId == registration.InstallationId)
+            ?? throw new KeyNotFoundException("The Feature installation authority was not found.");
+        DemandExactAuthority(context, authority, registration);
+        var durableRegistration = snapshot.Installations.SingleOrDefault(candidate => candidate.InstallationId == registration.InstallationId);
+        DemandSameRegistration(durableRegistration, registration);
+        await PublishCurrentAsync(context.OwnerId, hub, registration.InstallationId, cancellationToken);
+        snapshot = await hub.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        authority = snapshot.Authorities.SingleOrDefault(candidate => candidate.InstallationId == registration.InstallationId)
+            ?? throw new KeyNotFoundException("The Feature installation authority was not found after publication.");
+        DemandExactAuthority(context, authority, registration);
+        durableRegistration = snapshot.Installations.SingleOrDefault(candidate => candidate.InstallationId == registration.InstallationId);
+        DemandSameRegistration(durableRegistration, registration);
         return authority;
     }
     public async Task<FeatureLifecycleInspection> InspectAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default)
@@ -111,12 +146,43 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
             }
             inspections.Add(new FeatureInstallationInspection(authority, registration, runtime));
         }
-        return new FeatureLifecycleInspection(hub.Revision, hub.Releases, hub.Approvals, inspections);
+        return new FeatureLifecycleInspection(hub.Revision, hub.Releases, hub.Approvals, inspections, hub.Installations);
     }
     private IFeatureHubGrain Hub(RuntimeRequestContext context) =>
         cluster.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(context.OwnerId));
-    private Task PublishAuthorityAsync(BrainOwnerId ownerId, FeatureAuthoritySnapshot authority, CancellationToken cancellationToken) =>
-        FeaturePublicationRetry.ExecuteAsync(token => artifacts.PublishActiveAsync(ownerId, authority, token), cancellationToken);
+    private async Task PublishCurrentAsync(
+        BrainOwnerId ownerId,
+        IFeatureHubGrain hub,
+        FeatureInstallationId installationId,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await hub.PrepareActivePublicationAsync(installationId).WaitAsync(cancellationToken).ConfigureAwait(false);
+        var receipt = await FeaturePublicationRetry.ExecuteAsync(
+            token => artifacts.PublishActiveAsync(ownerId, ticket, token),
+            cancellationToken).ConfigureAwait(false);
+        var confirmed = await hub.ConfirmActivePublicationAsync(receipt).WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (confirmed != receipt)
+            throw new InvalidOperationException("The Feature publication confirmation changed the exact receipt.");
+    }
+    private static void DemandExactAuthority(RuntimeRequestContext context, FeatureAuthoritySnapshot authority, FeatureInstallationRegistration registration)
+    {
+        if (authority.InstallationId != registration.InstallationId || authority.ActorId != context.ActorId ||
+            authority.ActiveRelease != registration.Release || authority.ActiveGrantRevision is null)
+            throw new InvalidOperationException("The active Feature authority does not match the expected installation.");
+    }
+    private static void DemandSameRegistration(FeatureInstallationRegistration? actual, FeatureInstallationRegistration expected)
+    {
+        if (actual is null || actual.InstallationId != expected.InstallationId || actual.Release != expected.Release ||
+            !actual.Subscriptions.Order(StringComparer.Ordinal)
+                .SequenceEqual(expected.Subscriptions.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            throw new InvalidOperationException("The active Feature registration does not match the expected installation.");
+    }
+    private static FeatureInstallationRegistration CanonicalRegistration(FeatureInstallationRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        ArgumentNullException.ThrowIfNull(registration.Subscriptions);
+        return registration with { Subscriptions = registration.Subscriptions.Order(StringComparer.Ordinal).ToArray() };
+    }
     private static bool SameRelease(FeatureReleaseMetadata left, FeatureReleaseMetadata right) =>
         left.Digest == right.Digest && string.Equals(left.SourceReference, right.SourceReference, StringComparison.Ordinal) &&
         left.SourceKind == right.SourceKind &&
@@ -141,6 +207,26 @@ internal static class FeaturePublicationRetry
             {
                 await publish(cancellationToken).ConfigureAwait(false);
                 return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch when (attempt < MaximumAttempts)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(25 * attempt), cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+    public static async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> publish, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(publish);
+        for (var attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return await publish(cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

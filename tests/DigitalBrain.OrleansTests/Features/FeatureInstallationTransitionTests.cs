@@ -363,6 +363,221 @@ public sealed class FeatureInstallationTransitionTests
     }
 
     [Fact]
+    public void Confirmed_publication_is_exact_replayable_and_an_authority_change_invalidates_it()
+    {
+        FeatureGrantSpec[] grants =
+        [
+            new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), Constraints("gmail.message.read.v1"), "google")
+        ];
+        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, grants), grants);
+        var registered = FeatureHubTransitions.Register(
+            active,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["email.received"]));
+        var prepared = FeaturePublicationTransitions.Prepare(registered, InstallationId);
+        var receipt = new FeaturePublicationReceipt(
+            InstallationId,
+            prepared.Ticket.PublicationFence,
+            prepared.Ticket.AuthorityDigest,
+            prepared.Ticket.AccessDigest,
+            new string('f', 64));
+
+        var confirmed = FeaturePublicationTransitions.Confirm(prepared.State, receipt);
+        var replayed = FeaturePublicationTransitions.Confirm(confirmed.State, receipt);
+        var revoked = FeatureHubTransitions.Revoke(
+            confirmed.State,
+            new FeatureGrantRevocation(InstallationId, ReleaseOne, "gmail.message.read.v1", 1),
+            confirmed.State.Revision);
+
+        Assert.Same(confirmed.State, replayed.State);
+        Assert.Equal(receipt, replayed.Receipt);
+        Assert.True(revoked.Authorities[0].PublicationFence > receipt.PublicationFence);
+        Assert.Null(revoked.Authorities[0].PublicationReceipt);
+        Assert.Throws<FeatureConcurrencyException>(() => FeaturePublicationTransitions.Confirm(revoked, receipt));
+    }
+
+    [Fact]
+    public void Publication_authority_digest_includes_previous_release_and_grants_while_access_digest_does_not()
+    {
+        FeatureGrantSpec[] previousGrants =
+        [
+            new("capability.previous", 1, null, Constraints("capability.previous"))
+        ];
+        FeatureGrantSpec[] activeGrants =
+        [
+            new("capability.active", 1, null, Constraints("capability.active"))
+        ];
+        var previous = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, previousGrants), previousGrants);
+        var active = Activate(previous, Proposal(ReleaseTwo, activeGrants), activeGrants);
+        var registered = FeatureHubTransitions.Register(
+            active,
+            new FeatureInstallationRegistration(InstallationId, ReleaseTwo, ["manual"]));
+        var baseline = FeaturePublicationTransitions.Prepare(registered, InstallationId);
+        var authorities = baseline.State.Authorities.ToArray();
+        authorities[0] = authorities[0] with
+        {
+            PreviousRelease = new ReleaseDigest(new string('c', 64)),
+            PreviousGrants = [new FeatureGrantState("capability.other", 1, null, Constraints("capability.other"), null)]
+        };
+        var changed = FeaturePublicationTransitions.Prepare(
+            baseline.State with { Authorities = authorities },
+            InstallationId);
+
+        Assert.NotEqual(baseline.Ticket.AuthorityDigest, changed.Ticket.AuthorityDigest);
+        Assert.Equal(baseline.Ticket.AccessDigest, changed.Ticket.AccessDigest);
+    }
+
+    [Fact]
+    public void Registration_order_is_canonical_and_semantically_identical_replay_preserves_the_publication()
+    {
+        FeatureGrantSpec[] grants = [new("capability.active", 1, null, Constraints("capability.active"))];
+        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, grants), grants);
+        var registered = FeatureHubTransitions.Register(
+            active,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["z-event", "a-event"]));
+        var prepared = FeaturePublicationTransitions.Prepare(registered, InstallationId);
+        var receipt = new FeaturePublicationReceipt(
+            InstallationId,
+            prepared.Ticket.PublicationFence,
+            prepared.Ticket.AuthorityDigest,
+            prepared.Ticket.AccessDigest,
+            new string('e', 64));
+        var confirmed = FeaturePublicationTransitions.Confirm(prepared.State, receipt).State;
+
+        var replayed = FeatureHubTransitions.Register(
+            confirmed,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["a-event", "z-event"]));
+        var changed = FeatureHubTransitions.Register(
+            replayed,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["a-event", "other-event"]));
+
+        Assert.Same(confirmed, replayed);
+        Assert.Equal(["a-event", "z-event"], replayed.Installations[0].Subscriptions);
+        Assert.Equal(receipt, replayed.Authorities[0].PublicationReceipt);
+        Assert.True(changed.Authorities[0].PublicationFence > receipt.PublicationFence);
+        Assert.Null(changed.Authorities[0].PublicationReceipt);
+    }
+
+    [Fact]
+    public void Repeated_inbox_full_pause_preserves_an_already_exact_authority_publication_state()
+    {
+        FeatureGrantSpec[] grants = [new("capability.active", 1, null, Constraints("capability.active"))];
+        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, grants), grants);
+        var registered = FeatureHubTransitions.Register(
+            active,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["email.received"]));
+        var prepared = FeaturePublicationTransitions.Prepare(registered, InstallationId);
+        var receipt = new FeaturePublicationReceipt(
+            InstallationId,
+            prepared.Ticket.PublicationFence,
+            prepared.Ticket.AuthorityDigest,
+            prepared.Ticket.AccessDigest,
+            new string('d', 64));
+        var confirmed = FeaturePublicationTransitions.Confirm(prepared.State, receipt).State;
+        var authorities = confirmed.Authorities.ToArray();
+        authorities[0] = authorities[0] with { Paused = true, PauseReason = "feature inbox full" };
+        var paused = confirmed with { Authorities = authorities };
+        var input = Input("full-replay");
+        var begun = FeatureHubTransitions.BeginFanOut(paused, input);
+
+        var first = FeatureHubTransitions.RecordDeliveryOutcomes(
+            begun,
+            input.InputId,
+            [new FeatureDeliveryAttempt(InstallationId, FeatureAppendStatus.Full)],
+            Now);
+        var replayed = FeatureHubTransitions.RecordDeliveryOutcomes(
+            first,
+            input.InputId,
+            [new FeatureDeliveryAttempt(InstallationId, FeatureAppendStatus.Full)],
+            Now.AddSeconds(1));
+
+        Assert.Equal(paused.Authorities[0], first.Authorities[0]);
+        Assert.Equal(first.Authorities[0], replayed.Authorities[0]);
+        Assert.Equal(receipt, replayed.Authorities[0].PublicationReceipt);
+    }
+
+    [Fact]
+    public void Every_authority_mutation_advances_the_publication_fence_and_every_exact_no_op_preserves_it()
+    {
+        FeatureGrantSpec[] firstGrants = [new("capability.first", 1, null, Constraints("capability.first"))];
+        FeatureGrantSpec[] secondGrants = [new("capability.second", 1, null, Constraints("capability.second"))];
+        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, firstGrants), firstGrants);
+        var registered = FeatureHubTransitions.Register(
+            active,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["email.received"]));
+        var prepared = FeaturePublicationTransitions.Prepare(registered, InstallationId);
+        var receipt = new FeaturePublicationReceipt(
+            InstallationId,
+            prepared.Ticket.PublicationFence,
+            prepared.Ticket.AuthorityDigest,
+            prepared.Ticket.AccessDigest,
+            new string('c', 64));
+        var confirmed = FeaturePublicationTransitions.Confirm(prepared.State, receipt).State;
+        var confirmedAuthority = confirmed.Authorities[0];
+
+        var paused = FeatureHubTransitions.PauseAuthority(confirmed, InstallationId, "owner pause", confirmed.Revision);
+        Assert.Equal(confirmedAuthority.PublicationFence + 1, paused.Authorities[0].PublicationFence);
+        Assert.Null(paused.Authorities[0].PublicationReceipt);
+        var samePause = FeatureHubTransitions.PauseAuthority(paused, InstallationId, "owner pause", paused.Revision);
+        Assert.Same(paused, samePause);
+        var changedPause = FeatureHubTransitions.PauseAuthority(paused, InstallationId, "different pause", paused.Revision);
+        Assert.Equal(paused.Authorities[0].PublicationFence + 1, changedPause.Authorities[0].PublicationFence);
+        var resumed = FeatureHubTransitions.ResumeAuthority(changedPause, InstallationId, changedPause.Revision);
+        Assert.Equal(changedPause.Authorities[0].PublicationFence + 1, resumed.Authorities[0].PublicationFence);
+        Assert.Same(resumed, FeatureHubTransitions.ResumeAuthority(resumed, InstallationId, resumed.Revision));
+        Assert.Same(confirmed, FeatureHubTransitions.RollbackAuthority(confirmed, InstallationId, confirmed.Revision));
+
+        var proposed = FeatureHubTransitions.Propose(confirmed, Proposal(ReleaseTwo, secondGrants), confirmed.Revision, Now);
+        var approval = proposed.Approvals.Single(candidate => candidate.Release.Digest == ReleaseTwo);
+        var approved = FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseTwo, true, "decision-fence-update"),
+            proposed.Revision,
+            Now);
+        Assert.Equal(receipt, approved.Authorities[0].PublicationReceipt);
+        var granted = FeatureHubTransitions.Grant(
+            approved,
+            new FeatureGrantRequest(InstallationId, ReleaseTwo, new ActorId("actor-1"), secondGrants),
+            approved.Revision);
+        Assert.Equal(confirmedAuthority.PublicationFence + 1, granted.Authorities[0].PublicationFence);
+        Assert.Null(granted.Authorities[0].PublicationReceipt);
+        var activated = FeatureHubTransitions.Activate(granted, InstallationId, granted.Revision);
+        Assert.Equal(granted.Authorities[0].PublicationFence + 1, activated.Authorities[0].PublicationFence);
+        var registeredUpdate = FeatureHubTransitions.Register(
+            activated,
+            new FeatureInstallationRegistration(InstallationId, ReleaseTwo, ["email.received"]));
+        var updatePrepared = FeaturePublicationTransitions.Prepare(registeredUpdate, InstallationId);
+        var updateReceipt = new FeaturePublicationReceipt(
+            InstallationId,
+            updatePrepared.Ticket.PublicationFence,
+            updatePrepared.Ticket.AuthorityDigest,
+            updatePrepared.Ticket.AccessDigest,
+            new string('b', 64));
+        var updateConfirmed = FeaturePublicationTransitions.Confirm(updatePrepared.State, updateReceipt).State;
+        var rolledBack = FeatureHubTransitions.RollbackAuthority(updateConfirmed, InstallationId, updateConfirmed.Revision);
+        Assert.Equal(updateConfirmed.Authorities[0].PublicationFence + 1, rolledBack.Authorities[0].PublicationFence);
+        Assert.Null(rolledBack.Authorities[0].PublicationReceipt);
+
+        var input = Input("first-full-publication");
+        var begun = FeatureHubTransitions.BeginFanOut(confirmed, input);
+        var full = FeatureHubTransitions.RecordDeliveryOutcomes(
+            begun,
+            input.InputId,
+            [new FeatureDeliveryAttempt(InstallationId, FeatureAppendStatus.Full)],
+            Now);
+        Assert.Equal(confirmedAuthority.PublicationFence + 1, full.Authorities[0].PublicationFence);
+        Assert.Null(full.Authorities[0].PublicationReceipt);
+        Assert.True(full.Authorities[0].Paused);
+
+        var legacyAuthorities = registered.Authorities.ToArray();
+        legacyAuthorities[0] = legacyAuthorities[0] with { PublicationFence = 0, PublicationReceipt = null };
+        var legacy = registered with { Authorities = legacyAuthorities };
+        var upgraded = FeaturePublicationTransitions.Prepare(legacy, InstallationId);
+        Assert.Equal(1, upgraded.Ticket.PublicationFence);
+        Assert.Equal(1, upgraded.State.Authorities[0].PublicationFence);
+        Assert.Equal(legacy.Revision + 1, upgraded.State.Revision);
+    }
+
+    [Fact]
     public void Approval_cannot_be_replayed_for_another_digest_or_an_incomplete_grant_set()
     {
         FeatureGrantSpec[] grants =

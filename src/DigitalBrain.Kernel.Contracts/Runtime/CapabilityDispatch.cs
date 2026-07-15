@@ -50,11 +50,11 @@ public sealed record CapabilityGrant
     public bool Paused { get; }
     internal bool Allows(CapabilityRequest request) => CapabilityGrantConstraintPolicy.Allows(Constraints, request);
 }
-internal static class CapabilityGrantConstraintPolicy
+public static class CapabilityGrantConstraintPolicy
 {
     private const int MaximumAllowedValues = 256;
     private const int MaximumObjectProperties = 128;
-    internal static JsonElement CopyValidated(JsonElement constraints)
+    public static JsonElement CopyValidated(JsonElement constraints)
     {
         var copy = CapabilityPayload.CopyBounded(constraints, nameof(constraints));
         if (copy.ValueKind != JsonValueKind.Object)
@@ -83,7 +83,7 @@ internal static class CapabilityGrantConstraintPolicy
         if (!AllowsTool(constraints, request.CapabilityId)) return false;
         return !constraints.TryGetProperty("payload", out var payload) || Matches(payload, request.Payload);
     }
-    internal static bool AllowsTool(JsonElement constraints, string capabilityId) =>
+    public static bool AllowsTool(JsonElement constraints, string capabilityId) =>
         constraints.GetProperty("allowedToolIds").EnumerateArray().Any(candidate =>
             string.Equals(candidate.GetString(), capabilityId, StringComparison.Ordinal));
     private static void ValidateExpression(JsonElement expression)

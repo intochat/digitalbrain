@@ -26,8 +26,13 @@ var mcpAudience = SessionAudiences.RequireFixedMcp(builder.Configuration["Digita
 builder.Services.AddSingleton<ConversationStateClient>();
 builder.Services.AddSingleton<McpInoCommandHandler>();
 builder.Services.AddSingleton<FeatureArtifactPublisher>();
+builder.Services.AddSingleton<IFeatureArtifactCatalog>(services => services.GetRequiredService<FeatureArtifactPublisher>());
 builder.Services.AddSingleton<FeatureBuildEndpoint>();
+builder.Services.AddSingleton<IFeatureBuildEndpoint>(services => services.GetRequiredService<FeatureBuildEndpoint>());
 builder.Services.AddSingleton<FeatureLifecycleRail>();
+builder.Services.AddSingleton<IFeatureLifecycleRail>(services => services.GetRequiredService<FeatureLifecycleRail>());
+builder.Services.AddSingleton<FeatureSuggestionService>();
+builder.Services.AddSingleton<FeatureAuthoringService>();
 builder.Services.AddSingleton(AuthorizationFlowProxyOptions.FromConfiguration(builder.Configuration, profile));
 builder.Services.AddHttpClient<AuthorizationFlowStartProxy>().ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5) });
 var sessionKeyText = builder.Configuration["DigitalBrain:Auth:SessionSigningKey"] ?? Environment.GetEnvironmentVariable("DigitalBrain__Auth__SessionSigningKey");

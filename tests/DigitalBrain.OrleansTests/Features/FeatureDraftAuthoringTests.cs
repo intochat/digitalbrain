@@ -345,9 +345,23 @@ public sealed class FeatureDraftAuthoringTests
             created.State,
             new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-1"));
         var installationId = new FeatureInstallationId("installation-1");
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            1,
+            installationId,
+            verification.Release,
+            [],
+            ["manual"],
+            "decision-installed-1",
+            "installed-1");
+        var reservation = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            verified.State,
+            command,
+            new ActorId("actor-installation"));
+        var published = ConfirmPublication(reservation.State, command);
 
         var installed = FeatureDraftAuthoringTransitions.MarkInstalled(
-            verified.State,
+            published,
             new MarkFeatureDraftInstalled(
                 created.Draft.DraftId,
                 installationId,
@@ -375,16 +389,202 @@ public sealed class FeatureDraftAuthoringTests
         var verified = FeatureDraftAuthoringTransitions.RecordVerification(
             created.State,
             new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-1"));
+        var installationId = new FeatureInstallationId("installation-1");
+        var reservation = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            verified.State,
+            new InstallFeatureVersion(
+                created.Draft.DraftId,
+                1,
+                installationId,
+                verification.Release,
+                [],
+                ["manual"],
+                "decision-installed-wrong-release",
+                "installed-wrong-release"),
+            new ActorId("actor-installation"));
 
         Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.MarkInstalled(
-            verified.State,
+            reservation.State,
             new MarkFeatureDraftInstalled(
                 created.Draft.DraftId,
-                new FeatureInstallationId("installation-1"),
+                installationId,
                 new ReleaseDigest(new string('b', 64)),
                 1,
                 "installed-wrong-release",
                 Now.AddMinutes(2))));
+    }
+
+    [Fact]
+    public void Installation_reservation_is_exact_replayable_and_blocks_new_authoring()
+    {
+        var created = Create();
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-reservation"));
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            new FeatureInstallationId("installation-reservation"),
+            verification.Release,
+            [
+                new FeatureGrantSpec("capability.z", 1, null, "{\"allowedToolIds\":[\"capability.z\"]}"),
+                new FeatureGrantSpec("capability.a", 1, null, "{\"allowedToolIds\":[\"capability.a\"]}")
+            ],
+            ["z-event", "a-event"],
+            "decision-reservation",
+            "install-reservation");
+
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            verified.State,
+            command,
+            new ActorId("actor-installation"));
+        var replayed = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            reserved.State,
+            command with
+            {
+                Grants = command.Grants.Reverse().ToArray(),
+                Subscriptions = command.Subscriptions.Reverse().ToArray()
+            },
+            new ActorId("actor-installation"));
+
+        Assert.Same(reserved.State, replayed.State);
+        Assert.Equal(reserved.Reservation, replayed.Reservation);
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            reserved.State,
+            command with { Subscriptions = ["conversation.completed"] },
+            new ActorId("actor-installation")));
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            reserved.State,
+            command,
+            new ActorId("actor-other")));
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.ReviseBehavior(
+            reserved.State,
+            new ReviseFeatureBehavior(created.Draft.DraftId, Behavior("reserved"), verified.Draft.Revision, "behavior-reserved", Now.AddMinutes(2))));
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.ReviseSource(
+            reserved.State,
+            new ReviseFeatureSource(created.Draft.DraftId, Source(), verified.Draft.Revision, "source-reserved", Now.AddMinutes(2))));
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.AcceptSuggestedChange(
+            reserved.State,
+            new AcceptSuggestedChange(
+                new FeatureDraftPatch("patch-reserved", created.Draft.DraftId, verified.Draft.Revision, "Reserved", Behavior("reserved"), Source()),
+                verified.Draft.Revision,
+                "accept-reserved",
+                Now.AddMinutes(2))));
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.RecordVerification(
+            reserved.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification with { VerifiedAt = Now.AddMinutes(2) }, verified.Draft.Revision, "verification-reserved")));
+    }
+
+    [Fact]
+    public void A_reservation_without_a_confirmed_active_publication_cannot_mark_the_Draft_installed()
+    {
+        var created = Create();
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-unpublished"));
+        var installationId = new FeatureInstallationId("installation-unpublished");
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            installationId,
+            verification.Release,
+            [],
+            ["manual"],
+            "decision-unpublished",
+            "install-unpublished");
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            verified.State,
+            command,
+            new ActorId("actor-installation"));
+
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.MarkInstalled(
+            reserved.State,
+            new MarkFeatureDraftInstalled(
+                created.Draft.DraftId,
+                installationId,
+                verification.Release,
+                verified.Draft.Revision,
+                command.IdempotencyId,
+                Now.AddMinutes(2))));
+    }
+
+    [Fact]
+    public void A_confirmed_publication_by_another_actor_cannot_consume_the_reserved_installation()
+    {
+        var created = Create();
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-actor-swap"));
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            new FeatureInstallationId("installation-actor-swap"),
+            verification.Release,
+            [],
+            ["manual"],
+            "decision-actor-swap",
+            "install-actor-swap");
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            verified.State,
+            command,
+            new ActorId("actor-a"));
+        var publishedByAnotherActor = ConfirmPublication(
+            reserved.State,
+            command,
+            new ActorId("actor-b"));
+
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.MarkInstalled(
+            publishedByAnotherActor,
+            new MarkFeatureDraftInstalled(
+                command.DraftId,
+                command.InstallationId,
+                command.Release,
+                command.ExpectedRevision,
+                command.IdempotencyId,
+                Now.AddMinutes(2))));
+        Assert.Single(publishedByAnotherActor.DraftInstallationReservations ?? []);
+    }
+
+    [Fact]
+    public void Marking_installed_atomically_consumes_the_exact_reservation_and_replays()
+    {
+        var created = Create();
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-consume"));
+        var installationId = new FeatureInstallationId("installation-consume");
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            installationId,
+            verification.Release,
+            [],
+            ["manual"],
+            "decision-consume",
+            "install-consume");
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            verified.State,
+            command,
+            new ActorId("actor-installation"));
+        var mark = new MarkFeatureDraftInstalled(
+            created.Draft.DraftId,
+            installationId,
+            verification.Release,
+            verified.Draft.Revision,
+            command.IdempotencyId,
+            Now.AddMinutes(2));
+        var published = ConfirmPublication(reserved.State, command);
+
+        var installed = FeatureDraftAuthoringTransitions.MarkInstalled(published, mark);
+        var replayed = FeatureDraftAuthoringTransitions.MarkInstalled(installed.State, mark);
+
+        Assert.Empty(installed.State.DraftInstallationReservations ?? []);
+        Assert.Same(installed.State, replayed.State);
+        Assert.Equal(installed.Draft, replayed.Draft);
     }
 
     [Fact]
@@ -406,6 +606,48 @@ public sealed class FeatureDraftAuthoringTests
             FeatureHubState.Empty,
             owner,
             new CreateFeatureDraft("operation-1", "Create a useful Feature", Now, "conversation-1"));
+
+    private static FeatureHubState ConfirmPublication(
+        FeatureHubState state,
+        InstallFeatureVersion command,
+        ActorId? actorId = null)
+    {
+        var metadata = new FeatureReleaseMetadata(
+            command.Release,
+            "sha256:" + command.Release.Value,
+            FeatureSourceKind.RuntimeAuthored,
+            command.Grants.Select(grant => grant.CapabilityId).ToArray(),
+            []);
+        var proposed = FeatureHubTransitions.Propose(
+            state,
+            new FeatureReleaseProposal(command.InstallationId, metadata, command.Grants),
+            state.Revision,
+            Now);
+        var approval = proposed.Approvals.Single(candidate =>
+            candidate.InstallationId == command.InstallationId && candidate.Release.Digest == command.Release);
+        var approved = FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(approval.ApprovalId, command.Release, true, command.DecisionId),
+            proposed.Revision,
+            Now);
+        var staged = FeatureHubTransitions.Grant(
+            approved,
+            new FeatureGrantRequest(command.InstallationId, command.Release, actorId ?? new ActorId("actor-installation"), command.Grants),
+            approved.Revision);
+        var active = FeatureHubTransitions.Activate(staged, command.InstallationId, staged.Revision);
+        var registered = FeatureHubTransitions.Register(
+            active,
+            new FeatureInstallationRegistration(command.InstallationId, command.Release, command.Subscriptions));
+        var prepared = FeaturePublicationTransitions.Prepare(registered, command.InstallationId);
+        return FeaturePublicationTransitions.Confirm(
+            prepared.State,
+            new FeaturePublicationReceipt(
+                command.InstallationId,
+                prepared.Ticket.PublicationFence,
+                prepared.Ticket.AuthorityDigest,
+                prepared.Ticket.AccessDigest,
+                new string('f', 64))).State;
+    }
 
     private static FeatureBehavior Behavior(string suffix) => new([Scenario($"scenario-{suffix}")]);
 

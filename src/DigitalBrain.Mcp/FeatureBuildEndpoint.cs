@@ -14,7 +14,15 @@ namespace DigitalBrain.Mcp;
 public sealed record FeatureSourceInput(string Path, string Content);
 public sealed record FeatureBuildSubmission(string ImplementationProjectPath, string ScenarioProjectPath, IReadOnlyList<FeatureSourceInput> Files, FeatureSourceKind SourceKind);
 public sealed record FeatureBuildArtifact(FeatureReleaseMetadata Release, FeatureScenarioResult Scenarios);
-public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, TimeProvider timeProvider)
+public interface IFeatureBuildEndpoint
+{
+    Task<FeatureBuildArtifact> BuildAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default);
+}
+public interface IFeatureArtifactCatalog
+{
+    Task<FeatureReleaseMetadata> DemandReleaseAsync(ReleaseDigest digest, CancellationToken cancellationToken = default);
+}
+public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, TimeProvider timeProvider) : IFeatureBuildEndpoint
 {
     private const int MaximumProcessOutputCharacters = 65_536;
     public async Task<FeatureBuildArtifact> BuildAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default)
@@ -129,7 +137,7 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
     private sealed record BuilderFile(string Path, string ContentBase64);
     private sealed record BuilderRelease(string Digest, string SourceReference, string ReleaseDirectory, FeatureManifest Manifest, FeatureScenarioResult Scenarios);
 }
-public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] BlobServiceClient blobs)
+public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] BlobServiceClient blobs) : IFeatureArtifactCatalog
 {
     private const string ContainerName = "feature-releases";
     private const int MaximumReleaseFiles = 256;
@@ -204,30 +212,78 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             throw new InvalidDataException("The published Feature release metadata has another digest.");
         return metadata;
     }
-    public async Task PublishActiveAsync(BrainOwnerId ownerId, FeatureAuthoritySnapshot authority, CancellationToken cancellationToken = default)
+    public async Task<FeaturePublicationReceipt> PublishActiveAsync(
+        BrainOwnerId ownerId,
+        FeaturePublicationTicket ticket,
+        CancellationToken cancellationToken = default)
     {
-        if (authority.ActiveRelease is not { } release || authority.ActiveGrantRevision is not { } revision)
-            throw new InvalidOperationException("Only an active Feature authority can be published.");
-        var connections = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var grant in authority.ActiveGrants)
-        {
-            if (grant.ProviderConnectionId is not { } connection) continue;
-            var provider = grant.Provider ?? throw new InvalidOperationException("A provider connection requires a provider key.");
-            if (!connections.TryAdd(provider, connection.Value) &&
-                !string.Equals(connections[provider], connection.Value, StringComparison.Ordinal))
-                throw new InvalidOperationException("One installation cannot bind a provider to multiple connections.");
-        }
-        var manifest = JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            ownerId = ownerId.Value,
-            actorId = authority.ActorId.Value,
-            installationId = authority.InstallationId.Value,
-            releaseDigest = release.Value,
-            grantRevision = revision.Value,
-            providerConnections = connections
-        });
+        ArgumentNullException.ThrowIfNull(ticket);
+        var manifest = FeaturePublicationManifestCodec.Serialize(ownerId, ticket);
+        var receipt = new FeaturePublicationReceipt(
+            ticket.InstallationId,
+            ticket.PublicationFence,
+            ticket.AuthorityDigest,
+            ticket.AccessDigest,
+            Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(manifest)));
         await container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
-        await container.GetBlobClient($"active/{Segment(ownerId.Value)}/{Segment(authority.InstallationId.Value)}.json").UploadAsync(new BinaryData(manifest), overwrite: true, cancellationToken);
+        var blob = container.GetBlobClient(FeaturePublicationManifestCodec.Path(ownerId, ticket.InstallationId));
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            BlobProperties? properties;
+            try
+            {
+                properties = (await blob.GetPropertiesAsync(cancellationToken: cancellationToken).ConfigureAwait(false)).Value;
+            }
+            catch (RequestFailedException exception) when (exception.Status == 404)
+            {
+                properties = null;
+            }
+            if (properties is null)
+            {
+                try
+                {
+                    await blob.UploadAsync(
+                        new BinaryData(manifest),
+                        new BlobUploadOptions { Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All } },
+                        cancellationToken).ConfigureAwait(false);
+                    return receipt;
+                }
+                catch (RequestFailedException exception) when (exception.Status is 409 or 412)
+                {
+                    continue;
+                }
+            }
+            byte[] existing;
+            try
+            {
+                existing = await DownloadBoundedAsync(blob, properties, MaximumMetadataBytes, cancellationToken).ConfigureAwait(false);
+            }
+            catch (RequestFailedException exception) when (exception.Status is 404 or 412)
+            {
+                continue;
+            }
+            var existingFence = PublicationFence(existing);
+            if (existingFence > ticket.PublicationFence)
+                throw new InvalidOperationException("A newer active Feature publication already exists.");
+            if (existingFence == ticket.PublicationFence)
+            {
+                if (existing.AsSpan().SequenceEqual(manifest)) return receipt;
+                throw new InvalidOperationException("The active Feature publication fence has conflicting content.");
+            }
+            try
+            {
+                await blob.UploadAsync(
+                    new BinaryData(manifest),
+                    new BlobUploadOptions { Conditions = new BlobRequestConditions { IfMatch = properties.ETag } },
+                    cancellationToken).ConfigureAwait(false);
+                return receipt;
+            }
+            catch (RequestFailedException exception) when (exception.Status is 409 or 412)
+            {
+            }
+        }
+        throw new InvalidOperationException("The active Feature publication changed too many times.");
     }
     private static async Task UploadImmutableAsync(BlobClient blob, string sourcePath, CancellationToken cancellationToken)
     {
@@ -257,6 +313,14 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
     private static async Task<byte[]> DownloadBoundedAsync(BlobClient blob, int maximumBytes, CancellationToken cancellationToken)
     {
         var properties = (await blob.GetPropertiesAsync(cancellationToken: cancellationToken)).Value;
+        return await DownloadBoundedAsync(blob, properties, maximumBytes, cancellationToken).ConfigureAwait(false);
+    }
+    private static async Task<byte[]> DownloadBoundedAsync(
+        BlobClient blob,
+        BlobProperties properties,
+        int maximumBytes,
+        CancellationToken cancellationToken)
+    {
         if (properties.ContentLength < 0 || properties.ContentLength > maximumBytes)
             throw new InvalidDataException("A Feature release metadata blob exceeds its bound.");
         var options = new BlobDownloadOptions { Conditions = new BlobRequestConditions { IfMatch = properties.ETag } };
@@ -271,6 +335,40 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
                 throw new InvalidDataException("A Feature release metadata blob exceeds its bound.");
             await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
+    }
+
+    private static long PublicationFence(byte[] manifest)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(manifest, new JsonDocumentOptions { MaxDepth = 16 });
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("The active Feature publication manifest is invalid.");
+            if (!root.TryGetProperty("publicationFence", out var fence))
+            {
+                if (root.TryGetProperty("authorityDigest", out _) || root.TryGetProperty("accessDigest", out _))
+                    throw new InvalidDataException("The active Feature publication manifest is invalid.");
+                return 0;
+            }
+            if (!fence.TryGetInt64(out var value) || value < 1 ||
+                !root.TryGetProperty("authorityDigest", out var authorityDigest) ||
+                !root.TryGetProperty("accessDigest", out var accessDigest) ||
+                !CanonicalDigest(authorityDigest) || !CanonicalDigest(accessDigest))
+                throw new InvalidDataException("The active Feature publication manifest is invalid.");
+            return value;
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException("The active Feature publication manifest is invalid.", exception);
+        }
+    }
+
+    private static bool CanonicalDigest(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.String) return false;
+        var digest = value.GetString();
+        return digest is { Length: 64 } && digest.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
     }
     private static async Task VerifyExistingAsync(BlobClient blob, string sourcePath, CancellationToken cancellationToken)
     {
@@ -292,6 +390,4 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             if (localRead == 0) return;
         }
     }
-    private static string Segment(string value) =>
-        Convert.ToBase64String(Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

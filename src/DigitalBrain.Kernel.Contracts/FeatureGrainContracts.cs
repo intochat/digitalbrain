@@ -428,8 +428,20 @@ public interface IFeatureHubGrain : IGrainWithStringKey
     Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command);
     [Alias("revise-source")]
     Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command);
+    [Alias("accept-suggested-change")]
+    Task<FeatureDraft> AcceptSuggestedChangeAsync(AcceptSuggestedChange command);
+    [Alias("reject-suggested-change")]
+    Task<FeatureDraft> RejectSuggestedChangeAsync(RejectSuggestedChange command);
     [Alias("record-verification")]
     Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command);
+    [Alias("acquire-draft-installation-reservation")]
+    Task<FeatureDraftInstallationReservation> AcquireDraftInstallationReservationAsync(InstallFeatureVersion command, ActorId actorId);
+    [Alias("read-draft-installation-reservation")]
+    Task<FeatureDraftInstallationReservation?> ReadDraftInstallationReservationAsync(FeatureDraftId draftId);
+    [Alias("prepare-active-publication")]
+    Task<FeaturePublicationTicket> PrepareActivePublicationAsync(FeatureInstallationId installationId);
+    [Alias("confirm-active-publication")]
+    Task<FeaturePublicationReceipt> ConfirmActivePublicationAsync(FeaturePublicationReceipt receipt);
     [Alias("mark-draft-installed")]
     Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command);
     [Alias("publish")]

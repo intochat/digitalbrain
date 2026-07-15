@@ -4,6 +4,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
+using DigitalBrain.Kernel.Features;
 using DigitalBrain.Kernel.Hosting;
 using DigitalBrain.Kernel.Runtime;
 using DigitalBrain.RuntimeHost;
@@ -25,12 +26,18 @@ namespace DigitalBrain.RuntimeHost
             builder.AddServiceDefaults();
             builder.UseDigitalBrainOrleans();
             builder.AddDigitalBrainClients();
+            builder.AddKeyedAzureBlobServiceClient("features", settings =>
+            {
+                settings.DisableHealthChecks = true;
+                settings.DisableTracing = true;
+            });
             var corsOrigins = builder.Configuration.GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
                 ?? new[] { "https://digitalbrain.tech", "https://www.digitalbrain.tech" };
             builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy.WithOrigins(corsOrigins).AllowAnyMethod().AllowAnyHeader()));
             builder.Services.AddDigitalBrainGoogle();
             builder.Services.AddDigitalBrainSalesforce();
             builder.Services.AddSingleton(TimeProvider.System);
+            builder.Services.AddSingleton<IFeaturePublicationVerifier, BlobFeaturePublicationVerifier>();
             builder.Services.AddHealthChecks().AddAsyncCheck("google-connector", static _ => Task.FromResult(HealthCheckResult.Healthy("Google connector is registered")))
                 .AddAsyncCheck("salesforce-connector", static _ => Task.FromResult(HealthCheckResult.Healthy("Salesforce connector is registered")));
             builder.Services.Configure<ForwardedHeadersOptions>(options =>

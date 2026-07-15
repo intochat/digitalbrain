@@ -4,7 +4,11 @@ using Orleans.Runtime;
 namespace DigitalBrain.Kernel.Features;
 
 [GrainType("digitalbrain.v3.feature-hub")]
-internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersistentState<FeatureHubState> persistentState, IGrainFactory grainFactory, TimeProvider timeProvider) : Grain, IFeatureHubGrain
+internal sealed class FeatureHubGrain(
+    [PersistentState("feature-hub")] IPersistentState<FeatureHubState> persistentState,
+    IGrainFactory grainFactory,
+    TimeProvider timeProvider,
+    IFeaturePublicationVerifier? publicationVerifier = null) : Grain, IFeatureHubGrain
 {
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Features.Hub");
     public async Task RegisterAsync(FeatureInstallationRegistration registration)
@@ -91,6 +95,23 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         await WriteAsync(registered);
         return AuthoritySnapshot(authority);
     }
+    public async Task<FeaturePublicationTicket> PrepareActivePublicationAsync(FeatureInstallationId installationId)
+    {
+        using var activity = Start("prepare-active-publication");
+        var prepared = Domain(() => FeaturePublicationTransitions.Prepare(State, installationId));
+        if (!ReferenceEquals(prepared.State, State)) await WriteAsync(prepared.State);
+        return prepared.Ticket;
+    }
+    public async Task<FeaturePublicationReceipt> ConfirmActivePublicationAsync(FeaturePublicationReceipt receipt)
+    {
+        using var activity = Start("confirm-active-publication");
+        var confirmed = Domain(() => FeaturePublicationTransitions.Confirm(State, receipt));
+        if (publicationVerifier is null)
+            throw new InvalidOperationException("Feature publication verification is unavailable.");
+        await publicationVerifier.VerifyAsync(ParseKey(), confirmed.Ticket, receipt);
+        if (!ReferenceEquals(confirmed.State, State)) await WriteAsync(confirmed.State);
+        return confirmed.Receipt ?? throw new InvalidOperationException("The Feature publication receipt was not confirmed.");
+    }
     public async Task RevokeAsync(FeatureGrantRevocation revocation, long expectedRevision)
     {
         using var activity = Start("revoke-grant");
@@ -151,12 +172,36 @@ internal sealed class FeatureHubGrain([PersistentState("feature-hub")] IPersiste
         if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
         return result.Draft;
     }
+    public async Task<FeatureDraft> AcceptSuggestedChangeAsync(AcceptSuggestedChange command)
+    {
+        using var activity = Start("accept-suggested-change");
+        var result = Domain(() => FeatureDraftAuthoringTransitions.AcceptSuggestedChange(State, command));
+        if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
+        return result.Draft;
+    }
+    public Task<FeatureDraft> RejectSuggestedChangeAsync(RejectSuggestedChange command)
+    {
+        using var activity = Start("reject-suggested-change");
+        return Task.FromResult(Domain(() => FeatureDraftAuthoringTransitions.RejectSuggestedChange(State, command).Draft));
+    }
     public async Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command)
     {
         using var activity = Start("record-verification");
         var result = Domain(() => FeatureDraftAuthoringTransitions.RecordVerification(State, command));
         if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
         return result.Draft;
+    }
+    public async Task<FeatureDraftInstallationReservation> AcquireDraftInstallationReservationAsync(InstallFeatureVersion command, ActorId actorId)
+    {
+        using var activity = Start("acquire-draft-installation-reservation");
+        var result = Domain(() => FeatureDraftAuthoringTransitions.AcquireInstallationReservation(State, command, actorId));
+        if (!ReferenceEquals(result.State, State)) await WriteAsync(result.State);
+        return result.Reservation;
+    }
+    public Task<FeatureDraftInstallationReservation?> ReadDraftInstallationReservationAsync(FeatureDraftId draftId)
+    {
+        using var activity = Start("read-draft-installation-reservation");
+        return Task.FromResult(Domain(() => FeatureDraftAuthoringTransitions.ReadInstallationReservation(State, draftId)));
     }
     public async Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command)
     {

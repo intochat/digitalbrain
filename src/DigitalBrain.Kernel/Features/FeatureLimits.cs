@@ -19,6 +19,11 @@ internal static class FeatureLimits
     public const int DraftOwnerUtf8Bytes = 16 * 1024 * 1024;
     public const int DraftReplayRecords = 64;
     public const int DraftReplayUtf8Bytes = 10 * 1024 * 1024;
+    public const int DraftPatchIdCharacters = 256;
+    public const int DraftPatchSummaryCharacters = 2048;
+    public const int DraftSuggestionGuidanceCharacters = 4096;
+    public const int DraftSuggestionPayloadUtf8Bytes = 5 * 1024 * 1024;
+    public const int DraftInstallationReservations = 100;
     public const int InboxEntries = 1_000;
     public const int StateUtf8Bytes = 64 * 1024;
     public const int IntentsPerRun = 32;

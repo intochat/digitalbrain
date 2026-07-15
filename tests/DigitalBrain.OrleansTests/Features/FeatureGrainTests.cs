@@ -70,9 +70,44 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         Assert.Equal(1, replay.Revision);
         Assert.Equal(3, (await hub.ReadDraftAsync(draft.DraftId))?.Revision);
 
+        var installationId = new FeatureInstallationId("installation-draft-authoring");
+        await hub.AcquireDraftInstallationReservationAsync(new InstallFeatureVersion(
+            draft.DraftId,
+            3,
+            installationId,
+            ReleaseOne,
+            [],
+            ["manual"],
+            "decision-installed-grain",
+            "installed-grain"), new ActorId("actor-draft-authoring"));
+        var snapshot = await hub.ReadAsync();
+        var approval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                installationId,
+                new FeatureReleaseMetadata(
+                    ReleaseOne,
+                    "sha256:" + ReleaseOne.Value,
+                    FeatureSourceKind.RuntimeAuthored,
+                    [],
+                    []),
+                []),
+            snapshot.Revision);
+        snapshot = await hub.ReadAsync();
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-installed-grain"),
+            snapshot.Revision);
+        snapshot = await hub.ReadAsync();
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, ReleaseOne, new ActorId("actor-draft-authoring"), []),
+            snapshot.Revision);
+        snapshot = await hub.ReadAsync();
+        await hub.InstallAsync(
+            new FeatureInstallationRegistration(installationId, ReleaseOne, ["manual"]),
+            snapshot.Revision);
+        await fixture.PublishActiveAsync(owner, hub, installationId);
         var installed = await hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
             draft.DraftId,
-            new FeatureInstallationId("installation-draft-authoring"),
+            installationId,
             ReleaseOne,
             3,
             "installed-grain",
@@ -84,6 +119,73 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             4,
             "source-after-install",
             createdAt.AddMinutes(5))));
+    }
+
+    [Fact]
+    public async Task A_forged_deterministic_publication_receipt_cannot_confirm_or_finalize_a_Draft()
+    {
+        var owner = new BrainOwnerId("owner-forged-publication");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var installationId = new FeatureInstallationId("installation-forged-publication");
+        var now = fixture.Time.GetUtcNow();
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-forged-publication",
+            "Reject a forged publication receipt",
+            now,
+            "conversation-forged-publication"));
+        draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            new FeatureVerification(ReleaseOne, 1, 1, 0, 0, now),
+            draft.Revision,
+            "verify-forged-publication"));
+        await hub.AcquireDraftInstallationReservationAsync(new InstallFeatureVersion(
+            draft.DraftId,
+            draft.Revision,
+            installationId,
+            ReleaseOne,
+            [],
+            ["manual"],
+            "decision-forged-publication",
+            "install-forged-publication"), new ActorId("actor-forged-publication"));
+        var snapshot = await hub.ReadAsync();
+        var approval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                installationId,
+                new FeatureReleaseMetadata(ReleaseOne, "sha256:" + ReleaseOne.Value, FeatureSourceKind.RuntimeAuthored, [], []),
+                []),
+            snapshot.Revision);
+        snapshot = await hub.ReadAsync();
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-forged-publication"),
+            snapshot.Revision);
+        snapshot = await hub.ReadAsync();
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, ReleaseOne, new ActorId("actor-forged-publication"), []),
+            snapshot.Revision);
+        snapshot = await hub.ReadAsync();
+        await hub.InstallAsync(
+            new FeatureInstallationRegistration(installationId, ReleaseOne, ["manual"]),
+            snapshot.Revision);
+        var ticket = await hub.PrepareActivePublicationAsync(installationId);
+        var forged = new FeaturePublicationReceipt(
+            installationId,
+            ticket.PublicationFence,
+            ticket.AuthorityDigest,
+            ticket.AccessDigest,
+            Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+                FeaturePublicationManifestCodec.Serialize(owner, ticket))));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => hub.ConfirmActivePublicationAsync(forged));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
+            draft.DraftId,
+            installationId,
+            ReleaseOne,
+            draft.Revision,
+            "install-forged-publication",
+            now.AddMinutes(1))));
+
+        Assert.Equal("draft", (await hub.ReadDraftAsync(draft.DraftId))?.Status);
+        Assert.NotNull(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
     }
 
     [Fact]
@@ -480,6 +582,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         Assert.All(dependencies, dependency => Assert.True(
             dependency == typeof(IGrainFactory) ||
             dependency == typeof(TimeProvider) ||
+            dependency == typeof(IFeaturePublicationVerifier) ||
             dependency.IsGenericType && dependency.GetGenericTypeDefinition() == typeof(IPersistentState<>),
             $"Unexpected feature grain dependency: {dependency}."));
     }

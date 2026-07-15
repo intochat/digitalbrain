@@ -4,6 +4,7 @@ using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using DigitalBrain.FeatureHost;
+using DigitalBrain.Kernel.Contracts;
 using Xunit;
 
 namespace DigitalBrain.UnitTests;
@@ -71,6 +72,35 @@ public sealed class FeatureArtifactCatalogTests
 
         await Assert.ThrowsAsync<FeatureReleaseValidationException>(async () =>
             await catalog.ReadActiveAsync());
+    }
+
+    [Fact]
+    public async Task Accepts_a_fenced_active_manifest_without_changing_the_runtime_projection()
+    {
+        using var cache = new TemporaryDirectory();
+        var blobs = new InMemoryBlobServiceClient();
+        blobs.Container.Seed(
+            $"active/{Segment(Owner)}/{Segment(Installation)}.json",
+            JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                ownerId = Owner,
+                actorId = "actor-1",
+                installationId = Installation,
+                releaseDigest = Digest,
+                grantRevision = 1,
+                providerConnections = new Dictionary<string, string>(),
+                publicationFence = 7,
+                authorityDigest = new string('b', 64),
+                accessDigest = new string('c', 64)
+            }));
+        blobs.Container.Seed($"releases/{Digest}/feature.dll", [1]);
+        var catalog = new BlobFeatureArtifactCatalog(blobs, cache.Path);
+
+        var active = Assert.Single(await catalog.ReadActiveAsync());
+
+        Assert.Equal(Owner, active.OwnerId.Value);
+        Assert.Equal(Installation, active.InstallationId.Value);
+        Assert.Equal(new GrantRevision(1), active.GrantRevision);
     }
 
     private static InMemoryBlobServiceClient CatalogBlobs()

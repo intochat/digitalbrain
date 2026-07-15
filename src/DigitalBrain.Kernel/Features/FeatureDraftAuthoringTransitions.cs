@@ -19,6 +19,98 @@ internal static class FeatureDraftAuthoringTransitions
         return (state.Drafts ?? []).FirstOrDefault(draft => draft.DraftId == draftId);
     }
 
+    public static FeatureDraftInstallationReservation? ReadInstallationReservation(FeatureHubState state, FeatureDraftId draftId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        DemandDraftId(draftId);
+        return (state.DraftInstallationReservations ?? []).SingleOrDefault(candidate => candidate.DraftId == draftId);
+    }
+
+    public static FeatureDraftInstallationReservationTransition AcquireInstallationReservation(
+        FeatureHubState state,
+        InstallFeatureVersion command,
+        ActorId actorId)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(command);
+        DemandDraftId(command.DraftId);
+        if (command.ExpectedRevision < 0)
+            throw new ArgumentOutOfRangeException(nameof(command));
+        DemandText(command.InstallationId.Value, 256, nameof(command.InstallationId));
+        DemandRelease(command.Release);
+        DemandText(command.DecisionId, 256, nameof(command.DecisionId));
+        DemandText(command.IdempotencyId, 256, nameof(command.IdempotencyId));
+        DemandText(actorId.Value, 256, nameof(actorId));
+        var grants = FeatureHubTransitions.ValidateGrants(command.Grants);
+        DemandSubscriptions(command.Subscriptions);
+        var subscriptions = command.Subscriptions.Order(StringComparer.Ordinal).ToArray();
+        var canonicalCommand = command with
+        {
+            Grants = grants.Select(grant => new FeatureGrantSpec(
+                grant.CapabilityId,
+                grant.CapabilityVersion,
+                grant.ProviderConnectionId,
+                grant.ConstraintsJson,
+                grant.Provider)).ToArray(),
+            Subscriptions = subscriptions
+        };
+        var commandDigest = Fingerprint(canonicalCommand);
+        var accessDigest = FeaturePublicationTransitions.AccessDigest(
+            command.InstallationId,
+            command.Release,
+            grants,
+            subscriptions);
+        var reservations = (state.DraftInstallationReservations ?? []).ToArray();
+        if ((state.Drafts ?? []).Any(candidate =>
+                candidate.DraftId != command.DraftId &&
+                candidate.InstallationId is { } installationId &&
+                (installationId == command.InstallationId || candidate.Verification?.Release == command.Release)))
+            throw new FeatureConcurrencyException("The Feature installation coordinate is already bound to another Draft.");
+        var existing = reservations.SingleOrDefault(candidate => candidate.DraftId == command.DraftId);
+        if (existing is not null)
+        {
+            if (existing.DraftRevision != command.ExpectedRevision ||
+                existing.InstallationId != command.InstallationId ||
+                existing.Release != command.Release ||
+                existing.ActorId != actorId ||
+                !string.Equals(existing.IdempotencyId, command.IdempotencyId, StringComparison.Ordinal) ||
+                !string.Equals(existing.CommandDigest, commandDigest, StringComparison.Ordinal))
+                throw new FeatureConcurrencyException("The Feature Draft is reserved for a different installation command.");
+            return new FeatureDraftInstallationReservationTransition(state, existing);
+        }
+        var draft = DemandEditableDraft(state, command.DraftId, command.ExpectedRevision);
+        var verification = draft.Verification
+            ?? throw new FeatureConcurrencyException("The Feature Draft has no Verification to reserve for installation.");
+        if (verification.Release != command.Release || verification.Total <= 0 ||
+            verification.Passed != verification.Total || verification.Failed != 0 || verification.Skipped != 0)
+            throw new FeatureConcurrencyException("Only the exact fully verified Feature release can be reserved for installation.");
+        if (draft.InstallationId is { } installationId && installationId != command.InstallationId)
+            throw new FeatureConcurrencyException("The Feature Draft is bound to another installation identity.");
+        if (reservations.Any(candidate =>
+                candidate.InstallationId == command.InstallationId ||
+                candidate.Release == command.Release && candidate.InstallationId != command.InstallationId))
+            throw new FeatureConcurrencyException("The Feature installation coordinate is already reserved.");
+        if (reservations.Length >= FeatureLimits.DraftInstallationReservations)
+            throw new FeatureLimitExceededException("An Owner can have at most 100 active Feature installation reservations.");
+        var reservation = new FeatureDraftInstallationReservation(
+            command.DraftId,
+            command.ExpectedRevision,
+            command.InstallationId,
+            command.Release,
+            command.IdempotencyId,
+            commandDigest,
+            accessDigest,
+            command.DecisionId,
+            actorId);
+        return new FeatureDraftInstallationReservationTransition(
+            state with
+            {
+                DraftInstallationReservations = [.. reservations, reservation],
+                Revision = checked(state.Revision + 1)
+            },
+            reservation);
+    }
+
     public static FeatureDraftAuthoringTransition ReviseBehavior(FeatureHubState state, ReviseFeatureBehavior command)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -79,6 +171,49 @@ internal static class FeatureDraftAuthoringTransitions
             digest);
     }
 
+    public static FeatureDraftAuthoringTransition AcceptSuggestedChange(FeatureHubState state, AcceptSuggestedChange command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(command.Patch);
+        var patch = ValidatePatch(command.Patch);
+        DemandMutation(command.IdempotencyId, command.AcceptedAt);
+        if (patch.BaseRevision != command.ExpectedRevision)
+            throw new FeatureConcurrencyException("The Suggested Change does not target the expected Draft Revision.");
+        var digest = Fingerprint(command);
+        if (Replay(state, patch.DraftId, command.IdempotencyId, "suggested-change", digest) is { } replay)
+            return replay;
+        var draft = DemandEditableDraft(state, patch.DraftId, command.ExpectedRevision);
+        return Replace(
+            state,
+            draft,
+            new FeatureDraft(
+                draft.DraftId,
+                draft.OriginatingRequest,
+                draft.Goal,
+                draft.Status,
+                patch.ReplacementBehavior,
+                patch.ReplacementSource,
+                null,
+                draft.InstallationId,
+                checked(draft.Revision + 1),
+                draft.CreatedAt,
+                command.AcceptedAt),
+            command.IdempotencyId,
+            "suggested-change",
+            digest);
+    }
+
+    public static FeatureDraftAuthoringTransition RejectSuggestedChange(FeatureHubState state, RejectSuggestedChange command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        DemandDraftId(command.DraftId);
+        DemandText(command.PatchId, FeatureLimits.DraftPatchIdCharacters, nameof(command.PatchId));
+        if (command.BaseRevision != command.ExpectedRevision)
+            throw new FeatureConcurrencyException("The Suggested Change does not target the expected Draft Revision.");
+        var draft = DemandEditableDraft(state, command.DraftId, command.ExpectedRevision, allowReserved: true);
+        return new FeatureDraftAuthoringTransition(state, draft);
+    }
+
     public static FeatureDraftAuthoringTransition RecordVerification(FeatureHubState state, RecordFeatureVerification command)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -120,13 +255,21 @@ internal static class FeatureDraftAuthoringTransitions
         var digest = Fingerprint(command);
         if (Replay(state, command.DraftId, command.IdempotencyId, "installed", digest) is { } replay)
             return replay;
-        var draft = DemandEditableDraft(state, command.DraftId, command.ExpectedRevision);
+        var reservation = ReadInstallationReservation(state, command.DraftId)
+            ?? throw new FeatureConcurrencyException("The Feature Draft has no active installation reservation.");
+        if (reservation.DraftRevision != command.ExpectedRevision ||
+            reservation.InstallationId != command.InstallationId ||
+            reservation.Release != command.Release ||
+            !string.Equals(reservation.IdempotencyId, command.IdempotencyId, StringComparison.Ordinal))
+            throw new FeatureConcurrencyException("The Feature Draft installation reservation does not match this completion.");
+        var draft = DemandEditableDraft(state, command.DraftId, command.ExpectedRevision, allowReserved: true);
         var verification = draft.Verification ?? throw new FeatureConcurrencyException("The Feature Draft has no Verification to install.");
         if (verification.Release != command.Release)
             throw new FeatureConcurrencyException("The installed release must match the exact verified release.");
         if (verification.Failed != 0 || verification.Skipped != 0 || verification.Passed != verification.Total)
             throw new FeatureConcurrencyException("Only a fully successful Verification can be installed.");
-        return Replace(
+        FeaturePublicationTransitions.DemandConfirmedReservation(state, reservation);
+        var installed = Replace(
             state,
             draft,
             new FeatureDraft(
@@ -144,15 +287,30 @@ internal static class FeatureDraftAuthoringTransitions
             command.IdempotencyId,
             "installed",
             digest);
+        return installed with
+        {
+            State = installed.State with
+            {
+                DraftInstallationReservations = (installed.State.DraftInstallationReservations ?? [])
+                    .Where(candidate => candidate.DraftId != command.DraftId)
+                    .ToArray()
+            }
+        };
     }
 
-    private static FeatureDraft DemandEditableDraft(FeatureHubState state, FeatureDraftId draftId, long expectedRevision)
+    private static FeatureDraft DemandEditableDraft(
+        FeatureHubState state,
+        FeatureDraftId draftId,
+        long expectedRevision,
+        bool allowReserved = false)
     {
         var draft = ReadDraft(state, draftId) ?? throw new KeyNotFoundException("The Feature Draft does not exist in this Owner Scope.");
         if (!string.Equals(draft.Status, "draft", StringComparison.Ordinal))
             throw new FeatureConcurrencyException("An installed Feature Draft is immutable.");
         if (draft.Revision != expectedRevision)
             throw new FeatureConcurrencyException("The Draft Revision changed.");
+        if (!allowReserved && (state.DraftInstallationReservations ?? []).Any(candidate => candidate.DraftId == draftId))
+            throw new FeatureConcurrencyException("The Feature Draft is reserved for installation.");
         return draft;
     }
 
@@ -227,6 +385,21 @@ internal static class FeatureDraftAuthoringTransitions
         if (verification.VerifiedAt.Offset != TimeSpan.Zero)
             throw new ArgumentException("Verification timestamps must be UTC.", nameof(verification));
         return verification;
+    }
+
+    internal static FeatureDraftPatch ValidatePatch(FeatureDraftPatch patch)
+    {
+        ArgumentNullException.ThrowIfNull(patch);
+        DemandText(patch.PatchId, FeatureLimits.DraftPatchIdCharacters, nameof(patch.PatchId));
+        DemandDraftId(patch.DraftId);
+        if (patch.BaseRevision < 0)
+            throw new ArgumentOutOfRangeException(nameof(patch), "A nonnegative base Draft Revision is required.");
+        DemandText(patch.Summary, FeatureLimits.DraftPatchSummaryCharacters, nameof(patch.Summary));
+        return patch with
+        {
+            ReplacementBehavior = ValidateBehavior(patch.ReplacementBehavior),
+            ReplacementSource = ValidateSource(patch.ReplacementSource)
+        };
     }
 
     private static void DemandRelease(ReleaseDigest release)
@@ -379,6 +552,17 @@ internal static class FeatureDraftAuthoringTransitions
     {
         ArgumentNullException.ThrowIfNull(draftId);
         DemandText(draftId.Value, 128, nameof(draftId));
+    }
+
+    private static void DemandSubscriptions(string[] subscriptions)
+    {
+        ArgumentNullException.ThrowIfNull(subscriptions);
+        if (subscriptions.Length is 0 or > 64 || subscriptions.Any(subscription =>
+                string.IsNullOrWhiteSpace(subscription) || subscription.Length > 256 ||
+                subscription.Any(char.IsControl) ||
+                !string.Equals(subscription, subscription.Trim(), StringComparison.Ordinal)) ||
+            subscriptions.Distinct(StringComparer.Ordinal).Count() != subscriptions.Length)
+            throw new ArgumentException("Canonical unique Feature subscriptions are required.", nameof(subscriptions));
     }
 
     private static void DemandMutation(string idempotencyId, DateTimeOffset at)

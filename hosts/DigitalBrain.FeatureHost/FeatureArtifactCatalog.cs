@@ -58,6 +58,7 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
             {
                 throw new FeatureReleaseValidationException("An active installation manifest is invalid.", exception);
             }
+            ValidatePublication(manifest);
             var owner = new BrainOwnerId(manifest.OwnerId);
             var actor = new ActorId(manifest.ActorId);
             var installation = new FeatureInstallationId(manifest.InstallationId);
@@ -155,6 +156,15 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
             throw new FeatureReleaseValidationException("A provider connection key is invalid.");
         return value;
     }
+    private static void ValidatePublication(FeatureArtifactManifest manifest)
+    {
+        var legacy = manifest.PublicationFence == 0 && manifest.AuthorityDigest is null && manifest.AccessDigest is null;
+        var fenced = manifest.PublicationFence > 0 && CanonicalDigest(manifest.AuthorityDigest) && CanonicalDigest(manifest.AccessDigest);
+        if (!legacy && !fenced)
+            throw new FeatureReleaseValidationException("An active installation publication fence is invalid.");
+    }
+    private static bool CanonicalDigest(string? value) =>
+        value is { Length: 64 } && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
     private static string Segment(string value) =>
         Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     private sealed record FeatureArtifactManifest(
@@ -163,5 +173,8 @@ internal sealed class BlobFeatureArtifactCatalog : IFeatureArtifactCatalog
         string InstallationId,
         string ReleaseDigest,
         long GrantRevision,
-        IReadOnlyDictionary<string, string>? ProviderConnections);
+        IReadOnlyDictionary<string, string>? ProviderConnections,
+        long PublicationFence = 0,
+        string? AuthorityDigest = null,
+        string? AccessDigest = null);
 }
