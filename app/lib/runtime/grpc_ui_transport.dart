@@ -14,6 +14,7 @@ import 'runtime.dart';
 const Duration unaryRequestTimeout = Duration(seconds: 10);
 const Duration featureSuggestionRequestTimeout = Duration(seconds: 65);
 const Duration featureVerificationRequestTimeout = Duration(seconds: 65);
+const Duration featureAuthorityRequestTimeout = Duration(seconds: 30);
 
 abstract interface class GrpcClientPort {
   GrpcUnaryResponse<wire.SessionReply> bootstrapSession(
@@ -51,6 +52,11 @@ abstract interface class GrpcClientPort {
     CallOptions options,
   );
 
+  GrpcUnaryResponse<wire.FeatureDraftReply> resetFeatureDraftInstallation(
+    wire.ResetFeatureDraftInstallationRequest request,
+    CallOptions options,
+  );
+
   GrpcUnaryResponse<wire.FeatureDraftReply> reviseFeatureDraft(
     wire.ReviseFeatureDraftRequest request,
     CallOptions options,
@@ -63,6 +69,36 @@ abstract interface class GrpcClientPort {
 
   GrpcUnaryResponse<wire.FeatureReleaseReviewReply> verifyFeatureDraft(
     wire.VerifyFeatureDraftRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.FeatureAccessReviewReply> reviewFeatureAccess(
+    wire.ReviewFeatureAccessRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.FeatureInstallReply> installFeatureVersion(
+    wire.InstallFeatureVersionRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest(
+    wire.ResumeOriginatingRequestRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.FeatureReply> getFeature(
+    wire.GetFeatureRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.FeatureReleaseSourceReply> getFeatureReleaseSource(
+    wire.GetFeatureReleaseSourceRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.FeatureReply> rollbackFeatureVersion(
+    wire.RollbackFeatureVersionRequest request,
     CallOptions options,
   );
 }
@@ -295,6 +331,26 @@ class GrpcUiTransport
   }
 
   @override
+  Future<wire.FeatureDraftReply> resetFeatureDraftInstallation({
+    required String accessToken,
+    required wire.ResetFeatureDraftInstallationRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.resetFeatureDraftInstallation(
+          request,
+          _authenticatedOptions(
+            accessToken,
+            timeout: featureAuthorityRequestTimeout,
+          ),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
   Future<wire.FeatureDraftReply> reviseFeatureDraft({
     required String accessToken,
     required wire.ReviseFeatureDraftRequest request,
@@ -343,6 +399,114 @@ class GrpcUiTransport
           _authenticatedOptions(
             accessToken,
             timeout: featureVerificationRequestTimeout,
+          ),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.FeatureAccessReviewReply> reviewFeatureAccess({
+    required String accessToken,
+    required wire.ReviewFeatureAccessRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.reviewFeatureAccess(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.FeatureInstallReply> installFeatureVersion({
+    required String accessToken,
+    required wire.InstallFeatureVersionRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.installFeatureVersion(
+          request,
+          _authenticatedOptions(
+            accessToken,
+            timeout: featureAuthorityRequestTimeout,
+          ),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest({
+    required String accessToken,
+    required wire.ResumeOriginatingRequestRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.resumeOriginatingRequest(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.FeatureReply> getFeature({
+    required String accessToken,
+    required wire.GetFeatureRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.getFeature(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.FeatureReleaseSourceReply> getFeatureReleaseSource({
+    required String accessToken,
+    required wire.GetFeatureReleaseSourceRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.getFeatureReleaseSource(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.FeatureReply> rollbackFeatureVersion({
+    required String accessToken,
+    required wire.RollbackFeatureVersionRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.rollbackFeatureVersion(
+          request,
+          _authenticatedOptions(
+            accessToken,
+            timeout: featureAuthorityRequestTimeout,
           ),
         ),
       );
@@ -560,6 +724,14 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
   );
 
   @override
+  GrpcUnaryResponse<wire.FeatureDraftReply> resetFeatureDraftInstallation(
+    wire.ResetFeatureDraftInstallationRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.resetFeatureDraftInstallation(request, options: options),
+  );
+
+  @override
   GrpcUnaryResponse<wire.FeatureDraftReply> reviseFeatureDraft(
     wire.ReviseFeatureDraftRequest request,
     CallOptions options,
@@ -581,6 +753,53 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
     CallOptions options,
   ) => _GeneratedGrpcUnaryResponse(
     client.verifyFeatureDraft(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.FeatureAccessReviewReply> reviewFeatureAccess(
+    wire.ReviewFeatureAccessRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.reviewFeatureAccess(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.FeatureInstallReply> installFeatureVersion(
+    wire.InstallFeatureVersionRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.installFeatureVersion(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest(
+    wire.ResumeOriginatingRequestRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.resumeOriginatingRequest(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.FeatureReply> getFeature(
+    wire.GetFeatureRequest request,
+    CallOptions options,
+  ) =>
+      _GeneratedGrpcUnaryResponse(client.getFeature(request, options: options));
+
+  @override
+  GrpcUnaryResponse<wire.FeatureReleaseSourceReply> getFeatureReleaseSource(
+    wire.GetFeatureReleaseSourceRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.getFeatureReleaseSource(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.FeatureReply> rollbackFeatureVersion(
+    wire.RollbackFeatureVersionRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.rollbackFeatureVersion(request, options: options),
   );
 }
 

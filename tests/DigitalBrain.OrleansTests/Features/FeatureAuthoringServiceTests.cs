@@ -9,6 +9,7 @@ using FeatureArtifactCatalog = McpProject::DigitalBrain.Mcp.IFeatureArtifactCata
 using FeatureAuthoringService = McpProject::DigitalBrain.Mcp.FeatureAuthoringService;
 using FeatureBuildArtifact = McpProject::DigitalBrain.Mcp.FeatureBuildArtifact;
 using FeatureBuildEndpoint = McpProject::DigitalBrain.Mcp.IFeatureBuildEndpoint;
+using FeatureBuildReview = McpProject::DigitalBrain.Mcp.FeatureBuildReview;
 using FeatureBuildSubmission = McpProject::DigitalBrain.Mcp.FeatureBuildSubmission;
 using FeatureInstallationInspection = McpProject::DigitalBrain.Mcp.FeatureInstallationInspection;
 using FeatureLifecycleInspection = McpProject::DigitalBrain.Mcp.FeatureLifecycleInspection;
@@ -38,7 +39,7 @@ public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixt
             draft.Revision,
             "source-authoring-verify",
             fixture.Time.GetUtcNow().AddMinutes(1)));
-        var release = Release("a1", "capability.read");
+        var release = Release("a1", "capability.read") with { SourceReference = SourceReference(source) };
         var builds = new RecordingBuildEndpoint(new FeatureBuildArtifact(release, new FeatureScenarioResult(3, 3, 0, 0)));
         var service = Service(builds);
 
@@ -160,7 +161,7 @@ public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixt
     }
 
     [Fact]
-    public async Task A_lost_verification_response_may_rebuild_the_same_snapshot_and_replay_the_same_candidate()
+    public async Task A_lost_verification_response_reuses_persisted_evidence_without_rebuilding()
     {
         var context = Context("owner-authoring-verify-replay");
         var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(context.OwnerId));
@@ -169,19 +170,36 @@ public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixt
             "Replay a deterministic verification",
             fixture.Time.GetUtcNow(),
             "conversation-authoring-verify-replay"));
-        var artifact = new FeatureBuildArtifact(Release("a5"), new FeatureScenarioResult(1, 1, 0, 0));
+        var release = Release("a5") with
+        {
+            SourceReference = SourceReference(draft.Source),
+            Source = draft.Source
+        };
+        var artifact = new FeatureBuildArtifact(release, new FeatureScenarioResult(1, 1, 0, 0));
         var builds = new RecordingBuildEndpoint(artifact);
-        var service = Service(builds);
+        var service = new FeatureAuthoringService(
+            fixture.Cluster.Client,
+            builds,
+            new StaticArtifactCatalog(release),
+            new UnusedLifecycleRail(),
+            fixture.Time);
         var command = new VerifyFeatureDraft(draft.DraftId, draft.Revision, "verify-replay");
 
         var first = await service.VerifyAsync(context, command);
         fixture.Time.Advance(TimeSpan.FromMinutes(2));
         var replay = await service.VerifyAsync(context, command);
+        var conflicting = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            service.VerifyAsync(
+                context,
+                command with { IdempotencyId = "verify-replay-different" }));
 
-        Assert.Equal(2, builds.CallCount);
+        Assert.Equal(1, builds.CallCount);
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, conflicting.Reason);
         Assert.Equal(first.Release, replay.Release);
         Assert.Equal(first.Draft.Revision, replay.Draft.Revision);
-        Assert.Equal(first.Draft.Verification, replay.Draft.Verification);
+        Assert.Equal(
+            System.Text.Json.JsonSerializer.Serialize(first.Draft.Verification),
+            System.Text.Json.JsonSerializer.Serialize(replay.Draft.Verification));
     }
 
     [Fact]
@@ -201,6 +219,79 @@ public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixt
             new VerifyFeatureDraft(draft.DraftId, draft.Revision, "verify-scenario-failure")));
 
         Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
+        Assert.Null((await hub.ReadDraftAsync(draft.DraftId))?.Verification);
+    }
+
+    [Fact]
+    public async Task Failed_verification_returns_safe_evidence_without_mutating_the_Draft()
+    {
+        var context = Context("owner-authoring-structured-failure");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(context.OwnerId));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-authoring-structured-failure",
+            "Explain a failed verification safely",
+            fixture.Time.GetUtcNow(),
+            "conversation-authoring-structured-failure"));
+        var evidence = new FeatureVerificationEvidence(
+            "sha256:" + new string('7', 64),
+            2,
+            1,
+            1,
+            0,
+            [
+                new FeatureScenarioEvidence("scenario-pass", "Pass", FeatureScenarioOutcome.Passed, null, 12),
+                new FeatureScenarioEvidence("scenario-fail", "Fail", FeatureScenarioOutcome.Failed, "Expected a matching result.", 18)
+            ],
+            [new FeatureVerificationArtifact("scenarios.trx", "application/vnd.microsoft.trx+xml", 512, "sha256:" + new string('8', 64))]);
+        var service = Service(new StructuredBuildEndpoint(new FeatureBuildReview(evidence, null)));
+
+        var review = await service.RunVerificationAsync(
+            context,
+            new VerifyFeatureDraft(draft.DraftId, draft.Revision, "verify-structured-failure"));
+
+        Assert.Equal(draft.DraftId, review.Draft.DraftId);
+        Assert.Equal(draft.Revision, review.Draft.Revision);
+        Assert.Equal(draft.UpdatedAt, review.Draft.UpdatedAt);
+        Assert.Null(review.Draft.Verification);
+        Assert.Null(review.Release);
+        Assert.Equal(evidence, review.Evidence);
+        var persisted = Assert.IsType<FeatureDraft>(await hub.ReadDraftAsync(draft.DraftId));
+        Assert.Equal(draft.Revision, persisted.Revision);
+        Assert.Null(persisted.Verification);
+    }
+
+    [Fact]
+    public async Task Verification_rejects_evidence_exceeding_two_MiB_before_persistence()
+    {
+        var context = Context("owner-authoring-evidence-budget");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(context.OwnerId));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-authoring-evidence-budget",
+            "Reject oversized verification evidence",
+            fixture.Time.GetUtcNow(),
+            "conversation-authoring-evidence-budget"));
+        var scenarios = Enumerable.Range(0, 1024)
+            .Select(index => new FeatureScenarioEvidence(
+                $"scenario-{index:D4}",
+                "Oversized evidence",
+                FeatureScenarioOutcome.Failed,
+                new string('f', 2048),
+                1))
+            .ToArray();
+        var evidence = new FeatureVerificationEvidence(
+            "sha256:" + new string('7', 64),
+            scenarios.Length,
+            0,
+            scenarios.Length,
+            0,
+            scenarios,
+            []);
+        var service = Service(new StructuredBuildEndpoint(new FeatureBuildReview(evidence, null)));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => service.RunVerificationAsync(
+            context,
+            new VerifyFeatureDraft(draft.DraftId, draft.Revision, "verify-evidence-budget")));
+
         Assert.Null((await hub.ReadDraftAsync(draft.DraftId))?.Verification);
     }
 
@@ -406,12 +497,10 @@ public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixt
 
         var verified = await conflictHub.RecordVerificationAsync(new RecordFeatureVerification(
             conflictDraft.DraftId,
-            new FeatureVerification(
+            FeatureVerificationTestData.Passing(
                 new ReleaseDigest(new string('a', 64)),
+                conflictDraft.Source,
                 1,
-                1,
-                0,
-                0,
                 fixture.Time.GetUtcNow()),
             conflictDraft.Revision + 1,
             "rejection-precondition-verification"));
@@ -453,7 +542,7 @@ public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixt
         AssertRejection(limit, "Limit");
     }
 
-    private FeatureAuthoringService Service(RecordingBuildEndpoint builds) => new(
+    private FeatureAuthoringService Service(FeatureBuildEndpoint builds) => new(
         fixture.Cluster.Client,
         builds,
         new StaticArtifactCatalog(Release("a3")),
@@ -485,9 +574,12 @@ public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixt
             new FeatureSourceFile($"tests/Feature{suffix}.Scenarios/Feature{suffix}.Scenarios.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>")
         ]);
 
+    private static string SourceReference(FeatureSourceSnapshot source) =>
+        FeatureDraftAuthoringTransitions.SourceReference(source);
+
     private static FeatureReleaseMetadata Release(string suffix, params string[] capabilities) => new(
         new ReleaseDigest(new string('0', 63) + suffix[^1]),
-        $"runtime-authored-{suffix}",
+        "sha256:" + new string('0', 63) + suffix[^1],
         FeatureSourceKind.RuntimeAuthored,
         capabilities,
         []);
@@ -519,10 +611,24 @@ public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixt
         }
     }
 
+    private sealed class StructuredBuildEndpoint(FeatureBuildReview review) : FeatureBuildEndpoint
+    {
+        public Task<FeatureBuildReview> VerifyAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default) =>
+            Task.FromResult(review);
+
+        public Task<FeatureBuildArtifact> BuildAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
     private sealed class StaticArtifactCatalog(FeatureReleaseMetadata release) : FeatureArtifactCatalog
     {
         public Task<FeatureReleaseMetadata> DemandReleaseAsync(ReleaseDigest digest, CancellationToken cancellationToken = default) =>
             Task.FromResult(release);
+
+        public Task<FeatureSourceSnapshot> DemandSourceAsync(
+            string sourceReference,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(release.Source ?? throw new InvalidOperationException("A source fixture is required."));
     }
 
     private sealed class UnusedLifecycleRail : FeatureLifecycleRail

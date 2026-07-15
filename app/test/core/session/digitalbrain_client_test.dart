@@ -41,6 +41,110 @@ void main() {
     },
   );
 
+  test('pending install reset uses the shared authorized client', () async {
+    final session = _authenticatedSession();
+    final transport = _RecordingDigitalBrainTransport();
+    final client = DigitalBrainClient(session: session, transport: transport);
+    final request = wire.ResetFeatureDraftInstallationRequest(
+      draftId: 'draft-a',
+      idempotencyId: 'reset-a',
+    );
+
+    final reply = await client.resetFeatureDraftInstallation(request);
+
+    expect(reply, same(transport.draftReply));
+    expect(transport.resetRequests, [same(request)]);
+    expect(transport.productAccessTokens, ['access-a']);
+  });
+
+  test('originating request resume uses the shared authorized client', () async {
+    final session = _authenticatedSession();
+    final transport = _RecordingDigitalBrainTransport();
+    final client = DigitalBrainClient(session: session, transport: transport);
+    final request = wire.ResumeOriginatingRequestRequest(
+      draftId: 'draft-a',
+      expectedRevision: Int64(5),
+      idempotencyId: 'run-a',
+    );
+
+    final reply = await client.resumeOriginatingRequest(request);
+
+    expect(reply, same(transport.resumeReply));
+    expect(transport.resumeRequests, [same(request)]);
+    expect(transport.productAccessTokens, ['access-a']);
+  });
+
+  test(
+    'feature access review and install use the shared authorized client',
+    () async {
+      final session = _authenticatedSession();
+      final transport = _RecordingDigitalBrainTransport();
+      final client = DigitalBrainClient(session: session, transport: transport);
+      final reviewRequest = wire.ReviewFeatureAccessRequest(
+        draftId: 'draft-a',
+        expectedRevision: Int64(4),
+        installationId: 'installation-a',
+        releaseDigest: List.filled(64, 'a').join(),
+      );
+      final installRequest = wire.InstallFeatureVersionRequest(
+        draftId: 'draft-a',
+        expectedRevision: Int64(4),
+        installationId: 'installation-a',
+        releaseDigest: List.filled(64, 'a').join(),
+        decisionId: 'decision-a',
+        idempotencyId: 'installation-attempt-a',
+      );
+
+      final review = await client.reviewFeatureAccess(reviewRequest);
+      final install = await client.installFeatureVersion(installRequest);
+
+      expect(review, same(transport.accessReviewReply));
+      expect(install, same(transport.installReply));
+      expect(transport.reviewAccessRequests, [same(reviewRequest)]);
+      expect(transport.installRequests, [same(installRequest)]);
+      expect(transport.productAccessTokens, ['access-a', 'access-a']);
+    },
+  );
+
+  test(
+    'feature detail source and rollback use the shared authorized client',
+    () async {
+      final session = _authenticatedSession();
+      final transport = _RecordingDigitalBrainTransport();
+      final client = DigitalBrainClient(session: session, transport: transport);
+      final getRequest = wire.GetFeatureRequest(featureId: 'feature-a');
+      final sourceRequest = wire.GetFeatureReleaseSourceRequest(
+        featureId: 'feature-a',
+        installationId: 'installation-a',
+        releaseDigest: List.filled(64, 'b').join(),
+        sourceReference: 'sha256:${List.filled(64, 'c').join()}',
+      );
+      final rollbackRequest = wire.RollbackFeatureVersionRequest(
+        featureId: 'feature-a',
+        expectedActiveDigest: List.filled(64, 'a').join(),
+        targetDigest: List.filled(64, 'b').join(),
+        idempotencyId: 'rollback-a',
+        expectedRevision: Int64(7),
+      );
+
+      final feature = await client.getFeature(getRequest);
+      final source = await client.getFeatureReleaseSource(sourceRequest);
+      final rollback = await client.rollbackFeatureVersion(rollbackRequest);
+
+      expect(feature, same(transport.featureReply));
+      expect(source, same(transport.sourceReply));
+      expect(rollback, same(transport.featureReply));
+      expect(transport.getFeatureRequests, [same(getRequest)]);
+      expect(transport.sourceRequests, [same(sourceRequest)]);
+      expect(transport.rollbackRequests, [same(rollbackRequest)]);
+      expect(transport.productAccessTokens, [
+        'access-a',
+        'access-a',
+        'access-a',
+      ]);
+    },
+  );
+
   test(
     'unauthenticated product call refreshes and replays the same request once',
     () async {
@@ -685,13 +789,25 @@ class _RecordingDigitalBrainTransport
         SessionProductCallCancellation {
   final draftReply = wire.FeatureDraftReply();
   final reviewReply = wire.FeatureReleaseReviewReply();
+  final accessReviewReply = wire.FeatureAccessReviewReply();
+  final installReply = wire.FeatureInstallReply();
+  final resumeReply = wire.ResumeOriginatingRequestReply();
+  final featureReply = wire.FeatureReply();
+  final sourceReply = wire.FeatureReleaseSourceReply();
   String? accessToken;
   wire.GetFeatureDraftRequest? getRequest;
   final List<String> productAccessTokens = [];
   final List<String> refreshTokens = [];
   final List<wire.GetFeatureDraftRequest> getRequests = [];
+  final List<wire.ResetFeatureDraftInstallationRequest> resetRequests = [];
   final List<wire.ReviseFeatureDraftRequest> reviseRequests = [];
   final List<wire.VerifyFeatureDraftRequest> verifyRequests = [];
+  final List<wire.ReviewFeatureAccessRequest> reviewAccessRequests = [];
+  final List<wire.InstallFeatureVersionRequest> installRequests = [];
+  final List<wire.ResumeOriginatingRequestRequest> resumeRequests = [];
+  final List<wire.GetFeatureRequest> getFeatureRequests = [];
+  final List<wire.GetFeatureReleaseSourceRequest> sourceRequests = [];
+  final List<wire.RollbackFeatureVersionRequest> rollbackRequests = [];
   Future<SessionBundle>? refreshResult;
   Future<SessionBundle>? loginResult;
   FeedCall? feedCall;
@@ -729,6 +845,16 @@ class _RecordingDigitalBrainTransport
   }
 
   @override
+  Future<wire.FeatureDraftReply> resetFeatureDraftInstallation({
+    required String accessToken,
+    required wire.ResetFeatureDraftInstallationRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    resetRequests.add(request);
+    return draftReply;
+  }
+
+  @override
   Future<wire.FeatureDraftReply> reviseFeatureDraft({
     required String accessToken,
     required wire.ReviseFeatureDraftRequest request,
@@ -756,6 +882,66 @@ class _RecordingDigitalBrainTransport
     final callback = onVerify;
     if (callback != null) return callback(accessToken, request);
     return reviewReply;
+  }
+
+  @override
+  Future<wire.FeatureAccessReviewReply> reviewFeatureAccess({
+    required String accessToken,
+    required wire.ReviewFeatureAccessRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    reviewAccessRequests.add(request);
+    return accessReviewReply;
+  }
+
+  @override
+  Future<wire.FeatureInstallReply> installFeatureVersion({
+    required String accessToken,
+    required wire.InstallFeatureVersionRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    installRequests.add(request);
+    return installReply;
+  }
+
+  @override
+  Future<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest({
+    required String accessToken,
+    required wire.ResumeOriginatingRequestRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    resumeRequests.add(request);
+    return resumeReply;
+  }
+
+  @override
+  Future<wire.FeatureReply> getFeature({
+    required String accessToken,
+    required wire.GetFeatureRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    getFeatureRequests.add(request);
+    return featureReply;
+  }
+
+  @override
+  Future<wire.FeatureReleaseSourceReply> getFeatureReleaseSource({
+    required String accessToken,
+    required wire.GetFeatureReleaseSourceRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    sourceRequests.add(request);
+    return sourceReply;
+  }
+
+  @override
+  Future<wire.FeatureReply> rollbackFeatureVersion({
+    required String accessToken,
+    required wire.RollbackFeatureVersionRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    rollbackRequests.add(request);
+    return featureReply;
   }
 
   @override

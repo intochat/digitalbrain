@@ -59,6 +59,18 @@ public interface ICapabilityCatalog
     IReadOnlyList<CapabilityDescriptor> Snapshot();
 }
 
+[Alias("digitalbrain.capability-catalog-projection-grain.v1")]
+public interface ICapabilityCatalogProjectionGrain : IGrainWithIntegerKey
+{
+    [Alias("read")]
+    Task<CapabilityDescriptor[]> ReadAsync();
+}
+
+public static class CapabilityCatalogProjectionGrainIds
+{
+    public const long Singleton = 0;
+}
+
 public interface ICapabilityDescriptorSource
 {
     IReadOnlyList<CapabilityDescriptor> Descriptors { get; }

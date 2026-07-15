@@ -92,6 +92,44 @@ class FeatureSourceKind extends $pb.ProtobufEnum {
   const FeatureSourceKind._(super.value, super.name);
 }
 
+class FeatureScenarioOutcome extends $pb.ProtobufEnum {
+  static const FeatureScenarioOutcome FEATURE_SCENARIO_OUTCOME_UNSPECIFIED =
+      FeatureScenarioOutcome._(
+        0,
+        _omitEnumNames ? '' : 'FEATURE_SCENARIO_OUTCOME_UNSPECIFIED',
+      );
+  static const FeatureScenarioOutcome FEATURE_SCENARIO_OUTCOME_PASSED =
+      FeatureScenarioOutcome._(
+        1,
+        _omitEnumNames ? '' : 'FEATURE_SCENARIO_OUTCOME_PASSED',
+      );
+  static const FeatureScenarioOutcome FEATURE_SCENARIO_OUTCOME_FAILED =
+      FeatureScenarioOutcome._(
+        2,
+        _omitEnumNames ? '' : 'FEATURE_SCENARIO_OUTCOME_FAILED',
+      );
+  static const FeatureScenarioOutcome FEATURE_SCENARIO_OUTCOME_SKIPPED =
+      FeatureScenarioOutcome._(
+        3,
+        _omitEnumNames ? '' : 'FEATURE_SCENARIO_OUTCOME_SKIPPED',
+      );
+
+  static const $core.List<FeatureScenarioOutcome> values =
+      <FeatureScenarioOutcome>[
+        FEATURE_SCENARIO_OUTCOME_UNSPECIFIED,
+        FEATURE_SCENARIO_OUTCOME_PASSED,
+        FEATURE_SCENARIO_OUTCOME_FAILED,
+        FEATURE_SCENARIO_OUTCOME_SKIPPED,
+      ];
+
+  static final $core.List<FeatureScenarioOutcome?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static FeatureScenarioOutcome? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FeatureScenarioOutcome._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames = $core.bool.fromEnvironment(
   'protobuf.omit_enum_names',
 );

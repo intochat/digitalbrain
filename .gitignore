@@ -22,6 +22,10 @@ mono_crash.*
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+!app/lib/features/releases/
+!app/lib/features/releases/**
+!app/test/features/releases/
+!app/test/features/releases/**
 
 [Dd]ebug/x64/
 [Dd]ebugPublic/x64/

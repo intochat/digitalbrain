@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:digitalbrain_flutter/app.dart';
 import 'package:digitalbrain_flutter/core/session/digitalbrain_client.dart';
+import 'package:digitalbrain_flutter/features/releases/feature_release_page.dart';
+import 'package:digitalbrain_flutter/features/studio/feature_studio_models.dart';
 import 'package:digitalbrain_flutter/features/studio/feature_studio_page.dart';
 import 'package:digitalbrain_flutter/grpc/ui.pb.dart' as wire;
 import 'package:digitalbrain_flutter/router.dart';
@@ -9,6 +11,7 @@ import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
 import 'package:digitalbrain_flutter/runtime/runtime.dart';
 import 'package:digitalbrain_flutter/runtime/runtime_configuration.dart';
 import 'package:digitalbrain_flutter/runtime/runtime_session_owner.dart';
+import 'package:digitalbrain_flutter/runtime/widgets/chat_page.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_composer.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/ino_conversation_view.dart';
 import 'package:digitalbrain_flutter/runtime/widgets/runtime_shell.dart';
@@ -18,9 +21,641 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'features/releases/feature_release_test_fixtures.dart';
 import 'runtime/test_fixtures.dart';
 
 void main() {
+  testWidgets(
+    'canonical exact Feature Release route loads authority and generates canonical rollback location',
+    (tester) async {
+      final location = '/features/feature-a/releases/${releaseDigest('a')}';
+      final transport = _RouterTransport(
+        _RouterFeedCall(),
+        featureReply: wireReleaseDetails(),
+        rollbackReply: wireReleaseDetails(
+          activeCharacter: 'b',
+          withPrevious: false,
+          revision: Int64(13),
+        ),
+      );
+      final owner = RuntimeSessionOwner(
+        configuration: _configuration(),
+        transportFactory: (_) => transport,
+      );
+      final router = createDigitalBrainRouter(initialLocation: location);
+
+      await tester.pumpWidget(
+        DigitalBrainApp(
+          sessionOwnerFactory: () => owner,
+          routerFactory: () => router,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+      );
+      await tester.tap(find.byKey(runtimeSignInButtonKey));
+      await _pumpUntil(tester, () => transport.getFeatureRequests.length == 1);
+      await _pumpUntil(
+        tester,
+        () => find.text('Active Version').evaluate().isNotEmpty,
+      );
+
+      final page = tester.widget<FeatureReleasePage>(
+        find.byType(FeatureReleasePage),
+      );
+      expect(page.expectedReleaseDigest, releaseDigest('a'));
+      expect(
+        page.key,
+        ValueKey('feature-version-feature-a-${releaseDigest('a')}'),
+      );
+      expect(transport.getFeatureRequests.single.featureId, 'feature-a');
+      expect(transport.releaseSourceRequests, hasLength(2));
+      expect(find.text(releaseDigest('a')), findsOneWidget);
+      expect(find.text(sourceReference('a')), findsOneWidget);
+
+      final rollback = find.byKey(featureReleaseRollbackButtonKey);
+      await tester.ensureVisible(rollback);
+      await tester.tap(rollback);
+      await tester.pumpAndSettle();
+      expect(transport.rollbackRequests, isEmpty);
+      expect(find.text(releaseDigest('b')), findsOneWidget);
+      expect(find.text(sourceReference('b')), findsOneWidget);
+
+      await tester.tap(find.byKey(featureReleaseConfirmRollbackButtonKey));
+      await _pumpUntil(tester, () => transport.rollbackRequests.length == 1);
+      await tester.pumpAndSettle();
+
+      final request = transport.rollbackRequests.single;
+      expect(request.featureId, 'feature-a');
+      expect(request.expectedActiveDigest, releaseDigest('a'));
+      expect(request.targetDigest, releaseDigest('b'));
+      expect(request.idempotencyId, isNotEmpty);
+      expect(request.expectedRevision, Int64(12));
+      expect(transport.releaseSourceRequests, hasLength(4));
+      expect(find.text('Previous Version restored exactly'), findsOneWidget);
+      expect(find.text(releaseDigest('b')), findsOneWidget);
+      expect(find.text(sourceReference('b')), findsOneWidget);
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        '/features/feature-a/releases/${releaseDigest('b')}',
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpUntil(tester, () => transport.closeCalls > 0);
+    },
+  );
+
+  testWidgets('failed exact rollback retains the requested Version route', (
+    tester,
+  ) async {
+    final requestedLocation =
+        '/features/feature-a/versions/${releaseDigest('a')}';
+    final transport = _RouterTransport(
+      _RouterFeedCall(),
+      featureReply: wireReleaseDetails(),
+      rollbackReply: wire.FeatureReply(),
+    );
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(initialLocation: requestedLocation);
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.byKey(featureReleaseRollbackButtonKey).evaluate().isNotEmpty,
+    );
+
+    final rollback = find.byKey(featureReleaseRollbackButtonKey);
+    await tester.ensureVisible(rollback);
+    await tester.tap(rollback);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(featureReleaseConfirmRollbackButtonKey));
+    await _pumpUntil(tester, () => transport.rollbackRequests.length == 1);
+    await tester.pumpAndSettle();
+
+    expect(router.routeInformationProvider.value.uri.path, requestedLocation);
+    expect(
+      find.text(
+        'The rollback response could not be verified. Reload the Feature.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets(
+    'legacy Version route remains an exact release compatibility alias',
+    (tester) async {
+      final legacyLocation =
+          '/features/feature-a/versions/${releaseDigest('b')}';
+      final transport = _RouterTransport(
+        _RouterFeedCall(),
+        featureReply: wireReleaseDetails(
+          activeCharacter: 'b',
+          withPrevious: false,
+        ),
+      );
+      final owner = RuntimeSessionOwner(
+        configuration: _configuration(),
+        transportFactory: (_) => transport,
+      );
+      final router = createDigitalBrainRouter(initialLocation: legacyLocation);
+
+      await tester.pumpWidget(
+        DigitalBrainApp(
+          sessionOwnerFactory: () => owner,
+          routerFactory: () => router,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+      );
+      await tester.tap(find.byKey(runtimeSignInButtonKey));
+      await _pumpUntil(
+        tester,
+        () => find.text('Active Version').evaluate().isNotEmpty,
+      );
+
+      final page = tester.widget<FeatureReleasePage>(
+        find.byType(FeatureReleasePage),
+      );
+      expect(page.expectedReleaseDigest, releaseDigest('b'));
+      expect(router.routeInformationProvider.value.uri.path, legacyLocation);
+      expect(find.text(releaseDigest('b')), findsOneWidget);
+      expect(find.text('Previous Version restored exactly'), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpUntil(tester, () => transport.closeCalls > 0);
+    },
+  );
+
+  testWidgets('exact Feature Version route rejects an authority mismatch', (
+    tester,
+  ) async {
+    final location = '/features/feature-a/versions/${releaseDigest('b')}';
+    final transport = _RouterTransport(
+      _RouterFeedCall(),
+      featureReply: wireReleaseDetails(),
+    );
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(initialLocation: location);
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(tester, () => transport.getFeatureRequests.length == 1);
+    await _pumpUntil(
+      tester,
+      () => find
+          .text('The Feature response could not be verified.')
+          .evaluate()
+          .isNotEmpty,
+    );
+
+    final page = tester.widget<FeatureReleasePage>(
+      find.byType(FeatureReleasePage),
+    );
+    expect(page.expectedReleaseDigest, releaseDigest('b'));
+    expect(transport.releaseSourceRequests, isEmpty);
+    expect(find.text('Active Version'), findsNothing);
+    expect(find.byKey(featureReleaseRollbackButtonKey), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets('Feature route remains compatible without a Version digest', (
+    tester,
+  ) async {
+    const location = '/features/feature-a';
+    final transport = _RouterTransport(
+      _RouterFeedCall(),
+      featureReply: wireReleaseDetails(withPrevious: false),
+    );
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(initialLocation: location);
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.text('Active Version').evaluate().isNotEmpty,
+    );
+
+    final page = tester.widget<FeatureReleasePage>(
+      find.byType(FeatureReleasePage),
+    );
+    expect(page.expectedReleaseDigest, isNull);
+    expect(find.text(releaseDigest('a')), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets('Studio Run now sends one server-checkable resume intent', (
+    tester,
+  ) async {
+    final location = Uri(
+      path: '/features/proposals/draft-a',
+      queryParameters: const {
+        'conversationId': 'tampered-conversation',
+        'operationId': 'tampered-operation',
+        'prompt': 'tampered prompt',
+      },
+    ).toString();
+    final transport = _RouterTransport(_RouterFeedCall());
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(
+      initialLocation: location,
+      runNowIdFactory: () => 'resume-router',
+    );
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.byType(FeatureStudioPage).evaluate().isNotEmpty,
+    );
+
+    final studio = tester.widget<FeatureStudioPage>(
+      find.byType(FeatureStudioPage),
+    );
+    expect(studio.onRunNow, isNotNull);
+    studio.onRunNow?.call('draft-a', Int64(7));
+    await _pumpUntil(
+      tester,
+      () =>
+          router.routeInformationProvider.value.uri.path == '/chat' &&
+          transport.resumeRequests.length == 1,
+    );
+
+    expect(router.routeInformationProvider.value.uri.queryParameters, {
+      'intent': 'resume-originating-request',
+      'featureDraftId': 'draft-a',
+      'expectedRevision': '7',
+      'idempotencyId': 'resume-router',
+    });
+    expect(transport.resumeRequests.single.draftId, 'draft-a');
+    expect(transport.resumeRequests.single.expectedRevision, Int64(7));
+    expect(transport.resumeRequests.single.idempotencyId, 'resume-router');
+    await tester.pump(const Duration(milliseconds: 20));
+    expect(transport.resumeRequests, hasLength(1));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets('Studio Return to Chat performs no implicit resume', (
+    tester,
+  ) async {
+    const location = '/features/proposals/draft-a';
+    final transport = _RouterTransport(_RouterFeedCall());
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(initialLocation: location);
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.byType(FeatureStudioPage).evaluate().isNotEmpty,
+    );
+
+    final studio = tester.widget<FeatureStudioPage>(
+      find.byType(FeatureStudioPage),
+    );
+    studio.onBackToChat(
+      const FeatureStudioOriginatingRequest(
+        operationId: 'operation-router',
+        conversationId: 'conversation-router',
+        text: 'Research Acme',
+      ),
+      'draft-a',
+    );
+    await _pumpUntil(
+      tester,
+      () => router.routeInformationProvider.value.uri.path == '/chat',
+    );
+
+    expect(router.routeInformationProvider.value.uri.queryParameters, isEmpty);
+    expect(transport.resumeRequests, isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets('malformed resume intent fails safely without execution', (
+    tester,
+  ) async {
+    final location = Uri(
+      path: '/chat',
+      queryParameters: const {
+        'intent': 'resume-originating-request',
+        'featureDraftId': 'draft-a',
+        'expectedRevision': 'not-a-revision',
+        'idempotencyId': 'resume-router',
+        'prompt': 'must never execute',
+      },
+    ).toString();
+    final transport = _RouterTransport(_RouterFeedCall());
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(initialLocation: location);
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeResumeErrorKey).evaluate().isNotEmpty,
+    );
+
+    expect(transport.resumeRequests, isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets('resume failure retries once with the same stable identity', (
+    tester,
+  ) async {
+    final location = Uri(
+      path: '/chat',
+      queryParameters: const {
+        'intent': 'resume-originating-request',
+        'featureDraftId': 'draft-a',
+        'expectedRevision': '7',
+        'idempotencyId': 'resume-router',
+        'prompt': 'ignored prompt',
+      },
+    ).toString();
+    final transport = _RouterTransport(
+      _RouterFeedCall(),
+      failFirstResume: true,
+    );
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(initialLocation: location);
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () =>
+          transport.resumeRequests.length == 1 &&
+          find.byKey(runtimeResumeErrorKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeResumeRetryKey));
+    await _pumpUntil(tester, () => transport.resumeRequests.length == 2);
+
+    expect(
+      transport.resumeRequests.map((request) => request.idempotencyId),
+      everyElement('resume-router'),
+    );
+    expect(transport.resumeRequests.last.draftId, 'draft-a');
+    expect(transport.resumeRequests.last.expectedRevision, Int64(7));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  for (final (failure, reply) in <(String, wire.ResumeOriginatingRequestReply)>[
+    (
+      'mismatched command',
+      wire.ResumeOriginatingRequestReply(
+        commandId: 'different-intent',
+        operationId: _resumeOperationId,
+        phase: 'Accepted',
+        version: Int64.ONE,
+      ),
+    ),
+    (
+      'empty operation',
+      wire.ResumeOriginatingRequestReply(
+        commandId: 'resume-router',
+        operationId: '',
+        phase: 'Accepted',
+        version: Int64.ONE,
+      ),
+    ),
+    (
+      'noncanonical operation',
+      wire.ResumeOriginatingRequestReply(
+        commandId: 'resume-router',
+        operationId: 'operation-resumed',
+        phase: 'Accepted',
+        version: Int64.ONE,
+      ),
+    ),
+    (
+      'unexpected phase',
+      wire.ResumeOriginatingRequestReply(
+        commandId: 'resume-router',
+        operationId: _resumeOperationId,
+        phase: 'Running',
+        version: Int64.ONE,
+      ),
+    ),
+    (
+      'nonpositive version',
+      wire.ResumeOriginatingRequestReply(
+        commandId: 'resume-router',
+        operationId: _resumeOperationId,
+        phase: 'Accepted',
+        version: Int64.ZERO,
+      ),
+    ),
+  ]) {
+    testWidgets('Chat rejects $failure reply and retries the stable intent', (
+      tester,
+    ) async {
+      final location = Uri(
+        path: '/chat',
+        queryParameters: const {
+          'intent': 'resume-originating-request',
+          'featureDraftId': 'draft-a',
+          'expectedRevision': '7',
+          'idempotencyId': 'resume-router',
+        },
+      ).toString();
+      final transport = _RouterTransport(_RouterFeedCall(), resumeReply: reply);
+      final owner = RuntimeSessionOwner(
+        configuration: _configuration(),
+        transportFactory: (_) => transport,
+      );
+      final router = createDigitalBrainRouter(initialLocation: location);
+
+      await tester.pumpWidget(
+        DigitalBrainApp(
+          sessionOwnerFactory: () => owner,
+          routerFactory: () => router,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+      );
+      await tester.tap(find.byKey(runtimeSignInButtonKey));
+      await _pumpUntil(
+        tester,
+        () =>
+            transport.resumeRequests.length == 1 &&
+            find.byKey(runtimeResumeErrorKey).evaluate().isNotEmpty,
+      );
+
+      transport.resumeReply = null;
+      await tester.tap(find.byKey(runtimeResumeRetryKey));
+      await _pumpUntil(tester, () => transport.resumeRequests.length == 2);
+      expect(
+        transport.resumeRequests.map((request) => request.idempotencyId),
+        everyElement('resume-router'),
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpUntil(tester, () => transport.closeCalls > 0);
+    });
+  }
+
+  testWidgets(
+    'Studio update route preserves the requested installation target',
+    (tester) async {
+      final location = Uri(
+        path: '/features/proposals/draft-a',
+        queryParameters: const {'installationId': 'installation-existing'},
+      ).toString();
+      final transport = _RouterTransport(_RouterFeedCall());
+      final owner = RuntimeSessionOwner(
+        configuration: _configuration(),
+        transportFactory: (_) => transport,
+      );
+      final router = createDigitalBrainRouter(initialLocation: location);
+
+      await tester.pumpWidget(
+        DigitalBrainApp(
+          sessionOwnerFactory: () => owner,
+          routerFactory: () => router,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+      );
+      await tester.tap(find.byKey(runtimeSignInButtonKey));
+      await _pumpUntil(
+        tester,
+        () => find.byType(FeatureStudioPage).evaluate().isNotEmpty,
+      );
+
+      final studio = tester.widget<FeatureStudioPage>(
+        find.byType(FeatureStudioPage),
+      );
+      expect(studio.requestedInstallationId, 'installation-existing');
+      final firstStudioState = tester.state(find.byType(FeatureStudioPage));
+
+      router.go(
+        '/features/proposals/draft-a?installationId=installation-replacement',
+      );
+      await _pumpUntil(
+        tester,
+        () =>
+            tester
+                .widget<FeatureStudioPage>(find.byType(FeatureStudioPage))
+                .requestedInstallationId ==
+            'installation-replacement',
+      );
+      expect(
+        tester.state(find.byType(FeatureStudioPage)),
+        isNot(same(firstStudioState)),
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpUntil(tester, () => transport.closeCalls > 0);
+    },
+  );
+
   testWidgets('unauthenticated Studio deep link stays matched behind sign-in', (
     tester,
   ) async {
@@ -1067,6 +1702,9 @@ RuntimeConfiguration _configuration() => RuntimeConfiguration(
   externalIdentity: null,
 );
 
+const _resumeOperationId =
+    'runtime-op-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
 Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
   for (var attempt = 0; attempt < 100; attempt++) {
     await tester.pump(const Duration(milliseconds: 1));
@@ -1084,11 +1722,19 @@ class _RouterTransport
     this.feed, {
     this.unauthenticateFirstRevise = false,
     this.failFirstRefresh = false,
+    this.failFirstResume = false,
+    this.resumeReply,
+    this.featureReply,
+    this.rollbackReply,
   });
 
   final _RouterFeedCall feed;
   final bool unauthenticateFirstRevise;
   final bool failFirstRefresh;
+  final bool failFirstResume;
+  wire.ResumeOriginatingRequestReply? resumeReply;
+  wire.FeatureReply? featureReply;
+  final wire.FeatureReply? rollbackReply;
   int loginCalls = 0;
   int watchCalls = 0;
   int closeCalls = 0;
@@ -1097,6 +1743,10 @@ class _RouterTransport
   int refreshCalls = 0;
   int cancelProductCallCount = 0;
   final List<wire.ReviseFeatureDraftRequest> reviseRequests = [];
+  final List<wire.ResumeOriginatingRequestRequest> resumeRequests = [];
+  final List<wire.GetFeatureRequest> getFeatureRequests = [];
+  final List<wire.GetFeatureReleaseSourceRequest> releaseSourceRequests = [];
+  final List<wire.RollbackFeatureVersionRequest> rollbackRequests = [];
 
   @override
   Future<SessionBundle> login({
@@ -1169,6 +1819,14 @@ class _RouterTransport
   }
 
   @override
+  Future<wire.FeatureDraftReply> resetFeatureDraftInstallation({
+    required String accessToken,
+    required wire.ResetFeatureDraftInstallationRequest request,
+  }) async => wire.FeatureDraftReply(
+    draft: _wireDraft(request.draftId)..revision = Int64.ONE,
+  );
+
+  @override
   Future<wire.FeatureDraftReply> reviseFeatureDraft({
     required String accessToken,
     required wire.ReviseFeatureDraftRequest request,
@@ -1199,6 +1857,65 @@ class _RouterTransport
     required String accessToken,
     required wire.VerifyFeatureDraftRequest request,
   }) async => wire.FeatureReleaseReviewReply();
+
+  @override
+  Future<wire.FeatureAccessReviewReply> reviewFeatureAccess({
+    required String accessToken,
+    required wire.ReviewFeatureAccessRequest request,
+  }) async => wire.FeatureAccessReviewReply();
+
+  @override
+  Future<wire.FeatureInstallReply> installFeatureVersion({
+    required String accessToken,
+    required wire.InstallFeatureVersionRequest request,
+  }) async => wire.FeatureInstallReply();
+
+  @override
+  Future<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest({
+    required String accessToken,
+    required wire.ResumeOriginatingRequestRequest request,
+  }) async {
+    resumeRequests.add(request.deepCopy());
+    if (failFirstResume && resumeRequests.length == 1) {
+      throw const ProtocolException('unsafe backend detail');
+    }
+    return resumeReply ??
+        wire.ResumeOriginatingRequestReply(
+          commandId: request.idempotencyId,
+          operationId: _resumeOperationId,
+          phase: 'Accepted',
+          version: Int64.ONE,
+        );
+  }
+
+  @override
+  Future<wire.FeatureReply> getFeature({
+    required String accessToken,
+    required wire.GetFeatureRequest request,
+  }) async {
+    getFeatureRequests.add(request);
+    return featureReply ?? wire.FeatureReply();
+  }
+
+  @override
+  Future<wire.FeatureReleaseSourceReply> getFeatureReleaseSource({
+    required String accessToken,
+    required wire.GetFeatureReleaseSourceRequest request,
+  }) async {
+    releaseSourceRequests.add(request.deepCopy());
+    return wireReleaseSource(request.releaseDigest[0]);
+  }
+
+  @override
+  Future<wire.FeatureReply> rollbackFeatureVersion({
+    required String accessToken,
+    required wire.RollbackFeatureVersionRequest request,
+  }) async {
+    rollbackRequests.add(request);
+    final reply = rollbackReply ?? wire.FeatureReply();
+    featureReply = reply;
+    return reply;
+  }
 }
 
 wire.FeatureDraft _wireDraft(String draftId) => wire.FeatureDraft(

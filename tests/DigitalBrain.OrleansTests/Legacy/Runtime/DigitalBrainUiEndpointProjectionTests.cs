@@ -4,12 +4,23 @@ using System.Reflection;
 using DigitalBrain.Kernel.Contracts;
 using AcceptSuggestedChangeInput = McpProject::DigitalBrain.V2.Ui.Grpc.AcceptSuggestedChangeInput;
 using DigitalBrainUiEndpoints = McpProject::DigitalBrain.Mcp.DigitalBrainUiEndpoints;
+using FeatureDraftRecoverySnapshot = McpProject::DigitalBrain.Mcp.FeatureDraftRecoverySnapshot;
+using FeatureInstallationRecoverySnapshot = McpProject::DigitalBrain.Mcp.FeatureInstallationRecoverySnapshot;
+using FeatureVerificationReview = McpProject::DigitalBrain.Mcp.FeatureVerificationReview;
+using FeatureAccessReviewReply = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureAccessReviewReply;
+using FeatureDraftReply = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureDraftReply;
+using FeatureInstallReply = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureInstallReply;
+using FeatureReleaseReviewReply = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureReleaseReviewReply;
+using FeatureReleaseSourceReply = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureReleaseSourceReply;
+using FeatureReply = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureReply;
+using GrpcFeatureGrant = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureGrant;
 using GrpcFeatureBehavior = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureBehavior;
 using GrpcFeatureDraftPatch = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureDraftPatch;
 using GrpcFeatureScenario = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureScenario;
 using GrpcFeatureSourceFile = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureSourceFile;
 using GrpcFeatureSourceSnapshot = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureSourceSnapshot;
 using RejectSuggestedChangeInput = McpProject::DigitalBrain.V2.Ui.Grpc.RejectSuggestedChangeInput;
+using ReviewFeatureAccessRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ReviewFeatureAccessRequest;
 using ReviseFeatureBehaviorInput = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureBehaviorInput;
 using ReviseFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureDraftRequest;
 using ReviseFeatureSourceInput = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureSourceInput;
@@ -21,48 +32,258 @@ public sealed class DigitalBrainUiEndpointProjectionTests
     private static readonly DateTimeOffset Now = new(2026, 7, 15, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Access_review_mapping_accepts_only_the_exact_empty_pair_or_the_exact_nonempty_pair()
+    {
+        var empty = new ReviewFeatureAccessRequest
+        {
+            DraftId = "draft-access-map",
+            ExpectedRevision = 1,
+            InstallationId = "installation-access-map",
+            ReleaseDigest = Digest('a').Value
+        };
+
+        var mapped = InvokeProjection<PrepareFeatureAccessReview>("MapAccessReview", empty);
+        Assert.Empty(mapped.Grants);
+        Assert.Empty(mapped.Subscriptions);
+
+        var onlyGrant = empty.Clone();
+        onlyGrant.Grants.Add(new GrpcFeatureGrant
+        {
+            CapabilityId = "capability.read",
+            CapabilityVersion = 1,
+            ConstraintsJson = "{\"allowedToolIds\":[\"capability.read\"]}"
+        });
+        var onlySubscription = empty.Clone();
+        onlySubscription.Subscriptions.Add("manual");
+
+        AssertProjectionRejected("MapAccessReview", onlyGrant);
+        AssertProjectionRejected("MapAccessReview", onlySubscription);
+    }
+
+    [Fact]
     public void Draft_projection_binds_the_requested_identity_and_validates_Verification()
     {
         var release = Digest('a');
         var valid = Draft("draft-projection", new FeatureVerification(release, 2, 2, 0, 0, Now));
 
-        AssertProjectionRejected("ProjectDraft", new FeatureDraftId("different-draft"), valid);
+        AssertProjectionRejected(
+            "ProjectDraft",
+            new FeatureDraftId("different-draft"),
+            new FeatureDraftRecoverySnapshot(valid, null));
         AssertProjectionRejected(
             "ProjectDraft",
             valid.DraftId,
-            Draft("draft-projection", new FeatureVerification(release, 2, 1, 0, 0, Now)));
+            new FeatureDraftRecoverySnapshot(
+                Draft("draft-projection", new FeatureVerification(release, 2, 1, 0, 0, Now)),
+                null));
         AssertProjectionRejected(
             "ProjectDraft",
             valid.DraftId,
-            Draft("draft-projection", new FeatureVerification(
-                release,
-                1,
-                1,
-                0,
-                0,
-                Now.ToOffset(TimeSpan.FromHours(1)))));
+            new FeatureDraftRecoverySnapshot(
+                Draft("draft-projection", new FeatureVerification(
+                    release,
+                    1,
+                    1,
+                    0,
+                    0,
+                    Now.ToOffset(TimeSpan.FromHours(1)))),
+                null));
         AssertProjectionRejected(
             "ProjectDraft",
             valid.DraftId,
-            DraftState(valid.DraftId, "installed", null, null, 4));
+            new FeatureDraftRecoverySnapshot(DraftState(valid.DraftId, "installed", null, null, 4), null));
         AssertProjectionRejected(
             "ProjectDraft",
             valid.DraftId,
-            DraftState(
-                valid.DraftId,
-                "draft",
-                new FeatureVerification(release, 1, 1, 0, 0, Now),
-                new FeatureInstallationId("unexpected-installation"),
-                4));
+            new FeatureDraftRecoverySnapshot(
+                DraftState(
+                    valid.DraftId,
+                    "draft",
+                    new FeatureVerification(release, 1, 1, 0, 0, Now),
+                    new FeatureInstallationId("unexpected-installation"),
+                    4),
+                null));
         AssertProjectionRejected(
             "ProjectDraft",
             valid.DraftId,
-            DraftState(
-                valid.DraftId,
-                "installed",
-                new FeatureVerification(release, 2, 1, 1, 0, Now),
-                new FeatureInstallationId("installed-with-failed-verification"),
-                4));
+            new FeatureDraftRecoverySnapshot(
+                DraftState(
+                    valid.DraftId,
+                    "installed",
+                    new FeatureVerification(release, 2, 1, 1, 0, Now),
+                    new FeatureInstallationId("installed-with-failed-verification"),
+                    4),
+                null));
+    }
+
+    [Fact]
+    public void Draft_recovery_projection_exposes_full_evidence_and_metadata_only_coordinates()
+    {
+        var release = Release(Digest('1'));
+        var previous = Release(Digest('2'));
+        var verification = new FeatureVerification(
+            release.Digest,
+            1,
+            1,
+            0,
+            0,
+            Now,
+            Evidence(release));
+        var draft = Draft("draft-recovery-projection", verification);
+        var installationId = new FeatureInstallationId("installation-recovery-projection");
+        var recovery = new FeatureInstallationRecoverySnapshot(
+            false,
+            verification,
+            release,
+            installationId,
+            [Grant("capability.read")],
+            ["manual"],
+            previous,
+            "decision-recovery-projection",
+            "install-recovery-projection",
+            false,
+            false,
+            null);
+
+        var reply = InvokeProjection<FeatureDraftReply>(
+            "ProjectDraft",
+            draft.DraftId,
+            new FeatureDraftRecoverySnapshot(draft, recovery));
+
+        Assert.NotNull(reply.Recovery);
+        Assert.False(reply.Recovery.Installed);
+        Assert.Equal(release.Digest.Value, reply.Recovery.Release.Digest);
+        Assert.Null(reply.Recovery.Release.Source);
+        Assert.Equal(previous.Digest.Value, reply.Recovery.PreviousRelease.Digest);
+        Assert.Null(reply.Recovery.PreviousRelease.Source);
+        Assert.Equal(verification.Evidence!.SourceReference, reply.Recovery.Verification.SourceReference);
+        Assert.Equal(verification.VerifiedAt.ToUnixTimeMilliseconds(), reply.Recovery.Verification.VerifiedAtUnixMs);
+        Assert.Single(reply.Recovery.Verification.Scenarios);
+        Assert.Equal("decision-recovery-projection", reply.Recovery.DecisionId);
+        Assert.Equal("install-recovery-projection", reply.Recovery.IdempotencyId);
+        Assert.False(reply.Recovery.RollbackAvailable);
+        Assert.False(reply.Recovery.Paused);
+        Assert.False(reply.Recovery.HasPauseReason);
+    }
+
+    [Fact]
+    public void Installed_recovery_projection_enforces_retry_rollback_and_pause_exclusivity()
+    {
+        var release = Release(Digest('3'));
+        var previous = Release(Digest('4'));
+        var verification = new FeatureVerification(
+            release.Digest,
+            1,
+            1,
+            0,
+            0,
+            Now,
+            Evidence(release));
+        var installationId = new FeatureInstallationId("installation-installed-recovery");
+        var draft = DraftState(
+            new FeatureDraftId("draft-installed-recovery"),
+            "installed",
+            verification,
+            installationId,
+            5);
+        var recovery = new FeatureInstallationRecoverySnapshot(
+            true,
+            verification,
+            release,
+            installationId,
+            [Grant("capability.read")],
+            ["manual"],
+            previous,
+            null,
+            null,
+            true,
+            false,
+            null);
+
+        var reply = InvokeProjection<FeatureDraftReply>(
+            "ProjectDraft",
+            draft.DraftId,
+            new FeatureDraftRecoverySnapshot(draft, recovery));
+
+        Assert.True(reply.Recovery.Installed);
+        Assert.True(reply.Recovery.RollbackAvailable);
+        Assert.NotNull(reply.Recovery.PreviousRelease);
+        Assert.False(reply.Recovery.HasDecisionId);
+        Assert.False(reply.Recovery.HasIdempotencyId);
+        AssertProjectionRejected(
+            "ProjectDraft",
+            draft.DraftId,
+            new FeatureDraftRecoverySnapshot(draft, recovery with { DecisionId = "unexpected-retry" }));
+        AssertProjectionRejected(
+            "ProjectDraft",
+            draft.DraftId,
+            new FeatureDraftRecoverySnapshot(draft, recovery with
+            {
+                RollbackAvailable = false,
+                PreviousRelease = previous
+            }));
+        AssertProjectionRejected(
+            "ProjectDraft",
+            draft.DraftId,
+            new FeatureDraftRecoverySnapshot(draft, recovery with
+            {
+                RollbackAvailable = false,
+                PreviousRelease = null,
+                Paused = true,
+                PauseReason = null
+            }));
+    }
+
+    [Fact]
+    public void Installed_recovery_projection_preserves_historical_Draft_verification()
+    {
+        var historicalRelease = Release(Digest('5'));
+        var activeRelease = Release(Digest('6'));
+        var historicalVerification = new FeatureVerification(
+            historicalRelease.Digest,
+            1,
+            1,
+            0,
+            0,
+            Now,
+            Evidence(historicalRelease));
+        var activeVerification = new FeatureVerification(
+            activeRelease.Digest,
+            1,
+            1,
+            0,
+            0,
+            Now.AddMinutes(1),
+            Evidence(activeRelease));
+        var installationId = new FeatureInstallationId("installation-historical-recovery");
+        var draft = DraftState(
+            new FeatureDraftId("draft-historical-recovery"),
+            "installed",
+            historicalVerification,
+            installationId,
+            5);
+        var recovery = new FeatureInstallationRecoverySnapshot(
+            true,
+            activeVerification,
+            activeRelease,
+            installationId,
+            [Grant("capability.read")],
+            ["manual"],
+            null,
+            null,
+            null,
+            false,
+            false,
+            null);
+
+        var reply = InvokeProjection<FeatureDraftReply>(
+            "ProjectDraft",
+            draft.DraftId,
+            new FeatureDraftRecoverySnapshot(draft, recovery));
+
+        Assert.Equal(historicalRelease.Digest.Value, reply.Draft.Verification.ReleaseDigest);
+        Assert.Equal(activeRelease.Digest.Value, reply.Recovery.Verification.ReleaseDigest);
+        Assert.NotEqual(reply.Draft.Verification.ReleaseDigest, reply.Recovery.Verification.ReleaseDigest);
     }
 
     [Fact]
@@ -187,30 +408,79 @@ public sealed class DigitalBrainUiEndpointProjectionTests
         var draft = Draft(command.DraftId.Value, new FeatureVerification(digest, 1, 1, 0, 0, Now));
         var release = Release(digest);
 
-        AssertProjectionRejected("ProjectVerification", command, new VerifiedFeatureCandidate(
+        AssertProjectionRejected("ProjectVerification", command, Review(
             draft,
             release with { Digest = Digest('c') }));
-        AssertProjectionRejected("ProjectVerification", command, new VerifiedFeatureCandidate(
+        AssertProjectionRejected("ProjectVerification", command, Review(
             Draft(command.DraftId.Value, null),
             release));
-        AssertProjectionRejected("ProjectVerification", command, new VerifiedFeatureCandidate(
+        AssertProjectionRejected("ProjectVerification", command, Review(
             Draft(command.DraftId.Value, new FeatureVerification(digest, 2, 1, 1, 0, Now)),
             release));
-        AssertProjectionRejected("ProjectVerification", command, new VerifiedFeatureCandidate(
+        AssertProjectionRejected("ProjectVerification", command, Review(
             Draft(command.DraftId.Value, new FeatureVerification(digest, 2, 1, 0, 1, Now)),
             release));
-        AssertProjectionRejected("ProjectVerification", command, new VerifiedFeatureCandidate(
+        AssertProjectionRejected("ProjectVerification", command, Review(
             draft,
             release with { RequestedCapabilities = Enumerable.Range(0, 65).Select(index => $"capability-{index}").ToArray() }));
-        AssertProjectionRejected("ProjectVerification", command, new VerifiedFeatureCandidate(
+        AssertProjectionRejected("ProjectVerification", command, Review(
             draft,
             release with { Dependencies = ["dependency", "dependency"] }));
-        AssertProjectionRejected("ProjectVerification", command, new VerifiedFeatureCandidate(
+        AssertProjectionRejected("ProjectVerification", command, Review(
             DraftState(command.DraftId, "draft", draft.Verification, null, 99),
             release));
-        AssertProjectionRejected("ProjectVerification", command, new VerifiedFeatureCandidate(
+        AssertProjectionRejected("ProjectVerification", command, Review(
             draft,
             release with { SourceKind = FeatureSourceKind.Repository }));
+    }
+
+    [Fact]
+    public void Public_projection_rejects_verification_evidence_exceeding_two_MiB()
+    {
+        var scenarios = Enumerable.Range(0, 1024)
+            .Select(index => new FeatureScenarioEvidence(
+                $"scenario-{index:D4}",
+                "Oversized evidence",
+                FeatureScenarioOutcome.Failed,
+                new string('f', 2048),
+                1))
+            .ToArray();
+        var evidence = new FeatureVerificationEvidence(
+            $"sha256:{new string('a', 64)}",
+            scenarios.Length,
+            0,
+            scenarios.Length,
+            0,
+            scenarios,
+            []);
+
+        AssertProjectionRejected("ValidateEvidenceOutput", evidence);
+    }
+
+    [Fact]
+    public void Public_projection_recounts_outcomes_and_rejects_failure_text_on_passing_scenarios()
+    {
+        var sourceReference = $"sha256:{new string('a', 64)}";
+        AssertProjectionRejected(
+            "ValidateEvidenceOutput",
+            new FeatureVerificationEvidence(
+                sourceReference,
+                1,
+                1,
+                0,
+                0,
+                [new FeatureScenarioEvidence("scenario-pass", "Pass", FeatureScenarioOutcome.Passed, "unexpected failure", 1)],
+                []));
+        AssertProjectionRejected(
+            "ValidateEvidenceOutput",
+            new FeatureVerificationEvidence(
+                sourceReference,
+                1,
+                1,
+                0,
+                0,
+                [new FeatureScenarioEvidence("scenario-fail", "Fail", FeatureScenarioOutcome.Failed, "expected failure", 1)],
+                []));
     }
 
     [Fact]
@@ -263,6 +533,200 @@ public sealed class DigitalBrainUiEndpointProjectionTests
         });
     }
 
+    [Fact]
+    public void Explicit_rollback_availability_controls_detail_hydration_and_both_public_advertisements()
+    {
+        var installed = Installed("explicit-rollback-availability");
+        var previous = Release(Digest('e')) with { Source = Source("explicit-rollback-previous") };
+        installed = installed with
+        {
+            Release = installed.Release with { Source = installed.Draft.Source },
+            Authority = installed.Authority with
+            {
+                PreviousRelease = previous.Digest,
+                ExactRollbackAvailable = false
+            }
+        };
+        var detail = new InstalledFeatureDetail(
+            installed.Draft,
+            installed.Release,
+            null,
+            installed.Authority,
+            installed.Registration,
+            7);
+
+        var installReply = InvokeProjection<FeatureInstallReply>(
+            "ProjectInstallation",
+            Command(installed),
+            installed.Authority.ActorId,
+            installed);
+        var featureReply = InvokeProjection<FeatureReply>(
+            "ProjectFeature",
+            installed.Draft.DraftId,
+            installed.Authority.ActorId,
+            detail);
+
+        Assert.False(installReply.RollbackAvailable);
+        Assert.False(featureReply.RollbackAvailable);
+        Assert.Null(featureReply.PreviousRelease);
+        AssertProjectionRejected(
+            "ProjectFeature",
+            installed.Draft.DraftId,
+            installed.Authority.ActorId,
+            detail with { PreviousRelease = previous });
+        AssertProjectionRejected(
+            "ProjectFeature",
+            installed.Draft.DraftId,
+            installed.Authority.ActorId,
+            detail with
+            {
+                Authority = installed.Authority with { ExactRollbackAvailable = true }
+            });
+    }
+
+    [Fact]
+    public void Composite_Feature_replies_publish_source_metadata_without_duplicate_bodies()
+    {
+        var installed = Installed("source-ownership");
+        var previous = Release(Digest('e')) with { Source = Source("previous-source-ownership") };
+        installed = installed with
+        {
+            Release = installed.Release with { Source = installed.Draft.Source },
+            Authority = installed.Authority with
+            {
+                PreviousRelease = previous.Digest,
+                ExactRollbackAvailable = true
+            }
+        };
+        var verificationEvidence = Evidence(installed.Release);
+        var verificationDraft = Draft(
+            "draft-verification-source-ownership",
+            new FeatureVerification(installed.Release.Digest, 1, 1, 0, 0, Now, verificationEvidence));
+        var verificationRelease = installed.Release with { Source = verificationDraft.Source };
+        var verificationCommand = new VerifyFeatureDraft(
+            verificationDraft.DraftId,
+            verificationDraft.Revision - 1,
+            "verify-source-ownership");
+        var verification = InvokeProjection<FeatureReleaseReviewReply>(
+            "ProjectVerification",
+            verificationCommand,
+            new FeatureVerificationReview(verificationDraft, verificationRelease, verificationEvidence, Now));
+        var accessCommand = new PrepareFeatureAccessReview(
+            installed.Draft.DraftId,
+            installed.Draft.Revision,
+            installed.Registration.InstallationId,
+            installed.Release.Digest,
+            installed.Authority.ActiveGrants,
+            installed.Registration.Subscriptions);
+        var access = InvokeProjection<FeatureAccessReviewReply>(
+            "ProjectAccessReview",
+            accessCommand,
+            new FeatureAccessReview(
+                new VerifiedFeatureCandidate(installed.Draft, installed.Release),
+                installed.Registration.InstallationId,
+                installed.Authority.ActiveGrants,
+                installed.Registration.Subscriptions,
+                previous));
+        var installation = InvokeProjection<FeatureInstallReply>(
+            "ProjectInstallation",
+            Command(installed),
+            installed.Authority.ActorId,
+            installed);
+        var detail = InvokeProjection<FeatureReply>(
+            "ProjectFeature",
+            installed.Draft.DraftId,
+            installed.Authority.ActorId,
+            new InstalledFeatureDetail(
+                installed.Draft,
+                installed.Release,
+                previous,
+                installed.Authority,
+                installed.Registration,
+                7));
+
+        Assert.Null(verification.Draft.Source);
+        Assert.Empty(verification.Draft.Verification.Scenarios);
+        Assert.Empty(verification.Draft.Verification.Artifacts);
+        Assert.Single(verification.Verification.Scenarios);
+        Assert.Null(verification.Release.Source);
+        Assert.NotNull(access.Draft.Source);
+        Assert.Null(access.Release.Source);
+        Assert.Null(access.PreviousRelease.Source);
+        Assert.NotNull(installation.Draft.Source);
+        Assert.Null(installation.Release.Source);
+        Assert.Null(detail.ActiveRelease.Source);
+        Assert.Null(detail.PreviousRelease.Source);
+        Assert.Equal(7, detail.Revision);
+    }
+
+    [Fact]
+    public void Dedicated_Feature_release_source_projection_binds_every_authority_coordinate()
+    {
+        var installed = Installed("source-coordinate");
+        installed = installed with { Release = installed.Release with { Source = installed.Draft.Source } };
+        var detail = new InstalledFeatureDetail(
+            installed.Draft,
+            installed.Release,
+            null,
+            installed.Authority,
+            installed.Registration,
+            7);
+        var reply = InvokeProjection<FeatureReleaseSourceReply>(
+            "ProjectFeatureReleaseSource",
+            installed.Draft.DraftId,
+            installed.Registration.InstallationId,
+            installed.Release.Digest,
+            installed.Release.SourceReference,
+            installed.Authority.ActorId,
+            detail);
+
+        Assert.Equal(installed.Draft.DraftId.Value, reply.FeatureId);
+        Assert.Equal(installed.Registration.InstallationId.Value, reply.InstallationId);
+        Assert.Equal(installed.Release.Digest.Value, reply.ReleaseDigest);
+        Assert.Equal(installed.Release.SourceReference, reply.SourceReference);
+        Assert.Equal(installed.Draft.Source.Files.Select(file => file.Content), reply.Source.Files.Select(file => file.Content));
+        AssertProjectionRejected(
+            "ProjectFeatureReleaseSource",
+            new FeatureDraftId("different-feature"),
+            installed.Registration.InstallationId,
+            installed.Release.Digest,
+            installed.Release.SourceReference,
+            installed.Authority.ActorId,
+            detail);
+        AssertProjectionRejected(
+            "ProjectFeatureReleaseSource",
+            installed.Draft.DraftId,
+            new FeatureInstallationId("different-installation"),
+            installed.Release.Digest,
+            installed.Release.SourceReference,
+            installed.Authority.ActorId,
+            detail);
+        AssertProjectionRejected(
+            "ProjectFeatureReleaseSource",
+            installed.Draft.DraftId,
+            installed.Registration.InstallationId,
+            Digest('f'),
+            installed.Release.SourceReference,
+            installed.Authority.ActorId,
+            detail);
+        AssertProjectionRejected(
+            "ProjectFeatureReleaseSource",
+            installed.Draft.DraftId,
+            installed.Registration.InstallationId,
+            installed.Release.Digest,
+            $"sha256:{new string('f', 64)}",
+            installed.Authority.ActorId,
+            detail);
+        AssertProjectionRejected(
+            "ProjectFeatureReleaseSource",
+            installed.Draft.DraftId,
+            installed.Registration.InstallationId,
+            installed.Release.Digest,
+            installed.Release.SourceReference,
+            new ActorId("different-actor"),
+            detail);
+    }
+
     private static void AssertProjectionRejected(string methodName, params object[] arguments)
     {
         var method = typeof(DigitalBrainUiEndpoints).GetMethod(
@@ -276,6 +740,15 @@ public sealed class DigitalBrainUiEndpointProjectionTests
             exception.InnerException is InvalidDataException or ArgumentException,
             exception.InnerException.GetType().FullName);
         Assert.DoesNotContain("response-credential-canary", exception.InnerException.Message, StringComparison.Ordinal);
+    }
+
+    private static T InvokeProjection<T>(string methodName, params object[] arguments)
+    {
+        var method = typeof(DigitalBrainUiEndpoints).GetMethod(
+            methodName,
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return Assert.IsType<T>(method.Invoke(null, arguments));
     }
 
     private static object RevisionInput(ReviseFeatureDraftRequest request)
@@ -405,10 +878,25 @@ public sealed class DigitalBrainUiEndpointProjectionTests
 
     private static FeatureReleaseMetadata Release(ReleaseDigest digest) => new(
         digest,
-        "runtime-authored-projection",
+        $"sha256:{digest.Value}",
         FeatureSourceKind.RuntimeAuthored,
         ["capability.read"],
         ["dependency.read"]);
+
+    private static FeatureVerificationReview Review(FeatureDraft draft, FeatureReleaseMetadata release) => new(
+        draft,
+        release,
+        Evidence(release),
+        draft.Verification?.VerifiedAt ?? Now);
+
+    private static FeatureVerificationEvidence Evidence(FeatureReleaseMetadata release) => new(
+        release.SourceReference,
+        1,
+        1,
+        0,
+        0,
+        [new FeatureScenarioEvidence("scenario-projection", "Projection", FeatureScenarioOutcome.Passed, null, 1)],
+        []);
 
     private static FeatureGrantSpec Grant(string capabilityId) => new(
         capabilityId,

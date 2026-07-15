@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Kernel.Capabilities;
+using DigitalBrain.OrleansTests.Capabilities;
 using DigitalBrain.Kernel.Features;
 using Orleans;
 using Orleans.Hosting;
@@ -33,6 +35,9 @@ public sealed class FeatureGrainClusterFixture : IAsyncLifetime
             {
                 services.AddSingleton<TimeProvider>(Time);
                 services.AddSingleton<IChatClient>(SuggestionModel);
+                services.AddSingleton<ICapabilityCatalog>(
+                    new CapabilityCatalogProjectionTests.StaticProjectionCatalog(
+                        [CapabilityCatalogProjectionTests.Descriptor()]));
                 services.AddSingleton<IFeaturePublicationVerifier>(PublicationVerifier);
                 services.AddGrainStorage("Default", (_, _) => Storage);
             }));
@@ -179,9 +184,16 @@ public sealed class SharedGrainStorage : IGrainStorage
     private readonly ConcurrentDictionary<string, Entry> _states = new(StringComparer.Ordinal);
     private long _version;
     private int _nextWriteFailure;
+    private string? _nextWriteFailureStateName;
     private Func<object, object>? _nextCommittedState;
 
     public void FailNextWrite() => Interlocked.Exchange(ref _nextWriteFailure, 1);
+
+    public void FailNextWriteForState(string stateName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stateName);
+        Interlocked.Exchange(ref _nextWriteFailureStateName, stateName);
+    }
 
     public void CommitThenFailNextWrite() => Interlocked.Exchange(ref _nextWriteFailure, 2);
 
@@ -211,6 +223,10 @@ public sealed class SharedGrainStorage : IGrainStorage
 
     public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
     {
+        var targetedFailure = Volatile.Read(ref _nextWriteFailureStateName);
+        if (string.Equals(targetedFailure, stateName, StringComparison.Ordinal) &&
+            ReferenceEquals(Interlocked.CompareExchange(ref _nextWriteFailureStateName, null, targetedFailure), targetedFailure))
+            throw new InvalidOperationException("Injected feature storage write failure.");
         var failure = Interlocked.Exchange(ref _nextWriteFailure, 0);
         if (failure == 1)
             throw new InvalidOperationException("Injected feature storage write failure.");

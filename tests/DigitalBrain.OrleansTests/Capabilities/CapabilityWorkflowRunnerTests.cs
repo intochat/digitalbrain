@@ -314,6 +314,7 @@ public sealed class CapabilityWorkflowRunnerTests
 
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
         public Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraft?> ReadInstalledDraftAsync(FeatureInstallationId installationId, ReleaseDigest release) => throw new NotSupportedException();
         public Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command) => throw new NotSupportedException();
         public Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command) => throw new NotSupportedException();
         public Task<FeatureDraft> AcceptSuggestedChangeAsync(AcceptSuggestedChange command) => throw new NotSupportedException();
@@ -321,6 +322,9 @@ public sealed class CapabilityWorkflowRunnerTests
         public Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command) => throw new NotSupportedException();
         public Task<FeatureDraftInstallationReservation> AcquireDraftInstallationReservationAsync(InstallFeatureVersion command, ActorId actorId) => throw new NotSupportedException();
         public Task<FeatureDraftInstallationReservation?> ReadDraftInstallationReservationAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraftInstallationResetObligation?> ReadDraftInstallationResetAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraftInstallationResetPreparation> ResetDraftInstallationReservationAsync(ResetFeatureDraftInstallationReservation command, ActorId actorId) => throw new NotSupportedException();
+        public Task<FeatureDraft> CompleteDraftInstallationReservationResetAsync(FeatureDraftId draftId, string idempotencyId, ActorId actorId) => throw new NotSupportedException();
         public Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command) => throw new NotSupportedException();
         public Task<FeatureFanOutResult> PublishAsync(FeatureInput input) => throw new NotSupportedException();
         public Task<FeatureHubSnapshot> ReadAsync() => throw new NotSupportedException();
@@ -343,6 +347,7 @@ public sealed class CapabilityWorkflowRunnerTests
 
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
         public Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraft?> ReadInstalledDraftAsync(FeatureInstallationId installationId, ReleaseDigest release) => throw new NotSupportedException();
         public Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command) => throw new NotSupportedException();
         public Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command) => throw new NotSupportedException();
         public Task<FeatureDraft> AcceptSuggestedChangeAsync(AcceptSuggestedChange command) => throw new NotSupportedException();
@@ -350,6 +355,9 @@ public sealed class CapabilityWorkflowRunnerTests
         public Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command) => throw new NotSupportedException();
         public Task<FeatureDraftInstallationReservation> AcquireDraftInstallationReservationAsync(InstallFeatureVersion command, ActorId actorId) => throw new NotSupportedException();
         public Task<FeatureDraftInstallationReservation?> ReadDraftInstallationReservationAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraftInstallationResetObligation?> ReadDraftInstallationResetAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraftInstallationResetPreparation> ResetDraftInstallationReservationAsync(ResetFeatureDraftInstallationReservation command, ActorId actorId) => throw new NotSupportedException();
+        public Task<FeatureDraft> CompleteDraftInstallationReservationResetAsync(FeatureDraftId draftId, string idempotencyId, ActorId actorId) => throw new NotSupportedException();
         public Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command) => throw new NotSupportedException();
         public Task<FeatureFanOutResult> PublishAsync(FeatureInput input) => throw new NotSupportedException();
         public Task<FeatureHubSnapshot> ReadAsync() => throw new NotSupportedException();

@@ -35,4 +35,32 @@ internal static class PersistedStateReconciliation
             throw new InvalidOperationException("Persisted-state write failed after the durable concurrency state advanced; the refreshed state was retained.", writeFailure);
         }
     }
+
+    public static async Task ClearWithReconciliationAsync<TPersisted>(IPersistentState<TPersisted> persistentState)
+    {
+        var previousState = persistentState.State;
+        var previousEtag = persistentState.Etag;
+        var previousExists = persistentState.RecordExists;
+        try
+        {
+            await persistentState.ClearStateAsync().ConfigureAwait(false);
+        }
+        catch (Exception clearFailure)
+        {
+            try
+            {
+                await persistentState.ReadStateAsync().ConfigureAwait(false);
+            }
+            catch (Exception recoveryFailure)
+            {
+                throw new PersistedStateWriteOutcomeUnknownException(clearFailure, recoveryFailure);
+            }
+            if (!persistentState.RecordExists)
+                return;
+            if (persistentState.RecordExists == previousExists && string.Equals(persistentState.Etag, previousEtag, StringComparison.Ordinal) &&
+                EqualityComparer<TPersisted>.Default.Equals(persistentState.State, previousState))
+                throw;
+            throw new InvalidOperationException("Persisted-state clear failed after the durable concurrency state advanced; the refreshed state was retained.", clearFailure);
+        }
+    }
 }

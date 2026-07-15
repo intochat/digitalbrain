@@ -246,6 +246,68 @@ void main() {
     );
 
     test(
+      'pending install reset is a signed cancellable authority call',
+      () async {
+        final reply = wire.FeatureDraftReply();
+        final port = _FakeGrpcClientPort()..featureDraftReply = reply;
+        final transport = GrpcUiTransport.forTesting(client: port);
+        final request = wire.ResetFeatureDraftInstallationRequest(
+          draftId: 'draft-a',
+          idempotencyId: 'reset-a',
+        );
+
+        final result = await transport.resetFeatureDraftInstallation(
+          accessToken: 'signed-session',
+          request: request,
+        );
+
+        expect(result, same(reply));
+        expect(port.resetFeatureDraftInstallationRequest, same(request));
+        expect(port.resetFeatureDraftInstallationOptions?.metadata, {
+          'x-v2-session': 'signed-session',
+          'x-v2-audience': digitalBrainUiAudience,
+        });
+        expect(
+          port.resetFeatureDraftInstallationOptions?.timeout,
+          featureAuthorityRequestTimeout,
+        );
+      },
+    );
+
+    test('pending install reset preserves caller-reserved protobuf tags', () {
+      final request = wire.ResetFeatureDraftInstallationRequest(
+        draftId: 'a',
+        idempotencyId: 'b',
+      );
+
+      expect(request.writeToBuffer(), [26, 1, 97, 34, 1, 98]);
+    });
+
+    test('originating request resume is a signed cancellable call', () async {
+      final reply = wire.ResumeOriginatingRequestReply();
+      final port = _FakeGrpcClientPort()..resumeOriginatingRequestReply = reply;
+      final transport = GrpcUiTransport.forTesting(client: port);
+      final request = wire.ResumeOriginatingRequestRequest(
+        draftId: 'draft-a',
+        expectedRevision: Int64(6),
+        idempotencyId: 'run-a',
+      );
+
+      final result = await transport.resumeOriginatingRequest(
+        accessToken: 'signed-session',
+        request: request,
+      );
+
+      expect(result, same(reply));
+      expect(port.resumeOriginatingRequestRequest, same(request));
+      expect(port.resumeOriginatingRequestOptions?.metadata, {
+        'x-v2-session': 'signed-session',
+        'x-v2-audience': digitalBrainUiAudience,
+      });
+      expect(port.resumeOriginatingRequestOptions?.timeout, unaryRequestTimeout);
+    });
+
+    test(
       'feature draft mutations use bounded authenticated deadlines',
       () async {
         final port = _FakeGrpcClientPort();
@@ -309,6 +371,97 @@ void main() {
         expect(
           featureVerificationRequestTimeout,
           lessThanOrEqualTo(const Duration(seconds: 70)),
+        );
+      },
+    );
+
+    test(
+      'governed review install detail source and rollback use signed bounded calls',
+      () async {
+        final port = _FakeGrpcClientPort();
+        final transport = GrpcUiTransport.forTesting(client: port);
+        final review = wire.ReviewFeatureAccessRequest(
+          draftId: 'draft-a',
+          expectedRevision: Int64(5),
+          installationId: 'installation-a',
+          releaseDigest: List.filled(64, 'a').join(),
+          subscriptions: const ['manual'],
+        );
+        final install = wire.InstallFeatureVersionRequest(
+          draftId: 'draft-a',
+          expectedRevision: Int64(5),
+          installationId: 'installation-a',
+          releaseDigest: List.filled(64, 'a').join(),
+          subscriptions: const ['manual'],
+          decisionId: 'decision-a',
+          idempotencyId: 'install-a',
+        );
+        final detail = wire.GetFeatureRequest(featureId: 'draft-a');
+        final source = wire.GetFeatureReleaseSourceRequest(
+          featureId: 'draft-a',
+          installationId: 'installation-a',
+          releaseDigest: List.filled(64, 'a').join(),
+          sourceReference: 'sha256:${List.filled(64, 'c').join()}',
+        );
+        final rollback = wire.RollbackFeatureVersionRequest(
+          featureId: 'draft-a',
+          expectedActiveDigest: List.filled(64, 'b').join(),
+          targetDigest: List.filled(64, 'a').join(),
+          idempotencyId: 'rollback-a',
+          expectedRevision: Int64(6),
+        );
+
+        await transport.reviewFeatureAccess(
+          accessToken: 'signed-session',
+          request: review,
+        );
+        await transport.installFeatureVersion(
+          accessToken: 'signed-session',
+          request: install,
+        );
+        await transport.getFeature(
+          accessToken: 'signed-session',
+          request: detail,
+        );
+        await transport.getFeatureReleaseSource(
+          accessToken: 'signed-session',
+          request: source,
+        );
+        await transport.rollbackFeatureVersion(
+          accessToken: 'signed-session',
+          request: rollback,
+        );
+
+        expect(port.reviewFeatureAccessRequest, same(review));
+        expect(port.installFeatureVersionRequest, same(install));
+        expect(port.getFeatureRequest, same(detail));
+        expect(port.getFeatureReleaseSourceRequest, same(source));
+        expect(port.rollbackFeatureVersionRequest, same(rollback));
+        for (final options in [
+          port.reviewFeatureAccessOptions,
+          port.installFeatureVersionOptions,
+          port.getFeatureOptions,
+          port.getFeatureReleaseSourceOptions,
+          port.rollbackFeatureVersionOptions,
+        ]) {
+          expect(options?.metadata, {
+            'x-v2-session': 'signed-session',
+            'x-v2-audience': digitalBrainUiAudience,
+          });
+        }
+        expect(port.reviewFeatureAccessOptions?.timeout, unaryRequestTimeout);
+        expect(
+          port.installFeatureVersionOptions?.timeout,
+          featureAuthorityRequestTimeout,
+        );
+        expect(port.getFeatureOptions?.timeout, unaryRequestTimeout);
+        expect(
+          port.getFeatureReleaseSourceOptions?.timeout,
+          unaryRequestTimeout,
+        );
+        expect(
+          port.rollbackFeatureVersionOptions?.timeout,
+          featureAuthorityRequestTimeout,
         );
       },
     );
@@ -701,6 +854,9 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   GrpcUnaryResponse<wire.AcknowledgeSurfaceFeedReply>? ackResponse;
   wire.GetFeatureDraftRequest? getFeatureDraftRequest;
   CallOptions? getFeatureDraftOptions;
+  wire.ResetFeatureDraftInstallationRequest?
+  resetFeatureDraftInstallationRequest;
+  CallOptions? resetFeatureDraftInstallationOptions;
   wire.FeatureDraftReply? featureDraftReply;
   Object? getFeatureDraftError;
   wire.ReviseFeatureDraftRequest? reviseFeatureDraftRequest;
@@ -712,6 +868,19 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   wire.VerifyFeatureDraftRequest? verifyFeatureDraftRequest;
   CallOptions? verifyFeatureDraftOptions;
   GrpcUnaryResponse<wire.FeatureReleaseReviewReply>? verifyFeatureDraftResponse;
+  wire.ReviewFeatureAccessRequest? reviewFeatureAccessRequest;
+  CallOptions? reviewFeatureAccessOptions;
+  wire.InstallFeatureVersionRequest? installFeatureVersionRequest;
+  CallOptions? installFeatureVersionOptions;
+  wire.ResumeOriginatingRequestRequest? resumeOriginatingRequestRequest;
+  CallOptions? resumeOriginatingRequestOptions;
+  wire.ResumeOriginatingRequestReply? resumeOriginatingRequestReply;
+  wire.GetFeatureRequest? getFeatureRequest;
+  CallOptions? getFeatureOptions;
+  wire.GetFeatureReleaseSourceRequest? getFeatureReleaseSourceRequest;
+  CallOptions? getFeatureReleaseSourceOptions;
+  wire.RollbackFeatureVersionRequest? rollbackFeatureVersionRequest;
+  CallOptions? rollbackFeatureVersionOptions;
 
   wire.SessionReply get sessionReply => wire.SessionReply(
     accessToken: 'access-token',
@@ -824,6 +993,18 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   }
 
   @override
+  GrpcUnaryResponse<wire.FeatureDraftReply> resetFeatureDraftInstallation(
+    wire.ResetFeatureDraftInstallationRequest request,
+    CallOptions options,
+  ) {
+    resetFeatureDraftInstallationRequest = request;
+    resetFeatureDraftInstallationOptions = options;
+    return _FakeGrpcUnaryResponse(
+      Future.value(featureDraftReply ?? wire.FeatureDraftReply()),
+    );
+  }
+
+  @override
   GrpcUnaryResponse<wire.FeatureDraftReply> reviseFeatureDraft(
     wire.ReviseFeatureDraftRequest request,
     CallOptions options,
@@ -859,6 +1040,74 @@ class _FakeGrpcClientPort implements GrpcClientPort {
     return _FakeGrpcUnaryResponse(
       Future.value(wire.FeatureReleaseReviewReply()),
     );
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureAccessReviewReply> reviewFeatureAccess(
+    wire.ReviewFeatureAccessRequest request,
+    CallOptions options,
+  ) {
+    reviewFeatureAccessRequest = request;
+    reviewFeatureAccessOptions = options;
+    return _FakeGrpcUnaryResponse(
+      Future.value(wire.FeatureAccessReviewReply()),
+    );
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureInstallReply> installFeatureVersion(
+    wire.InstallFeatureVersionRequest request,
+    CallOptions options,
+  ) {
+    installFeatureVersionRequest = request;
+    installFeatureVersionOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.FeatureInstallReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest(
+    wire.ResumeOriginatingRequestRequest request,
+    CallOptions options,
+  ) {
+    resumeOriginatingRequestRequest = request;
+    resumeOriginatingRequestOptions = options;
+    return _FakeGrpcUnaryResponse(
+      Future.value(
+        resumeOriginatingRequestReply ?? wire.ResumeOriginatingRequestReply(),
+      ),
+    );
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureReply> getFeature(
+    wire.GetFeatureRequest request,
+    CallOptions options,
+  ) {
+    getFeatureRequest = request;
+    getFeatureOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.FeatureReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureReleaseSourceReply> getFeatureReleaseSource(
+    wire.GetFeatureReleaseSourceRequest request,
+    CallOptions options,
+  ) {
+    getFeatureReleaseSourceRequest = request;
+    getFeatureReleaseSourceOptions = options;
+    return _FakeGrpcUnaryResponse(
+      Future.value(wire.FeatureReleaseSourceReply()),
+    );
+  }
+
+  @override
+  GrpcUnaryResponse<wire.FeatureReply> rollbackFeatureVersion(
+    wire.RollbackFeatureVersionRequest request,
+    CallOptions options,
+  ) {
+    rollbackFeatureVersionRequest = request;
+    rollbackFeatureVersionOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.FeatureReply()));
   }
 }
 

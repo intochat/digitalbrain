@@ -34,10 +34,13 @@ using FeatureAuthoringService = McpProject::DigitalBrain.Mcp.FeatureAuthoringSer
 using FeatureBuildArtifact = McpProject::DigitalBrain.Mcp.FeatureBuildArtifact;
 using FeatureBuildEndpoint = McpProject::DigitalBrain.Mcp.IFeatureBuildEndpoint;
 using FeatureBuildSubmission = McpProject::DigitalBrain.Mcp.FeatureBuildSubmission;
+using FeatureCapabilityCatalog = McpProject::DigitalBrain.Mcp.IFeatureCapabilityCatalog;
 using FeatureInstallationInspection = McpProject::DigitalBrain.Mcp.FeatureInstallationInspection;
 using FeatureLifecycleInspection = McpProject::DigitalBrain.Mcp.FeatureLifecycleInspection;
 using FeatureLifecycleRail = McpProject::DigitalBrain.Mcp.IFeatureLifecycleRail;
 using FeatureSuggestionService = McpProject::DigitalBrain.Mcp.FeatureSuggestionService;
+using GetFeatureRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureRequest;
+using GetFeatureReleaseSourceRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureReleaseSourceRequest;
 using GetFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureDraftRequest;
 using GrpcFeatureBehavior = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureBehavior;
 using GrpcFeatureDraft = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureDraft;
@@ -47,8 +50,12 @@ using InstallFeatureVersionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.Install
 using LogoutSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.LogoutSessionRequest;
 using McpInoCommandHandler = McpProject::DigitalBrain.Mcp.McpInoCommandHandler;
 using RefreshSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.RefreshSessionRequest;
+using ResetFeatureDraftInstallationRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ResetFeatureDraftInstallationRequest;
+using ResumeOriginatingRequestRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ResumeOriginatingRequestRequest;
+using ReviewFeatureAccessRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ReviewFeatureAccessRequest;
 using ReviseFeatureBehaviorInput = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureBehaviorInput;
 using ReviseFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ReviseFeatureDraftRequest;
+using RollbackFeatureVersionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.RollbackFeatureVersionRequest;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 using RuntimeSessionAuthority = McpProject::DigitalBrain.Mcp.RuntimeSessionAuthority;
 using RuntimeSurfaceFeed = McpProject::DigitalBrain.Mcp.RuntimeSurfaceFeed;
@@ -329,8 +336,135 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         Assert.Equal(draft.DraftId.Value, reply.Draft.DraftId);
         Assert.Equal(draft.Goal, reply.Draft.Goal);
         Assert.Equal(draft.Revision, reply.Draft.Revision);
+        Assert.Null(reply.Recovery);
         Assert.Equal(StatusCode.NotFound, crossOwner.StatusCode);
         Assert.Equal(absent.Status, crossOwner.Status);
+    }
+
+    [Fact]
+    public async Task GetFeatureDraft_recovers_a_durable_partial_installation_for_the_authenticated_owner()
+    {
+        var ownerId = new BrainOwnerId("owner");
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-recovery-partial",
+            "Recover an interrupted Feature installation",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-recovery-partial"));
+        var release = new FeatureReleaseMetadata(
+            new ReleaseDigest(new string('7', 64)),
+            FeatureDraftAuthoringTransitions.SourceReference(draft.Source),
+            FeatureSourceKind.RuntimeAuthored,
+            ["capability.read"],
+            [],
+            draft.Source);
+        draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            FeatureVerificationTestData.Passing(release.Digest, draft.Source, 1, DateTimeOffset.UtcNow),
+            draft.Revision,
+            "verify-ui-recovery-partial"));
+        var catalog = new RecordingFeatureArtifactCatalog(release);
+        var lifecycle = new LiveFeatureLifecycleRail(Cluster.Client, ownerId, _publicationVerifier)
+        {
+            FailAfter = "propose"
+        };
+        var authoring = new FeatureAuthoringService(
+            Cluster.Client,
+            new UnusedBuildEndpoint(),
+            catalog,
+            lifecycle,
+            TimeProvider.System,
+            new StaticFeatureCapabilityCatalog([
+                new CapabilityDescriptor(
+                    "capability.read",
+                    1,
+                    "Read",
+                    "Read a value.",
+                    ["Read a value."],
+                    [],
+                    ["google"],
+                    CapabilityOrigin.Integration,
+                    CapabilityOperationKind.Query,
+                    true)
+            ]));
+        var (service, _) = CreateService(
+            grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal),
+            authoring: authoring);
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+        var review = await service.ReviewFeatureAccess(
+            new ReviewFeatureAccessRequest
+            {
+                DraftId = draft.DraftId.Value,
+                ExpectedRevision = draft.Revision,
+                InstallationId = "installation-ui-recovery-partial",
+                ReleaseDigest = release.Digest.Value
+            },
+            call);
+        var install = new InstallFeatureVersionRequest
+        {
+            DraftId = draft.DraftId.Value,
+            ExpectedRevision = draft.Revision,
+            InstallationId = "installation-ui-recovery-partial",
+            ReleaseDigest = release.Digest.Value,
+            DecisionId = "decision-ui-recovery-partial",
+            IdempotencyId = "install-ui-recovery-partial"
+        };
+        install.Grants.Add(review.Grants);
+        install.Subscriptions.Add(review.Subscriptions);
+
+        var interrupted = await Assert.ThrowsAsync<RpcException>(() =>
+            service.InstallFeatureVersion(install, call));
+        var recovered = await service.GetFeatureDraft(
+            new GetFeatureDraftRequest { DraftId = draft.DraftId.Value },
+            call);
+
+        Assert.Equal(StatusCode.Unavailable, interrupted.StatusCode);
+        Assert.NotNull(recovered.Recovery);
+        Assert.False(recovered.Recovery.Installed);
+        Assert.Equal(release.Digest.Value, recovered.Recovery.Release.Digest);
+        Assert.Null(recovered.Recovery.Release.Source);
+        Assert.Equal(release.SourceReference, recovered.Recovery.Verification.SourceReference);
+        Assert.Single(recovered.Recovery.Verification.Scenarios);
+        Assert.Single(recovered.Recovery.Verification.Artifacts);
+        Assert.Equal("capability.read", Assert.Single(recovered.Recovery.Grants).CapabilityId);
+        Assert.Equal("manual", Assert.Single(recovered.Recovery.Subscriptions));
+        Assert.Equal("decision-ui-recovery-partial", recovered.Recovery.DecisionId);
+        Assert.Equal("install-ui-recovery-partial", recovered.Recovery.IdempotencyId);
+        Assert.Null(recovered.Recovery.PreviousRelease);
+        Assert.False(recovered.Recovery.RollbackAvailable);
+        Assert.False(recovered.Recovery.Paused);
+        Assert.False(recovered.Recovery.HasPauseReason);
+        Assert.NotNull(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
+        Assert.Equal(1, lifecycle.ProposeCount);
+        Assert.Equal(0, lifecycle.DecideCount);
+        Assert.Equal(0, lifecycle.GrantCount);
+        Assert.Equal(0, lifecycle.InstallCount);
+
+        var malformedReset = await Assert.ThrowsAsync<RpcException>(() =>
+            service.ResetFeatureDraftInstallation(
+                new ResetFeatureDraftInstallationRequest { DraftId = draft.DraftId.Value },
+                call));
+        Assert.Equal(StatusCode.InvalidArgument, malformedReset.StatusCode);
+        Assert.Equal("The Feature request is invalid.", malformedReset.Status.Detail);
+        Assert.NotNull(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
+
+        var resetRequest = new ResetFeatureDraftInstallationRequest
+        {
+            DraftId = draft.DraftId.Value,
+            IdempotencyId = "reset-ui-recovery-partial"
+        };
+        var reset = await service.ResetFeatureDraftInstallation(resetRequest, call);
+        var replay = await service.ResetFeatureDraftInstallation(resetRequest, call);
+
+        Assert.Equal(draft.DraftId.Value, reset.Draft.DraftId);
+        Assert.Equal(reset, replay);
+        Assert.Null(reset.Recovery);
+        Assert.Null(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
+        Assert.Null(await hub.ReadDraftInstallationResetAsync(draft.DraftId));
     }
 
     [Fact]
@@ -452,10 +586,11 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             "conversation-ui-live-product"));
         var release = new FeatureReleaseMetadata(
             new ReleaseDigest(new string('a', 64)),
-            $"sha256:{new string('a', 64)}",
+            FeatureDraftAuthoringTransitions.SourceReference(draft.Source),
             FeatureSourceKind.RuntimeAuthored,
             ["capability.read"],
-            []);
+            [],
+            draft.Source);
         var builds = new RecordingFeatureBuildEndpoint(
             new FeatureBuildArtifact(release, new DigitalBrain.FeatureBuilder.FeatureScenarioResult(1, 1, 0, 0)));
         var catalog = new RecordingFeatureArtifactCatalog(release);
@@ -468,7 +603,20 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             builds,
             catalog,
             lifecycle,
-            TimeProvider.System);
+            TimeProvider.System,
+            new StaticFeatureCapabilityCatalog([
+                new CapabilityDescriptor(
+                    "capability.read",
+                    1,
+                    "Read",
+                    "Read a value.",
+                    ["Read a value."],
+                    [],
+                    ["google"],
+                    CapabilityOrigin.Integration,
+                    CapabilityOperationKind.Query,
+                    true)
+            ]));
         _chatClient!.Response = LiveSuggestionResponse();
         var (service, _) = CreateService(
             grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal),
@@ -497,9 +645,42 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         };
         var verified = await service.VerifyFeatureDraft(verifyRequest, call);
         var verifiedReplay = await service.VerifyFeatureDraft(verifyRequest, call);
-        var installRequest = ValidInstallRequest(verified.Draft, release);
+        var reviewRequest = new ReviewFeatureAccessRequest
+        {
+            DraftId = verified.Draft.DraftId,
+            ExpectedRevision = verified.Draft.Revision,
+            InstallationId = "installation-ui-live",
+            ReleaseDigest = release.Digest.Value
+        };
+        var accessReview = await service.ReviewFeatureAccess(reviewRequest, call);
+        var installRequest = new InstallFeatureVersionRequest
+        {
+            DraftId = reviewRequest.DraftId,
+            ExpectedRevision = reviewRequest.ExpectedRevision,
+            InstallationId = reviewRequest.InstallationId,
+            ReleaseDigest = reviewRequest.ReleaseDigest,
+            DecisionId = "decision-ui-live",
+            IdempotencyId = "install-ui-live"
+        };
+        installRequest.Grants.Add(accessReview.Grants);
+        installRequest.Subscriptions.Add(accessReview.Subscriptions);
         var installed = await service.InstallFeatureVersion(installRequest, call);
         var installedReplay = await service.InstallFeatureVersion(installRequest, call);
+        var recovered = await service.GetFeatureDraft(
+            new GetFeatureDraftRequest { DraftId = draft.DraftId.Value },
+            call);
+        var detail = await service.GetFeature(
+            new GetFeatureRequest { FeatureId = draft.DraftId.Value },
+            call);
+        var releaseSource = await service.GetFeatureReleaseSource(
+            new GetFeatureReleaseSourceRequest
+            {
+                FeatureId = detail.FeatureId,
+                InstallationId = detail.InstallationId,
+                ReleaseDigest = detail.ActiveRelease.Digest,
+                SourceReference = detail.ActiveRelease.SourceReference
+            },
+            call);
 
         Assert.Equal(draft.DraftId.Value, suggestion.Patch.DraftId);
         Assert.Equal(draft.Revision, suggestion.Patch.BaseRevision);
@@ -508,17 +689,206 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         Assert.Equal(verified, verifiedReplay);
         Assert.Equal(draft.Revision + 1, verified.Draft.Revision);
         Assert.Equal(release.Digest.Value, verified.Release.Digest);
+        Assert.Equal(release.Digest.Value, accessReview.Release.Digest);
+        Assert.Equal(release.SourceReference, accessReview.Release.SourceReference);
+        Assert.Null(accessReview.Release.Source);
+        Assert.Equal("capability.read", Assert.Single(accessReview.Grants).CapabilityId);
+        Assert.Equal("manual", Assert.Single(accessReview.Subscriptions));
         Assert.Equal(installed, installedReplay);
         Assert.Equal("installation-ui-live", installed.InstallationId);
         Assert.Equal(McpProject::DigitalBrain.V2.Ui.Grpc.FeatureDraftStatus.Installed, installed.Draft.Status);
         Assert.Equal(release.Digest.Value, installed.Release.Digest);
+        Assert.Null(installed.Release.Source);
         Assert.Equal("capability.read", Assert.Single(installed.ActiveGrants).CapabilityId);
-        Assert.Equal("conversation.completed", Assert.Single(installed.Subscriptions));
+        Assert.Equal("manual", Assert.Single(installed.Subscriptions));
+        Assert.NotNull(recovered.Recovery);
+        Assert.True(recovered.Recovery.Installed);
+        Assert.Equal(release.Digest.Value, recovered.Recovery.Release.Digest);
+        Assert.Null(recovered.Recovery.Release.Source);
+        Assert.Equal(release.SourceReference, recovered.Recovery.Verification.SourceReference);
+        Assert.Single(recovered.Recovery.Verification.Scenarios);
+        Assert.Empty(recovered.Recovery.Verification.Artifacts);
+        Assert.False(recovered.Recovery.HasDecisionId);
+        Assert.False(recovered.Recovery.HasIdempotencyId);
+        Assert.False(recovered.Recovery.RollbackAvailable);
+        Assert.Null(recovered.Recovery.PreviousRelease);
+        Assert.Equal(draft.DraftId.Value, detail.FeatureId);
+        Assert.Equal(release.Digest.Value, detail.ActiveRelease.Digest);
+        Assert.Equal("installation-ui-live", detail.InstallationId);
+        Assert.True(detail.Revision > 0);
+        Assert.Null(detail.ActiveRelease.Source);
+        Assert.Null(detail.PreviousRelease);
+        Assert.False(detail.RollbackAvailable);
+        Assert.Equal(detail.FeatureId, releaseSource.FeatureId);
+        Assert.Equal(detail.InstallationId, releaseSource.InstallationId);
+        Assert.Equal(detail.ActiveRelease.Digest, releaseSource.ReleaseDigest);
+        Assert.Equal(detail.ActiveRelease.SourceReference, releaseSource.SourceReference);
+        Assert.Equal(draft.Source.Files.Select(file => file.Content), releaseSource.Source.Files.Select(file => file.Content));
         Assert.Equal(1, _chatClient.CallCount);
-        Assert.Equal(2, builds.CallCount);
-        Assert.Equal(2, catalog.CallCount);
+        Assert.Equal(1, builds.CallCount);
+        Assert.Equal(7, catalog.CallCount);
+        Assert.Equal(7, catalog.SourceCallCount);
         Assert.Equal(1, lifecycle.InstallCount);
         Assert.Equal(1, lifecycle.RepublishCount);
+    }
+
+    [Fact]
+    public async Task ResumeOriginatingRequest_restores_the_persisted_conversation_and_prompt_once_per_stable_intent()
+    {
+        var fixture = await CreateInstalledResumeFixtureAsync();
+        var request = new ResumeOriginatingRequestRequest
+        {
+            DraftId = fixture.Draft.DraftId,
+            ExpectedRevision = fixture.Draft.Revision,
+            IdempotencyId = "run-originating-request-a"
+        };
+
+        var resumed = await fixture.Service.ResumeOriginatingRequest(request, fixture.Call);
+        var conversation = Cluster.Client.GetGrain<IConversationNeuron>(RuntimeStateKeys.Conversation(
+            fixture.OwnerId,
+            fixture.ActorId,
+            fixture.ConversationId));
+        var state = await conversation.ReadAsync();
+        var operation = Assert.Single(state.Operations, candidate =>
+            string.Equals(candidate.CommandId, request.IdempotencyId, StringComparison.Ordinal));
+        var turn = Assert.Single(state.Turns, candidate =>
+            candidate.Kind == ConversationTurnKind.User &&
+            string.Equals(candidate.OperationId, operation.OperationId, StringComparison.Ordinal));
+        var claim = await conversation.TryClaimOperationAsync(
+            state.Revision,
+            operation.OperationId,
+            "resume-test-worker",
+            DateTimeOffset.UtcNow,
+            TimeSpan.FromMinutes(1));
+        var replayed = await fixture.Service.ResumeOriginatingRequest(request, fixture.Call);
+        var replayedState = await conversation.ReadAsync();
+
+        Assert.True(claim.Acquired);
+        Assert.Equal(ConversationOperationStatus.Running, claim.Operation!.Status);
+        Assert.True(claim.Operation.Version > resumed.Version);
+        Assert.Single(replayedState.Operations, candidate =>
+            string.Equals(candidate.CommandId, request.IdempotencyId, StringComparison.Ordinal));
+        Assert.Equal(request.IdempotencyId, resumed.CommandId);
+        Assert.Equal(resumed, replayed);
+        Assert.Equal(operation.OperationId, resumed.OperationId);
+        Assert.Equal(fixture.Prompt, turn.Text);
+        Assert.Equal(InoOperationPhase.Accepted.ToString(), resumed.Phase);
+        Assert.True(resumed.Version >= 1);
+    }
+
+    [Fact]
+    public async Task ResumeOriginatingRequest_rejects_revision_actor_and_persisted_identity_mismatches()
+    {
+        var fixture = await CreateInstalledResumeFixtureAsync();
+        var stale = new ResumeOriginatingRequestRequest
+        {
+            DraftId = fixture.Draft.DraftId,
+            ExpectedRevision = fixture.Draft.Revision - 1,
+            IdempotencyId = "run-stale"
+        };
+        var staleFailure = await Assert.ThrowsAsync<RpcException>(() =>
+            fixture.Service.ResumeOriginatingRequest(stale, fixture.Call));
+
+        var (otherActorService, _) = CreateService(
+            grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal),
+            authoring: fixture.Authoring,
+            actorId: new ActorId("other-principal"));
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var otherBootstrap = await otherActorService.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var otherActorCall = TestServerCallContext.WithHeaders(
+            ("x-v2-session", otherBootstrap.AccessToken),
+            audience);
+        var actorFailure = await Assert.ThrowsAsync<RpcException>(() =>
+            otherActorService.ResumeOriginatingRequest(
+                new ResumeOriginatingRequestRequest
+                {
+                    DraftId = fixture.Draft.DraftId,
+                    ExpectedRevision = fixture.Draft.Revision,
+                    IdempotencyId = "run-other-actor"
+                },
+                otherActorCall));
+
+        var identityFixture = await CreateInstalledResumeFixtureAsync(
+            "ino-" + new string('f', 64),
+            operationSuffix: "identity-mismatch");
+        var identityFailure = await Assert.ThrowsAsync<RpcException>(() =>
+            identityFixture.Service.ResumeOriginatingRequest(
+                new ResumeOriginatingRequestRequest
+                {
+                    DraftId = identityFixture.Draft.DraftId,
+                    ExpectedRevision = identityFixture.Draft.Revision,
+                    IdempotencyId = "run-identity-mismatch"
+                },
+                identityFixture.Call));
+
+        Assert.Equal(StatusCode.Aborted, staleFailure.StatusCode);
+        Assert.Equal(StatusCode.FailedPrecondition, actorFailure.StatusCode);
+        Assert.Equal(StatusCode.FailedPrecondition, identityFailure.StatusCode);
+    }
+
+    [Fact]
+    public async Task Failed_verification_returns_safe_scenario_evidence_without_publishing_a_release()
+    {
+        var ownerId = new BrainOwnerId("owner");
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-failed-verification",
+            "Explain a failed Feature scenario safely",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-failed-verification"));
+        var release = new FeatureReleaseMetadata(
+            new ReleaseDigest(new string('f', 64)),
+            $"sha256:{new string('f', 64)}",
+            FeatureSourceKind.RuntimeAuthored,
+            ["capability.read"],
+            []);
+        var builds = new RecordingFeatureBuildEndpoint(
+            new FeatureBuildArtifact(
+                release,
+                new DigitalBrain.FeatureBuilder.FeatureScenarioResult(1, 0, 1, 0)));
+        var catalog = new RecordingFeatureArtifactCatalog(release);
+        var lifecycle = new LiveFeatureLifecycleRail(Cluster.Client, ownerId, _publicationVerifier);
+        var authoring = new FeatureAuthoringService(
+            Cluster.Client,
+            builds,
+            catalog,
+            lifecycle,
+            TimeProvider.System);
+        var (service, _) = CreateService(
+            grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal),
+            authoring: authoring);
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+
+        var reply = await service.VerifyFeatureDraft(
+            new VerifyFeatureDraftRequest
+            {
+                DraftId = draft.DraftId.Value,
+                ExpectedRevision = draft.Revision,
+                IdempotencyId = "verify-ui-failed"
+            },
+            call);
+
+        Assert.Null(reply.Release);
+        Assert.Equal(draft.Revision, reply.Draft.Revision);
+        Assert.Equal(1, reply.Verification.Total);
+        Assert.Equal(0, reply.Verification.Passed);
+        Assert.Equal(1, reply.Verification.Failed);
+        Assert.True(reply.Verification.VerifiedAtUnixMs > 0);
+        var scenario = Assert.Single(reply.Verification.Scenarios);
+        Assert.Equal("Scenario failed.", scenario.SafeFailure);
+        Assert.DoesNotContain(" at ", scenario.SafeFailure, StringComparison.Ordinal);
+        var persisted = Assert.IsType<FeatureDraft>(await hub.ReadDraftAsync(draft.DraftId));
+        Assert.Equal(draft.Revision, persisted.Revision);
+        Assert.Null(persisted.Verification);
+        Assert.Equal(1, builds.CallCount);
+        Assert.Equal(0, catalog.CallCount);
+        Assert.Equal(0, lifecycle.MutationCount);
     }
 
     [Fact]
@@ -595,20 +965,24 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     {
         var ownerId = new BrainOwnerId("owner");
         var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
-        var release = new FeatureReleaseMetadata(
-            new ReleaseDigest(new string('c', 64)),
-            $"sha256:{new string('c', 64)}",
-            FeatureSourceKind.RuntimeAuthored,
-            ["capability.read"],
-            []);
         var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
             "operation-ui-actor-mismatch",
             "Reject a different installation actor",
             DateTimeOffset.UtcNow,
             "conversation-ui-actor-mismatch"));
+        var release = new FeatureReleaseMetadata(
+            new ReleaseDigest(new string('c', 64)),
+            FeatureDraftAuthoringTransitions.SourceReference(draft.Source),
+            FeatureSourceKind.RuntimeAuthored,
+            ["capability.read"],
+            []);
         draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
             draft.DraftId,
-            new FeatureVerification(release.Digest, 1, 1, 0, 0, DateTimeOffset.UtcNow),
+            DigitalBrain.OrleansTests.Features.FeatureVerificationTestData.Passing(
+                release.Digest,
+                draft.Source,
+                1,
+                DateTimeOffset.UtcNow),
             draft.Revision,
             "verify-ui-actor-mismatch"));
         var request = ValidInstallRequest(draft, release);
@@ -831,7 +1205,8 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         IReadOnlySet<string>? grants = null,
         FeatureAuthoringService? authoring = null,
         FeatureSuggestionService? suggestion = null,
-        ILogger<DigitalBrainUiEndpoints>? endpointLogger = null)
+        ILogger<DigitalBrainUiEndpoints>? endpointLogger = null,
+        ActorId? actorId = null)
     {
         var timeProvider = TimeProvider.System;
         var tokens = new SessionTokenService(Enumerable.Repeat((byte)13, 32).ToArray(), timeProvider);
@@ -850,9 +1225,9 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         var service = new UiGrpcService(
             new UiDevelopmentLoginAuthenticator(new UiDevelopmentLoginOptions(
                 LoginUsername,
-                LoginPassword,
-                new BrainOwnerId("owner"),
-                new ActorId("principal"),
+                 LoginPassword,
+                 new BrainOwnerId("owner"),
+                 actorId ?? new ActorId("principal"),
                 TimeSpan.FromMinutes(15),
                 grants ?? new HashSet<string>(["brain.read", "ui.action"], StringComparer.Ordinal))),
             new UiExternalIdentityAuthenticator(externalOptions ?? new UiExternalIdentityOptions(
@@ -877,11 +1252,122 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     private static Func<Task>[] ProductCalls(UiGrpcService service, ServerCallContext context) =>
     [
         () => service.GetFeatureDraft(new GetFeatureDraftRequest(), context),
+        () => service.ResetFeatureDraftInstallation(new ResetFeatureDraftInstallationRequest(), context),
         () => service.ReviseFeatureDraft(new ReviseFeatureDraftRequest(), context),
         () => service.SuggestFeatureChange(new SuggestFeatureChangeRequest(), context),
         () => service.VerifyFeatureDraft(new VerifyFeatureDraftRequest(), context),
-        () => service.InstallFeatureVersion(new InstallFeatureVersionRequest(), context)
+        () => service.ReviewFeatureAccess(new ReviewFeatureAccessRequest(), context),
+        () => service.InstallFeatureVersion(new InstallFeatureVersionRequest(), context),
+        () => service.ResumeOriginatingRequest(new ResumeOriginatingRequestRequest(), context),
+        () => service.GetFeature(new GetFeatureRequest(), context),
+        () => service.GetFeatureReleaseSource(new GetFeatureReleaseSourceRequest(), context),
+        () => service.RollbackFeatureVersion(new RollbackFeatureVersionRequest(), context)
     ];
+
+    private async Task<InstalledResumeFixture> CreateInstalledResumeFixtureAsync(
+        string? conversationId = null,
+        string operationSuffix = "exact")
+    {
+        var ownerId = new BrainOwnerId("owner");
+        var actorId = new ActorId("principal");
+        var requestContext = new RuntimeRequestContext(
+            ownerId,
+            actorId,
+            new SessionId("resume-fixture-session"),
+            AuthAssurance.Oidc,
+            "resume-fixture-correlation",
+            null,
+            new HashSet<string>(StringComparer.Ordinal));
+        conversationId ??= InoConversationIdentity.From(requestContext);
+        var prompt = $"Run the persisted request {operationSuffix}";
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            $"operation-resume-{operationSuffix}",
+            prompt,
+            DateTimeOffset.UtcNow,
+            conversationId));
+        var release = new FeatureReleaseMetadata(
+            new ReleaseDigest(Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(operationSuffix)))),
+            FeatureDraftAuthoringTransitions.SourceReference(draft.Source),
+            FeatureSourceKind.RuntimeAuthored,
+            ["capability.read"],
+            [],
+            draft.Source);
+        draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            FeatureVerificationTestData.Passing(release.Digest, draft.Source, 1, DateTimeOffset.UtcNow),
+            draft.Revision,
+            $"verify-resume-{operationSuffix}"));
+        var catalog = new RecordingFeatureArtifactCatalog(release);
+        var lifecycle = new LiveFeatureLifecycleRail(Cluster.Client, ownerId, _publicationVerifier);
+        var authoring = new FeatureAuthoringService(
+            Cluster.Client,
+            new UnusedBuildEndpoint(),
+            catalog,
+            lifecycle,
+            TimeProvider.System,
+            new StaticFeatureCapabilityCatalog([
+                new CapabilityDescriptor(
+                    "capability.read",
+                    1,
+                    "Read",
+                    "Read a value.",
+                    ["Read a value."],
+                    [],
+                    ["google"],
+                    CapabilityOrigin.Integration,
+                    CapabilityOperationKind.Query,
+                    true)
+            ]));
+        var (service, _) = CreateService(
+            grants: new HashSet<string>(["feature.manage"], StringComparer.Ordinal),
+            authoring: authoring);
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+        var review = await service.ReviewFeatureAccess(
+            new ReviewFeatureAccessRequest
+            {
+                DraftId = draft.DraftId.Value,
+                ExpectedRevision = draft.Revision,
+                InstallationId = $"installation-resume-{operationSuffix}",
+                ReleaseDigest = release.Digest.Value
+            },
+            call);
+        var install = new InstallFeatureVersionRequest
+        {
+            DraftId = draft.DraftId.Value,
+            ExpectedRevision = draft.Revision,
+            InstallationId = review.InstallationId,
+            ReleaseDigest = release.Digest.Value,
+            DecisionId = $"decision-resume-{operationSuffix}",
+            IdempotencyId = $"install-resume-{operationSuffix}"
+        };
+        install.Grants.Add(review.Grants);
+        install.Subscriptions.Add(review.Subscriptions);
+        var installed = await service.InstallFeatureVersion(install, call);
+        return new InstalledResumeFixture(
+            service,
+            call,
+            authoring,
+            installed.Draft,
+            ownerId,
+            actorId,
+            conversationId,
+            prompt);
+    }
+
+    private sealed record InstalledResumeFixture(
+        UiGrpcService Service,
+        ServerCallContext Call,
+        FeatureAuthoringService Authoring,
+        GrpcFeatureDraft Draft,
+        BrainOwnerId OwnerId,
+        ActorId ActorId,
+        string ConversationId,
+        string Prompt);
 
     private static InstallFeatureVersionRequest ValidInstallRequest(
         GrpcFeatureDraft draft,
@@ -915,6 +1401,19 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         });
         request.Subscriptions.Add("conversation.completed");
         return request;
+    }
+
+    private sealed class StaticFeatureCapabilityCatalog(IEnumerable<CapabilityDescriptor> descriptors)
+        : FeatureCapabilityCatalog
+    {
+        private readonly CapabilityDescriptor[] _descriptors = descriptors.ToArray();
+
+        public Task<IReadOnlyList<CapabilityDescriptor>> ReadAsync(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<CapabilityDescriptor>>(_descriptors);
+        }
     }
 
     private static string LiveSuggestionResponse() => """
@@ -966,6 +1465,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     private sealed class RecordingFeatureArtifactCatalog(FeatureReleaseMetadata release) : FeatureArtifactCatalog
     {
         public int CallCount { get; private set; }
+        public int SourceCallCount { get; private set; }
 
         public Task<FeatureReleaseMetadata> DemandReleaseAsync(
             ReleaseDigest digest,
@@ -973,6 +1473,21 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         {
             CallCount++;
             return Task.FromResult(release);
+        }
+
+        public Task<FeatureSourceSnapshot> DemandSourceAsync(
+            string sourceReference,
+            CancellationToken cancellationToken = default)
+        {
+            SourceCallCount++;
+            return Task.FromResult(release.Source ?? new FeatureSourceSnapshot(
+                "src/UiLive/UiLive.csproj",
+                "tests/UiLive.Scenarios/UiLive.Scenarios.csproj",
+                [
+                    new FeatureSourceFile("src/UiLive/UiLive.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>"),
+                    new FeatureSourceFile("src/UiLive/Feature.cs", "namespace RuntimeAuthored; public sealed class Feature;"),
+                    new FeatureSourceFile("tests/UiLive.Scenarios/UiLive.Scenarios.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>")
+                ]));
         }
     }
 
@@ -986,6 +1501,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         public int GrantCount { get; private set; }
         public int InstallCount { get; private set; }
         public int RepublishCount { get; private set; }
+        public string? FailAfter { get; set; }
         public int MutationCount => ProposeCount + DecideCount + GrantCount + InstallCount;
 
         public async Task<FeatureLifecycleInspection> InspectAsync(
@@ -1020,7 +1536,9 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             CancellationToken cancellationToken = default)
         {
             ProposeCount++;
-            return await Hub.ProposeAsync(proposal, expectedRevision).WaitAsync(cancellationToken);
+            var approval = await Hub.ProposeAsync(proposal, expectedRevision).WaitAsync(cancellationToken);
+            Fail("propose");
+            return approval;
         }
 
         public async Task<FeatureApprovalSnapshot> DecideAsync(
@@ -1095,6 +1613,13 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         }
 
         private IFeatureHubGrain Hub => cluster.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(ownerId));
+
+        private void Fail(string boundary)
+        {
+            if (!string.Equals(FailAfter, boundary, StringComparison.Ordinal)) return;
+            FailAfter = null;
+            throw new IOException($"Injected failure after {boundary}.");
+        }
     }
 
     private sealed class FixedInspectionLifecycleRail(FeatureLifecycleInspection inspection) : FeatureLifecycleRail

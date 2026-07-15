@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
@@ -8,6 +9,7 @@ namespace DigitalBrain.OrleansTests.Features;
 public sealed class FeatureDraftAuthoringTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 15, 8, 0, 0, TimeSpan.Zero);
+    private static readonly string InitialSourceReference = SourceReference(Create().Draft.Source);
 
     [Fact]
     public void ReadDraft_is_local_to_the_owner_FeatureHub_state()
@@ -415,6 +417,89 @@ public sealed class FeatureDraftAuthoringTests
     }
 
     [Fact]
+    public void Replay_footprint_accounts_for_every_verification_evidence_string()
+    {
+        var created = Create();
+        var evidence = VerificationEvidence();
+        var expandedEvidence = evidence with
+        {
+            Scenarios =
+            [
+                evidence.Scenarios[0] with
+                {
+                    ScenarioId = new string('i', FeatureLimits.DraftVerificationScenarioIdCharacters),
+                    Name = new string('n', FeatureLimits.DraftVerificationScenarioNameCharacters),
+                    SafeFailure = new string('f', FeatureLimits.DraftVerificationSafeFailureCharacters)
+                }
+            ],
+            Artifacts =
+            [
+                evidence.Artifacts[0] with
+                {
+                    Name = new string('a', FeatureLimits.DraftVerificationArtifactNameCharacters),
+                    MediaType = new string('m', FeatureLimits.DraftVerificationArtifactMediaTypeCharacters)
+                }
+            ]
+        };
+        var baseline = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(
+                created.Draft.DraftId,
+                Verification(evidence),
+                0,
+                "verification-footprint"));
+        var expanded = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(
+                created.Draft.DraftId,
+                Verification(expandedEvidence),
+                0,
+                "verification-footprint"));
+
+        var baselineBytes = Assert.Single(baseline.State.DraftReplays ?? []).Utf8Bytes;
+        var expandedBytes = Assert.Single(expanded.State.DraftReplays ?? []).Utf8Bytes;
+        Assert.Equal(EvidenceStringsUtf8(expandedEvidence) - EvidenceStringsUtf8(evidence), expandedBytes - baselineBytes);
+    }
+
+    [Fact]
+    public void Replay_ledger_evicts_verification_evidence_above_the_byte_budget_and_preserves_the_recent_result()
+    {
+        var created = Create();
+        var state = created.State;
+        RecordFeatureVerification? recentCommand = null;
+        for (var index = 0; index < 6; index++)
+        {
+            recentCommand = new RecordFeatureVerification(
+                created.Draft.DraftId,
+                Verification(LargeVerificationEvidence((char)('a' + index), 1_800)),
+                index,
+                $"large-verification-{index}");
+            state = FeatureDraftAuthoringTransitions.RecordVerification(state, recentCommand).State;
+        }
+
+        var replays = state.DraftReplays ?? [];
+        Assert.True(replays.Sum(replay => (long)replay.Utf8Bytes) <= FeatureLimits.DraftReplayUtf8Bytes);
+        Assert.DoesNotContain(replays, replay => replay.IdempotencyId == "large-verification-0");
+        Assert.Contains(replays, replay => replay.IdempotencyId == "large-verification-5");
+        var replayed = FeatureDraftAuthoringTransitions.RecordVerification(state, recentCommand!);
+        Assert.Same(state, replayed.State);
+    }
+
+    [Fact]
+    public void RecordFeatureVerification_rejects_multibyte_evidence_above_the_aggregate_byte_budget()
+    {
+        var created = Create();
+        var command = new RecordFeatureVerification(
+            created.Draft.DraftId,
+            Verification(LargeVerificationEvidence('\u0800', 4_096)),
+            0,
+            "multibyte-verification");
+
+        Assert.Throws<FeatureLimitExceededException>(() =>
+            FeatureDraftAuthoringTransitions.RecordVerification(created.State, command));
+    }
+
+    [Fact]
     public void Owner_live_Draft_budget_accepts_the_boundary_and_rejects_creation_or_update_above_it()
     {
         var (drafts, expandableIndex, sourceBytes) = DraftsAtOwnerBudget();
@@ -573,6 +658,29 @@ public sealed class FeatureDraftAuthoringTests
 
         Assert.Same(reserved.State, replayed.State);
         Assert.Equal(reserved.Reservation, replayed.Reservation);
+        Assert.Equal(
+            ["capability.a", "capability.z"],
+            Assert.IsType<FeatureGrantSpec[]>(reserved.Reservation.Grants).Select(grant => grant.CapabilityId));
+        Assert.Equal(["a-event", "z-event"], Assert.IsType<string[]>(reserved.Reservation.Subscriptions));
+        var changedPlan = reserved.State with
+        {
+            DraftInstallationReservations =
+            [
+                reserved.Reservation with { Subscriptions = ["other-event"] }
+            ]
+        };
+        Assert.False(FeatureStateEquality.Same(reserved.State, changedPlan));
+        var legacy = reserved.State with
+        {
+            DraftInstallationReservations =
+            [
+                reserved.Reservation with { Grants = null, Subscriptions = null }
+            ]
+        };
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            legacy,
+            command,
+            new ActorId("actor-installation")));
         Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
             reserved.State,
             command with { Subscriptions = ["conversation.completed"] },
@@ -597,6 +705,236 @@ public sealed class FeatureDraftAuthoringTests
         Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.RecordVerification(
             reserved.State,
             new RecordFeatureVerification(created.Draft.DraftId, verification with { VerifiedAt = Now.AddMinutes(2) }, verified.Draft.Revision, "verification-reserved")));
+    }
+
+    [Fact]
+    public void Installation_recovery_ledger_enforces_one_aggregate_UTF8_budget_across_reservations_and_resets()
+    {
+        var grant = new FeatureGrantSpec("capability.ledger", 1, null, string.Empty);
+        var reservation = new FeatureDraftInstallationReservation(
+            new FeatureDraftId("draft-ledger"),
+            1,
+            new FeatureInstallationId("installation-ledger"),
+            new ReleaseDigest(new string('a', 64)),
+            "install-ledger",
+            new string('b', 64),
+            new string('c', 64),
+            "decision-ledger",
+            new ActorId("actor-ledger"),
+            [grant],
+            ["manual"]);
+        var baseBytes = FeatureDraftAuthoringTransitions.InstallationLedgerUtf8Bytes([reservation], []);
+        var paddingLength = FeatureLimits.DraftInstallationLedgerUtf8Bytes - baseBytes;
+        var exact = reservation with
+        {
+            Grants = [grant with { ConstraintsJson = new string('x', paddingLength) }]
+        };
+        var reset = new FeatureDraftInstallationResetState(
+            reservation.DraftId,
+            "reset-ledger",
+            reservation.ActorId,
+            Now,
+            reservation.InstallationId,
+            reservation.Release,
+            reservation.CommandDigest,
+            true,
+            1,
+            new string('d', 64),
+            new string('e', 64));
+
+        Assert.True(paddingLength > 0);
+        Assert.Equal(
+            FeatureLimits.DraftInstallationLedgerUtf8Bytes,
+            FeatureDraftAuthoringTransitions.InstallationLedgerUtf8Bytes([exact], []));
+        FeatureDraftAuthoringTransitions.DemandInstallationLedgerBudget([exact], []);
+        Assert.Throws<FeatureLimitExceededException>(() =>
+            FeatureDraftAuthoringTransitions.DemandInstallationLedgerBudget([exact], [reset]));
+        Assert.Throws<FeatureLimitExceededException>(() =>
+            FeatureDraftAuthoringTransitions.DemandInstallationLedgerBudget(
+                [exact with { Grants = [grant with { ConstraintsJson = new string('x', paddingLength + 1) }] }],
+                []));
+    }
+
+    [Fact]
+    public void Oversized_seeded_recovery_ledger_blocks_forward_replay_but_keeps_exact_reset_recovery_available()
+    {
+        var created = Create();
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-oversized-ledger"));
+        var actor = new ActorId("actor-oversized-ledger");
+        var grant = new FeatureGrantSpec(
+            "capability.oversized-ledger",
+            1,
+            null,
+            "{\"allowedToolIds\":[\"capability.oversized-ledger\"]}");
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            new FeatureInstallationId("installation-oversized-ledger-reset"),
+            verification.Release,
+            [grant],
+            ["manual"],
+            "decision-oversized-ledger-reset",
+            "install-oversized-ledger-reset");
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(verified.State, command, actor);
+        var forwardCommand = command with
+        {
+            DraftId = new FeatureDraftId("draft-oversized-ledger-forward"),
+            InstallationId = new FeatureInstallationId("installation-oversized-ledger-forward"),
+            DecisionId = "decision-oversized-ledger-forward",
+            IdempotencyId = "install-oversized-ledger-forward"
+        };
+        var forwardReservation = reserved.Reservation with
+        {
+            DraftId = forwardCommand.DraftId,
+            InstallationId = forwardCommand.InstallationId,
+            DecisionId = forwardCommand.DecisionId,
+            IdempotencyId = forwardCommand.IdempotencyId,
+            CommandDigest = FeatureInstallationReservationDigests.Command(forwardCommand),
+            AccessDigest = FeatureInstallationReservationDigests.Access(
+                forwardCommand.InstallationId,
+                forwardCommand.Release,
+                forwardCommand.Grants,
+                forwardCommand.Subscriptions)
+        };
+        var oversizedLegacyReservation = reserved.Reservation with
+        {
+            DraftId = new FeatureDraftId("draft-oversized-ledger-legacy"),
+            InstallationId = new FeatureInstallationId("installation-oversized-ledger-legacy"),
+            Grants = [grant with { ConstraintsJson = new string('x', FeatureLimits.DraftInstallationLedgerUtf8Bytes) }]
+        };
+        var seeded = reserved.State with
+        {
+            DraftInstallationReservations =
+            [
+                reserved.Reservation,
+                forwardReservation,
+                oversizedLegacyReservation
+            ]
+        };
+
+        Assert.True(FeatureDraftAuthoringTransitions.InstallationLedgerUtf8Bytes(
+            seeded.DraftInstallationReservations,
+            seeded.DraftInstallationResets ?? []) > FeatureLimits.DraftInstallationLedgerUtf8Bytes);
+        Assert.Throws<FeatureLimitExceededException>(() =>
+            FeatureDraftAuthoringTransitions.AcquireInstallationReservation(seeded, forwardCommand, actor));
+
+        var resetCommand = new ResetFeatureDraftInstallationReservation(
+            command.DraftId,
+            "reset-oversized-ledger",
+            command);
+        var reset = FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            seeded,
+            resetCommand,
+            actor,
+            Now.AddMinutes(2));
+        var replayedReset = FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            reset.State,
+            resetCommand with { ReservedInstallation = null },
+            actor,
+            Now.AddHours(1));
+
+        Assert.Same(reset.State, replayedReset.State);
+        Assert.DoesNotContain(reset.State.DraftInstallationReservations ?? [], candidate => candidate.DraftId == command.DraftId);
+        Assert.Contains(reset.State.DraftInstallationReservations ?? [], candidate => candidate.DraftId == forwardCommand.DraftId);
+        Assert.Throws<FeatureLimitExceededException>(() =>
+            FeatureDraftAuthoringTransitions.AcquireInstallationReservation(reset.State, forwardCommand, actor));
+    }
+
+    [Fact]
+    public void Same_release_reservation_rejects_grant_only_and_subscription_only_access_changes()
+    {
+        var verification = Verification();
+        var installationId = new FeatureInstallationId("installation-same-release-access");
+        var actor = new ActorId("actor-same-release-access");
+        var grant = new FeatureGrantSpec(
+            "capability.same",
+            1,
+            null,
+            "{\"allowedToolIds\":[\"capability.same\"]}");
+        var authority = new FeatureInstallationAuthorityState(
+            installationId,
+            actor,
+            verification.Release,
+            null,
+            new GrantRevision(1),
+            [new FeatureGrantState(
+                grant.CapabilityId,
+                grant.CapabilityVersion,
+                grant.ProviderConnectionId,
+                grant.ConstraintsJson,
+                grant.Provider)],
+            null,
+            [],
+            null,
+            null,
+            [],
+            false,
+            null);
+        var registration = new FeatureInstallationRegistration(
+            installationId,
+            verification.Release,
+            ["manual"]);
+        var created = FeatureHubTransitions.CreateDraft(
+            FeatureHubState.Empty with
+            {
+                Authorities = [authority],
+                Installations = [registration]
+            },
+            "owner-same-release-access",
+            new CreateFeatureDraft(
+                "operation-same-release-access",
+                "Review a same-release access plan",
+                Now,
+                "conversation-same-release-access"));
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(
+                created.Draft.DraftId,
+                verification,
+                created.Draft.Revision,
+                "verification-same-release-access"));
+        var command = new InstallFeatureVersion(
+            verified.Draft.DraftId,
+            verified.Draft.Revision,
+            installationId,
+            verification.Release,
+            [grant],
+            registration.Subscriptions,
+            "decision-same-release-access",
+            "install-same-release-access",
+            7,
+            verification.Release,
+            null);
+
+        var exact = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            verified.State,
+            command,
+            actor);
+        var changedGrant = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+                verified.State,
+                command with
+                {
+                    Grants = [grant with { CapabilityVersion = 2 }],
+                    IdempotencyId = "install-same-release-grant-change"
+                },
+                actor));
+        var changedSubscription = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+                verified.State,
+                command with
+                {
+                    Subscriptions = ["conversation.completed"],
+                    IdempotencyId = "install-same-release-subscription-change"
+                },
+                actor));
+
+        Assert.NotNull(exact.Reservation.AuthorityBaseline);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, changedGrant.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, changedSubscription.Reason);
     }
 
     [Fact]
@@ -654,22 +992,12 @@ public sealed class FeatureDraftAuthoringTests
             verified.State,
             command,
             new ActorId("actor-a"));
-        var publishedByAnotherActor = ConfirmPublication(
+        var rejected = Assert.Throws<FeatureAuthorityRejectedException>(() => ConfirmPublication(
             reserved.State,
             command,
-            new ActorId("actor-b"));
-
-        var rejected = Assert.Throws<FeatureAuthorityRejectedException>(() => FeatureDraftAuthoringTransitions.MarkInstalled(
-            publishedByAnotherActor,
-            new MarkFeatureDraftInstalled(
-                command.DraftId,
-                command.InstallationId,
-                command.Release,
-                command.ExpectedRevision,
-                command.IdempotencyId,
-                Now.AddMinutes(2))));
+            new ActorId("actor-b")));
         Assert.Equal(FeatureAuthorityRejectionReason.ActorMismatch, rejected.Reason);
-        Assert.Single(publishedByAnotherActor.DraftInstallationReservations ?? []);
+        Assert.Single(reserved.State.DraftInstallationReservations ?? []);
     }
 
     [Fact]
@@ -712,6 +1040,377 @@ public sealed class FeatureDraftAuthoringTests
     }
 
     [Fact]
+    public void Resetting_an_exact_reservation_is_actor_bound_replayable_and_makes_the_Draft_editable()
+    {
+        var created = Create();
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-reset"));
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            new FeatureInstallationId("installation-reset"),
+            verification.Release,
+            [new FeatureGrantSpec("capability.one", 1, null, "{\"allowedToolIds\":[\"capability.one\"]}")],
+            ["manual"],
+            "decision-reset",
+            "install-reset");
+        var actor = new ActorId("actor-reset");
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(verified.State, command, actor);
+        var resetCommand = new ResetFeatureDraftInstallationReservation(
+            command.DraftId,
+            "reset-reservation",
+            command);
+
+        var resetAt = Now.AddMinutes(2);
+        var reset = FeatureDraftAuthoringTransitions.ResetInstallationReservation(reserved.State, resetCommand, actor, resetAt);
+        var replayed = FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            reset.State,
+            resetCommand with { ReservedInstallation = null },
+            actor,
+            Now.AddHours(1));
+
+        Assert.Empty(reset.State.DraftInstallationReservations ?? []);
+        Assert.Null(reset.Draft.Verification);
+        Assert.Equal(verified.Draft.Revision + 1, reset.Draft.Revision);
+        Assert.Equal(resetAt, reset.Draft.UpdatedAt);
+        Assert.Same(reset.State, replayed.State);
+        Assert.Equal(reset.Draft, replayed.Draft);
+        Assert.True(reset.RequiresNewRuntimeDiscard);
+        Assert.False(reset.RequiresRepublish);
+        Assert.Throws<FeatureAuthorityRejectedException>(() => FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            reset.State,
+            resetCommand with { ReservedInstallation = null },
+            new ActorId("actor-other"),
+            Now.AddHours(1)));
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            reset.State,
+            resetCommand with { ReservedInstallation = command with { DecisionId = "different-decision" } },
+            actor,
+            Now.AddHours(1)));
+
+        var revised = FeatureDraftAuthoringTransitions.ReviseBehavior(
+            reset.State,
+            new ReviseFeatureBehavior(
+                command.DraftId,
+                Behavior("after-reset"),
+                reset.Draft.Revision,
+                "behavior-after-reset",
+                Now.AddMinutes(3)));
+
+        Assert.Equal(reset.Draft.Revision + 1, revised.Draft.Revision);
+
+        var reverified = FeatureDraftAuthoringTransitions.RecordVerification(
+            reset.State,
+            new RecordFeatureVerification(
+                command.DraftId,
+                verification with { VerifiedAt = Now.AddMinutes(4) },
+                reset.Draft.Revision,
+                "verification-after-reset"));
+        var newCommand = command with
+        {
+            ExpectedRevision = reverified.Draft.Revision,
+            IdempotencyId = "install-after-reset"
+        };
+        var newlyReserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            reverified.State,
+            newCommand,
+            actor);
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            newlyReserved.State,
+            resetCommand with { ReservedInstallation = null },
+            actor,
+            Now.AddMinutes(5)));
+    }
+
+    [Fact]
+    public void Resetting_supersedes_the_exact_approval_and_allows_a_fresh_same_release_access_plan()
+    {
+        var created = Create();
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-reset-approval"));
+        var oldGrant = new FeatureGrantSpec(
+            "capability.one",
+            1,
+            new ProviderConnectionId("connection-old"),
+            "{\"allowedToolIds\":[\"capability.one\"]}",
+            "sandbox");
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            new FeatureInstallationId("installation-reset-approval"),
+            verification.Release,
+            [oldGrant],
+            ["manual"],
+            "decision-reset-approval",
+            "install-reset-approval");
+        var actor = new ActorId("actor-reset-approval");
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(verified.State, command, actor);
+        var historicalApprovals = Enumerable.Range(1, 63).Select(index =>
+        {
+            var historicalRelease = new ReleaseDigest(index.ToString("x64"));
+            return new FeatureApprovalState(
+                $"historical-approval-{index:D2}",
+                new FeatureInstallationId($"historical-installation-{index:D2}"),
+                new FeatureReleaseMetadata(
+                    historicalRelease,
+                    "sha256:" + historicalRelease.Value,
+                    FeatureSourceKind.RuntimeAuthored,
+                    [],
+                    [],
+                    new FeatureSourceSnapshot(
+                        $"src/history-{index:D2}/Feature.csproj",
+                        $"tests/history-{index:D2}/Feature.Scenarios.csproj",
+                        [new FeatureSourceFile($"src/history-{index:D2}/Feature.cs", "history")])),
+                [],
+                [],
+                FeatureApprovalStatus.Superseded,
+                $"historical-decision-{index:D2}",
+                Now,
+                index,
+                [],
+                actor);
+        }).ToArray();
+        reserved = reserved with
+        {
+            State = reserved.State with { Approvals = historicalApprovals, Revision = 1000 }
+        };
+        var source = Source();
+        var release = new FeatureReleaseMetadata(
+            command.Release,
+            FeatureDraftAuthoringTransitions.SourceReference(source),
+            FeatureSourceKind.RuntimeAuthored,
+            [oldGrant.CapabilityId],
+            [],
+            source);
+        var proposed = FeatureHubTransitions.Propose(
+            reserved.State,
+            new FeatureReleaseProposal(command.InstallationId, release, [oldGrant]),
+            reserved.State.Revision,
+            Now);
+
+        var reset = FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            proposed,
+            new ResetFeatureDraftInstallationReservation(command.DraftId, "reset-approval", command),
+            actor,
+            Now.AddMinutes(2));
+        var newGrant = oldGrant with { ProviderConnectionId = new ProviderConnectionId("connection-new") };
+        var reverified = FeatureDraftAuthoringTransitions.RecordVerification(
+            reset.State,
+            new RecordFeatureVerification(
+                command.DraftId,
+                verification with { VerifiedAt = Now.AddMinutes(3) },
+                reset.Draft.Revision,
+                "verification-reset-approval-fresh"));
+        var freshCommand = command with
+        {
+            ExpectedRevision = reverified.Draft.Revision,
+            Grants = [newGrant],
+            DecisionId = "decision-reset-approval-fresh",
+            IdempotencyId = "install-reset-approval-fresh"
+        };
+        var reReserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(
+            reverified.State,
+            freshCommand,
+            actor);
+        var reproposed = FeatureHubTransitions.Propose(
+            reReserved.State,
+            new FeatureReleaseProposal(command.InstallationId, release, [newGrant]),
+            reReserved.State.Revision,
+            Now.AddMinutes(4));
+
+        Assert.Equal(FeatureLimits.ApprovalLedgerRecords, reset.State.Approvals.Length);
+        Assert.All(reset.State.Approvals, approval => Assert.Equal(FeatureApprovalStatus.Superseded, approval.Status));
+        Assert.All(reset.State.Approvals, approval => Assert.Null(approval.Release.Source));
+        Assert.Empty(reset.State.Releases);
+        Assert.Equal(FeatureLimits.ApprovalLedgerRecords, reproposed.Approvals.Length);
+        Assert.DoesNotContain(reproposed.Approvals, approval => approval.ApprovalId == "historical-approval-01");
+        Assert.Contains(reproposed.Approvals, approval =>
+            approval.Status == FeatureApprovalStatus.Pending &&
+            approval.Grants.Single().ProviderConnectionId == newGrant.ProviderConnectionId);
+    }
+
+    [Fact]
+    public void Resetting_supersedes_an_exact_rejected_approval_without_erasing_its_decision_history()
+    {
+        var created = Create();
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-reset-rejected"));
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            new FeatureInstallationId("installation-reset-rejected"),
+            verification.Release,
+            [],
+            ["manual"],
+            "decision-reset-rejected",
+            "install-reset-rejected");
+        var actor = new ActorId("actor-reset-rejected");
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(verified.State, command, actor);
+        var proposed = FeatureHubTransitions.Propose(
+            reserved.State,
+            new FeatureReleaseProposal(
+                command.InstallationId,
+                new FeatureReleaseMetadata(
+                    command.Release,
+                    "sha256:" + command.Release.Value,
+                    FeatureSourceKind.RuntimeAuthored,
+                    [],
+                    []),
+                []),
+            reserved.State.Revision,
+            Now);
+        var pending = proposed.Approvals.Single();
+        var rejected = FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(pending.ApprovalId, command.Release, false, command.DecisionId, actor),
+            proposed.Revision,
+            Now.AddMinutes(1));
+
+        var reset = FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            rejected,
+            new ResetFeatureDraftInstallationReservation(command.DraftId, "reset-rejected", command),
+            actor,
+            Now.AddMinutes(2));
+        var superseded = reset.State.Approvals.Single();
+
+        Assert.Equal(FeatureApprovalStatus.Superseded, superseded.Status);
+        Assert.Equal(command.DecisionId, superseded.DecisionId);
+        Assert.Equal(Now.AddMinutes(1), superseded.DecidedAt);
+    }
+
+    [Fact]
+    public void Resetting_an_update_preserves_active_authority_and_clears_only_the_exact_candidate()
+    {
+        var activeRelease = new ReleaseDigest(new string('b', 64));
+        var candidateRelease = Verification().Release;
+        var installationId = new FeatureInstallationId("installation-reset-update");
+        var actor = new ActorId("actor-reset-update");
+        var activeGrant = new FeatureGrantState(
+            "capability.one",
+            1,
+            null,
+            "{\"allowedToolIds\":[\"capability.one\"]}",
+            null);
+        var activeRegistration = new FeatureInstallationRegistration(installationId, activeRelease, ["active-event"]);
+        var activeAuthority = new FeatureInstallationAuthorityState(
+            installationId,
+            actor,
+            activeRelease,
+            null,
+            new GrantRevision(1),
+            [activeGrant],
+            null,
+            [],
+            null,
+            null,
+            [],
+            true,
+            "operator pause",
+            7,
+            null,
+            null,
+            null);
+        var baseState = FeatureHubState.Empty with
+        {
+            Installations = [activeRegistration],
+            Releases =
+            [
+                new FeatureReleaseMetadata(activeRelease, "sha256:" + activeRelease.Value, FeatureSourceKind.RuntimeAuthored, ["capability.one"], [])
+            ],
+            Authorities = [activeAuthority]
+        };
+        var created = FeatureHubTransitions.CreateDraft(
+            baseState,
+            "owner-reset-update",
+            new CreateFeatureDraft("operation-reset-update", "Update a Feature", Now, "conversation-reset-update"));
+        var verification = Verification();
+        var verified = FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(created.Draft.DraftId, verification, 0, "verification-reset-update"));
+        var candidateGrant = new FeatureGrantSpec(
+            "capability.one",
+            1,
+            null,
+            "{\"allowedToolIds\":[\"capability.one\"]}");
+        var command = new InstallFeatureVersion(
+            created.Draft.DraftId,
+            verified.Draft.Revision,
+            installationId,
+            candidateRelease,
+            [candidateGrant],
+            ["candidate-event"],
+            "decision-reset-update",
+            "install-reset-update",
+            42,
+            activeRelease,
+            null);
+        var reserved = FeatureDraftAuthoringTransitions.AcquireInstallationReservation(verified.State, command, actor);
+        var candidate = new FeatureReleaseMetadata(
+            candidateRelease,
+            "sha256:" + candidateRelease.Value,
+            FeatureSourceKind.RuntimeAuthored,
+            [candidateGrant.CapabilityId],
+            []);
+        var proposed = FeatureHubTransitions.Propose(
+            reserved.State,
+            new FeatureReleaseProposal(installationId, candidate, [candidateGrant]),
+            reserved.State.Revision,
+            Now);
+        var approval = proposed.Approvals.Single(approval => approval.Release.Digest == candidateRelease);
+        var approved = FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(approval.ApprovalId, candidateRelease, true, command.DecisionId, actor),
+            proposed.Revision,
+            Now);
+        var staged = FeatureHubTransitions.Grant(
+            approved,
+            new FeatureGrantRequest(installationId, candidateRelease, actor, [candidateGrant]),
+            approved.Revision);
+
+        var reset = FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            staged,
+            new ResetFeatureDraftInstallationReservation(command.DraftId, "reset-update", command),
+            actor,
+            Now.AddMinutes(2));
+        var preserved = Assert.Single(reset.State.Authorities);
+
+        Assert.Equal(activeAuthority.InstallationId, preserved.InstallationId);
+        Assert.Equal(activeAuthority.ActorId, preserved.ActorId);
+        Assert.Equal(activeAuthority.ActiveRelease, preserved.ActiveRelease);
+        Assert.Equal(activeAuthority.ActiveGrantRevision, preserved.ActiveGrantRevision);
+        Assert.Equal(activeAuthority.ActiveGrants, preserved.ActiveGrants);
+        Assert.Equal(activeAuthority.Paused, preserved.Paused);
+        Assert.Equal(activeAuthority.PauseReason, preserved.PauseReason);
+        Assert.Equal(8, preserved.PublicationFence);
+        Assert.Null(preserved.PublicationReceipt);
+        var preservedRegistration = Assert.Single(reset.State.Installations);
+        Assert.Equal(activeRegistration.InstallationId, preservedRegistration.InstallationId);
+        Assert.Equal(activeRegistration.Release, preservedRegistration.Release);
+        Assert.Equal(activeRegistration.Subscriptions, preservedRegistration.Subscriptions);
+        Assert.Equal(FeatureApprovalStatus.Superseded, reset.State.Approvals.Single().Status);
+        Assert.False(reset.RequiresNewRuntimeDiscard);
+        Assert.False(reset.RequiresRepublish);
+        Assert.Equal(activeRelease, reset.PreservedActiveRelease);
+
+        var activated = FeatureHubTransitions.Register(
+            FeatureHubTransitions.Activate(staged, installationId, staged.Revision),
+            new FeatureInstallationRegistration(installationId, candidateRelease, command.Subscriptions));
+        var activatedReset = FeatureDraftAuthoringTransitions.ResetInstallationReservation(
+            activated,
+            new ResetFeatureDraftInstallationReservation(command.DraftId, "reset-activated", command),
+            actor,
+            Now.AddMinutes(3));
+        Assert.Equal(activeRelease, Assert.Single(activatedReset.State.Authorities).ActiveRelease);
+        Assert.Null(Assert.Single(activatedReset.State.Authorities).PendingRelease);
+    }
+
+    [Fact]
     public void RecordFeatureVerification_rejects_a_default_release_with_a_controlled_validation_error()
     {
         var created = Create();
@@ -723,6 +1422,96 @@ public sealed class FeatureDraftAuthoringTests
                 new FeatureVerification(default, 1, 1, 0, 0, Now.AddMinutes(1)),
                 0,
                 "verification-default-release")));
+    }
+
+    [Fact]
+    public void RecordFeatureVerification_rejects_missing_evidence()
+    {
+        var created = Create();
+
+        Assert.Throws<ArgumentException>(() => FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(
+                created.Draft.DraftId,
+                Verification(null),
+                0,
+                "verification-missing-evidence")));
+    }
+
+    [Fact]
+    public void RecordFeatureVerification_rejects_evidence_for_another_source_snapshot()
+    {
+        var created = Create();
+        var evidence = PassingVerificationEvidence() with { SourceReference = $"sha256:{new string('0', 64)}" };
+
+        Assert.Throws<ArgumentException>(() => FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(
+                created.Draft.DraftId,
+                Verification(evidence),
+                0,
+                "verification-source-mismatch")));
+    }
+
+    [Fact]
+    public void ReadDraft_preserves_a_legacy_verification_without_evidence()
+    {
+        var created = Create();
+        var legacyVerification = Verification(null);
+        var legacyDraft = new FeatureDraft(
+            created.Draft.DraftId,
+            created.Draft.OriginatingRequest,
+            created.Draft.Goal,
+            created.Draft.Status,
+            created.Draft.Behavior,
+            created.Draft.Source,
+            legacyVerification,
+            created.Draft.InstallationId,
+            created.Draft.Revision,
+            created.Draft.CreatedAt,
+            created.Draft.UpdatedAt);
+        var legacyState = created.State with { Drafts = [legacyDraft] };
+
+        var read = FeatureDraftAuthoringTransitions.ReadDraft(legacyState, legacyDraft.DraftId);
+
+        var readVerification = Assert.IsType<FeatureVerification>(read?.Verification);
+        Assert.Same(legacyVerification, readVerification);
+        Assert.Null(readVerification.Evidence);
+    }
+
+    [Theory]
+    [InlineData("source-reference")]
+    [InlineData("total-bound")]
+    [InlineData("scenario-count")]
+    [InlineData("scenario-id")]
+    [InlineData("scenario-name")]
+    [InlineData("duplicate-scenario")]
+    [InlineData("duration")]
+    [InlineData("passing-failure")]
+    [InlineData("failed-failure")]
+    [InlineData("skipped-reason")]
+    [InlineData("unknown-outcome")]
+    [InlineData("null-scenarios")]
+    [InlineData("null-scenario")]
+    [InlineData("artifact-count")]
+    [InlineData("artifact-name")]
+    [InlineData("duplicate-artifact")]
+    [InlineData("artifact-media-type")]
+    [InlineData("artifact-size")]
+    [InlineData("artifact-digest")]
+    [InlineData("null-artifacts")]
+    [InlineData("null-artifact")]
+    public void RecordFeatureVerification_rejects_invalid_persisted_evidence(string invalidity)
+    {
+        var created = Create();
+
+        Assert.ThrowsAny<ArgumentException>(() => FeatureDraftAuthoringTransitions.RecordVerification(
+            created.State,
+            new RecordFeatureVerification(
+                created.Draft.DraftId,
+                InvalidVerification(invalidity),
+                0,
+                "verification-invalid-evidence")));
     }
 
     [Fact]
@@ -802,14 +1591,15 @@ public sealed class FeatureDraftAuthoringTests
             Now);
         var approval = proposed.Approvals.Single(candidate =>
             candidate.InstallationId == command.InstallationId && candidate.Release.Digest == command.Release);
+        var actor = actorId ?? new ActorId("actor-installation");
         var approved = FeatureHubTransitions.Decide(
             proposed,
-            new FeatureApprovalDecision(approval.ApprovalId, command.Release, true, command.DecisionId),
+            new FeatureApprovalDecision(approval.ApprovalId, command.Release, true, command.DecisionId, actor),
             proposed.Revision,
             Now);
         var staged = FeatureHubTransitions.Grant(
             approved,
-            new FeatureGrantRequest(command.InstallationId, command.Release, actorId ?? new ActorId("actor-installation"), command.Grants),
+            new FeatureGrantRequest(command.InstallationId, command.Release, actor, command.Grants),
             approved.Revision);
         var active = FeatureHubTransitions.Activate(staged, command.InstallationId, staged.Revision);
         var registered = FeatureHubTransitions.Register(
@@ -931,11 +1721,117 @@ public sealed class FeatureDraftAuthoringTests
         return new FeatureSourceSnapshot(implementationProject, scenarioProject, files.ToArray());
     }
 
-    private static FeatureVerification Verification() => new(
+    private static FeatureVerification Verification() => Verification(PassingVerificationEvidence());
+
+    private static FeatureVerification Verification(FeatureVerificationEvidence? evidence) => new(
         new ReleaseDigest(new string('a', 64)),
+        evidence?.Total ?? 1,
+        evidence?.Passed ?? 1,
+        evidence?.Failed ?? 0,
+        evidence?.Skipped ?? 0,
+        Now.AddMinutes(1),
+        evidence);
+
+    private static FeatureVerificationEvidence PassingVerificationEvidence() => new(
+        InitialSourceReference,
         1,
         1,
         0,
         0,
-        Now.AddMinutes(1));
+        [new FeatureScenarioEvidence("scenario-verification", "Verification scenario", FeatureScenarioOutcome.Passed, null, 25)],
+        [new FeatureVerificationArtifact("verification.trx", "application/xml", 1024, $"sha256:{new string('c', 64)}")]);
+
+    private static FeatureVerificationEvidence VerificationEvidence() => new(
+        InitialSourceReference,
+        1,
+        0,
+        1,
+        0,
+        [new FeatureScenarioEvidence("scenario-verification", "Verification scenario", FeatureScenarioOutcome.Failed, "Scenario failed safely.", 25)],
+        [new FeatureVerificationArtifact("verification.trx", "application/xml", 1024, $"sha256:{new string('c', 64)}")]);
+
+    private static FeatureVerificationEvidence LargeVerificationEvidence(char content, int safeFailureCharacters) => new(
+        InitialSourceReference,
+        1024,
+        0,
+        1024,
+        0,
+        Enumerable.Range(0, 1024)
+            .Select(index => new FeatureScenarioEvidence(
+                $"scenario-{index}",
+                $"Verification scenario {index}",
+                FeatureScenarioOutcome.Failed,
+                new string(content, safeFailureCharacters),
+                70_000))
+            .ToArray(),
+        [new FeatureVerificationArtifact("verification.trx", "application/xml", 1_048_576, $"sha256:{new string('c', 64)}")]);
+
+    private static int EvidenceStringsUtf8(FeatureVerificationEvidence evidence) =>
+        Encoding.UTF8.GetByteCount(evidence.SourceReference) +
+        evidence.Scenarios.Sum(scenario => Encoding.UTF8.GetByteCount(scenario.ScenarioId) +
+            Encoding.UTF8.GetByteCount(scenario.Name) + Encoding.UTF8.GetByteCount(scenario.SafeFailure ?? string.Empty)) +
+        evidence.Artifacts.Sum(artifact => Encoding.UTF8.GetByteCount(artifact.Name) +
+            Encoding.UTF8.GetByteCount(artifact.MediaType) + Encoding.UTF8.GetByteCount(artifact.Digest));
+
+    private static string SourceReference(FeatureSourceSnapshot source) =>
+        FeatureDraftAuthoringTransitions.SourceReference(source);
+
+    private static FeatureVerification InvalidVerification(string invalidity)
+    {
+        var evidence = VerificationEvidence();
+        evidence = invalidity switch
+        {
+            "source-reference" => evidence with { SourceReference = new string('b', 64) },
+            "total-bound" => evidence with
+            {
+                Total = 1025,
+                Passed = 1025,
+                Failed = 0,
+                Scenarios = Enumerable.Range(0, 1025)
+                    .Select(index => new FeatureScenarioEvidence($"scenario-{index}", "Scenario", FeatureScenarioOutcome.Passed, null, 0))
+                    .ToArray()
+            },
+            "scenario-count" => evidence with { Total = 2, Failed = 2 },
+            "scenario-id" => evidence with { Scenarios = [evidence.Scenarios[0] with { ScenarioId = new string('x', 257) }] },
+            "scenario-name" => evidence with { Scenarios = [evidence.Scenarios[0] with { Name = new string('x', 513) }] },
+            "duplicate-scenario" => evidence with
+            {
+                Total = 2,
+                Failed = 2,
+                Scenarios = [evidence.Scenarios[0], evidence.Scenarios[0] with { Name = "Duplicate scenario" }]
+            },
+            "duration" => evidence with { Scenarios = [evidence.Scenarios[0] with { DurationMilliseconds = 70_001 }] },
+            "passing-failure" => evidence with
+            {
+                Passed = 1,
+                Failed = 0,
+                Scenarios = [evidence.Scenarios[0] with { Outcome = FeatureScenarioOutcome.Passed }]
+            },
+            "failed-failure" => evidence with { Scenarios = [evidence.Scenarios[0] with { SafeFailure = new string('x', 4097) }] },
+            "skipped-reason" => evidence with
+            {
+                Failed = 0,
+                Skipped = 1,
+                Scenarios = [evidence.Scenarios[0] with { Outcome = FeatureScenarioOutcome.Skipped, SafeFailure = new string('x', 4097) }]
+            },
+            "unknown-outcome" => evidence with { Scenarios = [evidence.Scenarios[0] with { Outcome = (FeatureScenarioOutcome)99 }] },
+            "null-scenarios" => evidence with { Scenarios = null! },
+            "null-scenario" => evidence with { Scenarios = [null!] },
+            "artifact-count" => evidence with
+            {
+                Artifacts = Enumerable.Range(0, 33)
+                    .Select(index => new FeatureVerificationArtifact($"artifact-{index}", "application/json", 1, $"sha256:{new string('c', 64)}"))
+                    .ToArray()
+            },
+            "artifact-name" => evidence with { Artifacts = [evidence.Artifacts[0] with { Name = new string('x', 257) }] },
+            "duplicate-artifact" => evidence with { Artifacts = [evidence.Artifacts[0], evidence.Artifacts[0]] },
+            "artifact-media-type" => evidence with { Artifacts = [evidence.Artifacts[0] with { MediaType = new string('x', 129) }] },
+            "artifact-size" => evidence with { Artifacts = [evidence.Artifacts[0] with { SizeBytes = 1_048_577 }] },
+            "artifact-digest" => evidence with { Artifacts = [evidence.Artifacts[0] with { Digest = new string('c', 64) }] },
+            "null-artifacts" => evidence with { Artifacts = null! },
+            "null-artifact" => evidence with { Artifacts = [null!] },
+            _ => throw new ArgumentOutOfRangeException(nameof(invalidity))
+        };
+        return Verification(evidence);
+    }
 }

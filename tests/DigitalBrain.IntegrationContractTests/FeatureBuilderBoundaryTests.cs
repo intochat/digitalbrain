@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 using System.Xml.Linq;
 using DigitalBrain.FeatureBuilder;
 using Xunit;
@@ -137,6 +140,41 @@ public sealed class FeatureBuilderBoundaryTests
     }
 
     [Fact]
+    public void Source_reference_is_canonical_order_independent_and_content_authoritative()
+    {
+        var first = new FeatureSourceSnapshot(
+            "src/Feature.csproj",
+            "tests/Feature.Tests.csproj",
+            [
+                new FeatureSourceFile("src/Feature.csproj", "implementation"),
+                new FeatureSourceFile("tests/Feature.Tests.csproj", "scenarios")
+            ]);
+        var reversed = new FeatureSourceSnapshot(
+            first.ImplementationProjectPath,
+            first.ScenarioProjectPath,
+            first.Files.Reverse().ToArray());
+        var changed = new FeatureSourceSnapshot(
+            first.ImplementationProjectPath,
+            first.ScenarioProjectPath,
+            [
+                new FeatureSourceFile("src/Feature.csproj", "implementation changed"),
+                new FeatureSourceFile("tests/Feature.Tests.csproj", "scenarios")
+            ]);
+
+        var reference = FeatureReleaseWriter.ComputeSourceReference(first);
+        var kernelSource = new DigitalBrain.Kernel.Contracts.FeatureSourceSnapshot(
+            first.ImplementationProjectPath,
+            first.ScenarioProjectPath,
+            first.Files.Select(file => new DigitalBrain.Kernel.Contracts.FeatureSourceFile(file.Path, file.Content)).ToArray());
+        var kernelReference = DigitalBrain.Kernel.Features.FeatureDraftAuthoringTransitions.SourceReference(kernelSource);
+
+        Assert.Matches("^sha256:[0-9a-f]{64}$", reference);
+        Assert.Equal(kernelReference, reference);
+        Assert.Equal(reference, FeatureReleaseWriter.ComputeSourceReference(reversed));
+        Assert.NotEqual(reference, FeatureReleaseWriter.ComputeSourceReference(changed));
+    }
+
+    [Fact]
     public async Task Existing_content_address_rejects_extra_files()
     {
         using var directories = new TemporaryDirectories();
@@ -165,6 +203,123 @@ public sealed class FeatureBuilderBoundaryTests
             scenarios));
 
         Assert.Equal(FeatureBuildFailure.ReleaseConflict, exception.Failure);
+    }
+
+    [Fact]
+    public async Task Passing_verification_returns_ordered_scenario_evidence_artifacts_and_source_digest()
+    {
+        using var directories = new TemporaryDirectories();
+        var pipeline = new FeatureBuildPipeline();
+
+        var verification = await pipeline.VerifyAsync(VerificationRequest(VerificationSnapshot(), directories));
+
+        Assert.NotNull(verification.Release);
+        var release = verification.Release!;
+        Assert.Equal(verification.SourceReference, release.SourceReference);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", verification.SourceReference);
+        Assert.Equal(verification.Scenarios.Total, verification.Scenarios.Results.Count);
+        Assert.Equal(verification.Scenarios.Total, verification.Scenarios.Passed);
+        Assert.Equal(0, verification.Scenarios.Failed);
+        Assert.Equal(0, verification.Scenarios.Skipped);
+        Assert.All(verification.Scenarios.Results, result =>
+        {
+            Assert.Equal(FeatureScenarioOutcome.Passed, result.Outcome);
+            Assert.Null(result.SafeFailure);
+        });
+        Assert.Equal(
+            verification.Scenarios.Results.OrderBy(result => result.Name, StringComparer.Ordinal).ThenBy(result => result.ScenarioId, StringComparer.Ordinal),
+            verification.Scenarios.Results);
+        Assert.Equal(["scenarios.json", "source.json"], verification.Artifacts.Select(artifact => artifact.Name));
+        Assert.Equal(verification.Artifacts, release.Artifacts);
+        Assert.All(verification.Artifacts, AssertSafeArtifact);
+    }
+
+    [Fact]
+    public async Task Failed_verification_preserves_safe_scenario_evidence_without_publishing_a_release()
+    {
+        using var directories = new TemporaryDirectories();
+        var snapshot = AddFile(
+            VerificationSnapshot(),
+            "features/EmailSummarizer.Tests/EvidenceFailure.feature",
+            "Feature: Evidence failure\n  Scenario: Bounded safe failure\n    Given a verification failure\n");
+        snapshot = AddFile(
+            snapshot,
+            "features/EmailSummarizer.Tests/EvidenceFailureSteps.cs",
+            "using Reqnroll; namespace DigitalBrain.Features.EmailSummarizer.Tests; [Binding] public sealed class EvidenceFailureSteps { [Given(\"a verification failure\")] public void Fail() => throw new InvalidOperationException(\"unsafe C:\\\\private\\\\secret.txt \" + new string('x', 4096)); }");
+
+        var verification = await new FeatureBuildPipeline().VerifyAsync(VerificationRequest(snapshot, directories));
+
+        Assert.Null(verification.Release);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", verification.SourceReference);
+        Assert.Equal(verification.Scenarios.Total, verification.Scenarios.Results.Count);
+        Assert.True(verification.Scenarios.Failed > 0);
+        var failed = Assert.Single(
+            verification.Scenarios.Results,
+            result => result.Outcome == FeatureScenarioOutcome.Failed);
+        Assert.NotNull(failed.SafeFailure);
+        Assert.Contains("unsafe", failed.SafeFailure, StringComparison.Ordinal);
+        Assert.DoesNotContain("C:\\", failed.SafeFailure, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret.txt", failed.SafeFailure, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain('\n', failed.SafeFailure);
+        Assert.InRange(failed.SafeFailure.Length, 1, 1024);
+        Assert.Equal(["scenarios.json", "source.json"], verification.Artifacts.Select(artifact => artifact.Name));
+        Assert.All(verification.Artifacts, AssertSafeArtifact);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(directories.Output));
+    }
+
+    [Fact]
+    public async Task FeatureBuilder_cli_returns_failed_verification_evidence_without_a_release()
+    {
+        using var directories = new TemporaryDirectories();
+        var snapshot = AddFile(
+            VerificationSnapshot(),
+            "features/EmailSummarizer.Tests/CliFailure.feature",
+            "Feature: CLI failure\n  Scenario: Returned failure\n    Given a CLI verification failure\n");
+        var requestPath = Path.Combine(directories.Build, "request.json");
+        var command = new
+        {
+            snapshot.ImplementationProjectPath,
+            snapshot.ScenarioProjectPath,
+            Files = snapshot.Files.Select(file => new
+            {
+                file.Path,
+                ContentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(file.Content))
+            }).ToArray(),
+            OfflineFeedDirectory = OfflineFeed(),
+            OutputDirectory = directories.Output,
+            Deadline = DateTimeOffset.UtcNow.Add(FeatureBuildPipeline.MaximumRequestDuration)
+        };
+        await File.WriteAllBytesAsync(requestPath, JsonSerializer.SerializeToUtf8Bytes(command));
+        var start = new ProcessStartInfo
+        {
+            FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        start.ArgumentList.Add(typeof(FeatureBuildPipeline).Assembly.Location);
+        start.ArgumentList.Add(requestPath);
+        using var process = new Process { StartInfo = start };
+
+        Assert.True(process.Start());
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = await outputTask;
+        var error = await errorTask;
+
+        Assert.Equal(0, process.ExitCode);
+        Assert.True(string.IsNullOrWhiteSpace(error), error);
+        Assert.DoesNotContain(Path.GetTempPath(), output, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(directories.Output, output, StringComparison.OrdinalIgnoreCase);
+        using var document = JsonDocument.Parse(output);
+        var root = document.RootElement;
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("Release").ValueKind);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", root.GetProperty("SourceReference").GetString());
+        Assert.True(root.GetProperty("Scenarios").GetProperty("Failed").GetInt32() > 0);
+        Assert.Equal(2, root.GetProperty("Artifacts").GetArrayLength());
+        Assert.Empty(Directory.EnumerateFileSystemEntries(directories.Output));
     }
 
     [Fact]
@@ -461,6 +616,71 @@ public sealed class FeatureBuilderBoundaryTests
 
         Assert.Equal(FeatureBuildFailure.DeadlineExceeded, exception.Failure);
         Assert.Empty(Directory.EnumerateFileSystemEntries(directories.Output));
+    }
+
+    private static void AssertSafeArtifact(FeatureVerificationArtifact artifact)
+    {
+        Assert.False(Path.IsPathRooted(artifact.Name));
+        Assert.DoesNotContain('/', artifact.Name);
+        Assert.DoesNotContain('\\', artifact.Name);
+        Assert.InRange(artifact.Name.Length, 1, 64);
+        Assert.InRange(artifact.MediaType.Length, 1, 128);
+        Assert.InRange(artifact.SizeBytes, 1, 1_048_576);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", artifact.Digest);
+    }
+
+    private static FeatureSourceSnapshot VerificationSnapshot()
+    {
+        var root = RepositoryRoot();
+        string[] paths =
+        [
+            "Directory.Build.props",
+            "Directory.Packages.props",
+            "README.md",
+            "src/DigitalBrain.Features.Sdk/DigitalBrain.Features.Sdk.csproj",
+            "src/DigitalBrain.Features.Sdk/FeatureContracts.cs",
+            "src/DigitalBrain.Features.Sdk/FeatureContext.cs",
+            "src/DigitalBrain.Features.Sdk/MemoryContracts.cs",
+            "integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj",
+            "integrations/DigitalBrain.Integrations.Google.Contracts/GoogleCapabilities.cs",
+            "integrations/DigitalBrain.Integrations.Google.Contracts/GmailContracts.cs",
+            "src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj",
+            "src/DigitalBrain.Features.Testing/FeatureDuplicateScenario.cs",
+            "src/DigitalBrain.Features.Testing/FeatureScenarioContext.cs",
+            "src/DigitalBrain.Features.Testing/FeatureScenarioSteps.cs",
+            "src/DigitalBrain.Features.Testing/GeneratedDuplicateInput.feature",
+            "src/DigitalBrain.Features.Testing/buildTransitive/DigitalBrain.Features.Testing.targets",
+            "features/EmailSummarizer/DigitalBrain.Features.EmailSummarizer.csproj",
+            "features/EmailSummarizer/EmailSummarizer.cs",
+            "features/EmailSummarizer.Tests/DigitalBrain.Features.EmailSummarizer.Tests.csproj",
+            "features/EmailSummarizer.Tests/EmailSummarizer.feature",
+            "features/EmailSummarizer.Tests/EmailSummarizerSteps.cs",
+            "features/EmailSummarizer.Tests/reqnroll.json"
+        ];
+        return new FeatureSourceSnapshot(
+            "features/EmailSummarizer/DigitalBrain.Features.EmailSummarizer.csproj",
+            "features/EmailSummarizer.Tests/DigitalBrain.Features.EmailSummarizer.Tests.csproj",
+            paths.Select(path => new FeatureSourceFile(
+                path,
+                File.ReadAllBytes(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar)))))
+                .ToArray());
+    }
+
+    private static FeatureSourceSnapshot AddFile(FeatureSourceSnapshot snapshot, string path, string content) =>
+        new(
+            snapshot.ImplementationProjectPath,
+            snapshot.ScenarioProjectPath,
+            [.. snapshot.Files, new FeatureSourceFile(path, content)]);
+
+    private static FeatureBuildRequest VerificationRequest(FeatureSourceSnapshot snapshot, TemporaryDirectories directories) =>
+        new(snapshot, OfflineFeed(), directories.Output, DateTimeOffset.UtcNow.Add(FeatureBuildPipeline.MaximumRequestDuration));
+
+    private static string OfflineFeed()
+    {
+        var configured = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        return string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages")
+            : configured;
     }
 
     private sealed class TemporaryDirectories : IDisposable

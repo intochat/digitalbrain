@@ -154,7 +154,7 @@ internal static class FeatureInstallationTransitions
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(occurrence);
-        ArgumentException.ThrowIfNullOrWhiteSpace(occurrence.ScheduleId);
+        ValidateIdentifier(occurrence.ScheduleId, nameof(occurrence.ScheduleId));
         ArgumentException.ThrowIfNullOrWhiteSpace(occurrence.CorrelationId);
         ArgumentException.ThrowIfNullOrWhiteSpace(occurrence.TraceId);
         ValidateJson(occurrence.PayloadJson, nameof(occurrence.PayloadJson), FeatureLimits.StateUtf8Bytes);
@@ -165,6 +165,8 @@ internal static class FeatureInstallationTransitions
         var existingIndex = Array.FindIndex(
             state.Schedules,
             cursor => Same(cursor.ScheduleId, occurrence.ScheduleId));
+        if (existingIndex < 0 && state.Schedules.Length >= FeatureLimits.ScheduleCursors)
+            throw new FeatureLimitExceededException("Feature schedule cursors exceed the durable ledger capacity.");
         if (existingIndex >= 0)
         {
             var existing = state.Schedules[existingIndex];

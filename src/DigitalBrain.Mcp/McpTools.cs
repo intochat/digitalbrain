@@ -85,7 +85,7 @@ public sealed class McpConversationTools(McpAuthority authority, McpInoCommandHa
     public async Task<object> DecideFeatureAsync(string approvalId, string releaseDigest, bool approved, string decisionId, long expectedRevision, CancellationToken cancellationToken = default)
     {
         var context = await FeatureContextAsync(cancellationToken);
-        return await features.DecideAsync(context, new FeatureApprovalDecision(approvalId, new ReleaseDigest(releaseDigest), approved, decisionId), expectedRevision, cancellationToken);
+        return await features.DecideAsync(context, new FeatureApprovalDecision(approvalId, new ReleaseDigest(releaseDigest), approved, decisionId, context.ActorId), expectedRevision, cancellationToken);
     }
     [McpServerTool(Name = "feature_grant"), Description("Stage the exact grants already bound by an approved Feature digest.")]
     public async Task<object> GrantFeatureAsync(string installationId, string releaseDigest, FeatureGrantSpec[] grants, long expectedRevision, CancellationToken cancellationToken = default)

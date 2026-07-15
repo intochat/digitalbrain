@@ -26,6 +26,7 @@ public sealed class DigitalBrainUiEndpoints(
     FeatureSuggestionService suggestions,
     ILogger<DigitalBrainUiEndpoints> logger)
 {
+    private const int MaximumVerificationEvidenceUtf8Bytes = 2 * 1024 * 1024;
     private static readonly char[] InvalidSourcePathCharacters = ['<', '>', ':', '"', '|', '?', '*'];
     private static readonly HashSet<string> ReservedSourcePathSegments = new(
         ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM¹", "COM²", "COM³", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³"],
@@ -37,8 +38,25 @@ public sealed class DigitalBrainUiEndpoints(
         CancellationToken cancellationToken)
     {
         var draftId = MapRequest(context, () => new FeatureDraftId(Identifier(request.DraftId, 128)));
-        var draft = await InvokeAsync(() => authoring.ReadAsync(context, draftId, cancellationToken)).ConfigureAwait(false);
-        return Project(() => ProjectDraft(draftId, draft));
+        var read = await InvokeAsync(() => authoring.ReadWithRecoveryAsync(context, draftId, cancellationToken)).ConfigureAwait(false);
+        return Project(() => ProjectDraft(draftId, read));
+    }
+
+    public async Task<FeatureDraftReply> ResetFeatureDraftInstallationAsync(
+        RuntimeRequestContext context,
+        ResetFeatureDraftInstallationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var input = MapRequest(context, () => (
+            DraftId: new FeatureDraftId(Identifier(request.DraftId, 128)),
+            IdempotencyId: Identifier(request.IdempotencyId, 256)));
+        var read = await InvokeAsync(() => authoring.ResetInstallationReservationAsync(
+                context,
+                input.DraftId,
+                input.IdempotencyId,
+                cancellationToken))
+            .ConfigureAwait(false);
+        return Project(() => ProjectDraft(input.DraftId, read));
     }
 
     public async Task<FeatureDraftReply> ReviseFeatureDraftAsync(
@@ -105,8 +123,18 @@ public sealed class DigitalBrainUiEndpoints(
             new FeatureDraftId(Identifier(request.DraftId, 128)),
             Revision(request.HasExpectedRevision, request.ExpectedRevision),
             Identifier(request.IdempotencyId, 256)));
-        var candidate = await InvokeAsync(() => authoring.VerifyAsync(context, command, cancellationToken)).ConfigureAwait(false);
-        return Project(() => ProjectVerification(command, candidate));
+        var review = await InvokeAsync(() => authoring.RunVerificationAsync(context, command, cancellationToken)).ConfigureAwait(false);
+        return Project(() => ProjectVerification(command, review));
+    }
+
+    public async Task<FeatureAccessReviewReply> ReviewFeatureAccessAsync(
+        RuntimeRequestContext context,
+        ReviewFeatureAccessRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = MapRequest(context, () => MapAccessReview(request));
+        var review = await InvokeAsync(() => authoring.PrepareAccessReviewAsync(context, command, cancellationToken)).ConfigureAwait(false);
+        return Project(() => ProjectAccessReview(command, review));
     }
 
     public async Task<FeatureInstallReply> InstallFeatureVersionAsync(
@@ -117,6 +145,107 @@ public sealed class DigitalBrainUiEndpoints(
         var command = MapRequest(context, () => MapInstall(request));
         var installed = await InvokeAsync(() => authoring.InstallAsync(context, command, cancellationToken)).ConfigureAwait(false);
         return Project(() => ProjectInstallation(command, context.ActorId, installed));
+    }
+
+    public async Task<ResumeOriginatingRequestReply> ResumeOriginatingRequestAsync(
+        RuntimeRequestContext context,
+        ResumeOriginatingRequestRequest request,
+        McpInoCommandHandler conversation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(conversation);
+        var input = MapRequest(context, () => new ResumeOriginatingRequestInput(
+            new FeatureDraftId(Identifier(request.DraftId, 128)),
+            Revision(request.HasExpectedRevision, request.ExpectedRevision),
+            Identifier(request.IdempotencyId, 256)));
+        var snapshot = await InvokeAsync(() =>
+            authoring.ReadWithRecoveryAsync(context, input.DraftId, cancellationToken)).ConfigureAwait(false);
+        var draft = snapshot.Draft;
+        if (draft.Revision != input.ExpectedRevision)
+            throw Status(StatusCode.Aborted, "The Feature Draft changed. Reload it and retry.");
+        if (!string.Equals(draft.Status, "installed", StringComparison.Ordinal) ||
+            draft.InstallationId is not { } installationId ||
+            snapshot.Recovery is not { Installed: true } recovery ||
+            recovery.InstallationId != installationId ||
+            recovery.Release.Digest != recovery.Verification.Release ||
+            recovery.Paused)
+            throw Status(StatusCode.FailedPrecondition, "The Feature Draft is not ready for this operation.");
+        var origin = draft.OriginatingRequest;
+        if (!string.Equals(origin.ConversationId, InoConversationIdentity.From(context), StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(origin.OperationId) ||
+            string.IsNullOrWhiteSpace(origin.Text) ||
+            origin.Text.Length > 4096 ||
+            !string.Equals(origin.Text, origin.Text.Trim(), StringComparison.Ordinal))
+            throw Status(StatusCode.FailedPrecondition, "The Feature Draft is not ready for this operation.");
+        var grants = new HashSet<string>(context.Grants, StringComparer.Ordinal) { "brain.interact" };
+        var commandContext = context with
+        {
+            CorrelationId = Guid.NewGuid().ToString("N"),
+            IdempotencyKey = input.IdempotencyId,
+            Grants = grants,
+            ConversationId = origin.ConversationId
+        };
+        var receipt = await InvokeAsync(() => conversation.AcceptAsync(new CommandEnvelope(
+            McpInoCommandHandler.CommandType,
+            2,
+            input.IdempotencyId,
+            commandContext,
+            JsonSerializer.SerializeToElement(new { prompt = origin.Text })))).ConfigureAwait(false);
+        return new ResumeOriginatingRequestReply
+        {
+            CommandId = receipt.IdempotencyKey,
+            OperationId = receipt.OperationId,
+            Phase = InoOperationPhase.Accepted.ToString(),
+            Version = 1
+        };
+    }
+
+    public async Task<FeatureReply> GetFeatureAsync(
+        RuntimeRequestContext context,
+        GetFeatureRequest request,
+        CancellationToken cancellationToken)
+    {
+        var draftId = MapRequest(context, () => new FeatureDraftId(Identifier(request.FeatureId, 128)));
+        var detail = await InvokeAsync(() => authoring.ReadInstalledAsync(context, draftId, cancellationToken)).ConfigureAwait(false);
+        return Project(() => ProjectFeature(draftId, context.ActorId, detail));
+    }
+
+    public async Task<FeatureReleaseSourceReply> GetFeatureReleaseSourceAsync(
+        RuntimeRequestContext context,
+        GetFeatureReleaseSourceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var coordinate = MapRequest(context, () => new FeatureReleaseSourceCoordinate(
+            new FeatureDraftId(Identifier(request.FeatureId, 128)),
+            new FeatureInstallationId(Identifier(request.InstallationId, 256)),
+            new ReleaseDigest(ReleaseDigest(request.ReleaseDigest)),
+            SourceReference(request.SourceReference)));
+        var detail = await InvokeAsync(() => authoring.ReadInstalledAsync(
+            context,
+            coordinate.DraftId,
+            cancellationToken)).ConfigureAwait(false);
+        return Project(() => ProjectFeatureReleaseSource(
+            coordinate.DraftId,
+            coordinate.InstallationId,
+            coordinate.Release,
+            coordinate.SourceReference,
+            context.ActorId,
+            detail));
+    }
+
+    public async Task<FeatureReply> RollbackFeatureVersionAsync(
+        RuntimeRequestContext context,
+        RollbackFeatureVersionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = MapRequest(context, () => new RollbackFeatureVersion(
+            new FeatureDraftId(Identifier(request.FeatureId, 128)),
+            new ReleaseDigest(ReleaseDigest(request.ExpectedActiveDigest)),
+            new ReleaseDigest(ReleaseDigest(request.TargetDigest)),
+            Identifier(request.IdempotencyId, 256),
+            Revision(request.HasExpectedRevision, request.ExpectedRevision)));
+        var detail = await InvokeAsync(() => authoring.RollbackAsync(context, command, cancellationToken)).ConfigureAwait(false);
+        return Project(() => ProjectFeature(command.DraftId, context.ActorId, detail));
     }
 
     private static RevisionInput MapRevision(ReviseFeatureDraftRequest request)
@@ -161,7 +290,8 @@ public sealed class DigitalBrainUiEndpoints(
     private static InstallFeatureVersion MapInstall(InstallFeatureVersionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (request.Grants.Count > 32 || request.Subscriptions.Count is 0 or > 64)
+        if (request.Grants.Count > 32 || request.Subscriptions.Count > 64 ||
+            request.Subscriptions.Count == 0 && request.Grants.Count != 0)
             throw new ArgumentException("The Feature installation collection bounds are invalid.");
         var grants = request.Grants.Select(ToDomain).ToArray();
         if (grants.Select(grant => grant.CapabilityId).Distinct(StringComparer.Ordinal).Count() != grants.Length)
@@ -178,6 +308,27 @@ public sealed class DigitalBrainUiEndpoints(
             subscriptions,
             Identifier(request.DecisionId, 256),
             Identifier(request.IdempotencyId, 256));
+    }
+
+    private static PrepareFeatureAccessReview MapAccessReview(ReviewFeatureAccessRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Grants.Count > 32 || request.Subscriptions.Count > 64 ||
+            (request.Grants.Count == 0) != (request.Subscriptions.Count == 0))
+            throw new ArgumentException("The Feature access review collection bounds are invalid.");
+        var grants = request.Grants.Select(ToDomain).ToArray();
+        if (grants.Select(grant => grant.CapabilityId).Distinct(StringComparer.Ordinal).Count() != grants.Length)
+            throw new ArgumentException("Feature capability grants must be unique.");
+        var subscriptions = request.Subscriptions.Select(subscription => Identifier(subscription, 256)).ToArray();
+        if (subscriptions.Distinct(StringComparer.Ordinal).Count() != subscriptions.Length)
+            throw new ArgumentException("Feature subscriptions must be unique.");
+        return new PrepareFeatureAccessReview(
+            new FeatureDraftId(Identifier(request.DraftId, 128)),
+            Revision(request.HasExpectedRevision, request.ExpectedRevision),
+            new FeatureInstallationId(Identifier(request.InstallationId, 256)),
+            new ReleaseDigest(ReleaseDigest(request.ReleaseDigest)),
+            grants,
+            subscriptions);
     }
 
     private T MapRequest<T>(RuntimeRequestContext context, Func<T> mapping)
@@ -342,6 +493,11 @@ public sealed class DigitalBrainUiEndpoints(
         return value;
     }
 
+    private static string SourceReference(string value) =>
+        CanonicalSourceReference(value)
+            ? value
+            : throw new ArgumentException("A canonical Feature source reference is required.");
+
     private static DigitalBrain.Kernel.Contracts.FeatureBehavior ToDomain(GrpcFeatureBehavior? behavior)
     {
         if (behavior is null || behavior.Scenarios.Count is 0 or > 32)
@@ -465,10 +621,86 @@ public sealed class DigitalBrainUiEndpoints(
             provider);
     }
 
-    private static FeatureDraftReply ProjectDraft(FeatureDraftId expectedDraftId, DigitalBrain.Kernel.Contracts.FeatureDraft draft)
+    private static FeatureDraftReply ProjectDraft(FeatureDraftId expectedDraftId, FeatureDraftRecoverySnapshot read)
     {
-        ValidateDraftOutput(expectedDraftId, draft);
-        return new FeatureDraftReply { Draft = ToReply(draft) };
+        ArgumentNullException.ThrowIfNull(read);
+        ValidateDraftOutput(expectedDraftId, read.Draft);
+        var reply = new FeatureDraftReply { Draft = ToReply(read.Draft) };
+        if (read.Recovery is { } recovery)
+            reply.Recovery = ProjectRecovery(read.Draft, recovery);
+        return reply;
+    }
+
+    private static FeatureInstallationRecovery ProjectRecovery(
+        DigitalBrain.Kernel.Contracts.FeatureDraft draft,
+        FeatureInstallationRecoverySnapshot recovery)
+    {
+        ArgumentNullException.ThrowIfNull(recovery);
+        ArgumentNullException.ThrowIfNull(recovery.Verification);
+        var verification = draft.Verification;
+        var evidence = recovery.Verification.Evidence;
+        var installed = string.Equals(draft.Status, "installed", StringComparison.Ordinal);
+        ValidateReleaseOutput(recovery.Release);
+        ValidateGrantCollection(recovery.Grants);
+        ValidateSubscriptions(recovery.Subscriptions);
+        if (verification is null || evidence is null ||
+            !installed && !SameVerification(verification, recovery.Verification) ||
+            recovery.Verification.Passed != recovery.Verification.Total ||
+            recovery.Verification.Failed != 0 || recovery.Verification.Skipped != 0 ||
+            recovery.Release.Source is not null ||
+            recovery.Release.SourceKind != DigitalBrain.Kernel.Contracts.FeatureSourceKind.RuntimeAuthored ||
+            recovery.Release.Digest != recovery.Verification.Release ||
+            !string.Equals(recovery.Release.SourceReference, evidence.SourceReference, StringComparison.Ordinal) ||
+            !SameIdentifiers(
+                recovery.Release.RequestedCapabilities,
+                recovery.Grants.Select(grant => grant.CapabilityId)))
+            throw new InvalidDataException("Feature installation recovery coordinates are invalid.");
+        if (recovery.Installed != installed ||
+            installed && draft.InstallationId != recovery.InstallationId ||
+            !installed && draft.InstallationId is not null)
+            throw new InvalidDataException("Feature installation recovery state is invalid.");
+        if (recovery.PreviousRelease is { } previous)
+        {
+            ValidateReleaseOutput(previous);
+            if (previous.Source is not null || previous.Digest == recovery.Release.Digest)
+                throw new InvalidDataException("Feature installation recovery previous release is invalid.");
+        }
+        if (installed)
+        {
+            if (recovery.DecisionId is not null || recovery.IdempotencyId is not null ||
+                (recovery.PreviousRelease is not null) != recovery.RollbackAvailable ||
+                recovery.RollbackAvailable && recovery.Paused ||
+                recovery.Paused != (recovery.PauseReason is not null))
+                throw new InvalidDataException("Installed Feature recovery state is invalid.");
+        }
+        else if (!BoundedIdentifier(recovery.DecisionId, 256) ||
+                 !BoundedIdentifier(recovery.IdempotencyId, 256) ||
+                 recovery.RollbackAvailable || recovery.Paused || recovery.PauseReason is not null)
+        {
+            throw new InvalidDataException("Reserved Feature recovery state is invalid.");
+        }
+        if (recovery.PauseReason is { } pauseReason && !BoundedText(pauseReason, 4096))
+            throw new InvalidDataException("Feature installation recovery pause reason is invalid.");
+        var reply = new FeatureInstallationRecovery
+        {
+            Installed = recovery.Installed,
+            Verification = ToReply(evidence, recovery.Verification.Release, recovery.Verification.VerifiedAt),
+            Release = ToMetadataReply(recovery.Release),
+            InstallationId = Identifier(recovery.InstallationId.Value, 256),
+            RollbackAvailable = recovery.RollbackAvailable,
+            Paused = recovery.Paused
+        };
+        reply.Grants.Add(recovery.Grants.Select(ToReply));
+        reply.Subscriptions.Add(recovery.Subscriptions.Select(subscription => Identifier(subscription, 256)));
+        if (recovery.PreviousRelease is { } previousRelease)
+            reply.PreviousRelease = ToMetadataReply(previousRelease);
+        if (recovery.DecisionId is { } decisionId)
+            reply.DecisionId = Identifier(decisionId, 256);
+        if (recovery.IdempotencyId is { } idempotencyId)
+            reply.IdempotencyId = Identifier(idempotencyId, 256);
+        if (recovery.PauseReason is { } reason)
+            reply.PauseReason = Text(reason, 4096);
+        return reply;
     }
 
     private static FeatureDraftReply ProjectRevision(
@@ -514,28 +746,88 @@ public sealed class DigitalBrainUiEndpoints(
 
     private static FeatureReleaseReviewReply ProjectVerification(
         VerifyFeatureDraft command,
-        VerifiedFeatureCandidate candidate)
+        FeatureVerificationReview review)
     {
         ArgumentNullException.ThrowIfNull(command);
-        ArgumentNullException.ThrowIfNull(candidate);
-        ValidateDraftOutput(command.DraftId, candidate.Draft);
-        ValidateReleaseOutput(candidate.Release);
-        if (!string.Equals(candidate.Draft.Status, "draft", StringComparison.Ordinal) ||
-            command.ExpectedRevision == long.MaxValue ||
-            candidate.Draft.Revision != command.ExpectedRevision + 1 ||
-            candidate.Draft.Verification is not { } verification ||
-            verification.Total <= 0 ||
-            verification.Passed != verification.Total ||
-            verification.Failed != 0 ||
-            verification.Skipped != 0 ||
-            verification.Release != candidate.Release.Digest ||
-            candidate.Release.SourceKind != DigitalBrain.Kernel.Contracts.FeatureSourceKind.RuntimeAuthored)
+        ArgumentNullException.ThrowIfNull(review);
+        ValidateDraftOutput(command.DraftId, review.Draft);
+        ValidateEvidenceOutput(review.Evidence);
+        if (review.AttemptedAt.Offset != TimeSpan.Zero || review.AttemptedAt.ToUnixTimeMilliseconds() <= 0)
+            throw new InvalidDataException("Feature Verification attempt time is invalid.");
+        var passed = review.Evidence.Passed == review.Evidence.Total &&
+                     review.Evidence.Failed == 0 && review.Evidence.Skipped == 0;
+        if (!string.Equals(review.Draft.Status, "draft", StringComparison.Ordinal) || command.ExpectedRevision == long.MaxValue)
             throw new InvalidDataException("Verified Feature coordinates are invalid.");
-        return new FeatureReleaseReviewReply
+        if (passed)
         {
-            Draft = ToReply(candidate.Draft),
-            Release = ToReply(candidate.Release)
+            if (review.Release is not { } release ||
+                review.Draft.Revision != command.ExpectedRevision + 1 ||
+                review.Draft.Verification is not { } verification ||
+                verification.Release != release.Digest ||
+                verification.Total != review.Evidence.Total ||
+                verification.Passed != review.Evidence.Passed ||
+                verification.Failed != review.Evidence.Failed ||
+                verification.Skipped != review.Evidence.Skipped ||
+                verification.VerifiedAt != review.AttemptedAt ||
+                release.SourceKind != DigitalBrain.Kernel.Contracts.FeatureSourceKind.RuntimeAuthored ||
+                !string.Equals(release.SourceReference, review.Evidence.SourceReference, StringComparison.Ordinal))
+                throw new InvalidDataException("Verified Feature coordinates are invalid.");
+            ValidateReleaseOutput(release);
+        }
+        else if (review.Release is not null ||
+                 review.Draft.Revision != command.ExpectedRevision &&
+                 review.Draft.Revision != command.ExpectedRevision + 1)
+        {
+            throw new InvalidDataException("Failed Feature verification coordinates are invalid.");
+        }
+        var reply = new FeatureReleaseReviewReply
+        {
+            Draft = ToReply(review.Draft, false),
+            Verification = ToReply(
+                review.Evidence,
+                review.Release?.Digest,
+                review.AttemptedAt)
         };
+        if (review.Release is { } verifiedRelease) reply.Release = ToMetadataReply(verifiedRelease);
+        return reply;
+    }
+
+    private static FeatureAccessReviewReply ProjectAccessReview(
+        PrepareFeatureAccessReview command,
+        FeatureAccessReview review)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(review);
+        ValidateDraftOutput(command.DraftId, review.Candidate.Draft);
+        ValidateReleaseOutput(review.Candidate.Release);
+        ValidateGrantCollection(review.Grants);
+        ValidateSubscriptions(review.Subscriptions);
+        var serverAuthoredPlan = command.Grants.Length == 0 && command.Subscriptions.Length == 0;
+        if (review.Candidate.Draft.Revision != command.ExpectedRevision ||
+            review.Candidate.Draft.Verification?.Release != command.Release ||
+            review.Candidate.Release.Digest != command.Release ||
+            review.Candidate.Release.Source is null ||
+            review.InstallationId != command.InstallationId ||
+            !serverAuthoredPlan && !SameGrants(review.Grants, command.Grants) ||
+            !serverAuthoredPlan && !SameSubscriptions(review.Subscriptions, command.Subscriptions) ||
+            review.PreviousRelease?.Digest == command.Release)
+            throw new InvalidDataException("Feature access review coordinates are invalid.");
+        var reply = new FeatureAccessReviewReply
+        {
+            Draft = ToReply(review.Candidate.Draft),
+            Release = ToMetadataReply(review.Candidate.Release),
+            InstallationId = Identifier(review.InstallationId.Value, 256)
+        };
+        reply.Grants.Add(review.Grants.Select(ToReply));
+        reply.Subscriptions.Add(review.Subscriptions.Select(subscription => Identifier(subscription, 256)));
+        if (review.PreviousRelease is { } previous)
+        {
+            ValidateReleaseOutput(previous);
+            if (previous.Source is null)
+                throw new InvalidDataException("The previous Feature release has no inspectable source.");
+            reply.PreviousRelease = ToMetadataReply(previous);
+        }
+        return reply;
     }
 
     private static FeatureInstallReply ProjectInstallation(
@@ -574,6 +866,98 @@ public sealed class DigitalBrainUiEndpoints(
         return ToReply(installed);
     }
 
+    private static FeatureReply ProjectFeature(
+        FeatureDraftId expectedDraftId,
+        ActorId actorId,
+        InstalledFeatureDetail detail)
+    {
+        ValidateInstalledFeatureDetail(expectedDraftId, actorId, detail);
+        var draft = ToReply(detail.Draft);
+        var reply = new FeatureReply
+        {
+            FeatureId = Identifier(expectedDraftId.Value, 128),
+            OriginatingRequest = draft.OriginatingRequest,
+            ActiveRelease = ToMetadataReply(detail.ActiveRelease),
+            RollbackAvailable = detail.Authority.ExactRollbackAvailable,
+            Paused = detail.Authority.Paused,
+            InstallationId = Identifier(detail.Registration.InstallationId.Value, 256),
+            Revision = detail.Revision >= 0
+                ? detail.Revision
+                : throw new InvalidDataException("Invalid Feature lifecycle revision.")
+        };
+        reply.ActiveGrants.Add(detail.Authority.ActiveGrants.Select(ToReply));
+        reply.Subscriptions.Add(detail.Registration.Subscriptions.Select(subscription => Identifier(subscription, 256)));
+        if (detail.PreviousRelease is { } previous)
+        {
+            ValidateReleaseOutput(previous);
+            if (previous.Source is null)
+                throw new InvalidDataException("The previous Feature release has no inspectable source.");
+            reply.PreviousRelease = ToMetadataReply(previous);
+        }
+        if (detail.Authority.PauseReason is { } pauseReason)
+            reply.PauseReason = Text(pauseReason, 4096);
+        return reply;
+    }
+
+    private static FeatureReleaseSourceReply ProjectFeatureReleaseSource(
+        FeatureDraftId expectedDraftId,
+        FeatureInstallationId expectedInstallationId,
+        ReleaseDigest expectedRelease,
+        string expectedSourceReference,
+        ActorId actorId,
+        InstalledFeatureDetail detail)
+    {
+        ValidateInstalledFeatureDetail(expectedDraftId, actorId, detail);
+        if (detail.Registration.InstallationId != expectedInstallationId)
+            throw new InvalidDataException("Feature release source installation coordinates are invalid.");
+        var release = detail.ActiveRelease.Digest == expectedRelease
+            ? detail.ActiveRelease
+            : detail.PreviousRelease?.Digest == expectedRelease
+                ? detail.PreviousRelease
+                : throw new InvalidDataException("Feature release source digest coordinates are invalid.");
+        if (!string.Equals(release.SourceReference, expectedSourceReference, StringComparison.Ordinal) ||
+            release.Source is not { } source)
+            throw new InvalidDataException("Feature release source reference coordinates are invalid.");
+        return new FeatureReleaseSourceReply
+        {
+            FeatureId = Identifier(expectedDraftId.Value, 128),
+            InstallationId = Identifier(expectedInstallationId.Value, 256),
+            ReleaseDigest = ReleaseDigest(expectedRelease.Value),
+            SourceReference = CanonicalSourceReference(expectedSourceReference)
+                ? expectedSourceReference
+                : throw new InvalidDataException("Feature release source reference coordinates are invalid."),
+            Source = ToReply(source)
+        };
+    }
+
+    private static void ValidateInstalledFeatureDetail(
+        FeatureDraftId expectedDraftId,
+        ActorId actorId,
+        InstalledFeatureDetail detail)
+    {
+        ArgumentNullException.ThrowIfNull(detail);
+        ValidateDraftOutput(expectedDraftId, detail.Draft);
+        ValidateReleaseOutput(detail.ActiveRelease);
+        ValidateGrantCollection(detail.Authority.ActiveGrants);
+        ValidateSubscriptions(detail.Registration.Subscriptions);
+        if (!string.Equals(detail.Draft.Status, "installed", StringComparison.Ordinal) ||
+            detail.Revision < 0 ||
+            detail.Draft.InstallationId != detail.Registration.InstallationId ||
+            detail.Authority.InstallationId != detail.Registration.InstallationId ||
+            detail.Authority.ActorId != actorId ||
+            detail.Authority.ActiveRelease != detail.ActiveRelease.Digest ||
+            detail.Registration.Release != detail.ActiveRelease.Digest ||
+            detail.ActiveRelease.Source is null ||
+            !SameIdentifiers(
+                detail.ActiveRelease.RequestedCapabilities,
+                detail.Authority.ActiveGrants.Select(grant => grant.CapabilityId)) ||
+            (detail.PreviousRelease is not null) != detail.Authority.ExactRollbackAvailable ||
+            detail.Authority.ExactRollbackAvailable &&
+            (detail.Authority.PreviousRelease is not { } previousDigest ||
+             detail.PreviousRelease?.Digest != previousDigest))
+            throw new InvalidDataException("Installed Feature detail coordinates are invalid.");
+    }
+
     private static void ValidateDraftOutput(
         FeatureDraftId expectedDraftId,
         DigitalBrain.Kernel.Contracts.FeatureDraft draft)
@@ -605,7 +989,79 @@ public sealed class DigitalBrainUiEndpoints(
         if (string.Equals(draft.Status, "installed", StringComparison.Ordinal) &&
             (verification.Passed != verification.Total || verification.Failed != 0 || verification.Skipped != 0))
             throw new InvalidDataException("Installed Feature Verification output is invalid.");
+        if (verification.Evidence is { } evidence)
+        {
+            ValidateEvidenceOutput(evidence);
+            if (evidence.Total != verification.Total || evidence.Passed != verification.Passed ||
+                evidence.Failed != verification.Failed || evidence.Skipped != verification.Skipped)
+                throw new InvalidDataException("Feature Verification evidence totals are inconsistent.");
+        }
         _ = ReleaseDigest(verification.Release.Value);
+    }
+
+    private static void ValidateEvidenceOutput(FeatureVerificationEvidence evidence)
+    {
+        ArgumentNullException.ThrowIfNull(evidence);
+        ArgumentNullException.ThrowIfNull(evidence.Scenarios);
+        ArgumentNullException.ThrowIfNull(evidence.Artifacts);
+        if (!CanonicalSourceReference(evidence.SourceReference) ||
+            evidence.Total is <= 0 or > 1024 || evidence.Passed < 0 || evidence.Failed < 0 || evidence.Skipped < 0 ||
+            (long)evidence.Passed + evidence.Failed + evidence.Skipped != evidence.Total ||
+            evidence.Scenarios.Length != evidence.Total)
+            throw new InvalidDataException("Feature Verification evidence is invalid.");
+        long utf8Bytes = Encoding.UTF8.GetByteCount(evidence.SourceReference);
+        var identifiers = new HashSet<string>(StringComparer.Ordinal);
+        var passed = 0;
+        var failed = 0;
+        var skipped = 0;
+        foreach (var scenario in evidence.Scenarios)
+        {
+            if (!identifiers.Add(Identifier(scenario.ScenarioId, 256)) ||
+                string.IsNullOrWhiteSpace(Text(scenario.Name, 512)) ||
+                !Enum.IsDefined(scenario.Outcome) || scenario.DurationMilliseconds is < 0 or > 70_000)
+                throw new InvalidDataException("Feature scenario evidence is invalid.");
+            switch (scenario.Outcome)
+            {
+                case DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Passed:
+                    passed++;
+                    if (scenario.SafeFailure is not null)
+                        throw new InvalidDataException("Passing Feature scenario evidence cannot contain a failure.");
+                    break;
+                case DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Failed:
+                    failed++;
+                    _ = Text(scenario.SafeFailure ?? string.Empty, 4096);
+                    break;
+                case DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Skipped:
+                    skipped++;
+                    if (scenario.SafeFailure is { } skippedReason)
+                        _ = Text(skippedReason, 4096);
+                    break;
+                default:
+                    throw new InvalidDataException("Feature scenario evidence has an unknown outcome.");
+            }
+            utf8Bytes = checked(utf8Bytes +
+                Encoding.UTF8.GetByteCount(scenario.ScenarioId) +
+                Encoding.UTF8.GetByteCount(scenario.Name) +
+                Encoding.UTF8.GetByteCount(scenario.SafeFailure ?? string.Empty));
+        }
+        if (passed != evidence.Passed || failed != evidence.Failed || skipped != evidence.Skipped)
+            throw new InvalidDataException("Feature scenario evidence totals are inconsistent.");
+        if (evidence.Artifacts.Length > 32 ||
+            evidence.Artifacts.Select(artifact => artifact.Name).Distinct(StringComparer.Ordinal).Count() != evidence.Artifacts.Length)
+            throw new InvalidDataException("Feature Verification artifacts are invalid.");
+        foreach (var artifact in evidence.Artifacts)
+        {
+            _ = Identifier(artifact.Name, 256);
+            _ = Identifier(artifact.MediaType, 128);
+            if (artifact.SizeBytes is < 0 or > 1_048_576 || !CanonicalSourceReference(artifact.Digest))
+                throw new InvalidDataException("Feature Verification artifact coordinates are invalid.");
+            utf8Bytes = checked(utf8Bytes +
+                Encoding.UTF8.GetByteCount(artifact.Name) +
+                Encoding.UTF8.GetByteCount(artifact.MediaType) +
+                Encoding.UTF8.GetByteCount(artifact.Digest));
+        }
+        if (utf8Bytes > MaximumVerificationEvidenceUtf8Bytes)
+            throw new InvalidDataException("Feature Verification evidence exceeds its UTF-8 byte budget.");
     }
 
     private static void ValidateReleaseOutput(FeatureReleaseMetadata release)
@@ -616,7 +1072,16 @@ public sealed class DigitalBrainUiEndpoints(
         ValidateIdentifierList(release.Dependencies, 64);
         if (!Enum.IsDefined(release.SourceKind))
             throw new InvalidDataException("Feature release source kind is invalid.");
+        if (!CanonicalSourceReference(release.SourceReference))
+            throw new InvalidDataException("Feature release source reference is invalid.");
     }
+
+    private static bool CanonicalSourceReference(string value) =>
+        value is { Length: 71 } && value.StartsWith("sha256:", StringComparison.Ordinal) && CanonicalDigest(value[7..]);
+
+    private static bool CanonicalDigest(string value) =>
+        value is { Length: 64 } && !value.Any(character =>
+            character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f'));
 
     private static void ValidateIdentifierList(string[] values, int maximumCount)
     {
@@ -657,6 +1122,28 @@ public sealed class DigitalBrainUiEndpoints(
     private static bool SameSubscriptions(IReadOnlyList<string> left, IReadOnlyList<string> right) =>
         left.Order(StringComparer.Ordinal).SequenceEqual(right.Order(StringComparer.Ordinal), StringComparer.Ordinal);
 
+    private static bool SameVerification(
+        DigitalBrain.Kernel.Contracts.FeatureVerification left,
+        DigitalBrain.Kernel.Contracts.FeatureVerification right) =>
+        left.Release == right.Release && left.Total == right.Total && left.Passed == right.Passed &&
+        left.Failed == right.Failed && left.Skipped == right.Skipped && left.VerifiedAt == right.VerifiedAt &&
+        SameEvidence(left.Evidence, right.Evidence);
+
+    private static bool SameEvidence(FeatureVerificationEvidence? left, FeatureVerificationEvidence? right) =>
+        ReferenceEquals(left, right) ||
+        left is not null && right is not null &&
+        string.Equals(left.SourceReference, right.SourceReference, StringComparison.Ordinal) &&
+        left.Total == right.Total && left.Passed == right.Passed && left.Failed == right.Failed &&
+        left.Skipped == right.Skipped && left.Scenarios.SequenceEqual(right.Scenarios) &&
+        left.Artifacts.SequenceEqual(right.Artifacts);
+
+    private static bool BoundedIdentifier(string? value, int maximumLength) =>
+        value is not null && BoundedText(value, maximumLength);
+
+    private static bool BoundedText(string? value, int maximumLength) =>
+        !string.IsNullOrWhiteSpace(value) && value.Length <= maximumLength &&
+        string.Equals(value, value.Trim(), StringComparison.Ordinal) && !value.Any(char.IsControl);
+
     private static bool SameBehavior(
         DigitalBrain.Kernel.Contracts.FeatureBehavior left,
         DigitalBrain.Kernel.Contracts.FeatureBehavior right) =>
@@ -683,6 +1170,13 @@ public sealed class DigitalBrainUiEndpoints(
 
     private static GrpcFeatureDraft ToReply(DigitalBrain.Kernel.Contracts.FeatureDraft draft)
     {
+        return ToReply(draft, true);
+    }
+
+    private static GrpcFeatureDraft ToReply(
+        DigitalBrain.Kernel.Contracts.FeatureDraft draft,
+        bool includeSource)
+    {
         ArgumentNullException.ThrowIfNull(draft);
         var originatingRequest = new GrpcOriginatingRequest
         {
@@ -706,11 +1200,12 @@ public sealed class DigitalBrainUiEndpoints(
                 _ => throw new InvalidDataException("Unknown Feature Draft status.")
             },
             Behavior = ToReply(draft.Behavior),
-            Source = ToReply(draft.Source),
             Revision = draft.Revision >= 0 ? draft.Revision : throw new InvalidDataException("Invalid Feature Draft revision."),
             CreatedAtUnixMs = draft.CreatedAt.ToUnixTimeMilliseconds(),
             UpdatedAtUnixMs = draft.UpdatedAt.ToUnixTimeMilliseconds()
         };
+        if (includeSource)
+            reply.Source = ToReply(draft.Source);
         if (draft.Verification is { } verification)
         {
             reply.Verification = new DigitalBrain.V2.Ui.Grpc.FeatureVerification
@@ -722,6 +1217,8 @@ public sealed class DigitalBrainUiEndpoints(
                 Skipped = verification.Skipped,
                 VerifiedAtUnixMs = verification.VerifiedAt.ToUnixTimeMilliseconds()
             };
+            if (verification.Evidence is { } evidence)
+                reply.Verification.SourceReference = SourceReference(evidence.SourceReference);
         }
         if (draft.InstallationId is { } installationId)
             reply.InstallationId = Identifier(installationId.Value, 256);
@@ -801,6 +1298,16 @@ public sealed class DigitalBrainUiEndpoints(
 
     private static GrpcFeatureRelease ToReply(FeatureReleaseMetadata release)
     {
+        return ToReply(release, true);
+    }
+
+    private static GrpcFeatureRelease ToMetadataReply(FeatureReleaseMetadata release)
+    {
+        return ToReply(release, false);
+    }
+
+    private static GrpcFeatureRelease ToReply(FeatureReleaseMetadata release, bool includeSource)
+    {
         ValidateReleaseOutput(release);
         var reply = new GrpcFeatureRelease
         {
@@ -810,10 +1317,56 @@ public sealed class DigitalBrainUiEndpoints(
                 DigitalBrain.Kernel.Contracts.FeatureSourceKind.Repository => GrpcFeatureSourceKind.Repository,
                 DigitalBrain.Kernel.Contracts.FeatureSourceKind.RuntimeAuthored => GrpcFeatureSourceKind.RuntimeAuthored,
                 _ => throw new InvalidDataException("Unknown Feature Source kind.")
-            }
+            },
+            SourceReference = release.SourceReference
         };
         reply.RequestedCapabilityIds.Add(release.RequestedCapabilities.Select(capability => Identifier(capability, 256)));
         reply.Dependencies.Add(release.Dependencies.Select(dependency => Identifier(dependency, 256)));
+        if (includeSource && release.Source is { } source) reply.Source = ToReply(source);
+        return reply;
+    }
+
+    private static DigitalBrain.V2.Ui.Grpc.FeatureVerification ToReply(
+        FeatureVerificationEvidence evidence,
+        ReleaseDigest? release,
+        DateTimeOffset? verifiedAt)
+    {
+        ValidateEvidenceOutput(evidence);
+        var reply = new DigitalBrain.V2.Ui.Grpc.FeatureVerification
+        {
+            ReleaseDigest = release is { } digest ? ReleaseDigest(digest.Value) : string.Empty,
+            Total = evidence.Total,
+            Passed = evidence.Passed,
+            Failed = evidence.Failed,
+            Skipped = evidence.Skipped,
+            VerifiedAtUnixMs = verifiedAt?.ToUnixTimeMilliseconds() ?? 0,
+            SourceReference = evidence.SourceReference
+        };
+        reply.Scenarios.Add(evidence.Scenarios.Select(scenario =>
+        {
+            var mapped = new FeatureVerificationScenario
+            {
+                ScenarioId = scenario.ScenarioId,
+                Name = scenario.Name,
+                Outcome = scenario.Outcome switch
+                {
+                    DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Passed => DigitalBrain.V2.Ui.Grpc.FeatureScenarioOutcome.Passed,
+                    DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Failed => DigitalBrain.V2.Ui.Grpc.FeatureScenarioOutcome.Failed,
+                    DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Skipped => DigitalBrain.V2.Ui.Grpc.FeatureScenarioOutcome.Skipped,
+                    _ => throw new InvalidDataException("Unknown Feature scenario outcome.")
+                },
+                DurationMilliseconds = scenario.DurationMilliseconds
+            };
+            if (scenario.SafeFailure is { } safeFailure) mapped.SafeFailure = safeFailure;
+            return mapped;
+        }));
+        reply.Artifacts.Add(evidence.Artifacts.Select(artifact => new DigitalBrain.V2.Ui.Grpc.FeatureVerificationArtifact
+        {
+            Name = artifact.Name,
+            MediaType = artifact.MediaType,
+            SizeBytes = artifact.SizeBytes,
+            Digest = artifact.Digest
+        }));
         return reply;
     }
 
@@ -849,9 +1402,9 @@ public sealed class DigitalBrainUiEndpoints(
         var reply = new FeatureInstallReply
         {
             Draft = ToReply(installed.Draft),
-            Release = ToReply(installed.Release),
+            Release = ToMetadataReply(installed.Release),
             InstallationId = Identifier(installed.Registration.InstallationId.Value, 256),
-            RollbackAvailable = installed.Authority.PreviousRelease is not null,
+            RollbackAvailable = installed.Authority.ExactRollbackAvailable,
             Paused = installed.Authority.Paused
         };
         reply.ActiveGrants.Add(installed.Authority.ActiveGrants.Select(ToReply));
@@ -881,6 +1434,17 @@ public sealed class DigitalBrainUiEndpoints(
         long ExpectedRevision,
         string IdempotencyId,
         RevisionCommand Command);
+
+    private sealed record FeatureReleaseSourceCoordinate(
+        FeatureDraftId DraftId,
+        FeatureInstallationId InstallationId,
+        ReleaseDigest Release,
+        string SourceReference);
+
+    private sealed record ResumeOriginatingRequestInput(
+        FeatureDraftId DraftId,
+        long ExpectedRevision,
+        string IdempotencyId);
 
     private abstract record RevisionCommand;
     private sealed record ReviseBehaviorCommand(DigitalBrain.Kernel.Contracts.FeatureBehavior Behavior) : RevisionCommand;

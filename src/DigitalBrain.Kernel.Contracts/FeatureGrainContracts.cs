@@ -64,7 +64,8 @@ public sealed record FeatureReleaseMetadata(
     [property: Id(1)] string SourceReference,
     [property: Id(2)] FeatureSourceKind SourceKind,
     [property: Id(3)] string[] RequestedCapabilities,
-    [property: Id(4)] string[] Dependencies);
+    [property: Id(4)] string[] Dependencies,
+    [property: Id(5)] FeatureSourceSnapshot? Source = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-release-proposal")]
 public sealed record FeatureReleaseProposal(
     [property: Id(0)] FeatureInstallationId InstallationId,
@@ -78,7 +79,12 @@ public sealed record FeatureGrantSpec(
     [property: Id(3)] string ConstraintsJson,
     [property: Id(4)] string? Provider = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-approval-decision")]
-public sealed record FeatureApprovalDecision([property: Id(0)] string ApprovalId, [property: Id(1)] ReleaseDigest Release, [property: Id(2)] bool Approved, [property: Id(3)] string DecisionId);
+public sealed record FeatureApprovalDecision(
+    [property: Id(0)] string ApprovalId,
+    [property: Id(1)] ReleaseDigest Release,
+    [property: Id(2)] bool Approved,
+    [property: Id(3)] string DecisionId,
+    [property: Id(4)] ActorId? ActorId = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-grant-request")]
 public sealed record FeatureGrantRequest(
     [property: Id(0)] FeatureInstallationId InstallationId,
@@ -102,7 +108,8 @@ public enum FeatureApprovalStatus
 {
     Pending,
     Approved,
-    Rejected
+    Rejected,
+    Superseded
 }
 [GenerateSerializer, Alias("digitalbrain.v3.feature-approval-snapshot")]
 public sealed record FeatureApprovalSnapshot(
@@ -115,7 +122,8 @@ public sealed record FeatureApprovalSnapshot(
     [property: Id(6)] string? DecisionId,
     [property: Id(7)] DateTimeOffset? DecidedAt,
     [property: Id(8)] long Revision,
-    [property: Id(9)] FeatureGrantSpec[] Grants);
+    [property: Id(9)] FeatureGrantSpec[] Grants,
+    [property: Id(10)] ActorId? DecisionActorId = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-authority-snapshot")]
 public sealed record FeatureAuthoritySnapshot(
     [property: Id(0)] FeatureInstallationId InstallationId,
@@ -128,7 +136,17 @@ public sealed record FeatureAuthoritySnapshot(
     [property: Id(7)] GrantRevision? PendingGrantRevision,
     [property: Id(8)] FeatureGrantSpec[] PendingGrants,
     [property: Id(9)] bool Paused,
-    [property: Id(10)] string? PauseReason);
+    [property: Id(10)] string? PauseReason,
+    [property: Id(11)] FeatureRollbackReplaySnapshot? RollbackReplay = null,
+    [property: Id(12)] bool ExactRollbackAvailable = false,
+    [property: Id(13)] bool PublicationConfirmed = false);
+[GenerateSerializer, Alias("digitalbrain.v3.feature-rollback-replay-snapshot")]
+public sealed record FeatureRollbackReplaySnapshot(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ReleaseDigest ExpectedActiveRelease,
+    [property: Id(2)] ReleaseDigest TargetRelease,
+    [property: Id(3)] long ExpectedRevision,
+    [property: Id(4)] string IdempotencyId);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-grant-snapshot")]
 public sealed record FeatureGrantSnapshot(
     [property: Id(0)] FeatureInstallationId InstallationId,
@@ -237,7 +255,55 @@ public sealed record FeatureInstallationSnapshot(
     [property: Id(9)] FeatureIntentStatus[] Intents,
     [property: Id(10)] FeatureScheduleStatus[] Schedules,
     [property: Id(11)] long Revision,
-    [property: Id(12)] FeatureParkedInput[] Parked);
+    [property: Id(12)] FeatureParkedInput[] Parked,
+    [property: Id(13)] FeatureReleaseSwitchSnapshot? UnconfirmedReleaseSwitch = null);
+[GenerateSerializer, Alias("digitalbrain.feature.release-switch-snapshot.v1")]
+public sealed record FeatureReleaseSwitchSnapshot(
+    [property: Id(0)] string OperationToken,
+    [property: Id(1)] ReleaseDigest FromActiveRelease,
+    [property: Id(2)] ReleaseDigest? FromPreviousRelease,
+    [property: Id(3)] ReleaseDigest ToRelease,
+    [property: Id(4)] long FromRevision,
+    [property: Id(5)] long SwitchRevision);
+[GenerateSerializer, Alias("digitalbrain.feature.runtime-reservation.v1")]
+public sealed record FeatureRuntimeReservation(
+    [property: Id(0)] BrainOwnerId OwnerId,
+    [property: Id(1)] FeatureDraftId DraftId,
+    [property: Id(2)] FeatureInstallationId InstallationId,
+    [property: Id(3)] ActorId ActorId,
+    [property: Id(4)] string ReservationToken,
+    [property: Id(5)] string AccessDigest,
+    [property: Id(6)] ReleaseDigest CandidateRelease,
+    [property: Id(7)] long? RuntimeRevision,
+    [property: Id(8)] ReleaseDigest? RuntimeActiveRelease,
+    [property: Id(9)] ReleaseDigest? RuntimePreviousRelease,
+    [property: Id(10)] bool? RuntimePaused,
+    [property: Id(11)] string? RuntimePauseReason);
+[Alias("digitalbrain.feature.runtime-reservation-phase.v1")]
+public enum FeatureRuntimeReservationPhase
+{
+    Reserved,
+    Switched,
+    Resetting
+}
+[GenerateSerializer, Alias("digitalbrain.feature.runtime-reservation-snapshot.v1")]
+public sealed record FeatureRuntimeReservationSnapshot(
+    [property: Id(0)] FeatureRuntimeReservation Reservation,
+    [property: Id(1)] FeatureRuntimeReservationPhase Phase,
+    [property: Id(2)] bool RuntimeExists,
+    [property: Id(3)] long? ObservedRevision,
+    [property: Id(4)] ReleaseDigest? ObservedActiveRelease,
+    [property: Id(5)] ReleaseDigest? ObservedPreviousRelease,
+    [property: Id(6)] bool? ObservedPaused,
+    [property: Id(7)] string? ObservedPauseReason,
+    [property: Id(8)] FeatureLeaseStatus? ObservedLease);
+[GenerateSerializer, Alias("digitalbrain.feature.runtime-reservation-release.v1")]
+public sealed record FeatureRuntimeReservationRelease(
+    [property: Id(0)] FeatureRuntimeReservation Reservation,
+    [property: Id(1)] FeatureRuntimeReservationPhase ExpectedPhase,
+    [property: Id(2)] ReleaseDigest? ExpectedActiveRelease,
+    [property: Id(3)] ReleaseDigest? ExpectedPreviousRelease,
+    [property: Id(4)] bool RequireRuntimeAbsent);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-parked-input")]
 public sealed record FeatureParkedInput([property: Id(0)] FeatureInput Input, [property: Id(1)] int Attempts, [property: Id(2)] string? SafeFailure);
 [Alias("digitalbrain.v3.feature-failure-disposition")]
@@ -375,7 +441,8 @@ public sealed record FeatureVerification(
     [property: Id(2)] int Passed,
     [property: Id(3)] int Failed,
     [property: Id(4)] int Skipped,
-    [property: Id(5)] DateTimeOffset VerifiedAt);
+    [property: Id(5)] DateTimeOffset VerifiedAt,
+    [property: Id(6)] FeatureVerificationEvidence? Evidence = null);
 [GenerateSerializer, Alias("digitalbrain.feature.create-draft.v1")]
 public sealed record CreateFeatureDraft(
     [property: Id(0)] string OperationId,
@@ -410,6 +477,13 @@ public sealed record MarkFeatureDraftInstalled(
     [property: Id(3)] long ExpectedRevision,
     [property: Id(4)] string IdempotencyId,
     [property: Id(5)] DateTimeOffset InstalledAt);
+[GenerateSerializer, Alias("digitalbrain.feature.rollback-installation.v1")]
+public sealed record RollbackFeatureInstallation(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ReleaseDigest ExpectedActiveRelease,
+    [property: Id(2)] ReleaseDigest TargetRelease,
+    [property: Id(3)] long ExpectedRevision,
+    [property: Id(4)] string IdempotencyId);
 public interface IFeatureGrainResolver
 {
     IFeatureHubGrain Hub(BrainOwnerId ownerId);
@@ -424,6 +498,8 @@ public interface IFeatureHubGrain : IGrainWithStringKey
     Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request);
     [Alias("read-draft")]
     Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId);
+    [Alias("read-installed-draft")]
+    Task<FeatureDraft?> ReadInstalledDraftAsync(FeatureInstallationId installationId, ReleaseDigest release);
     [Alias("revise-behavior")]
     Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command);
     [Alias("revise-source")]
@@ -438,6 +514,12 @@ public interface IFeatureHubGrain : IGrainWithStringKey
     Task<FeatureDraftInstallationReservation> AcquireDraftInstallationReservationAsync(InstallFeatureVersion command, ActorId actorId);
     [Alias("read-draft-installation-reservation")]
     Task<FeatureDraftInstallationReservation?> ReadDraftInstallationReservationAsync(FeatureDraftId draftId);
+    [Alias("read-draft-installation-reset")]
+    Task<FeatureDraftInstallationResetObligation?> ReadDraftInstallationResetAsync(FeatureDraftId draftId);
+    [Alias("reset-draft-installation-reservation")]
+    Task<FeatureDraftInstallationResetPreparation> ResetDraftInstallationReservationAsync(ResetFeatureDraftInstallationReservation command, ActorId actorId);
+    [Alias("complete-draft-installation-reservation-reset")]
+    Task<FeatureDraft> CompleteDraftInstallationReservationResetAsync(FeatureDraftId draftId, string idempotencyId, ActorId actorId);
     [Alias("prepare-active-publication")]
     Task<FeaturePublicationTicket> PrepareActivePublicationAsync(FeatureInstallationId installationId);
     [Alias("confirm-active-publication")]
@@ -464,6 +546,10 @@ public interface IFeatureHubGrain : IGrainWithStringKey
     Task ResumeInstallationAsync(FeatureInstallationId installationId, long expectedRevision);
     [Alias("rollback-installation")]
     Task<FeatureAuthoritySnapshot> RollbackInstallationAsync(FeatureInstallationId installationId, long expectedRevision);
+    [Alias("rollback-installation-exact")]
+    Task<FeatureAuthoritySnapshot> RollbackInstallationExactAsync(RollbackFeatureInstallation command) =>
+        Task.FromException<FeatureAuthoritySnapshot>(
+            new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
     [Alias("read-grant")]
     Task<FeatureGrantSnapshot?> ReadGrantAsync(FeatureGrantLookup lookup);
 }
@@ -492,6 +578,30 @@ public interface IFeatureInstallationGrain : IGrainWithStringKey
     Task ResumeAsync();
     [Alias("switch-release")]
     Task SwitchReleaseAsync(ReleaseDigest release);
+    [Alias("establish-reservation")]
+    Task<FeatureRuntimeReservationSnapshot> EstablishReservationAsync(FeatureRuntimeReservation reservation);
+    [Alias("read-reservation")]
+    Task<FeatureRuntimeReservationSnapshot?> ReadReservationAsync();
+    [Alias("activate-reserved-release")]
+    Task ActivateReservedReleaseAsync(FeatureRuntimeReservation reservation);
+    [Alias("reset-reserved-release")]
+    Task ResetReservedReleaseAsync(FeatureRuntimeReservation reservation, bool requireRuntimeAbsence);
+    [Alias("release-reservation")]
+    Task ReleaseReservationAsync(FeatureRuntimeReservationRelease release);
+    [Alias("begin-release-switch")]
+    Task BeginReleaseSwitchAsync(ReleaseDigest release, string operationToken);
+    [Alias("confirm-release-switch")]
+    Task ConfirmReleaseSwitchAsync(ReleaseDigest release);
+    [Alias("clear-backpressure-pause")]
+    Task ClearBackpressurePauseAsync();
+    [Alias("discard-unpublished")]
+    Task DiscardUnpublishedAsync(ReleaseDigest release, bool requireAbsent);
+    [Alias("restore-unpublished-candidate")]
+    Task RestoreUnpublishedCandidateAsync(
+        ReleaseDigest candidateRelease,
+        ReleaseDigest expectedActiveRelease,
+        ReleaseDigest? expectedPreviousRelease,
+        long minimumFromRevision);
     [Alias("rollback")]
     Task RollbackAsync();
     [Alias("read")]

@@ -13,7 +13,7 @@ public static class UiHostingExtensions
         services.AddGrpc(options =>
         {
             options.MaxReceiveMessageSize = 8 * 1024 * 1024;
-            options.MaxSendMessageSize = 8 * 1024 * 1024;
+            options.MaxSendMessageSize = 16 * 1024 * 1024;
             options.EnableDetailedErrors = false;
         });
         services.AddCors(options => options.AddPolicy(CorsPolicy, policy => ConfigureCors(policy, configuration, profile)));

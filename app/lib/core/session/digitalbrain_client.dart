@@ -10,6 +10,11 @@ abstract interface class DigitalBrainTransport implements SessionTransport {
     required wire.GetFeatureDraftRequest request,
   });
 
+  Future<wire.FeatureDraftReply> resetFeatureDraftInstallation({
+    required String accessToken,
+    required wire.ResetFeatureDraftInstallationRequest request,
+  });
+
   Future<wire.FeatureDraftReply> reviseFeatureDraft({
     required String accessToken,
     required wire.ReviseFeatureDraftRequest request,
@@ -24,11 +29,45 @@ abstract interface class DigitalBrainTransport implements SessionTransport {
     required String accessToken,
     required wire.VerifyFeatureDraftRequest request,
   });
+
+  Future<wire.FeatureAccessReviewReply> reviewFeatureAccess({
+    required String accessToken,
+    required wire.ReviewFeatureAccessRequest request,
+  });
+
+  Future<wire.FeatureInstallReply> installFeatureVersion({
+    required String accessToken,
+    required wire.InstallFeatureVersionRequest request,
+  });
+
+  Future<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest({
+    required String accessToken,
+    required wire.ResumeOriginatingRequestRequest request,
+  });
+
+  Future<wire.FeatureReply> getFeature({
+    required String accessToken,
+    required wire.GetFeatureRequest request,
+  });
+
+  Future<wire.FeatureReleaseSourceReply> getFeatureReleaseSource({
+    required String accessToken,
+    required wire.GetFeatureReleaseSourceRequest request,
+  });
+
+  Future<wire.FeatureReply> rollbackFeatureVersion({
+    required String accessToken,
+    required wire.RollbackFeatureVersionRequest request,
+  });
 }
 
 abstract interface class FeatureAuthoringClient {
   Future<wire.FeatureDraftReply> getFeatureDraft(
     wire.GetFeatureDraftRequest request,
+  );
+
+  Future<wire.FeatureDraftReply> resetFeatureDraftInstallation(
+    wire.ResetFeatureDraftInstallationRequest request,
   );
 
   Future<wire.FeatureDraftReply> reviseFeatureDraft(
@@ -41,6 +80,24 @@ abstract interface class FeatureAuthoringClient {
 
   Future<wire.FeatureReleaseReviewReply> verifyFeatureDraft(
     wire.VerifyFeatureDraftRequest request,
+  );
+
+  Future<wire.FeatureAccessReviewReply> reviewFeatureAccess(
+    wire.ReviewFeatureAccessRequest request,
+  );
+
+  Future<wire.FeatureInstallReply> installFeatureVersion(
+    wire.InstallFeatureVersionRequest request,
+  );
+
+  Future<wire.FeatureReply> getFeature(wire.GetFeatureRequest request);
+
+  Future<wire.FeatureReleaseSourceReply> getFeatureReleaseSource(
+    wire.GetFeatureReleaseSourceRequest request,
+  );
+
+  Future<wire.FeatureReply> rollbackFeatureVersion(
+    wire.RollbackFeatureVersionRequest request,
   );
 }
 
@@ -63,6 +120,16 @@ class DigitalBrainClient implements FeatureAuthoringClient {
   ) => _authorized(
     (accessToken) =>
         _transport.getFeatureDraft(accessToken: accessToken, request: request),
+  );
+
+  @override
+  Future<wire.FeatureDraftReply> resetFeatureDraftInstallation(
+    wire.ResetFeatureDraftInstallationRequest request,
+  ) => _authorized(
+    (accessToken) => _transport.resetFeatureDraftInstallation(
+      accessToken: accessToken,
+      request: request,
+    ),
   );
 
   @override
@@ -90,6 +157,62 @@ class DigitalBrainClient implements FeatureAuthoringClient {
     wire.VerifyFeatureDraftRequest request,
   ) => _authorized(
     (accessToken) => _transport.verifyFeatureDraft(
+      accessToken: accessToken,
+      request: request,
+    ),
+  );
+
+  @override
+  Future<wire.FeatureAccessReviewReply> reviewFeatureAccess(
+    wire.ReviewFeatureAccessRequest request,
+  ) => _authorized(
+    (accessToken) => _transport.reviewFeatureAccess(
+      accessToken: accessToken,
+      request: request,
+    ),
+  );
+
+  @override
+  Future<wire.FeatureInstallReply> installFeatureVersion(
+    wire.InstallFeatureVersionRequest request,
+  ) => _authorized(
+    (accessToken) => _transport.installFeatureVersion(
+      accessToken: accessToken,
+      request: request,
+    ),
+  );
+
+  Future<wire.ResumeOriginatingRequestReply> resumeOriginatingRequest(
+    wire.ResumeOriginatingRequestRequest request,
+  ) => _authorized(
+    (accessToken) => _transport.resumeOriginatingRequest(
+      accessToken: accessToken,
+      request: request,
+    ),
+  );
+
+  @override
+  Future<wire.FeatureReply> getFeature(wire.GetFeatureRequest request) =>
+      _authorized(
+        (accessToken) =>
+            _transport.getFeature(accessToken: accessToken, request: request),
+      );
+
+  @override
+  Future<wire.FeatureReleaseSourceReply> getFeatureReleaseSource(
+    wire.GetFeatureReleaseSourceRequest request,
+  ) => _authorized(
+    (accessToken) => _transport.getFeatureReleaseSource(
+      accessToken: accessToken,
+      request: request,
+    ),
+  );
+
+  @override
+  Future<wire.FeatureReply> rollbackFeatureVersion(
+    wire.RollbackFeatureVersionRequest request,
+  ) => _authorized(
+    (accessToken) => _transport.rollbackFeatureVersion(
       accessToken: accessToken,
       request: request,
     ),

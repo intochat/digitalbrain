@@ -18,10 +18,19 @@ public sealed class FeatureBuildPipeline
     }
     public async Task<FeatureRelease> BuildAsync(FeatureBuildRequest request, CancellationToken cancellationToken = default)
     {
+        var verification = await VerifyAsync(request, cancellationToken);
+        return verification.Release
+            ?? throw new FeatureBuildException(
+                FeatureBuildFailure.ScenarioFailed,
+                "Feature scenarios must contain at least one test and pass with no failures or skips.");
+    }
+    public async Task<FeatureBuildVerification> VerifyAsync(FeatureBuildRequest request, CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(request);
         ValidateDeadline(request.Deadline);
         FeatureBuildSource.Validate(request.Source);
         cancellationToken.ThrowIfCancellationRequested();
+        var sourceReference = FeatureReleaseWriter.ComputeSourceReference(request.Source);
         var workspace = Path.Combine(Path.GetTempPath(), "digitalbrain-feature-builds", Guid.NewGuid().ToString("N"));
         try
         {
@@ -103,11 +112,10 @@ public sealed class FeatureBuildPipeline
             ValidateScenarioDependencies(request.Source, Path.GetDirectoryName(scenarioAssemblyPath)!, scenarioAssembly);
             var resultsDirectory = Path.Combine(workspace, "build", "results");
             Directory.CreateDirectory(resultsDirectory);
-            await process.RunAsync(
+            var scenarioProcess = await process.RunForEvidenceAsync(
                 workspace,
                 compileDeadline,
                 CompileAndScenarioTimeout,
-                FeatureBuildFailure.ScenarioFailed,
                 cancellationToken,
                 "test",
                 scenarioProject,
@@ -130,11 +138,11 @@ public sealed class FeatureBuildPipeline
                 "--verbosity",
                 "quiet");
             var scenarios = FeatureScenarioResultReader.Read(Path.Combine(resultsDirectory, "scenarios.trx"), expectedScenarioCount);
-            if (scenarios.Total == 0 || scenarios.Failed != 0 || scenarios.Skipped != 0 || scenarios.Passed != scenarios.Total)
+            var artifacts = FeatureReleaseWriter.DescribeEvidence(sourceReference, scenarios);
+            if (!scenarioProcess.Succeeded || scenarios.Failed != 0 || scenarios.Skipped != 0 || scenarios.Passed != scenarios.Total)
             {
-                throw new FeatureBuildException(FeatureBuildFailure.ScenarioFailed, "Feature scenarios must contain at least one test and pass with no failures or skips.");
+                return new FeatureBuildVerification(sourceReference, scenarios, artifacts, null);
             }
-            var sourceReference = FeatureReleaseWriter.ComputeSourceReference(request.Source);
             var remaining = request.Deadline - _timeProvider.GetUtcNow();
             if (remaining <= TimeSpan.Zero)
             {
@@ -144,7 +152,8 @@ public sealed class FeatureBuildPipeline
             releaseCancellation.CancelAfter(remaining);
             try
             {
-                return await _releaseWriter.WriteAsync(request.OutputDirectory, sourceReference, buildOutput, manifest, scenarios, releaseCancellation.Token);
+                var release = await _releaseWriter.WriteAsync(request.OutputDirectory, sourceReference, buildOutput, manifest, scenarios, releaseCancellation.Token);
+                return new FeatureBuildVerification(sourceReference, scenarios, release.Artifacts, release);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {

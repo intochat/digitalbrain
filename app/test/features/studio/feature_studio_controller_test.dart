@@ -239,7 +239,8 @@ void main() {
 
   test('invalid local aggregates never enter the mutation lane', () async {
     final delay = _ManualDelay();
-    final gateway = _ControlledGateway()..loadedDraft = _draft();
+    final gateway = _ControlledGateway()
+      ..loadedDraft = _draft(verification: _verification());
     final controller = FeatureStudioController(
       draftId: 'draft-a',
       gateway: gateway,
@@ -248,6 +249,9 @@ void main() {
     await controller.load();
 
     controller.reviseBehavior(FeatureStudioBehavior(scenarios: const []));
+    expect(controller.behavior?.scenarios, isEmpty);
+    expect(controller.verification, isNull);
+    expect(controller.verificationPhase, FeatureStudioVerificationPhase.stale);
     controller.reviseSource(
       FeatureStudioSource(
         implementationProjectPath: 'missing.csproj',
@@ -547,6 +551,372 @@ void main() {
     },
   );
 
+  test(
+    'every post-load Draft mutation rejects immutable metadata substitution',
+    () async {
+      void expectBaselineIdentity(FeatureStudioController controller) {
+        final draft = controller.confirmedDraft!;
+        expect(draft.draftId, 'draft-a');
+        expect(draft.originatingRequest.operationId, 'operation-a');
+        expect(draft.originatingRequest.conversationId, 'conversation-a');
+        expect(draft.originatingRequest.text, 'Research Acme');
+        expect(draft.goal, 'Create a concise company brief');
+        expect(draft.createdAt, DateTime.utc(2026, 7, 15, 10));
+      }
+
+      Future<(FeatureStudioController, _ControlledGateway)> verified() async {
+        final gateway = _ControlledGateway()..loadedDraft = _draft();
+        final controller = FeatureStudioController(
+          draftId: 'draft-a',
+          gateway: gateway,
+          idFactory: _SequenceIds().call,
+        );
+        await controller.load();
+        final request = controller.verify();
+        await pumpEventQueue();
+        gateway.verifyCalls.single.completer.complete(
+          _passingVerificationResult(
+            _draft(revision: Int64(5), verification: _verification()),
+          ),
+        );
+        await request;
+        return (controller, gateway);
+      }
+
+      final saveGateway = _ControlledGateway()..loadedDraft = _draft();
+      final saveController = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: saveGateway,
+      );
+      await saveController.load();
+      saveController.reviseBehavior(_behavior('Edited Behavior'));
+      final saving = saveController.saveNow();
+      await pumpEventQueue();
+      saveGateway.behaviorCalls.single.completer.complete(
+        _draft(
+          revision: Int64(5),
+          behavior: _behavior('Edited Behavior'),
+          goal: 'Substituted goal',
+        ),
+      );
+      await saving;
+      expectBaselineIdentity(saveController);
+      expect(saveController.savePhase, FeatureStudioSavePhase.failed);
+
+      for (final accept in [true, false]) {
+        final gateway = _ControlledGateway()..loadedDraft = _draft();
+        final controller = FeatureStudioController(
+          draftId: 'draft-a',
+          gateway: gateway,
+          idFactory: _SequenceIds().call,
+        );
+        await controller.load();
+        final request = controller.requestSuggestedChange('Improve it');
+        await pumpEventQueue();
+        gateway.suggestionCalls.single.completer.complete(_suggestion());
+        await request;
+        final decision = accept
+            ? controller.acceptSuggestedChange()
+            : controller.rejectSuggestedChange();
+        await pumpEventQueue();
+        final reply = _draft(
+          revision: accept ? Int64(5) : Int64(4),
+          behavior: accept ? _lastSuggestion.replacementBehavior : null,
+          source: accept ? _lastSuggestion.replacementSource : null,
+          originatingRequest: FeatureStudioOriginatingRequest(
+            operationId: accept ? 'substituted-operation' : 'operation-a',
+            conversationId: accept
+                ? 'conversation-a'
+                : 'substituted-conversation',
+            text: 'Research Acme',
+          ),
+        );
+        if (accept) {
+          gateway.acceptCalls.single.completer.complete(reply);
+        } else {
+          gateway.rejectCalls.single.completer.complete(reply);
+        }
+        await decision;
+        expectBaselineIdentity(controller);
+        expect(controller.suggestionPhase, FeatureStudioSuggestionPhase.failed);
+      }
+
+      final (verifyController, verifyGateway) = await verified();
+      final secondVerification = verifyController.verify();
+      await pumpEventQueue();
+      verifyGateway.verifyCalls.last.completer.complete(
+        _passingVerificationResult(
+          _draft(
+            revision: Int64(6),
+            verification: _verification(),
+            createdAt: DateTime.utc(2026, 7, 15, 9),
+          ),
+        ),
+      );
+      await secondVerification;
+      expectBaselineIdentity(verifyController);
+      expect(
+        verifyController.verificationPhase,
+        FeatureStudioVerificationPhase.failed,
+      );
+
+      final (reviewController, reviewGateway) = await verified();
+      final reviewing = reviewController.reviewAccess();
+      await pumpEventQueue();
+      reviewGateway.accessReviewCalls.single.completer.complete(
+        _accessReview(
+          draft: _draft(
+            revision: Int64(5),
+            verification: _verification(),
+            originatingRequest: const FeatureStudioOriginatingRequest(
+              operationId: 'operation-a',
+              conversationId: 'substituted-conversation',
+              text: 'Research Acme',
+            ),
+          ),
+        ),
+      );
+      await reviewing;
+      expectBaselineIdentity(reviewController);
+      expect(
+        reviewController.accessReviewPhase,
+        FeatureStudioAccessReviewPhase.failed,
+      );
+
+      final (installController, installGateway) = await verified();
+      final installReview = installController.reviewAccess();
+      await pumpEventQueue();
+      installGateway.accessReviewCalls.single.completer.complete(
+        _accessReview(),
+      );
+      await installReview;
+      final installing = installController.approveAndInstall();
+      await pumpEventQueue();
+      installGateway.installCalls.single.completer.complete(
+        _installSuccess(
+          draft: _draft(
+            draftId: 'substituted-draft',
+            revision: Int64(6),
+            status: FeatureStudioDraftStatus.installed,
+            verification: _verification(),
+          ),
+        ),
+      );
+      await installing;
+      expectBaselineIdentity(installController);
+      expect(installController.installPhase, FeatureStudioInstallPhase.failed);
+
+      final (reloadController, reloadGateway) = await verified();
+      final conflictedReview = reloadController.reviewAccess();
+      await pumpEventQueue();
+      reloadGateway.accessReviewCalls.single.completer.completeError(
+        const TransportException(
+          TransportErrorCode.aborted,
+          'The Draft changed.',
+        ),
+      );
+      await conflictedReview;
+      reloadGateway.loadedDraft = _draft(
+        revision: Int64(6),
+        goal: 'Substituted reload goal',
+      );
+      await reloadController.resetAuthorityReview();
+      expectBaselineIdentity(reloadController);
+      expect(
+        reloadController.loadPhase,
+        FeatureStudioLoadPhase.terminalFailure,
+      );
+    },
+  );
+
+  test(
+    'load trusts server-bound installation identity instead of the request hint',
+    () async {
+      Future<FeatureStudioController> load({
+        required FeatureStudioDraft draft,
+        String? requestedInstallationId,
+      }) async {
+        final gateway = _ControlledGateway()..loadedDraft = draft;
+        final controller = FeatureStudioController(
+          draftId: 'draft-a',
+          gateway: gateway,
+          requestedInstallationId: requestedInstallationId,
+        );
+        await controller.load();
+        return controller;
+      }
+
+      final serverBound = await load(
+        draft: _draft(installationId: 'installation-a'),
+      );
+      expect(serverBound.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(serverBound.confirmedDraft?.installationId, 'installation-a');
+
+      final mismatched = await load(
+        draft: _draft(installationId: 'installation-b'),
+        requestedInstallationId: 'installation-requested',
+      );
+      expect(mismatched.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(mismatched.confirmedDraft?.installationId, 'installation-b');
+
+      final routed = await load(
+        draft: _draft(installationId: 'installation-a'),
+        requestedInstallationId: 'installation-a',
+      );
+      expect(routed.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(routed.confirmedDraft?.installationId, 'installation-a');
+
+      final unreservedUpdate = await load(
+        draft: _draft(),
+        requestedInstallationId: 'installation-a',
+      );
+      expect(unreservedUpdate.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(unreservedUpdate.confirmedDraft?.installationId, isNull);
+    },
+  );
+
+  test(
+    'server-bound installation overrides an untrusted requested target',
+    () async {
+      const serverBoundInstallationId = 'installation-server-bound';
+      final gateway = _ControlledGateway()
+        ..loadedDraft = _draft(installationId: serverBoundInstallationId);
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        requestedInstallationId: 'installation-crafted-query',
+        idFactory: _SequenceIds().call,
+      );
+
+      await controller.load();
+
+      expect(controller.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(
+        controller.confirmedDraft?.installationId,
+        serverBoundInstallationId,
+      );
+
+      final verifying = controller.verify();
+      await pumpEventQueue();
+      final verifiedDraft = _draft(
+        revision: Int64(5),
+        installationId: serverBoundInstallationId,
+        verification: _verification(),
+      );
+      gateway.verifyCalls.single.completer.complete(
+        _passingVerificationResult(verifiedDraft),
+      );
+      await verifying;
+
+      final reviewing = controller.reviewAccess();
+      await pumpEventQueue();
+      expect(
+        gateway.accessReviewCalls.single.installationId,
+        serverBoundInstallationId,
+      );
+      gateway.accessReviewCalls.single.completer.complete(
+        _accessReview(
+          draft: verifiedDraft,
+          installationId: serverBoundInstallationId,
+        ),
+      );
+      await reviewing;
+
+      expect(
+        controller.accessReview?.installationId,
+        serverBoundInstallationId,
+      );
+      expect(controller.canApproveAndInstall, isTrue);
+    },
+  );
+
+  test('access review target drift fails closed before installation', () async {
+    const requestedInstallationId = 'installation-requested';
+    final gateway = _ControlledGateway()..loadedDraft = _draft();
+    final controller = FeatureStudioController(
+      draftId: 'draft-a',
+      gateway: gateway,
+      requestedInstallationId: requestedInstallationId,
+      idFactory: _SequenceIds().call,
+    );
+    await controller.load();
+    final verifying = controller.verify();
+    await pumpEventQueue();
+    final verifiedDraft = _draft(
+      revision: Int64(5),
+      verification: _verification(),
+    );
+    gateway.verifyCalls.single.completer.complete(
+      _passingVerificationResult(verifiedDraft),
+    );
+    await verifying;
+
+    final reviewing = controller.reviewAccess();
+    await pumpEventQueue();
+    expect(
+      gateway.accessReviewCalls.single.installationId,
+      requestedInstallationId,
+    );
+    gateway.accessReviewCalls.single.completer.complete(
+      _accessReview(
+        draft: verifiedDraft,
+        installationId: 'installation-drifted',
+      ),
+    );
+    await reviewing;
+
+    expect(controller.accessReviewPhase, FeatureStudioAccessReviewPhase.failed);
+    expect(controller.accessReview, isNull);
+    expect(controller.canApproveAndInstall, isFalse);
+    await controller.approveAndInstall();
+    expect(gateway.installCalls, isEmpty);
+  });
+
+  test(
+    'revision replies preserve the accepted installation identity',
+    () async {
+      final cases = <(String, String?, String?, String?)>[
+        ('introduces', null, null, 'installation-a'),
+        ('changes', 'installation-a', 'installation-a', 'installation-b'),
+        ('clears', 'installation-a', 'installation-a', null),
+      ];
+
+      for (final (name, routeId, baselineId, responseId) in cases) {
+        final gateway = _ControlledGateway()
+          ..loadedDraft = _draft(installationId: baselineId);
+        final controller = FeatureStudioController(
+          draftId: 'draft-a',
+          gateway: gateway,
+          requestedInstallationId: routeId,
+        );
+        await controller.load();
+        controller.reviseBehavior(_behavior('Edited Behavior'));
+        final saving = controller.saveNow();
+        await pumpEventQueue();
+        gateway.behaviorCalls.single.completer.complete(
+          _draft(
+            revision: Int64(5),
+            behavior: _behavior('Edited Behavior'),
+            installationId: responseId,
+          ),
+        );
+        await saving;
+
+        expect(
+          controller.savePhase,
+          FeatureStudioSavePhase.failed,
+          reason: name,
+        );
+        expect(controller.saveError, isA<ProtocolException>(), reason: name);
+        expect(
+          controller.confirmedDraft?.installationId,
+          baselineId,
+          reason: name,
+        );
+      }
+    },
+  );
+
   test('Reject preserves Passed verification for an exact echo', () async {
     final verification = _verification();
     final gateway = _ControlledGateway()
@@ -573,7 +943,7 @@ void main() {
     expect(controller.verification, same(verification));
   });
 
-  test('no-op Accept stales prior Passed verification', () async {
+  test('no-op Accept clears prior Passed verification', () async {
     final gateway = _ControlledGateway()
       ..loadedDraft = _draft(verification: _verification());
     final controller = FeatureStudioController(
@@ -592,7 +962,7 @@ void main() {
     gateway.acceptCalls.single.completer.complete(_draft(revision: Int64(5)));
     await acceptance;
 
-    expect(controller.verificationPhase, FeatureStudioVerificationPhase.stale);
+    expect(controller.verificationPhase, FeatureStudioVerificationPhase.idle);
   });
 
   test(
@@ -659,6 +1029,7 @@ void main() {
     final installedController = FeatureStudioController(
       draftId: 'draft-a',
       gateway: installedGateway,
+      requestedInstallationId: 'studio-id-2',
     );
     await installedController.load();
     expect(installedController.canVerify, isFalse);
@@ -687,6 +1058,7 @@ void main() {
       draftId: 'draft-a',
       gateway: gateway,
       delay: delay.call,
+      requestedInstallationId: 'studio-id-2',
     );
     await controller.load();
 
@@ -907,7 +1279,9 @@ void main() {
     expect(gateway.verifyCalls, hasLength(2));
     expect(gateway.verifyCalls.last.expectedRevision, Int64(8));
     gateway.verifyCalls.last.completer.complete(
-      _draft(revision: Int64(9), verification: _verification()),
+      _passingVerificationResult(
+        _draft(revision: Int64(9), verification: _verification()),
+      ),
     );
     await recovery;
 
@@ -931,7 +1305,9 @@ void main() {
       expect(gateway.verifyCalls.single.expectedRevision, Int64(4));
       expect(gateway.verifyCalls.single.idempotencyId, 'studio-id-1');
       gateway.verifyCalls.single.completer.complete(
-        _draft(revision: Int64(5), verification: _verification()),
+        _passingVerificationResult(
+          _draft(revision: Int64(5), verification: _verification()),
+        ),
       );
       await verification;
 
@@ -968,6 +1344,436 @@ void main() {
   });
 
   test(
+    'failed verification evidence remains inspectable but not reviewable',
+    () async {
+      final gateway = _ControlledGateway()..loadedDraft = _draft();
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+      );
+      await controller.load();
+
+      final verifying = controller.verify();
+      await pumpEventQueue();
+      gateway.verifyCalls.single.completer.complete(
+        _failedVerificationResult(),
+      );
+      await verifying;
+
+      expect(
+        controller.verificationPhase,
+        FeatureStudioVerificationPhase.failedTests,
+      );
+      expect(controller.verification?.failed, 1);
+      expect(
+        controller.verification?.scenarios.single.safeFailure,
+        'Expected a concise brief.',
+      );
+      expect(controller.version, isNull);
+      expect(controller.canReviewAccess, isFalse);
+    },
+  );
+
+  test(
+    'retryable install reuses exact authority and never repeats access review',
+    () async {
+      final gateway = _ControlledGateway()..loadedDraft = _draft();
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        idFactory: _SequenceIds().call,
+      );
+      await controller.load();
+
+      final verifying = controller.verify();
+      await pumpEventQueue();
+      gateway.verifyCalls.single.completer.complete(
+        _passingVerificationResult(
+          _draft(revision: Int64(5), verification: _verification()),
+        ),
+      );
+      await verifying;
+      expect(controller.canReviewAccess, isTrue);
+
+      final reviewing = controller.reviewAccess();
+      await pumpEventQueue();
+      final reviewCall = gateway.accessReviewCalls.single;
+      expect(reviewCall.expectedRevision, Int64(5));
+      expect(reviewCall.installationId, 'studio-id-2');
+      reviewCall.completer.complete(_accessReview());
+      await reviewing;
+      expect(controller.canApproveAndInstall, isTrue);
+
+      final installing = controller.approveAndInstall();
+      await pumpEventQueue();
+      final first = gateway.installCalls.single;
+      expect(first.decisionId, 'studio-id-3');
+      expect(first.idempotencyId, 'studio-id-4');
+      first.completer.completeError(
+        const TransportException(
+          TransportErrorCode.unavailable,
+          'Installation outcome is temporarily unavailable.',
+        ),
+      );
+      await installing;
+
+      expect(
+        controller.installPhase,
+        FeatureStudioInstallPhase.retryableFailure,
+      );
+      expect(controller.retryInstallIsSafe, isTrue);
+      final retry = controller.retryInstall();
+      await pumpEventQueue();
+      final second = gateway.installCalls.last;
+      expect(second.decisionId, first.decisionId);
+      expect(second.idempotencyId, first.idempotencyId);
+      expect(second.review, same(first.review));
+      expect(gateway.accessReviewCalls, hasLength(1));
+      second.completer.complete(_installSuccess());
+      await retry;
+
+      expect(controller.installPhase, FeatureStudioInstallPhase.succeeded);
+      expect(controller.installSuccess?.rollbackAvailable, isTrue);
+      expect(
+        controller.confirmedDraft?.status,
+        FeatureStudioDraftStatus.installed,
+      );
+    },
+  );
+
+  test(
+    'requested installation target and terminal authority failures recover through explicit reset',
+    () async {
+      const installationId = 'installation-existing';
+      const denied = TransportException(
+        TransportErrorCode.permissionDenied,
+        'This action is not permitted.',
+      );
+      final gateway = _ControlledGateway()..loadedDraft = _draft();
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        requestedInstallationId: installationId,
+        idFactory: _SequenceIds().call,
+      );
+      await controller.load();
+      final verifying = controller.verify();
+      await pumpEventQueue();
+      gateway.verifyCalls.single.completer.complete(
+        _passingVerificationResult(
+          _draft(revision: Int64(5), verification: _verification()),
+        ),
+      );
+      await verifying;
+
+      final deniedReview = controller.reviewAccess();
+      await pumpEventQueue();
+      expect(gateway.accessReviewCalls.single.installationId, installationId);
+      gateway.accessReviewCalls.single.completer.completeError(denied);
+      await deniedReview;
+      expect(
+        controller.accessReviewPhase,
+        FeatureStudioAccessReviewPhase.failed,
+      );
+      expect(controller.canReviewAccess, isFalse);
+
+      controller.resetAuthorityReview();
+      expect(controller.accessReviewPhase, FeatureStudioAccessReviewPhase.idle);
+      expect(controller.canReviewAccess, isTrue);
+      final reviewed = controller.reviewAccess();
+      await pumpEventQueue();
+      expect(gateway.accessReviewCalls.last.installationId, installationId);
+      gateway.accessReviewCalls.last.completer.complete(
+        _accessReview(installationId: installationId),
+      );
+      await reviewed;
+
+      final deniedInstall = controller.approveAndInstall();
+      await pumpEventQueue();
+      gateway.installCalls.single.completer.completeError(denied);
+      await deniedInstall;
+      expect(controller.installPhase, FeatureStudioInstallPhase.failed);
+
+      controller.resetAuthorityReview();
+      expect(controller.installPhase, FeatureStudioInstallPhase.idle);
+      expect(controller.accessReview, isNull);
+      expect(controller.canReviewAccess, isTrue);
+      final reviewedAgain = controller.reviewAccess();
+      await pumpEventQueue();
+      expect(gateway.accessReviewCalls.last.installationId, installationId);
+      gateway.accessReviewCalls.last.completer.complete(
+        _accessReview(installationId: installationId),
+      );
+      await reviewedAgain;
+      expect(controller.canApproveAndInstall, isTrue);
+    },
+  );
+
+  test(
+    'accepted edit clears every governed result and install intent',
+    () async {
+      final gateway = _ControlledGateway()..loadedDraft = _draft();
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        idFactory: _SequenceIds().call,
+      );
+      await controller.load();
+      final verifying = controller.verify();
+      await pumpEventQueue();
+      gateway.verifyCalls.single.completer.complete(
+        _passingVerificationResult(
+          _draft(revision: Int64(5), verification: _verification()),
+        ),
+      );
+      await verifying;
+      final reviewing = controller.reviewAccess();
+      await pumpEventQueue();
+      gateway.accessReviewCalls.single.completer.complete(_accessReview());
+      await reviewing;
+      final installing = controller.approveAndInstall();
+      await pumpEventQueue();
+      gateway.installCalls.single.completer.completeError(
+        const TransportException(
+          TransportErrorCode.unavailable,
+          'Installation outcome is temporarily unavailable.',
+        ),
+      );
+      await installing;
+
+      controller.reviseBehavior(_behavior('Accepted Behavior edit'));
+      expect(controller.verification, isNull);
+      expect(controller.version, isNull);
+      expect(controller.accessReview, isNull);
+      expect(controller.installSuccess, isNull);
+      expect(controller.installPhase, FeatureStudioInstallPhase.idle);
+      expect(controller.retryInstallIsSafe, isFalse);
+      expect(
+        controller.verificationPhase,
+        FeatureStudioVerificationPhase.stale,
+      );
+      final saving = controller.saveNow();
+      await pumpEventQueue();
+      gateway.behaviorCalls.single.completer.complete(
+        _draft(
+          revision: Int64(6),
+          behavior: _behavior('Accepted Behavior edit'),
+        ),
+      );
+      await saving;
+
+      expect(controller.verification, isNull);
+      expect(controller.version, isNull);
+      expect(controller.accessReview, isNull);
+      expect(controller.installSuccess, isNull);
+      expect(controller.installPhase, FeatureStudioInstallPhase.idle);
+      expect(controller.retryInstallIsSafe, isFalse);
+      expect(controller.verificationPhase, FeatureStudioVerificationPhase.idle);
+    },
+  );
+
+  test(
+    'authority conflicts reload the Draft before another review can start',
+    () async {
+      for (final conflictDuringInstall in [false, true]) {
+        final gateway = _ControlledGateway()..loadedDraft = _draft();
+        final controller = FeatureStudioController(
+          draftId: 'draft-a',
+          gateway: gateway,
+          idFactory: _SequenceIds().call,
+        );
+        await controller.load();
+        final verifying = controller.verify();
+        await pumpEventQueue();
+        gateway.verifyCalls.single.completer.complete(
+          _passingVerificationResult(
+            _draft(revision: Int64(5), verification: _verification()),
+          ),
+        );
+        await verifying;
+
+        final reviewing = controller.reviewAccess();
+        await pumpEventQueue();
+        if (conflictDuringInstall) {
+          gateway.accessReviewCalls.single.completer.complete(_accessReview());
+          await reviewing;
+          final installing = controller.approveAndInstall();
+          await pumpEventQueue();
+          gateway.installCalls.single.completer.completeError(
+            const PreconditionException('The authority coordinate is stale.'),
+          );
+          await installing;
+        } else {
+          gateway.accessReviewCalls.single.completer.completeError(
+            const TransportException(
+              TransportErrorCode.aborted,
+              'The Draft changed.',
+            ),
+          );
+          await reviewing;
+        }
+
+        gateway.loadedDraft = _draft(revision: Int64(6));
+        await controller.resetAuthorityReview();
+
+        expect(gateway.loadCalls, 2);
+        expect(controller.confirmedDraft?.revision, Int64(6));
+        expect(controller.verification, isNull);
+        expect(controller.version, isNull);
+        expect(controller.canReviewAccess, isFalse);
+      }
+    },
+  );
+
+  test(
+    'ambiguous install protocol failure reloads authority before another mutation',
+    () async {
+      final gateway = _ControlledGateway()..loadedDraft = _draft();
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        idFactory: _SequenceIds().call,
+      );
+      await controller.load();
+      final verifying = controller.verify();
+      await pumpEventQueue();
+      gateway.verifyCalls.single.completer.complete(
+        _passingVerificationResult(
+          _draft(revision: Int64(5), verification: _verification()),
+        ),
+      );
+      await verifying;
+      final reviewing = controller.reviewAccess();
+      await pumpEventQueue();
+      gateway.accessReviewCalls.single.completer.complete(_accessReview());
+      await reviewing;
+      final installing = controller.approveAndInstall();
+      await pumpEventQueue();
+      gateway.installCalls.single.completer.completeError(
+        const ProtocolException('Installation reply was not trustworthy.'),
+      );
+      await installing;
+
+      expect(controller.installPhase, FeatureStudioInstallPhase.failed);
+      gateway.loadedDraft = _draft(
+        revision: Int64(6),
+        status: FeatureStudioDraftStatus.installed,
+        verification: _verification(),
+      );
+      await controller.resetAuthorityReview();
+
+      expect(gateway.loadCalls, 2);
+      expect(
+        controller.confirmedDraft?.status,
+        FeatureStudioDraftStatus.installed,
+      );
+      expect(controller.accessReview, isNull);
+      expect(controller.canReviewAccess, isFalse);
+      await controller.reviewAccess();
+      await controller.approveAndInstall();
+      expect(gateway.accessReviewCalls, hasLength(1));
+      expect(gateway.installCalls, hasLength(1));
+    },
+  );
+
+  test(
+    'reserved recovery retries exact install identity without another review',
+    () async {
+      final recovery = _installationRecovery(installed: false);
+      final gateway = _ControlledGateway()
+        ..loadedDraft = _draft(
+          revision: Int64(5),
+          installationRecovery: recovery,
+        );
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        idFactory: _SequenceIds().call,
+      );
+
+      await controller.load();
+
+      expect(controller.verification, same(recovery.verification));
+      expect(
+        controller.verificationPhase,
+        FeatureStudioVerificationPhase.passed,
+      );
+      expect(
+        controller.accessReviewPhase,
+        FeatureStudioAccessReviewPhase.ready,
+      );
+      expect(
+        controller.installPhase,
+        FeatureStudioInstallPhase.retryableFailure,
+      );
+      expect(controller.retryInstallIsSafe, isTrue);
+      final retry = controller.retryInstall();
+      await pumpEventQueue();
+      final call = gateway.installCalls.single;
+      expect(call.expectedRevision, Int64(5));
+      expect(call.decisionId, 'decision-recovered');
+      expect(call.idempotencyId, 'install-recovered');
+      expect(call.review.installationId, 'studio-id-2');
+      expect(call.review.grants, orderedEquals(recovery.grants));
+      expect(call.review.subscriptions, orderedEquals(recovery.subscriptions));
+      expect(gateway.accessReviewCalls, isEmpty);
+      call.completer.complete(_installSuccess());
+      await retry;
+
+      expect(controller.installPhase, FeatureStudioInstallPhase.succeeded);
+      expect(gateway.accessReviewCalls, isEmpty);
+    },
+  );
+
+  test(
+    'protocol reset reconciles an installed recovery into full success state',
+    () async {
+      final gateway = _ControlledGateway()
+        ..loadedDraft = _draft(
+          revision: Int64(5),
+          installationRecovery: _installationRecovery(installed: false),
+        );
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+      );
+      await controller.load();
+      final retry = controller.retryInstall();
+      await pumpEventQueue();
+      gateway.installCalls.single.completer.completeError(
+        const ProtocolException('Installation reply was not trustworthy.'),
+      );
+      await retry;
+
+      final recovery = _installationRecovery(installed: true);
+      gateway.loadedDraft = _draft(
+        revision: Int64(6),
+        status: FeatureStudioDraftStatus.installed,
+        installationRecovery: recovery,
+      );
+      await controller.resetAuthorityReview();
+
+      expect(gateway.loadCalls, 2);
+      expect(controller.verification, same(recovery.verification));
+      expect(controller.version, same(recovery.version));
+      expect(
+        controller.accessReview?.previousVersion,
+        same(recovery.previousVersion),
+      );
+      expect(controller.installPhase, FeatureStudioInstallPhase.succeeded);
+      expect(controller.installSuccess?.draft, same(gateway.loadedDraft));
+      expect(controller.installSuccess?.rollbackAvailable, isTrue);
+      expect(
+        controller.installSuccess?.originalRequest.operationId,
+        'operation-a',
+      );
+      expect(controller.retryInstallIsSafe, isFalse);
+      expect(gateway.accessReviewCalls, isEmpty);
+      expect(gateway.installCalls, hasLength(1));
+    },
+  );
+
+  test(
     'edits during Verify stale its result and save from the reply revision',
     () async {
       final delay = _ManualDelay();
@@ -986,7 +1792,9 @@ void main() {
       controller.reviseSource(editedSource);
       expect(gateway.sourceCalls, isEmpty);
       gateway.verifyCalls.single.completer.complete(
-        _draft(revision: Int64(5), verification: _verification()),
+        _passingVerificationResult(
+          _draft(revision: Int64(5), verification: _verification()),
+        ),
       );
       await pumpEventQueue();
 
@@ -1036,7 +1844,9 @@ void main() {
       expect(second.expectedRevision, first.expectedRevision);
       expect(second.idempotencyId, first.idempotencyId);
       second.completer.complete(
-        _draft(revision: Int64(5), verification: _verification()),
+        _passingVerificationResult(
+          _draft(revision: Int64(5), verification: _verification()),
+        ),
       );
       await retry;
 
@@ -1082,6 +1892,588 @@ void main() {
       await phaseFor(const AuthenticationException()),
       FeatureStudioLoadPhase.authenticationRequired,
     );
+  });
+
+  test('only FailedPrecondition load exposes pending install reset', () async {
+    Future<(FeatureStudioLoadPhase, bool)> stateFor(
+      TransportException error,
+    ) async {
+      final gateway = _ControlledGateway()
+        ..loadError = error
+        ..loadedDraft = _draft();
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+      );
+      await controller.load();
+      return (controller.loadPhase, controller.canResetPendingInstall);
+    }
+
+    expect(await stateFor(const PreconditionException('The plan is stale.')), (
+      FeatureStudioLoadPhase.pendingInstallResetRequired,
+      true,
+    ));
+    expect(
+      await stateFor(
+        const ProtocolException('The response is not trustworthy.'),
+      ),
+      (FeatureStudioLoadPhase.terminalFailure, false),
+    );
+    expect(
+      await stateFor(
+        const TransportException(
+          TransportErrorCode.permissionDenied,
+          'Not permitted.',
+        ),
+      ),
+      (FeatureStudioLoadPhase.terminalFailure, false),
+    );
+    expect(
+      await stateFor(
+        const TransportException(TransportErrorCode.notFound, 'Not found.'),
+      ),
+      (FeatureStudioLoadPhase.notFound, false),
+    );
+    expect(
+      await stateFor(
+        const TransportException(
+          TransportErrorCode.unavailable,
+          'Unavailable.',
+        ),
+      ),
+      (FeatureStudioLoadPhase.retryableFailure, false),
+    );
+  });
+
+  test('confirmed pending install reset fences exit until durable', () async {
+    final gateway = _ControlledGateway()
+      ..loadError = const PreconditionException('The plan is stale.')
+      ..loadedDraft = _draft();
+    final controller = FeatureStudioController(
+      draftId: 'draft-a',
+      gateway: gateway,
+      idFactory: _SequenceIds().call,
+    );
+    await controller.load();
+    gateway.loadError = null;
+
+    final reset = controller.resetPendingInstall();
+    await pumpEventQueue();
+
+    expect(controller.pendingInstallResetUnresolved, isTrue);
+    expect(controller.hasUnresolvedMutation, isTrue);
+    gateway.resetPendingInstallCalls.single.completer.complete(
+      _draft(revision: Int64.ONE),
+    );
+    await reset;
+
+    expect(controller.pendingInstallResetUnresolved, isFalse);
+    expect(controller.hasUnresolvedMutation, isFalse);
+  });
+
+  test('pending install reset is singular and requires Verify again', () async {
+    final recovery = _installationRecovery(
+      installed: false,
+      hasPreviousVersion: false,
+    );
+    final gateway = _ControlledGateway()
+      ..loadedDraft = _draft(
+        revision: Int64(5),
+        installationRecovery: recovery,
+      );
+    final controller = FeatureStudioController(
+      draftId: 'draft-a',
+      gateway: gateway,
+      idFactory: _SequenceIds().call,
+    );
+    await controller.load();
+    expect(controller.verification, isNotNull);
+    expect(controller.version, isNotNull);
+    expect(controller.accessReview, isNotNull);
+    expect(controller.installPhase, FeatureStudioInstallPhase.retryableFailure);
+    gateway.loadError = const PreconditionException('The plan is stale.');
+    await controller.load();
+    gateway.loadError = null;
+
+    final reset = controller.resetPendingInstall();
+    await pumpEventQueue();
+    final duplicate = controller.resetPendingInstall();
+
+    expect(controller.pendingInstallResetInFlight, isTrue);
+    expect(controller.hasUnresolvedMutation, isTrue);
+    expect(controller.canResetPendingInstall, isFalse);
+    expect(gateway.resetPendingInstallCalls, hasLength(1));
+    expect(gateway.resetPendingInstallCalls.single.draftId, 'draft-a');
+    expect(
+      gateway.resetPendingInstallCalls.single.idempotencyId,
+      'studio-id-1',
+    );
+    gateway.resetPendingInstallCalls.single.completer.complete(
+      _draft(revision: Int64(6)),
+    );
+    await Future.wait([reset, duplicate]);
+
+    expect(controller.pendingInstallResetInFlight, isFalse);
+    expect(controller.hasUnresolvedMutation, isFalse);
+    expect(controller.loadPhase, FeatureStudioLoadPhase.ready);
+    expect(controller.savePhase, FeatureStudioSavePhase.saved);
+    expect(controller.confirmedDraft?.revision, Int64(6));
+    expect(controller.confirmedDraft?.installationId, isNull);
+    expect(controller.confirmedDraft?.installationRecovery, isNull);
+    expect(controller.verification, isNull);
+    expect(controller.version, isNull);
+    expect(controller.accessReview, isNull);
+    expect(controller.installSuccess, isNull);
+    expect(controller.verificationPhase, FeatureStudioVerificationPhase.idle);
+    expect(controller.accessReviewPhase, FeatureStudioAccessReviewPhase.idle);
+    expect(controller.installPhase, FeatureStudioInstallPhase.idle);
+    expect(controller.canVerify, isTrue);
+    expect(controller.canReviewAccess, isFalse);
+  });
+
+  test(
+    'server-confirmed update reset preserves its identity through re-verification',
+    () async {
+      const installationId = 'installation-existing';
+      final gateway = _ControlledGateway()
+        ..loadError = const PreconditionException('The plan is stale.')
+        ..loadedDraft = _draft();
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        requestedInstallationId: installationId,
+        idFactory: _SequenceIds().call,
+      );
+      await controller.load();
+
+      final reset = controller.resetPendingInstall();
+      await pumpEventQueue();
+      final resetDraft = _draft(
+        revision: Int64.ONE,
+        installationId: installationId,
+      );
+      gateway.resetPendingInstallCalls.single.completer.complete(resetDraft);
+      await reset;
+
+      expect(controller.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(controller.confirmedDraft?.installationId, installationId);
+      expect(controller.verification, isNull);
+      expect(controller.canVerify, isTrue);
+
+      final verifying = controller.verify();
+      await pumpEventQueue();
+      final verifiedDraft = _draft(
+        revision: Int64(2),
+        installationId: installationId,
+        verification: _verification(),
+      );
+      gateway.verifyCalls.single.completer.complete(
+        _passingVerificationResult(verifiedDraft),
+      );
+      await verifying;
+
+      final reviewing = controller.reviewAccess();
+      await pumpEventQueue();
+      expect(gateway.accessReviewCalls.single.installationId, installationId);
+      gateway.accessReviewCalls.single.completer.complete(
+        _accessReview(draft: verifiedDraft, installationId: installationId),
+      );
+      await reviewing;
+    },
+  );
+
+  test(
+    'requested target never constrains the authoritative reset response',
+    () async {
+      for (final (name, installationId) in <(String, String?)>[
+        ('missing', null),
+        ('different', 'installation-other'),
+      ]) {
+        final gateway = _ControlledGateway()
+          ..loadError = const PreconditionException('The plan is stale.')
+          ..loadedDraft = _draft();
+        final controller = FeatureStudioController(
+          draftId: 'draft-a',
+          gateway: gateway,
+          requestedInstallationId: 'installation-existing',
+        );
+        await controller.load();
+
+        final reset = controller.resetPendingInstall();
+        await pumpEventQueue();
+        gateway.resetPendingInstallCalls.single.completer.complete(
+          _draft(revision: Int64.ONE, installationId: installationId),
+        );
+        await reset;
+
+        expect(
+          controller.loadPhase,
+          FeatureStudioLoadPhase.ready,
+          reason: name,
+        );
+        expect(
+          controller.confirmedDraft?.installationId,
+          installationId,
+          reason: name,
+        );
+      }
+    },
+  );
+
+  test('cold-start reset requires a positive authoritative revision', () async {
+    final gateway = _ControlledGateway()
+      ..loadError = const PreconditionException('The plan is stale.')
+      ..loadedDraft = _draft();
+    final controller = FeatureStudioController(
+      draftId: 'draft-a',
+      gateway: gateway,
+    );
+    await controller.load();
+
+    final reset = controller.resetPendingInstall();
+    await pumpEventQueue();
+    gateway.resetPendingInstallCalls.single.completer.complete(
+      _draft(revision: Int64.ZERO),
+    );
+    await reset;
+
+    expect(controller.loadPhase, FeatureStudioLoadPhase.terminalFailure);
+    expect(controller.loadError, isA<ProtocolException>());
+  });
+
+  test('cold-start reset accepts a server-bound update identity', () async {
+    final gateway = _ControlledGateway()
+      ..loadError = const PreconditionException('The plan is stale.')
+      ..loadedDraft = _draft();
+    final controller = FeatureStudioController(
+      draftId: 'draft-a',
+      gateway: gateway,
+    );
+    await controller.load();
+
+    final reset = controller.resetPendingInstall();
+    await pumpEventQueue();
+    gateway.resetPendingInstallCalls.single.completer.complete(
+      _draft(revision: Int64.ONE, installationId: 'installation-existing'),
+    );
+    await reset;
+
+    expect(controller.loadPhase, FeatureStudioLoadPhase.ready);
+    expect(controller.confirmedDraft?.installationId, 'installation-existing');
+  });
+
+  test(
+    'loaded update recovery establishes the server-bound reset anchor',
+    () async {
+      final gateway = _ControlledGateway()
+        ..loadedDraft = _draft(
+          revision: Int64(5),
+          installationRecovery: _installationRecovery(installed: false),
+        );
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+      );
+      await controller.load();
+      gateway.loadError = const PreconditionException('The plan is stale.');
+      await controller.load();
+
+      final reset = controller.resetPendingInstall();
+      await pumpEventQueue();
+      gateway.resetPendingInstallCalls.single.completer.complete(
+        _draft(revision: Int64(6), installationId: 'studio-id-2'),
+      );
+      await reset;
+
+      expect(controller.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(controller.confirmedDraft?.installationId, 'studio-id-2');
+    },
+  );
+
+  test('unauthenticated reset fails directly without reconciliation', () async {
+    final gateway = _ControlledGateway()..loadedDraft = _draft();
+    final controller = FeatureStudioController(
+      draftId: 'draft-a',
+      gateway: gateway,
+    );
+    await controller.load();
+    gateway.loadError = const PreconditionException('The plan is stale.');
+    await controller.load();
+    gateway.loadError = null;
+
+    final reset = controller.resetPendingInstall();
+    await pumpEventQueue();
+    gateway.resetPendingInstallCalls.single.completer.completeError(
+      const AuthenticationException(),
+    );
+    await reset;
+
+    expect(gateway.loadCalls, 2);
+    expect(controller.loadPhase, FeatureStudioLoadPhase.authenticationRequired);
+    expect(controller.loadError, isA<AuthenticationException>());
+  });
+
+  test(
+    'uncertain pending install reset reconciles ready through one read',
+    () async {
+      final gateway = _ControlledGateway()
+        ..loadedDraft = _draft(
+          revision: Int64(5),
+          installationRecovery: _installationRecovery(installed: false),
+        );
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        idFactory: _SequenceIds().call,
+      );
+      await controller.load();
+      gateway.loadError = const PreconditionException('The plan is stale.');
+      await controller.load();
+      gateway
+        ..loadError = null
+        ..loadedDraft = _draft(
+          revision: Int64(6),
+          installationId: 'studio-id-2',
+        );
+
+      final reset = controller.resetPendingInstall();
+      await pumpEventQueue();
+      gateway.resetPendingInstallCalls.single.completer.completeError(
+        const TransportException(
+          TransportErrorCode.unavailable,
+          'The reset response was lost.',
+        ),
+      );
+      await reset;
+
+      expect(gateway.resetPendingInstallCalls, hasLength(1));
+      expect(gateway.loadCalls, 3);
+      expect(controller.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(controller.confirmedDraft?.revision, Int64(6));
+      expect(controller.verification, isNull);
+      expect(controller.canVerify, isTrue);
+    },
+  );
+
+  test(
+    'uncertain new install reset reconciliation allocates a fresh identity',
+    () async {
+      final ids = <String>['reset-id', 'verify-id', 'fresh-installation'];
+      var nextId = 0;
+      final gateway = _ControlledGateway()
+        ..loadedDraft = _draft(
+          revision: Int64(5),
+          installationRecovery: _installationRecovery(
+            installed: false,
+            hasPreviousVersion: false,
+          ),
+        );
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        idFactory: () => ids[nextId++],
+      );
+      await controller.load();
+      gateway.loadError = const PreconditionException('The plan is stale.');
+      await controller.load();
+      gateway
+        ..loadError = null
+        ..loadedDraft = _draft(revision: Int64(6));
+
+      final reset = controller.resetPendingInstall();
+      await pumpEventQueue();
+      gateway.resetPendingInstallCalls.single.completer.completeError(
+        const TransportException(
+          TransportErrorCode.unavailable,
+          'The reset response was lost.',
+        ),
+      );
+      await reset;
+
+      final verifying = controller.verify();
+      await pumpEventQueue();
+      final verifiedDraft = _draft(
+        revision: Int64(7),
+        verification: _verification(),
+      );
+      gateway.verifyCalls.single.completer.complete(
+        _passingVerificationResult(verifiedDraft),
+      );
+      await verifying;
+
+      final reviewing = controller.reviewAccess();
+      await pumpEventQueue();
+      expect(
+        gateway.accessReviewCalls.single.installationId,
+        'fresh-installation',
+      );
+      gateway.accessReviewCalls.single.completer.complete(
+        _accessReview(
+          draft: verifiedDraft,
+          installationId: 'fresh-installation',
+        ),
+      );
+      await reviewing;
+    },
+  );
+
+  test(
+    'reset-required reconciliation reuses one reset id after confirmation',
+    () async {
+      final gateway = _ControlledGateway()
+        ..loadedDraft = _draft(
+          revision: Int64(5),
+          installationRecovery: _installationRecovery(installed: false),
+        );
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+        idFactory: _SequenceIds().call,
+      );
+      await controller.load();
+      gateway.loadError = const PreconditionException('The plan is stale.');
+      await controller.load();
+
+      final firstReset = controller.resetPendingInstall();
+      await pumpEventQueue();
+      final firstId = gateway.resetPendingInstallCalls.single.idempotencyId;
+      gateway.resetPendingInstallCalls.single.completer.completeError(
+        const TransportException(
+          TransportErrorCode.unavailable,
+          'The reset response was lost.',
+        ),
+      );
+      await firstReset;
+
+      expect(gateway.loadCalls, 3);
+      expect(
+        controller.loadPhase,
+        FeatureStudioLoadPhase.pendingInstallResetRequired,
+      );
+      expect(gateway.resetPendingInstallCalls, hasLength(1));
+
+      gateway.loadError = null;
+      final secondReset = controller.resetPendingInstall();
+      await pumpEventQueue();
+      expect(gateway.resetPendingInstallCalls, hasLength(2));
+      expect(gateway.resetPendingInstallCalls.last.idempotencyId, firstId);
+      gateway.resetPendingInstallCalls.last.completer.complete(
+        _draft(revision: Int64(6), installationId: 'studio-id-2'),
+      );
+      await secondReset;
+
+      expect(controller.loadPhase, FeatureStudioLoadPhase.ready);
+      expect(controller.confirmedDraft?.revision, Int64(6));
+    },
+  );
+
+  test(
+    'uncertain reset reconciliation rejects governed ready replies',
+    () async {
+      final responses = <(String, FeatureStudioDraft)>[
+        (
+          'verification',
+          _draft(revision: Int64(6), verification: _verification()),
+        ),
+        (
+          'installation recovery',
+          _draft(
+            revision: Int64(6),
+            installationRecovery: _installationRecovery(installed: false),
+          ),
+        ),
+      ];
+
+      for (final (name, response) in responses) {
+        final gateway = _ControlledGateway()
+          ..loadedDraft = _draft(
+            revision: Int64(5),
+            installationRecovery: _installationRecovery(installed: false),
+          );
+        final controller = FeatureStudioController(
+          draftId: 'draft-a',
+          gateway: gateway,
+          idFactory: _SequenceIds().call,
+        );
+        await controller.load();
+        gateway.loadError = const PreconditionException('The plan is stale.');
+        await controller.load();
+        gateway
+          ..loadError = null
+          ..loadedDraft = response;
+
+        final reset = controller.resetPendingInstall();
+        await pumpEventQueue();
+        gateway.resetPendingInstallCalls.single.completer.completeError(
+          const TransportException(
+            TransportErrorCode.unavailable,
+            'The reset response was lost.',
+          ),
+        );
+        await reset;
+
+        expect(gateway.loadCalls, 3, reason: name);
+        expect(
+          controller.loadPhase,
+          FeatureStudioLoadPhase.terminalFailure,
+          reason: name,
+        );
+        expect(controller.loadError, isA<ProtocolException>(), reason: name);
+        expect(controller.canResetPendingInstall, isFalse, reason: name);
+      }
+    },
+  );
+
+  test('pending install reset rejects invalid Draft responses', () async {
+    final responses = <(String, FeatureStudioDraft)>[
+      ('different Draft', _draft(draftId: 'draft-b', revision: Int64(5))),
+      (
+        'installed status',
+        _draft(revision: Int64(5), status: FeatureStudioDraftStatus.installed),
+      ),
+      (
+        'verification',
+        _draft(revision: Int64(5), verification: _verification()),
+      ),
+      (
+        'installation recovery',
+        _draft(
+          revision: Int64(5),
+          installationRecovery: _installationRecovery(installed: false),
+        ),
+      ),
+      (
+        'changed immutable metadata',
+        _draft(revision: Int64(5), goal: 'Changed goal'),
+      ),
+      ('revision not advanced', _draft()),
+    ];
+
+    for (final (name, response) in responses) {
+      final gateway = _ControlledGateway()..loadedDraft = _draft();
+      final controller = FeatureStudioController(
+        draftId: 'draft-a',
+        gateway: gateway,
+      );
+      await controller.load();
+      gateway
+        ..loadError = const PreconditionException('The plan is stale.')
+        ..loadedDraft = response;
+      await controller.load();
+
+      final reset = controller.resetPendingInstall();
+      await pumpEventQueue();
+      gateway.resetPendingInstallCalls.single.completer.complete(response);
+      await reset;
+
+      expect(
+        controller.loadPhase,
+        FeatureStudioLoadPhase.terminalFailure,
+        reason: name,
+      );
+      expect(controller.loadError, isA<ProtocolException>(), reason: name);
+      expect(controller.canResetPendingInstall, isFalse, reason: name);
+    }
   });
 
   test(
@@ -1306,7 +2698,7 @@ void main() {
     );
     await recovery;
 
-    expect(controller.verificationPhase, FeatureStudioVerificationPhase.stale);
+    expect(controller.verificationPhase, FeatureStudioVerificationPhase.idle);
     expect(controller.savePhase, FeatureStudioSavePhase.saved);
   });
 
@@ -1371,7 +2763,7 @@ void main() {
     );
     expect(controller.source, _lastSuggestion.replacementSource);
     expect(controller.suggestionPhase, FeatureStudioSuggestionPhase.stale);
-    expect(controller.verificationPhase, FeatureStudioVerificationPhase.stale);
+    expect(controller.verificationPhase, FeatureStudioVerificationPhase.idle);
   });
 
   test('Aborted Reject recovery preserves edits made after decision', () async {
@@ -1415,7 +2807,7 @@ void main() {
 
     expect(controller.suggestionPhase, FeatureStudioSuggestionPhase.stale);
     expect(controller.savePhase, FeatureStudioSavePhase.saved);
-    expect(controller.verificationPhase, FeatureStudioVerificationPhase.stale);
+    expect(controller.verificationPhase, FeatureStudioVerificationPhase.idle);
   });
 
   test(
@@ -1693,7 +3085,9 @@ void main() {
     expect(replay.expectedRevision, first.expectedRevision);
     expect(replay.idempotencyId, first.idempotencyId);
     replay.completer.complete(
-      _draft(revision: Int64(5), verification: _verification()),
+      _passingVerificationResult(
+        _draft(revision: Int64(5), verification: _verification()),
+      ),
     );
     await retry;
 
@@ -1729,7 +3123,7 @@ void main() {
     await verification;
 
     expect(controller.savePhase, FeatureStudioSavePhase.saved);
-    expect(controller.verificationPhase, FeatureStudioVerificationPhase.stale);
+    expect(controller.verificationPhase, FeatureStudioVerificationPhase.idle);
   });
 
   test('transient Accept response survives a later edit and revert', () async {
@@ -1875,7 +3269,9 @@ void main() {
     expect(replay.expectedRevision, first.expectedRevision);
     expect(replay.idempotencyId, first.idempotencyId);
     replay.completer.complete(
-      _draft(revision: Int64(5), verification: _verification()),
+      _passingVerificationResult(
+        _draft(revision: Int64(5), verification: _verification()),
+      ),
     );
     await retry;
 
@@ -2075,6 +3471,48 @@ class _VerifyCall {
 
   final Int64 expectedRevision;
   final String idempotencyId;
+  final Completer<FeatureStudioVerificationResult> completer;
+}
+
+class _AccessReviewCall {
+  _AccessReviewCall({
+    required this.expectedRevision,
+    required this.installationId,
+    required this.version,
+    required this.completer,
+  });
+
+  final Int64 expectedRevision;
+  final String installationId;
+  final FeatureStudioVersion version;
+  final Completer<FeatureStudioAccessReview> completer;
+}
+
+class _InstallCall {
+  _InstallCall({
+    required this.expectedRevision,
+    required this.decisionId,
+    required this.idempotencyId,
+    required this.review,
+    required this.completer,
+  });
+
+  final Int64 expectedRevision;
+  final String decisionId;
+  final String idempotencyId;
+  final FeatureStudioAccessReview review;
+  final Completer<FeatureStudioInstallSuccess> completer;
+}
+
+class _ResetPendingInstallCall {
+  const _ResetPendingInstallCall({
+    required this.draftId,
+    required this.idempotencyId,
+    required this.completer,
+  });
+
+  final String draftId;
+  final String idempotencyId;
   final Completer<FeatureStudioDraft> completer;
 }
 
@@ -2095,6 +3533,9 @@ class _ControlledGateway implements FeatureStudioGateway {
   final List<_DecisionCall> acceptCalls = [];
   final List<_DecisionCall> rejectCalls = [];
   final List<_VerifyCall> verifyCalls = [];
+  final List<_AccessReviewCall> accessReviewCalls = [];
+  final List<_InstallCall> installCalls = [];
+  final List<_ResetPendingInstallCall> resetPendingInstallCalls = [];
 
   @override
   Future<FeatureStudioDraft> loadDraft(String draftId) async {
@@ -2102,6 +3543,22 @@ class _ControlledGateway implements FeatureStudioGateway {
     if (loadError case final error?) throw error;
     if (pendingLoad case final pending?) return pending.future;
     return loadedDraft;
+  }
+
+  @override
+  Future<FeatureStudioDraft> resetPendingInstall({
+    required String draftId,
+    required String idempotencyId,
+  }) {
+    final completer = Completer<FeatureStudioDraft>();
+    resetPendingInstallCalls.add(
+      _ResetPendingInstallCall(
+        draftId: draftId,
+        idempotencyId: idempotencyId,
+        completer: completer,
+      ),
+    );
+    return completer.future;
   }
 
   @override
@@ -2207,14 +3664,14 @@ class _ControlledGateway implements FeatureStudioGateway {
   }
 
   @override
-  Future<FeatureStudioDraft> verifyDraft({
+  Future<FeatureStudioVerificationResult> verifyDraft({
     required String draftId,
     required Int64 expectedRevision,
     required String idempotencyId,
     required FeatureStudioBehavior expectedBehavior,
     required FeatureStudioSource expectedSource,
   }) {
-    final completer = Completer<FeatureStudioDraft>();
+    final completer = Completer<FeatureStudioVerificationResult>();
     verifyCalls.add(
       _VerifyCall(
         expectedRevision: expectedRevision,
@@ -2224,29 +3681,86 @@ class _ControlledGateway implements FeatureStudioGateway {
     );
     return completer.future;
   }
+
+  @override
+  Future<FeatureStudioAccessReview> reviewAccess({
+    required String draftId,
+    required Int64 expectedRevision,
+    required FeatureStudioDraft expectedDraft,
+    required String installationId,
+    required FeatureStudioVersion version,
+    required FeatureStudioVerification expectedVerification,
+    required FeatureStudioBehavior expectedBehavior,
+    required FeatureStudioSource expectedSource,
+  }) {
+    final completer = Completer<FeatureStudioAccessReview>();
+    accessReviewCalls.add(
+      _AccessReviewCall(
+        expectedRevision: expectedRevision,
+        installationId: installationId,
+        version: version,
+        completer: completer,
+      ),
+    );
+    return completer.future;
+  }
+
+  @override
+  Future<FeatureStudioInstallSuccess> installVersion({
+    required FeatureStudioAccessReview review,
+    required Int64 expectedRevision,
+    required String decisionId,
+    required String idempotencyId,
+    required FeatureStudioBehavior expectedBehavior,
+    required FeatureStudioSource expectedSource,
+  }) {
+    final completer = Completer<FeatureStudioInstallSuccess>();
+    installCalls.add(
+      _InstallCall(
+        expectedRevision: expectedRevision,
+        decisionId: decisionId,
+        idempotencyId: idempotencyId,
+        review: review,
+        completer: completer,
+      ),
+    );
+    return completer.future;
+  }
 }
 
 FeatureStudioDraft _draft({
+  String draftId = 'draft-a',
   Int64? revision,
   FeatureStudioBehavior? behavior,
   FeatureStudioSource? source,
   FeatureStudioDraftStatus status = FeatureStudioDraftStatus.draft,
+  String? installationId,
   FeatureStudioVerification? verification,
+  FeatureStudioOriginatingRequest? originatingRequest,
+  String goal = 'Create a concise company brief',
+  DateTime? createdAt,
+  FeatureStudioInstallationRecovery? installationRecovery,
 }) => FeatureStudioDraft(
-  draftId: 'draft-a',
-  originatingRequest: const FeatureStudioOriginatingRequest(
-    operationId: 'operation-a',
-    conversationId: 'conversation-a',
-    text: 'Research Acme',
-  ),
-  goal: 'Create a concise company brief',
+  draftId: draftId,
+  originatingRequest:
+      originatingRequest ??
+      const FeatureStudioOriginatingRequest(
+        operationId: 'operation-a',
+        conversationId: 'conversation-a',
+        text: 'Research Acme',
+      ),
+  goal: goal,
   status: status,
+  installationId:
+      installationId ??
+      (status == FeatureStudioDraftStatus.installed ? 'studio-id-2' : null),
   behavior: behavior ?? _behavior('Create a brief'),
   source: source ?? _source(),
-  verification: verification,
+  verification: verification ?? installationRecovery?.verification,
   revision: revision ?? Int64(4),
-  createdAt: DateTime.utc(2026, 7, 15, 10),
+  createdAt: createdAt ?? DateTime.utc(2026, 7, 15, 10),
   updatedAt: DateTime.utc(2026, 7, 15, 10, 1),
+  installationRecovery: installationRecovery,
 );
 
 FeatureStudioBehavior _behavior(String name) => FeatureStudioBehavior(
@@ -2292,12 +3806,118 @@ FeatureStudioSource _source([String implementation = 'source']) =>
 
 FeatureStudioVerification _verification() => FeatureStudioVerification(
   releaseDigest: 'a' * 64,
+  sourceReference: 'b' * 64,
   total: 1,
   passed: 1,
   failed: 0,
   skipped: 0,
   verifiedAt: DateTime.utc(2026, 7, 15, 10, 1),
+  scenarios: const [
+    FeatureStudioVerificationScenario(
+      scenarioId: 'brief',
+      name: 'Create a brief',
+      outcome: FeatureStudioScenarioOutcome.passed,
+      safeFailure: null,
+      durationMilliseconds: 42,
+    ),
+  ],
+  artifacts: [
+    FeatureStudioVerificationArtifact(
+      name: 'test-results.txt',
+      mediaType: 'text/plain',
+      sizeBytes: 128,
+      digest: 'c' * 64,
+    ),
+  ],
 );
+
+FeatureStudioVerification _failedVerification() => FeatureStudioVerification(
+  releaseDigest: null,
+  sourceReference: 'b' * 64,
+  total: 1,
+  passed: 0,
+  failed: 1,
+  skipped: 0,
+  verifiedAt: DateTime.utc(2026, 7, 15, 10, 2),
+  scenarios: const [
+    FeatureStudioVerificationScenario(
+      scenarioId: 'brief',
+      name: 'Create a brief',
+      outcome: FeatureStudioScenarioOutcome.failed,
+      safeFailure: 'Expected a concise brief.',
+      durationMilliseconds: 19,
+    ),
+  ],
+  artifacts: [
+    FeatureStudioVerificationArtifact(
+      name: 'test-results.txt',
+      mediaType: 'text/plain',
+      sizeBytes: 96,
+      digest: 'd' * 64,
+    ),
+  ],
+);
+
+FeatureStudioVersion _version({String? digest, FeatureStudioSource? source}) =>
+    FeatureStudioVersion(
+      digest: digest ?? 'a' * 64,
+      sourceReference: 'b' * 64,
+      requestedCapabilityIds: const ['capability.read'],
+      dependencies: const [],
+      source: source ?? _source(),
+    );
+
+FeatureStudioVerificationResult _passingVerificationResult(
+  FeatureStudioDraft draft,
+) => FeatureStudioVerificationResult(
+  draft: draft,
+  verification: draft.verification ?? _verification(),
+  version: _version(source: draft.source),
+);
+
+FeatureStudioVerificationResult _failedVerificationResult() =>
+    FeatureStudioVerificationResult(
+      draft: _draft(),
+      verification: _failedVerification(),
+      version: null,
+    );
+
+FeatureStudioGrant _grant() => const FeatureStudioGrant(
+  capabilityId: 'capability.read',
+  capabilityVersion: 1,
+  provider: 'provider-a',
+  connectionId: 'connection-a',
+  constraintsJson: '{"allowedToolIds":["capability.read"]}',
+  constraintSummary: 'Only capability.read',
+);
+
+FeatureStudioAccessReview _accessReview({
+  FeatureStudioDraft? draft,
+  String installationId = 'studio-id-2',
+}) => FeatureStudioAccessReview(
+  draft: draft ?? _draft(revision: Int64(5), verification: _verification()),
+  version: _version(),
+  installationId: installationId,
+  grants: [_grant()],
+  subscriptions: const ['manual'],
+  previousVersion: null,
+);
+
+FeatureStudioInstallSuccess _installSuccess({FeatureStudioDraft? draft}) =>
+    FeatureStudioInstallSuccess(
+      draft:
+          draft ??
+          _draft(
+            revision: Int64(6),
+            status: FeatureStudioDraftStatus.installed,
+            verification: _verification(),
+          ),
+      version: _version(),
+      installationId: 'studio-id-2',
+      activeGrants: [_grant()],
+      subscriptions: const ['manual'],
+      rollbackAvailable: true,
+    );
 
 late FeatureStudioSuggestion _lastSuggestion;
 
@@ -2361,4 +3981,22 @@ FeatureStudioSuggestion _exactSuggestion({
   summary: 'Exact replacement',
   replacementBehavior: behavior ?? _behavior('Create a brief'),
   replacementSource: source ?? _source(),
+);
+
+FeatureStudioInstallationRecovery _installationRecovery({
+  required bool installed,
+  bool hasPreviousVersion = true,
+}) => FeatureStudioInstallationRecovery(
+  installed: installed,
+  verification: _verification(),
+  version: _version(),
+  installationId: 'studio-id-2',
+  grants: [_grant()],
+  subscriptions: const ['manual'],
+  previousVersion: hasPreviousVersion ? _version(digest: 'f' * 64) : null,
+  decisionId: installed ? null : 'decision-recovered',
+  idempotencyId: installed ? null : 'install-recovered',
+  rollbackAvailable: installed && hasPreviousVersion,
+  paused: false,
+  pauseReason: null,
 );

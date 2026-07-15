@@ -1,29 +1,62 @@
 import 'dart:async';
 
+import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/session/app_session_scope.dart';
 import 'feature_studio_controller.dart';
 import 'feature_studio_gateway.dart';
+import 'feature_studio_models.dart';
+import 'widgets/access_review_panel.dart';
 import 'widgets/behavior_canvas.dart';
 import 'widgets/code_changes_disclosure.dart';
+import 'widgets/install_success_panel.dart';
 import 'widgets/origin_request_bar.dart';
 import 'widgets/suggested_changes_panel.dart';
 import 'widgets/test_results_panel.dart';
+import 'widgets/version_review_panel.dart';
 
+export 'widgets/access_review_panel.dart'
+    show
+        featureStudioAccessReviewPanelKey,
+        featureStudioApproveInstallButtonKey,
+        featureStudioResetAuthorityReviewButtonKey,
+        featureStudioRetryInstallButtonKey;
+export 'widgets/install_success_panel.dart'
+    show
+        featureStudioInstallSuccessPanelKey,
+        featureStudioReturnRunNowButtonKey;
 export 'widgets/origin_request_bar.dart'
     show featureStudioBackToChatButtonKey, featureStudioDraftIdKey;
 export 'widgets/suggested_changes_panel.dart'
     show featureStudioSuggestionGuidanceKey, featureStudioSuggestionsPanelKey;
 export 'widgets/test_results_panel.dart' show featureStudioVerifyButtonKey;
+export 'widgets/version_review_panel.dart'
+    show featureStudioReviewAccessButtonKey, featureStudioVersionPanelKey;
 
 const Key featureStudioOpenSuggestionsKey = Key(
   'feature-studio-open-suggestions',
 );
 const Key featureStudioOpenCodeKey = Key('feature-studio-open-code');
+const Key featureStudioOpenVersionKey = Key('feature-studio-open-version');
+const Key featureStudioOpenAccessReviewKey = Key(
+  'feature-studio-open-access-review',
+);
 const Key featureStudioLoadingKey = Key('feature-studio-loading');
 const Key featureStudioLoadErrorKey = Key('feature-studio-load-error');
+const Key featureStudioResetPendingInstallButtonKey = Key(
+  'feature-studio-reset-pending-install-button',
+);
+const Key featureStudioResetPendingInstallDialogKey = Key(
+  'feature-studio-reset-pending-install-dialog',
+);
+const Key featureStudioCancelPendingInstallResetButtonKey = Key(
+  'feature-studio-cancel-pending-install-reset-button',
+);
+const Key featureStudioConfirmPendingInstallResetButtonKey = Key(
+  'feature-studio-confirm-pending-install-reset-button',
+);
 const Key featureStudioConflictKey = Key('feature-studio-conflict');
 const Key featureStudioLeaveDialogKey = Key('feature-studio-leave-dialog');
 const Key featureStudioStayButtonKey = Key('feature-studio-stay-button');
@@ -72,21 +105,30 @@ class FeatureStudioExitCoordinator {
   }
 }
 
+typedef FeatureStudioNavigationCallback =
+    void Function(FeatureStudioOriginatingRequest? origin, String draftId);
+typedef FeatureStudioRunNowCallback =
+    void Function(String draftId, Int64 expectedRevision);
+
 class FeatureStudioPage extends StatefulWidget {
   const FeatureStudioPage({
     super.key,
     required this.draftId,
     required this.onBackToChat,
+    this.requestedInstallationId,
     this.controller,
     this.gateway,
     this.exitCoordinator,
+    this.onRunNow,
   }) : assert(controller != null || gateway != null);
 
   final String draftId;
-  final VoidCallback onBackToChat;
+  final FeatureStudioNavigationCallback onBackToChat;
+  final String? requestedInstallationId;
   final FeatureStudioController? controller;
   final FeatureStudioGateway? gateway;
   final FeatureStudioExitCoordinator? exitCoordinator;
+  final FeatureStudioRunNowCallback? onRunNow;
 
   @override
   State<FeatureStudioPage> createState() => _FeatureStudioPageState();
@@ -118,8 +160,13 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
   final FocusNode _codeLauncherFocus = FocusNode(
     debugLabel: 'Open Code and changes',
   );
+  final FocusNode _versionLauncherFocus = FocusNode(debugLabel: 'Open Version');
+  final FocusNode _accessReviewLauncherFocus = FocusNode(
+    debugLabel: 'Open Review access',
+  );
   bool _exitApproved = false;
   bool _exitInProgress = false;
+  bool _resetConfirmationOpen = false;
 
   @override
   void initState() {
@@ -130,6 +177,7 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
         FeatureStudioController(
           draftId: widget.draftId,
           gateway: widget.gateway!,
+          requestedInstallationId: widget.requestedInstallationId,
         );
     if (_controller.loadPhase == FeatureStudioLoadPhase.idle) {
       unawaited(_controller.load());
@@ -146,6 +194,8 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
     _testResultsSectionFocus.dispose();
     _suggestionsLauncherFocus.dispose();
     _codeLauncherFocus.dispose();
+    _versionLauncherFocus.dispose();
+    _accessReviewLauncherFocus.dispose();
     if (_ownsController) _controller.dispose();
     super.dispose();
   }
@@ -229,6 +279,23 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
         onBackToChat: _requestExit,
       );
     }
+    if (_controller.loadPhase ==
+        FeatureStudioLoadPhase.pendingInstallResetRequired) {
+      return _LoadFailure(
+        title: 'Pending install needs attention',
+        message:
+            'The saved install plan is no longer valid. Reset it to continue '
+            'editing this Draft.',
+        onBackToChat: _requestExit,
+        actionLabel: 'Reset pending install',
+        actionKey: featureStudioResetPendingInstallButtonKey,
+        actionInProgress: _controller.pendingInstallResetInFlight,
+        backEnabled: !_controller.pendingInstallResetUnresolved,
+        onAction: _controller.canResetPendingInstall
+            ? _confirmPendingInstallReset
+            : null,
+      );
+    }
     if (_controller.loadPhase == FeatureStudioLoadPhase.retryableFailure) {
       return _LoadFailure(
         title: 'Draft could not be opened',
@@ -283,6 +350,45 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
     );
   }
 
+  Future<void> _confirmPendingInstallReset() async {
+    if (_resetConfirmationOpen || !_controller.canResetPendingInstall) return;
+    _resetConfirmationOpen = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          key: featureStudioResetPendingInstallDialogKey,
+          scrollable: true,
+          title: const Text('Reset pending install?'),
+          content: const Text(
+            'Resetting supersedes the prior access decision. You must Verify '
+            'this Draft and review access again before installing.',
+          ),
+          actions: [
+            TextButton(
+              key: featureStudioCancelPendingInstallResetButtonKey,
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: featureStudioConfirmPendingInstallResetButtonKey,
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Reset pending install'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true ||
+          !mounted ||
+          !_controller.canResetPendingInstall) {
+        return;
+      }
+      await _controller.resetPendingInstall();
+    } finally {
+      _resetConfirmationOpen = false;
+    }
+  }
+
   Widget _buildCompact(BuildContext context) => ListView(
     padding: const EdgeInsets.all(12),
     children: [
@@ -310,6 +416,35 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
       ),
       const SizedBox(height: 12),
       TestResultsPanel(controller: _controller),
+      if (_controller.installSuccess case final success?) ...[
+        const SizedBox(height: 12),
+        InstallSuccessPanel(
+          success: success,
+          onReturnToChat: () => unawaited(_requestExit()),
+          onRunNow: _runNowAction(success),
+        ),
+      ] else ...[
+        if (_controller.version != null) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: featureStudioOpenVersionKey,
+            focusNode: _versionLauncherFocus,
+            onPressed: () => _openVersionReview(context),
+            icon: const Icon(Icons.commit_outlined),
+            label: const Text('Version'),
+          ),
+        ],
+        if (_hasAccessReviewState) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: featureStudioOpenAccessReviewKey,
+            focusNode: _accessReviewLauncherFocus,
+            onPressed: () => _openAccessReview(context),
+            icon: const Icon(Icons.security_outlined),
+            label: const Text('Review access'),
+          ),
+        ],
+      ],
       const SizedBox(height: 24),
     ],
   );
@@ -336,6 +471,7 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
             ),
             const SizedBox(height: 16),
             TestResultsPanel(controller: _controller),
+            ..._inlineGovernancePanels(),
             const SizedBox(height: 24),
           ],
         ),
@@ -408,6 +544,7 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
                 label: 'Test results',
                 child: TestResultsPanel(controller: _controller),
               ),
+              ..._inlineGovernancePanels(spacing: 20),
               const SizedBox(height: 32),
             ],
           ),
@@ -510,9 +647,115 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
     if (mounted) _codeLauncherFocus.requestFocus();
   }
 
+  List<Widget> _inlineGovernancePanels({double spacing = 16}) {
+    final success = _controller.installSuccess;
+    if (success != null) {
+      return [
+        SizedBox(height: spacing),
+        InstallSuccessPanel(
+          success: success,
+          onReturnToChat: () => unawaited(_requestExit()),
+          onRunNow: _runNowAction(success),
+        ),
+      ];
+    }
+    return [
+      if (_controller.version != null) ...[
+        SizedBox(height: spacing),
+        VersionReviewPanel(controller: _controller),
+      ],
+      if (_hasAccessReviewState) ...[
+        SizedBox(height: spacing),
+        AccessReviewPanel(controller: _controller),
+      ],
+    ];
+  }
+
+  bool get _hasAccessReviewState =>
+      _controller.accessReview != null ||
+      _controller.accessReviewPhase != FeatureStudioAccessReviewPhase.idle;
+
+  Future<void> _openVersionReview(BuildContext context) async {
+    await _showGovernanceDialog(
+      context,
+      title: 'Version',
+      builder: (_) => VersionReviewPanel(controller: _controller),
+    );
+    if (mounted) _versionLauncherFocus.requestFocus();
+  }
+
+  Future<void> _openAccessReview(BuildContext context) async {
+    await _showGovernanceDialog(
+      context,
+      title: 'Review access',
+      builder: (dialogContext) {
+        final success = _controller.installSuccess;
+        if (success == null) {
+          return AccessReviewPanel(controller: _controller);
+        }
+        return InstallSuccessPanel(
+          success: success,
+          onReturnToChat: () {
+            Navigator.of(dialogContext).pop();
+            unawaited(_requestExit());
+          },
+          onRunNow: _runNowAction(success) == null
+              ? null
+              : () {
+                  Navigator.of(dialogContext).pop();
+                  _runNowAction(success)!();
+                },
+        );
+      },
+    );
+    if (mounted) _accessReviewLauncherFocus.requestFocus();
+  }
+
+  VoidCallback? _runNowAction(FeatureStudioInstallSuccess success) {
+    final callback = widget.onRunNow;
+    if (callback == null) return null;
+    return () => callback(success.draft.draftId, success.draft.revision);
+  }
+
+  Future<void> _showGovernanceDialog(
+    BuildContext context, {
+    required String title,
+    required Widget Function(BuildContext context) builder,
+  }) => showDialog<void>(
+    context: context,
+    useSafeArea: false,
+    useRootNavigator: false,
+    builder: (dialogContext) => CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            Navigator.of(dialogContext).pop(),
+      },
+      child: Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(title),
+            leading: IconButton(
+              tooltip: 'Close $title',
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              icon: const Icon(Icons.close),
+            ),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) => builder(dialogContext),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
   Future<bool> _requestExit([bool navigate = true]) async {
     if (_exitApproved) return true;
     if (_exitInProgress) return false;
+    if (_controller.pendingInstallResetUnresolved) return false;
     _exitInProgress = true;
     try {
       if ((_controller.isDirty || _controller.hasUnresolvedMutation) &&
@@ -572,12 +815,20 @@ class _FeatureStudioPageState extends State<FeatureStudioPage> {
     setState(() => _exitApproved = true);
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return false;
-    if (navigate) widget.onBackToChat();
+    if (navigate) {
+      final draft = _controller.confirmedDraft;
+      widget.onBackToChat(
+        draft?.originatingRequest,
+        draft?.draftId ?? widget.draftId,
+      );
+    }
     return true;
   }
 
   bool get _editingEnabled =>
-      _controller.isMutableDraft && !_controller.conflictRecoveryInFlight;
+      _controller.isMutableDraft &&
+      !_controller.conflictRecoveryInFlight &&
+      !_controller.authorityDecisionInFlight;
 }
 
 class _SectionNavigation extends StatelessWidget {
@@ -754,49 +1005,75 @@ class _LoadFailure extends StatelessWidget {
     required this.message,
     required this.onBackToChat,
     this.onRetry,
+    this.actionLabel,
+    this.actionKey,
+    this.onAction,
+    this.actionInProgress = false,
+    this.backEnabled = true,
   });
 
   final String title;
   final String message;
   final Future<void> Function() onBackToChat;
   final Future<void> Function()? onRetry;
+  final String? actionLabel;
+  final Key? actionKey;
+  final VoidCallback? onAction;
+  final bool actionInProgress;
+  final bool backEnabled;
 
   @override
   Widget build(BuildContext context) => Material(
     color: Theme.of(context).scaffoldBackgroundColor,
-    child: Center(
-      child: ConstrainedBox(
-        key: featureStudioLoadErrorKey,
-        constraints: const BoxConstraints(maxWidth: 440),
-        child: Padding(
+    child: SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Icon(
-                Icons.edit_note_outlined,
-                size: 42,
-                color: Theme.of(context).colorScheme.primary,
+          child: ConstrainedBox(
+            key: featureStudioLoadErrorKey,
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Semantics(
+              container: true,
+              liveRegion: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Icon(
+                    Icons.edit_note_outlined,
+                    size: 42,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 8),
+                  Text(message),
+                  const SizedBox(height: 20),
+                  if (onRetry != null) ...[
+                    OutlinedButton(
+                      onPressed: () => unawaited(onRetry!()),
+                      child: const Text('Try again'),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (actionLabel != null) ...[
+                    FilledButton(
+                      key: actionKey,
+                      onPressed: onAction,
+                      child: Text(
+                        actionInProgress ? 'Resetting…' : actionLabel!,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  TextButton(
+                    key: featureStudioBackToChatButtonKey,
+                    onPressed: backEnabled ? onBackToChat : null,
+                    child: const Text('Back to Chat'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text(message),
-              const SizedBox(height: 20),
-              if (onRetry != null) ...[
-                OutlinedButton(
-                  onPressed: () => unawaited(onRetry!()),
-                  child: const Text('Try again'),
-                ),
-                const SizedBox(height: 8),
-              ],
-              TextButton(
-                key: featureStudioBackToChatButtonKey,
-                onPressed: onBackToChat,
-                child: const Text('Back to Chat'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

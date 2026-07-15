@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\shared\FeatureSourceReference.cs" Link="FeatureSourceReference.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Anthropic" />
     <PackageReference Include="Aspire.Azure.Data.Tables" />

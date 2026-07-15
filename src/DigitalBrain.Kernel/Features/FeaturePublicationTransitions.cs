@@ -112,12 +112,11 @@ internal static class FeaturePublicationTransitions
     {
         ArgumentNullException.ThrowIfNull(grants);
         ArgumentNullException.ThrowIfNull(subscriptions);
-        var payload = new PublicationAccess(
-            installationId.Value,
-            release.Value,
-            GrantPayloads(grants),
-            subscriptions.Order(StringComparer.Ordinal).ToArray());
-        return Digest(payload);
+        return FeatureInstallationReservationDigests.Access(
+            installationId,
+            release,
+            grants.Select(GrantSpec).ToArray(),
+            subscriptions);
     }
 
     public static FeatureInstallationAuthorityState Invalidate(FeatureInstallationAuthorityState authority)
@@ -162,18 +161,54 @@ internal static class FeaturePublicationTransitions
             throw new FeatureConcurrencyException(
                 "The confirmed Feature publication does not match the reserved access review.",
                 FeatureCommandRejectionReason.Precondition);
-        var approval = state.Approvals.SingleOrDefault(candidate =>
-            candidate.InstallationId == reservation.InstallationId &&
-            candidate.Release.Digest == reservation.Release);
         var authority = state.Authorities.Single(candidate => candidate.InstallationId == reservation.InstallationId);
         if (authority.ActorId != reservation.ActorId)
             throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
-        if (approval is null || approval.Status != FeatureApprovalStatus.Approved ||
-            !string.Equals(approval.DecisionId, reservation.DecisionId, StringComparison.Ordinal) ||
-            !SameGrants(approval.Grants, authority.ActiveGrants))
+        var reservationGrants = reservation.Grants is null
+            ? throw new FeatureConcurrencyException(
+                "The confirmed Feature publication cannot bind a legacy reservation without its exact access plan.",
+                FeatureCommandRejectionReason.Precondition)
+            : FeatureHubTransitions.ValidateGrants(reservation.Grants);
+        var approvals = state.Approvals.Where(candidate =>
+            candidate.InstallationId == reservation.InstallationId &&
+            candidate.Release.Digest == reservation.Release &&
+            candidate.Status == FeatureApprovalStatus.Approved &&
+            string.Equals(candidate.DecisionId, reservation.DecisionId, StringComparison.Ordinal) &&
+            candidate.DecisionActorId == reservation.ActorId &&
+            FeatureHubTransitions.SameGrants(candidate.Grants, reservationGrants)).ToArray();
+        if (approvals.Length != 1 || !SameGrants(approvals[0].Grants, authority.ActiveGrants))
             throw new FeatureConcurrencyException(
                 "The confirmed Feature publication is not bound to the reserved approval decision.",
                 FeatureCommandRejectionReason.Precondition);
+    }
+
+    public static void DemandConfirmedActive(FeatureHubState state, FeatureInstallationId installationId)
+    {
+        var prepared = Prepare(state, installationId);
+        if (!ReferenceEquals(prepared.State, state) || prepared.Receipt is not { } receipt ||
+            receipt.PublicationFence != prepared.Ticket.PublicationFence ||
+            !string.Equals(receipt.AuthorityDigest, prepared.Ticket.AuthorityDigest, StringComparison.Ordinal) ||
+            !string.Equals(receipt.AccessDigest, prepared.Ticket.AccessDigest, StringComparison.Ordinal))
+            throw new FeatureConcurrencyException(
+                "The active Feature publication is not durably confirmed.",
+                FeatureCommandRejectionReason.Precondition);
+    }
+
+    public static bool IsConfirmedActive(FeatureHubState state, FeatureInstallationId installationId)
+    {
+        try
+        {
+            var prepared = Prepare(state, installationId);
+            return ReferenceEquals(prepared.State, state) &&
+                   prepared.Receipt is { } receipt &&
+                   receipt.PublicationFence == prepared.Ticket.PublicationFence &&
+                   string.Equals(receipt.AuthorityDigest, prepared.Ticket.AuthorityDigest, StringComparison.Ordinal) &&
+                   string.Equals(receipt.AccessDigest, prepared.Ticket.AccessDigest, StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or FeatureConcurrencyException)
+        {
+            return false;
+        }
     }
 
     private static string AuthorityDigest(
@@ -189,6 +224,7 @@ internal static class FeaturePublicationTransitions
             authority.PreviousRelease?.Value,
             authority.PreviousGrantRevision?.Value,
             GrantPayloads(authority.PreviousGrants),
+            authority.PreviousSubscriptions?.Order(StringComparer.Ordinal).ToArray(),
             authority.PendingRelease?.Value,
             authority.PendingGrantRevision?.Value,
             GrantPayloads(authority.PendingGrants),
@@ -236,12 +272,6 @@ internal static class FeaturePublicationTransitions
             throw new ArgumentException("A canonical SHA-256 digest is required.", parameterName);
     }
 
-    private sealed record PublicationAccess(
-        string InstallationId,
-        string Release,
-        PublicationGrant[] Grants,
-        string[] Subscriptions);
-
     private sealed record PublicationAuthority(
         string InstallationId,
         string ActorId,
@@ -251,6 +281,7 @@ internal static class FeaturePublicationTransitions
         string? PreviousRelease,
         long? PreviousGrantRevision,
         PublicationGrant[] PreviousGrants,
+        string[]? PreviousSubscriptions,
         string? PendingRelease,
         long? PendingGrantRevision,
         PublicationGrant[] PendingGrants,

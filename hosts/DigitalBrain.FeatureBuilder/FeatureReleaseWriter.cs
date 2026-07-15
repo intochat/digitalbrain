@@ -11,16 +11,47 @@ public sealed record FeatureManifest(
     IReadOnlyList<string> FeatureTypes,
     IReadOnlyList<string> RequestedCapabilities,
     IReadOnlyList<string> AssemblyReferences);
-public sealed record FeatureScenarioResult(int Total, int Passed, int Failed, int Skipped);
+public enum FeatureScenarioOutcome
+{
+    Passed,
+    Failed,
+    Skipped
+}
+public sealed record FeatureScenarioEvidence(
+    string ScenarioId,
+    string Name,
+    FeatureScenarioOutcome Outcome,
+    string? SafeFailure,
+    long DurationMilliseconds);
+public sealed record FeatureScenarioResult(
+    int Total,
+    int Passed,
+    int Failed,
+    int Skipped,
+    IReadOnlyList<FeatureScenarioEvidence> Results)
+{
+    public FeatureScenarioResult(int total, int passed, int failed, int skipped)
+        : this(total, passed, failed, skipped, Array.Empty<FeatureScenarioEvidence>())
+    {
+    }
+}
+public sealed record FeatureVerificationArtifact(string Name, string MediaType, long SizeBytes, string Digest);
+public sealed record FeatureBuildVerification(
+    string SourceReference,
+    FeatureScenarioResult Scenarios,
+    IReadOnlyList<FeatureVerificationArtifact> Artifacts,
+    FeatureRelease? Release);
 public sealed record FeatureRelease(
     string Digest,
     string SourceReference,
     string ReleaseDirectory,
     FeatureManifest Manifest,
     FeatureScenarioResult Scenarios,
+    IReadOnlyList<FeatureVerificationArtifact> Artifacts,
     TimeSpan ReleaseWriteDuration);
 public sealed class FeatureReleaseWriter
 {
+    private const int MaximumVerificationArtifactBytes = 1_048_576;
     public async Task<FeatureRelease> WriteAsync(
         string outputDirectory,
         string sourceReference,
@@ -35,14 +66,16 @@ public sealed class FeatureReleaseWriter
         ArgumentNullException.ThrowIfNull(manifest);
         ArgumentNullException.ThrowIfNull(scenarios);
         var stopwatch = Stopwatch.StartNew();
-        var entries = BuildEntries(sourceReference, buildOutputDirectory, manifest, scenarios);
+        var verificationEntries = VerificationEntries(sourceReference, scenarios);
+        var artifacts = Describe(verificationEntries);
+        var entries = BuildEntries(buildOutputDirectory, manifest, verificationEntries);
         var digest = ComputeDigest(entries);
         var releaseDirectory = Path.Combine(outputDirectory, digest);
         Directory.CreateDirectory(outputDirectory);
         if (Directory.Exists(releaseDirectory))
         {
             VerifyExisting(releaseDirectory, entries, digest);
-            return new FeatureRelease(digest, sourceReference, releaseDirectory, manifest, scenarios, stopwatch.Elapsed);
+            return new FeatureRelease(digest, sourceReference, releaseDirectory, manifest, scenarios, artifacts, stopwatch.Elapsed);
         }
         var staging = Path.Combine(outputDirectory, $".{digest}.{Guid.NewGuid():N}.tmp");
         try
@@ -71,18 +104,16 @@ public sealed class FeatureReleaseWriter
                 Directory.Delete(staging, true);
             }
         }
-        return new FeatureRelease(digest, sourceReference, releaseDirectory, manifest, scenarios, stopwatch.Elapsed);
+        return new FeatureRelease(digest, sourceReference, releaseDirectory, manifest, scenarios, artifacts, stopwatch.Elapsed);
     }
-    internal static string ComputeSourceReference(FeatureSourceSnapshot snapshot)
-    {
-        var entries = snapshot.Files.Select(static file => new ReleaseEntry("files/" + file.Path, Encoding.UTF8.GetBytes(file.Content)))
-            .Append(new ReleaseEntry("entries/implementation", Encoding.UTF8.GetBytes(snapshot.ImplementationProjectPath)))
-            .Append(new ReleaseEntry("entries/scenarios", Encoding.UTF8.GetBytes(snapshot.ScenarioProjectPath)))
-            .OrderBy(static entry => entry.Path, StringComparer.Ordinal)
-            .ToArray();
-        return "sha256:" + ComputeDigest(entries);
-    }
-    private static ReleaseEntry[] BuildEntries(string sourceReference, string buildOutputDirectory, FeatureManifest manifest, FeatureScenarioResult scenarios)
+    public static string ComputeSourceReference(FeatureSourceSnapshot snapshot) =>
+        DigitalBrain.Shared.FeatureSourceReference.Compute(
+            snapshot.ImplementationProjectPath,
+            snapshot.ScenarioProjectPath,
+            snapshot.Files.Select(static file => (file.Path, file.Content)));
+    internal static FeatureVerificationArtifact[] DescribeEvidence(string sourceReference, FeatureScenarioResult scenarios) =>
+        Describe(VerificationEntries(sourceReference, scenarios));
+    private static ReleaseEntry[] BuildEntries(string buildOutputDirectory, FeatureManifest manifest, IReadOnlyList<ReleaseEntry> verificationEntries)
     {
         var sharedAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -105,10 +136,29 @@ public sealed class FeatureReleaseWriter
             throw new FeatureBuildException(FeatureBuildFailure.CompilationFailed, "The implementation assembly was not emitted.");
         }
         outputEntries.Add(new ReleaseEntry("manifest.json", ManifestJson(manifest)));
-        outputEntries.Add(new ReleaseEntry("scenarios.json", ScenarioJson(scenarios)));
-        outputEntries.Add(new ReleaseEntry("source.json", SourceJson(sourceReference)));
+        outputEntries.AddRange(verificationEntries);
         return outputEntries.OrderBy(static entry => entry.Path, StringComparer.Ordinal).ToArray();
     }
+    private static ReleaseEntry[] VerificationEntries(string sourceReference, FeatureScenarioResult scenarios) =>
+    [
+        new ReleaseEntry("scenarios.json", ScenarioJson(scenarios)),
+        new ReleaseEntry("source.json", SourceJson(sourceReference))
+    ];
+    private static FeatureVerificationArtifact[] Describe(IEnumerable<ReleaseEntry> entries) =>
+        entries.OrderBy(static entry => entry.Path, StringComparer.Ordinal)
+            .Select(static entry =>
+            {
+                if (entry.Content.Length is <= 0 or > MaximumVerificationArtifactBytes)
+                {
+                    throw new FeatureBuildException(FeatureBuildFailure.ScenarioFailed, "A verification artifact exceeded its bound.");
+                }
+                return new FeatureVerificationArtifact(
+                    entry.Path,
+                    "application/json",
+                    entry.Content.LongLength,
+                    "sha256:" + Convert.ToHexStringLower(SHA256.HashData(entry.Content)));
+            })
+            .ToArray();
     private static byte[] ManifestJson(FeatureManifest manifest) => WriteJson(writer =>
     {
         writer.WriteStartObject();
@@ -126,6 +176,20 @@ public sealed class FeatureReleaseWriter
         writer.WriteNumber("passed", scenarios.Passed);
         writer.WriteNumber("failed", scenarios.Failed);
         writer.WriteNumber("skipped", scenarios.Skipped);
+        writer.WriteStartArray("results");
+        foreach (var result in scenarios.Results)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("scenarioId", result.ScenarioId);
+            writer.WriteString("name", result.Name);
+            writer.WriteString("outcome", result.Outcome.ToString().ToLowerInvariant());
+            if (result.SafeFailure is not null)
+            {
+                writer.WriteString("safeFailure", result.SafeFailure);
+            }
+            writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
         writer.WriteEndObject();
     });
     private static byte[] SourceJson(string sourceReference) => WriteJson(writer =>

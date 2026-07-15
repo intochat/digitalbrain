@@ -1,7 +1,6 @@
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
-using System.Xml.Linq;
 namespace DigitalBrain.FeatureBuilder;
 
 internal static class FeatureManifestDeriver
@@ -270,29 +269,4 @@ internal static class FeatureManifestDeriver
             _ => string.Empty
         };
     private sealed record AssemblyAnalysis(string AssemblyName, string[] FeatureTypes, string[] Capabilities, string[] AssemblyReferences, string? SdkVersion);
-}
-internal static class FeatureScenarioResultReader
-{
-    internal static FeatureScenarioResult Read(string path, int expectedScenarioCount)
-    {
-        if (!File.Exists(path))
-        {
-            throw Invalid("The scenario runner did not produce a result file.");
-        }
-        var document = XDocument.Load(path, LoadOptions.None);
-        var counters = document.Descendants().SingleOrDefault(static element => element.Name.LocalName == "Counters")
-            ?? throw Invalid("The scenario result does not contain counters.");
-        var result = new FeatureScenarioResult(Counter(counters, "total"), Counter(counters, "passed"), Counter(counters, "failed"), Counter(counters, "notExecuted"));
-        if (result.Total != expectedScenarioCount)
-        {
-            throw Invalid($"The test runner reported {result.Total} tests for {expectedScenarioCount} compiled BDD scenarios.");
-        }
-        return result;
-    }
-    private static int Counter(XElement counters, string name) =>
-        int.TryParse(counters.Attribute(name)?.Value, out var value)
-            ? value
-            : throw Invalid($"The scenario result is missing counter '{name}'.");
-    private static FeatureBuildException Invalid(string message) =>
-        new(FeatureBuildFailure.ScenarioFailed, message);
 }

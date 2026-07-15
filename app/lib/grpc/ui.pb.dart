@@ -1032,6 +1032,87 @@ class GetFeatureDraftRequest extends $pb.GeneratedMessage {
   void clearDraftId() => $_clearField(3);
 }
 
+class ResetFeatureDraftInstallationRequest extends $pb.GeneratedMessage {
+  factory ResetFeatureDraftInstallationRequest({
+    $core.String? draftId,
+    $core.String? idempotencyId,
+  }) {
+    final result = create();
+    if (draftId != null) result.draftId = draftId;
+    if (idempotencyId != null) result.idempotencyId = idempotencyId;
+    return result;
+  }
+
+  ResetFeatureDraftInstallationRequest._();
+
+  factory ResetFeatureDraftInstallationRequest.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory ResetFeatureDraftInstallationRequest.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ResetFeatureDraftInstallationRequest',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(3, _omitFieldNames ? '' : 'draftId')
+        ..aOS(4, _omitFieldNames ? '' : 'idempotencyId')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResetFeatureDraftInstallationRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResetFeatureDraftInstallationRequest copyWith(
+    void Function(ResetFeatureDraftInstallationRequest) updates,
+  ) =>
+      super.copyWith(
+            (message) =>
+                updates(message as ResetFeatureDraftInstallationRequest),
+          )
+          as ResetFeatureDraftInstallationRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ResetFeatureDraftInstallationRequest create() =>
+      ResetFeatureDraftInstallationRequest._();
+  @$core.override
+  ResetFeatureDraftInstallationRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ResetFeatureDraftInstallationRequest getDefault() =>
+      _defaultInstance ??=
+          $pb.GeneratedMessage.$_defaultFor<
+            ResetFeatureDraftInstallationRequest
+          >(create);
+  static ResetFeatureDraftInstallationRequest? _defaultInstance;
+
+  @$pb.TagNumber(3)
+  $core.String get draftId => $_getSZ(0);
+  @$pb.TagNumber(3)
+  set draftId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDraftId() => $_has(0);
+  @$pb.TagNumber(3)
+  void clearDraftId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get idempotencyId => $_getSZ(1);
+  @$pb.TagNumber(4)
+  set idempotencyId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(4)
+  $core.bool hasIdempotencyId() => $_has(1);
+  @$pb.TagNumber(4)
+  void clearIdempotencyId() => $_clearField(4);
+}
+
 enum ReviseFeatureDraftRequest_Command {
   reviseBehavior,
   reviseSource,
@@ -1408,6 +1489,122 @@ class VerifyFeatureDraftRequest extends $pb.GeneratedMessage {
   $core.bool hasIdempotencyId() => $_has(2);
   @$pb.TagNumber(5)
   void clearIdempotencyId() => $_clearField(5);
+}
+
+class ReviewFeatureAccessRequest extends $pb.GeneratedMessage {
+  factory ReviewFeatureAccessRequest({
+    $core.String? draftId,
+    $fixnum.Int64? expectedRevision,
+    $core.String? installationId,
+    $core.String? releaseDigest,
+    $core.Iterable<FeatureGrant>? grants,
+    $core.Iterable<$core.String>? subscriptions,
+  }) {
+    final result = create();
+    if (draftId != null) result.draftId = draftId;
+    if (expectedRevision != null) result.expectedRevision = expectedRevision;
+    if (installationId != null) result.installationId = installationId;
+    if (releaseDigest != null) result.releaseDigest = releaseDigest;
+    if (grants != null) result.grants.addAll(grants);
+    if (subscriptions != null) result.subscriptions.addAll(subscriptions);
+    return result;
+  }
+
+  ReviewFeatureAccessRequest._();
+
+  factory ReviewFeatureAccessRequest.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory ReviewFeatureAccessRequest.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ReviewFeatureAccessRequest',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(3, _omitFieldNames ? '' : 'draftId')
+        ..aInt64(4, _omitFieldNames ? '' : 'expectedRevision')
+        ..aOS(5, _omitFieldNames ? '' : 'installationId')
+        ..aOS(6, _omitFieldNames ? '' : 'releaseDigest')
+        ..pPM<FeatureGrant>(
+          7,
+          _omitFieldNames ? '' : 'grants',
+          subBuilder: FeatureGrant.create,
+        )
+        ..pPS(8, _omitFieldNames ? '' : 'subscriptions')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReviewFeatureAccessRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReviewFeatureAccessRequest copyWith(
+    void Function(ReviewFeatureAccessRequest) updates,
+  ) =>
+      super.copyWith(
+            (message) => updates(message as ReviewFeatureAccessRequest),
+          )
+          as ReviewFeatureAccessRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReviewFeatureAccessRequest create() => ReviewFeatureAccessRequest._();
+  @$core.override
+  ReviewFeatureAccessRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReviewFeatureAccessRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReviewFeatureAccessRequest>(create);
+  static ReviewFeatureAccessRequest? _defaultInstance;
+
+  @$pb.TagNumber(3)
+  $core.String get draftId => $_getSZ(0);
+  @$pb.TagNumber(3)
+  set draftId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDraftId() => $_has(0);
+  @$pb.TagNumber(3)
+  void clearDraftId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get expectedRevision => $_getI64(1);
+  @$pb.TagNumber(4)
+  set expectedRevision($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExpectedRevision() => $_has(1);
+  @$pb.TagNumber(4)
+  void clearExpectedRevision() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get installationId => $_getSZ(2);
+  @$pb.TagNumber(5)
+  set installationId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(5)
+  $core.bool hasInstallationId() => $_has(2);
+  @$pb.TagNumber(5)
+  void clearInstallationId() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get releaseDigest => $_getSZ(3);
+  @$pb.TagNumber(6)
+  set releaseDigest($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(6)
+  $core.bool hasReleaseDigest() => $_has(3);
+  @$pb.TagNumber(6)
+  void clearReleaseDigest() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<FeatureGrant> get grants => $_getList(4);
+
+  @$pb.TagNumber(8)
+  $pb.PbList<$core.String> get subscriptions => $_getList(5);
 }
 
 class InstallFeatureVersionRequest extends $pb.GeneratedMessage {
@@ -2240,6 +2437,9 @@ class FeatureVerification extends $pb.GeneratedMessage {
     $core.int? failed,
     $core.int? skipped,
     $fixnum.Int64? verifiedAtUnixMs,
+    $core.Iterable<FeatureVerificationScenario>? scenarios,
+    $core.Iterable<FeatureVerificationArtifact>? artifacts,
+    $core.String? sourceReference,
   }) {
     final result = create();
     if (releaseDigest != null) result.releaseDigest = releaseDigest;
@@ -2248,6 +2448,9 @@ class FeatureVerification extends $pb.GeneratedMessage {
     if (failed != null) result.failed = failed;
     if (skipped != null) result.skipped = skipped;
     if (verifiedAtUnixMs != null) result.verifiedAtUnixMs = verifiedAtUnixMs;
+    if (scenarios != null) result.scenarios.addAll(scenarios);
+    if (artifacts != null) result.artifacts.addAll(artifacts);
+    if (sourceReference != null) result.sourceReference = sourceReference;
     return result;
   }
 
@@ -2276,6 +2479,17 @@ class FeatureVerification extends $pb.GeneratedMessage {
         ..aI(4, _omitFieldNames ? '' : 'failed')
         ..aI(5, _omitFieldNames ? '' : 'skipped')
         ..aInt64(6, _omitFieldNames ? '' : 'verifiedAtUnixMs')
+        ..pPM<FeatureVerificationScenario>(
+          7,
+          _omitFieldNames ? '' : 'scenarios',
+          subBuilder: FeatureVerificationScenario.create,
+        )
+        ..pPM<FeatureVerificationArtifact>(
+          8,
+          _omitFieldNames ? '' : 'artifacts',
+          subBuilder: FeatureVerificationArtifact.create,
+        )
+        ..aOS(9, _omitFieldNames ? '' : 'sourceReference')
         ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2350,6 +2564,240 @@ class FeatureVerification extends $pb.GeneratedMessage {
   $core.bool hasVerifiedAtUnixMs() => $_has(5);
   @$pb.TagNumber(6)
   void clearVerifiedAtUnixMs() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<FeatureVerificationScenario> get scenarios => $_getList(6);
+
+  @$pb.TagNumber(8)
+  $pb.PbList<FeatureVerificationArtifact> get artifacts => $_getList(7);
+
+  @$pb.TagNumber(9)
+  $core.String get sourceReference => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set sourceReference($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasSourceReference() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSourceReference() => $_clearField(9);
+}
+
+class FeatureVerificationScenario extends $pb.GeneratedMessage {
+  factory FeatureVerificationScenario({
+    $core.String? scenarioId,
+    $core.String? name,
+    FeatureScenarioOutcome? outcome,
+    $core.String? safeFailure,
+    $fixnum.Int64? durationMilliseconds,
+  }) {
+    final result = create();
+    if (scenarioId != null) result.scenarioId = scenarioId;
+    if (name != null) result.name = name;
+    if (outcome != null) result.outcome = outcome;
+    if (safeFailure != null) result.safeFailure = safeFailure;
+    if (durationMilliseconds != null)
+      result.durationMilliseconds = durationMilliseconds;
+    return result;
+  }
+
+  FeatureVerificationScenario._();
+
+  factory FeatureVerificationScenario.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory FeatureVerificationScenario.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'FeatureVerificationScenario',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'scenarioId')
+        ..aOS(2, _omitFieldNames ? '' : 'name')
+        ..aE<FeatureScenarioOutcome>(
+          3,
+          _omitFieldNames ? '' : 'outcome',
+          enumValues: FeatureScenarioOutcome.values,
+        )
+        ..aOS(4, _omitFieldNames ? '' : 'safeFailure')
+        ..aInt64(5, _omitFieldNames ? '' : 'durationMilliseconds')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureVerificationScenario clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureVerificationScenario copyWith(
+    void Function(FeatureVerificationScenario) updates,
+  ) =>
+      super.copyWith(
+            (message) => updates(message as FeatureVerificationScenario),
+          )
+          as FeatureVerificationScenario;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FeatureVerificationScenario create() =>
+      FeatureVerificationScenario._();
+  @$core.override
+  FeatureVerificationScenario createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FeatureVerificationScenario getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FeatureVerificationScenario>(create);
+  static FeatureVerificationScenario? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get scenarioId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set scenarioId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasScenarioId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearScenarioId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  FeatureScenarioOutcome get outcome => $_getN(2);
+  @$pb.TagNumber(3)
+  set outcome(FeatureScenarioOutcome value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOutcome() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOutcome() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get safeFailure => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set safeFailure($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSafeFailure() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSafeFailure() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get durationMilliseconds => $_getI64(4);
+  @$pb.TagNumber(5)
+  set durationMilliseconds($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDurationMilliseconds() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDurationMilliseconds() => $_clearField(5);
+}
+
+class FeatureVerificationArtifact extends $pb.GeneratedMessage {
+  factory FeatureVerificationArtifact({
+    $core.String? name,
+    $core.String? mediaType,
+    $fixnum.Int64? sizeBytes,
+    $core.String? digest,
+  }) {
+    final result = create();
+    if (name != null) result.name = name;
+    if (mediaType != null) result.mediaType = mediaType;
+    if (sizeBytes != null) result.sizeBytes = sizeBytes;
+    if (digest != null) result.digest = digest;
+    return result;
+  }
+
+  FeatureVerificationArtifact._();
+
+  factory FeatureVerificationArtifact.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory FeatureVerificationArtifact.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'FeatureVerificationArtifact',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'name')
+        ..aOS(2, _omitFieldNames ? '' : 'mediaType')
+        ..aInt64(3, _omitFieldNames ? '' : 'sizeBytes')
+        ..aOS(4, _omitFieldNames ? '' : 'digest')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureVerificationArtifact clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureVerificationArtifact copyWith(
+    void Function(FeatureVerificationArtifact) updates,
+  ) =>
+      super.copyWith(
+            (message) => updates(message as FeatureVerificationArtifact),
+          )
+          as FeatureVerificationArtifact;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FeatureVerificationArtifact create() =>
+      FeatureVerificationArtifact._();
+  @$core.override
+  FeatureVerificationArtifact createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FeatureVerificationArtifact getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FeatureVerificationArtifact>(create);
+  static FeatureVerificationArtifact? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get mediaType => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set mediaType($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMediaType() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMediaType() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get sizeBytes => $_getI64(2);
+  @$pb.TagNumber(3)
+  set sizeBytes($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSizeBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSizeBytes() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get digest => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set digest($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDigest() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDigest() => $_clearField(4);
 }
 
 class FeatureDraft extends $pb.GeneratedMessage {
@@ -2700,6 +3148,8 @@ class FeatureRelease extends $pb.GeneratedMessage {
     FeatureSourceKind? sourceKind,
     $core.Iterable<$core.String>? requestedCapabilityIds,
     $core.Iterable<$core.String>? dependencies,
+    $core.String? sourceReference,
+    FeatureSourceSnapshot? source,
   }) {
     final result = create();
     if (digest != null) result.digest = digest;
@@ -2707,6 +3157,8 @@ class FeatureRelease extends $pb.GeneratedMessage {
     if (requestedCapabilityIds != null)
       result.requestedCapabilityIds.addAll(requestedCapabilityIds);
     if (dependencies != null) result.dependencies.addAll(dependencies);
+    if (sourceReference != null) result.sourceReference = sourceReference;
+    if (source != null) result.source = source;
     return result;
   }
 
@@ -2737,6 +3189,12 @@ class FeatureRelease extends $pb.GeneratedMessage {
         )
         ..pPS(3, _omitFieldNames ? '' : 'requestedCapabilityIds')
         ..pPS(4, _omitFieldNames ? '' : 'dependencies')
+        ..aOS(5, _omitFieldNames ? '' : 'sourceReference')
+        ..aOM<FeatureSourceSnapshot>(
+          6,
+          _omitFieldNames ? '' : 'source',
+          subBuilder: FeatureSourceSnapshot.create,
+        )
         ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2781,6 +3239,26 @@ class FeatureRelease extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(4)
   $pb.PbList<$core.String> get dependencies => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $core.String get sourceReference => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set sourceReference($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSourceReference() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSourceReference() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  FeatureSourceSnapshot get source => $_getN(5);
+  @$pb.TagNumber(6)
+  set source(FeatureSourceSnapshot value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasSource() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSource() => $_clearField(6);
+  @$pb.TagNumber(6)
+  FeatureSourceSnapshot ensureSource() => $_ensure(5);
 }
 
 class FeatureGrant extends $pb.GeneratedMessage {
@@ -2891,10 +3369,221 @@ class FeatureGrant extends $pb.GeneratedMessage {
   void clearProvider() => $_clearField(5);
 }
 
+class FeatureInstallationRecovery extends $pb.GeneratedMessage {
+  factory FeatureInstallationRecovery({
+    $core.bool? installed,
+    FeatureVerification? verification,
+    FeatureRelease? release,
+    $core.String? installationId,
+    $core.Iterable<FeatureGrant>? grants,
+    $core.Iterable<$core.String>? subscriptions,
+    FeatureRelease? previousRelease,
+    $core.String? decisionId,
+    $core.String? idempotencyId,
+    $core.bool? rollbackAvailable,
+    $core.bool? paused,
+    $core.String? pauseReason,
+  }) {
+    final result = create();
+    if (installed != null) result.installed = installed;
+    if (verification != null) result.verification = verification;
+    if (release != null) result.release = release;
+    if (installationId != null) result.installationId = installationId;
+    if (grants != null) result.grants.addAll(grants);
+    if (subscriptions != null) result.subscriptions.addAll(subscriptions);
+    if (previousRelease != null) result.previousRelease = previousRelease;
+    if (decisionId != null) result.decisionId = decisionId;
+    if (idempotencyId != null) result.idempotencyId = idempotencyId;
+    if (rollbackAvailable != null) result.rollbackAvailable = rollbackAvailable;
+    if (paused != null) result.paused = paused;
+    if (pauseReason != null) result.pauseReason = pauseReason;
+    return result;
+  }
+
+  FeatureInstallationRecovery._();
+
+  factory FeatureInstallationRecovery.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory FeatureInstallationRecovery.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'FeatureInstallationRecovery',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOB(1, _omitFieldNames ? '' : 'installed')
+        ..aOM<FeatureVerification>(
+          2,
+          _omitFieldNames ? '' : 'verification',
+          subBuilder: FeatureVerification.create,
+        )
+        ..aOM<FeatureRelease>(
+          3,
+          _omitFieldNames ? '' : 'release',
+          subBuilder: FeatureRelease.create,
+        )
+        ..aOS(4, _omitFieldNames ? '' : 'installationId')
+        ..pPM<FeatureGrant>(
+          5,
+          _omitFieldNames ? '' : 'grants',
+          subBuilder: FeatureGrant.create,
+        )
+        ..pPS(6, _omitFieldNames ? '' : 'subscriptions')
+        ..aOM<FeatureRelease>(
+          7,
+          _omitFieldNames ? '' : 'previousRelease',
+          subBuilder: FeatureRelease.create,
+        )
+        ..aOS(8, _omitFieldNames ? '' : 'decisionId')
+        ..aOS(9, _omitFieldNames ? '' : 'idempotencyId')
+        ..aOB(10, _omitFieldNames ? '' : 'rollbackAvailable')
+        ..aOB(11, _omitFieldNames ? '' : 'paused')
+        ..aOS(12, _omitFieldNames ? '' : 'pauseReason')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureInstallationRecovery clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureInstallationRecovery copyWith(
+    void Function(FeatureInstallationRecovery) updates,
+  ) =>
+      super.copyWith(
+            (message) => updates(message as FeatureInstallationRecovery),
+          )
+          as FeatureInstallationRecovery;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FeatureInstallationRecovery create() =>
+      FeatureInstallationRecovery._();
+  @$core.override
+  FeatureInstallationRecovery createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FeatureInstallationRecovery getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FeatureInstallationRecovery>(create);
+  static FeatureInstallationRecovery? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get installed => $_getBF(0);
+  @$pb.TagNumber(1)
+  set installed($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasInstalled() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearInstalled() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  FeatureVerification get verification => $_getN(1);
+  @$pb.TagNumber(2)
+  set verification(FeatureVerification value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasVerification() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearVerification() => $_clearField(2);
+  @$pb.TagNumber(2)
+  FeatureVerification ensureVerification() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  FeatureRelease get release => $_getN(2);
+  @$pb.TagNumber(3)
+  set release(FeatureRelease value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRelease() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRelease() => $_clearField(3);
+  @$pb.TagNumber(3)
+  FeatureRelease ensureRelease() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.String get installationId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set installationId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasInstallationId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearInstallationId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<FeatureGrant> get grants => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<$core.String> get subscriptions => $_getList(5);
+
+  @$pb.TagNumber(7)
+  FeatureRelease get previousRelease => $_getN(6);
+  @$pb.TagNumber(7)
+  set previousRelease(FeatureRelease value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasPreviousRelease() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearPreviousRelease() => $_clearField(7);
+  @$pb.TagNumber(7)
+  FeatureRelease ensurePreviousRelease() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $core.String get decisionId => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set decisionId($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasDecisionId() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearDecisionId() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get idempotencyId => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set idempotencyId($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasIdempotencyId() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearIdempotencyId() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get rollbackAvailable => $_getBF(9);
+  @$pb.TagNumber(10)
+  set rollbackAvailable($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasRollbackAvailable() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearRollbackAvailable() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.bool get paused => $_getBF(10);
+  @$pb.TagNumber(11)
+  set paused($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasPaused() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearPaused() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get pauseReason => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set pauseReason($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasPauseReason() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearPauseReason() => $_clearField(12);
+}
+
 class FeatureDraftReply extends $pb.GeneratedMessage {
-  factory FeatureDraftReply({FeatureDraft? draft}) {
+  factory FeatureDraftReply({
+    FeatureDraft? draft,
+    FeatureInstallationRecovery? recovery,
+  }) {
     final result = create();
     if (draft != null) result.draft = draft;
+    if (recovery != null) result.recovery = recovery;
     return result;
   }
 
@@ -2921,6 +3610,11 @@ class FeatureDraftReply extends $pb.GeneratedMessage {
           1,
           _omitFieldNames ? '' : 'draft',
           subBuilder: FeatureDraft.create,
+        )
+        ..aOM<FeatureInstallationRecovery>(
+          2,
+          _omitFieldNames ? '' : 'recovery',
+          subBuilder: FeatureInstallationRecovery.create,
         )
         ..hasRequiredFields = false;
 
@@ -2953,6 +3647,17 @@ class FeatureDraftReply extends $pb.GeneratedMessage {
   void clearDraft() => $_clearField(1);
   @$pb.TagNumber(1)
   FeatureDraft ensureDraft() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  FeatureInstallationRecovery get recovery => $_getN(1);
+  @$pb.TagNumber(2)
+  set recovery(FeatureInstallationRecovery value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRecovery() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRecovery() => $_clearField(2);
+  @$pb.TagNumber(2)
+  FeatureInstallationRecovery ensureRecovery() => $_ensure(1);
 }
 
 class FeatureDraftPatchReply extends $pb.GeneratedMessage {
@@ -3025,10 +3730,12 @@ class FeatureReleaseReviewReply extends $pb.GeneratedMessage {
   factory FeatureReleaseReviewReply({
     FeatureDraft? draft,
     FeatureRelease? release,
+    FeatureVerification? verification,
   }) {
     final result = create();
     if (draft != null) result.draft = draft;
     if (release != null) result.release = release;
+    if (verification != null) result.verification = verification;
     return result;
   }
 
@@ -3060,6 +3767,11 @@ class FeatureReleaseReviewReply extends $pb.GeneratedMessage {
           2,
           _omitFieldNames ? '' : 'release',
           subBuilder: FeatureRelease.create,
+        )
+        ..aOM<FeatureVerification>(
+          3,
+          _omitFieldNames ? '' : 'verification',
+          subBuilder: FeatureVerification.create,
         )
         ..hasRequiredFields = false;
 
@@ -3105,6 +3817,149 @@ class FeatureReleaseReviewReply extends $pb.GeneratedMessage {
   void clearRelease() => $_clearField(2);
   @$pb.TagNumber(2)
   FeatureRelease ensureRelease() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  FeatureVerification get verification => $_getN(2);
+  @$pb.TagNumber(3)
+  set verification(FeatureVerification value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasVerification() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearVerification() => $_clearField(3);
+  @$pb.TagNumber(3)
+  FeatureVerification ensureVerification() => $_ensure(2);
+}
+
+class FeatureAccessReviewReply extends $pb.GeneratedMessage {
+  factory FeatureAccessReviewReply({
+    FeatureDraft? draft,
+    FeatureRelease? release,
+    $core.String? installationId,
+    $core.Iterable<FeatureGrant>? grants,
+    $core.Iterable<$core.String>? subscriptions,
+    FeatureRelease? previousRelease,
+  }) {
+    final result = create();
+    if (draft != null) result.draft = draft;
+    if (release != null) result.release = release;
+    if (installationId != null) result.installationId = installationId;
+    if (grants != null) result.grants.addAll(grants);
+    if (subscriptions != null) result.subscriptions.addAll(subscriptions);
+    if (previousRelease != null) result.previousRelease = previousRelease;
+    return result;
+  }
+
+  FeatureAccessReviewReply._();
+
+  factory FeatureAccessReviewReply.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory FeatureAccessReviewReply.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'FeatureAccessReviewReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOM<FeatureDraft>(
+          1,
+          _omitFieldNames ? '' : 'draft',
+          subBuilder: FeatureDraft.create,
+        )
+        ..aOM<FeatureRelease>(
+          2,
+          _omitFieldNames ? '' : 'release',
+          subBuilder: FeatureRelease.create,
+        )
+        ..aOS(3, _omitFieldNames ? '' : 'installationId')
+        ..pPM<FeatureGrant>(
+          4,
+          _omitFieldNames ? '' : 'grants',
+          subBuilder: FeatureGrant.create,
+        )
+        ..pPS(5, _omitFieldNames ? '' : 'subscriptions')
+        ..aOM<FeatureRelease>(
+          6,
+          _omitFieldNames ? '' : 'previousRelease',
+          subBuilder: FeatureRelease.create,
+        )
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureAccessReviewReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureAccessReviewReply copyWith(
+    void Function(FeatureAccessReviewReply) updates,
+  ) =>
+      super.copyWith((message) => updates(message as FeatureAccessReviewReply))
+          as FeatureAccessReviewReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FeatureAccessReviewReply create() => FeatureAccessReviewReply._();
+  @$core.override
+  FeatureAccessReviewReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FeatureAccessReviewReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FeatureAccessReviewReply>(create);
+  static FeatureAccessReviewReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  FeatureDraft get draft => $_getN(0);
+  @$pb.TagNumber(1)
+  set draft(FeatureDraft value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDraft() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDraft() => $_clearField(1);
+  @$pb.TagNumber(1)
+  FeatureDraft ensureDraft() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  FeatureRelease get release => $_getN(1);
+  @$pb.TagNumber(2)
+  set release(FeatureRelease value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRelease() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRelease() => $_clearField(2);
+  @$pb.TagNumber(2)
+  FeatureRelease ensureRelease() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $core.String get installationId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set installationId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasInstallationId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearInstallationId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<FeatureGrant> get grants => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<$core.String> get subscriptions => $_getList(4);
+
+  @$pb.TagNumber(6)
+  FeatureRelease get previousRelease => $_getN(5);
+  @$pb.TagNumber(6)
+  set previousRelease(FeatureRelease value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPreviousRelease() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPreviousRelease() => $_clearField(6);
+  @$pb.TagNumber(6)
+  FeatureRelease ensurePreviousRelease() => $_ensure(5);
 }
 
 class FeatureInstallReply extends $pb.GeneratedMessage {
@@ -3347,7 +4202,19 @@ class ResumeOriginatingRequestRequest extends $pb.GeneratedMessage {
 }
 
 class ResumeOriginatingRequestReply extends $pb.GeneratedMessage {
-  factory ResumeOriginatingRequestReply() => create();
+  factory ResumeOriginatingRequestReply({
+    $core.String? commandId,
+    $core.String? operationId,
+    $core.String? phase,
+    $fixnum.Int64? version,
+  }) {
+    final result = create();
+    if (commandId != null) result.commandId = commandId;
+    if (operationId != null) result.operationId = operationId;
+    if (phase != null) result.phase = phase;
+    if (version != null) result.version = version;
+    return result;
+  }
 
   ResumeOriginatingRequestReply._();
 
@@ -3360,13 +4227,19 @@ class ResumeOriginatingRequestReply extends $pb.GeneratedMessage {
     $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
   ]) => create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'ResumeOriginatingRequestReply',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ResumeOriginatingRequestReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'commandId')
+        ..aOS(2, _omitFieldNames ? '' : 'operationId')
+        ..aOS(3, _omitFieldNames ? '' : 'phase')
+        ..aInt64(4, _omitFieldNames ? '' : 'version')
+        ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   ResumeOriginatingRequestReply clone() => deepCopy();
@@ -3391,6 +4264,42 @@ class ResumeOriginatingRequestReply extends $pb.GeneratedMessage {
   static ResumeOriginatingRequestReply getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<ResumeOriginatingRequestReply>(create);
   static ResumeOriginatingRequestReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get commandId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set commandId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCommandId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCommandId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get operationId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set operationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOperationId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOperationId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get phase => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set phase($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPhase() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPhase() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get version => $_getI64(3);
+  @$pb.TagNumber(4)
+  set version($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasVersion() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearVersion() => $_clearField(4);
 }
 
 class ListFeaturesRequest extends $pb.GeneratedMessage {
@@ -3535,8 +4444,366 @@ class GetFeatureRequest extends $pb.GeneratedMessage {
   void clearFeatureId() => $_clearField(3);
 }
 
+class GetFeatureReleaseSourceRequest extends $pb.GeneratedMessage {
+  factory GetFeatureReleaseSourceRequest({
+    $core.String? featureId,
+    $core.String? installationId,
+    $core.String? releaseDigest,
+    $core.String? sourceReference,
+  }) {
+    final result = create();
+    if (featureId != null) result.featureId = featureId;
+    if (installationId != null) result.installationId = installationId;
+    if (releaseDigest != null) result.releaseDigest = releaseDigest;
+    if (sourceReference != null) result.sourceReference = sourceReference;
+    return result;
+  }
+
+  GetFeatureReleaseSourceRequest._();
+
+  factory GetFeatureReleaseSourceRequest.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory GetFeatureReleaseSourceRequest.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'GetFeatureReleaseSourceRequest',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(3, _omitFieldNames ? '' : 'featureId')
+        ..aOS(4, _omitFieldNames ? '' : 'installationId')
+        ..aOS(5, _omitFieldNames ? '' : 'releaseDigest')
+        ..aOS(6, _omitFieldNames ? '' : 'sourceReference')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFeatureReleaseSourceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetFeatureReleaseSourceRequest copyWith(
+    void Function(GetFeatureReleaseSourceRequest) updates,
+  ) =>
+      super.copyWith(
+            (message) => updates(message as GetFeatureReleaseSourceRequest),
+          )
+          as GetFeatureReleaseSourceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetFeatureReleaseSourceRequest create() =>
+      GetFeatureReleaseSourceRequest._();
+  @$core.override
+  GetFeatureReleaseSourceRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetFeatureReleaseSourceRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetFeatureReleaseSourceRequest>(create);
+  static GetFeatureReleaseSourceRequest? _defaultInstance;
+
+  @$pb.TagNumber(3)
+  $core.String get featureId => $_getSZ(0);
+  @$pb.TagNumber(3)
+  set featureId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFeatureId() => $_has(0);
+  @$pb.TagNumber(3)
+  void clearFeatureId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get installationId => $_getSZ(1);
+  @$pb.TagNumber(4)
+  set installationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(4)
+  $core.bool hasInstallationId() => $_has(1);
+  @$pb.TagNumber(4)
+  void clearInstallationId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get releaseDigest => $_getSZ(2);
+  @$pb.TagNumber(5)
+  set releaseDigest($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(5)
+  $core.bool hasReleaseDigest() => $_has(2);
+  @$pb.TagNumber(5)
+  void clearReleaseDigest() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get sourceReference => $_getSZ(3);
+  @$pb.TagNumber(6)
+  set sourceReference($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(6)
+  $core.bool hasSourceReference() => $_has(3);
+  @$pb.TagNumber(6)
+  void clearSourceReference() => $_clearField(6);
+}
+
+class FeatureReleaseSourceReply extends $pb.GeneratedMessage {
+  factory FeatureReleaseSourceReply({
+    $core.String? featureId,
+    $core.String? installationId,
+    $core.String? releaseDigest,
+    $core.String? sourceReference,
+    FeatureSourceSnapshot? source,
+  }) {
+    final result = create();
+    if (featureId != null) result.featureId = featureId;
+    if (installationId != null) result.installationId = installationId;
+    if (releaseDigest != null) result.releaseDigest = releaseDigest;
+    if (sourceReference != null) result.sourceReference = sourceReference;
+    if (source != null) result.source = source;
+    return result;
+  }
+
+  FeatureReleaseSourceReply._();
+
+  factory FeatureReleaseSourceReply.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory FeatureReleaseSourceReply.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'FeatureReleaseSourceReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'featureId')
+        ..aOS(2, _omitFieldNames ? '' : 'installationId')
+        ..aOS(3, _omitFieldNames ? '' : 'releaseDigest')
+        ..aOS(4, _omitFieldNames ? '' : 'sourceReference')
+        ..aOM<FeatureSourceSnapshot>(
+          5,
+          _omitFieldNames ? '' : 'source',
+          subBuilder: FeatureSourceSnapshot.create,
+        )
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureReleaseSourceReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FeatureReleaseSourceReply copyWith(
+    void Function(FeatureReleaseSourceReply) updates,
+  ) =>
+      super.copyWith((message) => updates(message as FeatureReleaseSourceReply))
+          as FeatureReleaseSourceReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FeatureReleaseSourceReply create() => FeatureReleaseSourceReply._();
+  @$core.override
+  FeatureReleaseSourceReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FeatureReleaseSourceReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FeatureReleaseSourceReply>(create);
+  static FeatureReleaseSourceReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get featureId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set featureId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasFeatureId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFeatureId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get installationId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set installationId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasInstallationId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearInstallationId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get releaseDigest => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set releaseDigest($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasReleaseDigest() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearReleaseDigest() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get sourceReference => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set sourceReference($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSourceReference() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSourceReference() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  FeatureSourceSnapshot get source => $_getN(4);
+  @$pb.TagNumber(5)
+  set source(FeatureSourceSnapshot value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSource() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSource() => $_clearField(5);
+  @$pb.TagNumber(5)
+  FeatureSourceSnapshot ensureSource() => $_ensure(4);
+}
+
+class RollbackFeatureVersionRequest extends $pb.GeneratedMessage {
+  factory RollbackFeatureVersionRequest({
+    $core.String? featureId,
+    $core.String? expectedActiveDigest,
+    $core.String? targetDigest,
+    $core.String? idempotencyId,
+    $fixnum.Int64? expectedRevision,
+  }) {
+    final result = create();
+    if (featureId != null) result.featureId = featureId;
+    if (expectedActiveDigest != null)
+      result.expectedActiveDigest = expectedActiveDigest;
+    if (targetDigest != null) result.targetDigest = targetDigest;
+    if (idempotencyId != null) result.idempotencyId = idempotencyId;
+    if (expectedRevision != null) result.expectedRevision = expectedRevision;
+    return result;
+  }
+
+  RollbackFeatureVersionRequest._();
+
+  factory RollbackFeatureVersionRequest.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory RollbackFeatureVersionRequest.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'RollbackFeatureVersionRequest',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(3, _omitFieldNames ? '' : 'featureId')
+        ..aOS(4, _omitFieldNames ? '' : 'expectedActiveDigest')
+        ..aOS(5, _omitFieldNames ? '' : 'targetDigest')
+        ..aOS(6, _omitFieldNames ? '' : 'idempotencyId')
+        ..aInt64(7, _omitFieldNames ? '' : 'expectedRevision')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RollbackFeatureVersionRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RollbackFeatureVersionRequest copyWith(
+    void Function(RollbackFeatureVersionRequest) updates,
+  ) =>
+      super.copyWith(
+            (message) => updates(message as RollbackFeatureVersionRequest),
+          )
+          as RollbackFeatureVersionRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RollbackFeatureVersionRequest create() =>
+      RollbackFeatureVersionRequest._();
+  @$core.override
+  RollbackFeatureVersionRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RollbackFeatureVersionRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RollbackFeatureVersionRequest>(create);
+  static RollbackFeatureVersionRequest? _defaultInstance;
+
+  @$pb.TagNumber(3)
+  $core.String get featureId => $_getSZ(0);
+  @$pb.TagNumber(3)
+  set featureId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFeatureId() => $_has(0);
+  @$pb.TagNumber(3)
+  void clearFeatureId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get expectedActiveDigest => $_getSZ(1);
+  @$pb.TagNumber(4)
+  set expectedActiveDigest($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExpectedActiveDigest() => $_has(1);
+  @$pb.TagNumber(4)
+  void clearExpectedActiveDigest() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get targetDigest => $_getSZ(2);
+  @$pb.TagNumber(5)
+  set targetDigest($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTargetDigest() => $_has(2);
+  @$pb.TagNumber(5)
+  void clearTargetDigest() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get idempotencyId => $_getSZ(3);
+  @$pb.TagNumber(6)
+  set idempotencyId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(6)
+  $core.bool hasIdempotencyId() => $_has(3);
+  @$pb.TagNumber(6)
+  void clearIdempotencyId() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get expectedRevision => $_getI64(4);
+  @$pb.TagNumber(7)
+  set expectedRevision($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(7)
+  $core.bool hasExpectedRevision() => $_has(4);
+  @$pb.TagNumber(7)
+  void clearExpectedRevision() => $_clearField(7);
+}
+
 class FeatureReply extends $pb.GeneratedMessage {
-  factory FeatureReply() => create();
+  factory FeatureReply({
+    $core.String? featureId,
+    OriginatingRequest? originatingRequest,
+    FeatureRelease? activeRelease,
+    FeatureRelease? previousRelease,
+    $core.Iterable<FeatureGrant>? activeGrants,
+    $core.Iterable<$core.String>? subscriptions,
+    $core.bool? rollbackAvailable,
+    $core.bool? paused,
+    $core.String? pauseReason,
+    $core.String? installationId,
+    $fixnum.Int64? revision,
+  }) {
+    final result = create();
+    if (featureId != null) result.featureId = featureId;
+    if (originatingRequest != null)
+      result.originatingRequest = originatingRequest;
+    if (activeRelease != null) result.activeRelease = activeRelease;
+    if (previousRelease != null) result.previousRelease = previousRelease;
+    if (activeGrants != null) result.activeGrants.addAll(activeGrants);
+    if (subscriptions != null) result.subscriptions.addAll(subscriptions);
+    if (rollbackAvailable != null) result.rollbackAvailable = rollbackAvailable;
+    if (paused != null) result.paused = paused;
+    if (pauseReason != null) result.pauseReason = pauseReason;
+    if (installationId != null) result.installationId = installationId;
+    if (revision != null) result.revision = revision;
+    return result;
+  }
 
   FeatureReply._();
 
@@ -3549,13 +4816,42 @@ class FeatureReply extends $pb.GeneratedMessage {
     $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
   ]) => create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'FeatureReply',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'FeatureReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'featureId')
+        ..aOM<OriginatingRequest>(
+          2,
+          _omitFieldNames ? '' : 'originatingRequest',
+          subBuilder: OriginatingRequest.create,
+        )
+        ..aOM<FeatureRelease>(
+          3,
+          _omitFieldNames ? '' : 'activeRelease',
+          subBuilder: FeatureRelease.create,
+        )
+        ..aOM<FeatureRelease>(
+          4,
+          _omitFieldNames ? '' : 'previousRelease',
+          subBuilder: FeatureRelease.create,
+        )
+        ..pPM<FeatureGrant>(
+          5,
+          _omitFieldNames ? '' : 'activeGrants',
+          subBuilder: FeatureGrant.create,
+        )
+        ..pPS(6, _omitFieldNames ? '' : 'subscriptions')
+        ..aOB(7, _omitFieldNames ? '' : 'rollbackAvailable')
+        ..aOB(8, _omitFieldNames ? '' : 'paused')
+        ..aOS(9, _omitFieldNames ? '' : 'pauseReason')
+        ..aOS(10, _omitFieldNames ? '' : 'installationId')
+        ..aInt64(11, _omitFieldNames ? '' : 'revision')
+        ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   FeatureReply clone() => deepCopy();
@@ -3575,6 +4871,99 @@ class FeatureReply extends $pb.GeneratedMessage {
   static FeatureReply getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<FeatureReply>(create);
   static FeatureReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get featureId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set featureId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasFeatureId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFeatureId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  OriginatingRequest get originatingRequest => $_getN(1);
+  @$pb.TagNumber(2)
+  set originatingRequest(OriginatingRequest value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOriginatingRequest() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOriginatingRequest() => $_clearField(2);
+  @$pb.TagNumber(2)
+  OriginatingRequest ensureOriginatingRequest() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  FeatureRelease get activeRelease => $_getN(2);
+  @$pb.TagNumber(3)
+  set activeRelease(FeatureRelease value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasActiveRelease() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearActiveRelease() => $_clearField(3);
+  @$pb.TagNumber(3)
+  FeatureRelease ensureActiveRelease() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  FeatureRelease get previousRelease => $_getN(3);
+  @$pb.TagNumber(4)
+  set previousRelease(FeatureRelease value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPreviousRelease() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPreviousRelease() => $_clearField(4);
+  @$pb.TagNumber(4)
+  FeatureRelease ensurePreviousRelease() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<FeatureGrant> get activeGrants => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<$core.String> get subscriptions => $_getList(5);
+
+  @$pb.TagNumber(7)
+  $core.bool get rollbackAvailable => $_getBF(6);
+  @$pb.TagNumber(7)
+  set rollbackAvailable($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasRollbackAvailable() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRollbackAvailable() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get paused => $_getBF(7);
+  @$pb.TagNumber(8)
+  set paused($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasPaused() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearPaused() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get pauseReason => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set pauseReason($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasPauseReason() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearPauseReason() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get installationId => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set installationId($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasInstallationId() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearInstallationId() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $fixnum.Int64 get revision => $_getI64(10);
+  @$pb.TagNumber(11)
+  set revision($fixnum.Int64 value) => $_setInt64(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasRevision() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearRevision() => $_clearField(11);
 }
 
 class ListConnectionsRequest extends $pb.GeneratedMessage {

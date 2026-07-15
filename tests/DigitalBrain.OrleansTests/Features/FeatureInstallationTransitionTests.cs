@@ -6,6 +6,7 @@ namespace DigitalBrain.OrleansTests.Features;
 
 public sealed class FeatureInstallationTransitionTests
 {
+    private static readonly ActorId Actor = new("actor-1");
     private static readonly FeatureInstallationId InstallationId = new("installation-1");
     private static readonly ReleaseDigest ReleaseOne = new(new string('a', 64));
     private static readonly ReleaseDigest ReleaseTwo = new(new string('b', 64));
@@ -235,6 +236,73 @@ public sealed class FeatureInstallationTransitionTests
     }
 
     [Fact]
+    public void Schedule_cursor_capacity_allows_existing_updates_and_rejects_new_cursors_without_mutation()
+    {
+        var schedules = Enumerable.Range(0, FeatureLimits.ScheduleCursors)
+            .Select(index => new FeatureScheduleCursor(
+                $"schedule-{index:D4}",
+                Now.AddHours(-2),
+                Now.AddHours(-1)))
+            .ToArray();
+        var full = State() with { Schedules = schedules };
+        var existing = new FeatureScheduleOccurrence(
+            schedules[0].ScheduleId,
+            Now.AddHours(-1),
+            Now.AddHours(1),
+            "{}",
+            "correlation-existing-schedule",
+            "trace-existing-schedule");
+
+        var updated = FeatureInstallationTransitions.RecordScheduleOccurrence(full, existing, Now);
+        var inboxBeforeOverflow = updated.State.Inbox;
+        var schedulesBeforeOverflow = updated.State.Schedules;
+        var unique = existing with
+        {
+            ScheduleId = "schedule-overflow",
+            CorrelationId = "correlation-overflow-schedule",
+            TraceId = "trace-overflow-schedule"
+        };
+
+        Assert.Equal(FeatureAppendStatus.Accepted, updated.Status);
+        Assert.Equal(FeatureLimits.ScheduleCursors, updated.State.Schedules.Length);
+        Assert.Equal(Now.AddHours(1), updated.State.Schedules[0].NextOccurrenceAt);
+        Assert.Single(updated.State.Inbox);
+        Assert.Throws<FeatureLimitExceededException>(() =>
+            FeatureInstallationTransitions.RecordScheduleOccurrence(updated.State, unique, Now));
+        Assert.Same(inboxBeforeOverflow, updated.State.Inbox);
+        Assert.Same(schedulesBeforeOverflow, updated.State.Schedules);
+    }
+
+    [Theory]
+    [InlineData("oversized")]
+    [InlineData("control")]
+    [InlineData("padded")]
+    public void Schedule_identifiers_are_bounded_before_input_derivation(string kind)
+    {
+        var scheduleId = kind switch
+        {
+            "oversized" => new string('s', 257),
+            "control" => "schedule\u0001control",
+            _ => " schedule-padded "
+        };
+        var state = State();
+        var occurrence = new FeatureScheduleOccurrence(
+            scheduleId,
+            Now.AddMinutes(-1),
+            Now.AddMinutes(1),
+            "{}",
+            "correlation-invalid-schedule",
+            "trace-invalid-schedule");
+
+        var rejected = Assert.Throws<ArgumentException>(() =>
+            FeatureInstallationTransitions.RecordScheduleOccurrence(state, occurrence, Now));
+
+        Assert.Equal(nameof(FeatureScheduleOccurrence.ScheduleId), rejected.ParamName);
+        Assert.Empty(state.Inbox);
+        Assert.Empty(state.Schedules);
+    }
+
+    [Fact]
     public void Intent_operation_keys_include_installation_input_and_logical_key_and_apply_once()
     {
         var claimed = Claimed();
@@ -325,6 +393,112 @@ public sealed class FeatureInstallationTransitionTests
     }
 
     [Fact]
+    public void Hub_rejects_embedded_release_source_outside_the_Draft_bounds_without_mutation()
+    {
+        var valid = Source("bounded");
+        var overFileCount = valid with
+        {
+            Files =
+            [
+                .. valid.Files,
+                .. Enumerable.Range(0, FeatureLimits.DraftSourceFiles - valid.Files.Length + 1)
+                    .Select(index => new FeatureSourceFile($"src/bounded/File{index}.cs", "sealed class Feature;"))
+            ]
+        };
+        var overFileBytes = valid with
+        {
+            Files =
+            [
+                valid.Files[0] with { Content = new string('x', FeatureLimits.DraftSourceFileUtf8Bytes + 1) },
+                valid.Files[1]
+            ]
+        };
+        var overTotalBytes = valid with
+        {
+            Files = Enumerable.Range(0, 5)
+                .Select(index => new FeatureSourceFile(
+                    index switch
+                    {
+                        0 => valid.ImplementationProjectPath,
+                        1 => valid.ScenarioProjectPath,
+                        _ => $"src/bounded/Total{index}.cs"
+                    },
+                    new string('x', FeatureLimits.DraftSourceFileUtf8Bytes)))
+                .ToArray()
+        };
+
+        foreach (var source in new[] { overFileCount, overFileBytes, overTotalBytes })
+            AssertProposalRejectedWithoutMutation(Proposal(ReleaseOne, [], source));
+    }
+
+    [Fact]
+    public void Hub_rejects_invalid_embedded_release_project_and_path_structure_without_mutation()
+    {
+        var valid = Source("structure");
+        FeatureSourceSnapshot[] invalidSources =
+        [
+            valid with { ImplementationProjectPath = "src/../Feature.csproj" },
+            valid with { ScenarioProjectPath = "tests/structure/Feature.Scenarios.txt" },
+            valid with { ScenarioProjectPath = "tests/missing/Feature.Scenarios.csproj" }
+        ];
+
+        foreach (var source in invalidSources)
+            AssertProposalRejectedWithoutMutation(Proposal(ReleaseOne, [], source));
+    }
+
+    [Fact]
+    public void Hub_rejects_embedded_release_source_reference_mismatch_without_mutation()
+    {
+        var source = Source("mismatch");
+        var proposal = Proposal(ReleaseOne, [], source);
+        proposal = proposal with
+        {
+            Release = proposal.Release with { SourceReference = "sha256:" + ReleaseOne.Value }
+        };
+
+        AssertProposalRejectedWithoutMutation(proposal);
+    }
+
+    [Fact]
+    public void Hub_rejects_noncanonical_release_coordinates_without_mutation()
+    {
+        var proposal = Proposal(ReleaseOne, []);
+        string?[] invalidReferences =
+        [
+            null,
+            "sha256:" + ReleaseOne.Value.ToUpperInvariant()
+        ];
+
+        foreach (var sourceReference in invalidReferences)
+            AssertProposalRejectedWithoutMutation(proposal with
+            {
+                Release = proposal.Release with { SourceReference = sourceReference! }
+            });
+
+        AssertProposalRejectedWithoutMutation(proposal with
+        {
+            Release = proposal.Release with
+            {
+                Digest = default
+            }
+        });
+    }
+
+    [Fact]
+    public void Repository_release_metadata_without_embedded_source_remains_valid()
+    {
+        var proposed = FeatureHubTransitions.Propose(
+            FeatureHubState.Empty,
+            Proposal(ReleaseOne, []),
+            0,
+            Now);
+
+        var release = Assert.Single(proposed.Releases);
+        Assert.Equal(FeatureSourceKind.Repository, release.SourceKind);
+        Assert.Null(release.Source);
+    }
+
+    [Fact]
     public void Exact_digest_approval_stages_then_activates_a_complete_grant_set()
     {
         FeatureGrantSpec[] grants =
@@ -337,7 +511,7 @@ public sealed class FeatureInstallationTransitionTests
         var approval = Assert.Single(proposed.Approvals);
         var approved = FeatureHubTransitions.Decide(
             proposed,
-            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-1"),
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-1", Actor),
             proposed.Revision,
             Now.AddSeconds(1));
         var staged = FeatureHubTransitions.Grant(
@@ -360,6 +534,57 @@ public sealed class FeatureInstallationTransitionTests
             Assert.IsType<FeatureGrantState>(FeatureHubTransitions.ReadGrant(
                 activated,
                 new FeatureGrantLookup(InstallationId, ReleaseOne, "gmail.message.read.v1", 1))).CapabilityId);
+    }
+
+    [Fact]
+    public void Same_release_access_activation_preserves_the_existing_rollback_coordinate()
+    {
+        FeatureGrantSpec[] previousGrants = [new("capability.previous", 1, null, Constraints("capability.previous"))];
+        FeatureGrantSpec[] activeGrants =
+        [
+            new("capability.active", 1, new ProviderConnectionId("connection-old"), Constraints("capability.active"), "sandbox")
+        ];
+        FeatureGrantSpec[] replacementGrants =
+        [
+            activeGrants[0] with { ProviderConnectionId = new ProviderConnectionId("connection-new") }
+        ];
+        var previous = FeatureHubTransitions.Register(
+            Activate(FeatureHubState.Empty, Proposal(ReleaseOne, previousGrants), previousGrants),
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["previous-event"]));
+        var active = FeatureHubTransitions.Register(
+            Activate(previous, Proposal(ReleaseTwo, activeGrants), activeGrants),
+            new FeatureInstallationRegistration(InstallationId, ReleaseTwo, ["active-event"]));
+        var superseded = active with
+        {
+            Approvals = active.Approvals.Select(approval => approval.Release.Digest == ReleaseTwo
+                ? approval with { Status = FeatureApprovalStatus.Superseded }
+                : approval).ToArray()
+        };
+        var proposed = FeatureHubTransitions.Propose(
+            superseded,
+            Proposal(ReleaseTwo, replacementGrants),
+            superseded.Revision,
+            Now.AddMinutes(1));
+        var approval = proposed.Approvals.Single(candidate => candidate.Status == FeatureApprovalStatus.Pending);
+        var approved = FeatureHubTransitions.Decide(
+            proposed,
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseTwo, true, "decision-access-replacement", Actor),
+            proposed.Revision,
+            Now.AddMinutes(2));
+        var staged = FeatureHubTransitions.Grant(
+            approved,
+            new FeatureGrantRequest(InstallationId, ReleaseTwo, new ActorId("actor-1"), replacementGrants),
+            approved.Revision);
+
+        var activated = FeatureHubTransitions.Activate(staged, InstallationId, staged.Revision);
+        var authority = Assert.Single(activated.Authorities);
+
+        Assert.Equal(ReleaseTwo, authority.ActiveRelease);
+        Assert.Equal("connection-new", Assert.Single(authority.ActiveGrants).ProviderConnectionId?.Value);
+        Assert.Equal(ReleaseOne, authority.PreviousRelease);
+        Assert.Equal("capability.previous", Assert.Single(authority.PreviousGrants).CapabilityId);
+        Assert.Equal(["previous-event"], authority.PreviousSubscriptions);
+        Assert.Null(authority.PendingRelease);
     }
 
     [Fact]
@@ -396,7 +621,7 @@ public sealed class FeatureInstallationTransitionTests
     }
 
     [Fact]
-    public void Publication_authority_digest_includes_previous_release_and_grants_while_access_digest_does_not()
+    public void Publication_authority_digest_includes_previous_release_grants_and_subscriptions_while_access_digest_does_not()
     {
         FeatureGrantSpec[] previousGrants =
         [
@@ -406,7 +631,10 @@ public sealed class FeatureInstallationTransitionTests
         [
             new("capability.active", 1, null, Constraints("capability.active"))
         ];
-        var previous = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, previousGrants), previousGrants);
+        var previousActive = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, previousGrants), previousGrants);
+        var previous = FeatureHubTransitions.Register(
+            previousActive,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["previous"]));
         var active = Activate(previous, Proposal(ReleaseTwo, activeGrants), activeGrants);
         var registered = FeatureHubTransitions.Register(
             active,
@@ -416,7 +644,8 @@ public sealed class FeatureInstallationTransitionTests
         authorities[0] = authorities[0] with
         {
             PreviousRelease = new ReleaseDigest(new string('c', 64)),
-            PreviousGrants = [new FeatureGrantState("capability.other", 1, null, Constraints("capability.other"), null)]
+            PreviousGrants = [new FeatureGrantState("capability.other", 1, null, Constraints("capability.other"), null)],
+            PreviousSubscriptions = ["other-previous"]
         };
         var changed = FeaturePublicationTransitions.Prepare(
             baseline.State with { Authorities = authorities },
@@ -495,6 +724,80 @@ public sealed class FeatureInstallationTransitionTests
         Assert.Equal(receipt, replayed.Authorities[0].PublicationReceipt);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Inbox_full_records_backpressure_without_auto_pausing_during_reservation_or_reset(bool resetInProgress)
+    {
+        FeatureGrantSpec[] grants = [new("capability.active", 1, null, Constraints("capability.active"))];
+        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, grants), grants);
+        var registered = FeatureHubTransitions.Register(
+            active,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["email.received"]));
+        var prepared = FeaturePublicationTransitions.Prepare(registered, InstallationId);
+        var receipt = new FeaturePublicationReceipt(
+            InstallationId,
+            prepared.Ticket.PublicationFence,
+            prepared.Ticket.AuthorityDigest,
+            prepared.Ticket.AccessDigest,
+            new string('9', 64));
+        var confirmed = FeaturePublicationTransitions.Confirm(prepared.State, receipt).State;
+        var draftId = new FeatureDraftId("draft-backpressure-guard");
+        var actor = new ActorId("actor-backpressure-guard");
+        var guarded = resetInProgress
+            ? confirmed with
+            {
+                DraftInstallationResets =
+                [
+                    new FeatureDraftInstallationResetState(
+                        draftId,
+                        "reset-backpressure-guard",
+                        actor,
+                        Now,
+                        InstallationId,
+                        ReleaseTwo,
+                        new string('a', 64),
+                        true,
+                        prepared.Ticket.PublicationFence,
+                        prepared.Ticket.AuthorityDigest,
+                        prepared.Ticket.AccessDigest)
+                ]
+            }
+            : confirmed with
+            {
+                DraftInstallationReservations =
+                [
+                    new FeatureDraftInstallationReservation(
+                        draftId,
+                        1,
+                        InstallationId,
+                        ReleaseTwo,
+                        "install-backpressure-guard",
+                        new string('a', 64),
+                        new string('b', 64),
+                        "decision-backpressure-guard",
+                        actor,
+                        [],
+                        ["email.received"])
+                ]
+            };
+        var input = Input("full-reservation-reset-guard");
+        var begun = FeatureHubTransitions.BeginFanOut(guarded, input);
+
+        var full = FeatureHubTransitions.RecordDeliveryOutcomes(
+            begun,
+            input.InputId,
+            [new FeatureDeliveryAttempt(InstallationId, FeatureAppendStatus.Full)],
+            Now);
+
+        Assert.Equal(confirmed.Authorities[0], full.Authorities[0]);
+        Assert.Equal(receipt, full.Authorities[0].PublicationReceipt);
+        var alert = Assert.Single(full.Alerts);
+        Assert.Equal(InstallationId, alert.InstallationId);
+        Assert.Equal(input.InputId, alert.InputId);
+        Assert.False(full.Authorities[0].Paused);
+    }
+
     [Fact]
     public void Every_authority_mutation_advances_the_publication_fence_and_every_exact_no_op_preserves_it()
     {
@@ -524,13 +827,22 @@ public sealed class FeatureInstallationTransitionTests
         var resumed = FeatureHubTransitions.ResumeAuthority(changedPause, InstallationId, changedPause.Revision);
         Assert.Equal(changedPause.Authorities[0].PublicationFence + 1, resumed.Authorities[0].PublicationFence);
         Assert.Same(resumed, FeatureHubTransitions.ResumeAuthority(resumed, InstallationId, resumed.Revision));
-        Assert.Same(confirmed, FeatureHubTransitions.RollbackAuthority(confirmed, InstallationId, confirmed.Revision));
+        var unavailableRollback = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureHubTransitions.RollbackAuthority(
+                confirmed,
+                new RollbackFeatureInstallation(
+                    InstallationId,
+                    ReleaseOne,
+                    ReleaseTwo,
+                    confirmed.Revision,
+                    "rollback-unavailable")));
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, unavailableRollback.Reason);
 
         var proposed = FeatureHubTransitions.Propose(confirmed, Proposal(ReleaseTwo, secondGrants), confirmed.Revision, Now);
         var approval = proposed.Approvals.Single(candidate => candidate.Release.Digest == ReleaseTwo);
         var approved = FeatureHubTransitions.Decide(
             proposed,
-            new FeatureApprovalDecision(approval.ApprovalId, ReleaseTwo, true, "decision-fence-update"),
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseTwo, true, "decision-fence-update", Actor),
             proposed.Revision,
             Now);
         Assert.Equal(receipt, approved.Authorities[0].PublicationReceipt);
@@ -553,7 +865,14 @@ public sealed class FeatureInstallationTransitionTests
             updatePrepared.Ticket.AccessDigest,
             new string('b', 64));
         var updateConfirmed = FeaturePublicationTransitions.Confirm(updatePrepared.State, updateReceipt).State;
-        var rolledBack = FeatureHubTransitions.RollbackAuthority(updateConfirmed, InstallationId, updateConfirmed.Revision);
+        var rolledBack = FeatureHubTransitions.RollbackAuthority(
+            updateConfirmed,
+            new RollbackFeatureInstallation(
+                InstallationId,
+                ReleaseTwo,
+                ReleaseOne,
+                updateConfirmed.Revision,
+                "rollback-fence"));
         Assert.Equal(updateConfirmed.Authorities[0].PublicationFence + 1, rolledBack.Authorities[0].PublicationFence);
         Assert.Null(rolledBack.Authorities[0].PublicationReceipt);
 
@@ -594,18 +913,18 @@ public sealed class FeatureInstallationTransitionTests
 
         var wrongDigest = Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Decide(
             proposed,
-            new FeatureApprovalDecision(approval.ApprovalId, ReleaseTwo, true, "decision-wrong-digest"),
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseTwo, true, "decision-wrong-digest", Actor),
             proposed.Revision,
             Now.AddSeconds(1)));
 
         var approved = FeatureHubTransitions.Decide(
             proposed,
-            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-1"),
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-1", Actor),
             proposed.Revision,
             Now.AddSeconds(1));
         var alreadyDecided = Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Decide(
             approved,
-            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-repeated"),
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-repeated", Actor),
             approved.Revision,
             Now.AddSeconds(2)));
         var missingApproval = Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Grant(
@@ -629,6 +948,107 @@ public sealed class FeatureInstallationTransitionTests
         Assert.Equal(FeatureCommandRejectionReason.Precondition, incompleteGrantSet.Reason);
         Assert.Equal(FeatureCommandRejectionReason.Precondition, wrongDigest.Reason);
         Assert.Equal(FeatureCommandRejectionReason.Precondition, alreadyDecided.Reason);
+    }
+
+    [Fact]
+    public void Decision_replay_is_exact_actor_bound_and_precedes_stale_revision_rejection()
+    {
+        FeatureGrantSpec[] grants = [new("capability.active", 1, null, Constraints("capability.active"))];
+        var proposed = FeatureHubTransitions.Propose(
+            FeatureHubState.Empty,
+            Proposal(ReleaseOne, grants),
+            0,
+            Now);
+        var approval = Assert.Single(proposed.Approvals);
+        var actor = new ActorId("actor-decision-replay");
+        var decision = new FeatureApprovalDecision(
+            approval.ApprovalId,
+            ReleaseOne,
+            true,
+            "decision-actor-replay",
+            actor);
+
+        var approved = FeatureHubTransitions.Decide(proposed, decision, proposed.Revision, Now);
+        var replay = FeatureHubTransitions.Decide(approved, decision, proposed.Revision, Now.AddMinutes(1));
+        var swappedActor = Assert.Throws<FeatureAuthorityRejectedException>(() =>
+            FeatureHubTransitions.Decide(
+                approved,
+                decision with { ActorId = new ActorId("actor-decision-other") },
+                proposed.Revision,
+                Now.AddMinutes(1)));
+        var missingActor = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureHubTransitions.Decide(
+                proposed,
+                decision with { DecisionId = "decision-missing-actor", ActorId = null },
+                proposed.Revision,
+                Now));
+
+        Assert.Same(approved, replay);
+        Assert.Equal(FeatureAuthorityRejectionReason.ActorMismatch, swappedActor.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, missingActor.Reason);
+    }
+
+    [Fact]
+    public void Grant_cannot_transfer_an_existing_authority_to_another_actor()
+    {
+        FeatureGrantSpec[] firstGrants = [new("capability.first", 1, null, Constraints("capability.first"))];
+        FeatureGrantSpec[] secondGrants = [new("capability.second", 1, null, Constraints("capability.second"))];
+        var actor = new ActorId("actor-authority-owner");
+        var firstProposal = FeatureHubTransitions.Propose(
+            FeatureHubState.Empty,
+            Proposal(ReleaseOne, firstGrants),
+            0,
+            Now);
+        var firstApproval = Assert.Single(firstProposal.Approvals);
+        var firstApproved = FeatureHubTransitions.Decide(
+            firstProposal,
+            new FeatureApprovalDecision(firstApproval.ApprovalId, ReleaseOne, true, "decision-first-actor", actor),
+            firstProposal.Revision,
+            Now);
+        var firstStaged = FeatureHubTransitions.Grant(
+            firstApproved,
+            new FeatureGrantRequest(InstallationId, ReleaseOne, actor, firstGrants),
+            firstApproved.Revision);
+        var active = FeatureHubTransitions.Activate(firstStaged, InstallationId, firstStaged.Revision);
+        var secondProposal = FeatureHubTransitions.Propose(
+            active,
+            Proposal(ReleaseTwo, secondGrants),
+            active.Revision,
+            Now.AddMinutes(1));
+        var secondApproval = secondProposal.Approvals.Single(candidate => candidate.Release.Digest == ReleaseTwo);
+        var otherActor = new ActorId("actor-authority-other");
+        var secondApproved = FeatureHubTransitions.Decide(
+            secondProposal,
+            new FeatureApprovalDecision(secondApproval.ApprovalId, ReleaseTwo, true, "decision-second-actor", otherActor),
+            secondProposal.Revision,
+            Now.AddMinutes(1));
+
+        var rejected = Assert.Throws<FeatureAuthorityRejectedException>(() =>
+            FeatureHubTransitions.Grant(
+                secondApproved,
+                new FeatureGrantRequest(InstallationId, ReleaseTwo, otherActor, secondGrants),
+                secondApproved.Revision));
+
+        Assert.Equal(FeatureAuthorityRejectionReason.ActorMismatch, rejected.Reason);
+        Assert.Equal(actor, Assert.Single(secondApproved.Authorities).ActorId);
+    }
+
+    [Fact]
+    public void Release_digest_cannot_be_rebound_to_different_source_content()
+    {
+        FeatureGrantSpec[] grants = [new("capability.active", 1, null, Constraints("capability.active"))];
+        var firstProposal = Proposal(ReleaseOne, grants, Source("first"));
+        var proposed = FeatureHubTransitions.Propose(
+            FeatureHubState.Empty,
+            firstProposal,
+            0,
+            Now);
+
+        Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.Propose(
+            proposed,
+            Proposal(ReleaseOne, grants, Source("second")),
+            proposed.Revision,
+            Now));
     }
 
     [Fact]
@@ -697,7 +1117,10 @@ public sealed class FeatureInstallationTransitionTests
     {
         FeatureGrantSpec[] readGrant = [new("gmail.message.read.v1", 1, new ProviderConnectionId("google-1"), Constraints("gmail.message.read.v1"), "google")];
         FeatureGrantSpec[] modelGrant = [new("model.complete.v1", 1, null, Constraints("model.complete.v1"))];
-        var active = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, readGrant), readGrant);
+        var firstActive = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, readGrant), readGrant);
+        var active = FeatureHubTransitions.Register(
+            firstActive,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["first"]));
         var updated = Activate(active, Proposal(ReleaseTwo, modelGrant), modelGrant);
 
         Assert.NotNull(FeatureHubTransitions.ReadGrant(
@@ -726,6 +1149,126 @@ public sealed class FeatureInstallationTransitionTests
             new FeatureGrantLookup(InstallationId, ReleaseTwo, "model.complete.v1", 1)));
     }
 
+    [Fact]
+    public void Exact_rollback_availability_requires_complete_coherent_retained_state()
+    {
+        FeatureGrantSpec[] firstGrants = [new("capability.first", 1, null, Constraints("capability.first"))];
+        FeatureGrantSpec[] secondGrants = [new("capability.second", 1, null, Constraints("capability.second"))];
+        var firstActive = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, firstGrants), firstGrants);
+        var firstRegistered = FeatureHubTransitions.Register(
+            firstActive,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["first"]));
+        var secondActive = Activate(firstRegistered, Proposal(ReleaseTwo, secondGrants), secondGrants);
+        var authority = Assert.Single(secondActive.Authorities);
+
+        Assert.True(FeatureHubTransitions.ExactRollbackAvailable(authority));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { ActiveRelease = null }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { ActiveGrantRevision = null }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PreviousRelease = null }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PreviousRelease = authority.ActiveRelease }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PreviousGrantRevision = null }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PreviousGrantRevision = authority.ActiveGrantRevision }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { Paused = true, PauseReason = "owner pause" }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PendingRelease = ReleaseOne }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PendingGrantRevision = new GrantRevision(3) }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PendingGrants = authority.ActiveGrants }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PendingGrants = null! }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PreviousSubscriptions = null }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PreviousSubscriptions = [] }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PreviousSubscriptions = ["duplicate", "duplicate"] }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with { PreviousGrants = null! }));
+        Assert.False(FeatureHubTransitions.ExactRollbackAvailable(authority with
+        {
+            PreviousGrants = [authority.PreviousGrants[0] with { CapabilityVersion = 0 }]
+        }));
+    }
+
+    [Fact]
+    public void Exact_rollback_restores_the_retained_release_grants_and_subscriptions_once()
+    {
+        FeatureGrantSpec[] firstGrants = [new("capability.first", 1, null, Constraints("capability.first"))];
+        FeatureGrantSpec[] secondGrants = [new("capability.second", 1, null, Constraints("capability.second"))];
+        var firstActive = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, firstGrants), firstGrants);
+        var firstRegistered = FeatureHubTransitions.Register(
+            firstActive,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["z-first", "a-first"]));
+        var secondActive = Activate(firstRegistered, Proposal(ReleaseTwo, secondGrants), secondGrants);
+        var secondRegistered = FeatureHubTransitions.Register(
+            secondActive,
+            new FeatureInstallationRegistration(InstallationId, ReleaseTwo, ["second"]));
+        var command = new RollbackFeatureInstallation(
+            InstallationId,
+            ReleaseTwo,
+            ReleaseOne,
+            secondRegistered.Revision,
+            "rollback-1");
+
+        var rolledBack = FeatureHubTransitions.RollbackAuthority(secondRegistered, command);
+        var replayed = FeatureHubTransitions.RollbackAuthority(rolledBack, command);
+
+        var authority = Assert.Single(rolledBack.Authorities);
+        Assert.Equal(ReleaseOne, authority.ActiveRelease);
+        Assert.Equal(firstGrants.Select(grant => grant.CapabilityId), authority.ActiveGrants.Select(grant => grant.CapabilityId));
+        Assert.Null(authority.PreviousRelease);
+        Assert.Null(authority.PreviousGrantRevision);
+        Assert.Empty(authority.PreviousGrants);
+        Assert.Null(authority.PreviousSubscriptions);
+        var registration = Assert.Single(rolledBack.Installations);
+        Assert.Equal(ReleaseOne, registration.Release);
+        Assert.Equal(["a-first", "z-first"], registration.Subscriptions);
+        Assert.Equal(secondRegistered.Revision + 1, rolledBack.Revision);
+        Assert.Same(rolledBack, replayed);
+    }
+
+    [Fact]
+    public void Exact_rollback_rejects_stale_coordinates_and_idempotency_conflicts()
+    {
+        FeatureGrantSpec[] firstGrants = [new("capability.first", 1, null, Constraints("capability.first"))];
+        FeatureGrantSpec[] secondGrants = [new("capability.second", 1, null, Constraints("capability.second"))];
+        var firstActive = Activate(FeatureHubState.Empty, Proposal(ReleaseOne, firstGrants), firstGrants);
+        var firstRegistered = FeatureHubTransitions.Register(
+            firstActive,
+            new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["first"]));
+        var secondActive = Activate(firstRegistered, Proposal(ReleaseTwo, secondGrants), secondGrants);
+        var state = FeatureHubTransitions.Register(
+            secondActive,
+            new FeatureInstallationRegistration(InstallationId, ReleaseTwo, ["second"]));
+        var command = new RollbackFeatureInstallation(
+            InstallationId,
+            ReleaseTwo,
+            ReleaseOne,
+            state.Revision,
+            "rollback-conflicts");
+
+        var staleRevision = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureHubTransitions.RollbackAuthority(
+                state,
+                command with { ExpectedRevision = state.Revision - 1, IdempotencyId = "rollback-stale" }));
+        var wrongActive = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureHubTransitions.RollbackAuthority(
+                state,
+                command with { ExpectedActiveRelease = ReleaseOne, IdempotencyId = "rollback-wrong-active" }));
+        var wrongTarget = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureHubTransitions.RollbackAuthority(
+                state,
+                command with { TargetRelease = ReleaseTwo, IdempotencyId = "rollback-wrong-target" }));
+        var rolledBack = FeatureHubTransitions.RollbackAuthority(state, command);
+        var reboundId = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureHubTransitions.RollbackAuthority(
+                rolledBack,
+                command with { TargetRelease = ReleaseTwo }));
+        var differentId = Assert.Throws<FeatureConcurrencyException>(() =>
+            FeatureHubTransitions.RollbackAuthority(
+                rolledBack,
+                command with { IdempotencyId = "rollback-different-id" }));
+
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, staleRevision.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, wrongActive.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, wrongTarget.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, reboundId.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, differentId.Reason);
+    }
+
     private static FeatureHubState Activate(
         FeatureHubState state,
         FeatureReleaseProposal proposal,
@@ -735,7 +1278,7 @@ public sealed class FeatureInstallationTransitionTests
         var approval = proposed.Approvals[^1];
         var approved = FeatureHubTransitions.Decide(
             proposed,
-            new FeatureApprovalDecision(approval.ApprovalId, proposal.Release.Digest, true, "decision-" + proposed.Revision),
+            new FeatureApprovalDecision(approval.ApprovalId, proposal.Release.Digest, true, "decision-" + proposed.Revision, Actor),
             proposed.Revision,
             Now);
         var staged = FeatureHubTransitions.Grant(
@@ -745,18 +1288,45 @@ public sealed class FeatureInstallationTransitionTests
         return FeatureHubTransitions.Activate(staged, InstallationId, staged.Revision);
     }
 
-    private static FeatureReleaseProposal Proposal(ReleaseDigest release, FeatureGrantSpec[] grants) => new(
+    private static FeatureReleaseProposal Proposal(
+        ReleaseDigest release,
+        FeatureGrantSpec[] grants,
+        FeatureSourceSnapshot? source = null) => new(
         InstallationId,
         new FeatureReleaseMetadata(
             release,
-            "sha256:" + release.Value,
-            FeatureSourceKind.Repository,
+            source is null ? "sha256:" + release.Value : FeatureDraftAuthoringTransitions.SourceReference(source),
+            source is null ? FeatureSourceKind.Repository : FeatureSourceKind.RuntimeAuthored,
             grants.Select(grant => grant.CapabilityId).ToArray(),
-            ["DigitalBrain.Features.Sdk"]),
+            ["DigitalBrain.Features.Sdk"],
+            source),
         grants);
 
     private static string Constraints(string capabilityId) =>
         JsonSerializer.Serialize(new { allowedToolIds = new[] { capabilityId } });
+
+    private static FeatureSourceSnapshot Source(string suffix) => new(
+        $"src/{suffix}/Feature.csproj",
+        $"tests/{suffix}/Feature.Scenarios.csproj",
+        [
+            new FeatureSourceFile($"src/{suffix}/Feature.csproj", "<Project />"),
+            new FeatureSourceFile($"tests/{suffix}/Feature.Scenarios.csproj", "<Project />")
+        ]);
+
+    private static void AssertProposalRejectedWithoutMutation(FeatureReleaseProposal proposal)
+    {
+        var state = FeatureHubState.Empty;
+        var releases = state.Releases;
+        var approvals = state.Approvals;
+
+        Assert.Throws<ArgumentException>(() => FeatureHubTransitions.Propose(state, proposal, state.Revision, Now));
+
+        Assert.Equal(0, state.Revision);
+        Assert.Same(releases, state.Releases);
+        Assert.Same(approvals, state.Approvals);
+        Assert.Empty(state.Releases);
+        Assert.Empty(state.Approvals);
+    }
 
     private static FeatureInstallationState State() =>
         FeatureInstallationState.Create(ReleaseOne, InstallationId);

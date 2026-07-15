@@ -84,7 +84,11 @@ public sealed class FeatureSuggestedChangeTests
             created.State,
             new RecordFeatureVerification(
                 created.Draft.DraftId,
-                new FeatureVerification(new ReleaseDigest(new string('a', 64)), 1, 1, 0, 0, Now.AddMinutes(1)),
+                FeatureVerificationTestData.Passing(
+                    new ReleaseDigest(new string('a', 64)),
+                    created.Draft.Source,
+                    1,
+                    Now.AddMinutes(1)),
                 0,
                 "verification-1"));
         var patch = Patch(verified.Draft, "after-verification");

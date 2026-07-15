@@ -196,6 +196,7 @@ public sealed class FeatureEventEffectE2ETests
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
         public Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request) => throw new NotSupportedException();
         public Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraft?> ReadInstalledDraftAsync(FeatureInstallationId installationId, ReleaseDigest release) => throw new NotSupportedException();
         public Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command) => throw new NotSupportedException();
         public Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command) => throw new NotSupportedException();
         public Task<FeatureDraft> AcceptSuggestedChangeAsync(AcceptSuggestedChange command) => throw new NotSupportedException();
@@ -203,6 +204,9 @@ public sealed class FeatureEventEffectE2ETests
         public Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command) => throw new NotSupportedException();
         public Task<FeatureDraftInstallationReservation> AcquireDraftInstallationReservationAsync(InstallFeatureVersion command, ActorId actorId) => throw new NotSupportedException();
         public Task<FeatureDraftInstallationReservation?> ReadDraftInstallationReservationAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraftInstallationResetObligation?> ReadDraftInstallationResetAsync(FeatureDraftId draftId) => throw new NotSupportedException();
+        public Task<FeatureDraftInstallationResetPreparation> ResetDraftInstallationReservationAsync(ResetFeatureDraftInstallationReservation command, ActorId actorId) => throw new NotSupportedException();
+        public Task<FeatureDraft> CompleteDraftInstallationReservationResetAsync(FeatureDraftId draftId, string idempotencyId, ActorId actorId) => throw new NotSupportedException();
         public Task<FeatureDraft> MarkDraftInstalledAsync(MarkFeatureDraftInstalled command) => throw new NotSupportedException();
         public Task<FeatureHubSnapshot> ReadAsync() => throw new NotSupportedException();
         public Task<FeatureApprovalSnapshot> ProposeAsync(FeatureReleaseProposal proposal, long expectedRevision) => throw new NotSupportedException();
@@ -247,6 +251,20 @@ public sealed class FeatureEventEffectE2ETests
         public Task PauseAsync(string reason) => Task.CompletedTask;
         public Task ResumeAsync() => throw new NotSupportedException();
         public Task SwitchReleaseAsync(ReleaseDigest release) => throw new NotSupportedException();
+        public Task<FeatureRuntimeReservationSnapshot> EstablishReservationAsync(FeatureRuntimeReservation reservation) => throw new NotSupportedException();
+        public Task<FeatureRuntimeReservationSnapshot?> ReadReservationAsync() => throw new NotSupportedException();
+        public Task ActivateReservedReleaseAsync(FeatureRuntimeReservation reservation) => throw new NotSupportedException();
+        public Task ResetReservedReleaseAsync(FeatureRuntimeReservation reservation, bool requireRuntimeAbsence) => throw new NotSupportedException();
+        public Task ReleaseReservationAsync(FeatureRuntimeReservationRelease release) => throw new NotSupportedException();
+        public Task BeginReleaseSwitchAsync(ReleaseDigest release, string operationToken) => throw new NotSupportedException();
+        public Task ConfirmReleaseSwitchAsync(ReleaseDigest release) => throw new NotSupportedException();
+        public Task ClearBackpressurePauseAsync() => throw new NotSupportedException();
+        public Task DiscardUnpublishedAsync(ReleaseDigest release, bool requireAbsent) => throw new NotSupportedException();
+        public Task RestoreUnpublishedCandidateAsync(
+            ReleaseDigest candidateRelease,
+            ReleaseDigest expectedActiveRelease,
+            ReleaseDigest? expectedPreviousRelease,
+            long minimumFromRevision) => throw new NotSupportedException();
         public Task RollbackAsync() => throw new NotSupportedException();
         public Task<FeatureInstallationSnapshot> ReadAsync() => throw new NotSupportedException();
     }

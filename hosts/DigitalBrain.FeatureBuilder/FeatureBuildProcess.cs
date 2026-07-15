@@ -3,6 +3,11 @@ using System.Diagnostics;
 using System.Text;
 namespace DigitalBrain.FeatureBuilder;
 
+internal sealed record FeatureBuildProcessResult(int ExitCode, string Failure)
+{
+    internal bool Succeeded => ExitCode == 0;
+}
+
 internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
 {
     private const int MaximumCapturedCharacters = 16_384;
@@ -14,6 +19,27 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         FeatureBuildFailure failure,
         CancellationToken cancellationToken,
         params string[] arguments)
+    {
+        var result = await RunCoreAsync(workspace, deadline, stageLimit, failure, cancellationToken, arguments);
+        if (!result.Succeeded)
+        {
+            throw new FeatureBuildException(failure, result.Failure);
+        }
+    }
+    internal Task<FeatureBuildProcessResult> RunForEvidenceAsync(
+        string workspace,
+        DateTimeOffset deadline,
+        TimeSpan stageLimit,
+        CancellationToken cancellationToken,
+        params string[] arguments) =>
+        RunCoreAsync(workspace, deadline, stageLimit, FeatureBuildFailure.ScenarioFailed, cancellationToken, arguments);
+    private async Task<FeatureBuildProcessResult> RunCoreAsync(
+        string workspace,
+        DateTimeOffset deadline,
+        TimeSpan stageLimit,
+        FeatureBuildFailure failure,
+        CancellationToken cancellationToken,
+        IReadOnlyList<string> arguments)
     {
         var remaining = deadline - _timeProvider.GetUtcNow();
         if (remaining <= TimeSpan.Zero)
@@ -49,10 +75,9 @@ internal sealed class FeatureBuildProcess(TimeProvider timeProvider)
         }
         var output = await outputTask;
         var error = await errorTask;
-        if (process.ExitCode != 0)
-        {
-            throw new FeatureBuildException(failure, BoundedFailure(arguments[0], process.ExitCode, output, error));
-        }
+        return new FeatureBuildProcessResult(
+            process.ExitCode,
+            process.ExitCode == 0 ? string.Empty : BoundedFailure(arguments[0], process.ExitCode, output, error));
     }
     private static ProcessStartInfo CreateStartInfo(string workspace, IReadOnlyList<string> arguments)
     {

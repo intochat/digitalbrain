@@ -17,6 +17,9 @@ public interface IFeatureLifecycleRail
     Task<FeatureApprovalSnapshot> DecideAsync(RuntimeRequestContext context, FeatureApprovalDecision decision, long expectedRevision, CancellationToken cancellationToken = default);
     Task<FeatureAuthoritySnapshot> GrantAsync(RuntimeRequestContext context, FeatureInstallationId installationId, ReleaseDigest release, FeatureGrantSpec[] grants, long expectedRevision, CancellationToken cancellationToken = default);
     Task<FeatureAuthoritySnapshot> InstallAsync(RuntimeRequestContext context, FeatureInstallationRegistration registration, long expectedRevision, CancellationToken cancellationToken = default);
+    Task<FeatureAuthoritySnapshot> RollbackAsync(RuntimeRequestContext context, RollbackFeatureInstallation command, CancellationToken cancellationToken = default) =>
+        Task.FromException<FeatureAuthoritySnapshot>(
+            new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
     Task<FeatureAuthoritySnapshot> RepublishAsync(RuntimeRequestContext context, FeatureInstallationRegistration registration, CancellationToken cancellationToken = default);
     Task<FeatureLifecycleInspection> InspectAsync(RuntimeRequestContext context, CancellationToken cancellationToken = default);
 }
@@ -35,7 +38,9 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
     public async Task<FeatureApprovalSnapshot> DecideAsync(RuntimeRequestContext context, FeatureApprovalDecision decision, long expectedRevision, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
-        return await Hub(context).DecideAsync(decision, expectedRevision).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return await Hub(context).DecideAsync(decision with { ActorId = context.ActorId }, expectedRevision)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
     public async Task<FeatureAuthoritySnapshot> GrantAsync(
         RuntimeRequestContext context,
@@ -55,6 +60,10 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
         registration = CanonicalRegistration(registration);
         var hub = Hub(context);
         var current = await hub.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var coordinateAuthority = current.Authorities.FirstOrDefault(candidate =>
+            candidate.InstallationId == registration.InstallationId);
+        if (coordinateAuthority is not null && coordinateAuthority.ActorId != context.ActorId)
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
         var existing = current.Authorities.FirstOrDefault(candidate =>
             candidate.InstallationId == registration.InstallationId && candidate.ActiveRelease == registration.Release);
         var installed = current.Installations.FirstOrDefault(candidate => candidate.InstallationId == registration.InstallationId);
@@ -90,12 +99,17 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
         DemandActor(context);
         await Hub(context).ResumeInstallationAsync(installationId, expectedRevision).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
-    public async Task<FeatureAuthoritySnapshot> RollbackAsync(RuntimeRequestContext context, FeatureInstallationId installationId, long expectedRevision, CancellationToken cancellationToken = default)
+    public Task<FeatureAuthoritySnapshot> RollbackAsync(RuntimeRequestContext context, FeatureInstallationId installationId, long expectedRevision, CancellationToken cancellationToken = default)
+    {
+        DemandActor(context);
+        throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
+    }
+    public async Task<FeatureAuthoritySnapshot> RollbackAsync(RuntimeRequestContext context, RollbackFeatureInstallation command, CancellationToken cancellationToken = default)
     {
         DemandActor(context);
         var hub = Hub(context);
-        var authority = await hub.RollbackInstallationAsync(installationId, expectedRevision).WaitAsync(cancellationToken).ConfigureAwait(false);
-        await PublishCurrentAsync(context.OwnerId, hub, installationId, cancellationToken);
+        var authority = await hub.RollbackInstallationExactAsync(command).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await PublishCurrentAsync(context.OwnerId, hub, command.InstallationId, cancellationToken);
         return authority;
     }
     public async Task<FeatureAuthoritySnapshot> RepublishAsync(RuntimeRequestContext context, FeatureInstallationId installationId, CancellationToken cancellationToken = default)
@@ -105,6 +119,8 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
         var snapshot = await hub.ReadAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         var authority = snapshot.Authorities.FirstOrDefault(candidate => candidate.InstallationId == installationId && candidate.ActiveRelease is not null)
             ?? throw new KeyNotFoundException("The Feature installation has no active release to publish.");
+        if (authority.ActorId != context.ActorId)
+            throw new FeatureAuthorityRejectedException(FeatureAuthorityRejectionReason.ActorMismatch);
         await PublishCurrentAsync(context.OwnerId, hub, installationId, cancellationToken);
         return authority;
     }
@@ -189,7 +205,14 @@ public sealed class FeatureLifecycleRail(IClusterClient cluster, FeatureArtifact
         left.Digest == right.Digest && string.Equals(left.SourceReference, right.SourceReference, StringComparison.Ordinal) &&
         left.SourceKind == right.SourceKind &&
         left.RequestedCapabilities.SequenceEqual(right.RequestedCapabilities, StringComparer.Ordinal) &&
-        left.Dependencies.SequenceEqual(right.Dependencies, StringComparer.Ordinal);
+        left.Dependencies.SequenceEqual(right.Dependencies, StringComparer.Ordinal) &&
+        SameSource(left.Source, right.Source);
+    private static bool SameSource(FeatureSourceSnapshot? left, FeatureSourceSnapshot? right) =>
+        ReferenceEquals(left, right) ||
+        left is not null && right is not null &&
+        string.Equals(left.ImplementationProjectPath, right.ImplementationProjectPath, StringComparison.Ordinal) &&
+        string.Equals(left.ScenarioProjectPath, right.ScenarioProjectPath, StringComparison.Ordinal) &&
+        left.Files.SequenceEqual(right.Files);
     private static void DemandActor(RuntimeRequestContext context)
     {
         if (string.IsNullOrEmpty(context.OwnerId.Value) || string.IsNullOrEmpty(context.ActorId.Value))

@@ -128,6 +128,17 @@ public sealed class UiGrpcService(
         var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
         return await productEndpoints.GetFeatureDraftAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
     }
+    public override async Task<FeatureDraftReply> ResetFeatureDraftInstallation(
+        ResetFeatureDraftInstallationRequest request,
+        ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.ResetFeatureDraftInstallationAsync(
+                authenticated,
+                request,
+                context.CancellationToken)
+            .ConfigureAwait(false);
+    }
     public override async Task<FeatureDraftReply> ReviseFeatureDraft(ReviseFeatureDraftRequest request, ServerCallContext context)
     {
         var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
@@ -143,10 +154,44 @@ public sealed class UiGrpcService(
         var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
         return await productEndpoints.VerifyFeatureDraftAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
     }
+    public override async Task<FeatureAccessReviewReply> ReviewFeatureAccess(ReviewFeatureAccessRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.ReviewFeatureAccessAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
     public override async Task<FeatureInstallReply> InstallFeatureVersion(InstallFeatureVersionRequest request, ServerCallContext context)
     {
         var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
         return await productEndpoints.InstallFeatureVersionAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
+    public override async Task<ResumeOriginatingRequestReply> ResumeOriginatingRequest(
+        ResumeOriginatingRequestRequest request,
+        ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.ResumeOriginatingRequestAsync(
+                authenticated,
+                request,
+                conversationHandler,
+                context.CancellationToken)
+            .ConfigureAwait(false);
+    }
+    public override async Task<FeatureReply> GetFeature(GetFeatureRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.GetFeatureAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
+    public override async Task<FeatureReleaseSourceReply> GetFeatureReleaseSource(
+        GetFeatureReleaseSourceRequest request,
+        ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.GetFeatureReleaseSourceAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
+    public override async Task<FeatureReply> RollbackFeatureVersion(RollbackFeatureVersionRequest request, ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.RollbackFeatureVersionAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
     }
     public override async Task<SessionReply> BootstrapSession(BootstrapSessionRequest request, ServerCallContext context)
     {
@@ -359,7 +404,7 @@ public sealed class UiGrpcService(
                 throw new RpcException(new Status(StatusCode.PermissionDenied, "Action authorization failed."));
             await featureLifecycle.DecideAsync(
                 authenticated,
-                new FeatureApprovalDecision(featureDecision.ApprovalId, new ReleaseDigest(featureDecision.ReleaseDigest), featureDecision.Approved, submission.IdempotencyKey),
+                new FeatureApprovalDecision(featureDecision.ApprovalId, new ReleaseDigest(featureDecision.ReleaseDigest), featureDecision.Approved, submission.IdempotencyKey, authenticated.ActorId),
                 featureDecision.ExpectedRevision,
                 context.CancellationToken).ConfigureAwait(false);
             await feed.RestoreConversationSurfaceAsync(authenticated, context.CancellationToken).ConfigureAwait(false);

@@ -13,8 +13,8 @@ try
     var files = command.Files.Select(file => new FeatureSourceFile(file.Path, Convert.FromBase64String(file.ContentBase64))).ToArray();
     var snapshot = new FeatureSourceSnapshot(command.ImplementationProjectPath, command.ScenarioProjectPath, files);
     var request = new FeatureBuildRequest(snapshot, command.OfflineFeedDirectory, command.OutputDirectory, command.Deadline);
-    var release = await new FeatureBuildPipeline().BuildAsync(request);
-    await Console.Out.WriteLineAsync(JsonSerializer.Serialize(release));
+    var verification = await new FeatureBuildPipeline().VerifyAsync(request);
+    await Console.Out.WriteLineAsync(JsonSerializer.Serialize(verification));
     return 0;
 }
 catch (Exception exception) when (exception is FeatureBuildException or ArgumentException or InvalidDataException or JsonException or FormatException or IOException)

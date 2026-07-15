@@ -13,10 +13,24 @@ internal sealed record FeatureHubState(
     [property: Id(6)] FeatureBackpressureAlert[] Alerts,
     [property: Id(7)] FeatureDraft[]? Drafts = null,
     [property: Id(8)] FeatureDraftCommandReplay[]? DraftReplays = null,
-    [property: Id(9)] FeatureDraftInstallationReservation[]? DraftInstallationReservations = null)
+    [property: Id(9)] FeatureDraftInstallationReservation[]? DraftInstallationReservations = null,
+    [property: Id(10)] FeatureDraftInstallationResetState[]? DraftInstallationResets = null)
 {
-    public static FeatureHubState Empty { get; } = new([], 0, [], [], [], [], [], [], []);
+    public static FeatureHubState Empty { get; } = new([], 0, [], [], [], [], [], [], [], []);
 }
+[GenerateSerializer, Alias("digitalbrain.feature.draft-installation-reset-state.v1")]
+internal sealed record FeatureDraftInstallationResetState(
+    [property: Id(0)] FeatureDraftId DraftId,
+    [property: Id(1)] string IdempotencyId,
+    [property: Id(2)] ActorId ActorId,
+    [property: Id(3)] DateTimeOffset ResetAt,
+    [property: Id(4)] FeatureInstallationId InstallationId,
+    [property: Id(5)] ReleaseDigest Release,
+    [property: Id(6)] string CommandDigest,
+    [property: Id(7)] bool RequiresRepublish,
+    [property: Id(8)] long TargetPublicationFence,
+    [property: Id(9)] string TargetAuthorityDigest,
+    [property: Id(10)] string TargetAccessDigest);
 [GenerateSerializer, Alias("digitalbrain.feature.draft-command-replay.v1")]
 internal sealed record FeatureDraftCommandReplay(
     [property: Id(0)] FeatureDraftId DraftId,
@@ -30,7 +44,8 @@ internal sealed record FeatureDraftCommandReplay(
     [property: Id(8)] FeatureInstallationId? ResultInstallationId,
     [property: Id(9)] long ResultRevision,
     [property: Id(10)] DateTimeOffset ResultUpdatedAt,
-    [property: Id(11)] int Utf8Bytes)
+    [property: Id(11)] int Utf8Bytes,
+    [property: Id(12)] ActorId ActorId = default)
 {
     public FeatureDraft Result(FeatureDraft current) => new(
         current.DraftId,
@@ -56,7 +71,8 @@ internal sealed record FeatureApprovalState(
     [property: Id(6)] string? DecisionId,
     [property: Id(7)] DateTimeOffset? DecidedAt,
     [property: Id(8)] long Revision,
-    [property: Id(9)] FeatureGrantState[] Grants);
+    [property: Id(9)] FeatureGrantState[] Grants,
+    [property: Id(10)] ActorId? DecisionActorId = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-grant-state")]
 internal sealed record FeatureGrantState(
     [property: Id(0)] string CapabilityId,
@@ -64,6 +80,14 @@ internal sealed record FeatureGrantState(
     [property: Id(2)] ProviderConnectionId? ProviderConnectionId,
     [property: Id(3)] string ConstraintsJson,
     [property: Id(4)] string? Provider);
+[GenerateSerializer, Alias("digitalbrain.feature.rollback-replay.v1")]
+internal sealed record FeatureRollbackReplay(
+    [property: Id(0)] FeatureInstallationId InstallationId,
+    [property: Id(1)] ReleaseDigest ExpectedActiveRelease,
+    [property: Id(2)] ReleaseDigest TargetRelease,
+    [property: Id(3)] long ExpectedRevision,
+    [property: Id(4)] string IdempotencyId,
+    [property: Id(5)] string ResultAccessDigest);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-installation-authority-state")]
 internal sealed record FeatureInstallationAuthorityState(
     [property: Id(0)] FeatureInstallationId InstallationId,
@@ -80,7 +104,9 @@ internal sealed record FeatureInstallationAuthorityState(
     [property: Id(11)] bool Paused,
     [property: Id(12)] string? PauseReason,
     [property: Id(13)] long PublicationFence = 0,
-    [property: Id(14)] FeaturePublicationReceipt? PublicationReceipt = null);
+    [property: Id(14)] FeaturePublicationReceipt? PublicationReceipt = null,
+    [property: Id(15)] string[]? PreviousSubscriptions = null,
+    [property: Id(16)] FeatureRollbackReplay? RollbackReplay = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-fanout-delivery-state")]
 internal sealed record FeatureFanOutDeliveryState([property: Id(0)] FeatureInstallationId InstallationId, [property: Id(1)] bool Delivered);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-fanout-state")]
@@ -114,6 +140,18 @@ internal sealed record PersistedFeatureIntent(
     [property: Id(3)] DateTimeOffset? AppliedAt);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-schedule-cursor")]
 internal sealed record FeatureScheduleCursor([property: Id(0)] string ScheduleId, [property: Id(1)] DateTimeOffset LastOccurrenceAt, [property: Id(2)] DateTimeOffset NextOccurrenceAt);
+[GenerateSerializer, Alias("digitalbrain.v3.feature-release-switch")]
+internal sealed record FeatureReleaseSwitch(
+    [property: Id(0)] string OperationToken,
+    [property: Id(1)] ReleaseDigest FromActiveRelease,
+    [property: Id(2)] ReleaseDigest? FromPreviousRelease,
+    [property: Id(3)] ReleaseDigest ToRelease,
+    [property: Id(4)] long FromRevision,
+    [property: Id(5)] long SwitchRevision);
+[GenerateSerializer, Alias("digitalbrain.feature.runtime-reservation-hold.v1")]
+internal sealed record FeatureRuntimeReservationHold(
+    [property: Id(0)] FeatureRuntimeReservation Reservation,
+    [property: Id(1)] FeatureRuntimeReservationPhase Phase);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-installation-state")]
 internal sealed record FeatureInstallationState(
     [property: Id(0)] FeatureInstallationId InstallationId,
@@ -128,14 +166,27 @@ internal sealed record FeatureInstallationState(
     [property: Id(9)] long NextFence,
     [property: Id(10)] long Revision,
     [property: Id(11)] string? PauseReason,
-    [property: Id(12)] FeatureScheduleCursor[] Schedules)
+    [property: Id(12)] FeatureScheduleCursor[] Schedules,
+    [property: Id(13)] FeatureReleaseSwitch? UnconfirmedReleaseSwitch = null)
 {
     public static FeatureInstallationState Create(ReleaseDigest release, FeatureInstallationId? installationId = null) =>
-        new(installationId ?? new FeatureInstallationId("unbound"), release, null, "{}", false, [], null, [], [], 0, 0, null, []);
+        new(installationId ?? new FeatureInstallationId("unbound"), release, null, "{}", false, [], null, [], [], 0, 0, null, [], null);
 }
 internal sealed record FeatureCreateDraftTransition(FeatureHubState State, FeatureDraft Draft);
 internal sealed record FeatureDraftAuthoringTransition(FeatureHubState State, FeatureDraft Draft);
 internal sealed record FeatureDraftInstallationReservationTransition(FeatureHubState State, FeatureDraftInstallationReservation Reservation);
+internal sealed record FeatureDraftInstallationResetTransition(
+    FeatureHubState State,
+    FeatureDraft Draft,
+    bool Replay,
+    bool RequiresNewRuntimeDiscard,
+    bool RequiresRuntimeAbsence,
+    bool RequiresRepublish,
+    FeatureInstallationAuthorityState? PreservedAuthority,
+    bool Completed = false)
+{
+    public ReleaseDigest? PreservedActiveRelease => PreservedAuthority?.ActiveRelease;
+}
 internal sealed record FeatureAppendTransition(FeatureInstallationState State, FeatureAppendStatus Status);
 internal sealed record FeatureClaimTransition(FeatureInstallationState State, FeatureRunClaim? Claim);
 internal sealed record FeatureCommitTransition(FeatureInstallationState State, FeatureCompletion Completion);

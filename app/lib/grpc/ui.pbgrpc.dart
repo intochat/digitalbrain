@@ -73,6 +73,17 @@ class DigitalBrainV2UiClient extends $grpc.Client {
     return $createUnaryCall(_$getFeatureDraft, request, options: options);
   }
 
+  $grpc.ResponseFuture<$0.FeatureDraftReply> resetFeatureDraftInstallation(
+    $0.ResetFeatureDraftInstallationRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(
+      _$resetFeatureDraftInstallation,
+      request,
+      options: options,
+    );
+  }
+
   $grpc.ResponseFuture<$0.FeatureDraftReply> reviseFeatureDraft(
     $0.ReviseFeatureDraftRequest request, {
     $grpc.CallOptions? options,
@@ -92,6 +103,13 @@ class DigitalBrainV2UiClient extends $grpc.Client {
     $grpc.CallOptions? options,
   }) {
     return $createUnaryCall(_$verifyFeatureDraft, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.FeatureAccessReviewReply> reviewFeatureAccess(
+    $0.ReviewFeatureAccessRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$reviewFeatureAccess, request, options: options);
   }
 
   $grpc.ResponseFuture<$0.FeatureInstallReply> installFeatureVersion(
@@ -125,6 +143,28 @@ class DigitalBrainV2UiClient extends $grpc.Client {
     $grpc.CallOptions? options,
   }) {
     return $createUnaryCall(_$getFeature, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.FeatureReleaseSourceReply> getFeatureReleaseSource(
+    $0.GetFeatureReleaseSourceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(
+      _$getFeatureReleaseSource,
+      request,
+      options: options,
+    );
+  }
+
+  $grpc.ResponseFuture<$0.FeatureReply> rollbackFeatureVersion(
+    $0.RollbackFeatureVersionRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(
+      _$rollbackFeatureVersion,
+      request,
+      options: options,
+    );
   }
 
   $grpc.ResponseFuture<$0.ListConnectionsReply> listConnections(
@@ -221,6 +261,16 @@ class DigitalBrainV2UiClient extends $grpc.Client {
         ($0.GetFeatureDraftRequest value) => value.writeToBuffer(),
         $0.FeatureDraftReply.fromBuffer,
       );
+  static final _$resetFeatureDraftInstallation =
+      $grpc.ClientMethod<
+        $0.ResetFeatureDraftInstallationRequest,
+        $0.FeatureDraftReply
+      >(
+        '/digitalbrain.v2.ui.DigitalBrainV2Ui/ResetFeatureDraftInstallation',
+        ($0.ResetFeatureDraftInstallationRequest value) =>
+            value.writeToBuffer(),
+        $0.FeatureDraftReply.fromBuffer,
+      );
   static final _$reviseFeatureDraft =
       $grpc.ClientMethod<$0.ReviseFeatureDraftRequest, $0.FeatureDraftReply>(
         '/digitalbrain.v2.ui.DigitalBrainV2Ui/ReviseFeatureDraft',
@@ -244,6 +294,15 @@ class DigitalBrainV2UiClient extends $grpc.Client {
         '/digitalbrain.v2.ui.DigitalBrainV2Ui/VerifyFeatureDraft',
         ($0.VerifyFeatureDraftRequest value) => value.writeToBuffer(),
         $0.FeatureReleaseReviewReply.fromBuffer,
+      );
+  static final _$reviewFeatureAccess =
+      $grpc.ClientMethod<
+        $0.ReviewFeatureAccessRequest,
+        $0.FeatureAccessReviewReply
+      >(
+        '/digitalbrain.v2.ui.DigitalBrainV2Ui/ReviewFeatureAccess',
+        ($0.ReviewFeatureAccessRequest value) => value.writeToBuffer(),
+        $0.FeatureAccessReviewReply.fromBuffer,
       );
   static final _$installFeatureVersion =
       $grpc.ClientMethod<
@@ -273,6 +332,21 @@ class DigitalBrainV2UiClient extends $grpc.Client {
       $grpc.ClientMethod<$0.GetFeatureRequest, $0.FeatureReply>(
         '/digitalbrain.v2.ui.DigitalBrainV2Ui/GetFeature',
         ($0.GetFeatureRequest value) => value.writeToBuffer(),
+        $0.FeatureReply.fromBuffer,
+      );
+  static final _$getFeatureReleaseSource =
+      $grpc.ClientMethod<
+        $0.GetFeatureReleaseSourceRequest,
+        $0.FeatureReleaseSourceReply
+      >(
+        '/digitalbrain.v2.ui.DigitalBrainV2Ui/GetFeatureReleaseSource',
+        ($0.GetFeatureReleaseSourceRequest value) => value.writeToBuffer(),
+        $0.FeatureReleaseSourceReply.fromBuffer,
+      );
+  static final _$rollbackFeatureVersion =
+      $grpc.ClientMethod<$0.RollbackFeatureVersionRequest, $0.FeatureReply>(
+        '/digitalbrain.v2.ui.DigitalBrainV2Ui/RollbackFeatureVersion',
+        ($0.RollbackFeatureVersionRequest value) => value.writeToBuffer(),
         $0.FeatureReply.fromBuffer,
       );
   static final _$listConnections =
@@ -404,6 +478,20 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
       ),
     );
     $addMethod(
+      $grpc.ServiceMethod<
+        $0.ResetFeatureDraftInstallationRequest,
+        $0.FeatureDraftReply
+      >(
+        'ResetFeatureDraftInstallation',
+        resetFeatureDraftInstallation_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ResetFeatureDraftInstallationRequest.fromBuffer(value),
+        ($0.FeatureDraftReply value) => value.writeToBuffer(),
+      ),
+    );
+    $addMethod(
       $grpc.ServiceMethod<$0.ReviseFeatureDraftRequest, $0.FeatureDraftReply>(
         'ReviseFeatureDraft',
         reviseFeatureDraft_Pre,
@@ -440,6 +528,20 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.VerifyFeatureDraftRequest.fromBuffer(value),
         ($0.FeatureReleaseReviewReply value) => value.writeToBuffer(),
+      ),
+    );
+    $addMethod(
+      $grpc.ServiceMethod<
+        $0.ReviewFeatureAccessRequest,
+        $0.FeatureAccessReviewReply
+      >(
+        'ReviewFeatureAccess',
+        reviewFeatureAccess_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ReviewFeatureAccessRequest.fromBuffer(value),
+        ($0.FeatureAccessReviewReply value) => value.writeToBuffer(),
       ),
     );
     $addMethod(
@@ -488,6 +590,31 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
         false,
         false,
         ($core.List<$core.int> value) => $0.GetFeatureRequest.fromBuffer(value),
+        ($0.FeatureReply value) => value.writeToBuffer(),
+      ),
+    );
+    $addMethod(
+      $grpc.ServiceMethod<
+        $0.GetFeatureReleaseSourceRequest,
+        $0.FeatureReleaseSourceReply
+      >(
+        'GetFeatureReleaseSource',
+        getFeatureReleaseSource_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetFeatureReleaseSourceRequest.fromBuffer(value),
+        ($0.FeatureReleaseSourceReply value) => value.writeToBuffer(),
+      ),
+    );
+    $addMethod(
+      $grpc.ServiceMethod<$0.RollbackFeatureVersionRequest, $0.FeatureReply>(
+        'RollbackFeatureVersion',
+        rollbackFeatureVersion_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.RollbackFeatureVersionRequest.fromBuffer(value),
         ($0.FeatureReply value) => value.writeToBuffer(),
       ),
     );
@@ -653,6 +780,18 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
     $0.GetFeatureDraftRequest request,
   );
 
+  $async.Future<$0.FeatureDraftReply> resetFeatureDraftInstallation_Pre(
+    $grpc.ServiceCall $call,
+    $async.Future<$0.ResetFeatureDraftInstallationRequest> $request,
+  ) async {
+    return resetFeatureDraftInstallation($call, await $request);
+  }
+
+  $async.Future<$0.FeatureDraftReply> resetFeatureDraftInstallation(
+    $grpc.ServiceCall call,
+    $0.ResetFeatureDraftInstallationRequest request,
+  );
+
   $async.Future<$0.FeatureDraftReply> reviseFeatureDraft_Pre(
     $grpc.ServiceCall $call,
     $async.Future<$0.ReviseFeatureDraftRequest> $request,
@@ -687,6 +826,18 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
   $async.Future<$0.FeatureReleaseReviewReply> verifyFeatureDraft(
     $grpc.ServiceCall call,
     $0.VerifyFeatureDraftRequest request,
+  );
+
+  $async.Future<$0.FeatureAccessReviewReply> reviewFeatureAccess_Pre(
+    $grpc.ServiceCall $call,
+    $async.Future<$0.ReviewFeatureAccessRequest> $request,
+  ) async {
+    return reviewFeatureAccess($call, await $request);
+  }
+
+  $async.Future<$0.FeatureAccessReviewReply> reviewFeatureAccess(
+    $grpc.ServiceCall call,
+    $0.ReviewFeatureAccessRequest request,
   );
 
   $async.Future<$0.FeatureInstallReply> installFeatureVersion_Pre(
@@ -735,6 +886,30 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
   $async.Future<$0.FeatureReply> getFeature(
     $grpc.ServiceCall call,
     $0.GetFeatureRequest request,
+  );
+
+  $async.Future<$0.FeatureReleaseSourceReply> getFeatureReleaseSource_Pre(
+    $grpc.ServiceCall $call,
+    $async.Future<$0.GetFeatureReleaseSourceRequest> $request,
+  ) async {
+    return getFeatureReleaseSource($call, await $request);
+  }
+
+  $async.Future<$0.FeatureReleaseSourceReply> getFeatureReleaseSource(
+    $grpc.ServiceCall call,
+    $0.GetFeatureReleaseSourceRequest request,
+  );
+
+  $async.Future<$0.FeatureReply> rollbackFeatureVersion_Pre(
+    $grpc.ServiceCall $call,
+    $async.Future<$0.RollbackFeatureVersionRequest> $request,
+  ) async {
+    return rollbackFeatureVersion($call, await $request);
+  }
+
+  $async.Future<$0.FeatureReply> rollbackFeatureVersion(
+    $grpc.ServiceCall call,
+    $0.RollbackFeatureVersionRequest request,
   );
 
   $async.Future<$0.ListConnectionsReply> listConnections_Pre(

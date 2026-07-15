@@ -13,19 +13,43 @@ namespace DigitalBrain.Mcp;
 
 public sealed record FeatureSourceInput(string Path, string Content);
 public sealed record FeatureBuildSubmission(string ImplementationProjectPath, string ScenarioProjectPath, IReadOnlyList<FeatureSourceInput> Files, FeatureSourceKind SourceKind);
-public sealed record FeatureBuildArtifact(FeatureReleaseMetadata Release, FeatureScenarioResult Scenarios);
+public sealed record FeatureBuildArtifact(
+    FeatureReleaseMetadata Release,
+    FeatureScenarioResult Scenarios,
+    FeatureVerificationEvidence? VerificationEvidence = null)
+{
+    public FeatureVerificationEvidence Evidence =>
+        VerificationEvidence ?? FeatureBuildEvidence.Project(Release.SourceReference, Scenarios, []);
+}
+public sealed record FeatureBuildReview(FeatureVerificationEvidence Evidence, FeatureBuildArtifact? Artifact);
 public interface IFeatureBuildEndpoint
 {
     Task<FeatureBuildArtifact> BuildAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default);
+    async Task<FeatureBuildReview> VerifyAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default)
+    {
+        var artifact = await BuildAsync(submission, cancellationToken).ConfigureAwait(false);
+        var scenarios = artifact.Scenarios;
+        var passed = scenarios.Total > 0 && scenarios.Passed == scenarios.Total && scenarios.Failed == 0 && scenarios.Skipped == 0;
+        return new FeatureBuildReview(artifact.Evidence, passed ? artifact : null);
+    }
 }
 public interface IFeatureArtifactCatalog
 {
     Task<FeatureReleaseMetadata> DemandReleaseAsync(ReleaseDigest digest, CancellationToken cancellationToken = default);
+    Task<DigitalBrain.Kernel.Contracts.FeatureSourceSnapshot> DemandSourceAsync(string sourceReference, CancellationToken cancellationToken = default) =>
+        Task.FromException<DigitalBrain.Kernel.Contracts.FeatureSourceSnapshot>(
+            new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
 }
 public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, TimeProvider timeProvider) : IFeatureBuildEndpoint
 {
-    private const int MaximumProcessOutputCharacters = 65_536;
+    private const int MaximumProcessOutputCharacters = 1_048_576;
     public async Task<FeatureBuildArtifact> BuildAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default)
+    {
+        var review = await VerifyAsync(submission, cancellationToken).ConfigureAwait(false);
+        return review.Artifact
+            ?? throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
+    }
+    public async Task<FeatureBuildReview> VerifyAsync(FeatureBuildSubmission submission, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(submission);
         ArgumentNullException.ThrowIfNull(submission.Files);
@@ -47,24 +71,40 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
                 output,
                 timeProvider.GetUtcNow().Add(FeatureBuildPipeline.MaximumRequestDuration));
             await File.WriteAllBytesAsync(requestPath, JsonSerializer.SerializeToUtf8Bytes(request), cancellationToken);
-            var release = await RunBuilderAsync(requestPath, cancellationToken);
-            if (!string.Equals(Path.GetFullPath(release.ReleaseDirectory), Path.GetFullPath(Path.Combine(output, release.Digest)), PathComparison))
-                throw new InvalidDataException("FeatureBuilder returned a release outside its assigned output.");
+            var verification = await RunBuilderAsync(requestPath, cancellationToken);
+            var expectedSourceReference = FeatureReleaseWriter.ComputeSourceReference(source);
+            if (!string.Equals(verification.SourceReference, expectedSourceReference, StringComparison.Ordinal))
+                throw new InvalidDataException("FeatureBuilder returned evidence for another source snapshot.");
+            var evidence = FeatureBuildEvidence.Project(
+                verification.SourceReference,
+                verification.Scenarios,
+                verification.Artifacts);
+            if (verification.Release is null)
+                return new FeatureBuildReview(evidence, null);
+            var release = verification.Release;
+            if (!string.Equals(release.SourceReference, verification.SourceReference, StringComparison.Ordinal) ||
+                !string.Equals(Path.GetFullPath(release.ReleaseDirectory), Path.GetFullPath(Path.Combine(output, release.Digest)), PathComparison))
+                throw new InvalidDataException("FeatureBuilder returned a release outside its verified source coordinate.");
+            var sourceSnapshot = new DigitalBrain.Kernel.Contracts.FeatureSourceSnapshot(
+                submission.ImplementationProjectPath,
+                submission.ScenarioProjectPath,
+                submission.Files.Select(file => new DigitalBrain.Kernel.Contracts.FeatureSourceFile(file.Path, file.Content)).ToArray());
             var metadata = new FeatureReleaseMetadata(
                 new ReleaseDigest(release.Digest),
                 release.SourceReference,
                 submission.SourceKind,
                 release.Manifest.RequestedCapabilities.ToArray(),
-                release.Manifest.AssemblyReferences.ToArray());
+                release.Manifest.AssemblyReferences.ToArray(),
+                sourceSnapshot);
             await artifacts.PublishReleaseAsync(metadata, release.ReleaseDirectory, cancellationToken);
-            return new FeatureBuildArtifact(metadata, release.Scenarios);
+            return new FeatureBuildReview(evidence, new FeatureBuildArtifact(metadata, release.Scenarios, evidence));
         }
         finally
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
-    private static async Task<BuilderRelease> RunBuilderAsync(string requestPath, CancellationToken cancellationToken)
+    private static async Task<FeatureBuildVerification> RunBuilderAsync(string requestPath, CancellationToken cancellationToken)
     {
         var start = new ProcessStartInfo
         {
@@ -105,7 +145,8 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
         var error = await errorTask;
         if (process.ExitCode != 0)
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? "FeatureBuilder rejected the source." : error.Trim());
-        return JsonSerializer.Deserialize<BuilderRelease>(output, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? throw new InvalidDataException("FeatureBuilder returned no release.");
+        return JsonSerializer.Deserialize<FeatureBuildVerification>(output, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidDataException("FeatureBuilder returned no verification evidence.");
     }
     private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken)
     {
@@ -135,7 +176,54 @@ public sealed class FeatureBuildEndpoint(FeatureArtifactPublisher artifacts, Tim
         string OutputDirectory,
         DateTimeOffset Deadline);
     private sealed record BuilderFile(string Path, string ContentBase64);
-    private sealed record BuilderRelease(string Digest, string SourceReference, string ReleaseDirectory, FeatureManifest Manifest, FeatureScenarioResult Scenarios);
+}
+internal static class FeatureBuildEvidence
+{
+    public static FeatureVerificationEvidence Project(
+        string sourceReference,
+        FeatureScenarioResult scenarios,
+        IReadOnlyList<DigitalBrain.FeatureBuilder.FeatureVerificationArtifact> artifacts)
+    {
+        var results = scenarios.Results.Count == 0
+            ? Enumerable.Range(0, scenarios.Total).Select(index =>
+            {
+                var outcome = index < scenarios.Passed
+                    ? DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Passed
+                    : index < scenarios.Passed + scenarios.Failed
+                        ? DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Failed
+                        : DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Skipped;
+                return new DigitalBrain.Kernel.Contracts.FeatureScenarioEvidence(
+                    $"scenario-{index + 1}",
+                    $"Scenario {index + 1}",
+                    outcome,
+                    outcome == DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Failed ? "Scenario failed." : null,
+                    0);
+            }).ToArray()
+            : scenarios.Results.Select(result => new DigitalBrain.Kernel.Contracts.FeatureScenarioEvidence(
+                result.ScenarioId,
+                result.Name,
+                result.Outcome switch
+                {
+                    DigitalBrain.FeatureBuilder.FeatureScenarioOutcome.Passed => DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Passed,
+                    DigitalBrain.FeatureBuilder.FeatureScenarioOutcome.Failed => DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Failed,
+                    DigitalBrain.FeatureBuilder.FeatureScenarioOutcome.Skipped => DigitalBrain.Kernel.Contracts.FeatureScenarioOutcome.Skipped,
+                    _ => throw new InvalidDataException("FeatureBuilder returned an unknown scenario outcome.")
+                },
+                result.SafeFailure,
+                result.DurationMilliseconds)).ToArray();
+        return new FeatureVerificationEvidence(
+            sourceReference,
+            scenarios.Total,
+            scenarios.Passed,
+            scenarios.Failed,
+            scenarios.Skipped,
+            results,
+            artifacts.Select(artifact => new DigitalBrain.Kernel.Contracts.FeatureVerificationArtifact(
+                artifact.Name,
+                artifact.MediaType,
+                artifact.SizeBytes,
+                artifact.Digest)).ToArray());
+    }
 }
 public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] BlobServiceClient blobs) : IFeatureArtifactCatalog
 {
@@ -143,12 +231,18 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
     private const int MaximumReleaseFiles = 256;
     private const long MaximumReleaseBytes = 67_108_864;
     private const int MaximumMetadataBytes = 65_536;
+    private const int MaximumSerializedSourceBytes = 33_554_432;
     private readonly BlobContainerClient container = blobs.GetBlobContainerClient(ContainerName);
     public async Task PublishReleaseAsync(FeatureReleaseMetadata metadata, string releaseDirectory, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(metadata);
         if (!Enum.IsDefined(metadata.SourceKind))
             throw new ArgumentException("The Feature source kind is invalid.", nameof(metadata));
+        if (metadata.Source is { } source)
+        {
+            await PublishSourceAsync(metadata.SourceReference, source, cancellationToken).ConfigureAwait(false);
+            metadata = metadata with { Source = null };
+        }
         var digest = metadata.Digest;
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(releaseDirectory));
         if (!Directory.Exists(root) || File.GetAttributes(root).HasFlag(FileAttributes.ReparsePoint))
@@ -176,7 +270,11 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
                 throw new InvalidDataException("A Feature release path escaped its root.");
             await UploadImmutableAsync(container.GetBlobClient($"releases/{digest.Value}/{relative}"), path, cancellationToken);
         }
-        await UploadImmutableAsync(container.GetBlobClient($"metadata/{digest.Value}.json"), JsonSerializer.SerializeToUtf8Bytes(metadata), cancellationToken);
+        await UploadImmutableAsync(
+            container.GetBlobClient($"metadata/{digest.Value}.json"),
+            JsonSerializer.SerializeToUtf8Bytes(metadata),
+            MaximumMetadataBytes,
+            cancellationToken);
     }
     private static string[] ReleaseFiles(string root)
     {
@@ -211,6 +309,40 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
         if (metadata.Digest != digest)
             throw new InvalidDataException("The published Feature release metadata has another digest.");
         return metadata;
+    }
+    public async Task<DigitalBrain.Kernel.Contracts.FeatureSourceSnapshot> DemandSourceAsync(string sourceReference, CancellationToken cancellationToken = default)
+    {
+        var digest = SourceDigest(sourceReference);
+        byte[] bytes;
+        try
+        {
+            bytes = await DownloadBoundedAsync(
+                container.GetBlobClient($"sources/{digest}.json"),
+                MaximumSerializedSourceBytes,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestFailedException exception) when (exception.Status == 404)
+        {
+            throw new KeyNotFoundException("The verified Feature source is not published.", exception);
+        }
+        var source = JsonSerializer.Deserialize<DigitalBrain.Kernel.Contracts.FeatureSourceSnapshot>(bytes)
+            ?? throw new InvalidDataException("The published Feature source snapshot is invalid.");
+        DemandSourceReference(sourceReference, source);
+        return source;
+    }
+    private async Task PublishSourceAsync(
+        string sourceReference,
+        DigitalBrain.Kernel.Contracts.FeatureSourceSnapshot source,
+        CancellationToken cancellationToken)
+    {
+        var digest = SourceDigest(sourceReference);
+        DemandSourceReference(sourceReference, source);
+        await container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
+        await UploadImmutableAsync(
+            container.GetBlobClient($"sources/{digest}.json"),
+            JsonSerializer.SerializeToUtf8Bytes(source),
+            MaximumSerializedSourceBytes,
+            cancellationToken).ConfigureAwait(false);
     }
     public async Task<FeaturePublicationReceipt> PublishActiveAsync(
         BrainOwnerId ownerId,
@@ -297,17 +429,23 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
             await VerifyExistingAsync(blob, sourcePath, cancellationToken);
         }
     }
-    private static async Task UploadImmutableAsync(BlobClient blob, byte[] content, CancellationToken cancellationToken)
+    private static async Task UploadImmutableAsync(
+        BlobClient blob,
+        byte[] content,
+        int maximumBytes,
+        CancellationToken cancellationToken)
     {
+        if (content.Length > maximumBytes)
+            throw new InvalidDataException("An immutable Feature artifact exceeds its bound.");
         try
         {
             await blob.UploadAsync(new BinaryData(content), new BlobUploadOptions { Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All } }, cancellationToken);
         }
         catch (RequestFailedException exception) when (exception.Status is 409 or 412)
         {
-            var existing = await DownloadBoundedAsync(blob, MaximumMetadataBytes, cancellationToken);
+            var existing = await DownloadBoundedAsync(blob, maximumBytes, cancellationToken);
             if (!existing.SequenceEqual(content))
-                throw new InvalidDataException("An immutable Feature release metadata blob has conflicting content.");
+                throw new InvalidDataException("An immutable Feature artifact has conflicting content.");
         }
     }
     private static async Task<byte[]> DownloadBoundedAsync(BlobClient blob, int maximumBytes, CancellationToken cancellationToken)
@@ -362,6 +500,27 @@ public sealed class FeatureArtifactPublisher([FromKeyedServices("features")] Blo
         {
             throw new InvalidDataException("The active Feature publication manifest is invalid.", exception);
         }
+    }
+
+    private static string SourceDigest(string sourceReference)
+    {
+        if (sourceReference is null || sourceReference.Length != 71 ||
+            !sourceReference.StartsWith("sha256:", StringComparison.Ordinal) ||
+            sourceReference.Skip(7).Any(character =>
+                character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+            throw new InvalidDataException("A canonical Feature source reference is required.");
+        return sourceReference[7..];
+    }
+
+    private static void DemandSourceReference(string sourceReference, DigitalBrain.Kernel.Contracts.FeatureSourceSnapshot source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var builderSource = new BuilderFeatureSourceSnapshot(
+            source.ImplementationProjectPath,
+            source.ScenarioProjectPath,
+            source.Files.Select(file => new BuilderFeatureSourceFile(file.Path, file.Content)).ToArray());
+        if (!string.Equals(FeatureReleaseWriter.ComputeSourceReference(builderSource), sourceReference, StringComparison.Ordinal))
+            throw new InvalidDataException("The Feature source snapshot does not match its content reference.");
     }
 
     private static bool CanonicalDigest(JsonElement value)

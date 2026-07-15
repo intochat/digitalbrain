@@ -51,7 +51,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             1,
             "source-grain",
             createdAt.AddMinutes(2)));
-        var verification = new FeatureVerification(ReleaseOne, 1, 1, 0, 0, createdAt.AddMinutes(3));
+        var verification = FeatureVerificationTestData.Passing(ReleaseOne, sourceResult.Source, 1, createdAt.AddMinutes(3));
         var verificationResult = await hub.RecordVerificationAsync(new RecordFeatureVerification(
             draft.DraftId,
             verification,
@@ -94,7 +94,12 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             snapshot.Revision);
         snapshot = await hub.ReadAsync();
         await hub.DecideAsync(
-            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-installed-grain"),
+            new FeatureApprovalDecision(
+                approval.ApprovalId,
+                ReleaseOne,
+                true,
+                "decision-installed-grain",
+                new ActorId("actor-draft-authoring")),
             snapshot.Revision);
         snapshot = await hub.ReadAsync();
         await hub.GrantAsync(
@@ -122,6 +127,36 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
     }
 
     [Fact]
+    public async Task Direct_grain_verification_rejects_unbounded_evidence_without_persisting_it()
+    {
+        var owner = new BrainOwnerId("owner-invalid-verification-evidence");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var now = fixture.Time.GetUtcNow();
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-invalid-verification-evidence",
+            "Reject invalid verification evidence",
+            now,
+            "conversation-invalid-verification-evidence"));
+        var evidence = new FeatureVerificationEvidence(
+            $"sha256:{new string('b', 64)}",
+            1,
+            0,
+            1,
+            0,
+            [new FeatureScenarioEvidence("scenario-invalid", "Invalid evidence", FeatureScenarioOutcome.Failed, new string('x', 4097), 1)],
+            []);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            new FeatureVerification(ReleaseOne, 1, 0, 1, 0, now, evidence),
+            draft.Revision,
+            "verification-invalid-evidence")));
+        var persisted = Assert.IsType<FeatureDraft>(await hub.ReadDraftAsync(draft.DraftId));
+        Assert.Null(persisted.Verification);
+        Assert.Equal(draft.Revision, persisted.Revision);
+    }
+
+    [Fact]
     public async Task A_forged_deterministic_publication_receipt_cannot_confirm_or_finalize_a_Draft()
     {
         var owner = new BrainOwnerId("owner-forged-publication");
@@ -135,7 +170,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             "conversation-forged-publication"));
         draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
             draft.DraftId,
-            new FeatureVerification(ReleaseOne, 1, 1, 0, 0, now),
+            FeatureVerificationTestData.Passing(ReleaseOne, draft.Source, 1, now),
             draft.Revision,
             "verify-forged-publication"));
         await hub.AcquireDraftInstallationReservationAsync(new InstallFeatureVersion(
@@ -156,11 +191,16 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             snapshot.Revision);
         snapshot = await hub.ReadAsync();
         await hub.DecideAsync(
-            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-forged-publication"),
+            new FeatureApprovalDecision(
+                approval.ApprovalId,
+                ReleaseOne,
+                true,
+                "decision-forged-publication",
+                new ActorId("actor-reservation")),
             snapshot.Revision);
         snapshot = await hub.ReadAsync();
         await hub.GrantAsync(
-            new FeatureGrantRequest(installationId, ReleaseOne, new ActorId("actor-forged-publication"), []),
+            new FeatureGrantRequest(installationId, ReleaseOne, new ActorId("actor-reservation"), []),
             snapshot.Revision);
         snapshot = await hub.ReadAsync();
         await hub.InstallAsync(
@@ -200,13 +240,13 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         var verifierUnavailable = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
             hub.ConfirmActivePublicationAsync(forged));
         Assert.Equal(forged, await hub.ConfirmActivePublicationAsync(forged));
-        var actorMismatch = await Assert.ThrowsAsync<FeatureAuthorityRejectedException>(() => hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
+        var installed = await hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
             draft.DraftId,
             installationId,
             ReleaseOne,
             draft.Revision,
             "install-forged-publication",
-            now.AddMinutes(1))));
+            now.AddMinutes(1)));
 
         Assert.Equal(FeatureCommandRejectionReason.Precondition, nullReceipt.Reason);
         Assert.Equal(FeatureCommandRejectionReason.Precondition, forgedReceipt.Reason);
@@ -215,9 +255,8 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         Assert.DoesNotContain("FeatureCommandRejectedException", verifierArgument.GetType().Name, StringComparison.Ordinal);
         Assert.DoesNotContain("FeatureCommandRejectedException", verifierInvalidOperation.GetType().Name, StringComparison.Ordinal);
         Assert.Equal(FeatureCommandRejectionReason.Unavailable, verifierUnavailable.Reason);
-        Assert.Equal(FeatureAuthorityRejectionReason.ActorMismatch, actorMismatch.Reason);
-        Assert.Equal("draft", (await hub.ReadDraftAsync(draft.DraftId))?.Status);
-        Assert.NotNull(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
+        Assert.Equal("installed", installed.Status);
+        Assert.Null(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
     }
 
     [Fact]
@@ -244,6 +283,526 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
 
         Assert.Equal(1, revised.Revision);
         Assert.Equal(1, (await hub.ReadDraftAsync(draft.DraftId))?.Revision);
+    }
+
+    [Fact]
+    public async Task Resetting_a_new_installation_discards_only_a_pristine_unpublished_runtime_and_replays()
+    {
+        var prepared = await PreparePendingDraftInstallationAsync("reset-pristine");
+        var installation = fixture.Grain<IFeatureInstallationGrain>(
+            FeatureGrainIds.Installation(prepared.Owner, prepared.Command.InstallationId));
+        var reservation = Assert.IsType<FeatureDraftInstallationReservation>(
+            await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        await installation.ActivateReservedReleaseAsync(RuntimeReservation(prepared.Owner, reservation));
+        var reset = new ResetFeatureDraftInstallationReservation(
+            prepared.Command.DraftId,
+            "reset-pristine",
+            prepared.Command);
+
+        var result = await prepared.Hub.ResetDraftInstallationReservationAsync(reset, prepared.ActorId);
+        var replay = await prepared.Hub.ResetDraftInstallationReservationAsync(
+            reset with { ReservedInstallation = null },
+            prepared.ActorId);
+
+        Assert.True(result.Completed);
+        Assert.True(replay.Completed);
+        Assert.Equal(result.Draft.DraftId, replay.Draft.DraftId);
+        Assert.Equal(result.Draft.Revision, replay.Draft.Revision);
+        Assert.Null(result.Draft.Verification);
+        Assert.Null(await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        Assert.Equal(FeatureApprovalStatus.Superseded, (await prepared.Hub.ReadAsync()).Approvals.Single().Status);
+        var absent = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => installation.ReadAsync());
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, absent.Reason);
+    }
+
+    [Fact]
+    public async Task New_install_reset_retries_after_the_final_hub_write_fails_with_the_runtime_hold_released()
+    {
+        var prepared = await PreparePendingDraftInstallationAsync("reset-new-final-write");
+        var installation = fixture.Grain<IFeatureInstallationGrain>(
+            FeatureGrainIds.Installation(prepared.Owner, prepared.Command.InstallationId));
+        var reset = new ResetFeatureDraftInstallationReservation(
+            prepared.Command.DraftId,
+            "reset-new-final-write",
+            prepared.Command);
+        fixture.Storage.FailNextWriteForState("feature-hub");
+
+        await Assert.ThrowsAsync<OrleansException>(() =>
+            prepared.Hub.ResetDraftInstallationReservationAsync(reset, prepared.ActorId));
+
+        Assert.NotNull(await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        Assert.Null(await installation.ReadReservationAsync());
+
+        var completed = await prepared.Hub.ResetDraftInstallationReservationAsync(reset, prepared.ActorId);
+
+        Assert.True(completed.Completed);
+        Assert.Null(completed.Draft.Verification);
+        Assert.Null(await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        Assert.Null(await installation.ReadReservationAsync());
+        var absent = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => installation.ReadAsync());
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, absent.Reason);
+    }
+
+    [Fact]
+    public async Task Resetting_an_update_preserves_or_exactly_restores_the_runtime_and_rejects_candidate_era_mutation()
+    {
+        var owner = new BrainOwnerId("owner-reset-update-grain");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var installationId = new FeatureInstallationId("installation-reset-update-grain");
+        var actor = new ActorId("actor-reset-update-grain");
+        var activeApproval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                installationId,
+                new FeatureReleaseMetadata(ReleaseOne, "sha256:" + ReleaseOne.Value, FeatureSourceKind.RuntimeAuthored, [], []),
+                []),
+            0);
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(activeApproval.ApprovalId, ReleaseOne, true, "decision-active-update-grain", actor),
+            (await hub.ReadAsync()).Revision);
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, ReleaseOne, actor, []),
+            (await hub.ReadAsync()).Revision);
+        await hub.InstallAsync(
+            new FeatureInstallationRegistration(installationId, ReleaseOne, ["active-event"]),
+            (await hub.ReadAsync()).Revision);
+        await fixture.PublishActiveAsync(owner, hub, installationId);
+        var installation = fixture.Grain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(owner, installationId));
+        var runtimeBefore = await installation.ReadAsync();
+        var now = fixture.Time.GetUtcNow();
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-reset-update-grain",
+            "Reset a Feature update",
+            now,
+            "conversation-reset-update-grain"));
+        draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            FeatureVerificationTestData.Passing(ReleaseTwo, draft.Source, 1, now),
+            draft.Revision,
+            "verification-reset-update-grain"));
+        var command = new InstallFeatureVersion(
+            draft.DraftId,
+            draft.Revision,
+            installationId,
+            ReleaseTwo,
+            [],
+            ["candidate-event"],
+            "decision-reset-update-grain",
+            "install-reset-update-grain",
+            runtimeBefore.Revision,
+            runtimeBefore.ActiveRelease,
+            runtimeBefore.PreviousRelease);
+        await hub.AcquireDraftInstallationReservationAsync(command, actor);
+        var candidateApproval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                installationId,
+                new FeatureReleaseMetadata(ReleaseTwo, "sha256:" + ReleaseTwo.Value, FeatureSourceKind.RuntimeAuthored, [], []),
+                []),
+            (await hub.ReadAsync()).Revision);
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(candidateApproval.ApprovalId, ReleaseTwo, true, command.DecisionId, actor),
+            (await hub.ReadAsync()).Revision);
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, ReleaseTwo, actor, []),
+            (await hub.ReadAsync()).Revision);
+
+        var preparedReset = await hub.ResetDraftInstallationReservationAsync(
+            new ResetFeatureDraftInstallationReservation(command.DraftId, "reset-update-grain", command),
+            actor);
+        Assert.False(preparedReset.Completed);
+        Assert.True(preparedReset.RequiresRepublish);
+        Assert.NotNull(await hub.ReadDraftInstallationReservationAsync(command.DraftId));
+        Assert.NotNull((await hub.ReadDraftAsync(command.DraftId))?.Verification);
+        await fixture.PublishActiveAsync(owner, hub, installationId);
+        var completedReset = await hub.CompleteDraftInstallationReservationResetAsync(
+            command.DraftId,
+            "reset-update-grain",
+            actor);
+        var runtimeAfter = await installation.ReadAsync();
+        var resetSnapshot = await hub.ReadAsync();
+        var authority = Assert.Single(resetSnapshot.Authorities);
+
+        Assert.Equal(runtimeBefore.ActiveRelease, runtimeAfter.ActiveRelease);
+        Assert.Equal(runtimeBefore.PreviousRelease, runtimeAfter.PreviousRelease);
+        Assert.Equal(runtimeBefore.StateJson, runtimeAfter.StateJson);
+        Assert.Equal(runtimeBefore.Revision, runtimeAfter.Revision);
+        Assert.Null(completedReset.Verification);
+        Assert.Equal(ReleaseOne, authority.ActiveRelease);
+        Assert.Null(authority.PendingRelease);
+        Assert.Equal(ReleaseOne, Assert.Single(resetSnapshot.Installations).Release);
+        Assert.Equal(ReleaseOne, Assert.Single(resetSnapshot.Releases).Digest);
+
+        var orphan = await PreparePendingUpdateAsync("reset-update-orphan");
+        var orphanBefore = await orphan.Installation.ReadAsync();
+        var orphanReservation = Assert.IsType<FeatureDraftInstallationReservation>(
+            await orphan.Hub.ReadDraftInstallationReservationAsync(orphan.Command.DraftId));
+        await orphan.Installation.ActivateReservedReleaseAsync(
+            RuntimeReservation(orphan.Owner, orphanReservation));
+        var reconciled = await orphan.Hub.ResetDraftInstallationReservationAsync(
+            new ResetFeatureDraftInstallationReservation(orphan.Command.DraftId, "reset-update-orphan", orphan.Command),
+            orphan.ActorId);
+        var orphanAfter = await orphan.Installation.ReadAsync();
+
+        Assert.True(reconciled.RequiresRepublish);
+        Assert.NotNull(await orphan.Hub.ReadDraftInstallationReservationAsync(orphan.Command.DraftId));
+        Assert.Equal(orphanBefore.ActiveRelease, orphanAfter.ActiveRelease);
+        Assert.Equal(orphanBefore.PreviousRelease, orphanAfter.PreviousRelease);
+        Assert.Equal(orphanBefore.Revision + 2, orphanAfter.Revision);
+
+        var mutated = await PreparePendingUpdateAsync("reset-update-mutated");
+        var mutatedReservation = Assert.IsType<FeatureDraftInstallationReservation>(
+            await mutated.Hub.ReadDraftInstallationReservationAsync(mutated.Command.DraftId));
+        await mutated.Installation.ActivateReservedReleaseAsync(
+            RuntimeReservation(mutated.Owner, mutatedReservation));
+        var blockedPause = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            mutated.Installation.PauseAsync("candidate mutation"));
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, blockedPause.Reason);
+        Assert.Equal(FeatureAppendStatus.Paused, await mutated.Installation.AppendAsync(Input("candidate-input")));
+        var resetMutation = await mutated.Hub.ResetDraftInstallationReservationAsync(
+            new ResetFeatureDraftInstallationReservation(mutated.Command.DraftId, "reset-update-mutated", mutated.Command),
+            mutated.ActorId);
+
+        Assert.True(resetMutation.RequiresRepublish);
+        Assert.NotNull(await mutated.Hub.ReadDraftInstallationReservationAsync(mutated.Command.DraftId));
+        Assert.Equal(ReleaseOne, (await mutated.Installation.ReadAsync()).ActiveRelease);
+    }
+
+    [Fact]
+    public async Task Reset_restores_a_failed_hub_switch_without_losing_active_work_after_reservation()
+    {
+        var prepared = await PreparePendingUpdateAsync("reset-switch-race");
+        var baseline = await prepared.Installation.ReadAsync();
+        var hubBeforeSwitch = await prepared.Hub.ReadAsync();
+        var reservation = Assert.IsType<FeatureDraftInstallationReservation>(
+            await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        await prepared.Installation.ActivateReservedReleaseAsync(
+            RuntimeReservation(prepared.Owner, reservation));
+        fixture.Storage.FailNextWrite();
+
+        await Assert.ThrowsAsync<OrleansException>(() => prepared.Hub.InstallAsync(
+            new FeatureInstallationRegistration(
+                prepared.Command.InstallationId,
+                prepared.Command.Release,
+                prepared.Command.Subscriptions),
+            hubBeforeSwitch.Revision));
+
+        var orphan = await prepared.Installation.ReadAsync();
+        Assert.Equal(prepared.Command.Release, orphan.ActiveRelease);
+        Assert.Equal(baseline.ActiveRelease, orphan.PreviousRelease);
+        Assert.Empty(orphan.Inbox);
+        Assert.Equal(FeatureRuntimeReservationPhase.Switched,
+            (await prepared.Installation.ReadReservationAsync())?.Phase);
+
+        var reset = await prepared.Hub.ResetDraftInstallationReservationAsync(
+            new ResetFeatureDraftInstallationReservation(
+                prepared.Command.DraftId,
+                "reset-switch-race",
+                prepared.Command),
+            prepared.ActorId);
+        var restored = await prepared.Installation.ReadAsync();
+
+        Assert.True(reset.RequiresRepublish);
+        Assert.Equal(baseline.ActiveRelease, restored.ActiveRelease);
+        Assert.Equal(baseline.PreviousRelease, restored.PreviousRelease);
+        Assert.Empty(restored.Inbox);
+        Assert.Equal(baseline.Revision + 2, restored.Revision);
+        Assert.Equal(FeatureRuntimeReservationPhase.Resetting,
+            (await prepared.Installation.ReadReservationAsync())?.Phase);
+    }
+
+    [Fact]
+    public async Task Confirmed_same_release_candidate_refuses_reset_and_completes_only_through_exact_forward_recovery()
+    {
+        var prepared = await PreparePendingUpdateAsync("confirmed-same-release", ReleaseOne);
+        var snapshot = await prepared.Hub.ReadAsync();
+        await prepared.Hub.InstallAsync(
+            new FeatureInstallationRegistration(
+                prepared.Command.InstallationId,
+                prepared.Command.Release,
+                prepared.Command.Subscriptions),
+            snapshot.Revision);
+        await fixture.PublishActiveAsync(prepared.Owner, prepared.Hub, prepared.Command.InstallationId);
+
+        var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            prepared.Hub.ResetDraftInstallationReservationAsync(
+                new ResetFeatureDraftInstallationReservation(
+                    prepared.Command.DraftId,
+                    "reset-confirmed-same-release",
+                    prepared.Command),
+                prepared.ActorId));
+        var installed = await prepared.Hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
+            prepared.Command.DraftId,
+            prepared.Command.InstallationId,
+            prepared.Command.Release,
+            prepared.Command.ExpectedRevision,
+            prepared.Command.IdempotencyId,
+            fixture.Time.GetUtcNow()));
+
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
+        Assert.Equal("installed", installed.Status);
+        Assert.Null(await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+    }
+
+    [Fact]
+    public async Task Activated_new_install_refuses_runtime_discard_and_completes_only_through_exact_forward_recovery()
+    {
+        var prepared = await PreparePendingDraftInstallationAsync("activated-new-forward");
+        var snapshot = await prepared.Hub.ReadAsync();
+        await prepared.Hub.InstallAsync(
+            new FeatureInstallationRegistration(
+                prepared.Command.InstallationId,
+                prepared.Command.Release,
+                prepared.Command.Subscriptions),
+            snapshot.Revision);
+
+        var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            prepared.Hub.ResetDraftInstallationReservationAsync(
+                new ResetFeatureDraftInstallationReservation(
+                    prepared.Command.DraftId,
+                    "reset-activated-new-forward",
+                    prepared.Command),
+                prepared.ActorId));
+        await fixture.PublishActiveAsync(prepared.Owner, prepared.Hub, prepared.Command.InstallationId);
+        var installed = await prepared.Hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
+            prepared.Command.DraftId,
+            prepared.Command.InstallationId,
+            prepared.Command.Release,
+            prepared.Command.ExpectedRevision,
+            prepared.Command.IdempotencyId,
+            fixture.Time.GetUtcNow()));
+
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
+        Assert.Equal("installed", installed.Status);
+        Assert.Equal(prepared.Command.InstallationId, installed.InstallationId);
+        Assert.Null(await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+    }
+
+    [Fact]
+    public async Task Publication_preflight_rejects_a_markerless_direct_runtime_switch()
+    {
+        var prepared = await PreparePendingUpdateAsync("markerless-publication");
+        var before = await prepared.Installation.ReadAsync();
+        var blocked = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            prepared.Installation.SwitchReleaseAsync(prepared.Command.Release));
+
+        var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            prepared.Hub.PrepareActivePublicationAsync(prepared.Command.InstallationId));
+
+        Assert.Equal(FeatureCommandRejectionReason.Conflict, blocked.Reason);
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
+        Assert.Equal(before, await prepared.Installation.ReadAsync());
+        Assert.Equal(FeatureRuntimeReservationPhase.Reserved,
+            (await prepared.Installation.ReadReservationAsync())?.Phase);
+    }
+
+    [Fact]
+    public async Task Publication_marker_binds_previous_release_reserved_revision_and_one_step_switch_structure()
+    {
+        var prepared = await PreparePendingUpdateAsync("publication-marker-contract");
+        var reservation = Assert.IsType<FeatureDraftInstallationReservation>(
+            await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        var baseline = Assert.IsType<FeatureInstallationAuthorityBaseline>(reservation.AuthorityBaseline);
+        var reservedRevision = Assert.IsType<long>(reservation.RuntimeRevision);
+        var marker = new FeatureReleaseSwitchSnapshot(
+            reservation.CommandDigest,
+            baseline.ActiveRelease,
+            baseline.PreviousRelease,
+            reservation.Release,
+            reservedRevision + 3,
+            reservedRevision + 4);
+        var runtime = (await prepared.Installation.ReadAsync()) with
+        {
+            ActiveRelease = reservation.Release,
+            PreviousRelease = baseline.ActiveRelease,
+            Revision = reservedRevision + 5,
+            UnconfirmedReleaseSwitch = marker
+        };
+
+        FeatureHubGrain.DemandExactReservedReleaseSwitch(runtime, reservation, baseline, reservation.Release);
+
+        Assert.Equal(
+            FeatureCommandRejectionReason.Precondition,
+            Assert.Throws<FeatureCommandRejectedException>(() =>
+                FeatureHubGrain.DemandExactReservedReleaseSwitch(
+                    runtime with
+                    {
+                        UnconfirmedReleaseSwitch = marker with
+                        {
+                            FromPreviousRelease = baseline.PreviousRelease is null ? ReleaseTwo : null
+                        }
+                    },
+                    reservation,
+                    baseline,
+                    reservation.Release)).Reason);
+        Assert.Equal(
+            FeatureCommandRejectionReason.Precondition,
+            Assert.Throws<FeatureCommandRejectedException>(() =>
+                FeatureHubGrain.DemandExactReservedReleaseSwitch(
+                    runtime with
+                    {
+                        UnconfirmedReleaseSwitch = marker with { FromRevision = reservedRevision - 1 }
+                    },
+                    reservation,
+                    baseline,
+                    reservation.Release)).Reason);
+        Assert.Equal(
+            FeatureCommandRejectionReason.Precondition,
+            Assert.Throws<FeatureCommandRejectedException>(() =>
+                FeatureHubGrain.DemandExactReservedReleaseSwitch(
+                    runtime with
+                    {
+                        UnconfirmedReleaseSwitch = marker with { SwitchRevision = marker.FromRevision + 2 }
+                    },
+                    reservation,
+                    baseline,
+                    reservation.Release)).Reason);
+        Assert.Equal(
+            FeatureCommandRejectionReason.Precondition,
+            Assert.Throws<FeatureCommandRejectedException>(() =>
+                FeatureHubGrain.DemandExactReservedReleaseSwitch(
+                    runtime with { Revision = marker.SwitchRevision - 1 },
+                    reservation,
+                    baseline,
+                    reservation.Release)).Reason);
+    }
+
+    [Fact]
+    public async Task Reservation_blocks_competing_registration_authority_and_rollback_mutations()
+    {
+        var prepared = await PreparePendingUpdateAsync("reservation-mutation-guard");
+        var before = await prepared.Hub.ReadAsync();
+        Func<Task>[] mutations =
+        [
+            async () => await prepared.Hub.RegisterAsync(new FeatureInstallationRegistration(
+                prepared.Command.InstallationId,
+                ReleaseOne,
+                ["active-event"])),
+            async () => await prepared.Hub.PauseInstallationAsync(
+                prepared.Command.InstallationId,
+                "competing pause",
+                before.Revision),
+            async () => await prepared.Hub.ResumeInstallationAsync(
+                prepared.Command.InstallationId,
+                before.Revision),
+            async () => await prepared.Hub.RevokeAsync(
+                new FeatureGrantRevocation(
+                    prepared.Command.InstallationId,
+                    ReleaseOne,
+                    "capability.absent",
+                    1),
+                before.Revision),
+            async () => await prepared.Hub.RollbackInstallationExactAsync(new RollbackFeatureInstallation(
+                prepared.Command.InstallationId,
+                ReleaseOne,
+                ReleaseTwo,
+                before.Revision,
+                "rollback-reservation-mutation-guard"))
+        ];
+
+        foreach (var mutation in mutations)
+        {
+            var rejected = await Assert.ThrowsAsync<FeatureCommandRejectedException>(mutation);
+            Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
+        }
+
+        var after = await prepared.Hub.ReadAsync();
+        Assert.Equal(before.Revision, after.Revision);
+        var beforeRegistration = Assert.Single(before.Installations);
+        var afterRegistration = Assert.Single(after.Installations);
+        Assert.Equal(beforeRegistration.InstallationId, afterRegistration.InstallationId);
+        Assert.Equal(beforeRegistration.Release, afterRegistration.Release);
+        Assert.Equal(beforeRegistration.Subscriptions, afterRegistration.Subscriptions);
+        var beforeAuthority = Assert.Single(before.Authorities);
+        var afterAuthority = Assert.Single(after.Authorities);
+        Assert.Equal(beforeAuthority.ActiveRelease, afterAuthority.ActiveRelease);
+        Assert.Equal(beforeAuthority.ActiveGrantRevision, afterAuthority.ActiveGrantRevision);
+        Assert.Equal(beforeAuthority.PendingRelease, afterAuthority.PendingRelease);
+        Assert.Equal(beforeAuthority.PendingGrantRevision, afterAuthority.PendingGrantRevision);
+        Assert.Equal(beforeAuthority.Paused, afterAuthority.Paused);
+        Assert.NotNull(await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+    }
+
+    [Fact]
+    public async Task Pre_marker_full_backpressure_is_reconciled_and_forward_installation_can_publish()
+    {
+        var prepared = await PreparePendingUpdateAsync("pre-marker-full-forward");
+        var before = await prepared.Installation.ReadAsync();
+        Assert.Equal(
+            FeatureAppendStatus.Paused,
+            await prepared.Installation.AppendAsync(Input("input-pre-marker-forward-held")));
+        var input = new FeatureInput(
+            "input-pre-marker-forward-full",
+            "active-event",
+            "{}",
+            fixture.Time.GetUtcNow(),
+            "correlation-pre-marker-forward-full",
+            "trace-pre-marker-forward-full");
+
+        var delivery = await prepared.Hub.PublishAsync(input);
+        var afterDelivery = await prepared.Installation.ReadAsync();
+
+        Assert.Equal(0, delivery.Delivered);
+        Assert.Equal(1, delivery.Pending);
+        Assert.False(afterDelivery.Paused);
+        Assert.Equal(before.Inbox, afterDelivery.Inbox);
+        Assert.Equal(before.Revision, afterDelivery.Revision);
+        Assert.Null(afterDelivery.PauseReason);
+        Assert.DoesNotContain((await prepared.Hub.ReadAsync()).Alerts, alert =>
+            alert.InstallationId == prepared.Command.InstallationId && alert.InputId == input.InputId);
+
+        var snapshot = await prepared.Hub.ReadAsync();
+        await prepared.Hub.InstallAsync(
+            new FeatureInstallationRegistration(
+                prepared.Command.InstallationId,
+                prepared.Command.Release,
+                prepared.Command.Subscriptions),
+            snapshot.Revision);
+        await fixture.PublishActiveAsync(prepared.Owner, prepared.Hub, prepared.Command.InstallationId);
+        var installed = await prepared.Hub.MarkDraftInstalledAsync(new MarkFeatureDraftInstalled(
+            prepared.Command.DraftId,
+            prepared.Command.InstallationId,
+            prepared.Command.Release,
+            prepared.Command.ExpectedRevision,
+            prepared.Command.IdempotencyId,
+            fixture.Time.GetUtcNow()));
+
+        Assert.Equal("installed", installed.Status);
+        Assert.Equal(prepared.Command.Release, (await prepared.Installation.ReadAsync()).ActiveRelease);
+        var replay = await prepared.Hub.PublishAsync(input);
+        Assert.Equal(1, replay.Delivered);
+        Assert.Equal(0, replay.Pending);
+        Assert.Equal(input.InputId, Assert.Single((await prepared.Installation.ReadAsync()).Inbox).InputId);
+    }
+
+    [Fact]
+    public async Task Reset_reconciles_a_pre_marker_full_pause_to_the_exact_unpaused_baseline()
+    {
+        var prepared = await PreparePendingUpdateAsync("pre-marker-full-reset");
+        Assert.Equal(
+            FeatureAppendStatus.Paused,
+            await prepared.Installation.AppendAsync(Input("input-pre-marker-reset-full")));
+        Assert.False((await prepared.Installation.ReadAsync()).Paused);
+
+        var reset = await prepared.Hub.ResetDraftInstallationReservationAsync(
+            new ResetFeatureDraftInstallationReservation(
+                prepared.Command.DraftId,
+                "reset-pre-marker-full",
+                prepared.Command),
+            prepared.ActorId);
+        var runtime = await prepared.Installation.ReadAsync();
+
+        Assert.True(reset.RequiresRepublish);
+        Assert.False(runtime.Paused);
+        Assert.Null(runtime.PauseReason);
+        Assert.Equal(ReleaseOne, runtime.ActiveRelease);
+        await fixture.PublishActiveAsync(prepared.Owner, prepared.Hub, prepared.Command.InstallationId);
+        var completed = await prepared.Hub.CompleteDraftInstallationReservationResetAsync(
+            prepared.Command.DraftId,
+            "reset-pre-marker-full",
+            prepared.ActorId);
+
+        Assert.Null(completed.Verification);
+        Assert.Null(await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        Assert.Null(await prepared.Installation.ReadReservationAsync());
     }
 
     [Fact]
@@ -343,6 +902,286 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         var rolledBack = Assert.IsType<FeatureRunClaim>(
             await installation.ClaimAsync("host-rollback", TimeSpan.FromSeconds(60)));
         Assert.Equal(ReleaseOne, rolledBack.Release);
+    }
+
+    [Fact]
+    public async Task Reservation_hold_is_exact_durable_and_blocks_runtime_ingress_and_execution()
+    {
+        var prepared = await PreparePendingUpdateAsync("reservation-hold");
+        var hold = Assert.IsType<FeatureRuntimeReservationSnapshot>(
+            await prepared.Installation.ReadReservationAsync());
+        var before = await prepared.Installation.ReadAsync();
+        var occurrence = new FeatureScheduleOccurrence(
+            "reservation-hold-schedule",
+            fixture.Time.GetUtcNow(),
+            fixture.Time.GetUtcNow().AddHours(1),
+            "{}",
+            "correlation-reservation-hold",
+            "trace-reservation-hold");
+
+        Assert.Equal(FeatureRuntimeReservationPhase.Reserved, hold.Phase);
+        Assert.Equal(prepared.Owner, hold.Reservation.OwnerId);
+        Assert.Equal(prepared.Command.DraftId, hold.Reservation.DraftId);
+        Assert.Equal(prepared.Command.InstallationId, hold.Reservation.InstallationId);
+        Assert.Equal(prepared.ActorId, hold.Reservation.ActorId);
+        Assert.Equal(FeatureInstallationReservationDigests.Command(prepared.Command), hold.Reservation.ReservationToken);
+        Assert.Equal(prepared.Command.Release, hold.Reservation.CandidateRelease);
+        Assert.Equal(prepared.Command.RuntimeRevision, hold.Reservation.RuntimeRevision);
+        Assert.Equal(FeatureAppendStatus.Paused, await prepared.Installation.AppendAsync(Input("reservation-hold-input")));
+        Assert.Equal(FeatureAppendStatus.Paused, await prepared.Installation.RecordScheduleOccurrenceAsync(occurrence));
+        Assert.Null(await prepared.Installation.ClaimAsync("reservation-hold-host", TimeSpan.FromSeconds(60)));
+
+        var after = await prepared.Installation.ReadAsync();
+        Assert.Equal(before, after);
+        await fixture.Cluster.DeactivateAsync((IAddressable)prepared.Installation);
+        var replay = await prepared.Hub.AcquireDraftInstallationReservationAsync(prepared.Command, prepared.ActorId);
+        var rehydrated = Assert.IsType<FeatureRuntimeReservationSnapshot>(
+            await prepared.Installation.ReadReservationAsync());
+
+        Assert.Equal(prepared.Command.DraftId, replay.DraftId);
+        Assert.Equal(hold, rehydrated);
+        Assert.Null(await prepared.Installation.ClaimAsync("reservation-hold-rehydrated", TimeSpan.FromSeconds(60)));
+    }
+
+    [Fact]
+    public async Task Persisted_reservation_survives_a_crash_before_the_hold_and_exact_reset_preserves_baseline_work()
+    {
+        var suffix = "reservation-hold-gap";
+        var owner = new BrainOwnerId("owner-" + suffix);
+        var installationId = new FeatureInstallationId("installation-" + suffix);
+        var actor = new ActorId("actor-" + suffix);
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var approval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                installationId,
+                new FeatureReleaseMetadata(ReleaseOne, "sha256:" + ReleaseOne.Value, FeatureSourceKind.RuntimeAuthored, [], []),
+                []),
+            0);
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-active-" + suffix, actor),
+            (await hub.ReadAsync()).Revision);
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, ReleaseOne, actor, []),
+            (await hub.ReadAsync()).Revision);
+        await hub.InstallAsync(
+            new FeatureInstallationRegistration(installationId, ReleaseOne, ["active-event"]),
+            (await hub.ReadAsync()).Revision);
+        await fixture.PublishActiveAsync(owner, hub, installationId);
+        var installation = fixture.Grain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(owner, installationId));
+        Assert.Equal(FeatureAppendStatus.Accepted, await installation.AppendAsync(Input("queued-" + suffix)));
+        var runtime = await installation.ReadAsync();
+        var now = fixture.Time.GetUtcNow();
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-" + suffix,
+            "Exercise a reservation hold crash boundary",
+            now,
+            "conversation-" + suffix));
+        draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            FeatureVerificationTestData.Passing(ReleaseTwo, draft.Source, 1, now),
+            draft.Revision,
+            "verification-" + suffix));
+        var command = new InstallFeatureVersion(
+            draft.DraftId,
+            draft.Revision,
+            installationId,
+            ReleaseTwo,
+            [],
+            ["candidate-event"],
+            "decision-" + suffix,
+            "install-" + suffix,
+            runtime.Revision,
+            runtime.ActiveRelease,
+            runtime.PreviousRelease);
+        fixture.Storage.FailNextWriteForState("feature-installation-reservation-hold");
+
+        await Assert.ThrowsAsync<OrleansException>(() =>
+            hub.AcquireDraftInstallationReservationAsync(command, actor));
+
+        Assert.NotNull(await hub.ReadDraftInstallationReservationAsync(draft.DraftId));
+        Assert.Null(await installation.ReadReservationAsync());
+        var input = new FeatureInput(
+            "input-" + suffix,
+            "active-event",
+            "{}",
+            now,
+            "correlation-" + suffix,
+            "trace-" + suffix);
+        var delivery = await hub.PublishAsync(input);
+
+        Assert.Equal(0, delivery.Delivered);
+        Assert.Equal(1, delivery.Pending);
+        Assert.Equal("queued-" + suffix, Assert.Single((await installation.ReadAsync()).Inbox).InputId);
+        Assert.NotNull(await installation.ClaimAsync("host-" + suffix, TimeSpan.FromSeconds(60)));
+        for (var index = 1; index < FeatureLimits.InboxEntries; index++)
+            Assert.Equal(FeatureAppendStatus.Accepted, await installation.AppendAsync(Input($"queued-{suffix}-{index}")));
+        Assert.Equal(FeatureAppendStatus.Full, await installation.AppendAsync(Input("queued-" + suffix + "-full")));
+        var baselineMutation = await installation.ReadAsync();
+        Assert.True(baselineMutation.Paused);
+        Assert.Equal("feature inbox full", baselineMutation.PauseReason);
+        Assert.Equal(FeatureLimits.InboxEntries, baselineMutation.Inbox.Length);
+
+        var reset = await hub.ResetDraftInstallationReservationAsync(
+            new ResetFeatureDraftInstallationReservation(command.DraftId, "reset-" + suffix, command),
+            actor);
+
+        Assert.True(reset.Completed);
+        Assert.Null(await hub.ReadDraftInstallationReservationAsync(command.DraftId));
+        Assert.Null(await installation.ReadReservationAsync());
+        var afterReset = await installation.ReadAsync();
+        Assert.Equal(baselineMutation.Revision + 1, afterReset.Revision);
+        Assert.Equal(baselineMutation.ActiveRelease, afterReset.ActiveRelease);
+        Assert.Equal(baselineMutation.PreviousRelease, afterReset.PreviousRelease);
+        Assert.Equal(baselineMutation.Lease, afterReset.Lease);
+        Assert.False(afterReset.Paused);
+        Assert.Null(afterReset.PauseReason);
+        Assert.Equal(baselineMutation.Inbox, afterReset.Inbox);
+    }
+
+    [Fact]
+    public async Task Resetting_hold_retry_accepts_an_exact_live_baseline_after_the_preparation_hub_write_fails()
+    {
+        var prepared = await PreparePendingUpdateAsync("resetting-hold-hub-failure");
+        var reservation = Assert.IsType<FeatureDraftInstallationReservation>(
+            await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        var runtimeReservation = RuntimeReservation(prepared.Owner, reservation);
+        await prepared.Installation.ReleaseReservationAsync(new FeatureRuntimeReservationRelease(
+            runtimeReservation,
+            FeatureRuntimeReservationPhase.Reserved,
+            reservation.RuntimeActiveRelease,
+            reservation.RuntimePreviousRelease,
+            false));
+        Assert.Null(await prepared.Installation.ReadReservationAsync());
+        Assert.Equal(
+            FeatureAppendStatus.Accepted,
+            await prepared.Installation.AppendAsync(Input("resetting-hold-live")));
+        Assert.NotNull(await prepared.Installation.ClaimAsync(
+            "host-resetting-hold-live",
+            TimeSpan.FromSeconds(60)));
+        for (var index = 1; index < FeatureLimits.InboxEntries; index++)
+        {
+            Assert.Equal(
+                FeatureAppendStatus.Accepted,
+                await prepared.Installation.AppendAsync(Input($"resetting-hold-live-{index}")));
+        }
+        Assert.Equal(
+            FeatureAppendStatus.Full,
+            await prepared.Installation.AppendAsync(Input("resetting-hold-live-full")));
+        var beforeReset = await prepared.Installation.ReadAsync();
+        Assert.True(beforeReset.Paused);
+        Assert.Equal("feature inbox full", beforeReset.PauseReason);
+        Assert.NotNull(beforeReset.Lease);
+        Assert.Equal(FeatureLimits.InboxEntries, beforeReset.Inbox.Length);
+        var command = new ResetFeatureDraftInstallationReservation(
+            prepared.Command.DraftId,
+            "resetting-hold-hub-failure",
+            prepared.Command);
+        fixture.Storage.FailNextWriteForState("feature-hub");
+
+        await Assert.ThrowsAsync<OrleansException>(() =>
+            prepared.Hub.ResetDraftInstallationReservationAsync(command, prepared.ActorId));
+
+        var afterFailure = await prepared.Installation.ReadAsync();
+        var resetting = Assert.IsType<FeatureRuntimeReservationSnapshot>(
+            await prepared.Installation.ReadReservationAsync());
+        Assert.Equal(FeatureRuntimeReservationPhase.Resetting, resetting.Phase);
+        Assert.Equal(runtimeReservation, resetting.Reservation);
+        Assert.False(afterFailure.Paused);
+        Assert.Null(afterFailure.PauseReason);
+        Assert.Equal(beforeReset.Revision + 1, afterFailure.Revision);
+        Assert.Equal(beforeReset.Lease, afterFailure.Lease);
+        Assert.Equal(beforeReset.Inbox, afterFailure.Inbox);
+        Assert.Equal(beforeReset.StateJson, afterFailure.StateJson);
+
+        var retried = await prepared.Hub.ResetDraftInstallationReservationAsync(command, prepared.ActorId);
+        var afterRetry = await prepared.Installation.ReadAsync();
+
+        Assert.False(retried.Completed);
+        Assert.True(retried.RequiresRepublish);
+        Assert.NotNull(await prepared.Hub.ReadDraftInstallationReservationAsync(prepared.Command.DraftId));
+        Assert.NotNull(await prepared.Hub.ReadDraftInstallationResetAsync(prepared.Command.DraftId));
+        Assert.Equal(afterFailure.Revision, afterRetry.Revision);
+        Assert.Equal(afterFailure.Lease, afterRetry.Lease);
+        Assert.Equal(afterFailure.Inbox, afterRetry.Inbox);
+        Assert.Equal(afterFailure.StateJson, afterRetry.StateJson);
+    }
+
+    [Fact]
+    public async Task Release_switch_waits_for_an_active_lease_normalizes_expiry_and_never_deadlocks_a_full_inbox()
+    {
+        var installation = Installation("release-switch-quiescence");
+        await installation.InitializeAsync(ReleaseOne);
+        await installation.AppendAsync(Input("input-release-switch-lease"));
+        var claimed = Assert.IsType<FeatureRunClaim>(
+            await installation.ClaimAsync("host-release-switch", TimeSpan.FromSeconds(60)));
+        var before = await installation.ReadAsync();
+
+        var activeLease = await Assert.ThrowsAsync<FeatureCommandRejectedException>(() =>
+            installation.BeginReleaseSwitchAsync(ReleaseTwo, "switch-quiescence"));
+        Assert.Equal(FeatureCommandRejectionReason.Precondition, activeLease.Reason);
+        var afterRejection = await installation.ReadAsync();
+        Assert.Equal(before.ActiveRelease, afterRejection.ActiveRelease);
+        Assert.Equal(before.PreviousRelease, afterRejection.PreviousRelease);
+        Assert.Equal(before.Revision, afterRejection.Revision);
+        Assert.Equal(before.Lease, afterRejection.Lease);
+        Assert.Null(afterRejection.UnconfirmedReleaseSwitch);
+
+        fixture.Time.Advance(TimeSpan.FromSeconds(60));
+        await installation.BeginReleaseSwitchAsync(ReleaseTwo, "switch-quiescence");
+        var switched = await installation.ReadAsync();
+
+        Assert.Null(switched.Lease);
+        Assert.Equal(ReleaseTwo, switched.ActiveRelease);
+        Assert.Equal(ReleaseOne, switched.PreviousRelease);
+        Assert.Equal(before.Revision + 2, switched.Revision);
+        Assert.Equal(before.Revision + 1, switched.UnconfirmedReleaseSwitch?.FromRevision);
+        Assert.Equal(before.Revision + 2, switched.UnconfirmedReleaseSwitch?.SwitchRevision);
+        Assert.Null(await installation.ClaimAsync("host-quiescent", TimeSpan.FromSeconds(60)));
+        Assert.Equal(
+            FeatureCommandRejectionReason.Conflict,
+            (await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => installation.PauseAsync("blocked"))).Reason);
+        Assert.Equal(
+            FeatureCommandRejectionReason.Conflict,
+            (await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => installation.ResumeAsync())).Reason);
+        Assert.Equal(
+            FeatureCommandRejectionReason.Conflict,
+            (await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => installation.SwitchReleaseAsync(ReleaseOne))).Reason);
+        Assert.Equal(
+            FeatureCommandRejectionReason.Conflict,
+            (await Assert.ThrowsAsync<FeatureCommandRejectedException>(() => installation.RollbackAsync())).Reason);
+
+        for (var index = 1; index < FeatureLimits.InboxEntries; index++)
+            Assert.Equal(FeatureAppendStatus.Accepted, await installation.AppendAsync(Input($"input-quiescent-{index}")));
+        var full = await installation.ReadAsync();
+        Assert.Equal(FeatureLimits.InboxEntries, full.Inbox.Length);
+        Assert.Equal(FeatureAppendStatus.Full, await installation.AppendAsync(Input("input-quiescent-full")));
+        var occurrence = new FeatureScheduleOccurrence(
+            "quiescent-full",
+            fixture.Time.GetUtcNow(),
+            fixture.Time.GetUtcNow().AddHours(1),
+            "{}",
+            "correlation-quiescent-full",
+            "trace-quiescent-full");
+        Assert.Equal(FeatureAppendStatus.Full, await installation.RecordScheduleOccurrenceAsync(occurrence));
+        var afterFull = await installation.ReadAsync();
+
+        Assert.False(afterFull.Paused);
+        Assert.Equal(full.Revision, afterFull.Revision);
+        Assert.Equal(full.UnconfirmedReleaseSwitch, afterFull.UnconfirmedReleaseSwitch);
+        Assert.Empty(afterFull.Schedules);
+
+        await installation.ConfirmReleaseSwitchAsync(ReleaseTwo);
+        var forwardClaim = Assert.IsType<FeatureRunClaim>(
+            await installation.ClaimAsync("host-forward", TimeSpan.FromSeconds(60)));
+        Assert.Equal(claimed.Fence.InputId, forwardClaim.Fence.InputId);
+        Assert.Equal(ReleaseTwo, forwardClaim.Release);
+        await installation.CommitAsync(new FeatureRunCommit(
+            forwardClaim.Fence,
+            "{}",
+            [],
+            new FeatureResourceUsage(0, 0),
+            "{}"));
+        Assert.Equal(FeatureAppendStatus.Accepted, await installation.AppendAsync(Input("input-quiescent-full")));
     }
 
     [Fact]
@@ -511,7 +1350,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
                 [new("gmail.message.read.v1", 1, connection, "{\"allowedToolIds\":[\"gmail.message.read.v1\"]}", "google")]),
             0);
         await hub.DecideAsync(
-            new FeatureApprovalDecision(proposal.ApprovalId, ReleaseOne, true, "decision-live-grant"),
+            new FeatureApprovalDecision(proposal.ApprovalId, ReleaseOne, true, "decision-live-grant", actor),
             1);
         var authority = await hub.GrantAsync(
             new FeatureGrantRequest(
@@ -606,7 +1445,12 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             new FeatureReleaseProposal(installationId, release, []),
             (await hub.ReadAsync()).Revision);
         await hub.DecideAsync(
-            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, "decision-release-precondition"),
+            new FeatureApprovalDecision(
+                approval.ApprovalId,
+                ReleaseOne,
+                true,
+                "decision-release-precondition",
+                new ActorId("actor-release-precondition")),
             (await hub.ReadAsync()).Revision);
         await hub.GrantAsync(
             new FeatureGrantRequest(installationId, ReleaseOne, new ActorId("actor-release-precondition"), []),
@@ -618,6 +1462,89 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             revision));
 
         Assert.Equal(FeatureCommandRejectionReason.Precondition, rejected.Reason);
+    }
+
+    [Fact]
+    public async Task Hub_second_install_projects_exact_rollback_availability()
+    {
+        var owner = new BrainOwnerId("owner-exact-rollback-availability");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var installationId = new FeatureInstallationId("installation-exact-rollback-availability");
+        var firstGrant = new FeatureGrantSpec(
+            "capability.first",
+            1,
+            null,
+            JsonSerializer.Serialize(new { allowedToolIds = new[] { "capability.first" } }));
+        var secondGrant = new FeatureGrantSpec(
+            "capability.second",
+            1,
+            null,
+            JsonSerializer.Serialize(new { allowedToolIds = new[] { "capability.second" } }));
+
+        await InstallHubReleaseAsync(hub, installationId, ReleaseOne, firstGrant, ["first"], "availability-first");
+        var first = Assert.Single((await hub.ReadAsync()).Authorities);
+        await InstallHubReleaseAsync(hub, installationId, ReleaseTwo, secondGrant, ["second"], "availability-second");
+        var second = Assert.Single((await hub.ReadAsync()).Authorities);
+
+        Assert.False(first.ExactRollbackAvailable);
+        Assert.True(second.ExactRollbackAvailable);
+    }
+
+    [Fact]
+    public async Task Hub_exact_rollback_restores_authority_registration_and_runtime_once()
+    {
+        var owner = new BrainOwnerId("owner-exact-rollback");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var installationId = new FeatureInstallationId("installation-exact-rollback");
+        var firstGrant = new FeatureGrantSpec(
+            "capability.first",
+            1,
+            null,
+            JsonSerializer.Serialize(new { allowedToolIds = new[] { "capability.first" } }));
+        var secondGrant = new FeatureGrantSpec(
+            "capability.second",
+            1,
+            null,
+            JsonSerializer.Serialize(new { allowedToolIds = new[] { "capability.second" } }));
+        await InstallHubReleaseAsync(hub, installationId, ReleaseOne, firstGrant, ["z-first", "a-first"], "first");
+        await InstallHubReleaseAsync(hub, installationId, ReleaseTwo, secondGrant, ["second"], "second");
+        await fixture.PublishActiveAsync(owner, hub, installationId);
+        var before = await hub.ReadAsync();
+        var command = new RollbackFeatureInstallation(
+            installationId,
+            ReleaseTwo,
+            ReleaseOne,
+            before.Revision,
+            "rollback-exact-grain");
+
+        var authority = await hub.RollbackInstallationExactAsync(command);
+        var rolledBack = await hub.ReadAsync();
+        await fixture.PublishActiveAsync(owner, hub, installationId);
+        var published = await hub.ReadAsync();
+        var replay = await hub.RollbackInstallationExactAsync(command);
+        var replayed = await hub.ReadAsync();
+        var ticket = await hub.PrepareActivePublicationAsync(installationId);
+        var runtime = await fixture.Grain<IFeatureInstallationGrain>(
+            FeatureGrainIds.Installation(owner, installationId)).ReadAsync();
+
+        Assert.Equal(ReleaseOne, authority.ActiveRelease);
+        Assert.Equal(["capability.first"], authority.ActiveGrants.Select(grant => grant.CapabilityId));
+        Assert.Null(authority.PreviousRelease);
+        Assert.Equal(authority.ActiveRelease, replay.ActiveRelease);
+        Assert.Equal(authority.ActiveGrantRevision, replay.ActiveGrantRevision);
+        Assert.Equal(
+            authority.ActiveGrants.Select(grant => grant.CapabilityId),
+            replay.ActiveGrants.Select(grant => grant.CapabilityId));
+        var registration = Assert.Single(rolledBack.Installations);
+        Assert.Equal(ReleaseOne, registration.Release);
+        Assert.Equal(["a-first", "z-first"], registration.Subscriptions);
+        Assert.Equal(ReleaseOne, runtime.ActiveRelease);
+        Assert.Null(runtime.PreviousRelease);
+        Assert.Equal(ReleaseOne, ticket.Release);
+        Assert.Equal(["capability.first"], ticket.ActiveGrants.Select(grant => grant.CapabilityId));
+        Assert.Equal(["a-first", "z-first"], ticket.Subscriptions);
+        Assert.Equal(published.Revision, replayed.Revision);
+        Assert.True(published.Revision > rolledBack.Revision);
     }
 
     [Fact]
@@ -642,6 +1569,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         [
             typeof(FeatureHubState),
             typeof(FeatureDraftCommandReplay),
+            typeof(FeatureRollbackReplay),
             typeof(FeatureFanOutState),
             typeof(FeatureFanOutDeliveryState),
             typeof(FeatureInstallationState),
@@ -666,9 +1594,174 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             $"Unexpected feature grain dependency: {dependency}."));
     }
 
+    private async Task<(BrainOwnerId Owner, IFeatureHubGrain Hub, InstallFeatureVersion Command, ActorId ActorId)>
+        PreparePendingDraftInstallationAsync(string suffix)
+    {
+        var owner = new BrainOwnerId("owner-" + suffix);
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var now = fixture.Time.GetUtcNow();
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-" + suffix,
+            "Prepare a resettable Feature",
+            now,
+            "conversation-" + suffix));
+        draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            FeatureVerificationTestData.Passing(ReleaseOne, draft.Source, 1, now),
+            draft.Revision,
+            "verification-" + suffix));
+        var actor = new ActorId("actor-" + suffix);
+        var command = new InstallFeatureVersion(
+            draft.DraftId,
+            draft.Revision,
+            new FeatureInstallationId("installation-" + suffix),
+            ReleaseOne,
+            [],
+            ["manual"],
+            "decision-" + suffix,
+            "install-" + suffix);
+        await hub.AcquireDraftInstallationReservationAsync(command, actor);
+        var approval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                command.InstallationId,
+                new FeatureReleaseMetadata(ReleaseOne, "sha256:" + ReleaseOne.Value, FeatureSourceKind.RuntimeAuthored, [], []),
+                []),
+            (await hub.ReadAsync()).Revision);
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(approval.ApprovalId, ReleaseOne, true, command.DecisionId, actor),
+            (await hub.ReadAsync()).Revision);
+        await hub.GrantAsync(
+            new FeatureGrantRequest(command.InstallationId, ReleaseOne, actor, []),
+            (await hub.ReadAsync()).Revision);
+        return (owner, hub, command, actor);
+    }
+
+    private async Task<(
+        BrainOwnerId Owner,
+        IFeatureHubGrain Hub,
+        IFeatureInstallationGrain Installation,
+        InstallFeatureVersion Command,
+        ActorId ActorId)> PreparePendingUpdateAsync(string suffix, ReleaseDigest? candidateRelease = null)
+    {
+        var owner = new BrainOwnerId("owner-" + suffix);
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var installationId = new FeatureInstallationId("installation-" + suffix);
+        var actor = new ActorId("actor-" + suffix);
+        var activeDecisionId = "decision-active-" + suffix;
+        var activeApproval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                installationId,
+                new FeatureReleaseMetadata(ReleaseOne, "sha256:" + ReleaseOne.Value, FeatureSourceKind.RuntimeAuthored, [], []),
+                []),
+            0);
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(activeApproval.ApprovalId, ReleaseOne, true, activeDecisionId, actor),
+            (await hub.ReadAsync()).Revision);
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, ReleaseOne, actor, []),
+            (await hub.ReadAsync()).Revision);
+        await hub.InstallAsync(
+            new FeatureInstallationRegistration(installationId, ReleaseOne, ["active-event"]),
+            (await hub.ReadAsync()).Revision);
+        await fixture.PublishActiveAsync(owner, hub, installationId);
+        var installation = fixture.Grain<IFeatureInstallationGrain>(FeatureGrainIds.Installation(owner, installationId));
+        var runtime = await installation.ReadAsync();
+        var release = candidateRelease ?? ReleaseTwo;
+        string[] subscriptions = release == ReleaseOne ? ["active-event"] : ["candidate-event"];
+        var decisionId = release == ReleaseOne ? activeDecisionId : "decision-" + suffix;
+        var now = fixture.Time.GetUtcNow();
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-" + suffix,
+            "Prepare a resettable Feature update",
+            now,
+            "conversation-" + suffix));
+        draft = await hub.RecordVerificationAsync(new RecordFeatureVerification(
+            draft.DraftId,
+            FeatureVerificationTestData.Passing(release, draft.Source, 1, now),
+            draft.Revision,
+            "verification-" + suffix));
+        var command = new InstallFeatureVersion(
+            draft.DraftId,
+            draft.Revision,
+            installationId,
+            release,
+            [],
+            subscriptions,
+            decisionId,
+            "install-" + suffix,
+            runtime.Revision,
+            runtime.ActiveRelease,
+            runtime.PreviousRelease);
+        await hub.AcquireDraftInstallationReservationAsync(command, actor);
+        var candidateApproval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(
+                installationId,
+                new FeatureReleaseMetadata(release, "sha256:" + release.Value, FeatureSourceKind.RuntimeAuthored, [], []),
+                []),
+            (await hub.ReadAsync()).Revision);
+        if (release != ReleaseOne)
+            await hub.DecideAsync(
+                new FeatureApprovalDecision(candidateApproval.ApprovalId, release, true, command.DecisionId, actor),
+                (await hub.ReadAsync()).Revision);
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, release, actor, []),
+            (await hub.ReadAsync()).Revision);
+        return (owner, hub, installation, command, actor);
+    }
+
     private IFeatureInstallationGrain Installation(string installationId) =>
         fixture.Grain<IFeatureInstallationGrain>(
             FeatureGrainIds.Installation(Owner, new FeatureInstallationId(installationId)));
+
+    private static FeatureRuntimeReservation RuntimeReservation(
+        BrainOwnerId ownerId,
+        FeatureDraftInstallationReservation reservation) =>
+        new(
+            ownerId,
+            reservation.DraftId,
+            reservation.InstallationId,
+            reservation.ActorId,
+            reservation.CommandDigest,
+            reservation.AccessDigest,
+            reservation.Release,
+            reservation.RuntimeRevision,
+            reservation.RuntimeActiveRelease,
+            reservation.RuntimePreviousRelease,
+            reservation.AuthorityBaseline?.Paused,
+            reservation.AuthorityBaseline?.PauseReason);
+
+    private static async Task InstallHubReleaseAsync(
+        IFeatureHubGrain hub,
+        FeatureInstallationId installationId,
+        ReleaseDigest release,
+        FeatureGrantSpec grant,
+        string[] subscriptions,
+        string suffix)
+    {
+        var metadata = new FeatureReleaseMetadata(
+            release,
+            "sha256:" + release.Value,
+            FeatureSourceKind.RuntimeAuthored,
+            [grant.CapabilityId],
+            []);
+        var approval = await hub.ProposeAsync(
+            new FeatureReleaseProposal(installationId, metadata, [grant]),
+            (await hub.ReadAsync()).Revision);
+        await hub.DecideAsync(
+            new FeatureApprovalDecision(
+                approval.ApprovalId,
+                release,
+                true,
+                "decision-" + suffix,
+                new ActorId("actor-exact-rollback")),
+            (await hub.ReadAsync()).Revision);
+        await hub.GrantAsync(
+            new FeatureGrantRequest(installationId, release, new ActorId("actor-exact-rollback"), [grant]),
+            (await hub.ReadAsync()).Revision);
+        await hub.InstallAsync(
+            new FeatureInstallationRegistration(installationId, release, subscriptions),
+            (await hub.ReadAsync()).Revision);
+    }
 
     private static FeatureSourceSnapshot GrainSource() => new(
         "src/Feature/Feature.csproj",

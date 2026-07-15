@@ -12,13 +12,17 @@ service DigitalBrainV2Ui {
   rpc SubmitAction(SubmitActionRequest) returns (SubmitActionReply);
   rpc LogoutSession(LogoutSessionRequest) returns (LogoutSessionReply);
   rpc GetFeatureDraft(GetFeatureDraftRequest) returns (FeatureDraftReply);
+  rpc ResetFeatureDraftInstallation(ResetFeatureDraftInstallationRequest) returns (FeatureDraftReply);
   rpc ReviseFeatureDraft(ReviseFeatureDraftRequest) returns (FeatureDraftReply);
   rpc SuggestFeatureChange(SuggestFeatureChangeRequest) returns (FeatureDraftPatchReply);
   rpc VerifyFeatureDraft(VerifyFeatureDraftRequest) returns (FeatureReleaseReviewReply);
+  rpc ReviewFeatureAccess(ReviewFeatureAccessRequest) returns (FeatureAccessReviewReply);
   rpc InstallFeatureVersion(InstallFeatureVersionRequest) returns (FeatureInstallReply);
   rpc ResumeOriginatingRequest(ResumeOriginatingRequestRequest) returns (ResumeOriginatingRequestReply);
   rpc ListFeatures(ListFeaturesRequest) returns (ListFeaturesReply);
   rpc GetFeature(GetFeatureRequest) returns (FeatureReply);
+  rpc GetFeatureReleaseSource(GetFeatureReleaseSourceRequest) returns (FeatureReleaseSourceReply);
+  rpc RollbackFeatureVersion(RollbackFeatureVersionRequest) returns (FeatureReply);
   rpc ListConnections(ListConnectionsRequest) returns (ListConnectionsReply);
   rpc GetConnection(GetConnectionRequest) returns (ConnectionReply);
   rpc ListActivity(ListActivityRequest) returns (ListActivityReply);
@@ -115,10 +119,24 @@ enum FeatureSourceKind {
   FEATURE_SOURCE_KIND_RUNTIME_AUTHORED = 2;
 }
 
+enum FeatureScenarioOutcome {
+  FEATURE_SCENARIO_OUTCOME_UNSPECIFIED = 0;
+  FEATURE_SCENARIO_OUTCOME_PASSED = 1;
+  FEATURE_SCENARIO_OUTCOME_FAILED = 2;
+  FEATURE_SCENARIO_OUTCOME_SKIPPED = 3;
+}
+
 message GetFeatureDraftRequest {
   reserved 1, 2;
   reserved "owner_id", "actor_id";
   string draft_id = 3;
+}
+
+message ResetFeatureDraftInstallationRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string draft_id = 3;
+  string idempotency_id = 4;
 }
 
 message ReviseFeatureDraftRequest {
@@ -150,6 +168,17 @@ message VerifyFeatureDraftRequest {
   string draft_id = 3;
   optional int64 expected_revision = 4;
   string idempotency_id = 5;
+}
+
+message ReviewFeatureAccessRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string draft_id = 3;
+  optional int64 expected_revision = 4;
+  string installation_id = 5;
+  string release_digest = 6;
+  repeated FeatureGrant grants = 7;
+  repeated string subscriptions = 8;
 }
 
 message InstallFeatureVersionRequest {
@@ -228,6 +257,26 @@ message FeatureVerification {
   int32 failed = 4;
   int32 skipped = 5;
   int64 verified_at_unix_ms = 6;
+  repeated FeatureVerificationScenario scenarios = 7;
+  repeated FeatureVerificationArtifact artifacts = 8;
+  string source_reference = 9;
+}
+
+message FeatureVerificationScenario {
+  reserved "owner_id", "actor_id";
+  string scenario_id = 1;
+  string name = 2;
+  FeatureScenarioOutcome outcome = 3;
+  optional string safe_failure = 4;
+  int64 duration_milliseconds = 5;
+}
+
+message FeatureVerificationArtifact {
+  reserved "owner_id", "actor_id";
+  string name = 1;
+  string media_type = 2;
+  int64 size_bytes = 3;
+  string digest = 4;
 }
 
 message FeatureDraft {
@@ -261,6 +310,8 @@ message FeatureRelease {
   FeatureSourceKind source_kind = 2;
   repeated string requested_capability_ids = 3;
   repeated string dependencies = 4;
+  string source_reference = 5;
+  FeatureSourceSnapshot source = 6;
 }
 
 message FeatureGrant {
@@ -272,9 +323,26 @@ message FeatureGrant {
   optional string provider = 5;
 }
 
+message FeatureInstallationRecovery {
+  reserved "owner_id", "actor_id";
+  bool installed = 1;
+  FeatureVerification verification = 2;
+  FeatureRelease release = 3;
+  string installation_id = 4;
+  repeated FeatureGrant grants = 5;
+  repeated string subscriptions = 6;
+  optional FeatureRelease previous_release = 7;
+  optional string decision_id = 8;
+  optional string idempotency_id = 9;
+  bool rollback_available = 10;
+  bool paused = 11;
+  optional string pause_reason = 12;
+}
+
 message FeatureDraftReply {
   reserved "owner_id", "actor_id";
   FeatureDraft draft = 1;
+  FeatureInstallationRecovery recovery = 2;
 }
 
 message FeatureDraftPatchReply {
@@ -285,7 +353,18 @@ message FeatureDraftPatchReply {
 message FeatureReleaseReviewReply {
   reserved "owner_id", "actor_id";
   FeatureDraft draft = 1;
+  optional FeatureRelease release = 2;
+  FeatureVerification verification = 3;
+}
+
+message FeatureAccessReviewReply {
+  reserved "owner_id", "actor_id";
+  FeatureDraft draft = 1;
   FeatureRelease release = 2;
+  string installation_id = 3;
+  repeated FeatureGrant grants = 4;
+  repeated string subscriptions = 5;
+  optional FeatureRelease previous_release = 6;
 }
 
 message FeatureInstallReply {
@@ -309,7 +388,11 @@ message ResumeOriginatingRequestRequest {
 }
 
 message ResumeOriginatingRequestReply {
-  reserved "owner_id", "actor_id";
+  reserved "owner_id", "actor_id", "prompt", "conversation_id";
+  string command_id = 1;
+  string operation_id = 2;
+  string phase = 3;
+  int64 version = 4;
 }
 
 message ListFeaturesRequest {
@@ -327,8 +410,47 @@ message GetFeatureRequest {
   string feature_id = 3;
 }
 
+message GetFeatureReleaseSourceRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string feature_id = 3;
+  string installation_id = 4;
+  string release_digest = 5;
+  string source_reference = 6;
+}
+
+message FeatureReleaseSourceReply {
+  reserved "owner_id", "actor_id";
+  string feature_id = 1;
+  string installation_id = 2;
+  string release_digest = 3;
+  string source_reference = 4;
+  FeatureSourceSnapshot source = 5;
+}
+
+message RollbackFeatureVersionRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string feature_id = 3;
+  string expected_active_digest = 4;
+  string target_digest = 5;
+  string idempotency_id = 6;
+  optional int64 expected_revision = 7;
+}
+
 message FeatureReply {
   reserved "owner_id", "actor_id";
+  string feature_id = 1;
+  OriginatingRequest originating_request = 2;
+  FeatureRelease active_release = 3;
+  optional FeatureRelease previous_release = 4;
+  repeated FeatureGrant active_grants = 5;
+  repeated string subscriptions = 6;
+  bool rollback_available = 7;
+  bool paused = 8;
+  optional string pause_reason = 9;
+  string installation_id = 10;
+  int64 revision = 11;
 }
 
 message ListConnectionsRequest {
