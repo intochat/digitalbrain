@@ -36,6 +36,7 @@ void main() {
     test(
       'login exchanges development credentials for the exact UI audience',
       () async {
+        expect(digitalBrainUiAudience, 'digitalbrain-v3-ui');
         final port = _FakeGrpcClientPort();
         final transport = GrpcUiTransport.forTesting(client: port);
 

@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../telemetry/platform_env.dart';
 import 'external_identity.dart';
 
-const String digitalBrainUiAudience = 'digitalbrain-v2-ui';
+const String digitalBrainUiAudience = 'digitalbrain-v3-ui';
 
 class RuntimeConfiguration {
   const RuntimeConfiguration({required this.endpoint, this.externalIdentity});
