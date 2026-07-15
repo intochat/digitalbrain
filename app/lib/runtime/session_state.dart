@@ -51,7 +51,10 @@ class SessionBundle {
 }
 
 abstract interface class SessionTransport {
-  Future<SessionBundle> bootstrapSession(String bootstrapSecret);
+  Future<SessionBundle> login({
+    required String username,
+    required String password,
+  });
 
   Future<SessionBundle> refreshSession({required String refreshToken});
 
@@ -59,7 +62,7 @@ abstract interface class SessionTransport {
 }
 
 abstract interface class ExternalSessionTransport {
-  Future<SessionBundle> bootstrapExternalSession(String identityToken);
+  Future<SessionBundle> loginExternal(String identityToken);
 }
 
 class SessionController {
@@ -69,7 +72,7 @@ class SessionController {
   final DateTime Function() _now;
   SessionBundle? _bundle;
   int _bundleVersion = 0;
-  int _bootstrapGeneration = 0;
+  int _authenticationGeneration = 0;
   Future<String>? _refreshInFlight;
   int? _refreshBundleVersion;
 
@@ -90,44 +93,54 @@ class SessionController {
 
   void establish(SessionBundle bundle) {
     _validate(bundle);
-    _bootstrapGeneration++;
+    _authenticationGeneration++;
     _bundle = bundle;
     _bundleVersion++;
     lastError = null;
     status = SessionStatus.authenticated;
   }
 
-  Future<bool> bootstrap(
-    SessionTransport transport,
-    String bootstrapSecret,
-  ) async {
-    if (bootstrapSecret.trim().isEmpty) {
+  Future<bool> login(
+    SessionTransport transport, {
+    required String username,
+    required String password,
+  }) async {
+    if (username.trim().isEmpty) {
       throw ArgumentError.value(
-        bootstrapSecret,
-        'bootstrapSecret',
-        'A bootstrap secret is required.',
+        username,
+        'username',
+        'A username is required.',
       );
     }
-    return _bootstrap(() => transport.bootstrapSession(bootstrapSecret));
+    if (password.isEmpty) {
+      throw ArgumentError.value(
+        password,
+        'password',
+        'A password is required.',
+      );
+    }
+    return _establish(
+      () => transport.login(username: username, password: password),
+    );
   }
 
-  Future<bool> bootstrapExternal(
+  Future<bool> loginExternal(
     ExternalSessionTransport transport,
     String identityToken,
-  ) => _bootstrap(() => transport.bootstrapExternalSession(identityToken));
+  ) => _establish(() => transport.loginExternal(identityToken));
 
-  Future<bool> _bootstrap(Future<SessionBundle> Function() establish) async {
-    final generation = ++_bootstrapGeneration;
+  Future<bool> _establish(Future<SessionBundle> Function() establish) async {
+    final generation = ++_authenticationGeneration;
     _bundle = null;
     _bundleVersion++;
     begin();
     try {
       final established = await establish();
-      if (generation != _bootstrapGeneration) return false;
+      if (generation != _authenticationGeneration) return false;
       this.establish(established);
       return true;
     } catch (error) {
-      if (generation != _bootstrapGeneration) return false;
+      if (generation != _authenticationGeneration) return false;
       _bundle = null;
       _bundleVersion++;
       lastError = error;
@@ -224,7 +237,7 @@ class SessionController {
       _bundleVersion == bundleVersion && identical(_bundle, bundle);
 
   void expire() {
-    _bootstrapGeneration++;
+    _authenticationGeneration++;
     _bundle = null;
     _bundleVersion++;
     status = SessionStatus.expired;
@@ -233,7 +246,7 @@ class SessionController {
   Future<void> signOut(SessionTransport transport) async {
     final bundle = _bundle;
     final refreshToken = bundle?.credentials.refreshToken;
-    _bootstrapGeneration++;
+    _authenticationGeneration++;
     if (refreshToken == null) {
       _bundle = null;
       _bundleVersion++;

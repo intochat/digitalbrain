@@ -15,7 +15,10 @@ DateTime _utcNow() => DateTime.now().toUtc();
 
 const Key runtimeLoadingKey = Key('v2-runtime-loading');
 const Key runtimeSignInKey = Key('v2-runtime-sign-in');
-const Key runtimeSecretFieldKey = Key('v2-runtime-secret-field');
+const String developmentUsername = 'admin';
+const String developmentPassword = 'admin';
+const Key runtimeUsernameFieldKey = Key('v2-runtime-username-field');
+const Key runtimePasswordFieldKey = Key('v2-runtime-password-field');
 const Key runtimeSignInButtonKey = Key('v2-runtime-sign-in-button');
 const Key runtimeSignOutButtonKey = Key('v2-runtime-sign-out-button');
 const Key runtimeSurfaceKey = Key('v2-runtime-surface');
@@ -44,7 +47,12 @@ class RuntimeShell extends StatefulWidget {
 }
 
 class _RuntimeShellState extends State<RuntimeShell> {
-  final TextEditingController _secret = TextEditingController();
+  final TextEditingController _username = TextEditingController(
+    text: developmentUsername,
+  );
+  final TextEditingController _password = TextEditingController(
+    text: developmentPassword,
+  );
   late final RuntimeSessionOwner _session;
   Timer? _surfaceExpiryTimer;
   bool _firstSurfaceFrameReported = false;
@@ -85,7 +93,8 @@ class _RuntimeShellState extends State<RuntimeShell> {
   @override
   void dispose() {
     _surfaceExpiryTimer?.cancel();
-    _secret.dispose();
+    _username.dispose();
+    _password.dispose();
     _session.removeListener(_onSessionChanged);
     unawaited(_session.close());
     super.dispose();
@@ -145,7 +154,10 @@ class _RuntimeShellState extends State<RuntimeShell> {
                 message: 'Sign out',
                 child: IconButton.filledTonal(
                   key: runtimeSignOutButtonKey,
-                  onPressed: _session.signOut,
+                  onPressed: () {
+                    _resetDevelopmentCredentials();
+                    _session.signOut();
+                  },
                   icon: const Icon(Icons.logout),
                 ),
               ),
@@ -222,21 +234,26 @@ class _RuntimeShellState extends State<RuntimeShell> {
                   Text(
                     externalIdentity
                         ? 'Continue with your organization identity.'
-                        : 'Enter the sign-in code supplied by your '
-                              'DigitalBrain administrator.',
+                        : 'Use your Development username and password.',
                   ),
                   const SizedBox(height: 16),
                   if (!externalIdentity) ...[
                     TextField(
-                      key: runtimeSecretFieldKey,
-                      controller: _secret,
+                      key: runtimeUsernameFieldKey,
+                      controller: _username,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _authenticate(),
+                      decoration: const InputDecoration(labelText: 'Username'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: runtimePasswordFieldKey,
+                      controller: _password,
                       obscureText: true,
                       enableSuggestions: false,
                       autocorrect: false,
                       onSubmitted: (_) => _authenticate(),
-                      decoration: const InputDecoration(
-                        labelText: 'Sign-in code',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Password'),
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -252,8 +269,7 @@ class _RuntimeShellState extends State<RuntimeShell> {
                     Text(
                       externalIdentity
                           ? 'Sign-in was not accepted. Please try again.'
-                          : 'That sign-in code wasn\'t accepted. '
-                                'Please try again.',
+                          : 'Sign-in was not accepted. Please try again.',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
@@ -273,9 +289,15 @@ class _RuntimeShellState extends State<RuntimeShell> {
       _session.authenticateWithExternalIdentity();
       return;
     }
-    final value = _secret.text;
-    _secret.clear();
-    _session.authenticateWithBootstrap(value);
+    final username = _username.text;
+    final password = _password.text;
+    _resetDevelopmentCredentials();
+    _session.authenticateWithPassword(username: username, password: password);
+  }
+
+  void _resetDevelopmentCredentials() {
+    _username.text = developmentUsername;
+    _password.text = developmentPassword;
   }
 
   Widget _errorScaffold(String message, {required Key key}) => Scaffold(

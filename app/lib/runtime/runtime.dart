@@ -96,25 +96,26 @@ class RuntimeController extends ChangeNotifier {
       status == RuntimeStatus.streaming &&
       identical(feed.surface(surface.surfaceId), surface);
 
-  Future<void> start({String? bootstrapSecret}) async {
+  Future<void> start() async {
     if (_loop != null || status == RuntimeStatus.authenticating) return;
     _stopRequested = false;
     terminalError = null;
     transientError = null;
     if (!session.isAuthenticated) {
-      if (bootstrapSecret == null || bootstrapSecret.trim().isEmpty) {
-        _setStatus(RuntimeStatus.awaitingSignIn);
-        return;
-      }
-      await authenticateWithBootstrap(bootstrapSecret);
+      _setStatus(RuntimeStatus.awaitingSignIn);
       return;
     }
     _bindIdentity(session.identity!);
     _launchLoop();
   }
 
-  Future<void> authenticateWithBootstrap(String secret) async {
-    await _authenticate(() => session.bootstrap(transport, secret));
+  Future<void> authenticateWithPassword({
+    required String username,
+    required String password,
+  }) async {
+    await _authenticate(
+      () => session.login(transport, username: username, password: password),
+    );
   }
 
   Future<void> authenticateWithExternalIdentityToken(String token) async {
@@ -125,10 +126,10 @@ class RuntimeController extends ChangeNotifier {
       );
     }
     final typedTransport = externalTransport as ExternalSessionTransport;
-    await _authenticate(() => session.bootstrapExternal(typedTransport, token));
+    await _authenticate(() => session.loginExternal(typedTransport, token));
   }
 
-  Future<void> _authenticate(Future<bool> Function() bootstrap) async {
+  Future<void> _authenticate(Future<bool> Function() establishSession) async {
     final authenticationGeneration = ++_authenticationGeneration;
     await stop(closeTransport: false, invalidateAuthentication: false);
     if (authenticationGeneration != _authenticationGeneration) return;
@@ -138,7 +139,7 @@ class RuntimeController extends ChangeNotifier {
     _clearProtectedState(clearFeedIdentity: true);
     _setStatus(RuntimeStatus.authenticating);
     try {
-      final applied = await bootstrap();
+      final applied = await establishSession();
       if (!applied || authenticationGeneration != _authenticationGeneration) {
         return;
       }

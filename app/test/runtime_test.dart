@@ -6,14 +6,19 @@ import 'runtime/test_fixtures.dart';
 void main() {
   group('SessionController', () {
     test(
-      'bootstraps an in-memory signed session and clears it on sign out',
+      'establishes an in-memory signed session and clears it on sign out',
       () async {
         final transport = _SessionTransport(testSession());
         final session = SessionController(now: () => testNow);
 
-        await session.bootstrap(transport, 'local-bootstrap');
+        await session.login(
+          transport,
+          username: 'admin',
+          password: 'local-password',
+        );
 
-        expect(transport.bootstrapSecret, 'local-bootstrap');
+        expect(transport.loginUsername, 'admin');
+        expect(transport.loginPassword, 'local-password');
         expect(session.status, SessionStatus.authenticated);
         expect(session.ownerId, 'owner-a');
         expect(session.actorId, 'actor-a');
@@ -216,13 +221,18 @@ class _SessionTransport implements SessionTransport {
   final SessionBundle initial;
   final SessionBundle refreshed;
   final Object? logoutError;
-  String? bootstrapSecret;
+  String? loginUsername;
+  String? loginPassword;
   String? refreshToken;
   String? logoutRefreshToken;
 
   @override
-  Future<SessionBundle> bootstrapSession(String bootstrapSecret) async {
-    this.bootstrapSecret = bootstrapSecret;
+  Future<SessionBundle> login({
+    required String username,
+    required String password,
+  }) async {
+    loginUsername = username;
+    loginPassword = password;
     return initial;
   }
 

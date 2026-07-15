@@ -6,19 +6,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'test_fixtures.dart';
 
 void main() {
-  group('SessionController bootstrap', () {
-    test('an older bootstrap failure cannot clear a newer session', () async {
-      final transport = _PendingBootstrapTransport();
+  group('SessionController login', () {
+    test('an older login failure cannot clear a newer session', () async {
+      final transport = _PendingLoginTransport();
       final controller = SessionController(now: () => testNow);
-      final older = controller.bootstrap(transport, 'older');
-      final newer = controller.bootstrap(transport, 'newer');
+      final older = controller.login(
+        transport,
+        username: 'admin',
+        password: 'older',
+      );
+      final newer = controller.login(
+        transport,
+        username: 'admin',
+        password: 'newer',
+      );
 
       transport.pending['newer']!.complete(
         testSession(accessToken: 'access-newer', refreshToken: 'refresh-newer'),
       );
       expect(await newer, isTrue);
       transport.pending['older']!.completeError(
-        const AuthenticationException('Older bootstrap was rejected.'),
+        const AuthenticationException('Older login was rejected.'),
       );
       expect(await older, isFalse);
 
@@ -27,11 +35,19 @@ void main() {
       expect(await controller.accessToken(transport), 'access-newer');
     });
 
-    test('an older bootstrap success cannot replace a newer session', () async {
-      final transport = _PendingBootstrapTransport();
+    test('an older login success cannot replace a newer session', () async {
+      final transport = _PendingLoginTransport();
       final controller = SessionController(now: () => testNow);
-      final older = controller.bootstrap(transport, 'older');
-      final newer = controller.bootstrap(transport, 'newer');
+      final older = controller.login(
+        transport,
+        username: 'admin',
+        password: 'older',
+      );
+      final newer = controller.login(
+        transport,
+        username: 'admin',
+        password: 'newer',
+      );
 
       transport.pending['newer']!.complete(
         testSession(accessToken: 'access-newer', refreshToken: 'refresh-newer'),
@@ -46,11 +62,11 @@ void main() {
       expect(await controller.accessToken(transport), 'access-newer');
     });
 
-    test('external bootstrap establishes the server-derived session', () async {
-      final transport = _ExternalBootstrapTransport();
+    test('external login establishes the server-derived session', () async {
+      final transport = _ExternalLoginTransport();
       final controller = SessionController(now: () => testNow);
 
-      final established = await controller.bootstrapExternal(
+      final established = await controller.loginExternal(
         transport,
         'identityheader.identitypayload.identitysignature',
       );
@@ -127,10 +143,10 @@ void main() {
       'an older refresh cannot replace an explicit reauthentication',
       () async {
         final pendingRefresh = Completer<SessionBundle>();
-        final pendingBootstrap = Completer<SessionBundle>();
+        final pendingLogin = Completer<SessionBundle>();
         final transport = _PendingRefreshTransport(
           pendingRefresh,
-          pendingBootstrap: pendingBootstrap,
+          pendingLogin: pendingLogin,
         );
         final controller = SessionController(now: () => testNow)
           ..establish(
@@ -138,9 +154,10 @@ void main() {
           );
 
         final olderRefresh = controller.refreshAccessToken(transport);
-        final newerBootstrap = controller.bootstrap(
+        final newerLogin = controller.login(
           transport,
-          'reauthenticate',
+          username: 'admin',
+          password: 'reauthenticate',
         );
         pendingRefresh.complete(
           testSession(
@@ -153,13 +170,13 @@ void main() {
           throwsA(isA<AuthenticationException>()),
         );
 
-        pendingBootstrap.complete(
+        pendingLogin.complete(
           testSession(
             accessToken: 'access-reauthenticated',
             refreshToken: 'refresh-reauthenticated',
           ),
         );
-        expect(await newerBootstrap, isTrue);
+        expect(await newerLogin, isTrue);
         expect(controller.status, SessionStatus.authenticated);
         expect(
           await controller.accessToken(transport),
@@ -170,19 +187,20 @@ void main() {
 
     test('a refresh cannot start after reauthentication begins', () async {
       final pendingRefresh = Completer<SessionBundle>();
-      final pendingBootstrap = Completer<SessionBundle>();
+      final pendingLogin = Completer<SessionBundle>();
       final transport = _PendingRefreshTransport(
         pendingRefresh,
-        pendingBootstrap: pendingBootstrap,
+        pendingLogin: pendingLogin,
       );
       final controller = SessionController(now: () => testNow)
         ..establish(
           testSession(accessToken: 'access-old', refreshToken: 'refresh-old'),
         );
 
-      final reauthentication = controller.bootstrap(
+      final reauthentication = controller.login(
         transport,
-        'reauthenticate',
+        username: 'admin',
+        password: 'reauthenticate',
       );
 
       await expectLater(
@@ -190,7 +208,7 @@ void main() {
         throwsA(isA<AuthenticationException>()),
       );
       expect(transport.refreshTokens, isEmpty);
-      pendingBootstrap.complete(
+      pendingLogin.complete(
         testSession(
           accessToken: 'access-reauthenticated',
           refreshToken: 'refresh-reauthenticated',
@@ -202,22 +220,24 @@ void main() {
   });
 }
 
-class _ExternalBootstrapTransport implements ExternalSessionTransport {
+class _ExternalLoginTransport implements ExternalSessionTransport {
   final List<String> identityTokens = [];
 
   @override
-  Future<SessionBundle> bootstrapExternalSession(String identityToken) async {
+  Future<SessionBundle> loginExternal(String identityToken) async {
     identityTokens.add(identityToken);
     return testSession();
   }
 }
 
-class _PendingBootstrapTransport implements SessionTransport {
+class _PendingLoginTransport implements SessionTransport {
   final Map<String, Completer<SessionBundle>> pending = {};
 
   @override
-  Future<SessionBundle> bootstrapSession(String bootstrapSecret) =>
-      (pending[bootstrapSecret] ??= Completer<SessionBundle>()).future;
+  Future<SessionBundle> login({
+    required String username,
+    required String password,
+  }) => (pending[password] ??= Completer<SessionBundle>()).future;
 
   @override
   Future<SessionBundle> refreshSession({required String refreshToken}) =>
@@ -228,15 +248,17 @@ class _PendingBootstrapTransport implements SessionTransport {
 }
 
 class _PendingRefreshTransport implements SessionTransport {
-  _PendingRefreshTransport(this.pendingRefresh, {this.pendingBootstrap});
+  _PendingRefreshTransport(this.pendingRefresh, {this.pendingLogin});
 
   final Completer<SessionBundle> pendingRefresh;
-  final Completer<SessionBundle>? pendingBootstrap;
+  final Completer<SessionBundle>? pendingLogin;
   final List<String> refreshTokens = [];
 
   @override
-  Future<SessionBundle> bootstrapSession(String bootstrapSecret) =>
-      pendingBootstrap?.future ?? (throw UnimplementedError());
+  Future<SessionBundle> login({
+    required String username,
+    required String password,
+  }) => pendingLogin?.future ?? (throw UnimplementedError());
 
   @override
   Future<SessionBundle> refreshSession({required String refreshToken}) {

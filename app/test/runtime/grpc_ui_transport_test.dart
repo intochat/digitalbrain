@@ -34,14 +34,18 @@ void main() {
     });
 
     test(
-      'bootstrap exchanges the credential for the exact UI audience',
+      'login exchanges development credentials for the exact UI audience',
       () async {
         final port = _FakeGrpcClientPort();
         final transport = GrpcUiTransport.forTesting(client: port);
 
-        final session = await transport.bootstrapSession('bootstrap-once');
+        final session = await transport.login(
+          username: 'admin',
+          password: 'admin',
+        );
 
-        expect(port.bootstrapRequest?.secret, 'bootstrap-once');
+        expect(port.bootstrapRequest?.username, 'admin');
+        expect(port.bootstrapRequest?.password, 'admin');
         expect(port.bootstrapOptions?.metadata, {
           'x-v2-audience': digitalBrainUiAudience,
         });
@@ -56,16 +60,17 @@ void main() {
     );
 
     test(
-      'external bootstrap sends bearer identity and an empty bootstrap secret',
+      'external login sends bearer identity and an empty credential body',
       () async {
         const identityToken =
             'identityheader.identitypayload.identitysignature';
         final port = _FakeGrpcClientPort();
         final transport = GrpcUiTransport.forTesting(client: port);
 
-        final session = await transport.bootstrapExternalSession(identityToken);
+        final session = await transport.loginExternal(identityToken);
 
-        expect(port.bootstrapRequest?.secret, isEmpty);
+        expect(port.bootstrapRequest?.username, isEmpty);
+        expect(port.bootstrapRequest?.password, isEmpty);
         expect(port.bootstrapOptions?.metadata, {
           'authorization': 'Bearer $identityToken',
           'x-v2-audience': digitalBrainUiAudience,
@@ -79,29 +84,26 @@ void main() {
       },
     );
 
-    test(
-      'external bootstrap rejects malformed compact identity tokens',
-      () async {
-        final port = _FakeGrpcClientPort();
-        final transport = GrpcUiTransport.forTesting(client: port);
+    test('external login rejects malformed compact identity tokens', () async {
+      final port = _FakeGrpcClientPort();
+      final transport = GrpcUiTransport.forTesting(client: port);
 
-        for (final token in [
-          '',
-          'identity-token-without-compact-segments',
-          'header.payload',
-          ' headerheader.payloadpayload.signaturesignature',
-          'headerheader.payload payload.signaturesignature',
-        ]) {
-          await expectLater(
-            transport.bootstrapExternalSession(token),
-            throwsA(isA<AuthenticationException>()),
-          );
-        }
+      for (final token in [
+        '',
+        'identity-token-without-compact-segments',
+        'header.payload',
+        ' headerheader.payloadpayload.signaturesignature',
+        'headerheader.payload payload.signaturesignature',
+      ]) {
+        await expectLater(
+          transport.loginExternal(token),
+          throwsA(isA<AuthenticationException>()),
+        );
+      }
 
-        expect(port.bootstrapRequest, isNull);
-        expect(port.bootstrapOptions, isNull);
-      },
-    );
+      expect(port.bootstrapRequest, isNull);
+      expect(port.bootstrapOptions, isNull);
+    });
 
     test(
       'refresh sends exact audience and never requires expired access',
@@ -333,7 +335,10 @@ void main() {
       final transport = GrpcUiTransport.forTesting(client: port);
       final runtime = RuntimeController(transport: transport);
 
-      await runtime.authenticateWithBootstrap('bootstrap-once');
+      await runtime.authenticateWithPassword(
+        username: 'admin',
+        password: 'admin',
+      );
       await _eventually(() => runtime.latestSurface != null);
 
       final payload =
@@ -370,7 +375,7 @@ void main() {
 
         Object? caught;
         try {
-          await transport.bootstrapSession('bad');
+          await transport.login(username: 'admin', password: 'bad');
         } catch (error) {
           caught = error;
         }

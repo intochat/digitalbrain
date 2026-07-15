@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:digitalbrain_flutter/runtime/external_identity.dart';
 import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
 import 'package:digitalbrain_flutter/runtime/runtime_configuration.dart';
 import 'package:digitalbrain_flutter/runtime/runtime.dart';
@@ -15,7 +16,7 @@ import 'package:go_router/go_router.dart';
 import 'test_fixtures.dart';
 
 void main() {
-  testWidgets('normal runtime shell bootstraps and renders its first surface', (
+  testWidgets('normal authenticated runtime shell renders its first surface', (
     tester,
   ) async {
     final feed = _ShellFeedCall.open();
@@ -23,12 +24,7 @@ void main() {
     final runtime = _runtime(transport);
 
     await tester.pumpWidget(
-      _host(
-        RuntimeShell(
-          configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-          controller: runtime,
-        ),
-      ),
+      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
     );
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(
@@ -45,8 +41,6 @@ void main() {
     expect(find.byKey(runtimeSurfaceKey), findsOneWidget);
     expect(find.text('Ask INO about this workspace.'), findsOneWidget);
     expect(find.byKey(inoComposerFieldKey), findsOneWidget);
-    expect(transport.bootstrapSecret, 'bootstrap-once');
-
     await runtime.stop();
   });
 
@@ -58,12 +52,7 @@ void main() {
     final runtime = _runtime(transport);
 
     await tester.pumpWidget(
-      _host(
-        RuntimeShell(
-          configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-          controller: runtime,
-        ),
-      ),
+      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
     );
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(
@@ -111,7 +100,7 @@ void main() {
     await tester.pumpWidget(
       _host(
         RuntimeShell(
-          configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+          configuration: _configuration(),
           transportFactory: (endpoint) {
             connectedEndpoint = endpoint;
             return transport;
@@ -119,6 +108,11 @@ void main() {
         ),
       ),
     );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
     await _pumpUntil(tester, () => transport.watchStarted);
 
     expect(connectedEndpoint, Uri.parse('https://localhost:7443'));
@@ -150,12 +144,12 @@ void main() {
     expect(find.textContaining('private transport error'), findsNothing);
   });
 
-  testWidgets('manual bootstrap sign-in does not retain the typed secret', (
+  testWidgets('development login is prefilled and submits both fields', (
     tester,
   ) async {
     final feed = _ShellFeedCall.open();
     final transport = _ShellTransport(feed);
-    final runtime = _runtime(transport);
+    final runtime = _runtime(transport, authenticated: false);
 
     await tester.pumpWidget(
       _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
@@ -164,13 +158,155 @@ void main() {
       tester,
       () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
     );
-    await tester.enterText(find.byKey(runtimeSecretFieldKey), 'typed-once');
+    final username = tester.widget<TextField>(
+      find.byKey(runtimeUsernameFieldKey),
+    );
+    final password = tester.widget<TextField>(
+      find.byKey(runtimePasswordFieldKey),
+    );
+    expect(username.controller?.text, 'admin');
+    expect(username.obscureText, isFalse);
+    expect(password.controller?.text, 'admin');
+    expect(password.obscureText, isTrue);
+
     await tester.tap(find.byKey(runtimeSignInButtonKey));
     await _pumpUntil(tester, () => transport.watchStarted);
 
-    expect(transport.bootstrapSecret, 'typed-once');
-    expect(find.text('typed-once'), findsNothing);
+    expect(transport.loginUsername, 'admin');
+    expect(transport.loginPassword, 'admin');
     expect(runtime.session.status, SessionStatus.authenticated);
+
+    feed.add(FeedSurfaceJson(surfaceJsonString(sequence: 1)));
+    await _pumpUntil(tester, () => runtime.latestSurface != null);
+    await tester.tap(find.byKey(runtimeSignOutButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+
+    final signedOutUsername = tester.widget<TextField>(
+      find.byKey(runtimeUsernameFieldKey),
+    );
+    final signedOutPassword = tester.widget<TextField>(
+      find.byKey(runtimePasswordFieldKey),
+    );
+    expect(signedOutUsername.controller?.text, 'admin');
+    expect(signedOutPassword.controller?.text, 'admin');
+    expect(signedOutPassword.obscureText, isTrue);
+    expect(find.byKey(runtimeSurfaceKey), findsNothing);
+
+    await runtime.stop();
+  });
+
+  testWidgets('rejected login is generic and restores development defaults', (
+    tester,
+  ) async {
+    final transport = _ShellTransport(
+      _ShellFeedCall.open(),
+      loginResults: [
+        const AuthenticationException('Private authentication detail.'),
+      ],
+    );
+    final runtime = _runtime(transport, authenticated: false);
+
+    await tester.pumpWidget(
+      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.enterText(find.byKey(runtimeUsernameFieldKey), 'other-user');
+    await tester.enterText(
+      find.byKey(runtimePasswordFieldKey),
+      'wrong-password',
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find
+          .text('Sign-in was not accepted. Please try again.')
+          .evaluate()
+          .isNotEmpty,
+    );
+
+    expect(transport.loginAttempts, [
+      ['other-user', 'wrong-password'],
+    ]);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(runtimeUsernameFieldKey))
+          .controller
+          ?.text,
+      'admin',
+    );
+    final password = tester.widget<TextField>(
+      find.byKey(runtimePasswordFieldKey),
+    );
+    expect(password.controller?.text, 'admin');
+    expect(password.obscureText, isTrue);
+    expect(find.textContaining('Private authentication detail'), findsNothing);
+    expect(find.textContaining('wrong-password'), findsNothing);
+
+    await runtime.stop();
+  });
+
+  testWidgets('enter from either development field submits the form', (
+    tester,
+  ) async {
+    for (final key in [runtimeUsernameFieldKey, runtimePasswordFieldKey]) {
+      final transport = _ShellTransport(_ShellFeedCall.open());
+      final runtime = _runtime(transport, authenticated: false);
+      await tester.pumpWidget(
+        _host(
+          RuntimeShell(configuration: _configuration(), controller: runtime),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+      );
+
+      tester.widget<TextField>(find.byKey(key)).onSubmitted?.call('admin');
+      await _pumpUntil(tester, () => transport.watchStarted);
+
+      expect(transport.loginAttempts, [
+        ['admin', 'admin'],
+      ]);
+      await runtime.stop();
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+
+  testWidgets('external identity hides development credentials', (
+    tester,
+  ) async {
+    final transport = _ShellTransport(_ShellFeedCall.open());
+    final runtime = _runtime(transport, authenticated: false);
+
+    await tester.pumpWidget(
+      _host(
+        RuntimeShell(
+          configuration: _configuration(
+            externalIdentity: ExternalIdentityConfiguration(
+              issuer: Uri.parse('https://identity.example'),
+              clientId: 'digitalbrain-ui',
+            ),
+          ),
+          controller: runtime,
+          externalIdentityTokenSourceFactory: (_) => _ExternalTokenSource(),
+        ),
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+
+    expect(find.text('Continue'), findsOneWidget);
+    expect(find.byKey(runtimeUsernameFieldKey), findsNothing);
+    expect(find.byKey(runtimePasswordFieldKey), findsNothing);
+    expect(find.textContaining('organization identity'), findsOneWidget);
 
     await runtime.stop();
   });
@@ -187,12 +323,7 @@ void main() {
     final runtime = _runtime(_ShellTransport(feed));
 
     await tester.pumpWidget(
-      _host(
-        RuntimeShell(
-          configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-          controller: runtime,
-        ),
-      ),
+      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
     );
     await _pumpUntil(
       tester,
@@ -219,7 +350,7 @@ void main() {
     await tester.pumpWidget(
       _host(
         RuntimeShell(
-          configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+          configuration: _configuration(),
           controller: runtime,
           now: () => now,
         ),
@@ -243,10 +374,7 @@ void main() {
     final transport = _ShellTransport(first);
     final runtime = _runtime(transport);
     Widget shell() => _host(
-      RuntimeShell(
-        configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-        controller: runtime,
-      ),
+      RuntimeShell(configuration: _configuration(), controller: runtime),
     );
 
     await tester.pumpWidget(shell());
@@ -304,10 +432,7 @@ void main() {
     final transport = _ShellTransport(feed);
     final runtime = _runtime(transport);
     Widget shell() => _host(
-      RuntimeShell(
-        configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-        controller: runtime,
-      ),
+      RuntimeShell(configuration: _configuration(), controller: runtime),
     );
 
     await tester.pumpWidget(shell());
@@ -348,12 +473,7 @@ void main() {
     final runtime = _runtime(transport);
 
     await tester.pumpWidget(
-      _host(
-        RuntimeShell(
-          configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-          controller: runtime,
-        ),
-      ),
+      _host(RuntimeShell(configuration: _configuration(), controller: runtime)),
     );
     await _pumpUntil(tester, () => transport.watchStarted);
     feed.add(
@@ -385,10 +505,7 @@ void main() {
 
       await tester.pumpWidget(
         _host(
-          RuntimeShell(
-            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-            controller: runtime,
-          ),
+          RuntimeShell(configuration: _configuration(), controller: runtime),
         ),
       );
       await _pumpUntil(tester, () => transport.watchStarted);
@@ -427,10 +544,7 @@ void main() {
 
       await tester.pumpWidget(
         _host(
-          RuntimeShell(
-            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-            controller: runtime,
-          ),
+          RuntimeShell(configuration: _configuration(), controller: runtime),
         ),
       );
       await _pumpUntil(tester, () => transport.watchStarted);
@@ -477,10 +591,7 @@ void main() {
 
       await tester.pumpWidget(
         _host(
-          RuntimeShell(
-            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-            controller: runtime,
-          ),
+          RuntimeShell(configuration: _configuration(), controller: runtime),
         ),
       );
       await _pumpUntil(tester, () => transport.watchStarted);
@@ -513,10 +624,7 @@ void main() {
 
       await tester.pumpWidget(
         _host(
-          RuntimeShell(
-            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
-            controller: runtime,
-          ),
+          RuntimeShell(configuration: _configuration(), controller: runtime),
         ),
       );
       await _pumpUntil(tester, () => transport.watchStarted);
@@ -564,7 +672,7 @@ void main() {
         GoRoute(
           path: '/chat',
           builder: (context, state) => RuntimeShell(
-            configuration: _configuration(bootstrapSecret: 'bootstrap-once'),
+            configuration: _configuration(),
             controller: runtime,
           ),
         ),
@@ -615,20 +723,28 @@ void main() {
 
 Widget _host(Widget child) => MaterialApp(home: child);
 
-RuntimeConfiguration _configuration({String? bootstrapSecret}) =>
-    RuntimeConfiguration(
-      endpoint: Uri.parse('https://localhost:7443'),
-      bootstrapSecret: bootstrapSecret,
-    );
-
-RuntimeController _runtime(_ShellTransport transport) => RuntimeController(
-  transport: transport,
-  reconnectPolicy: const ReconnectPolicy(
-    delays: [Duration.zero],
-    maxAttempts: 1,
-  ),
-  delay: (_) async {},
+RuntimeConfiguration _configuration({
+  ExternalIdentityConfiguration? externalIdentity,
+}) => RuntimeConfiguration(
+  endpoint: Uri.parse('https://localhost:7443'),
+  externalIdentity: externalIdentity,
 );
+
+RuntimeController _runtime(
+  _ShellTransport transport, {
+  bool authenticated = true,
+}) {
+  final runtime = RuntimeController(
+    transport: transport,
+    reconnectPolicy: const ReconnectPolicy(
+      delays: [Duration.zero],
+      maxAttempts: 1,
+    ),
+    delay: (_) async {},
+  );
+  if (authenticated) runtime.session.establish(testSession());
+  return runtime;
+}
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
   for (var attempt = 0; attempt < 100; attempt++) {
@@ -639,18 +755,32 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 class _ShellTransport implements UiTransport {
-  _ShellTransport(this.feed);
+  _ShellTransport(this.feed, {Iterable<Object>? loginResults})
+    : _loginResults = [...?loginResults];
 
   final _ShellFeedCall feed;
-  String? bootstrapSecret;
+  final List<Object> _loginResults;
+  final List<List<String>> loginAttempts = [];
+  String? loginUsername;
+  String? loginPassword;
   bool watchStarted = false;
   int closeCount = 0;
   UiActionRef? submittedAction;
   Map<String, Object?>? submittedInput;
 
   @override
-  Future<SessionBundle> bootstrapSession(String bootstrapSecret) async {
-    this.bootstrapSecret = bootstrapSecret;
+  Future<SessionBundle> login({
+    required String username,
+    required String password,
+  }) async {
+    loginUsername = username;
+    loginPassword = password;
+    loginAttempts.add([username, password]);
+    if (_loginResults.isNotEmpty) {
+      final result = _loginResults.removeAt(0);
+      if (result is SessionBundle) return result;
+      throw result;
+    }
     return testSession();
   }
 
@@ -698,6 +828,14 @@ class _ShellTransport implements UiTransport {
   Future<void> close() async {
     closeCount++;
   }
+}
+
+class _ExternalTokenSource implements ExternalIdentityTokenSource {
+  @override
+  Future<void> beginAuthentication() async {}
+
+  @override
+  Future<String?> restoreIdentityToken() async => null;
 }
 
 class _ShellFeedCall implements FeedCall {

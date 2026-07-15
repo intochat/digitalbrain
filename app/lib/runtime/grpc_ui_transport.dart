@@ -89,11 +89,14 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
   bool _closed = false;
 
   @override
-  Future<SessionBundle> bootstrapSession(String bootstrapSecret) async {
+  Future<SessionBundle> login({
+    required String username,
+    required String password,
+  }) async {
     try {
       final reply = await _awaitUnary(
         _client.bootstrapSession(
-          wire.BootstrapSessionRequest(secret: bootstrapSecret),
+          wire.BootstrapSessionRequest(username: username, password: password),
           _audienceOnlyOptions(),
         ),
       );
@@ -104,7 +107,7 @@ class GrpcUiTransport implements UiTransport, ExternalSessionTransport {
   }
 
   @override
-  Future<SessionBundle> bootstrapExternalSession(String identityToken) async {
+  Future<SessionBundle> loginExternal(String identityToken) async {
     _validateIdentityToken(identityToken);
     try {
       final reply = await _awaitUnary(

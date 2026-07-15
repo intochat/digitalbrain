@@ -6,15 +6,10 @@ import 'external_identity.dart';
 const String digitalBrainUiAudience = 'digitalbrain-v2-ui';
 
 class RuntimeConfiguration {
-  const RuntimeConfiguration({
-    required this.endpoint,
-    this.bootstrapSecret,
-    this.externalIdentity,
-  });
+  const RuntimeConfiguration({required this.endpoint, this.externalIdentity});
 
   final Uri endpoint;
 
-  final String? bootstrapSecret;
   final ExternalIdentityConfiguration? externalIdentity;
 
   factory RuntimeConfiguration.fromEnvironment() {
@@ -45,9 +40,6 @@ class RuntimeConfiguration {
         : null;
     return RuntimeConfiguration(
       endpoint: parseUiEndpoint(source),
-      bootstrapSecret: kIsWeb
-          ? null
-          : _nonEmpty(getEnv('DIGITALBRAIN_V2_UI_BOOTSTRAP_SECRET')),
       externalIdentity: externalIdentity,
     );
   }
@@ -112,9 +104,4 @@ Uri parseUiEndpoint(String source) {
     );
   }
   return endpoint.replace(path: '', query: null, fragment: null);
-}
-
-String? _nonEmpty(String? value) {
-  final trimmed = value?.trim();
-  return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }

@@ -15,12 +15,12 @@ void main() {
       final transport = _FakeUiTransport([call]);
       final runtime = _runtime(transport);
 
-      await runtime.authenticateWithBootstrap('bootstrap-once');
+      await _login(runtime, 'bootstrap-once');
       await _eventually(() => transport.watchAfter.isNotEmpty);
       call.add(FeedSurfaceJson(surfaceJsonString(sequence: 1)));
       await _eventually(() => runtime.latestSurface != null);
 
-      expect(transport.bootstrapSecret, 'bootstrap-once');
+      expect(transport.loginPassword, 'bootstrap-once');
       expect(runtime.status, RuntimeStatus.streaming);
       expect(runtime.latestSurface?.feedSequence, 1);
       expect(runtime.latestSurface?.payload, isA<NativeSurfacePayload>());
@@ -45,7 +45,7 @@ void main() {
         expect(transport.externalIdentityTokens, [
           'identityheader.identitypayload.identitysignature',
         ]);
-        expect(transport.bootstrapSecrets, isEmpty);
+        expect(transport.loginPasswords, isEmpty);
         expect(runtime.session.isAuthenticated, isTrue);
         expect(runtime.session.sessionId, 'session-a');
         expect(transport.watchAccessTokens, ['access-token']);
@@ -61,7 +61,7 @@ void main() {
         final transport = _FakeUiTransport([call]);
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
         await runtime.signOut();
 
@@ -89,7 +89,7 @@ void main() {
         );
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
         await expectLater(
           runtime.signOut(),
@@ -120,7 +120,7 @@ void main() {
       final transport = _FakeUiTransport([first, second]);
       final runtime = _runtime(transport);
 
-      await runtime.authenticateWithBootstrap('bootstrap-once');
+      await _login(runtime, 'bootstrap-once');
       await _eventually(() => transport.watchAfter.length == 2);
 
       expect(transport.watchAfter, [0, 1]);
@@ -143,7 +143,7 @@ void main() {
         final transport = _FakeUiTransport([first, second]);
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => transport.watchAfter.length == 2);
 
         expect(transport.watchAfter, [0, 0]);
@@ -175,7 +175,7 @@ void main() {
         final transport = _FakeUiTransport([call]);
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => transport.watchAfter.isNotEmpty);
         call.add(
           FeedResetEvent(
@@ -212,7 +212,7 @@ void main() {
         final transport = _FakeUiTransport([call]);
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
         call.add(
           FeedResetEvent(
@@ -270,7 +270,7 @@ void main() {
             final transport = _FakeUiTransport([first, unusedReconnect]);
             final runtime = _runtime(transport);
 
-            await runtime.authenticateWithBootstrap('bootstrap-once');
+            await _login(runtime, 'bootstrap-once');
             await _eventually(() => runtime.status == RuntimeStatus.streaming);
             first.add(
               reset
@@ -307,7 +307,7 @@ void main() {
       final transport = _FakeUiTransport([first, second]);
       final runtime = _runtime(transport);
 
-      await runtime.authenticateWithBootstrap('bootstrap-once');
+      await _login(runtime, 'bootstrap-once');
       await _eventually(() => transport.watchAfter.length == 2);
 
       expect(transport.watchAfter, [0, 0]);
@@ -326,7 +326,7 @@ void main() {
         final transport = _FakeUiTransport([first, second]);
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => transport.watchAfter.length == 2);
 
         expect(transport.refreshCount, 1);
@@ -356,7 +356,7 @@ void main() {
           ),
         );
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => runtime.status == RuntimeStatus.terminalError);
 
         expect(runtime.terminalError, same(original));
@@ -377,7 +377,7 @@ void main() {
         final transport = _FakeUiTransport([call]);
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
         await runtime.stop();
 
@@ -396,7 +396,7 @@ void main() {
       ], acknowledgementGate: acknowledgementGate);
       final runtime = _runtime(transport);
 
-      await runtime.authenticateWithBootstrap('bootstrap-once');
+      await _login(runtime, 'bootstrap-once');
       await _eventually(() => runtime.status == RuntimeStatus.streaming);
       call.add(FeedSurfaceJson(surfaceJsonString(sequence: 1)));
       await _eventually(() => transport.acknowledged.isNotEmpty);
@@ -421,7 +421,7 @@ void main() {
           actions: [testInoActionJson()],
         );
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
         call.add(FeedSurfaceJson(json));
         await _eventually(() => runtime.latestSurface != null);
@@ -468,14 +468,14 @@ void main() {
         final second = _FakeFeedCall.open();
         final transport = _FakeUiTransport(
           [first, second],
-          bootstrapResults: [
+          loginResults: [
             testSession(),
             testSession(identity: testIdentity(session: 'session-b')),
           ],
         );
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-a');
+        await _login(runtime, 'bootstrap-a');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
         first.add(
           FeedSurfaceJson(
@@ -499,7 +499,7 @@ void main() {
               runtime.lastReset != null;
         });
 
-        await runtime.authenticateWithBootstrap('bootstrap-b');
+        await _login(runtime, 'bootstrap-b');
         await _eventually(() => transport.watchAfter.length == 2);
 
         expect(observedNewScope, isTrue);
@@ -532,7 +532,7 @@ void main() {
         final transport = _FakeUiTransport([first, second]);
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
         first.add(
           FeedSurfaceJson(
@@ -568,18 +568,18 @@ void main() {
       },
     );
 
-    test('failed bootstrap clears protected in-memory scope state', () async {
+    test('failed login clears protected in-memory scope state', () async {
       final call = _FakeFeedCall.open();
       final transport = _FakeUiTransport(
         [call],
-        bootstrapResults: [
+        loginResults: [
           testSession(),
           const AuthenticationException('Bootstrap was denied.'),
         ],
       );
       final runtime = _runtime(transport);
 
-      await runtime.authenticateWithBootstrap('bootstrap-once');
+      await _login(runtime, 'bootstrap-once');
       await _eventually(() => runtime.status == RuntimeStatus.streaming);
       call.add(FeedSurfaceJson(surfaceJsonString(sequence: 1)));
       await _eventually(() => runtime.latestSurface != null);
@@ -587,7 +587,7 @@ void main() {
       final epoch = runtime.scopeEpoch;
 
       await expectLater(
-        runtime.authenticateWithBootstrap('bootstrap-invalid'),
+        _login(runtime, 'bootstrap-invalid'),
         throwsA(isA<AuthenticationException>()),
       );
 
@@ -606,44 +606,41 @@ void main() {
       await runtime.stop();
     });
 
-    test(
-      'an older bootstrap failure cannot sign out a newer runtime',
-      () async {
-        final older = Completer<SessionBundle>();
-        final newer = Completer<SessionBundle>();
-        final call = _FakeFeedCall.open();
-        final transport = _FakeUiTransport(
-          [call],
-          bootstrapResults: [older.future, newer.future],
-        );
-        final runtime = _runtime(transport);
+    test('an older login failure cannot sign out a newer runtime', () async {
+      final older = Completer<SessionBundle>();
+      final newer = Completer<SessionBundle>();
+      final call = _FakeFeedCall.open();
+      final transport = _FakeUiTransport(
+        [call],
+        loginResults: [older.future, newer.future],
+      );
+      final runtime = _runtime(transport);
 
-        final olderAuthentication = runtime.authenticateWithBootstrap('older');
-        await _eventually(() => transport.bootstrapSecrets.length == 1);
-        final newerAuthentication = runtime.authenticateWithBootstrap('newer');
-        await _eventually(() => transport.bootstrapSecrets.length == 2);
-        newer.complete(
-          testSession(
-            identity: testIdentity(session: 'session-newer'),
-            accessToken: 'access-newer',
-            refreshToken: 'refresh-newer',
-          ),
-        );
-        await newerAuthentication;
-        await _eventually(() => runtime.status == RuntimeStatus.streaming);
+      final olderAuthentication = _login(runtime, 'older');
+      await _eventually(() => transport.loginPasswords.length == 1);
+      final newerAuthentication = _login(runtime, 'newer');
+      await _eventually(() => transport.loginPasswords.length == 2);
+      newer.complete(
+        testSession(
+          identity: testIdentity(session: 'session-newer'),
+          accessToken: 'access-newer',
+          refreshToken: 'refresh-newer',
+        ),
+      );
+      await newerAuthentication;
+      await _eventually(() => runtime.status == RuntimeStatus.streaming);
 
-        older.completeError(
-          const AuthenticationException('Older bootstrap was rejected.'),
-        );
-        await olderAuthentication;
+      older.completeError(
+        const AuthenticationException('Older login was rejected.'),
+      );
+      await olderAuthentication;
 
-        expect(runtime.status, RuntimeStatus.streaming);
-        expect(runtime.session.sessionId, 'session-newer');
-        expect(runtime.transientError, isNull);
-        expect(transport.watchAccessTokens, ['access-newer']);
-        await runtime.stop();
-      },
-    );
+      expect(runtime.status, RuntimeStatus.streaming);
+      expect(runtime.session.sessionId, 'session-newer');
+      expect(runtime.transientError, isNull);
+      expect(transport.watchAccessTokens, ['access-newer']);
+      await runtime.stop();
+    });
 
     test(
       'a later authentication intent wins while an older stop is blocked',
@@ -651,20 +648,20 @@ void main() {
         final cancelGate = Completer<void>();
         final firstCall = _FakeFeedCall.open(cancelCompletionGate: cancelGate);
         final laterCall = _FakeFeedCall.open();
-        final laterBootstrap = Completer<SessionBundle>();
+        final laterLogin = Completer<SessionBundle>();
         final transport = _FakeUiTransport(
           [firstCall, laterCall],
-          bootstrapResults: [testSession(), laterBootstrap.future],
+          loginResults: [testSession(), laterLogin.future],
         );
         final runtime = _runtime(transport);
-        await runtime.authenticateWithBootstrap('initial');
+        await _login(runtime, 'initial');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
 
-        final olderAuthentication = runtime.authenticateWithBootstrap('older');
+        final olderAuthentication = _login(runtime, 'older');
         await _eventually(() => firstCall.cancelled);
-        final laterAuthentication = runtime.authenticateWithBootstrap('later');
-        await _eventually(() => transport.bootstrapSecrets.length == 2);
-        laterBootstrap.complete(
+        final laterAuthentication = _login(runtime, 'later');
+        await _eventually(() => transport.loginPasswords.length == 2);
+        laterLogin.complete(
           testSession(
             identity: testIdentity(session: 'session-later'),
             accessToken: 'access-later',
@@ -677,7 +674,7 @@ void main() {
         cancelGate.complete();
         await olderAuthentication;
 
-        expect(transport.bootstrapSecrets, ['initial', 'later']);
+        expect(transport.loginPasswords, ['initial', 'later']);
         expect(runtime.session.sessionId, 'session-later');
         expect(transport.watchAccessTokens, ['access-token', 'access-later']);
         await runtime.stop();
@@ -693,7 +690,7 @@ void main() {
         ], refreshError: const AuthenticationException('Refresh was denied.'));
         final runtime = _runtime(transport);
 
-        await runtime.authenticateWithBootstrap('bootstrap-once');
+        await _login(runtime, 'bootstrap-once');
         await _eventually(() => runtime.status == RuntimeStatus.streaming);
         call.add(FeedSurfaceJson(surfaceJsonString(sequence: 1)));
         await _eventually(() => runtime.latestSurface != null);
@@ -724,7 +721,7 @@ void main() {
       final receipt = Completer<ActionResult>();
       final transport = _FakeUiTransport(
         [first, second],
-        bootstrapResults: [
+        loginResults: [
           testSession(),
           testSession(
             identity: testIdentity(actor: 'actor-b', session: 'session-b'),
@@ -734,7 +731,7 @@ void main() {
       );
       final runtime = _runtime(transport);
 
-      await runtime.authenticateWithBootstrap('bootstrap-a');
+      await _login(runtime, 'bootstrap-a');
       await _eventually(() => runtime.status == RuntimeStatus.streaming);
       first.add(
         FeedSurfaceJson(
@@ -751,7 +748,7 @@ void main() {
       );
       await _eventually(() => transport.submittedAction != null);
 
-      await runtime.authenticateWithBootstrap('bootstrap-b');
+      await _login(runtime, 'bootstrap-b');
       await _eventually(() => transport.watchAfter.length == 2);
       receipt.complete(
         const ActionResult(
@@ -779,6 +776,9 @@ RuntimeController _runtime(
   delay: (_) async {},
 );
 
+Future<void> _login(RuntimeController runtime, String password) =>
+    runtime.authenticateWithPassword(username: 'admin', password: password);
+
 Future<void> _eventually(bool Function() condition) async {
   for (var attempt = 0; attempt < 100; attempt++) {
     if (condition()) return;
@@ -790,18 +790,16 @@ Future<void> _eventually(bool Function() condition) async {
 class _FakeUiTransport implements UiTransport, ExternalSessionTransport {
   _FakeUiTransport(
     Iterable<_FakeFeedCall> calls, {
-    Iterable<Object>? bootstrapResults,
+    Iterable<Object>? loginResults,
     this.refreshError,
     this.actionResult,
     this.acknowledgementGate,
     this.logoutError,
   }) : _calls = Queue.of(calls),
-       _bootstrapResults = Queue.of(
-         bootstrapResults ?? <Object>[testSession()],
-       );
+       _loginResults = Queue.of(loginResults ?? <Object>[testSession()]);
 
   final Queue<_FakeFeedCall> _calls;
-  final Queue<Object> _bootstrapResults;
+  final Queue<Object> _loginResults;
   final Object? refreshError;
   final Future<ActionResult>? actionResult;
   final Completer<void>? acknowledgementGate;
@@ -809,33 +807,36 @@ class _FakeUiTransport implements UiTransport, ExternalSessionTransport {
   final List<int> watchAfter = [];
   final List<String> watchAccessTokens = [];
   final List<int> acknowledged = [];
-  final List<String> bootstrapSecrets = [];
+  final List<String> loginPasswords = [];
   final List<String> externalIdentityTokens = [];
   final List<String> logoutRefreshTokens = [];
-  String? bootstrapSecret;
+  String? loginPassword;
   UiActionRef? submittedAction;
   Map<String, Object?>? submittedInput;
   bool closed = false;
   int refreshCount = 0;
 
   @override
-  Future<SessionBundle> bootstrapSession(String bootstrapSecret) async {
-    this.bootstrapSecret = bootstrapSecret;
-    bootstrapSecrets.add(bootstrapSecret);
-    return _nextBootstrapResult();
+  Future<SessionBundle> login({
+    required String username,
+    required String password,
+  }) async {
+    loginPassword = password;
+    loginPasswords.add(password);
+    return _nextLoginResult();
   }
 
   @override
-  Future<SessionBundle> bootstrapExternalSession(String identityToken) async {
+  Future<SessionBundle> loginExternal(String identityToken) async {
     externalIdentityTokens.add(identityToken);
-    return _nextBootstrapResult();
+    return _nextLoginResult();
   }
 
-  Future<SessionBundle> _nextBootstrapResult() async {
-    if (_bootstrapResults.isEmpty) {
-      throw StateError('No fake bootstrap result is available.');
+  Future<SessionBundle> _nextLoginResult() async {
+    if (_loginResults.isEmpty) {
+      throw StateError('No fake login result is available.');
     }
-    final result = _bootstrapResults.removeFirst();
+    final result = _loginResults.removeFirst();
     if (result is SessionBundle) return result;
     if (result is Future<SessionBundle>) return await result;
     throw result;

@@ -65,7 +65,7 @@ class RuntimeSessionOwner extends ChangeNotifier {
       controller.addListener(_onControllerChanged);
       notifyListeners();
       if (_autoStart) {
-        unawaited(_run(_start(controller, configuration.bootstrapSecret)));
+        unawaited(_run(_start(controller)));
       }
     } catch (error) {
       _initializationError = error;
@@ -82,14 +82,7 @@ class RuntimeSessionOwner extends ChangeNotifier {
         ),
       );
 
-  Future<void> _start(
-    RuntimeController controller,
-    String? bootstrapSecret,
-  ) async {
-    if (bootstrapSecret != null && bootstrapSecret.trim().isNotEmpty) {
-      await controller.start(bootstrapSecret: bootstrapSecret);
-      return;
-    }
+  Future<void> _start(RuntimeController controller) async {
     final externalIdentity = _externalIdentity;
     if (externalIdentity == null) {
       await controller.start();
@@ -108,11 +101,21 @@ class RuntimeSessionOwner extends ChangeNotifier {
     }
   }
 
-  void authenticateWithBootstrap(String bootstrapSecret) {
-    if (_closing || bootstrapSecret.trim().isEmpty) return;
+  void authenticateWithPassword({
+    required String username,
+    required String password,
+  }) {
+    if (_closing || username.trim().isEmpty || password.isEmpty) return;
     final controller = _controller;
     if (controller == null) return;
-    unawaited(_run(controller.authenticateWithBootstrap(bootstrapSecret)));
+    unawaited(
+      _run(
+        controller.authenticateWithPassword(
+          username: username,
+          password: password,
+        ),
+      ),
+    );
   }
 
   void authenticateWithExternalIdentity() {
