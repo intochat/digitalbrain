@@ -9,6 +9,7 @@ public static class BrainErrors
     public const string GrantMissing = "grant.missing";
     public const string EffectNotApproved = "effect.not-approved";
     public const string CallerMalformed = "caller.malformed";
+    public const string ModelUnavailable = "model.unavailable";
 }
 
 [GenerateSerializer, Alias("brain.exception.v2")]

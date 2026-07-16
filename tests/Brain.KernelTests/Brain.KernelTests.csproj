@@ -11,11 +11,13 @@
     <ProjectReference Include="../../kernel/Brain.Client/Brain.Client.csproj" />
     <ProjectReference Include="../../modules/Brain.Modules.Sdk/Brain.Modules.Sdk.csproj" />
     <ProjectReference Include="../../modules/Brain.Modules.Workspace/Brain.Modules.Workspace.csproj" />
+    <ProjectReference Include="../../modules/Brain.Modules.Ai/Brain.Modules.Ai.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
   </ItemGroup>
 </Project>
