@@ -372,6 +372,127 @@ void main() {
       expect(find.byKey(activityStatusFilterKey), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'waiting for approval shows trust card, review CTA, and no fabricated diffs',
+    (tester) async {
+      String? conversation;
+      final run = activityRun(
+        status: ActivityStatus.waitingForApproval,
+        authority: ActivityAuthority.waitingForApproval,
+        resultSurfaceReference: null,
+        conversationId: 'conversation-waiting',
+        requestId: 'request-waiting',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ActivityRunDetailPage(
+            run: run,
+            onOpenConversation: (value) => conversation = value,
+            onOpenRequest: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(activityApprovalCardKey), findsOneWidget);
+      expect(find.text('Waiting for approval'), findsWidgets);
+      expect(
+        find.textContaining(
+          'A change is waiting for your approval',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(activityReviewChangeButtonKey), findsOneWidget);
+      expect(find.text('Review change'), findsOneWidget);
+      expect(find.text('Approve'), findsNothing);
+      expect(find.text('Decline'), findsNothing);
+      expect(find.textContaining('field diff'), findsNothing);
+      expect(find.textContaining('Before'), findsNothing);
+      expect(find.textContaining('After'), findsNothing);
+      expect(find.textContaining('Agent'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(activityApprovalCardKey),
+          matching: find.text('Waiting for approval'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.ensureVisible(find.byKey(activityReviewChangeButtonKey));
+      await tester.tap(find.byKey(activityReviewChangeButtonKey));
+      expect(conversation, 'conversation-waiting');
+    },
+  );
+
+  testWidgets(
+    'waiting without origin refs guides to Ask or Chat and omits review CTA',
+    (tester) async {
+      final run = activityRun(
+        status: ActivityStatus.waitingForApproval,
+        authority: ActivityAuthority.waitingForApproval,
+        resultSurfaceReference: null,
+        conversationId: null,
+        requestId: null,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: ActivityRunDetailPage(run: run)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(activityApprovalCardKey), findsOneWidget);
+      expect(find.byKey(activityReviewChangeButtonKey), findsNothing);
+      expect(find.text('Review change'), findsNothing);
+      expect(find.text('Approve'), findsNothing);
+      expect(find.text('Decline'), findsNothing);
+      expect(
+        find.textContaining('originating Ask or Chat session'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'review change prefers request when only request origin is present',
+    (tester) async {
+      String? request;
+      final run = activityRun(
+        status: ActivityStatus.running,
+        authority: ActivityAuthority.waitingForApproval,
+        resultSurfaceReference: null,
+        conversationId: null,
+        requestId: 'request-only',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ActivityRunDetailPage(
+            run: run,
+            onOpenRequest: (value) => request = value,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(activityApprovalCardKey), findsOneWidget);
+      await tester.tap(find.byKey(activityReviewChangeButtonKey));
+      expect(request, 'request-only');
+    },
+  );
+
+  testWidgets('completed runs do not show the approval trust card', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(home: ActivityRunDetailPage(run: activityRun())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(activityApprovalCardKey), findsNothing);
+    expect(find.byKey(activityReviewChangeButtonKey), findsNothing);
+  });
 }
 
 Future<ActivityController> _controllerWith(List<ActivityRun> runs) async {

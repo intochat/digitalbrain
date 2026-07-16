@@ -10,6 +10,8 @@ const activityOpenChatButtonKey = ValueKey('activity-open-chat');
 const activityOpenRequestButtonKey = ValueKey('activity-open-request');
 const activityOpenAutomationButtonKey = ValueKey('activity-open-automation');
 const activityOpenResultButtonKey = ValueKey('activity-open-result');
+const activityApprovalCardKey = ValueKey('activity-approval-card');
+const activityReviewChangeButtonKey = ValueKey('activity-review-change');
 
 typedef ActivityAutomationReferenceCallback =
     void Function(String featureId, String automationId);
@@ -89,6 +91,14 @@ class ActivityRunDetailView extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           _RunHeading(run: run),
+          if (_isWaitingForApproval(run)) ...[
+            const SizedBox(height: 16),
+            _ApprovalWaitingCard(
+              run: run,
+              onOpenConversation: onOpenConversation,
+              onOpenRequest: onOpenRequest,
+            ),
+          ],
           const SizedBox(height: 20),
           _OverviewCard(run: run),
           if (run.safeFailure != null || run.failureGuidance != null) ...[
@@ -109,6 +119,98 @@ class ActivityRunDetailView extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+bool _isWaitingForApproval(ActivityRun run) =>
+    run.status == ActivityStatus.waitingForApproval ||
+    run.authority == ActivityAuthority.waitingForApproval;
+
+class _ApprovalWaitingCard extends StatelessWidget {
+  const _ApprovalWaitingCard({
+    required this.run,
+    required this.onOpenConversation,
+    required this.onOpenRequest,
+  });
+
+  final ActivityRun run;
+  final ValueChanged<String>? onOpenConversation;
+  final ValueChanged<String>? onOpenRequest;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final reviewAction = _reviewChangeAction();
+    final hasOriginRefs =
+        run.conversationId != null || run.requestId != null;
+    final guidance = hasOriginRefs
+        ? 'A change is waiting for your approval in the originating conversation. '
+              'Open it to review the Effect before this Activity continues.'
+        : 'A change is waiting for your approval. Complete it in the originating '
+              'Ask or Chat session. This Activity surface does not approve Effects directly.';
+
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Waiting for approval',
+      child: Card(
+        key: activityApprovalCardKey,
+        color: colors.tertiaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.approval_outlined,
+                    color: colors.onTertiaryContainer,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Waiting for approval',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colors.onTertiaryContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                guidance,
+                style: TextStyle(color: colors.onTertiaryContainer),
+              ),
+              if (reviewAction != null) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  key: activityReviewChangeButtonKey,
+                  onPressed: reviewAction,
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Review change'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  VoidCallback? _reviewChangeAction() {
+    final conversationId = run.conversationId;
+    final openConversation = onOpenConversation;
+    if (conversationId != null && openConversation != null) {
+      return () => openConversation(conversationId);
+    }
+    final requestId = run.requestId;
+    final openRequest = onOpenRequest;
+    if (requestId != null && openRequest != null) {
+      return () => openRequest(requestId);
+    }
+    return null;
   }
 }
 
