@@ -23,4 +23,13 @@ public class TypedProxyTests(ClusterFixture fixture) : IClassFixture<ClusterFixt
         var reply = await proxy.EchoAsync(new EchoRequest(7));
         Assert.Equal(7, reply.V);
     }
+
+    [Fact]
+    public async Task Grain_failure_surfaces_as_unwrapped_brain_exception()
+    {
+        var proxy = NeuronProxy.Create<ITestNeuron>(
+            fixture.Cluster.Client, "owner|actor/test|nope/proxy-err", fixture.OwnerSession);
+        var exception = await Assert.ThrowsAsync<BrainException>(() => proxy.EchoAsync(new EchoRequest(1)));
+        Assert.Equal(BrainErrors.UnknownKind, exception.Code);
+    }
 }
