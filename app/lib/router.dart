@@ -222,6 +222,7 @@ GoRouter createDigitalBrainRouter({
                   pathParameters: {'proposalId': draftId},
                 ),
                 onCreateFeature: () => context.go('/chat'),
+                onOpenConnections: () => context.go('/connections'),
               );
             },
           ),

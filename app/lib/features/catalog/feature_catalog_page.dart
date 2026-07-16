@@ -7,12 +7,14 @@ class FeatureCatalogPage extends StatefulWidget {
     required this.gateway,
     required this.onOpenFeature,
     required this.onCreateFeature,
+    this.onOpenConnections,
     super.key,
   });
 
   final FeatureCatalogGateway gateway;
   final ValueChanged<String> onOpenFeature;
   final VoidCallback onCreateFeature;
+  final VoidCallback? onOpenConnections;
 
   @override
   State<FeatureCatalogPage> createState() => _FeatureCatalogPageState();
@@ -61,7 +63,10 @@ class _FeatureCatalogPageState extends State<FeatureCatalogPage> {
           }
           final features = snapshot.data ?? const <FeatureCatalogItem>[];
           if (features.isEmpty) {
-            return _EmptyState(onCreateFeature: widget.onCreateFeature);
+            return _EmptyState(
+              onCreateFeature: widget.onCreateFeature,
+              onOpenConnections: widget.onOpenConnections,
+            );
           }
           return ListView.separated(
             padding: const EdgeInsets.all(24),
@@ -92,6 +97,7 @@ class _FeatureCard extends StatelessWidget {
     final status = feature.status == FeatureCatalogStatus.installed
         ? 'Installed'
         : 'Draft';
+    final theme = Theme.of(context);
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -109,10 +115,28 @@ class _FeatureCard extends StatelessWidget {
                   children: [
                     Text(
                       feature.goal,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Feature specialist',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    Text('Version ${feature.revision} · $status'),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _StatusChip(label: status),
+                        Text(
+                          'Version ${feature.revision}',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -125,10 +149,43 @@ class _FeatureCard extends StatelessWidget {
   }
 }
 
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isInstalled = label == 'Installed';
+    final background = isInstalled
+        ? theme.colorScheme.primaryContainer
+        : theme.colorScheme.surfaceContainerHighest;
+    final foreground = isInstalled
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(color: foreground),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onCreateFeature});
+  const _EmptyState({
+    required this.onCreateFeature,
+    this.onOpenConnections,
+  });
 
   final VoidCallback onCreateFeature;
+  final VoidCallback? onOpenConnections;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -140,12 +197,14 @@ class _EmptyState extends StatelessWidget {
           const Icon(Icons.auto_awesome_outlined, size: 48),
           const SizedBox(height: 16),
           Text(
-            'No Features yet',
+            'Install a Feature specialist',
             style: Theme.of(context).textTheme.titleLarge,
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           const Text(
-            'Describe what you want in Chat and DigitalBrain will open it in Feature Studio.',
+            'Features are specialists that automate a goal. Start with something like Enrich Salesforce account from Gmail, then open Ask to describe what you want.',
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
           FilledButton.icon(
@@ -153,6 +212,14 @@ class _EmptyState extends StatelessWidget {
             icon: const Icon(Icons.add),
             label: const Text('Create Feature'),
           ),
+          if (onOpenConnections != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onOpenConnections,
+              icon: const Icon(Icons.link),
+              label: const Text('Connect apps'),
+            ),
+          ],
         ],
       ),
     ),
