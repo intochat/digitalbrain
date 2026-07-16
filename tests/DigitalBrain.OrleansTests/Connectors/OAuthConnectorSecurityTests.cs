@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Integrations.Google;
+using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Configuration;
@@ -21,6 +22,17 @@ public sealed class OAuthConnectorSecurityTests
     [InlineData("https://accounts.google.com/o/oauth2/v2/auth?client_id=test#fragment", false)]
     public void Google_authorization_url_allowlist_is_exact(string target, bool expected) =>
         Assert.Equal(expected, GoogleClientFactory.IsAllowedAuthorizationUrl(target));
+
+    [Theory]
+    [InlineData(GoogleCapabilityIds.GmailMessageRead)]
+    [InlineData(GoogleCapabilityIds.GmailMailboxRead)]
+    [InlineData(GoogleCapabilityIds.GmailSendPropose)]
+    public void Google_authorization_allows_typed_gmail_capabilities(string capabilityId)
+    {
+        var resolver = new GoogleAuthorizationResolver(new FakeIntegrationConfigStore());
+
+        Assert.True(resolver.AllowsTool(capabilityId));
+    }
 
     [Fact]
     public void Google_authorization_requests_only_readonly_and_send_gmail_scopes()

@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
@@ -74,11 +76,94 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         return resolution.Receipt.Kind switch
         {
             CapabilityResolutionKind.Ambiguous => AmbiguousResult(workflow, resolution),
-            CapabilityResolutionKind.Missing => await CreateMissingCapabilityResultAsync(request, normalizedPrompt, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false),
+            CapabilityResolutionKind.Missing => await ResolveMissingCapabilityAsync(
+                request,
+                normalizedPrompt,
+                workflow,
+                resolution.Receipt,
+                resolver,
+                snapshot,
+                cancellationToken).ConfigureAwait(false),
             CapabilityResolutionKind.Match when !string.Equals(resolution.Receipt.CapabilityId, BuiltInCapabilityCatalog.AssistantAnswerCapabilityId, StringComparison.Ordinal) =>
                 await ExecuteSelectedCapabilityAsync(request, normalizedPrompt, workflow, resolution, snapshot, cancellationToken).ConfigureAwait(false),
             _ => await RunGeneralAgentAsync(request, workflow, resolution.Receipt, cancellationToken).ConfigureAwait(false)
         };
+    }
+    private async Task<InoWorkflowResult> ResolveMissingCapabilityAsync(
+        InoWorkflowRequest request,
+        string normalizedPrompt,
+        WorkflowReference workflow,
+        CapabilityResolutionReceipt receipt,
+        ICapabilityResolver resolver,
+        OwnerCapabilityCatalogSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var unavailable = await ResolveUnavailableIntegrationAsync(
+            request,
+            normalizedPrompt,
+            workflow,
+            resolver,
+            snapshot,
+            cancellationToken).ConfigureAwait(false);
+        return unavailable ?? await CreateMissingCapabilityResultAsync(
+            request,
+            normalizedPrompt,
+            workflow,
+            receipt,
+            cancellationToken).ConfigureAwait(false);
+    }
+    private async Task<InoWorkflowResult?> ResolveUnavailableIntegrationAsync(
+        InoWorkflowRequest request,
+        string normalizedPrompt,
+        WorkflowReference workflow,
+        ICapabilityResolver resolver,
+        OwnerCapabilityCatalogSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        if (request.OwnerId is not { } ownerId ||
+            services.GetService<IOAuthStateProtector>() is not { } protector)
+            return null;
+        var grants = (request.Grants ?? []).ToHashSet(StringComparer.Ordinal);
+        var descriptors = services.GetRequiredService<ICapabilityCatalog>().Snapshot()
+            .Where(static descriptor =>
+                descriptor.Available &&
+                descriptor.Origin == CapabilityOrigin.Integration &&
+                descriptor.RequiredConnections.Length == 1)
+            .Where(descriptor => descriptor.RequiredGrants.All(grants.Contains))
+            .Where(descriptor => !snapshot.HealthyConnections.Contains(descriptor.RequiredConnections[0]))
+            .OrderBy(static descriptor => descriptor.Id, StringComparer.Ordinal)
+            .ToArray();
+        if (descriptors.Length == 0)
+            return null;
+        var requiredConnections = descriptors
+            .SelectMany(static descriptor => descriptor.RequiredConnections)
+            .ToHashSet(StringComparer.Ordinal);
+        var resolution = await resolver.ResolveAsync(
+            new CapabilitySearchRequest(
+                normalizedPrompt,
+                grants,
+                requiredConnections,
+                MaximumCapabilityMatches,
+                descriptors),
+            cancellationToken).ConfigureAwait(false);
+        if (resolution.Receipt.Kind == CapabilityResolutionKind.Ambiguous)
+            return AmbiguousResult(workflow, resolution);
+        if (resolution.Receipt.Kind != CapabilityResolutionKind.Match ||
+            resolution.Selected is not { } descriptor)
+            return null;
+        var provider = descriptor.RequiredConnections[0];
+        var authorization = new InoAuthorizationRequest(
+            provider,
+            descriptor.Id,
+            StableAuthorizationAttemptId(request.OperationId, descriptor.Id),
+            ResolveNow().AddMinutes(15),
+            protector.Protect(new NeuronId(ownerId.Value)),
+            $"Connect {ConnectionName(provider)} to continue with {descriptor.Name}.");
+        return new InoWorkflowResult(
+            authorization.SafeSummary,
+            workflow,
+            AuthorizationRequest: authorization,
+            Capability: resolution.Receipt);
     }
     private static string NormalizeCapabilityPrompt(string prompt)
     {
@@ -241,6 +326,14 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
                 "/features/proposals/" + draft.DraftId.Value));
     }
     private DateTimeOffset ResolveNow() => services.GetService<TimeProvider>()?.GetUtcNow() ?? DateTimeOffset.UtcNow;
+    private static string StableAuthorizationAttemptId(string operationId, string capabilityId) =>
+        new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(operationId + "\0" + capabilityId))[..16]).ToString("N");
+    private static string ConnectionName(string provider) => provider switch
+    {
+        "google" => "Google",
+        "salesforce" => "Salesforce",
+        _ => provider
+    };
     private static bool IsConversationalPrompt(string prompt)
     {
         var trimmed = prompt.Trim();

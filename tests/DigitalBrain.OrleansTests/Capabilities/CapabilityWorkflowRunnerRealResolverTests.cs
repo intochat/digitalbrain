@@ -1,5 +1,7 @@
 using DigitalBrain.Integrations.Google;
+using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Integrations.Salesforce;
+using DigitalBrain.Integrations.Salesforce.Contracts;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
@@ -14,7 +16,35 @@ namespace DigitalBrain.OrleansTests.Capabilities;
 public sealed class CapabilityWorkflowRunnerRealResolverTests
 {
     private static readonly BrainOwnerId Owner = new("owner-real-resolver");
+    private static readonly ActorId Actor = new("actor-real-resolver");
+    private static readonly DateTimeOffset OccurredAt = new(2026, 7, 16, 12, 0, 0, TimeSpan.Zero);
     private readonly RecordingChatClient _chat = new();
+
+    [Theory]
+    [InlineData(
+        "Use Gmail to list my latest inbox messages. Do not modify anything.",
+        "google",
+        GoogleCapabilityIds.GmailMailboxRead)]
+    [InlineData(
+        "Use Salesforce to find the account named Acme. Do not modify anything.",
+        "salesforce",
+        SalesforceCapabilityIds.AccountSearch)]
+    public async Task ExecuteAsync_requests_authorization_for_a_clear_unavailable_integration(
+        string prompt,
+        string provider,
+        string capabilityId)
+    {
+        var runner = Runner(
+            ownerCatalog: new EmptyOwnerCapabilityCatalog(),
+            oauthStateProtector: new FixedOAuthStateProtector());
+
+        var result = await runner.ExecuteAsync(Request(prompt, Owner, Actor, OccurredAt));
+
+        Assert.Equal(provider, result.AuthorizationRequest?.Provider);
+        Assert.Equal(capabilityId, result.AuthorizationRequest?.ToolId);
+        Assert.True(Guid.TryParseExact(result.AuthorizationRequest?.AuthorizationAttemptId, "N", out _));
+        Assert.Null(result.Proposal);
+    }
 
     [Fact]
     public async Task ExecuteAsync_answers_a_paraphrased_general_question_without_drafting()
@@ -55,7 +85,10 @@ public sealed class CapabilityWorkflowRunnerRealResolverTests
         Assert.Equal("Open Studio", result.Proposal?.Label);
     }
 
-    private AgentFrameworkWorkflowRunner Runner(RecordingFeatureHubGrain? hub = null)
+    private AgentFrameworkWorkflowRunner Runner(
+        RecordingFeatureHubGrain? hub = null,
+        IOwnerCapabilityCatalog? ownerCatalog = null,
+        IOAuthStateProtector? oauthStateProtector = null)
     {
         var catalog = new BuiltInCapabilityCatalog(
             [new GoogleCapabilityDescriptorSource(), new SalesforceCapabilityDescriptorSource()]);
@@ -66,16 +99,50 @@ public sealed class CapabilityWorkflowRunnerRealResolverTests
             .AddSingleton<ICapabilityResolver, HybridCapabilityResolver>();
         if (hub is not null)
             services.AddSingleton<IFeatureGrainResolver>(new RecordingFeatureGrainResolver(hub));
+        if (ownerCatalog is not null)
+            services.AddSingleton(ownerCatalog);
+        if (oauthStateProtector is not null)
+            services.AddSingleton(oauthStateProtector);
         return new AgentFrameworkWorkflowRunner(services.BuildServiceProvider());
     }
 
-    private static InoWorkflowRequest Request(string prompt, BrainOwnerId? ownerId = null) => new(
+    private static InoWorkflowRequest Request(
+        string prompt,
+        BrainOwnerId? ownerId = null,
+        ActorId? actorId = null,
+        DateTimeOffset? occurredAt = null) => new(
         "operation-1",
         "conversation-1",
         prompt,
         [],
         "request-1",
-        OwnerId: ownerId);
+        OwnerId: ownerId,
+        ActorId: actorId,
+        OccurredAt: occurredAt);
+
+    private sealed class EmptyOwnerCapabilityCatalog : IOwnerCapabilityCatalog
+    {
+        public Task<OwnerCapabilityCatalogSnapshot> ReadAsync(
+            BrainOwnerId ownerId,
+            ActorId actorId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new OwnerCapabilityCatalogSnapshot(
+                [],
+                new HashSet<string>(StringComparer.Ordinal)));
+    }
+
+    private sealed class FixedOAuthStateProtector : IOAuthStateProtector
+    {
+        private const string ProtectedOwner = "Y29kZXgtb2F1dGgtc3RhdGU";
+
+        public string Protect(NeuronId ownerId) => ProtectedOwner;
+
+        public bool TryUnprotect(string protectedState, out NeuronId ownerId)
+        {
+            ownerId = new NeuronId(Owner.Value);
+            return string.Equals(protectedState, ProtectedOwner, StringComparison.Ordinal);
+        }
+    }
 
     private sealed class RecordingFeatureHubGrain : IFeatureHubGrain
     {

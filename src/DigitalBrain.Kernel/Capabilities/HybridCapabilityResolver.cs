@@ -23,6 +23,10 @@ internal sealed class HybridCapabilityResolver(
     internal const int MaximumPromptLength = 4096;
     internal const int MinimumLexicalFallbackMatches = 3;
     private static readonly Regex TokenPattern = new("[a-z0-9]+", RegexOptions.Compiled);
+    private static readonly HashSet<string> LexicalStopWords = new(StringComparer.Ordinal)
+    {
+        "a", "anything", "do", "latest", "modify", "my", "named", "not", "please", "the", "to", "use"
+    };
 
     public async Task<CapabilityResolution> ResolveAsync(
         CapabilitySearchRequest request,
@@ -82,21 +86,7 @@ internal sealed class HybridCapabilityResolver(
         var vectorEnabled = HasUsableVectors(generated, documents.Length + 1);
 
         if (!vectorEnabled)
-        {
-            var lexicalRanked = ranked
-                .OrderByDescending(x => x.LexicalFallback)
-                .ThenByDescending(x => x.LexicalMatches)
-                .ThenBy(x => x.Descriptor.Id, StringComparer.Ordinal)
-                .Select(x => x with { Score = x.LexicalFallback })
-                .ToArray();
-            var reportedLexical = lexicalRanked.Take(request.MaximumMatches).ToArray();
-            if (!IsStrongLexicalMatch(lexicalRanked[0])) return Missing(reportedLexical);
-            if (lexicalRanked.Length > 1
-                && IsStrongLexicalMatch(lexicalRanked[1])
-                && lexicalRanked[0].Score - lexicalRanked[1].Score < AmbiguityMargin)
-                return Ambiguous(reportedLexical);
-            return Match(lexicalRanked[0], reportedLexical);
-        }
+            return ResolveLexicalFallback(ranked, request.MaximumMatches);
 
         var semanticRanked = ranked
             .Select((x, index) => x with
@@ -113,7 +103,8 @@ internal sealed class HybridCapabilityResolver(
 
         var reported = semanticRanked.Take(request.MaximumMatches).ToArray();
         var first = semanticRanked[0];
-        if (first.Score < MatchThreshold) return Missing(reported);
+        if (first.Score < MatchThreshold)
+            return ResolveLexicalFallback(ranked, request.MaximumMatches);
         if (semanticRanked.Length > 1 && first.Score - semanticRanked[1].Score < AmbiguityMargin)
             return Ambiguous(reported);
         return Match(first, reported);
@@ -150,17 +141,39 @@ internal sealed class HybridCapabilityResolver(
         string document)
     {
         var requested = Tokenize(query);
+        requested.ExceptWith(LexicalStopWords);
         if (requested.Count == 0) return (0, 0);
-        var nameMatches = requested.Intersect(Tokenize(descriptor.Name)).Count();
+        var name = Tokenize(descriptor.Name);
+        name.ExceptWith(LexicalStopWords);
+        var nameMatches = requested.Intersect(name).Count();
         var documentMatches = requested.Intersect(Tokenize(document)).Count();
-        var nameCoverage = (double)nameMatches / requested.Count;
+        var nameCoverage = name.Count == 0 ? 0 : (double)nameMatches / name.Count;
         var documentCoverage = (double)documentMatches / requested.Count;
-        return (0.8 * nameCoverage + 0.2 * documentCoverage, nameMatches);
+        return (0.8 * documentCoverage + 0.2 * nameCoverage, documentMatches);
     }
 
     private static bool IsStrongLexicalMatch(RankedCapability ranked) =>
         ranked.LexicalMatches >= MinimumLexicalFallbackMatches
         && ranked.LexicalFallback >= LexicalFallbackThreshold;
+
+    private static CapabilityResolution ResolveLexicalFallback(
+        RankedCapability[] ranked,
+        int maximumMatches)
+    {
+        var lexicalRanked = ranked
+            .OrderByDescending(x => x.LexicalFallback)
+            .ThenByDescending(x => x.LexicalMatches)
+            .ThenBy(x => x.Descriptor.Id, StringComparer.Ordinal)
+            .Select(x => x with { Score = x.LexicalFallback })
+            .ToArray();
+        var reported = lexicalRanked.Take(maximumMatches).ToArray();
+        if (!IsStrongLexicalMatch(lexicalRanked[0])) return Missing(reported);
+        if (lexicalRanked.Length > 1
+            && IsStrongLexicalMatch(lexicalRanked[1])
+            && lexicalRanked[0].Score - lexicalRanked[1].Score < AmbiguityMargin)
+            return Ambiguous(reported);
+        return Match(lexicalRanked[0], reported);
+    }
 
     private static bool HasUsableVectors(GeneratedEmbeddings<Embedding<float>>? generated, int expectedCount)
     {

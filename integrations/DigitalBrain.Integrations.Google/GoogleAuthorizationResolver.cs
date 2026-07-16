@@ -8,7 +8,9 @@ internal sealed class GoogleAuthorizationResolver(IIntegrationConfigStore store)
     public string Provider => GoogleClientFactory.Provider;
     public string DisplayName => "Google";
     public bool AllowsTool(string toolId) =>
-        toolId.StartsWith("gmail.", StringComparison.Ordinal) || toolId.StartsWith("cross.", StringComparison.Ordinal);
+        toolId.StartsWith("google.gmail.", StringComparison.Ordinal) ||
+        toolId.StartsWith("gmail.", StringComparison.Ordinal) ||
+        toolId.StartsWith("cross.", StringComparison.Ordinal);
     public bool IsAllowedAuthorizationUrl(string? value) => GoogleClientFactory.IsAllowedAuthorizationUrl(value);
     public async Task<ExternalAuthorizationResolution> ResolveAsync(BrainOwnerId ownerId, ActorId actorId, CancellationToken cancellationToken = default)
     {

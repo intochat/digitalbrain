@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Integrations.Salesforce;
+using DigitalBrain.Integrations.Salesforce.Contracts;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
@@ -18,6 +19,70 @@ public sealed class CapabilityWorkflowRunnerTests
     private static readonly DateTimeOffset OccurredAt = new(2026, 7, 15, 9, 0, 0, TimeSpan.Zero);
     private readonly RecordingChatClient _chat = new();
     private readonly RecordingCapabilityParameterModel _parameterModel = new();
+
+    [Theory]
+    [InlineData(
+        "google",
+        GoogleCapabilityIds.GmailMailboxRead,
+        "List Gmail mailbox messages",
+        "list my latest Gmail messages")]
+    [InlineData(
+        "salesforce",
+        SalesforceCapabilityIds.AccountSearch,
+        "Search Salesforce accounts",
+        "find the Salesforce account for Acme")]
+    public async Task ExecuteAsync_requests_authorization_for_a_recognized_unhealthy_integration(
+        string provider,
+        string capabilityId,
+        string capabilityName,
+        string prompt)
+    {
+        var descriptor = new CapabilityDescriptor(
+            capabilityId,
+            1,
+            capabilityName,
+            capabilityName,
+            [prompt],
+            [],
+            [provider],
+            CapabilityOrigin.Integration,
+            CapabilityOperationKind.Query,
+            true);
+        var snapshot = new OwnerCapabilityCatalogSnapshot(
+            [],
+            new HashSet<string>(StringComparer.Ordinal));
+        var resolver = new SequencedCapabilityResolver(
+            Missing(),
+            new CapabilityResolution(
+                new CapabilityResolutionReceipt(
+                    CapabilityResolutionKind.Match,
+                    descriptor.Id,
+                    descriptor.Name,
+                    [descriptor.Id],
+                    1),
+                descriptor,
+                [descriptor]));
+        var hub = new RecordingFeatureHubGrain();
+        var protector = new RecordingOAuthStateProtector();
+        var runner = Runner(
+            resolver,
+            new RecordingFeatureGrainResolver(hub),
+            new RecordingOwnerCapabilityCatalog(snapshot),
+            capabilityCatalog: new StubCapabilityCatalog([descriptor]),
+            oauthStateProtector: protector);
+
+        var result = await runner.ExecuteAsync(Request(prompt, Owner, Actor, OccurredAt));
+
+        Assert.Equal(2, resolver.CallCount);
+        Assert.Equal(0, hub.CreateDraftCallCount);
+        Assert.Null(result.Proposal);
+        Assert.Equal(provider, result.AuthorizationRequest?.Provider);
+        Assert.Equal(capabilityId, result.AuthorizationRequest?.ToolId);
+        Assert.Equal(Owner.Value, protector.LastProtectedOwner?.Value);
+        Assert.True(Guid.TryParseExact(result.AuthorizationRequest?.AuthorizationAttemptId, "N", out _));
+        Assert.True(OAuthCallbackPaths.IsOpaqueFlowReference(result.AuthorizationRequest?.AuthorizationFlowReference));
+        Assert.Contains("Connect", result.Text, StringComparison.Ordinal);
+    }
 
     [Fact]
     public async Task ExecuteAsync_resolves_before_calling_the_parameter_model()
@@ -381,20 +446,24 @@ public sealed class CapabilityWorkflowRunnerTests
         ICapabilityResolver resolver,
         IFeatureGrainResolver? featureGrainResolver = null,
         IOwnerCapabilityCatalog? ownerCatalog = null,
-        IFeatureCapabilityInvoker? featureInvoker = null)
+        IFeatureCapabilityInvoker? featureInvoker = null,
+        ICapabilityCatalog? capabilityCatalog = null,
+        IOAuthStateProtector? oauthStateProtector = null)
     {
         var services = new ServiceCollection()
             .AddSingleton<IChatClient>(_chat)
             .AddSingleton(resolver)
             .AddSingleton<ICapabilityParameterModel>(_parameterModel)
             .AddSingleton<IFeatureDraftTemplate, SalesforceEnrichmentFeatureTemplate>()
-            .AddSingleton<ICapabilityCatalog>(new StubCapabilityCatalog());
+            .AddSingleton(capabilityCatalog ?? new StubCapabilityCatalog());
         if (featureGrainResolver is not null)
             services.AddSingleton(featureGrainResolver);
         if (ownerCatalog is not null)
             services.AddSingleton(ownerCatalog);
         if (featureInvoker is not null)
             services.AddSingleton(featureInvoker);
+        if (oauthStateProtector is not null)
+            services.AddSingleton(oauthStateProtector);
         return new AgentFrameworkWorkflowRunner(services.BuildServiceProvider());
     }
 
@@ -467,6 +536,44 @@ public sealed class CapabilityWorkflowRunnerTests
         {
             CallCount++;
             return Task.FromResult(snapshot);
+        }
+    }
+
+    private sealed class SequencedCapabilityResolver(params CapabilityResolution[] results) : ICapabilityResolver
+    {
+        private int _index;
+        public int CallCount { get; private set; }
+
+        public Task<CapabilityResolution> ResolveAsync(
+            CapabilitySearchRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            var result = results[Math.Min(_index, results.Length - 1)];
+            _index++;
+            return Task.FromResult(result);
+        }
+    }
+
+    private sealed class RecordingOAuthStateProtector : IOAuthStateProtector
+    {
+        public NeuronId? LastProtectedOwner { get; private set; }
+
+        public string Protect(NeuronId owner)
+        {
+            LastProtectedOwner = owner;
+            return "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        }
+
+        public bool TryUnprotect(string state, out NeuronId owner)
+        {
+            if (LastProtectedOwner is { } protectedOwner)
+            {
+                owner = protectedOwner;
+                return true;
+            }
+            owner = new NeuronId("unavailable");
+            return false;
         }
     }
 
@@ -633,8 +740,9 @@ public sealed class CapabilityWorkflowRunnerTests
         public void Dispose() { }
     }
 
-    private sealed class StubCapabilityCatalog : ICapabilityCatalog
+    private sealed class StubCapabilityCatalog(IReadOnlyList<CapabilityDescriptor>? descriptors = null)
+        : ICapabilityCatalog
     {
-        public IReadOnlyList<CapabilityDescriptor> Snapshot() => [];
+        public IReadOnlyList<CapabilityDescriptor> Snapshot() => descriptors ?? [];
     }
 }

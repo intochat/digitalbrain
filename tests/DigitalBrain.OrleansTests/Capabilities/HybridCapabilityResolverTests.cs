@@ -128,6 +128,28 @@ public sealed class HybridCapabilityResolverTests
         Assert.Equal(GoogleCapabilityIds.GmailMessageRead, result.Receipt.CapabilityId);
     }
 
+    [Theory]
+    [InlineData(
+        "Use Gmail to list my latest inbox messages. Do not modify anything.",
+        GoogleCapabilityIds.GmailMailboxRead)]
+    [InlineData(
+        "Use Salesforce to find the account named Acme. Do not modify anything.",
+        SalesforceCapabilityIds.AccountSearch)]
+    public async Task ResolveAsync_uses_clear_lexical_intent_when_embeddings_are_weak(
+        string prompt,
+        string expectedCapabilityId)
+    {
+        var resolver = Resolver(new Dictionary<string, float[]>
+        {
+            [prompt] = [1, 0]
+        });
+
+        var result = await resolver.ResolveAsync(Request(prompt, connections: ["google", "salesforce"]));
+
+        Assert.Equal(CapabilityResolutionKind.Match, result.Receipt.Kind);
+        Assert.Equal(expectedCapabilityId, result.Receipt.CapabilityId);
+    }
+
     [Fact]
     public async Task ResolveAsync_rejects_non_finite_embeddings_before_owner_feature_selection()
     {
