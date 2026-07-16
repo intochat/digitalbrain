@@ -42,7 +42,10 @@ public class NeuronProxy : DispatchProxy
 
     private async Task<TResult> InvokeContractAsync<TResult>(string contract, object? argument)
     {
-        var invocation = new NeuronInvocation(contract, JsonSerializer.Serialize(argument, JsonOptions), Guid.NewGuid().ToString("N"), _callerKey);
+        var inputJson = argument is IRawJson rawJson
+            ? rawJson.Json
+            : JsonSerializer.Serialize(argument, JsonOptions);
+        var invocation = new NeuronInvocation(contract, inputJson, Guid.NewGuid().ToString("N"), _callerKey);
         var receipt = await _client.GetGrain<INeuron>(_addressKey).InvokeAsync(invocation);
         return JsonSerializer.Deserialize<TResult>(receipt.OutputJson, JsonOptions)!;
     }

@@ -8,7 +8,7 @@ public sealed record Block(string Kind, string Json);
 
 public sealed record BlockAction(string Label, string Contract, string InputJson);
 
-public sealed record BlockDoc(string Json)
+public sealed record BlockDoc(string Json) : IRawJson
 {
     public const int MaxBytes = 65536;
     public const int MaxDepth = 8;
