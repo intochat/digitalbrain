@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:media_kit/media_kit.dart';
 
 import 'package:digitalbrain_flutter/app.dart';
 import 'package:digitalbrain_flutter/digital_brain_ui/glow/glow_icon.dart';
@@ -20,9 +19,6 @@ Future<void> main() async {
   }
   GoogleFonts.config.allowRuntimeFetching = true;
   WidgetCensus.glowIconType = GlowIcon;
-  if (!kIsWeb) {
-    MediaKit.ensureInitialized();
-  }
 
   if (!kIsWeb) {
     DigitalBrainTelemetry.initialize();

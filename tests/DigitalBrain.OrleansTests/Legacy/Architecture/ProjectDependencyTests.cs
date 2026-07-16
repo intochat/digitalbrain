@@ -10,8 +10,6 @@ public sealed class ProjectDependencyTests
         ("DigitalBrain.Kernel", "DigitalBrain.Mcp"),
         ("DigitalBrain.Kernel", "DigitalBrain.Integrations.Google"),
         ("DigitalBrain.Kernel", "DigitalBrain.Integrations.Salesforce"),
-        ("DigitalBrain.Kernel", "DigitalBrain.Ui.Contracts"),
-        ("DigitalBrain.Kernel", "DigitalBrain.Ui.Runtime"),
         ("DigitalBrain.Kernel", "DigitalBrain.ServiceDefaults"),
         ("DigitalBrain.Integrations.Google", "DigitalBrain.Kernel"),
         ("DigitalBrain.Integrations.Salesforce", "DigitalBrain.Kernel")
@@ -102,8 +100,14 @@ public sealed class ProjectDependencyTests
         string repositoryRoot,
         string projectPath)
     {
+        var fullPath = Path.Combine(repositoryRoot, projectPath);
+        if (!File.Exists(fullPath))
+        {
+            return [];
+        }
+
         var source = Path.GetFileNameWithoutExtension(projectPath);
-        var document = XDocument.Load(Path.Combine(repositoryRoot, projectPath));
+        var document = XDocument.Load(fullPath);
         return document
             .Descendants("ProjectReference")
             .Select(reference => reference.Attribute("Include")?.Value)

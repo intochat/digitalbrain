@@ -40,16 +40,12 @@ dependencies:
   shared_preferences: ^2.5.5
   flutter_web_plugins:
     sdk: flutter
-  media_kit: ^1.2.6
-  media_kit_video: ^2.0.1
-  media_kit_libs_video: ^1.0.7
   youtube_player_iframe: ^6.0.0
   markdraw: ^0.2.0
   simple_icons: 16.23.0
   digital_brain_sdk_flutter:
     path: packages/digital_brain_sdk_flutter
 
-  widgetbook: 3.25.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

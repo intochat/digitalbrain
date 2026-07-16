@@ -8,14 +8,14 @@
     <Project Path="src/DigitalBrain.Kernel.Contracts/DigitalBrain.Kernel.Contracts.csproj" />
     <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-    <Project Path="src/DigitalBrain.Ui.Contracts/DigitalBrain.Ui.Contracts.csproj" />
-    <Project Path="src/DigitalBrain.Ui.Runtime/DigitalBrain.Ui.Runtime.csproj" />
   </Folder>
   <Folder Name="/integrations/">
     <Project Path="integrations/DigitalBrain.Integrations.Google/DigitalBrain.Integrations.Google.csproj" />
     <Project Path="integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj" />
     <Project Path="integrations/DigitalBrain.Integrations.Salesforce.Contracts/DigitalBrain.Integrations.Salesforce.Contracts.csproj" />
     <Project Path="integrations/DigitalBrain.Integrations.Salesforce/DigitalBrain.Integrations.Salesforce.csproj" />
+    <Project Path="integrations/DigitalBrain.Integrations.Web.Contracts/DigitalBrain.Integrations.Web.Contracts.csproj" />
+    <Project Path="integrations/DigitalBrain.Integrations.Web/DigitalBrain.Integrations.Web.csproj" />
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
@@ -35,6 +35,8 @@
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
   </Folder>
   <Folder Name="/features/">
+    <Project Path="features/EnrichSalesforce/DigitalBrain.Features.EnrichSalesforce.csproj" />
+    <Project Path="features/EnrichSalesforce.Tests/DigitalBrain.Features.EnrichSalesforce.Tests.csproj" />
     <Project Path="features/EmailSummarizer/DigitalBrain.Features.EmailSummarizer.csproj" />
     <Project Path="features/EmailSummarizer.Tests/DigitalBrain.Features.EmailSummarizer.Tests.csproj" />
   </Folder>
