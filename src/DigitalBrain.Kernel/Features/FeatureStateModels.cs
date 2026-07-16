@@ -17,6 +17,7 @@ internal sealed record FeatureHubState(
     [property: Id(10)] FeatureDraftInstallationResetState[]? DraftInstallationResets = null)
 {
     public static FeatureHubState Empty { get; } = new([], 0, [], [], [], [], [], [], [], []);
+    [field: NonSerialized] internal bool RequiresStorageRewrite { get; init; }
 }
 [GenerateSerializer, Alias("digitalbrain.feature.draft-installation-reset-state.v1")]
 internal sealed record FeatureDraftInstallationResetState(

@@ -12,9 +12,12 @@ using DigitalBrain.Kernel.Memory;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Storage;
 namespace DigitalBrain.Kernel.Hosting;
 
 internal static class DigitalBrainOrleansExtensions
@@ -89,7 +92,7 @@ internal static class DigitalBrainOrleansExtensions
                         options.TableName = "OrleansReminders";
                     });
                     var blobs = runtimeStateBlobs!;
-                    siloBuilder.AddAzureBlobGrainStorage("Default", options => options.BlobServiceClient = blobs);
+                    ConfigureDefaultStorage(siloBuilder, blobs);
                     ConfigureRuntimeStateStorage(siloBuilder, blobs, runtimeStorageNamespace);
                 }
                 else
@@ -103,13 +106,21 @@ internal static class DigitalBrainOrleansExtensions
                         options.TableName = "OrleansReminders";
                     });
                     var grainStateBlobs = runtimeStateBlobs!;
-                    siloBuilder.AddAzureBlobGrainStorage("Default", options => options.BlobServiceClient = grainStateBlobs);
+                    ConfigureDefaultStorage(siloBuilder, grainStateBlobs);
                     ConfigureRuntimeStateStorage(siloBuilder, grainStateBlobs, runtimeStorageNamespace);
                 }
             }
         });
         return builder;
     }
+    private static void ConfigureDefaultStorage(ISiloBuilder siloBuilder, BlobServiceClient blobs) =>
+        siloBuilder.AddAzureBlobGrainStorage(
+            "Default",
+            (OptionsBuilder<AzureBlobStorageOptions> builder) => builder.Configure<OrleansJsonSerializer>((options, serializer) =>
+            {
+                options.BlobServiceClient = blobs;
+                options.GrainStorageSerializer = new FeatureHubStateStorageSerializer(new JsonGrainStorageSerializer(serializer));
+            }));
     private static void ConfigureRuntimeStateStorage(ISiloBuilder siloBuilder, BlobServiceClient blobs, string storageNamespace)
     {
         Add(RuntimeStateStorageProviders.Conversations);

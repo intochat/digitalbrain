@@ -493,6 +493,24 @@ public sealed record FeatureDraft
     public DateTimeOffset CreatedAt => _createdAt;
     public DateTimeOffset UpdatedAt => _updatedAt == default ? _createdAt : _updatedAt;
 
+    internal static FeatureDraft RestoreLegacy(
+        string proposalId,
+        string operationId,
+        string goal,
+        string status,
+        DateTimeOffset createdAt) => new(
+            new FeatureDraftId(proposalId),
+            new OriginatingRequest(operationId, LegacyMissingConversationId, goal),
+            goal,
+            status,
+            SeedBehavior(),
+            SeedSource(),
+            null,
+            null,
+            0,
+            createdAt,
+            createdAt);
+
     private static FeatureBehavior SeedBehavior() => new([
         new FeatureScenario(
             "scenario-1",

@@ -12,6 +12,12 @@ internal sealed class FeatureHubGrain(
     IFeaturePublicationVerifier? publicationVerifier = null) : Grain, IFeatureHubGrain
 {
     private static readonly ActivitySource ActivitySource = new("DigitalBrain.Features.Hub");
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        if (State.RequiresStorageRewrite)
+            await WriteAsync(State with { RequiresStorageRewrite = false });
+    }
     public async Task RegisterAsync(FeatureInstallationRegistration registration)
     {
         using var activity = Start("register");

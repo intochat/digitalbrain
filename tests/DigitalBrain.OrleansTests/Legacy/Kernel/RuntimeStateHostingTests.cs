@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Hosting;
+using DigitalBrain.Kernel.Features;
 using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -12,6 +13,10 @@ namespace DigitalBrain.Tests.Kernel;
 
 public sealed class RuntimeStateHostingTests
 {
+    private const string LegacyFeatureHubBlob = """
+        {"$id":"1","$type":"DigitalBrain.Kernel.Features.FeatureHubState, DigitalBrain.Kernel","Installations":{"$type":"DigitalBrain.Kernel.Contracts.FeatureInstallationRegistration[], DigitalBrain.Kernel.Contracts","$values":[]},"Revision":0,"FanOuts":{"$type":"DigitalBrain.Kernel.Features.FeatureFanOutState[], DigitalBrain.Kernel","$values":[]},"Releases":{"$type":"DigitalBrain.Kernel.Contracts.FeatureReleaseMetadata[], DigitalBrain.Kernel.Contracts","$values":[]},"Approvals":{"$type":"DigitalBrain.Kernel.Features.FeatureApprovalState[], DigitalBrain.Kernel","$values":[]},"Authorities":{"$type":"DigitalBrain.Kernel.Features.FeatureInstallationAuthorityState[], DigitalBrain.Kernel","$values":[]},"Alerts":{"$type":"DigitalBrain.Kernel.Contracts.FeatureBackpressureAlert[], DigitalBrain.Kernel.Contracts","$values":[]},"Drafts":{"$type":"DigitalBrain.Kernel.Contracts.FeatureDraftProposal[], DigitalBrain.Kernel.Contracts","$values":[{"$id":"2","$type":"DigitalBrain.Kernel.Contracts.FeatureDraftProposal, DigitalBrain.Kernel.Contracts","ProposalId":"proposal-legacy-live","OperationId":"operation-legacy-live","Goal":"Research Acme and create a text file","Status":"draft","CreatedAt":"2026-07-14T17:30:00+00:00"}]}}
+        """;
+
     [Fact]
     public void Hosted_runtime_state_registers_a_purpose_derived_exact_aes256_kek()
     {
@@ -109,6 +114,29 @@ public sealed class RuntimeStateHostingTests
             Assert.Equal(RuntimeStateStorageNames.Container("main", kind), options.ContainerName);
             Assert.NotNull(options.BlobServiceClient);
         }
+    }
+
+    [Fact]
+    public void Default_azure_storage_reads_the_exact_legacy_feature_draft_blob_shape()
+    {
+        var builder = HostedBuilder(managedIdentity: false, RandomNumberGenerator.GetBytes(33));
+        builder.UseDigitalBrainOrleans();
+
+        using var services = builder.Services.BuildServiceProvider();
+        var storage = services.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>().Get("Default");
+        var state = storage.GrainStorageSerializer.Deserialize<FeatureHubState>(BinaryData.FromString(LegacyFeatureHubBlob));
+        var draft = Assert.Single(state.Drafts ?? []);
+
+        Assert.Equal(new FeatureDraftId("proposal-legacy-live"), draft.DraftId);
+        Assert.Equal("operation-legacy-live", draft.OriginatingRequest.OperationId);
+        Assert.Equal(FeatureDraft.LegacyMissingConversationId, draft.OriginatingRequest.ConversationId);
+        Assert.Equal("Research Acme and create a text file", draft.Goal);
+        Assert.Equal("draft", draft.Status);
+        Assert.Equal(new DateTimeOffset(2026, 7, 14, 17, 30, 0, TimeSpan.Zero), draft.CreatedAt);
+        Assert.True(state.RequiresStorageRewrite);
+        var rewritten = storage.GrainStorageSerializer.Serialize(state with { RequiresStorageRewrite = false }).ToString();
+        Assert.DoesNotContain("FeatureDraftProposal", rewritten, StringComparison.Ordinal);
+        Assert.Contains("DigitalBrain.Kernel.Contracts.FeatureDraft, DigitalBrain.Kernel.Contracts", rewritten, StringComparison.Ordinal);
     }
 
     private static HostApplicationBuilder HostedBuilder(bool managedIdentity, byte[] rawKek)
