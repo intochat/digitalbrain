@@ -56,7 +56,7 @@ public sealed class LlmKind(ModelCatalog catalog, IServiceProvider services) : I
         {
             response = await client.GetResponseAsync(
                 [new ChatMessage(ChatRole.User, prompt)],
-                new ChatOptions { MaxOutputTokens = maxOutputTokens },
+                new ChatOptions { MaxOutputTokens = maxOutputTokens, ModelId = binding.Model },
                 deadline.Token);
         }
         catch (OperationCanceledException)

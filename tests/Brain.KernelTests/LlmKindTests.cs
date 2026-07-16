@@ -47,4 +47,13 @@ public class LlmKindTests(BrainClusterFixture<AiKindsConfigurator> fixture) : Br
             llm.InvokeAsync(new("llm.complete.v1", """{"prompt":"x"}""", "cmd-1", OwnerSession)));
         Assert.Equal("input.invalid", exception.Code);
     }
+
+    [Fact]
+    public async Task Tier_model_routes_into_chat_options()
+    {
+        var llm = Neuron("llm", "reasoning");
+        var receipt = await llm.InvokeAsync(new("llm.complete.v1", """{"prompt":"route"}""", "cmd-1", OwnerSession));
+        Assert.Contains("fake-reasoning", receipt.OutputJson);
+        Assert.Equal("fake-reasoning", AiKindsConfigurator.Client.LastOptions?.ModelId);
+    }
 }

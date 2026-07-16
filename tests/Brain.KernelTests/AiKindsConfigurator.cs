@@ -16,9 +16,9 @@ public sealed class AiKindsConfigurator : ISiloConfigurator
         siloBuilder.AddBrainKernel();
         siloBuilder.AddBrainKind("llm", sp => new LlmKind(
             new ModelCatalog([
-                new ModelBinding(ModelTier.Fast, "ollama", "fake"),
-                new ModelBinding(ModelTier.Balanced, "ollama", "fake"),
-                new ModelBinding(ModelTier.Reasoning, "ollama", "fake")
+                new ModelBinding(ModelTier.Fast, "ollama", "fake-fast"),
+                new ModelBinding(ModelTier.Balanced, "ollama", "fake-balanced"),
+                new ModelBinding(ModelTier.Reasoning, "ollama", "fake-reasoning")
             ]),
             sp));
         siloBuilder.Services.AddKeyedSingleton<IChatClient>("ollama", Client);
