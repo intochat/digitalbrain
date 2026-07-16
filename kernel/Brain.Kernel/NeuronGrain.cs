@@ -39,6 +39,15 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
         var kind = RequireKind();
         if (state.Receipts.TryGetValue(invocation.CommandId, out var replay))
             return replay;
+
+        var caller = NeuronAddress.Parse(invocation.CallerKey);
+        var requiresGrant = caller.OwnerId != _address.OwnerId || caller.SpaceId.StartsWith("behavior/", StringComparison.Ordinal);
+        if (requiresGrant && !state.Synapses.Any(s =>
+                s.Relation == SynapseRelation.Grants
+                && s.TargetKey == invocation.CallerKey
+                && s.Constraint == invocation.Contract))
+            throw new BrainException(BrainErrors.GrantMissing, $"{invocation.CallerKey} lacks {invocation.Contract}");
+
         if (invocation.ExpectedRevision is { } expected && expected != Revision)
             throw new BrainException(BrainErrors.RevisionConflict, $"expected {expected}, actual {Revision}");
 
