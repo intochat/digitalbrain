@@ -44,4 +44,11 @@ public class ModelCatalogTests
         var exception = Assert.Throws<BrainException>(() => catalog.Resolve(ModelTier.Reasoning));
         Assert.Equal(BrainErrors.ModelUnavailable, exception.Code);
     }
+
+    [Fact]
+    public void Numeric_tier_segment_fails_closed()
+    {
+        var exception = Assert.Throws<BrainException>(() => ModelCatalog.ParseTier("llm/99"));
+        Assert.Equal("input.invalid", exception.Code);
+    }
 }

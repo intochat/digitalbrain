@@ -30,7 +30,7 @@ public sealed class ModelCatalog
         var remainder = neuronId[prefix.Length..];
         var dashIndex = remainder.IndexOf('-');
         var segment = dashIndex >= 0 ? remainder[..dashIndex] : remainder;
-        return Enum.TryParse<ModelTier>(segment, ignoreCase: true, out var tier)
+        return Enum.TryParse<ModelTier>(segment, ignoreCase: true, out var tier) && Enum.IsDefined(tier)
             ? tier
             : throw new BrainException("input.invalid", $"'{segment}' is not a known model tier");
     }
