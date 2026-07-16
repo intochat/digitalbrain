@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <IsTestProject>false</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../kernel/Brain.Contracts/Brain.Contracts.csproj" />
