@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -36,23 +35,6 @@ public static class RequestScope
     {
         var canonical = JsonSerializer.SerializeToUtf8Bytes(new { owner = ownerId.Value, actor = actorId.Value });
         return Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant();
-    }
-}
-public static class GrainIds
-{
-    public static string Aggregate(BrainOwnerId owner, string aggregate) =>
-        ScopePrefix(owner) + "aggregate/" + Segment(aggregate);
-    public static string Conversation(BrainOwnerId owner, string conversation) =>
-        ScopePrefix(owner) + "conversation/" + Segment(conversation);
-    public static string Workflow(BrainOwnerId owner, string workflow) =>
-        ScopePrefix(owner) + "workflow/" + Segment(workflow);
-    public static string ScopePrefix(BrainOwnerId owner) => $"v3/{Segment(owner.Value)}/";
-    public static bool IsInScope(string? grainId, BrainOwnerId owner) =>
-        !string.IsNullOrWhiteSpace(grainId) && grainId.StartsWith(ScopePrefix(owner), StringComparison.Ordinal);
-    private static string Segment(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("A non-empty grain id component is required.", nameof(value));
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 }
 public sealed class SessionTokenService
@@ -272,13 +254,5 @@ public sealed record SessionPair(
     DateTimeOffset RefreshExpiresAt,
     DateTimeOffset AccessExpiresAt = default,
     string Audience = SessionAudiences.Mcp);
-public enum Sensitivity { Public, Internal, Confidential, Secret }
-public static class Redaction
-{
-    public static string SafeSummary(string? value, Sensitivity classification = Sensitivity.Internal) =>
-        classification == Sensitivity.Secret ? "[REDACTED]" : value is null ? string.Empty : value.Length > 256 ? value[..256] + "…" : value;
-    public static JsonElement Redact(JsonElement value, Sensitivity classification) =>
-        classification == Sensitivity.Secret ? JsonElement.Parse("\"[REDACTED]\"") : value.Clone();
-}
 [GenerateSerializer, Alias("digitalbrain.v2.command-envelope")]
 public sealed record CommandEnvelope([property: Id(0)] string Type, [property: Id(1)] int Version, [property: Id(2)] string CommandId, [property: Id(3)] RequestContext Context, [property: Id(4)] JsonElement Payload);

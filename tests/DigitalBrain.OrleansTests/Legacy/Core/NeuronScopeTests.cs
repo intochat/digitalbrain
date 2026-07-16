@@ -30,14 +30,6 @@ public class NeuronScopeTests
     }
 
     [Fact]
-    public void AsScope_Extension_Parses_NeuronId()
-    {
-        var scope = new NeuronId("bob").AsScope();
-        Assert.Equal("bob", scope.UserId.Value);
-        Assert.Null(scope.ThreadId);
-    }
-
-    [Fact]
     public void IntegrationConfigScopes_App_Is_Default_And_ForUser_Prefixes_UserId()
     {
         Assert.Equal("default", IntegrationConfigScopes.App);

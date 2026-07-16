@@ -20,7 +20,6 @@ if (!Enum.TryParse<RuntimeProfile>(profileText, true, out var profile))
 builder.Services.AddMcpServer().WithHttpTransport().WithTools<McpConversationTools>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<McpAuthority>();
-builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
 builder.Services.AddSingleton(TimeProvider.System);
 var mcpAudience = SessionAudiences.RequireFixedMcp(builder.Configuration["DigitalBrain:Runtime:Mcp:Audience"]);
 builder.Services.AddSingleton<ConversationStateClient>();

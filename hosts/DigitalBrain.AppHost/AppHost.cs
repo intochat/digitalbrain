@@ -1,10 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.AppHost;
-using AnthropicModels = DigitalBrain.Kernel.Contracts.Models.Anthropic;
-using GitHubModels = DigitalBrain.Kernel.Contracts.Models.GitHub;
 using OllamaModels = DigitalBrain.Kernel.Contracts.Models.Ollama;
-using OpenAIModels = DigitalBrain.Kernel.Contracts.Models.OpenAI;
 var builder = DistributedApplication.CreateBuilder(args);
 var configuredProfile = builder.Configuration["DigitalBrain:Profile"];
 var profile = configuredProfile ?? (builder.ExecutionContext.IsRunMode

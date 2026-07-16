@@ -150,7 +150,6 @@ internal static class DigitalBrainOrleansExtensions
     }
     public static IHostApplicationBuilder AddDigitalBrainClients(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddSingleton<ITelemetrySink, TelemetryBuffer>();
         var isAspireHosted = DigitalBrainHostEnvironment.IsAspireHosted(builder.Configuration);
         var storageAccountName = builder.Configuration["DigitalBrain:Storage:AccountName"];
         var useManagedIdentity = !string.IsNullOrWhiteSpace(storageAccountName);

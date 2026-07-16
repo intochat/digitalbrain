@@ -22,19 +22,3 @@ public static class IntegrationConfigScopes
     public const string App = "default";
     public static string ForUser(UserId userId) => $"user:{userId.Value}";
 }
-public static class OwnerCollections
-{
-    public static string VectorCollection(UserId userId, string collection = "documents") =>
-        $"owner:{Safe(userId.Value)}:{Safe(collection)}";
-    private static string Safe(string value) =>
-        new string(value.Trim().ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
-            .ToArray())
-            .Trim('-');
-}
-public static class NeuronScopeExtensions
-{
-    public static NeuronScope AsScope(this NeuronId id) =>
-        NeuronScope.TryParse(id.Value, out var scope)
-            ? scope
-            : throw new InvalidOperationException($"Grain key '{id.Value}' cannot be parsed as a NeuronScope.");
-}
