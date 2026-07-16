@@ -2,6 +2,9 @@
   <Folder Name="/clients/">
     <Project Path="app/Flutter.proj" Type="C#" />
   </Folder>
+  <Folder Name="/modules/">
+    <Project Path="modules/Brain.Modules.Sdk/Brain.Modules.Sdk.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/DigitalBrain.Features.Sdk/DigitalBrain.Features.Sdk.csproj" />
     <Project Path="src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj" />

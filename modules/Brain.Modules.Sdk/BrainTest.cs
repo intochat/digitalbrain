@@ -1,19 +1,22 @@
 using Brain.Contracts;
-using Brain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.TestingHost;
+using Xunit;
 
-namespace Brain.KernelTests;
+namespace Brain.Modules.Sdk;
 
-public sealed class ClusterFixture : IDisposable
+public sealed class BrainClusterFixture<TKindsConfigurator> : IDisposable
+    where TKindsConfigurator : ISiloConfigurator, new()
 {
     public TestCluster Cluster { get; }
 
-    public ClusterFixture()
+    public BrainClusterFixture()
     {
         var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        builder.AddSiloBuilderConfigurator<JournalStorageConfigurator>();
+        builder.AddSiloBuilderConfigurator<TKindsConfigurator>();
         Cluster = builder.Build();
         Cluster.Deploy();
     }
@@ -28,14 +31,26 @@ public sealed class ClusterFixture : IDisposable
 
     public void Dispose() => Cluster.StopAllSilos();
 
-    private sealed class SiloConfigurator : ISiloConfigurator
+    private sealed class JournalStorageConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
             var storageProvider = new VolatileJournalStorageProvider();
             siloBuilder.AddJournalStorage();
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
-            siloBuilder.AddBrainKernel(new TestKind(), new ProposerKind());
         }
     }
+}
+
+public abstract class BrainTest<TKindsConfigurator>(BrainClusterFixture<TKindsConfigurator> fixture)
+    : IClassFixture<BrainClusterFixture<TKindsConfigurator>>
+    where TKindsConfigurator : ISiloConfigurator, new()
+{
+    protected TestCluster Cluster => fixture.Cluster;
+
+    protected string OwnerSession => fixture.OwnerSession;
+
+    protected string AddressKey(string kind, string id) => fixture.AddressKey(kind, id);
+
+    protected INeuron Neuron(string kind, string id) => fixture.Neuron(kind, id);
 }

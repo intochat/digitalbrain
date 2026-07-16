@@ -8,13 +8,9 @@
   <ItemGroup>
     <ProjectReference Include="../../kernel/Brain.Contracts/Brain.Contracts.csproj" />
     <ProjectReference Include="../../kernel/Brain.Kernel/Brain.Kernel.csproj" />
-    <ProjectReference Include="../../kernel/Brain.Client/Brain.Client.csproj" />
-    <ProjectReference Include="../../modules/Brain.Modules.Sdk/Brain.Modules.Sdk.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
+    <PackageReference Include="xunit" />
   </ItemGroup>
 </Project>
