@@ -1,10 +1,99 @@
 # DigitalBrain
 
-**DigitalBrain** is the .NET Aspire + Orleans runtime for a self-evolving personal OS.
+**One living workspace where you and AI agents work together — safely.**
 
-Keep one path: `Client -> Edge/Auth -> INO operation -> deterministic function or bounded model workflow -> effect gate -> connector adapter`. Commands and queries use typed grain interfaces. Orleans streams are reserved for progress, fan-out, and observability. The generic Neuron/Synapse runtime, legacy gateway, second auth system, Foundry execution loop, pack runtime, and duplicate UI rail are removed after their remaining behavior is either migrated or explicitly discarded.
+DigitalBrain is a personal OS built on **.NET Aspire + Orleans**. The product axiom is simple:
 
-## Quick Start (Local)
+> **Everything addressable is a Neuron** — pages, buttons, Chat, Features, Gmail, Salesforce, Approvals.
+
+Not a metaphor. Login is a Neuron. The Chat page is a Neuron. Gmail is a Neuron. A Feature you install (or write with real logic) is a Neuron. People and agents share **one brain**. The app is a **live window**. Outside changes need **your approval**.
+
+Product story for stakeholders: **[Wiki](https://github.com/digitalbraintech/brain/wiki)** · deep design: [`EVERYTHING-IS-A-NEURON.md`](EVERYTHING-IS-A-NEURON.md) · way of working: [`CLAUDE.md`](CLAUDE.md)
+
+---
+
+## Everything is a Neuron
+
+```mermaid
+flowchart TB
+  You["You<br/>Flutter app"]
+  Agent["AI agent<br/>Claude · Codex · Grok · …"]
+  MCP["DigitalBrain MCP<br/>the only doorway"]
+
+  You --> UI
+  Agent --> MCP
+  MCP --> Brain
+
+  subgraph Brain["Your DigitalBrain — one graph of Neurons"]
+    direction TB
+
+    subgraph UI["UI Neurons — screens, pages, buttons"]
+      direction LR
+      Login["Login page"]
+      ChatUI["Chat page"]
+      FeatUI["Features page"]
+      ConnUI["Connections page"]
+      ActUI["Activity page"]
+      ApproveBtn["Approve / Reject<br/>actions"]
+    end
+
+    subgraph Core["Work Neurons — memory, skills, control"]
+      direction LR
+      Chat["Chat"]
+      Feature["Feature<br/>your programmable skill"]
+      Effect["Effect<br/>prepared outside change"]
+      Approval["Approval"]
+      Session["Session"]
+    end
+
+    subgraph World["World Neurons — connectors"]
+      direction LR
+      Gmail["Gmail"]
+      Salesforce["Salesforce"]
+      More["… other systems"]
+    end
+
+    UI -. projects / invokes .-> Core
+    Feature --> Gmail
+    Feature --> Salesforce
+    Feature --> Effect
+    Effect --> Approval
+    Approval -->|"you said yes"| Gmail
+    Approval -->|"you said yes"| Salesforce
+  end
+```
+
+| Layer | Examples | Meaning |
+|-------|----------|---------|
+| **UI Neurons** | Login, Chat page, Connections, Approve button | What you see and click — not a separate app model |
+| **Work Neurons** | Chat, Feature, Effect, Approval, Session | Memory, skills, control |
+| **World Neurons** | Gmail, Salesforce, … | Real systems, **same Neuron kind** as Login |
+
+**Same kind of thing. Different jobs. One brain.**
+
+Because **UI contracts** and **connector contracts** are both Neuron contracts, Features can compose complex logic *inside* DigitalBrain — project UI, call Gmail/Salesforce under grants, and still pass every outside write through **Effect → your Approve/Reject**.
+
+```mermaid
+flowchart LR
+  A["1 Connect<br/>World Neurons"] --> B["2 Abilities unlock"]
+  B --> C["3 You or agent work<br/>Chat · Features · UI"]
+  C --> D["4 Outside change?<br/>Effect → Approve"]
+  D --> E["5 Activity trail"]
+```
+
+---
+
+## Retained execution path
+
+Keep one path:
+
+`Client → Edge/Auth → INO operation → deterministic function or bounded model workflow → effect gate → connector adapter`
+
+Commands and queries use typed grain interfaces. Orleans streams are reserved for progress, fan-out, and observability.
+
+---
+
+## Quick start (local)
 
 From repo root:
 
@@ -23,11 +112,11 @@ Full stack:
 aspire start
 ```
 
-See CLAUDE.md for the complete way of working, Elon's 5-step algorithm, iteration speed rules (MCP-first, parallel Context7, bg tests + polling, metrics + retro, self-evolution for WoW proposals), and pre-change ritual (Context7 + Aspire MCP + CodeGraph + todo).
+See [CLAUDE.md](CLAUDE.md) for the complete way of working (Elon’s 5-step algorithm, MCP-first iteration, Context7 + CodeGraph + Aspire ritual).
 
-**Rely on CodeGraph** (configured in .mcp.json) for architecture understanding, symbol exploration, and call-path analysis.
+---
 
-## Test Suites
+## Test suites
 
 The root test command is expected to run every test with zero skips:
 
@@ -40,16 +129,22 @@ dotnet test --logger "console;verbosity=minimal"
 
 Do not keep a separate `aspire run` / `aspire start` session alive while running the full root test suite; the E2E fixture owns its AppHost lifecycle.
 
-## Core Ideas
+---
 
-- **External mutation rail**: Durable INO effect plans with approval evidence, idempotency, lease/fence checks, and outcome verification.
-- **External edge**: V2 UI gRPC plus the retained MCP operation surface.
-- **Orleans**: Typed grain interfaces for commands and queries; streams only for progress, fan-out, and observability.
-- **Aspire hosting**:  AppHost wires replicas, Ollama, storage, MCP, flutter client.
+## Core ideas (engineering)
 
-Use the CodeGraph MCP (see .mcp.json and CLAUDE.md) as the primary tool for architecture and codebase understanding.
+- **Neuron ontology** — one addressable kind for UI, work, connectors, Features, Effects; differences are traits, not parallel runtimes.
+- **External mutation rail** — durable effect plans with approval evidence, idempotency, lease/fence checks, and outcome verification.
+- **External edge** — UI gRPC plus DigitalBrain MCP (agents enter *this* brain, not a tool mall).
+- **Orleans** — typed grain interfaces for commands and queries; streams only for progress, fan-out, and observability.
+- **Aspire hosting** — AppHost wires replicas, Ollama, storage, MCP, Flutter client.
+- **Self-evolution** — user-visible mutations (Features, automations) go through the human-approved, journaled rail.
 
-## Target Dependency Direction
+Use CodeGraph MCP (see `.mcp.json` and CLAUDE.md) as the primary tool for architecture and codebase understanding.
+
+---
+
+## Target dependency direction
 
 ```text
 Provider Contracts       Feature SDK       Kernel Contracts
@@ -68,25 +163,25 @@ Dependencies point inward toward the three contract seams. `DigitalBrain.Runtime
 
 No external mutation may bypass `InoEffectPlanAuthority`, durable approval evidence, idempotency, lease/fence checks, and outcome verification.
 
-## Working Rules (see CLAUDE.md)
+---
 
-- Always follow Elon's 5 steps **in order**: less dumb reqs → delete (target 10%+) → simplify → accelerate → automate last.
-- **CodeGraph MCP for architecture understanding**: Use the `codegraph` server (from .mcp.json; auto-inits on build after `git clean -fdx`) for symbols, call graphs, impact analysis, and architecture exploration. Prefer it over manual file reads or grep.
+## Working rules (see CLAUDE.md)
+
+- Always follow Elon’s 5 steps **in order**: less dumb reqs → delete (target 10%+) → simplify → accelerate → automate last.
+- **CodeGraph MCP** for architecture understanding (prefer over manual file crawls).
 - **Context7** for every library/framework API before touching code.
-- **Aspire MCP + CLI** for fast inspection/restarts/logs/traces (prefer over full runs). Use resource-targeted restarts.
-- Tests: `dotnet test --logger "console;verbosity=minimal"` from root only. No --filter. Launch bg + poll with MCP logs.
-- After every change: build + above test + `aspire doctor` + MCP health. Log cycle time + 5-steps retro.
-- Delete superseded documentation. Keep this README and CLAUDE.md current; retain an active approved spec or implementation plan only while its work remains open.
+- **Aspire MCP + CLI** for inspection/restarts/logs/traces (prefer over full runs).
+- Tests: `dotnet test --logger "console;verbosity=minimal"` from root. No `--filter`.
+- Delete superseded documentation. Keep this README and CLAUDE.md current.
 - Relative paths. Self-explanatory names. No vacuous summaries.
-- Self-evolution is non-negotiable for mutations. Use rail to propose WoW improvements.
-- Minimal/isolated starts when possible; pre-build for MCP; parallel Context7 + MCP.
-
-## Status
-
-AppHost + kernels + self-evolution rail are live. Use `aspire doctor`, MCP tools (incl. `codegraph` for architecture), and `codegraph status` for state.
-
-For detailed rules and iteration improvements (including CodeGraph for architecture), read CLAUDE.md.
+- Self-evolution is non-negotiable for mutations.
 
 ---
 
-Built for speed, safety, and relentless self-improvement. Delete the dumb parts first.
+## Status
+
+AppHost + kernels + self-evolution rail are live. Product narrative: [wiki](https://github.com/digitalbraintech/brain/wiki). Design axiom: [EVERYTHING-IS-A-NEURON.md](EVERYTHING-IS-A-NEURON.md). Day-to-day rules: [CLAUDE.md](CLAUDE.md).
+
+---
+
+**In one line:** Pages, buttons, Chat, Gmail, Salesforce, and the skills you build are all Neurons — one programmable brain, live window, you approve what touches the world.
