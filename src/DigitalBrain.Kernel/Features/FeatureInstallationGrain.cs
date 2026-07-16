@@ -135,6 +135,15 @@ internal sealed class FeatureInstallationGrain(
             return;
         await WriteAsync(next);
     }
+    public async Task ResolveIntentAsync(FeatureEffectResolution resolution)
+    {
+        using var activity = Start("resolve-intent");
+        DemandNoReservation();
+        var next = Domain(() => FeatureInstallationTransitions.ResolveIntent(RequiredState(), resolution));
+        if (ReferenceEquals(next, persistentState.State))
+            return;
+        await WriteAsync(next);
+    }
     public Task PauseAsync(string reason) => PersistAsync("pause", state => !HasReservation && state.UnconfirmedReleaseSwitch is null
         ? FeatureInstallationTransitions.Pause(state, reason)
         : throw new FeatureConcurrencyException("The Feature runtime is reserved or has an unconfirmed release switch."));
@@ -736,7 +745,15 @@ internal sealed class FeatureInstallationGrain(
     }
     private static FeatureCompletionReceipt Receipt(FeatureCompletion completion) => new(completion.InputId, completion.Fence, completion.ResultJson, completion.CompletedAt, completion.CommitDigest, completion.InputDigest);
     private static FeatureIntentStatus IntentStatus(PersistedFeatureIntent intent) =>
-        new(intent.OperationKey, intent.Kind, intent.PayloadJson, intent.AppliedAt, intent.InputId, intent.DeclinedAt);
+        new(
+            intent.OperationKey,
+            intent.Kind,
+            intent.PayloadJson,
+            intent.AppliedAt,
+            intent.InputId,
+            intent.DeclinedAt,
+            intent.PayloadDigest,
+            intent.Resolution);
     private static T Domain<T>(Func<T> transition)
     {
         try

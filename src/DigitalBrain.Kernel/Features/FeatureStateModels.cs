@@ -147,7 +147,9 @@ internal sealed record FeatureCompletion(
     [property: Id(7)] FeatureRunIdentity? Run = null,
     [property: Id(8)] int Attempts = 0,
     [property: Id(9)] DateTimeOffset? StartedAt = null,
-    [property: Id(10)] bool HasResultSurface = false);
+    [property: Id(10)] bool HasResultSurface = false,
+    [property: Id(11)] int EffectCount = 0,
+    [property: Id(12)] FeatureEffectResolution[]? EffectResolutions = null);
 [GenerateSerializer, Alias("digitalbrain.v3.persisted-feature-intent")]
 internal sealed record PersistedFeatureIntent(
     [property: Id(0)] string OperationKey,
@@ -155,7 +157,9 @@ internal sealed record PersistedFeatureIntent(
     [property: Id(2)] string PayloadJson,
     [property: Id(3)] DateTimeOffset? AppliedAt,
     [property: Id(4)] string? InputId = null,
-    [property: Id(5)] DateTimeOffset? DeclinedAt = null);
+    [property: Id(5)] DateTimeOffset? DeclinedAt = null,
+    [property: Id(6)] string? PayloadDigest = null,
+    [property: Id(7)] FeatureEffectResolution? Resolution = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-schedule-cursor")]
 internal sealed record FeatureScheduleCursor([property: Id(0)] string ScheduleId, [property: Id(1)] DateTimeOffset LastOccurrenceAt, [property: Id(2)] DateTimeOffset NextOccurrenceAt);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-release-switch")]

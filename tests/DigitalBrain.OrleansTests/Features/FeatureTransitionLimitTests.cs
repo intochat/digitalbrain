@@ -1,5 +1,6 @@
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
+using DigitalBrain.Kernel.Runtime;
 
 namespace DigitalBrain.OrleansTests.Features;
 
@@ -218,6 +219,40 @@ public sealed class FeatureTransitionLimitTests
                     new FeatureIntent("overflow", FeatureIntentKind.Event, "{}"),
                 ]),
             Now.AddSeconds(1)));
+    }
+
+    [Fact]
+    public void Run_effect_resolution_history_is_bounded_to_thirty_two_and_deterministically_ordered()
+    {
+        var claimed = ClaimedState();
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                "{}",
+                Enumerable.Range(0, FeatureLimits.IntentsPerRun)
+                    .Reverse()
+                    .Select(index => new FeatureIntent($"effect-{index:D2}", FeatureIntentKind.ExternalEffect, "{}"))
+                    .ToArray()),
+            Now.AddSeconds(1));
+        var resolved = committed.State;
+        foreach (var intent in FeatureInstallationTransitions.ListPendingIntents(committed.State))
+        {
+            resolved = FeatureInstallationTransitions.ResolveIntent(
+                resolved,
+                new FeatureEffectResolution(
+                    intent.OperationKey,
+                    "decision-" + intent.OperationKey,
+                    new string('a', 64),
+                    InoEffectTerminalKind.Approved,
+                    Now.AddSeconds(2),
+                    "The provider update succeeded."));
+        }
+
+        var history = Assert.IsType<FeatureEffectResolution[]>(Assert.Single(resolved.Completions).EffectResolutions);
+
+        Assert.Equal(FeatureLimits.IntentsPerRun, history.Length);
+        Assert.Equal(history.OrderBy(item => item.OperationKey, StringComparer.Ordinal), history);
     }
 
     private static (FeatureInstallationState State, FeatureRunClaim Claim) ClaimedState(int inputIndex = 0)

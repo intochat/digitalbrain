@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Runtime;
 
 namespace DigitalBrain.Kernel.Features;
 
@@ -71,22 +72,39 @@ internal static class FeatureRunProjection
             var runId = ProjectedRunId(state.InstallationId, identity.RunId);
             var intents = state.Intents.Where(intent =>
                 string.Equals(intent.InputId, identity.RunId, StringComparison.Ordinal)).ToArray();
-            var waiting = intents.Any(intent =>
-                intent.Kind == FeatureIntentKind.ExternalEffect &&
-                intent.AppliedAt is null &&
-                intent.DeclinedAt is null);
-            var declinedAt = intents
-                .Where(intent => intent.Kind == FeatureIntentKind.ExternalEffect && intent.DeclinedAt is not null)
-                .Select(intent => intent.DeclinedAt!.Value)
-                .DefaultIfEmpty(completion.CompletedAt)
-                .Max();
-            var declined = intents.Any(intent =>
-                intent.Kind == FeatureIntentKind.ExternalEffect && intent.DeclinedAt is not null);
+            var legacyEffects = intents.Where(intent => intent.Kind == FeatureIntentKind.ExternalEffect).ToArray();
+            var resolutions = completion.EffectCount > 0
+                ? (completion.EffectResolutions ?? []).Select(Effect).ToArray()
+                : legacyEffects.Select(Effect).Where(effect => effect is not null).Cast<EffectProjection>().ToArray();
+            var waiting = completion.EffectCount > 0
+                ? resolutions.Select(effect => effect.OperationKey).Distinct(StringComparer.Ordinal).Count() < completion.EffectCount
+                : legacyEffects.Any(intent => Effect(intent) is null);
+            var failed = resolutions.Any(effect => effect.TerminalKind is
+                InoEffectTerminalKind.Declined or InoEffectTerminalKind.Expired or InoEffectTerminalKind.Failed);
+            var outcomeUnknown = resolutions.Any(effect => effect.TerminalKind == InoEffectTerminalKind.OutcomeUnknown);
             var status = waiting
                 ? FeatureRunStatus.WaitingForApproval
-                : declined
+                : failed
                     ? FeatureRunStatus.Failed
-                    : FeatureRunStatus.Completed;
+                    : outcomeUnknown
+                        ? FeatureRunStatus.Parked
+                        : FeatureRunStatus.Completed;
+            var terminalAt = resolutions
+                .Select(effect => effect.ResolvedAt)
+                .DefaultIfEmpty(completion.CompletedAt)
+                .Append(completion.CompletedAt)
+                .Max();
+            var adverse = resolutions
+                .Where(effect => status switch
+                {
+                    FeatureRunStatus.Failed => effect.TerminalKind is
+                        InoEffectTerminalKind.Declined or InoEffectTerminalKind.Expired or InoEffectTerminalKind.Failed,
+                    FeatureRunStatus.Parked => effect.TerminalKind == InoEffectTerminalKind.OutcomeUnknown,
+                    _ => false
+                })
+                .OrderByDescending(effect => effect.ResolvedAt)
+                .ThenBy(effect => effect.OperationKey, StringComparer.Ordinal)
+                .FirstOrDefault();
             runs.Add(new FeatureRunSnapshot(
                 runId,
                 state.InstallationId,
@@ -98,12 +116,16 @@ internal static class FeatureRunProjection
                 waiting ? FeatureRunAuthorityState.WaitingForApproval : FeatureRunAuthorityState.Authorized,
                 identity.OccurredAt,
                 completion.StartedAt,
-                declined && declinedAt > completion.CompletedAt ? declinedAt : completion.CompletedAt,
+                terminalAt,
                 null,
                 completion.Attempts,
                 status == FeatureRunStatus.Completed && completion.HasResultSurface ? ResultSurfaceReference(runId) : null,
-                declined ? DeclinedFailure : null,
-                declined ? DeclinedGuidance : null,
+                adverse?.SafeResult,
+                adverse?.TerminalKind == InoEffectTerminalKind.Declined
+                    ? DeclinedGuidance
+                    : adverse is null
+                        ? null
+                        : ParkedGuidance,
                 identity.TraceReference));
         }
         return runs.ToArray();
@@ -217,4 +239,27 @@ internal static class FeatureRunProjection
 
     private static void AppendCanonical(StringBuilder builder, string value) =>
         builder.Append(value.Length).Append(':').Append(value).Append(';');
+
+    private static EffectProjection Effect(FeatureEffectResolution resolution) => new(
+        resolution.OperationKey,
+        resolution.TerminalKind,
+        resolution.ResolvedAt,
+        resolution.SafeResult);
+
+    private static EffectProjection? Effect(PersistedFeatureIntent intent)
+    {
+        if (intent.Resolution is { } resolution)
+            return Effect(resolution);
+        if (intent.AppliedAt is { } appliedAt)
+            return new(intent.OperationKey, InoEffectTerminalKind.Approved, appliedAt, "The action completed.");
+        if (intent.DeclinedAt is { } declinedAt)
+            return new(intent.OperationKey, InoEffectTerminalKind.Declined, declinedAt, DeclinedFailure);
+        return null;
+    }
+
+    private sealed record EffectProjection(
+        string OperationKey,
+        InoEffectTerminalKind TerminalKind,
+        DateTimeOffset ResolvedAt,
+        string SafeResult);
 }

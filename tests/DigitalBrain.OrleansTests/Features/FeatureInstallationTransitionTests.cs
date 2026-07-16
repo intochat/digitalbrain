@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
+using DigitalBrain.Kernel.Runtime;
 
 namespace DigitalBrain.OrleansTests.Features;
 
@@ -955,6 +956,82 @@ public sealed class FeatureInstallationTransitionTests
         Assert.DoesNotContain("never-project", run.ToString(), StringComparison.Ordinal);
         Assert.Throws<FeatureConcurrencyException>(() =>
             FeatureInstallationTransitions.ApplyIntent(declined, intent.OperationKey, declinedAt.AddSeconds(2)));
+    }
+
+    [Fact]
+    public void Pruning_resolved_intents_does_not_change_historical_Run_status()
+    {
+        var claimed = Claimed();
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                intents: [new FeatureIntent("provider-update", FeatureIntentKind.ExternalEffect, "{\"secret\":\"remove\"}")]),
+            Now.AddSeconds(1));
+        var intent = Assert.Single(FeatureInstallationTransitions.ListPendingIntents(committed.State));
+        var resolution = Resolution(
+            intent.OperationKey,
+            InoEffectTerminalKind.Failed,
+            Now.AddSeconds(2),
+            "The provider rejected the update.");
+        var resolved = FeatureInstallationTransitions.ResolveIntent(
+            committed.State,
+            resolution);
+        var compacted = resolved with { Intents = [] };
+        var replay = FeatureInstallationTransitions.ResolveIntent(compacted, resolution);
+
+        var retained = Assert.Single(FeatureRunProjection.Project(resolved));
+        var pruned = Assert.Single(FeatureRunProjection.Project(compacted));
+
+        Assert.Same(compacted, replay);
+        Assert.Equal(FeatureRunStatus.Failed, retained.Status);
+        Assert.Equal(retained.Status, pruned.Status);
+        Assert.Equal(retained.CompletedAt, pruned.CompletedAt);
+        Assert.Equal(retained.SafeFailure, pruned.SafeFailure);
+        Assert.Equal(retained.Release, pruned.Release);
+    }
+
+    [Fact]
+    public void Outcome_unknown_projects_Parked_and_provider_failure_projects_Failed()
+    {
+        var unknown = ResolvedRun("outcome-unknown", InoEffectTerminalKind.OutcomeUnknown, "The provider outcome could not be confirmed.");
+        var failed = ResolvedRun("provider-failure", InoEffectTerminalKind.Failed, "The provider rejected the update.");
+
+        Assert.Equal(FeatureRunStatus.Parked, Assert.Single(FeatureRunProjection.Project(unknown)).Status);
+        Assert.Equal(FeatureRunStatus.Failed, Assert.Single(FeatureRunProjection.Project(failed)).Status);
+    }
+
+    [Fact]
+    public void Multiple_effects_use_the_latest_resolution_as_terminal_time()
+    {
+        var claimed = Claimed();
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                intents:
+                [
+                    new FeatureIntent("effect-b", FeatureIntentKind.ExternalEffect, "{\"value\":2}"),
+                    new FeatureIntent("effect-a", FeatureIntentKind.ExternalEffect, "{\"value\":1}")
+                ]),
+            Now.AddSeconds(1));
+        var intents = FeatureInstallationTransitions.ListPendingIntents(committed.State);
+        var latest = Now.AddSeconds(4);
+        var first = FeatureInstallationTransitions.ResolveIntent(
+            committed.State,
+            Resolution(intents[0].OperationKey, InoEffectTerminalKind.Approved, latest, "The second update succeeded."));
+        var resolved = FeatureInstallationTransitions.ResolveIntent(
+            first,
+            Resolution(intents[1].OperationKey, InoEffectTerminalKind.Approved, Now.AddSeconds(2), "The first update succeeded."));
+
+        var run = Assert.Single(FeatureRunProjection.Project(resolved));
+        var history = Assert.IsType<FeatureEffectResolution[]>(resolved.Completions[0].EffectResolutions);
+
+        Assert.Equal(FeatureRunStatus.Completed, run.Status);
+        Assert.Equal(latest, run.CompletedAt);
+        Assert.Equal(
+            history.OrderBy(item => item.OperationKey, StringComparer.Ordinal),
+            history);
     }
 
     [Fact]
@@ -1961,6 +2038,42 @@ public sealed class FeatureInstallationTransitionTests
 
     private static FeatureInstallationState State() =>
         FeatureInstallationState.Create(ReleaseOne, InstallationId);
+
+    private static FeatureInstallationState ResolvedRun(
+        string inputId,
+        InoEffectTerminalKind terminalKind,
+        string safeResult)
+    {
+        var appended = FeatureInstallationTransitions.Append(State(), Input(inputId), Now);
+        var claimed = FeatureInstallationTransitions.Claim(
+            appended.State,
+            "host-" + inputId,
+            Now,
+            TimeSpan.FromSeconds(60));
+        var claim = Assert.IsType<FeatureRunClaim>(claimed.Claim);
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claim.Fence,
+                intents: [new FeatureIntent("provider", FeatureIntentKind.ExternalEffect, "{\"secret\":\"remove\"}")]),
+            Now.AddSeconds(1));
+        var intent = Assert.Single(FeatureInstallationTransitions.ListPendingIntents(committed.State));
+        return FeatureInstallationTransitions.ResolveIntent(
+            committed.State,
+            Resolution(intent.OperationKey, terminalKind, Now.AddSeconds(2), safeResult));
+    }
+
+    private static FeatureEffectResolution Resolution(
+        string operationKey,
+        InoEffectTerminalKind terminalKind,
+        DateTimeOffset resolvedAt,
+        string safeResult) => new(
+            operationKey,
+            "decision-" + operationKey,
+            new string('a', 64),
+            terminalKind,
+            resolvedAt,
+            safeResult);
 
     private static string LegacyInputDigest(FeatureInput input)
     {

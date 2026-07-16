@@ -1,7 +1,10 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Features;
+using DigitalBrain.Kernel.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Concurrency;
@@ -863,6 +866,41 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
         Assert.NotNull(run.SafeFailure);
         Assert.NotNull(run.FailureGuidance);
         Assert.DoesNotContain("never-project", run.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Resolving_an_intent_scrubs_payload_but_preserves_its_digest()
+    {
+        var installation = Installation("scrubbed-effect");
+        await installation.InitializeAsync(ReleaseOne);
+        await installation.AppendAsync(Input("input-scrubbed-effect"));
+        var claim = Assert.IsType<FeatureRunClaim>(
+            await installation.ClaimAsync("host-scrubbed-effect", TimeSpan.FromSeconds(60)));
+        const string payload = "{\"secret\":\"remove-after-resolution\"}";
+        await installation.CommitAsync(new FeatureRunCommit(
+            claim.Fence,
+            "{}",
+            [new FeatureIntent("provider-update", FeatureIntentKind.ExternalEffect, payload)],
+            new FeatureResourceUsage(0, 0),
+            "{}"));
+        var intent = Assert.Single(await installation.ListPendingIntentsAsync());
+        var expectedDigest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
+
+        await installation.ResolveIntentAsync(new FeatureEffectResolution(
+            intent.OperationKey,
+            "decision-provider-update",
+            new string('a', 64),
+            InoEffectTerminalKind.Approved,
+            fixture.Time.GetUtcNow().AddSeconds(1),
+            "The provider update succeeded."));
+        await fixture.Cluster.DeactivateAsync((IAddressable)installation);
+
+        var snapshot = await installation.ReadAsync();
+        var resolved = Assert.Single(snapshot.Intents);
+
+        Assert.Equal(string.Empty, resolved.PayloadJson);
+        Assert.Equal(expectedDigest, resolved.PayloadDigest);
+        Assert.Equal(InoEffectTerminalKind.Approved, resolved.Resolution!.TerminalKind);
     }
 
     [Fact]
@@ -1882,6 +1920,7 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             typeof(FeatureInboxEntry),
             typeof(FeatureLease),
             typeof(FeatureCompletion),
+            typeof(FeatureEffectResolution),
             typeof(PersistedFeatureIntent),
             typeof(FeatureScheduleCursor)
         ];

@@ -1,4 +1,5 @@
 using System.Text;
+using DigitalBrain.Kernel.Runtime;
 using Orleans;
 namespace DigitalBrain.Kernel.Contracts;
 
@@ -319,6 +320,14 @@ public sealed record FeatureCompletionReceipt(
     [property: Id(3)] DateTimeOffset CompletedAt,
     [property: Id(4)] string CommitDigest,
     [property: Id(5)] string InputDigest);
+[GenerateSerializer, Alias("digitalbrain.feature.effect-resolution.v1")]
+public sealed record FeatureEffectResolution(
+    [property: Id(0)] string OperationKey,
+    [property: Id(1)] string DecisionId,
+    [property: Id(2)] string ActorScope,
+    [property: Id(3)] InoEffectTerminalKind TerminalKind,
+    [property: Id(4)] DateTimeOffset ResolvedAt,
+    [property: Id(5)] string SafeResult);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-intent-status")]
 public sealed record FeatureIntentStatus(
     [property: Id(0)] string OperationKey,
@@ -326,7 +335,9 @@ public sealed record FeatureIntentStatus(
     [property: Id(2)] string PayloadJson,
     [property: Id(3)] DateTimeOffset? AppliedAt,
     [property: Id(4)] string? InputId = null,
-    [property: Id(5)] DateTimeOffset? DeclinedAt = null);
+    [property: Id(5)] DateTimeOffset? DeclinedAt = null,
+    [property: Id(6)] string? PayloadDigest = null,
+    [property: Id(7)] FeatureEffectResolution? Resolution = null);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-schedule-status")]
 public sealed record FeatureScheduleStatus([property: Id(0)] string ScheduleId, [property: Id(1)] DateTimeOffset LastOccurrenceAt, [property: Id(2)] DateTimeOffset NextOccurrenceAt);
 [GenerateSerializer, Alias("digitalbrain.v3.feature-lease-status")]
@@ -680,6 +691,9 @@ public interface IFeatureInstallationGrain : IGrainWithStringKey
     Task ApplyIntentAsync(string operationKey);
     [Alias("decline-intent")]
     Task DeclineIntentAsync(string operationKey) =>
+        Task.FromException(new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
+    [Alias("resolve-intent")]
+    Task ResolveIntentAsync(FeatureEffectResolution resolution) =>
         Task.FromException(new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
     [Alias("pause")]
     Task PauseAsync(string reason);
