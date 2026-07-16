@@ -35,3 +35,10 @@ public sealed record NeuronDescription(
 
 [GenerateSerializer, Alias("brain.snapshot.v2")]
 public sealed record NeuronSnapshot([property: Id(0)] long Revision, [property: Id(1)] string StateJson);
+
+[GenerateSerializer, Alias("brain.approved-effect-proof.v2")]
+public sealed record ApprovedEffectProof(
+    [property: Id(0)] string EffectKey,
+    [property: Id(1)] long EffectRevision,
+    [property: Id(2)] string PayloadDigest,
+    [property: Id(3)] string DecisionCommandId);

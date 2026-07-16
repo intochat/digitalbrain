@@ -1,6 +1,7 @@
 using Brain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using System.Text.Json;
 
 namespace Brain.Kernel;
 
@@ -61,12 +62,22 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
 
         var result = await kind.InvokeAsync(Context(invocation.CallerKey), invocation);
 
+        string? effectKey = null;
+        if (result.Effect is { } proposal)
+        {
+            effectKey = new NeuronAddress(_address.OwnerId, _address.SpaceId, $"effect/{invocation.CommandId}").ToGrainKey();
+            var effect = GrainFactory.GetGrain<INeuron>(effectKey);
+            await effect.InvokeAsync(new("effect.propose.v1",
+                JsonSerializer.Serialize(proposal), invocation.CommandId, this.GetPrimaryKeyString()));
+            state.Synapses.Add(new SynapseRecord(SynapseRelation.Awaits, effectKey, invocation.Contract, Revision));
+        }
+
         foreach (var (eventKind, payload) in result.Events)
             state.Journal.Add(new NeuronEvent(Revision + 1, eventKind, payload, invocation.CommandId, DateTimeOffset.UtcNow));
         if (result.Synapse is { } synapse)
             state.Synapses.Add(synapse with { Revision = Revision });
 
-        var receipt = new NeuronReceipt(invocation.CommandId, Revision, "accepted", result.OutputJson);
+        var receipt = new NeuronReceipt(invocation.CommandId, Revision, "accepted", result.OutputJson, effectKey);
         state.Receipts[invocation.CommandId] = receipt;
         await WriteStateAsync();
         return receipt;

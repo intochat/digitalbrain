@@ -11,7 +11,7 @@ public static class KernelHosting
     {
         silo.UseJsonJournalFormat(NeuronJournalJsonContext.Default);
         silo.Services.AddSingleton<IAttributeToFactoryMapper<NeuronStateAttribute>, NeuronStateMapper>();
-        foreach (var kind in kinds)
+        foreach (var kind in kinds.Append(new EffectKind()))
             silo.Services.AddKeyedSingleton<INeuronKind>(kind.Kind, kind);
         return silo;
     }

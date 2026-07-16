@@ -35,7 +35,7 @@ public sealed class ClusterFixture : IDisposable
             var storageProvider = new VolatileJournalStorageProvider();
             siloBuilder.AddJournalStorage();
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
-            siloBuilder.AddBrainKernel(new TestKind());
+            siloBuilder.AddBrainKernel(new TestKind(), new ProposerKind());
         }
     }
 }
