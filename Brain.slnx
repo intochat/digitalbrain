@@ -11,6 +11,7 @@
   </Folder>
   <Folder Name="/kernel/">
     <Project Path="kernel/Brain.Contracts/Brain.Contracts.csproj" />
+    <Project Path="kernel/Brain.Kernel/Brain.Kernel.csproj" />
   </Folder>
   <Folder Name="/integrations/">
     <Project Path="integrations/DigitalBrain.Integrations.Google/DigitalBrain.Integrations.Google.csproj" />

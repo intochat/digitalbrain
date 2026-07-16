@@ -10,7 +10,9 @@ public static class BrainErrors
     public const string EffectNotApproved = "effect.not-approved";
 }
 
+[GenerateSerializer, Alias("brain.exception.v2")]
 public sealed class BrainException(string code, string detail) : Exception($"{code}: {detail}")
 {
+    [Id(0)]
     public string Code { get; } = code;
 }

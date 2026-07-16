@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../kernel/Brain.Contracts/Brain.Contracts.csproj" />
+    <ProjectReference Include="../../kernel/Brain.Kernel/Brain.Kernel.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit" />
