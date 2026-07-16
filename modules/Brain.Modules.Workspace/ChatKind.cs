@@ -17,28 +17,40 @@ public sealed class ChatKind : INeuronKind
 
     private ValueTask<KindResult> HandlePostAsync(NeuronContext context, NeuronInvocation invocation)
     {
-        using var doc = JsonDocument.Parse(invocation.InputJson);
-        var root = doc.RootElement;
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(invocation.InputJson);
+        }
+        catch (JsonException)
+        {
+            throw new BrainException("input.invalid", "malformed json");
+        }
 
-        if (!root.TryGetProperty("text", out var textElement) || textElement.ValueKind != JsonValueKind.String)
-            throw new BrainException("input.invalid", "text field is required");
+        using (doc)
+        {
+            var root = doc.RootElement;
 
-        var text = textElement.GetString();
+            if (!root.TryGetProperty("text", out var textElement) || textElement.ValueKind != JsonValueKind.String)
+                throw new BrainException("input.invalid", "text field is required");
 
-        if (string.IsNullOrWhiteSpace(text))
-            throw new BrainException("input.invalid", "text cannot be empty");
+            var text = textElement.GetString();
 
-        var textBytes = System.Text.Encoding.UTF8.GetByteCount(text);
-        if (textBytes > 8192)
-            throw new BrainException("input.invalid", "text exceeds maximum size of 8192 bytes");
+            if (string.IsNullOrWhiteSpace(text))
+                throw new BrainException("input.invalid", "text cannot be empty");
 
-        var now = DateTimeOffset.UtcNow;
-        var eventPayload = JsonSerializer.Serialize(new { text, at = now.ToString("O") });
+            var textBytes = System.Text.Encoding.UTF8.GetByteCount(text);
+            if (textBytes > 8192)
+                throw new BrainException("input.invalid", "text exceeds maximum size of 8192 bytes");
 
-        var output = JsonSerializer.Serialize(new { revision = context.Revision + 1 });
-        var events = new[] { ("chat.message", eventPayload) };
+            var now = DateTimeOffset.UtcNow;
+            var eventPayload = JsonSerializer.Serialize(new { text, at = now.ToString("O") });
 
-        return ValueTask.FromResult(new KindResult(output, events));
+            var output = JsonSerializer.Serialize(new { revision = context.Revision + 1 });
+            var events = new[] { ("chat.message", eventPayload) };
+
+            return ValueTask.FromResult(new KindResult(output, events));
+        }
     }
 
     public string Project(NeuronContext context, string projection)

@@ -28,4 +28,14 @@ public class ChatKindTests(BrainClusterFixture<ChatKindsConfigurator> fixture)
         Assert.Equal("input.invalid", exception.Code);
         Assert.Equal(0, (await chat.ReadAsync("conversation")).Revision);
     }
+
+    [Fact]
+    public async Task Malformed_input_json_fails_closed()
+    {
+        var chat = Neuron("chat", "malformed");
+        var exception = await Assert.ThrowsAsync<BrainException>(() =>
+            chat.InvokeAsync(new("chat.post.v1", "{not json", "cmd-1", OwnerSession)));
+        Assert.Equal("input.invalid", exception.Code);
+        Assert.Equal(0, (await chat.ReadAsync("conversation")).Revision);
+    }
 }
