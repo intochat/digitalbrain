@@ -10,6 +10,7 @@
     <ProjectReference Include="../../kernel/Brain.Kernel/Brain.Kernel.csproj" />
     <ProjectReference Include="../../kernel/Brain.Client/Brain.Client.csproj" />
     <ProjectReference Include="../../modules/Brain.Modules.Sdk/Brain.Modules.Sdk.csproj" />
+    <ProjectReference Include="../../modules/Brain.Modules.Workspace/Brain.Modules.Workspace.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit" />
