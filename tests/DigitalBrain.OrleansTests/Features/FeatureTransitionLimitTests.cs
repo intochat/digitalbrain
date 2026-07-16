@@ -222,7 +222,32 @@ public sealed class FeatureTransitionLimitTests
     }
 
     [Fact]
-    public void Run_effect_resolution_history_is_bounded_to_thirty_two_and_deterministically_ordered()
+    public void Commit_and_resolution_reject_operation_keys_above_the_per_record_bound()
+    {
+        var claimed = ClaimedState();
+        Assert.Throws<ArgumentException>(() => FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                "{}",
+                [new FeatureIntent(new string('x', 1025), FeatureIntentKind.ExternalEffect, "{}")]),
+            Now.AddSeconds(1)));
+
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                "{}",
+                [new FeatureIntent("effect", FeatureIntentKind.ExternalEffect, "{}")]),
+            Now.AddSeconds(1));
+
+        Assert.Throws<ArgumentException>(() => FeatureInstallationTransitions.ResolveIntent(
+            committed.State,
+            Resolution(new string('x', 1025), Now.AddSeconds(2))));
+    }
+
+    [Fact]
+    public void Legacy_resolution_overflow_retains_the_incoming_resolution_and_compacts_deterministically()
     {
         var claimed = ClaimedState();
         var committed = FeatureInstallationTransitions.Commit(
@@ -230,30 +255,85 @@ public sealed class FeatureTransitionLimitTests
             Commit(
                 claimed.Claim.Fence,
                 "{}",
-                Enumerable.Range(0, FeatureLimits.IntentsPerRun)
-                    .Reverse()
-                    .Select(index => new FeatureIntent($"effect-{index:D2}", FeatureIntentKind.ExternalEffect, "{}"))
-                    .ToArray()),
+                [new FeatureIntent("incoming", FeatureIntentKind.ExternalEffect, "{}")]),
             Now.AddSeconds(1));
-        var resolved = committed.State;
-        foreach (var intent in FeatureInstallationTransitions.ListPendingIntents(committed.State))
+        var incoming = Assert.Single(committed.State.Intents);
+        var legacy = Enumerable.Range(0, FeatureLimits.EffectResolutionsPerRun)
+            .Select(index => Resolution($"legacy-{index:D2}", Now.AddMinutes(index)))
+            .ToArray();
+        var seeded = committed.State with
         {
-            resolved = FeatureInstallationTransitions.ResolveIntent(
-                resolved,
-                new FeatureEffectResolution(
-                    intent.OperationKey,
-                    "decision-" + intent.OperationKey,
-                    new string('a', 64),
-                    InoEffectTerminalKind.Approved,
-                    Now.AddSeconds(2),
-                    "The provider update succeeded."));
-        }
+            Completions =
+            [
+                committed.Completion with
+                {
+                    EffectCount = 0,
+                    EffectResolutions = legacy
+                }
+            ]
+        };
+        var resolution = Resolution(incoming.OperationKey, Now.AddHours(1));
 
+        var first = FeatureInstallationTransitions.ResolveIntent(seeded, resolution);
+        var second = FeatureInstallationTransitions.ResolveIntent(seeded, resolution);
+        var history = Assert.IsType<FeatureEffectResolution[]>(Assert.Single(first.Completions).EffectResolutions);
+
+        Assert.Equal(FeatureLimits.EffectResolutionsPerRun, history.Length);
+        Assert.Contains(resolution, history);
+        Assert.DoesNotContain(history, item => item.OperationKey == "legacy-00");
+        Assert.Equal(history.OrderBy(item => item.OperationKey, StringComparer.Ordinal), history);
+        Assert.Equal(history, Assert.Single(second.Completions).EffectResolutions);
+    }
+
+    [Fact]
+    public void Legacy_resolution_history_compacts_deterministically_under_the_utf8_byte_bound()
+    {
+        var claimed = ClaimedState();
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                "{}",
+                [new FeatureIntent("incoming", FeatureIntentKind.ExternalEffect, "{}")]),
+            Now.AddSeconds(1));
+        var incoming = Assert.Single(committed.State.Intents);
+        var legacy = Enumerable.Range(0, FeatureLimits.EffectResolutionsPerRun)
+            .Select(index => Resolution($"legacy-{index:D2}-" + new string('\u4e00', 800), Now.AddMinutes(index)))
+            .ToArray();
+        var seeded = committed.State with
+        {
+            Completions =
+            [
+                committed.Completion with
+                {
+                    EffectCount = 0,
+                    EffectResolutions = legacy
+                }
+            ]
+        };
+        var resolution = Resolution(incoming.OperationKey, Now.AddHours(1));
+
+        var resolved = FeatureInstallationTransitions.ResolveIntent(seeded, resolution);
         var history = Assert.IsType<FeatureEffectResolution[]>(Assert.Single(resolved.Completions).EffectResolutions);
 
-        Assert.Equal(FeatureLimits.IntentsPerRun, history.Length);
+        Assert.Contains(resolution, history);
+        Assert.True(ResolutionHistoryBytes(history) <= FeatureLimits.EffectResolutionHistoryUtf8Bytes);
         Assert.Equal(history.OrderBy(item => item.OperationKey, StringComparer.Ordinal), history);
     }
+
+    private static FeatureEffectResolution Resolution(string operationKey, DateTimeOffset resolvedAt) => new(
+        operationKey,
+        "decision-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(operationKey))),
+        new string('a', 64),
+        InoEffectTerminalKind.Approved,
+        resolvedAt,
+        "The provider update succeeded.");
+
+    private static int ResolutionHistoryBytes(IEnumerable<FeatureEffectResolution> resolutions) => resolutions.Sum(item =>
+        System.Text.Encoding.UTF8.GetByteCount(item.OperationKey) +
+        System.Text.Encoding.UTF8.GetByteCount(item.DecisionId) +
+        System.Text.Encoding.UTF8.GetByteCount(item.ActorScope) +
+        System.Text.Encoding.UTF8.GetByteCount(item.SafeResult));
 
     private static (FeatureInstallationState State, FeatureRunClaim Claim) ClaimedState(int inputIndex = 0)
     {

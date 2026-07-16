@@ -73,9 +73,12 @@ internal static class FeatureRunProjection
             var intents = state.Intents.Where(intent =>
                 string.Equals(intent.InputId, identity.RunId, StringComparison.Ordinal)).ToArray();
             var legacyEffects = intents.Where(intent => intent.Kind == FeatureIntentKind.ExternalEffect).ToArray();
-            var resolutions = completion.EffectCount > 0
-                ? (completion.EffectResolutions ?? []).Select(Effect).ToArray()
-                : legacyEffects.Select(Effect).Where(effect => effect is not null).Cast<EffectProjection>().ToArray();
+            var resolutions = (completion.EffectResolutions ?? [])
+                .Select(Effect)
+                .Concat(legacyEffects.Select(Effect).Where(effect => effect is not null).Cast<EffectProjection>())
+                .GroupBy(effect => effect.OperationKey, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .ToArray();
             var waiting = completion.EffectCount > 0
                 ? resolutions.Select(effect => effect.OperationKey).Distinct(StringComparer.Ordinal).Count() < completion.EffectCount
                 : legacyEffects.Any(intent => Effect(intent) is null);

@@ -897,7 +897,7 @@ public sealed class FeatureInstallationTransitionTests
     }
 
     [Fact]
-    public void Intent_operation_keys_include_installation_input_and_logical_key_and_apply_once()
+    public void Intent_operation_keys_include_installation_input_and_logical_key_and_resolve_once()
     {
         var claimed = Claimed();
         var committed = FeatureInstallationTransitions.Commit(
@@ -913,8 +913,13 @@ public sealed class FeatureInstallationTransitionTests
         Assert.Contains("input-1", intent.OperationKey, StringComparison.Ordinal);
         Assert.Contains("notify", intent.OperationKey, StringComparison.Ordinal);
 
-        var applied = FeatureInstallationTransitions.ApplyIntent(committed.State, intent.OperationKey, Now.AddSeconds(2));
-        var repeated = FeatureInstallationTransitions.ApplyIntent(applied, intent.OperationKey, Now.AddSeconds(3));
+        var resolution = Resolution(
+            intent.OperationKey,
+            InoEffectTerminalKind.Approved,
+            Now.AddSeconds(2),
+            "The external action completed.");
+        var applied = FeatureInstallationTransitions.ResolveIntent(committed.State, resolution);
+        var repeated = FeatureInstallationTransitions.ResolveIntent(applied, resolution);
 
         Assert.Empty(FeatureInstallationTransitions.ListPendingIntents(repeated));
         Assert.Equal(applied, repeated);
@@ -935,14 +940,13 @@ public sealed class FeatureInstallationTransitionTests
         var waiting = Assert.Single(FeatureRunProjection.Project(committed.State));
         var declinedAt = Now.AddSeconds(2);
 
-        var declined = FeatureInstallationTransitions.DeclineIntent(
-            committed.State,
+        var resolution = Resolution(
             intent.OperationKey,
-            declinedAt);
-        var replay = FeatureInstallationTransitions.DeclineIntent(
-            declined,
-            intent.OperationKey,
-            declinedAt.AddSeconds(1));
+            InoEffectTerminalKind.Declined,
+            declinedAt,
+            "The proposed external action was declined.");
+        var declined = FeatureInstallationTransitions.ResolveIntent(committed.State, resolution);
+        var replay = FeatureInstallationTransitions.ResolveIntent(declined, resolution);
         var run = Assert.Single(FeatureRunProjection.Project(declined));
 
         Assert.Equal(FeatureRunStatus.WaitingForApproval, waiting.Status);
@@ -955,7 +959,13 @@ public sealed class FeatureInstallationTransitionTests
         Assert.NotNull(run.FailureGuidance);
         Assert.DoesNotContain("never-project", run.ToString(), StringComparison.Ordinal);
         Assert.Throws<FeatureConcurrencyException>(() =>
-            FeatureInstallationTransitions.ApplyIntent(declined, intent.OperationKey, declinedAt.AddSeconds(2)));
+            FeatureInstallationTransitions.ResolveIntent(
+                declined,
+                Resolution(
+                    intent.OperationKey,
+                    InoEffectTerminalKind.Approved,
+                    declinedAt.AddSeconds(2),
+                    "The external action completed.")));
     }
 
     [Fact]
@@ -989,6 +999,46 @@ public sealed class FeatureInstallationTransitionTests
         Assert.Equal(retained.CompletedAt, pruned.CompletedAt);
         Assert.Equal(retained.SafeFailure, pruned.SafeFailure);
         Assert.Equal(retained.Release, pruned.Release);
+    }
+
+    [Fact]
+    public void Legacy_checkpoint_resolution_survives_intent_pruning_with_stable_status_and_terminal_time()
+    {
+        var claimed = Claimed();
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                intents: [new FeatureIntent("legacy-provider-update", FeatureIntentKind.ExternalEffect, "{\"secret\":\"remove\"}")]),
+            Now.AddSeconds(1));
+        var legacy = committed.State with
+        {
+            Completions =
+            [
+                committed.Completion with
+                {
+                    EffectCount = 0,
+                    EffectResolutions = null
+                }
+            ]
+        };
+        var intent = Assert.Single(FeatureInstallationTransitions.ListPendingIntents(legacy));
+        var resolution = Resolution(
+            intent.OperationKey,
+            InoEffectTerminalKind.Failed,
+            Now.AddSeconds(3),
+            "The provider rejected the legacy update.");
+
+        var resolved = FeatureInstallationTransitions.ResolveIntent(legacy, resolution);
+        var pruned = resolved with { Intents = [] };
+        var before = Assert.Single(FeatureRunProjection.Project(resolved));
+        var after = Assert.Single(FeatureRunProjection.Project(pruned));
+
+        Assert.Equal(FeatureRunStatus.Failed, before.Status);
+        Assert.Equal(before.Status, after.Status);
+        Assert.Equal(resolution.ResolvedAt, before.CompletedAt);
+        Assert.Equal(before.CompletedAt, after.CompletedAt);
+        Assert.Equal(before.SafeFailure, after.SafeFailure);
     }
 
     [Fact]

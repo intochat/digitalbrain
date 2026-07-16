@@ -43,6 +43,9 @@ internal static class FeatureLimits
     public const int ScheduleCursors = 1_000;
     public const int StateUtf8Bytes = 64 * 1024;
     public const int IntentsPerRun = 32;
+    public const int EffectResolutionsPerRun = 32;
+    public const int IntentOperationKeyUtf8Bytes = 1024;
+    public const int EffectResolutionHistoryUtf8Bytes = 65_536;
     public const int ReadsPerRun = 20;
     public const int ModelCallsPerRun = 4;
     public const int AttemptsPerInput = 5;

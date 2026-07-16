@@ -190,8 +190,10 @@ internal static class FeatureInstallationTransitions
             ArgumentNullException.ThrowIfNull(intent);
             ArgumentException.ThrowIfNullOrWhiteSpace(intent.LogicalOperationKey);
             ValidateJson(intent.PayloadJson, nameof(intent.PayloadJson), FeatureLimits.StateUtf8Bytes);
+            var operationKey = FeatureIntentKeys.Create(state.InstallationId, commit.Fence.InputId, intent.LogicalOperationKey);
+            ValidateOperationKey(operationKey);
             return new PersistedFeatureIntent(
-                FeatureIntentKeys.Create(state.InstallationId, commit.Fence.InputId, intent.LogicalOperationKey),
+                operationKey,
                 intent.Kind,
                 intent.PayloadJson,
                 null,
@@ -289,14 +291,6 @@ internal static class FeatureInstallationTransitions
         ArgumentNullException.ThrowIfNull(state);
         return state.Intents.Where(intent => intent.Resolution is null && intent.AppliedAt is null && intent.DeclinedAt is null).ToArray();
     }
-    public static FeatureInstallationState ApplyIntent(FeatureInstallationState state, string operationKey, DateTimeOffset appliedAt)
-        => ResolveLegacyIntent(
-            state,
-            LegacyResolution(operationKey, InoEffectTerminalKind.Approved, appliedAt, "The action completed."));
-    public static FeatureInstallationState DeclineIntent(FeatureInstallationState state, string operationKey, DateTimeOffset declinedAt)
-        => ResolveLegacyIntent(
-            state,
-            LegacyResolution(operationKey, InoEffectTerminalKind.Declined, declinedAt, "The proposed external action was declined."));
     public static FeatureInstallationState ResolveIntent(
         FeatureInstallationState state,
         FeatureEffectResolution resolution)
@@ -352,12 +346,8 @@ internal static class FeatureInstallationTransitions
                 if (existingResolution is not null && existingResolution != resolution)
                     throw new FeatureConcurrencyException("The Feature Run already has a different effect resolution.");
                 var effectResolutions = existingResolution is null
-                    ? existing.Append(resolution)
-                        .OrderBy(item => item.OperationKey, StringComparer.Ordinal)
-                        .ToArray()
+                    ? RetainEffectResolutionHistory(existing, resolution)
                     : existing;
-                if (effectResolutions.Length > FeatureLimits.IntentsPerRun)
-                    throw new FeatureLimitExceededException("A Feature Run can retain at most 32 effect resolutions.");
                 completions = completions.ToArray();
                 completions[completionIndex] = completions[completionIndex] with
                 {
@@ -529,27 +519,6 @@ internal static class FeatureInstallationTransitions
         Encoding.UTF8.GetByteCount(intent.Resolution?.DecisionId ?? string.Empty) +
         Encoding.UTF8.GetByteCount(intent.Resolution?.ActorScope ?? string.Empty) +
         Encoding.UTF8.GetByteCount(intent.Resolution?.SafeResult ?? string.Empty);
-    private static FeatureEffectResolution LegacyResolution(
-        string operationKey,
-        InoEffectTerminalKind terminalKind,
-        DateTimeOffset resolvedAt,
-        string safeResult) => new(
-            operationKey,
-            "legacy-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(operationKey))),
-            new string('0', 64),
-            terminalKind,
-            resolvedAt,
-            safeResult);
-    private static FeatureInstallationState ResolveLegacyIntent(
-        FeatureInstallationState state,
-        FeatureEffectResolution resolution)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        var intent = state.Intents.FirstOrDefault(item => Same(item.OperationKey, resolution.OperationKey));
-        if (intent?.Resolution is { } stored && stored.TerminalKind == resolution.TerminalKind)
-            return state;
-        return ResolveIntent(state, resolution);
-    }
     private static InoEffectTerminalKind? LegacyTerminalKind(PersistedFeatureIntent intent) =>
         intent.AppliedAt is not null
             ? InoEffectTerminalKind.Approved
@@ -559,7 +528,7 @@ internal static class FeatureInstallationTransitions
     private static void ValidateResolution(FeatureEffectResolution resolution)
     {
         ArgumentNullException.ThrowIfNull(resolution);
-        ArgumentException.ThrowIfNullOrWhiteSpace(resolution.OperationKey);
+        ValidateOperationKey(resolution.OperationKey);
         DemandBoundedText(resolution.DecisionId, 256, nameof(resolution.DecisionId));
         if (!RuntimeStateKeys.IsScopeHash(resolution.ActorScope))
             throw new ArgumentException("A canonical actor scope digest is required.", nameof(resolution.ActorScope));
@@ -569,6 +538,38 @@ internal static class FeatureInstallationTransitions
             throw new ArgumentException("An effect resolution timestamp must be UTC.", nameof(resolution.ResolvedAt));
         DemandBoundedText(resolution.SafeResult, 512, nameof(resolution.SafeResult));
     }
+    private static void ValidateOperationKey(string operationKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationKey);
+        if (operationKey.Any(char.IsControl) ||
+            Encoding.UTF8.GetByteCount(operationKey) > FeatureLimits.IntentOperationKeyUtf8Bytes)
+            throw new ArgumentException("A bounded feature intent operation key is required.", nameof(operationKey));
+    }
+    private static FeatureEffectResolution[] RetainEffectResolutionHistory(
+        IReadOnlyList<FeatureEffectResolution> existing,
+        FeatureEffectResolution resolution)
+    {
+        var retained = new List<FeatureEffectResolution> { resolution };
+        var retainedBytes = ResolutionBytes(resolution);
+        foreach (var candidate in existing
+            .Where(item => !Same(item.OperationKey, resolution.OperationKey))
+            .OrderByDescending(item => item.ResolvedAt)
+            .ThenByDescending(item => item.OperationKey, StringComparer.Ordinal))
+        {
+            var candidateBytes = ResolutionBytes(candidate);
+            if (retained.Count >= FeatureLimits.EffectResolutionsPerRun ||
+                candidateBytes > FeatureLimits.EffectResolutionHistoryUtf8Bytes - retainedBytes)
+                continue;
+            retained.Add(candidate);
+            retainedBytes += candidateBytes;
+        }
+        return retained.OrderBy(item => item.OperationKey, StringComparer.Ordinal).ToArray();
+    }
+    private static long ResolutionBytes(FeatureEffectResolution resolution) =>
+        (long)Encoding.UTF8.GetByteCount(resolution.OperationKey) +
+        Encoding.UTF8.GetByteCount(resolution.DecisionId) +
+        Encoding.UTF8.GetByteCount(resolution.ActorScope) +
+        Encoding.UTF8.GetByteCount(resolution.SafeResult);
     private static void DemandBoundedText(string value, int maximumLength, string parameterName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);

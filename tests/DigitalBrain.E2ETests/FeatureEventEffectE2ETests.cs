@@ -109,7 +109,7 @@ public sealed class FeatureEventEffectE2ETests
             null));
         var hub = new RecordingHub();
         var plans = new RecordingPlanStore();
-        var effects = new RecordingEffectExecutor();
+        var effects = new RecordingEffectExecutor(plans);
         var rail = new SalesforceFeatureEffectRail(
             new FeatureGrains(hub, new Dictionary<FeatureInstallationId, IFeatureInstallationGrain>
             {
@@ -133,13 +133,21 @@ public sealed class FeatureEventEffectE2ETests
         Assert.Equal(first, replay);
         Assert.Equal(1, plans.PlanCount);
         Assert.Equal(0, effects.Executions);
-        Assert.Null(installation.AppliedOperationKey);
+        Assert.Null(installation.Resolution);
 
         var outcome = await rail.ApplyAsync(first, approved: true);
 
         Assert.Equal(InoToolEffectDisposition.Succeeded, outcome.Disposition);
         Assert.Equal(1, effects.Executions);
-        Assert.Equal(persistedOperationKey, installation.AppliedOperationKey);
+        Assert.Equal(
+            new FeatureEffectResolution(
+                persistedOperationKey,
+                first.EffectId,
+                first.ActorScope,
+                InoEffectTerminalKind.Approved,
+                Now,
+                "verified"),
+            installation.Resolution);
         var outcomeInput = Assert.Single(hub.Inputs);
         Assert.Equal("salesforce.record.update.outcome.v1", outcomeInput.Kind);
         Assert.Equal("event-1", outcomeInput.CausationId);
@@ -185,8 +193,15 @@ public sealed class FeatureEventEffectE2ETests
         Assert.Equal(outcome, replay);
         Assert.Equal(1, plans.Declines);
         Assert.Equal(0, effects.Executions);
-        Assert.Null(installation.AppliedOperationKey);
-        Assert.Equal(persistedOperationKey, installation.DeclinedOperationKey);
+        Assert.Equal(
+            new FeatureEffectResolution(
+                persistedOperationKey,
+                proposal.DecisionId,
+                proposal.ActorScope,
+                InoEffectTerminalKind.Declined,
+                Now,
+                "The Salesforce update was not approved. No external action was performed."),
+            installation.Resolution);
         var outcomeInput = Assert.Single(hub.Inputs);
         Assert.Equal(SalesforceFeatureEffectRail.OutcomeKind, outcomeInput.Kind);
         Assert.Equal("event-declined", outcomeInput.CausationId);
@@ -297,6 +312,7 @@ public sealed class FeatureEventEffectE2ETests
         public virtual Task<FeatureIntentStatus[]> ListPendingIntentsAsync() => throw new NotSupportedException();
         public virtual Task ApplyIntentAsync(string operationKey) => throw new NotSupportedException();
         public virtual Task DeclineIntentAsync(string operationKey) => throw new NotSupportedException();
+        public virtual Task ResolveIntentAsync(FeatureEffectResolution resolution) => throw new NotSupportedException();
         public Task PauseAsync(string reason) => Task.CompletedTask;
         public Task ResumeAsync() => throw new NotSupportedException();
         public Task SwitchReleaseAsync(ReleaseDigest release) => throw new NotSupportedException();
@@ -320,17 +336,11 @@ public sealed class FeatureEventEffectE2ETests
 
     private sealed class IntentInstallation(FeatureIntentStatus intent) : ControlledInstallation
     {
-        public string? AppliedOperationKey { get; private set; }
-        public string? DeclinedOperationKey { get; private set; }
+        public FeatureEffectResolution? Resolution { get; private set; }
         public override Task<FeatureIntentStatus[]> ListPendingIntentsAsync() => Task.FromResult(new[] { intent });
-        public override Task ApplyIntentAsync(string operationKey)
+        public override Task ResolveIntentAsync(FeatureEffectResolution resolution)
         {
-            AppliedOperationKey = operationKey;
-            return Task.CompletedTask;
-        }
-        public override Task DeclineIntentAsync(string operationKey)
-        {
-            DeclinedOperationKey = operationKey;
+            Resolution = resolution;
             return Task.CompletedTask;
         }
     }
@@ -394,6 +404,16 @@ public sealed class FeatureEventEffectE2ETests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(TerminalDecision);
 
+        public void RecordExecution(InoToolEffectRequest request, InoToolEffectResult result)
+        {
+            TerminalResult = result;
+            TerminalDecision = new InoEffectDecision(
+                request.EffectId,
+                request.ActorScope,
+                InoEffectTerminalKind.Approved,
+                Now);
+        }
+
         private sealed record PlanBinding(
             string ActorScope,
             string OperationId,
@@ -421,7 +441,9 @@ public sealed class FeatureEventEffectE2ETests
             if (plans?.TerminalResult is { } terminal)
                 return Task.FromResult(terminal);
             Executions++;
-            return Task.FromResult(new InoToolEffectResult(InoToolEffectDisposition.Succeeded, "verified"));
+            var result = new InoToolEffectResult(InoToolEffectDisposition.Succeeded, "verified");
+            plans?.RecordExecution(request, result);
+            return Task.FromResult(result);
         }
     }
 

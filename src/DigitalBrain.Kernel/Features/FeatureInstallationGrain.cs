@@ -117,24 +117,6 @@ internal sealed class FeatureInstallationGrain(
             .Select(IntentStatus)
             .ToArray());
     }
-    public async Task ApplyIntentAsync(string operationKey)
-    {
-        using var activity = Start("apply-intent");
-        DemandNoReservation();
-        var next = Domain(() => FeatureInstallationTransitions.ApplyIntent(RequiredState(), operationKey, timeProvider.GetUtcNow()));
-        if (ReferenceEquals(next, persistentState.State))
-            return;
-        await WriteAsync(next);
-    }
-    public async Task DeclineIntentAsync(string operationKey)
-    {
-        using var activity = Start("decline-intent");
-        DemandNoReservation();
-        var next = Domain(() => FeatureInstallationTransitions.DeclineIntent(RequiredState(), operationKey, timeProvider.GetUtcNow()));
-        if (ReferenceEquals(next, persistentState.State))
-            return;
-        await WriteAsync(next);
-    }
     public async Task ResolveIntentAsync(FeatureEffectResolution resolution)
     {
         using var activity = Start("resolve-intent");

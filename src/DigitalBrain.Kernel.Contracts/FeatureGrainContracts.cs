@@ -688,7 +688,8 @@ public interface IFeatureInstallationGrain : IGrainWithStringKey
     [Alias("list-pending-intents")]
     Task<FeatureIntentStatus[]> ListPendingIntentsAsync();
     [Alias("apply-intent")]
-    Task ApplyIntentAsync(string operationKey);
+    Task ApplyIntentAsync(string operationKey) =>
+        Task.FromException(new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));
     [Alias("decline-intent")]
     Task DeclineIntentAsync(string operationKey) =>
         Task.FromException(new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable));

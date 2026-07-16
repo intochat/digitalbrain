@@ -852,7 +852,13 @@ public sealed class FeatureGrainTests(FeatureGrainClusterFixture fixture)
             "{}"));
         var intent = Assert.Single(await installation.ListPendingIntentsAsync());
 
-        await installation.DeclineIntentAsync(intent.OperationKey);
+        await installation.ResolveIntentAsync(new FeatureEffectResolution(
+            intent.OperationKey,
+            "decision-salesforce-update",
+            new string('a', 64),
+            InoEffectTerminalKind.Declined,
+            fixture.Time.GetUtcNow().AddSeconds(1),
+            "The proposed external action was declined."));
         await fixture.Cluster.DeactivateAsync((IAddressable)installation);
 
         Assert.Empty(await installation.ListPendingIntentsAsync());
