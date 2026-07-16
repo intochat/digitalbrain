@@ -1,4 +1,5 @@
 using Brain.Kernel;
+using Brain.Modules.Ai;
 using Brain.Modules.Workspace;
 using DigitalBrain.ServiceDefaults;
 using Orleans.Journaling;
@@ -11,6 +12,7 @@ builder.UseOrleans(silo =>
     silo.AddJournalStorage();
     silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
     silo.AddBrainKernel(new ChatKind());
+    silo.AddBrainAi(builder.Configuration);
 });
 var app = builder.Build();
 app.MapDefaultEndpoints();

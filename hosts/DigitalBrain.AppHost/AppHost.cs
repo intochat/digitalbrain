@@ -95,6 +95,11 @@ if (ctx.EnableMcp)
     }
 }
 var brainKernel = builder.AddProject<Projects.Brain_Kernel_Host>("brain-kernel");
+if (ctx.OllamaEndpoint is not null)
+{
+    brainKernel.WithEnvironment("Brain__Ai__OllamaEndpoint", ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
+    brainKernel.WaitFor(ctx.Llm);
+}
 builder.AddProject<Projects.Brain_Mcp>("brain-mcp").WaitFor(brainKernel);
 builder.Build().Run();
 static bool IsLocalUiProfile(string profile) =>
