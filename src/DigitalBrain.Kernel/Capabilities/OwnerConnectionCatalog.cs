@@ -47,39 +47,33 @@ internal sealed class OwnerConnectionCatalog(IServiceProvider services, ICapabil
         var orderedProviders = unlockedByProvider.Keys
             .OrderBy(static provider => provider, StringComparer.Ordinal)
             .ToArray();
-        var snapshots = new OwnerConnectionSnapshot[orderedProviders.Length];
-        for (var index = 0; index < orderedProviders.Length; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var provider = orderedProviders[index];
-            snapshots[index] = await ProjectAsync(
+        var snapshots = await Task.WhenAll(orderedProviders.Select(provider =>
+                ProjectAsync(
                     ownerId,
                     provider,
                     unlockedByProvider[provider].ToArray(),
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-
+                    cancellationToken)))
+            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         return snapshots;
     }
 
     private async Task<OwnerConnectionSnapshot> ProjectAsync(
         BrainOwnerId ownerId,
         string provider,
-        string[] unlockedCapabilityIds,
+        string[] capabilityIdsForProvider,
         CancellationToken cancellationToken)
     {
         var connectPath = $"/oauth/start/{provider}";
         var connector = services.GetKeyedService<IConnector>(provider);
         if (connector is null || !string.Equals(connector.Descriptor.Id, provider, StringComparison.Ordinal))
         {
-            return new OwnerConnectionSnapshot(
-                provider,
+            return Snapshot(
                 provider,
                 provider,
                 OwnerConnectionHealthStatus.Disconnected,
                 "Connector is not registered.",
-                unlockedCapabilityIds,
+                capabilityIdsForProvider,
                 connectPath);
         }
 
@@ -96,13 +90,12 @@ internal sealed class OwnerConnectionCatalog(IServiceProvider services, ICapabil
                 .ConfigureAwait(false);
             if (!config.IsValid)
             {
-                return new OwnerConnectionSnapshot(
-                    provider,
+                return Snapshot(
                     provider,
                     displayName,
                     OwnerConnectionHealthStatus.Misconfigured,
                     config.Message ?? config.MissingKey,
-                    unlockedCapabilityIds,
+                    capabilityIdsForProvider,
                     connectPath);
             }
 
@@ -112,46 +105,60 @@ internal sealed class OwnerConnectionCatalog(IServiceProvider services, ICapabil
                 .ConfigureAwait(false);
             if (health.Healthy)
             {
-                return new OwnerConnectionSnapshot(
-                    provider,
+                return Snapshot(
                     provider,
                     displayName,
                     OwnerConnectionHealthStatus.Healthy,
                     health.Detail,
-                    unlockedCapabilityIds,
+                    capabilityIdsForProvider,
                     connectPath);
             }
 
-            return new OwnerConnectionSnapshot(
-                provider,
+            return Snapshot(
                 provider,
                 displayName,
                 OwnerConnectionHealthStatus.NeedsReauth,
                 health.Detail,
-                unlockedCapabilityIds,
+                capabilityIdsForProvider,
                 connectPath);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new OwnerConnectionSnapshot(
-                provider,
+            return Snapshot(
                 provider,
                 displayName,
                 OwnerConnectionHealthStatus.Disconnected,
                 "Connection probe timed out.",
-                unlockedCapabilityIds,
+                capabilityIdsForProvider,
                 connectPath);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
-            return new OwnerConnectionSnapshot(
-                provider,
+            return Snapshot(
                 provider,
                 displayName,
                 OwnerConnectionHealthStatus.Disconnected,
                 "Connection probe failed.",
-                unlockedCapabilityIds,
+                capabilityIdsForProvider,
                 connectPath);
         }
     }
+
+    private static OwnerConnectionSnapshot Snapshot(
+        string provider,
+        string displayName,
+        OwnerConnectionHealthStatus health,
+        string? healthDetail,
+        string[] capabilityIdsForProvider,
+        string connectPath) =>
+        new(
+            provider,
+            provider,
+            displayName,
+            health,
+            healthDetail,
+            health == OwnerConnectionHealthStatus.Healthy
+                ? capabilityIdsForProvider
+                : [],
+            connectPath);
 }

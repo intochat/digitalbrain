@@ -278,7 +278,7 @@ public sealed class DigitalBrainUiEndpoints(
         ListConnectionsRequest request,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        DemandConnectionsAuthority(context);
         _ = request;
         var snapshots = await InvokeConnectionQueryAsync(
                 () => connections.ReadAsync(context.OwnerId, cancellationToken),
@@ -297,7 +297,7 @@ public sealed class DigitalBrainUiEndpoints(
         GetConnectionRequest request,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        DemandConnectionsAuthority(context);
         string connectionId;
         try
         {
@@ -451,9 +451,19 @@ public sealed class DigitalBrainUiEndpoints(
 
     private static void DemandActivityAuthority(RuntimeRequestContext context)
     {
+        DemandBrainReadAuthority(context, "Activity");
+    }
+
+    private static void DemandConnectionsAuthority(RuntimeRequestContext context)
+    {
+        DemandBrainReadAuthority(context, "Connections");
+    }
+
+    private static void DemandBrainReadAuthority(RuntimeRequestContext context, string surface)
+    {
         ArgumentNullException.ThrowIfNull(context);
         if (!context.Grants.Contains("brain.read"))
-            throw Status(StatusCode.PermissionDenied, "Activity read authority is required.");
+            throw Status(StatusCode.PermissionDenied, $"{surface} read authority is required.");
     }
 
     private async Task<T> InvokeQueryAsync<T>(Func<Task<T>> invocation)

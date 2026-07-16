@@ -73,11 +73,13 @@ public sealed class OwnerConnectionCatalogTests
         Assert.Equal(OwnerConnectionHealthStatus.NeedsReauth, googleSnapshot.Health);
         Assert.NotEqual(OwnerConnectionHealthStatus.Healthy, googleSnapshot.Health);
         Assert.Equal("token expired", googleSnapshot.HealthDetail);
+        Assert.Empty(googleSnapshot.UnlockedCapabilityIds);
 
         var salesforceSnapshot = Assert.Single(snapshots, snapshot => snapshot.Provider == "salesforce");
         Assert.Equal(OwnerConnectionHealthStatus.Disconnected, salesforceSnapshot.Health);
         Assert.NotEqual(OwnerConnectionHealthStatus.Healthy, salesforceSnapshot.Health);
         Assert.Equal("Connection probe failed.", salesforceSnapshot.HealthDetail);
+        Assert.Empty(salesforceSnapshot.UnlockedCapabilityIds);
     }
 
     [Fact]
@@ -120,7 +122,42 @@ public sealed class OwnerConnectionCatalogTests
         Assert.Equal(OwnerConnectionHealthStatus.Misconfigured, snapshot.Health);
         Assert.Equal("Missing client_id", snapshot.HealthDetail);
         Assert.Equal("/oauth/start/google", snapshot.ConnectPath);
+        Assert.Empty(snapshot.UnlockedCapabilityIds);
         Assert.False(connector.ProbeCalled);
+    }
+
+    [Fact]
+    public async Task GetConnection_requires_brain_read_authority()
+    {
+        var client = new StaticConnectionCatalogClient([
+            new OwnerConnectionSnapshot(
+                "google",
+                "google",
+                "Google",
+                OwnerConnectionHealthStatus.Healthy,
+                "ok",
+                ["google.read"],
+                "/oauth/start/google")
+        ]);
+        var endpoints = new DigitalBrainUiEndpoints(
+            authoring: null!,
+            suggestions: null!,
+            logger: NullLogger<DigitalBrainUiEndpoints>.Instance,
+            connections: client);
+        var context = new RuntimeRequestContext(
+            Owner,
+            new ActorId("actor-scope"),
+            new SessionId("session-scope"),
+            RuntimeAuthAssurance.Password,
+            "correlation-scope",
+            null,
+            new HashSet<string>(StringComparer.Ordinal));
+
+        var denied = await Assert.ThrowsAsync<RpcException>(() => endpoints.GetConnectionAsync(
+            context,
+            new GrpcGetConnectionRequest { ConnectionId = "google" },
+            CancellationToken.None));
+        Assert.Equal(StatusCode.PermissionDenied, denied.StatusCode);
     }
 
     [Fact]
