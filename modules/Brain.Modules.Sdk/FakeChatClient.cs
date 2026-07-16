@@ -1,0 +1,24 @@
+using Microsoft.Extensions.AI;
+namespace Brain.Modules.Sdk;
+
+public sealed class FakeChatClient(string reply) : IChatClient
+{
+    private int _calls;
+
+    public int Calls => _calls;
+
+    public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        Interlocked.Increment(ref _calls);
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
+    }
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    public void Dispose()
+    {
+    }
+}

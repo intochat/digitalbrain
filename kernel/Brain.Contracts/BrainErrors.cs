@@ -10,6 +10,7 @@ public static class BrainErrors
     public const string EffectNotApproved = "effect.not-approved";
     public const string CallerMalformed = "caller.malformed";
     public const string ModelUnavailable = "model.unavailable";
+    public const string ModelTimeout = "model.timeout";
 }
 
 [GenerateSerializer, Alias("brain.exception.v2")]

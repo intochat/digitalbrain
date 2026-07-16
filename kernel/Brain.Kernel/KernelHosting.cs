@@ -15,4 +15,10 @@ public static class KernelHosting
             silo.Services.AddKeyedSingleton<INeuronKind>(kind.Kind, kind);
         return silo;
     }
+
+    public static ISiloBuilder AddBrainKind(this ISiloBuilder silo, string kind, Func<IServiceProvider, INeuronKind> factory)
+    {
+        silo.Services.AddKeyedSingleton<INeuronKind>(kind, (sp, _) => factory(sp));
+        return silo;
+    }
 }

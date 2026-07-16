@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="xunit" />
   </ItemGroup>
 </Project>
