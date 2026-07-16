@@ -8,5 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="../../kernel/Brain.Client/Brain.Client.csproj" />
     <ProjectReference Include="../../modules/Brain.Modules.Workspace/Brain.Modules.Workspace.csproj" />
+    <ProjectReference Include="../../modules/Brain.Modules.Ai/Brain.Modules.Ai.csproj" />
   </ItemGroup>
 </Project>
