@@ -156,6 +156,8 @@ internal static class DigitalBrainBuilderExtensions
         kernel.WaitFor(ctx.SurfaceFeedStateBlobs);
         kernel.WaitFor(ctx.SessionStateBlobs);
         kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
+        if (TryResolveRepositoryRoot(out var repositoryRoot))
+            kernel.WithEnvironment("DIGITALBRAIN_REPO_ROOT", repositoryRoot);
         kernel.WithEnvironment("DigitalBrain__Llm__Provider", ctx.LlmProvider);
         kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
         if (ctx.OllamaEndpoint is not null)
@@ -263,5 +265,30 @@ internal static class DigitalBrainBuilderExtensions
         return getEnvironmentVariable("DIGITALBRAIN_CLUSTER_ID")
             ?? getEnvironmentVariable("DigitalBrain__ClusterId")
             ?? getEnvironmentVariable("Orleans__ClusterId") ?? $"digitalbrain-dev-{Guid.NewGuid():N}";
+    }
+
+    private static bool TryResolveRepositoryRoot(out string root)
+    {
+        var configured = Environment.GetEnvironmentVariable("DIGITALBRAIN_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(Path.Combine(configured, "Brain.slnx")))
+        {
+            root = Path.GetFullPath(configured);
+            return true;
+        }
+
+        var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Brain.slnx")))
+            {
+                root = directory.FullName;
+                return true;
+            }
+
+            directory = directory.Parent;
+        }
+
+        root = string.Empty;
+        return false;
     }
 }

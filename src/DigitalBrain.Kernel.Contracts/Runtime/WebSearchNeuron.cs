@@ -1,4 +1,5 @@
 using DigitalBrain.Kernel.Contracts;
+using Orleans;
 
 namespace DigitalBrain.Kernel.Runtime;
 
@@ -18,7 +19,7 @@ public sealed record WebSearchSnapshot(
     [property: Id(0)] WebSearchEvidence[] Results);
 
 [Alias("digitalbrain.web-search.v1")]
-public interface IWebSearch : INeuron
+public interface IWebSearch : IGrainWithStringKey
 {
     [Alias("digitalbrain.web-search.search")]
     Task<WebSearchSnapshot> SearchAsync(

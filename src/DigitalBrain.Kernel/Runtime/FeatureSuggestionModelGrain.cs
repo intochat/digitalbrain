@@ -28,6 +28,23 @@ public sealed class FeatureSuggestionModelGrain(IGrainFactory grainFactory, ICha
             throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Precondition);
         if (draft.Revision != command.ExpectedRevision)
             throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Conflict);
+        if (ConstrainedFeaturePackTemplates.TryMatchEnrichSalesforce(draft.Goal))
+        {
+            var constrained = FeatureDraftAuthoringTransitions.ValidatePatch(new FeatureDraftPatch(
+                "patch-pending",
+                draft.DraftId,
+                draft.Revision,
+                "Constrained Gmail + Web Search + Salesforce enrichment pack.",
+                ConstrainedFeaturePackTemplates.SeedBehavior(draft.Goal),
+                ConstrainedFeaturePackTemplates.SeedSource(draft.Goal)));
+            constrained = constrained with { PatchId = PatchId(ownerId, draft, command.SuggestionId, constrained) };
+            var currentConstrained = await hub.ReadDraftAsync(command.DraftId).WaitAsync(cancellationToken)
+                ?? throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Unavailable);
+            if (!string.Equals(currentConstrained.Status, "draft", StringComparison.Ordinal) ||
+                currentConstrained.Revision != draft.Revision)
+                throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Conflict);
+            return constrained;
+        }
         var prompt = BuildPrompt(draft, command.Guidance);
         if (Encoding.UTF8.GetByteCount(prompt) > FeatureLimits.DraftSuggestionPayloadUtf8Bytes)
             throw new FeatureCommandRejectedException(FeatureCommandRejectionReason.Limit);

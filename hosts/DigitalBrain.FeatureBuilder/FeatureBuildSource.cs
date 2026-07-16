@@ -14,6 +14,7 @@ internal static class FeatureBuildSource
         "DigitalBrain.Features.Testing",
         "DigitalBrain.Integrations.Google.Contracts",
         "DigitalBrain.Integrations.Salesforce.Contracts",
+        "DigitalBrain.Integrations.Web.Contracts",
         "Microsoft.NET.Test.Sdk",
         "Reqnroll",
         "Reqnroll.xUnit",
@@ -338,6 +339,9 @@ internal static class FeatureBuildSource
             path.Equals("integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj", StringComparison.OrdinalIgnoreCase) ||
             path.Equals(
                 "integrations/DigitalBrain.Integrations.Salesforce.Contracts/DigitalBrain.Integrations.Salesforce.Contracts.csproj",
+                StringComparison.OrdinalIgnoreCase) ||
+            path.Equals(
+                "integrations/DigitalBrain.Integrations.Web.Contracts/DigitalBrain.Integrations.Web.Contracts.csproj",
                 StringComparison.OrdinalIgnoreCase);
     }
     private static void ValidatePackages(string sourcePath, XDocument document, IReadOnlyDictionary<string, string> centralVersions, FeatureSourceSnapshot snapshot)

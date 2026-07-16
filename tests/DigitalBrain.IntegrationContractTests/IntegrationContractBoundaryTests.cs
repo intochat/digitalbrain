@@ -6,6 +6,7 @@ using DigitalBrain.Integrations.Salesforce.Contracts;
 using DigitalBrain.Integrations.Web.Contracts;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Runtime;
+using Orleans;
 using Xunit;
 
 namespace DigitalBrain.IntegrationContractTests;
@@ -227,7 +228,7 @@ public sealed class IntegrationContractBoundaryTests
         AssertInterface<ISalesforceAccountSearcher>("SearchAsync", typeof(Task<SalesforceAccountSearchResponse>), typeof(SalesforceAccountSearchRequest));
         AssertInterface<ISalesforceUpdateProposer>("ProposeAsync", typeof(Task<SalesforceUpdateProposal>), typeof(SalesforceUpdateProposalRequest));
         AssertInterface<IWebSearchReader>("SearchAsync", typeof(Task<WebSearchResponse>), typeof(WebSearchRequest));
-        Assert.Contains(typeof(INeuron), typeof(IWebSearch).GetInterfaces());
+        Assert.Contains(typeof(IGrainWithStringKey), typeof(IWebSearch).GetInterfaces());
     }
 
     private static void AssertDto<T>(params (string Name, Type Type)[] expected)

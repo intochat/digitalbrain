@@ -1,8 +1,5 @@
 namespace DigitalBrain.Kernel.Contracts;
 
-[Alias("digitalbrain.i-neuron")]
-public interface INeuron : IGrainWithStringKey;
-
 [GenerateSerializer]
 [Alias("DigitalBrain.Kernel.Contracts.NeuronId")]
 public record NeuronId([property: Id(0)] string Value)
