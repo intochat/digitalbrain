@@ -75,4 +75,131 @@ public class BlocksTests
         Assert.Equal("workspace.approve.v1", action.GetProperty("contract").GetString());
         Assert.Equal("{\"id\":7}", action.GetProperty("inputJson").GetString());
     }
+
+    [Fact]
+    public void String_version_is_rejected()
+    {
+        var json = """{"version":"1","blocks":[]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Action_row_with_unvalidated_action_kind_is_rejected()
+    {
+        var json = """{"version":1,"blocks":[{"kind":"actionRow","actions":[{"kind":"bogus"}]}]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Non_array_children_is_rejected()
+    {
+        var json = """{"version":1,"blocks":[{"kind":"section","children":{}}]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Non_array_entries_is_rejected()
+    {
+        var json = """{"version":1,"blocks":[{"kind":"timeline","entries":"nope"}]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Action_row_without_actions_array_is_rejected()
+    {
+        var json = """{"version":1,"blocks":[{"kind":"actionRow"}]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Action_row_action_with_extra_property_is_rejected()
+    {
+        var json = """{"version":1,"blocks":[{"kind":"actionRow","actions":[{"label":"Approve","contract":"c","inputJson":"{}","extra":"nope"}]}]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Action_row_action_with_non_string_field_is_rejected()
+    {
+        var json = """{"version":1,"blocks":[{"kind":"actionRow","actions":[{"label":1,"contract":"c","inputJson":"{}"}]}]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Action_row_action_with_duplicate_property_is_rejected()
+    {
+        var json = """{"version":1,"blocks":[{"kind":"actionRow","actions":[{"label":"a","label":"b","contract":"c"}]}]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Action_row_actions_count_toward_nesting_depth()
+    {
+        var block = Blocks.ActionRow(Blocks.Action("Approve", "workspace.approve.v1", "{}"));
+        for (var i = 0; i < 7; i++)
+            block = Blocks.Section($"level {i}", block);
+        var doc = Blocks.Doc(block);
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(doc.Json));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Action_row_actions_within_depth_limit_are_accepted()
+    {
+        var block = Blocks.ActionRow(Blocks.Action("Approve", "workspace.approve.v1", "{}"));
+        for (var i = 0; i < 6; i++)
+            block = Blocks.Section($"level {i}", block);
+        var doc = Blocks.Doc(block);
+
+        var parsed = BlockDoc.Parse(doc.Json);
+
+        Assert.Equal(doc.Json, parsed.Json);
+    }
+
+    [Fact]
+    public void Progress_with_non_finite_fraction_throws()
+    {
+        var exception = Assert.Throws<BrainException>(() => Blocks.Progress("Loading", double.NaN));
+
+        Assert.Equal("input.invalid", exception.Code);
+    }
+
+    [Fact]
+    public void Unknown_kind_detail_is_truncated_to_64_chars()
+    {
+        var longKind = new string('x', 200);
+        var json = $$"""{"version":1,"blocks":[{"kind":"{{longKind}}"}]}""";
+
+        var exception = Assert.Throws<BrainException>(() => BlockDoc.Parse(json));
+
+        Assert.Equal("input.invalid", exception.Code);
+        Assert.Contains(longKind[..64], exception.Message);
+        Assert.DoesNotContain(longKind, exception.Message);
+    }
 }
