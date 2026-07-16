@@ -18,6 +18,7 @@ class ActivityRunPage extends StatefulWidget {
     this.onOpenFeature,
     this.onOpenConversation,
     this.onOpenRequest,
+    this.onOpenConversationContext,
     this.onOpenAutomation,
     this.onOpenResultSurface,
   });
@@ -29,6 +30,8 @@ class ActivityRunPage extends StatefulWidget {
   final ValueChanged<String>? onOpenFeature;
   final ValueChanged<String>? onOpenConversation;
   final ValueChanged<String>? onOpenRequest;
+  final void Function(String conversationId, String requestId)?
+  onOpenConversationContext;
   final ActivityAutomationReferenceCallback? onOpenAutomation;
   final ValueChanged<String>? onOpenResultSurface;
 
@@ -136,13 +139,31 @@ class _ActivityRunPageState extends State<ActivityRunPage> {
           run: _run!,
           onBackToActivity: widget.onBackToActivity,
           onOpenFeature: widget.onOpenFeature,
-          onOpenConversation: widget.onOpenConversation,
-          onOpenRequest: widget.onOpenRequest,
+          onOpenConversation: _openConversation(_run!),
+          onOpenRequest: _openRequest(_run!),
           onOpenAutomation: widget.onOpenAutomation,
           onOpenResultSurface: widget.onOpenResultSurface,
         ),
       ),
     );
+  }
+
+  ValueChanged<String>? _openConversation(ActivityRun run) {
+    final openContext = widget.onOpenConversationContext;
+    final requestId = run.requestId;
+    if (openContext == null || requestId == null) {
+      return widget.onOpenConversation;
+    }
+    return (conversationId) => openContext(conversationId, requestId);
+  }
+
+  ValueChanged<String>? _openRequest(ActivityRun run) {
+    final openContext = widget.onOpenConversationContext;
+    final conversationId = run.conversationId;
+    if (openContext == null || conversationId == null) {
+      return widget.onOpenRequest;
+    }
+    return (requestId) => openContext(conversationId, requestId);
   }
 }
 

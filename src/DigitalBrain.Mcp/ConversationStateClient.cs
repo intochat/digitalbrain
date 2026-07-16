@@ -8,6 +8,8 @@ using Orleans;
 using RuntimeRequestContext = DigitalBrain.Kernel.Contracts.Runtime.RequestContext;
 namespace DigitalBrain.Mcp;
 
+public sealed record InoConversationRequest(string ConversationId, string RequestId, string Text);
+
 public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider timeProvider)
 {
     private const string FeedOutboxKind = "surface-feed";
@@ -16,6 +18,30 @@ public sealed class ConversationStateClient(IClusterClient cluster, TimeProvider
         context = await ResolveContextAsync(context, cancellationToken).ConfigureAwait(false);
         var state = await ReadStateAsync(context, cancellationToken).ConfigureAwait(false);
         return ToSnapshot(context, state);
+    }
+    public async Task<InoConversationRequest?> ReadRequestAsync(
+        RuntimeRequestContext context,
+        string requestId,
+        CancellationToken cancellationToken = default)
+    {
+        context = await ResolveContextAsync(context, cancellationToken).ConfigureAwait(false);
+        var state = await ReadStateAsync(context, cancellationToken).ConfigureAwait(false);
+        if (state.Identity is null)
+            return null;
+        if (state.Identity.OwnerId != context.OwnerId ||
+            state.Identity.ActorId != context.ActorId ||
+            !string.Equals(state.Identity.ConversationId, context.ConversationId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Conversation identity does not match the authenticated scope.");
+        var operations = state.Operations.Where(operation =>
+            string.Equals(operation.RequestId, requestId, StringComparison.Ordinal)).ToArray();
+        if (operations.Length != 1)
+            return null;
+        var turns = state.Turns.Where(turn =>
+            turn.Kind == ConversationTurnKind.User &&
+            string.Equals(turn.OperationId, operations[0].OperationId, StringComparison.Ordinal)).ToArray();
+        return turns.Length == 1
+            ? new InoConversationRequest(state.Identity.ConversationId, requestId, turns[0].Text)
+            : null;
     }
     public async Task<InoConversationSnapshot> BeginAsync(RuntimeRequestContext context, string commandId, string prompt, CancellationToken cancellationToken = default)
     {

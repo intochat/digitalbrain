@@ -29,6 +29,7 @@ class ActivityPage extends StatefulWidget {
     this.onOpenFeature,
     this.onOpenConversation,
     this.onOpenRequest,
+    this.onOpenConversationContext,
     this.onOpenAutomation,
     this.onOpenResultSurface,
   }) : assert(gateway != null || controller != null),
@@ -40,6 +41,8 @@ class ActivityPage extends StatefulWidget {
   final ValueChanged<String>? onOpenFeature;
   final ValueChanged<String>? onOpenConversation;
   final ValueChanged<String>? onOpenRequest;
+  final void Function(String conversationId, String requestId)?
+  onOpenConversationContext;
   final ActivityAutomationReferenceCallback? onOpenAutomation;
   final ValueChanged<String>? onOpenResultSurface;
 
@@ -164,8 +167,10 @@ class _ActivityPageState extends State<ActivityPage> {
                           key: ValueKey(_controller.selectedRun!.runId),
                           run: _controller.selectedRun!,
                           onOpenFeature: widget.onOpenFeature,
-                          onOpenConversation: widget.onOpenConversation,
-                          onOpenRequest: widget.onOpenRequest,
+                          onOpenConversation: _openConversation(
+                            _controller.selectedRun!,
+                          ),
+                          onOpenRequest: _openRequest(_controller.selectedRun!),
                           onOpenAutomation: widget.onOpenAutomation,
                           onOpenResultSurface: widget.onOpenResultSurface,
                         ),
@@ -198,14 +203,32 @@ class _ActivityPageState extends State<ActivityPage> {
           builder: (context) => ActivityRunDetailPage(
             run: run,
             onOpenFeature: widget.onOpenFeature,
-            onOpenConversation: widget.onOpenConversation,
-            onOpenRequest: widget.onOpenRequest,
+            onOpenConversation: _openConversation(run),
+            onOpenRequest: _openRequest(run),
             onOpenAutomation: widget.onOpenAutomation,
             onOpenResultSurface: widget.onOpenResultSurface,
           ),
         ),
       ),
     );
+  }
+
+  ValueChanged<String>? _openConversation(ActivityRun run) {
+    final openContext = widget.onOpenConversationContext;
+    final requestId = run.requestId;
+    if (openContext == null || requestId == null) {
+      return widget.onOpenConversation;
+    }
+    return (conversationId) => openContext(conversationId, requestId);
+  }
+
+  ValueChanged<String>? _openRequest(ActivityRun run) {
+    final openContext = widget.onOpenConversationContext;
+    final conversationId = run.conversationId;
+    if (openContext == null || conversationId == null) {
+      return widget.onOpenRequest;
+    }
+    return (requestId) => openContext(conversationId, requestId);
   }
 }
 

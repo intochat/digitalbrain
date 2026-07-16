@@ -43,6 +43,7 @@ using FeatureRunInstallationInspection = McpProject::DigitalBrain.Mcp.FeatureRun
 using FeatureRunLifecycleInspection = McpProject::DigitalBrain.Mcp.FeatureRunLifecycleInspection;
 using FeatureSuggestionService = McpProject::DigitalBrain.Mcp.FeatureSuggestionService;
 using GetRunRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetRunRequest;
+using GetConversationContextRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetConversationContextRequest;
 using GetFeatureRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureRequest;
 using GetFeatureReleaseSourceRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureReleaseSourceRequest;
 using GetFeatureDraftRequest = McpProject::DigitalBrain.V2.Ui.Grpc.GetFeatureDraftRequest;
@@ -993,6 +994,86 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
     }
 
     [Fact]
+    public async Task GetConversationContext_returns_only_the_authenticated_owner_request_without_logging_it()
+    {
+        const string exactRequest = "Compare the retained request exactly, including punctuation: alpha/beta?";
+        const string requestId = "request-chat-context-owned";
+        var conversationId = "ino-" + new string('a', 64);
+        var context = new RuntimeRequestContext(
+            new BrainOwnerId("owner"),
+            new ActorId("principal"),
+            new SessionId("chat-context-seed-session"),
+            AuthAssurance.Oidc,
+            requestId,
+            null,
+            new HashSet<string>(StringComparer.Ordinal),
+            conversationId);
+        await new ConversationStateClient(Cluster.Client, TimeProvider.System)
+            .BeginAsync(context, "command-chat-context-owned", exactRequest);
+        var logger = new CapturingLogger<UiGrpcService>();
+        var (service, _) = CreateService(serviceLogger: logger);
+        var call = await AuthenticatedCallAsync(service);
+
+        var reply = await service.GetConversationContext(
+            new GetConversationContextRequest
+            {
+                ConversationId = conversationId,
+                RequestId = requestId
+            },
+            call);
+
+        Assert.Equal(conversationId, reply.ConversationId);
+        Assert.Equal(requestId, reply.RequestId);
+        Assert.Equal(exactRequest, reply.RequestText);
+        Assert.DoesNotContain(logger.Messages, message => message.Contains(exactRequest, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GetConversationContext_maps_missing_and_wrong_owner_requests_to_the_same_safe_failure()
+    {
+        const string exactRequest = "This request belongs only to the original owner.";
+        const string requestId = "request-chat-context-private";
+        var conversationId = "ino-" + new string('b', 64);
+        var context = new RuntimeRequestContext(
+            new BrainOwnerId("owner"),
+            new ActorId("principal"),
+            new SessionId("chat-context-private-session"),
+            AuthAssurance.Oidc,
+            requestId,
+            null,
+            new HashSet<string>(StringComparer.Ordinal),
+            conversationId);
+        await new ConversationStateClient(Cluster.Client, TimeProvider.System)
+            .BeginAsync(context, "command-chat-context-private", exactRequest);
+        var logger = new CapturingLogger<UiGrpcService>();
+        var (service, _) = CreateService(serviceLogger: logger);
+        var call = await AuthenticatedCallAsync(service);
+        var missing = await Assert.ThrowsAsync<RpcException>(() => service.GetConversationContext(
+            new GetConversationContextRequest
+            {
+                ConversationId = "ino-" + new string('c', 64),
+                RequestId = requestId
+            },
+            call));
+        var (wrongOwnerService, _) = CreateService(
+            ownerId: new BrainOwnerId("other-owner"),
+            serviceLogger: logger);
+        var wrongOwnerCall = await AuthenticatedCallAsync(wrongOwnerService);
+
+        var wrongOwner = await Assert.ThrowsAsync<RpcException>(() => wrongOwnerService.GetConversationContext(
+            new GetConversationContextRequest
+            {
+                ConversationId = conversationId,
+                RequestId = requestId
+            },
+            wrongOwnerCall));
+
+        Assert.Equal(StatusCode.NotFound, missing.StatusCode);
+        Assert.Equal(missing.Status, wrongOwner.Status);
+        Assert.DoesNotContain(logger.Messages, message => message.Contains(exactRequest, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Failed_verification_returns_safe_scenario_evidence_without_publishing_a_release()
     {
         var ownerId = new BrainOwnerId("owner");
@@ -1371,7 +1452,9 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         FeatureSuggestionService? suggestion = null,
         ILogger<DigitalBrainUiEndpoints>? endpointLogger = null,
         ActorId? actorId = null,
-        DigitalBrainQueryService? queries = null)
+        DigitalBrainQueryService? queries = null,
+        BrainOwnerId? ownerId = null,
+        ILogger<UiGrpcService>? serviceLogger = null)
     {
         var timeProvider = TimeProvider.System;
         var tokens = new SessionTokenService(Enumerable.Repeat((byte)13, 32).ToArray(), timeProvider);
@@ -1392,7 +1475,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             new UiDevelopmentLoginAuthenticator(new UiDevelopmentLoginOptions(
                 LoginUsername,
                  LoginPassword,
-                 new BrainOwnerId("owner"),
+                 ownerId ?? new BrainOwnerId("owner"),
                  actorId ?? new ActorId("principal"),
                 TimeSpan.FromMinutes(15),
                 grants ?? new HashSet<string>(["brain.read", "ui.action"], StringComparer.Ordinal))),
@@ -1410,7 +1493,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
             new McpInoCommandHandler(conversations),
             conversations,
             UiDeliveryOptions.Default,
-            NullLogger<UiGrpcService>.Instance,
+            serviceLogger ?? NullLogger<UiGrpcService>.Instance,
             endpoints);
         return (service, sessions);
     }

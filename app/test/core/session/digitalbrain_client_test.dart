@@ -150,7 +150,7 @@ void main() {
   );
 
   test(
-    'Activity list and Run detail use the shared authorized client',
+    'Activity, Run, and Chat context use the shared authorized client',
     () async {
       final session = _authenticatedSession();
       final transport = _RecordingDigitalBrainTransport();
@@ -162,15 +162,26 @@ void main() {
         limit: 50,
       );
       final runRequest = wire.GetRunRequest(runId: 'run-a');
+      final contextRequest = wire.GetConversationContextRequest(
+        conversationId: 'conversation-a',
+        requestId: 'request-a',
+      );
 
       final activity = await client.listActivity(listRequest);
       final run = await client.getRun(runRequest);
+      final context = await client.getConversationContext(contextRequest);
 
       expect(activity, same(transport.activityReply));
       expect(run, same(transport.runReply));
+      expect(context, same(transport.contextReply));
       expect(transport.listActivityRequests, [same(listRequest)]);
       expect(transport.getRunRequests, [same(runRequest)]);
-      expect(transport.productAccessTokens, ['access-a', 'access-a']);
+      expect(transport.contextRequests, [same(contextRequest)]);
+      expect(transport.productAccessTokens, [
+        'access-a',
+        'access-a',
+        'access-a',
+      ]);
     },
   );
 
@@ -825,6 +836,7 @@ class _RecordingDigitalBrainTransport
   final sourceReply = wire.FeatureReleaseSourceReply();
   final activityReply = wire.ListActivityReply();
   final runReply = wire.RunReply();
+  final contextReply = wire.GetConversationContextReply();
   String? accessToken;
   wire.GetFeatureDraftRequest? getRequest;
   final List<String> productAccessTokens = [];
@@ -841,6 +853,7 @@ class _RecordingDigitalBrainTransport
   final List<wire.RollbackFeatureVersionRequest> rollbackRequests = [];
   final List<wire.ListActivityRequest> listActivityRequests = [];
   final List<wire.GetRunRequest> getRunRequests = [];
+  final List<wire.GetConversationContextRequest> contextRequests = [];
   Future<SessionBundle>? refreshResult;
   Future<SessionBundle>? loginResult;
   FeedCall? feedCall;
@@ -995,6 +1008,16 @@ class _RecordingDigitalBrainTransport
     productAccessTokens.add(accessToken);
     getRunRequests.add(request);
     return runReply;
+  }
+
+  @override
+  Future<wire.GetConversationContextReply> getConversationContext({
+    required String accessToken,
+    required wire.GetConversationContextRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    contextRequests.add(request);
+    return contextReply;
   }
 
   @override

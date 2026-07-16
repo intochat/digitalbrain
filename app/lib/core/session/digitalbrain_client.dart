@@ -69,6 +69,11 @@ abstract interface class DigitalBrainTransport implements SessionTransport {
     required String accessToken,
     required wire.GetRunRequest request,
   });
+
+  Future<wire.GetConversationContextReply> getConversationContext({
+    required String accessToken,
+    required wire.GetConversationContextRequest request,
+  });
 }
 
 abstract interface class FeatureAuthoringClient {
@@ -246,6 +251,15 @@ class DigitalBrainClient implements FeatureAuthoringClient, ActivityClient {
   Future<wire.RunReply> getRun(wire.GetRunRequest request) => _authorized(
     (accessToken) =>
         _transport.getRun(accessToken: accessToken, request: request),
+  );
+
+  Future<wire.GetConversationContextReply> getConversationContext(
+    wire.GetConversationContextRequest request,
+  ) => _authorized(
+    (accessToken) => _transport.getConversationContext(
+      accessToken: accessToken,
+      request: request,
+    ),
   );
 
   Future<T> _authorized<T>(Future<T> Function(String accessToken) send) async {

@@ -109,6 +109,10 @@ class _ChatPageState extends State<ChatPage> {
   _attemptedResumeIntents = {};
   ({String draftId, Int64 expectedRevision, String idempotencyId})?
   _failedResumeIntent;
+  ({String conversationId, String requestId})? _loadingActivityContext;
+  ({String conversationId, String requestId})? _loadedActivityContext;
+  ({String conversationId, String requestId})? _failedActivityContext;
+  wire.GetConversationContextReply? _activityContext;
 
   @override
   void didChangeDependencies() {
@@ -117,12 +121,21 @@ class _ChatPageState extends State<ChatPage> {
     _scheduleSurfaceExpiry(controller);
     _scheduleFirstSurfaceFrame(controller);
     _scheduleResumeIntent();
+    _scheduleActivityContext();
   }
 
   @override
   void didUpdateWidget(covariant ChatPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_activityIdentity(oldWidget.activityReference) !=
+        _activityIdentity(widget.activityReference)) {
+      _loadingActivityContext = null;
+      _loadedActivityContext = null;
+      _failedActivityContext = null;
+      _activityContext = null;
+    }
     _scheduleResumeIntent();
+    _scheduleActivityContext();
   }
 
   @override
@@ -173,7 +186,13 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       body: Column(
         children: [
-          _ChatActivityContextBanner(reference: reference),
+          _ChatActivityContextBanner(
+            reference: reference,
+            contextReply: _loadedActivityContext == _activityIdentity(reference)
+                ? _activityContext
+                : null,
+            failed: _failedActivityContext == _activityIdentity(reference),
+          ),
           Expanded(child: body),
         ],
       ),
@@ -194,6 +213,69 @@ class _ChatPageState extends State<ChatPage> {
     final client = owner.digitalBrainClient;
     if (client == null || !_attemptedResumeIntents.add(intent.identity)) return;
     unawaited(_resume(client, intent));
+  }
+
+  void _scheduleActivityContext() {
+    final identity = _activityIdentity(widget.activityReference);
+    if (identity == null ||
+        _loadedActivityContext == identity ||
+        _loadingActivityContext == identity) {
+      return;
+    }
+    final owner = AppSessionScope.of(context);
+    if (owner.controller?.session.isAuthenticated != true) return;
+    final client = owner.digitalBrainClient;
+    if (client == null) return;
+    _loadingActivityContext = identity;
+    unawaited(_loadActivityContext(client, identity));
+  }
+
+  Future<void> _loadActivityContext(
+    DigitalBrainClient client,
+    ({String conversationId, String requestId}) identity,
+  ) async {
+    try {
+      final reply = await client.getConversationContext(
+        wire.GetConversationContextRequest(
+          conversationId: identity.conversationId,
+          requestId: identity.requestId,
+        ),
+      );
+      if (reply.conversationId != identity.conversationId ||
+          reply.requestId != identity.requestId) {
+        throw StateError('Invalid conversation context reply.');
+      }
+      if (!mounted || _activityIdentity(widget.activityReference) != identity) {
+        return;
+      }
+      setState(() {
+        _activityContext = reply;
+        _loadedActivityContext = identity;
+        _failedActivityContext = null;
+      });
+    } catch (_) {
+      if (!mounted || _activityIdentity(widget.activityReference) != identity) {
+        return;
+      }
+      setState(() {
+        _activityContext = null;
+        _loadedActivityContext = null;
+        _failedActivityContext = identity;
+      });
+    } finally {
+      if (_loadingActivityContext == identity) {
+        _loadingActivityContext = null;
+      }
+    }
+  }
+
+  ({String conversationId, String requestId})? _activityIdentity(
+    ChatActivityReference? reference,
+  ) {
+    final conversationId = reference?.conversationId;
+    final requestId = reference?.requestId;
+    if (conversationId == null || requestId == null) return null;
+    return (conversationId: conversationId, requestId: requestId);
   }
 
   Future<void> _resume(
@@ -340,9 +422,15 @@ class _ChatPageState extends State<ChatPage> {
 }
 
 class _ChatActivityContextBanner extends StatelessWidget {
-  const _ChatActivityContextBanner({required this.reference});
+  const _ChatActivityContextBanner({
+    required this.reference,
+    required this.contextReply,
+    required this.failed,
+  });
 
   final ChatActivityReference reference;
+  final wire.GetConversationContextReply? contextReply;
+  final bool failed;
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +438,10 @@ class _ChatActivityContextBanner extends StatelessWidget {
     return Semantics(
       key: chatActivityContextKey,
       container: true,
-      label: reference.semanticsLabel,
+      label: [
+        reference.semanticsLabel,
+        if (contextReply case final context?) context.requestText,
+      ].join(' '),
       child: ExcludeSemantics(
         child: Material(
           color: colors.secondaryContainer,
@@ -372,12 +463,30 @@ class _ChatActivityContextBanner extends StatelessWidget {
                           style: Theme.of(context).textTheme.labelLarge
                               ?.copyWith(color: colors.onSecondaryContainer),
                         ),
-                        Text(
-                          reference.detailLabel,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: colors.onSecondaryContainer),
-                        ),
+                        if (contextReply case final context?) ...[
+                          Text(
+                            'Conversation ${context.conversationId}',
+                            style: TextStyle(
+                              color: colors.onSecondaryContainer,
+                            ),
+                          ),
+                          Text(
+                            context.requestText,
+                            style: TextStyle(
+                              color: colors.onSecondaryContainer,
+                            ),
+                          ),
+                        ] else
+                          Text(
+                            failed
+                                ? 'The originating request is unavailable.'
+                                : reference.detailLabel,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.onSecondaryContainer,
+                            ),
+                          ),
                       ],
                     ),
                   ),

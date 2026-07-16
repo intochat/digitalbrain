@@ -469,28 +469,47 @@ void main() {
       },
     );
 
-    test('Activity and Run queries use signed bounded calls', () async {
-      final port = _FakeGrpcClientPort();
-      final transport = GrpcUiTransport.forTesting(client: port);
-      final list = wire.ListActivityRequest(featureId: 'feature-a', limit: 100);
-      final run = wire.GetRunRequest(runId: 'run-a');
+    test(
+      'Activity, Run, and Chat context queries use signed bounded calls',
+      () async {
+        final port = _FakeGrpcClientPort();
+        final transport = GrpcUiTransport.forTesting(client: port);
+        final list = wire.ListActivityRequest(
+          featureId: 'feature-a',
+          limit: 100,
+        );
+        final run = wire.GetRunRequest(runId: 'run-a');
+        final context = wire.GetConversationContextRequest(
+          conversationId: 'conversation-a',
+          requestId: 'request-a',
+        );
 
-      await transport.listActivity(
-        accessToken: 'signed-session',
-        request: list,
-      );
-      await transport.getRun(accessToken: 'signed-session', request: run);
+        await transport.listActivity(
+          accessToken: 'signed-session',
+          request: list,
+        );
+        await transport.getRun(accessToken: 'signed-session', request: run);
+        await transport.getConversationContext(
+          accessToken: 'signed-session',
+          request: context,
+        );
 
-      expect(port.listActivityRequest, same(list));
-      expect(port.getRunRequest, same(run));
-      for (final options in [port.listActivityOptions, port.getRunOptions]) {
-        expect(options?.metadata, {
-          'x-v2-session': 'signed-session',
-          'x-v2-audience': digitalBrainUiAudience,
-        });
-        expect(options?.timeout, unaryRequestTimeout);
-      }
-    });
+        expect(port.listActivityRequest, same(list));
+        expect(port.getRunRequest, same(run));
+        expect(port.contextRequest, same(context));
+        for (final options in [
+          port.listActivityOptions,
+          port.getRunOptions,
+          port.contextOptions,
+        ]) {
+          expect(options?.metadata, {
+            'x-v2-session': 'signed-session',
+            'x-v2-audience': digitalBrainUiAudience,
+          });
+          expect(options?.timeout, unaryRequestTimeout);
+        }
+      },
+    );
 
     test(
       'preserves safe draft not found and revision conflict codes',
@@ -911,6 +930,8 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   CallOptions? listActivityOptions;
   wire.GetRunRequest? getRunRequest;
   CallOptions? getRunOptions;
+  wire.GetConversationContextRequest? contextRequest;
+  CallOptions? contextOptions;
 
   wire.SessionReply get sessionReply => wire.SessionReply(
     accessToken: 'access-token',
@@ -1159,6 +1180,18 @@ class _FakeGrpcClientPort implements GrpcClientPort {
     getRunRequest = request;
     getRunOptions = options;
     return _FakeGrpcUnaryResponse(Future.value(wire.RunReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.GetConversationContextReply> getConversationContext(
+    wire.GetConversationContextRequest request,
+    CallOptions options,
+  ) {
+    contextRequest = request;
+    contextOptions = options;
+    return _FakeGrpcUnaryResponse(
+      Future.value(wire.GetConversationContextReply()),
+    );
   }
 }
 

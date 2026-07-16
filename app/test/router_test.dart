@@ -1665,118 +1665,136 @@ void main() {
     expect(transport.closeCalls, 1);
   });
 
-  testWidgets('Activity list opens a canonical deep-linked Run detail', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 900);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPhysicalSize);
-    final run = _wireActivityRun();
-    final transport = _RouterTransport(
-      _RouterFeedCall(),
-      activityReply: wire.ListActivityReply(runs: [run]),
-      runReply: wire.RunReply(run: run),
-    );
-    final owner = RuntimeSessionOwner(
-      configuration: _configuration(),
-      transportFactory: (_) => transport,
-    );
-    final router = createDigitalBrainRouter(initialLocation: '/activity');
+  testWidgets(
+    'Activity opens and renders the exact originating request in Chat',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 900);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final run = _wireActivityRun();
+      const exactRequest =
+          'Compare the retained request exactly, including punctuation: alpha/beta?';
+      final transport = _RouterTransport(
+        _RouterFeedCall(),
+        activityReply: wire.ListActivityReply(runs: [run]),
+        runReply: wire.RunReply(run: run),
+        conversationContextReply: wire.GetConversationContextReply(
+          conversationId: 'conversation-a',
+          requestId: 'request-a',
+          requestText: exactRequest,
+        ),
+      );
+      final owner = RuntimeSessionOwner(
+        configuration: _configuration(),
+        transportFactory: (_) => transport,
+      );
+      final router = createDigitalBrainRouter(initialLocation: '/activity');
 
-    await tester.pumpWidget(
-      DigitalBrainApp(
-        sessionOwnerFactory: () => owner,
-        routerFactory: () => router,
-      ),
-    );
-    await _pumpUntil(
-      tester,
-      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
-    );
-    await tester.tap(find.byKey(runtimeSignInButtonKey));
-    await _pumpUntil(tester, () => transport.activityRequests.length == 1);
-    await _pumpUntil(
-      tester,
-      () => find.byType(ActivityPage).evaluate().isNotEmpty,
-    );
+      await tester.pumpWidget(
+        DigitalBrainApp(
+          sessionOwnerFactory: () => owner,
+          routerFactory: () => router,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+      );
+      await tester.tap(find.byKey(runtimeSignInButtonKey));
+      await _pumpUntil(tester, () => transport.activityRequests.length == 1);
+      await _pumpUntil(
+        tester,
+        () => find.byType(ActivityPage).evaluate().isNotEmpty,
+      );
 
-    expect(transport.activityRequests.single.limit, 200);
-    expect(find.text('Research brief'), findsOneWidget);
-    expect(router.routeInformationProvider.value.uri.path, '/activity');
+      expect(transport.activityRequests.single.limit, 200);
+      expect(find.text('Research brief'), findsOneWidget);
+      expect(router.routeInformationProvider.value.uri.path, '/activity');
 
-    await tester.tap(find.byKey(activityStatusFilterKey));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Completed').last);
-    await _pumpUntil(tester, () => transport.activityRequests.length == 2);
-    await _pumpUntil(
-      tester,
-      () => find.byKey(activityRunCardKey('run-a')).evaluate().isNotEmpty,
-    );
-    expect(find.text('Status: Completed'), findsOneWidget);
+      await tester.tap(find.byKey(activityStatusFilterKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Completed').last);
+      await _pumpUntil(tester, () => transport.activityRequests.length == 2);
+      await _pumpUntil(
+        tester,
+        () => find.byKey(activityRunCardKey('run-a')).evaluate().isNotEmpty,
+      );
+      expect(find.text('Status: Completed'), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(activityRunCardKey('run-a')));
-    await tester.tap(find.byKey(activityRunCardKey('run-a')));
-    await _pumpUntil(tester, () => transport.runRequests.length == 1);
-    await _pumpUntil(
-      tester,
-      () => find.byType(ActivityRunPage).evaluate().isNotEmpty,
-    );
+      await tester.ensureVisible(find.byKey(activityRunCardKey('run-a')));
+      await tester.tap(find.byKey(activityRunCardKey('run-a')));
+      await _pumpUntil(tester, () => transport.runRequests.length == 1);
+      await _pumpUntil(
+        tester,
+        () => find.byType(ActivityRunPage).evaluate().isNotEmpty,
+      );
 
-    expect(transport.runRequests.single.runId, 'run-a');
-    expect(router.routeInformationProvider.value.uri.path, '/activity/run-a');
-    expect(router.canPop(), isTrue);
-    expect(find.byType(AppBar), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byKey(digitalBrainCurrentContextKey),
-        matching: find.text('Run details'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.byKey(activityTechnicalDetailsKey), findsOneWidget);
-    expect(find.text('Back to Activity'), findsOneWidget);
+      expect(transport.runRequests.single.runId, 'run-a');
+      expect(router.routeInformationProvider.value.uri.path, '/activity/run-a');
+      expect(router.canPop(), isTrue);
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(digitalBrainCurrentContextKey),
+          matching: find.text('Run details'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(activityTechnicalDetailsKey), findsOneWidget);
+      expect(find.text('Back to Activity'), findsOneWidget);
 
-    await tester.tap(find.text('Back to Activity'));
-    await _pumpUntil(
-      tester,
-      () => router.routeInformationProvider.value.uri.path == '/activity',
-    );
-    await _pumpUntil(
-      tester,
-      () => find.byType(ActivityPage).evaluate().isNotEmpty,
-    );
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Back to Activity'));
+      await _pumpUntil(
+        tester,
+        () => router.routeInformationProvider.value.uri.path == '/activity',
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byType(ActivityPage).evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(ActivityPage), findsOneWidget);
-    expect(find.text('Status: Completed'), findsOneWidget);
-    expect(transport.activityRequests, hasLength(2));
+      expect(find.byType(ActivityPage), findsOneWidget);
+      expect(find.text('Status: Completed'), findsOneWidget);
+      expect(transport.activityRequests, hasLength(2));
 
-    await tester.ensureVisible(find.byKey(activityRunCardKey('run-a')));
-    await tester.tap(find.byKey(activityRunCardKey('run-a')));
-    await _pumpUntil(tester, () => transport.runRequests.length == 2);
-    await _pumpUntil(
-      tester,
-      () => find.byKey(activityOpenChatButtonKey).evaluate().isNotEmpty,
-    );
-    await tester.ensureVisible(find.byKey(activityOpenChatButtonKey));
-    await tester.tap(find.byKey(activityOpenChatButtonKey));
-    await _pumpUntil(
-      tester,
-      () => router.routeInformationProvider.value.uri.path == '/chat',
-    );
+      await tester.ensureVisible(find.byKey(activityRunCardKey('run-a')));
+      await tester.tap(find.byKey(activityRunCardKey('run-a')));
+      await _pumpUntil(tester, () => transport.runRequests.length == 2);
+      await _pumpUntil(
+        tester,
+        () => find.byKey(activityOpenChatButtonKey).evaluate().isNotEmpty,
+      );
+      await tester.ensureVisible(find.byKey(activityOpenChatButtonKey));
+      await tester.tap(find.byKey(activityOpenChatButtonKey));
+      await _pumpUntil(
+        tester,
+        () =>
+            router.routeInformationProvider.value.uri.path ==
+            '/chat/conversation-a',
+      );
+      await _pumpUntil(tester, () => transport.contextRequests.length == 1);
 
-    expect(
-      router.routeInformationProvider.value.uri.queryParameters,
-      containsPair('conversationId', 'conversation-a'),
-    );
-    expect(find.byKey(chatActivityContextKey), findsOneWidget);
-    expect(find.text('Conversation conversation-a'), findsOneWidget);
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        '/chat/conversation-a',
+      );
+      expect(
+        router.routeInformationProvider.value.uri.queryParameters,
+        containsPair('requestId', 'request-a'),
+      );
+      expect(transport.contextRequests.single.conversationId, 'conversation-a');
+      expect(transport.contextRequests.single.requestId, 'request-a');
+      expect(find.byKey(chatActivityContextKey), findsOneWidget);
+      expect(find.text('Conversation conversation-a'), findsOneWidget);
+      expect(find.text(exactRequest), findsOneWidget);
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    await _pumpUntil(tester, () => transport.closeCalls > 0);
-    expect(transport.closeCalls, 1);
-  });
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpUntil(tester, () => transport.closeCalls > 0);
+      expect(transport.closeCalls, 1);
+    },
+  );
 
   testWidgets('deep-linked Run has a real Back to Activity fallback', (
     tester,
@@ -1886,10 +1904,16 @@ void main() {
     await _pumpUntil(tester, () => transport.getFeatureRequests.length == 1);
     await _pumpUntil(
       tester,
-      () => find.byKey(featureReleaseReferencedAutomationKey).evaluate().isNotEmpty,
+      () => find
+          .byKey(featureReleaseReferencedAutomationKey)
+          .evaluate()
+          .isNotEmpty,
     );
 
-    expect(router.routeInformationProvider.value.uri.path, '/features/feature-a');
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/features/feature-a',
+    );
     expect(
       router.routeInformationProvider.value.uri.queryParameters,
       containsPair('automationId', 'schedule:weekday'),
@@ -1967,6 +1991,7 @@ class _RouterTransport
     this.rollbackReply,
     this.activityReply,
     this.runReply,
+    this.conversationContextReply,
   });
 
   final _RouterFeedCall feed;
@@ -1978,6 +2003,7 @@ class _RouterTransport
   final wire.FeatureReply? rollbackReply;
   final wire.ListActivityReply? activityReply;
   final wire.RunReply? runReply;
+  final wire.GetConversationContextReply? conversationContextReply;
   int loginCalls = 0;
   int watchCalls = 0;
   int closeCalls = 0;
@@ -1992,6 +2018,7 @@ class _RouterTransport
   final List<wire.RollbackFeatureVersionRequest> rollbackRequests = [];
   final List<wire.ListActivityRequest> activityRequests = [];
   final List<wire.GetRunRequest> runRequests = [];
+  final List<wire.GetConversationContextRequest> contextRequests = [];
 
   @override
   Future<SessionBundle> login({
@@ -2178,6 +2205,15 @@ class _RouterTransport
   }) async {
     runRequests.add(request.deepCopy());
     return runReply ?? wire.RunReply();
+  }
+
+  @override
+  Future<wire.GetConversationContextReply> getConversationContext({
+    required String accessToken,
+    required wire.GetConversationContextRequest request,
+  }) async {
+    contextRequests.add(request.deepCopy());
+    return conversationContextReply ?? wire.GetConversationContextReply();
   }
 }
 

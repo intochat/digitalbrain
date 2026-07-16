@@ -296,6 +296,48 @@ public sealed class DigitalBrainUiEndpoints(
         return ProjectQuery(() => new RunReply { Run = ToReply(run) });
     }
 
+    public async Task<GetConversationContextReply> GetConversationContextAsync(
+        RuntimeRequestContext context,
+        GetConversationContextRequest request,
+        ConversationStateClient conversations,
+        CancellationToken cancellationToken)
+    {
+        DemandActivityAuthority(context);
+        string conversationId;
+        string requestId;
+        try
+        {
+            conversationId = request.ConversationId;
+            ConversationStateClient.DemandConversationId(conversationId);
+            requestId = Identifier(request.RequestId, 256);
+        }
+        catch (ArgumentException)
+        {
+            throw Status(StatusCode.InvalidArgument, "The Chat context request is invalid.");
+        }
+        InoConversationRequest? originatingRequest;
+        try
+        {
+            originatingRequest = await conversations.ReadRequestAsync(
+                    context with { ConversationId = conversationId },
+                    requestId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            originatingRequest = null;
+        }
+        if (originatingRequest is null)
+            throw Status(StatusCode.NotFound, "The Chat context was not found.");
+        return new GetConversationContextReply
+        {
+            ConversationId = originatingRequest.ConversationId,
+            RequestId = originatingRequest.RequestId,
+            RequestText = originatingRequest.Text
+        };
+    }
+
     private DigitalBrainQueryService QueryService => queries ??
         throw Status(StatusCode.Unavailable, "Activity is temporarily unavailable. Retry the same request.");
 

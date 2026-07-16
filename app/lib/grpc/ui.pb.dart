@@ -5433,6 +5433,172 @@ class RunReply extends $pb.GeneratedMessage {
   FeatureRunSnapshot ensureRun() => $_ensure(0);
 }
 
+class GetConversationContextRequest extends $pb.GeneratedMessage {
+  factory GetConversationContextRequest({
+    $core.String? conversationId,
+    $core.String? requestId,
+  }) {
+    final result = create();
+    if (conversationId != null) result.conversationId = conversationId;
+    if (requestId != null) result.requestId = requestId;
+    return result;
+  }
+
+  GetConversationContextRequest._();
+
+  factory GetConversationContextRequest.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory GetConversationContextRequest.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'GetConversationContextRequest',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(3, _omitFieldNames ? '' : 'conversationId')
+        ..aOS(4, _omitFieldNames ? '' : 'requestId')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetConversationContextRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetConversationContextRequest copyWith(
+    void Function(GetConversationContextRequest) updates,
+  ) =>
+      super.copyWith(
+            (message) => updates(message as GetConversationContextRequest),
+          )
+          as GetConversationContextRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetConversationContextRequest create() =>
+      GetConversationContextRequest._();
+  @$core.override
+  GetConversationContextRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetConversationContextRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetConversationContextRequest>(create);
+  static GetConversationContextRequest? _defaultInstance;
+
+  @$pb.TagNumber(3)
+  $core.String get conversationId => $_getSZ(0);
+  @$pb.TagNumber(3)
+  set conversationId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(3)
+  $core.bool hasConversationId() => $_has(0);
+  @$pb.TagNumber(3)
+  void clearConversationId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(4)
+  set requestId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(4)
+  void clearRequestId() => $_clearField(4);
+}
+
+class GetConversationContextReply extends $pb.GeneratedMessage {
+  factory GetConversationContextReply({
+    $core.String? conversationId,
+    $core.String? requestId,
+    $core.String? requestText,
+  }) {
+    final result = create();
+    if (conversationId != null) result.conversationId = conversationId;
+    if (requestId != null) result.requestId = requestId;
+    if (requestText != null) result.requestText = requestText;
+    return result;
+  }
+
+  GetConversationContextReply._();
+
+  factory GetConversationContextReply.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory GetConversationContextReply.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'GetConversationContextReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'conversationId')
+        ..aOS(2, _omitFieldNames ? '' : 'requestId')
+        ..aOS(3, _omitFieldNames ? '' : 'requestText')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetConversationContextReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetConversationContextReply copyWith(
+    void Function(GetConversationContextReply) updates,
+  ) =>
+      super.copyWith(
+            (message) => updates(message as GetConversationContextReply),
+          )
+          as GetConversationContextReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetConversationContextReply create() =>
+      GetConversationContextReply._();
+  @$core.override
+  GetConversationContextReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetConversationContextReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetConversationContextReply>(create);
+  static GetConversationContextReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get conversationId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set conversationId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasConversationId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearConversationId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get requestText => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set requestText($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRequestText() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestText() => $_clearField(3);
+}
+
 class FeatureRunOriginReference extends $pb.GeneratedMessage {
   factory FeatureRunOriginReference({
     $core.String? conversationId,

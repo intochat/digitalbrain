@@ -35,6 +35,7 @@ public sealed class UiProductGrpcContractTests
         "GetConnection",
         "ListActivity",
         "GetRun",
+        "GetConversationContext",
         "ListMemoryItems",
         "GetMemoryItem",
         "GetHomeSummary"
@@ -88,7 +89,8 @@ public sealed class UiProductGrpcContractTests
                 "GetFeatureReleaseSource",
                 "RollbackFeatureVersion",
                 "ListActivity",
-                "GetRun"
+                "GetRun",
+                "GetConversationContext"
             }.Order(StringComparer.Ordinal),
             declaredProductMethods);
     }
@@ -134,7 +136,8 @@ public sealed class UiProductGrpcContractTests
                 "GetFeatureReleaseSource",
                 "RollbackFeatureVersion",
                 "ListActivity",
-                "GetRun"
+                "GetRun",
+                "GetConversationContext"
             ],
             StringComparer.Ordinal);
         var deferred = ProductMethods.Where(method => !implemented.Contains(method)).ToHashSet(StringComparer.Ordinal);

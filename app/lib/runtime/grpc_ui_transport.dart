@@ -112,6 +112,11 @@ abstract interface class GrpcClientPort {
     wire.GetRunRequest request,
     CallOptions options,
   );
+
+  GrpcUnaryResponse<wire.GetConversationContextReply> getConversationContext(
+    wire.GetConversationContextRequest request,
+    CallOptions options,
+  );
 }
 
 abstract interface class GrpcUnaryResponse<T> {
@@ -561,6 +566,23 @@ class GrpcUiTransport
   }
 
   @override
+  Future<wire.GetConversationContextReply> getConversationContext({
+    required String accessToken,
+    required wire.GetConversationContextRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.getConversationContext(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
@@ -861,6 +883,14 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
     wire.GetRunRequest request,
     CallOptions options,
   ) => _GeneratedGrpcUnaryResponse(client.getRun(request, options: options));
+
+  @override
+  GrpcUnaryResponse<wire.GetConversationContextReply> getConversationContext(
+    wire.GetConversationContextRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.getConversationContext(request, options: options),
+  );
 }
 
 class _GeneratedGrpcUnaryResponse<T> implements GrpcUnaryResponse<T> {

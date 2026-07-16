@@ -203,6 +203,18 @@ public sealed class UiGrpcService(
         var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
         return await productEndpoints.GetRunAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
     }
+    public override async Task<GetConversationContextReply> GetConversationContext(
+        GetConversationContextRequest request,
+        ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.GetConversationContextAsync(
+                authenticated,
+                request,
+                conversations,
+                context.CancellationToken)
+            .ConfigureAwait(false);
+    }
     public override async Task<SessionReply> BootstrapSession(BootstrapSessionRequest request, ServerCallContext context)
     {
         DemandAudience(context);

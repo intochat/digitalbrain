@@ -195,6 +195,17 @@ class DigitalBrainV2UiClient extends $grpc.Client {
     return $createUnaryCall(_$getRun, request, options: options);
   }
 
+  $grpc.ResponseFuture<$0.GetConversationContextReply> getConversationContext(
+    $0.GetConversationContextRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(
+      _$getConversationContext,
+      request,
+      options: options,
+    );
+  }
+
   $grpc.ResponseFuture<$0.ListMemoryItemsReply> listMemoryItems(
     $0.ListMemoryItemsRequest request, {
     $grpc.CallOptions? options,
@@ -372,6 +383,15 @@ class DigitalBrainV2UiClient extends $grpc.Client {
     ($0.GetRunRequest value) => value.writeToBuffer(),
     $0.RunReply.fromBuffer,
   );
+  static final _$getConversationContext =
+      $grpc.ClientMethod<
+        $0.GetConversationContextRequest,
+        $0.GetConversationContextReply
+      >(
+        '/digitalbrain.v2.ui.DigitalBrainV2Ui/GetConversationContext',
+        ($0.GetConversationContextRequest value) => value.writeToBuffer(),
+        $0.GetConversationContextReply.fromBuffer,
+      );
   static final _$listMemoryItems =
       $grpc.ClientMethod<$0.ListMemoryItemsRequest, $0.ListMemoryItemsReply>(
         '/digitalbrain.v2.ui.DigitalBrainV2Ui/ListMemoryItems',
@@ -659,6 +679,20 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.GetRunRequest.fromBuffer(value),
         ($0.RunReply value) => value.writeToBuffer(),
+      ),
+    );
+    $addMethod(
+      $grpc.ServiceMethod<
+        $0.GetConversationContextRequest,
+        $0.GetConversationContextReply
+      >(
+        'GetConversationContext',
+        getConversationContext_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.GetConversationContextRequest.fromBuffer(value),
+        ($0.GetConversationContextReply value) => value.writeToBuffer(),
       ),
     );
     $addMethod(
@@ -958,6 +992,18 @@ abstract class DigitalBrainV2UiServiceBase extends $grpc.Service {
   $async.Future<$0.RunReply> getRun(
     $grpc.ServiceCall call,
     $0.GetRunRequest request,
+  );
+
+  $async.Future<$0.GetConversationContextReply> getConversationContext_Pre(
+    $grpc.ServiceCall $call,
+    $async.Future<$0.GetConversationContextRequest> $request,
+  ) async {
+    return getConversationContext($call, await $request);
+  }
+
+  $async.Future<$0.GetConversationContextReply> getConversationContext(
+    $grpc.ServiceCall call,
+    $0.GetConversationContextRequest request,
   );
 
   $async.Future<$0.ListMemoryItemsReply> listMemoryItems_Pre(

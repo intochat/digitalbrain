@@ -27,6 +27,7 @@ service DigitalBrainV2Ui {
   rpc GetConnection(GetConnectionRequest) returns (ConnectionReply);
   rpc ListActivity(ListActivityRequest) returns (ListActivityReply);
   rpc GetRun(GetRunRequest) returns (RunReply);
+  rpc GetConversationContext(GetConversationContextRequest) returns (GetConversationContextReply);
   rpc ListMemoryItems(ListMemoryItemsRequest) returns (ListMemoryItemsReply);
   rpc GetMemoryItem(GetMemoryItemRequest) returns (MemoryItemReply);
   rpc GetHomeSummary(GetHomeSummaryRequest) returns (HomeSummaryReply);
@@ -495,6 +496,20 @@ message GetRunRequest {
 message RunReply {
   reserved "owner_id", "actor_id";
   FeatureRunSnapshot run = 1;
+}
+
+message GetConversationContextRequest {
+  reserved 1, 2;
+  reserved "owner_id", "actor_id";
+  string conversation_id = 3;
+  string request_id = 4;
+}
+
+message GetConversationContextReply {
+  reserved "owner_id", "actor_id";
+  string conversation_id = 1;
+  string request_id = 2;
+  string request_text = 3;
 }
 
 enum FeatureRunOrigin {

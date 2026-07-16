@@ -97,6 +97,22 @@ GoRouter createDigitalBrainRouter({
             },
           ),
           GoRoute(
+            path: '/chat/:conversationId',
+            name: 'chat-context',
+            builder: (context, state) {
+              final conversationId = state.pathParameters['conversationId'];
+              final requestId = state.uri.queryParameters['requestId'];
+              final activityReference = ChatActivityReference.tryCreate(
+                conversationId: conversationId,
+                requestId: requestId,
+              );
+              return ChatPage(
+                key: ValueKey('chat-context-$conversationId-$requestId'),
+                activityReference: activityReference,
+              );
+            },
+          ),
+          GoRoute(
             path: '/activity',
             name: 'activity',
             builder: (context, state) {
@@ -121,6 +137,13 @@ GoRouter createDigitalBrainRouter({
                 ),
                 onOpenRequest: (requestId) =>
                     context.go(_activityChatLocation(requestId: requestId)),
+                onOpenConversationContext: (conversationId, requestId) =>
+                    context.go(
+                      _activityChatLocation(
+                        conversationId: conversationId,
+                        requestId: requestId,
+                      ),
+                    ),
                 onOpenAutomation: (featureId, automationId) => context.go(
                   _featureAutomationLocation(
                     featureId: featureId,
@@ -161,6 +184,13 @@ GoRouter createDigitalBrainRouter({
                 ),
                 onOpenRequest: (requestId) =>
                     context.go(_activityChatLocation(requestId: requestId)),
+                onOpenConversationContext: (conversationId, requestId) =>
+                    context.go(
+                      _activityChatLocation(
+                        conversationId: conversationId,
+                        requestId: requestId,
+                      ),
+                    ),
                 onOpenAutomation: (featureId, automationId) => context.go(
                   _featureAutomationLocation(
                     featureId: featureId,
@@ -258,11 +288,14 @@ String _resumeChatLocation({
 
 String _activityChatLocation({String? conversationId, String? requestId}) {
   final queryParameters = <String, String>{};
-  if (conversationId != null) {
-    queryParameters['conversationId'] = conversationId;
-  }
   if (requestId != null) {
     queryParameters['requestId'] = requestId;
+  }
+  if (conversationId != null) {
+    return Uri(
+      pathSegments: ['', 'chat', conversationId],
+      queryParameters: queryParameters,
+    ).toString();
   }
   return Uri(path: '/chat', queryParameters: queryParameters).toString();
 }
