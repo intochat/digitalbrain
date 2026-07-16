@@ -6,6 +6,17 @@ namespace DigitalBrain.UnitTests;
 
 public sealed class RepositoryPolicyTests
 {
+    private static readonly string[] FlutterGeneratedArtifacts =
+    [
+        "app/linux/flutter/generated_plugin_registrant.cc",
+        "app/linux/flutter/generated_plugin_registrant.h",
+        "app/linux/flutter/generated_plugins.cmake",
+        "app/macos/Flutter/GeneratedPluginRegistrant.swift",
+        "app/windows/flutter/generated_plugin_registrant.cc",
+        "app/windows/flutter/generated_plugin_registrant.h",
+        "app/windows/flutter/generated_plugins.cmake"
+    ];
+
     private static readonly HashSet<string> CStyleExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".cs", ".dart", ".cpp", ".cc", ".h", ".swift", ".kt", ".kts", ".proto", ".frag", ".rc", ".pbxproj"
@@ -32,6 +43,19 @@ public sealed class RepositoryPolicyTests
             .ToArray();
 
         Assert.True(violations.Length == 0, string.Join(Environment.NewLine, violations));
+    }
+
+    [Fact]
+    public void Flutter_generated_artifacts_are_ignored_and_untracked()
+    {
+        var root = FindRepositoryRoot();
+        var trackedFiles = TrackedFiles(root);
+
+        foreach (var path in FlutterGeneratedArtifacts)
+        {
+            Assert.DoesNotContain(path, trackedFiles);
+            Assert.Equal(0, GitExitCode(root, "check-ignore", "--no-index", "-q", "--", path));
+        }
     }
 
     [Fact]
@@ -299,5 +323,22 @@ public sealed class RepositoryPolicyTests
         process.WaitForExit();
         Assert.Equal(0, process.ExitCode);
         return output.Split('\0', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private static int GitExitCode(string root, params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = root,
+            UseShellExecute = false
+        };
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start git.");
+        process.WaitForExit();
+        return process.ExitCode;
     }
 }
