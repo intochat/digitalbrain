@@ -298,7 +298,7 @@ public sealed class FeatureTransitionLimitTests
             Now.AddSeconds(1));
         var incoming = Assert.Single(committed.State.Intents);
         var legacy = Enumerable.Range(0, FeatureLimits.EffectResolutionsPerRun)
-            .Select(index => Resolution($"legacy-{index:D2}-" + new string('\u4e00', 800), Now.AddMinutes(index)))
+            .Select(index => Resolution($"legacy-{index:D2}-" + new string('\u4e00', 1200), Now.AddMinutes(index)))
             .ToArray();
         var seeded = committed.State with
         {
@@ -321,6 +321,53 @@ public sealed class FeatureTransitionLimitTests
         Assert.Equal(history.OrderBy(item => item.OperationKey, StringComparer.Ordinal), history);
     }
 
+    [Fact]
+    public void Maximum_metadata_for_thirty_two_effects_survives_pruning_with_stable_projection_and_exact_replay()
+    {
+        var claimed = ClaimedState();
+        var committed = FeatureInstallationTransitions.Commit(
+            claimed.State,
+            Commit(
+                claimed.Claim.Fence,
+                "{}",
+                Enumerable.Range(0, FeatureLimits.EffectResolutionsPerRun)
+                    .Select(index => new FeatureIntent(
+                        MaximumLogicalOperationKey(index),
+                        FeatureIntentKind.ExternalEffect,
+                        "{}"))
+                    .ToArray()),
+            Now.AddSeconds(1));
+        var resolutions = committed.State.Intents.Select((intent, index) => new FeatureEffectResolution(
+            intent.OperationKey,
+            new string((char)('\u4e00' + index), 256),
+            new string('a', 64),
+            index == 0 ? InoEffectTerminalKind.Failed : InoEffectTerminalKind.Approved,
+            Now.AddMinutes(index + 1),
+            new string('\u4f00', 512))).ToArray();
+        var resolved = resolutions.Aggregate(
+            committed.State,
+            FeatureInstallationTransitions.ResolveIntent);
+        var before = Assert.Single(FeatureRunProjection.Project(resolved));
+        var pruned = resolved with { Intents = [] };
+        var after = Assert.Single(FeatureRunProjection.Project(pruned));
+        var replay = FeatureInstallationTransitions.ResolveIntent(pruned, resolutions[0]);
+        var completion = Assert.Single(pruned.Completions);
+        var history = Assert.IsType<FeatureEffectResolution[]>(completion.EffectResolutions);
+
+        Assert.Equal(FeatureLimits.EffectResolutionsPerRun, completion.EffectCount);
+        Assert.Equal(FeatureLimits.EffectResolutionsPerRun, history.Length);
+        Assert.All(history, item => Assert.Equal(1024, System.Text.Encoding.UTF8.GetByteCount(item.OperationKey)));
+        Assert.All(history, item => Assert.Equal(768, System.Text.Encoding.UTF8.GetByteCount(item.DecisionId)));
+        Assert.All(history, item => Assert.Equal(1536, System.Text.Encoding.UTF8.GetByteCount(item.SafeResult)));
+        Assert.Equal(108_544, ResolutionHistoryBytes(history));
+        Assert.Equal(FeatureRunStatus.Failed, before.Status);
+        Assert.Equal(before.Status, after.Status);
+        Assert.Equal(resolutions[^1].ResolvedAt, before.CompletedAt);
+        Assert.Equal(before.CompletedAt, after.CompletedAt);
+        Assert.Equal(before.SafeFailure, after.SafeFailure);
+        Assert.Same(pruned, replay);
+    }
+
     private static FeatureEffectResolution Resolution(string operationKey, DateTimeOffset resolvedAt) => new(
         operationKey,
         "decision-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(operationKey))),
@@ -334,6 +381,9 @@ public sealed class FeatureTransitionLimitTests
         System.Text.Encoding.UTF8.GetByteCount(item.DecisionId) +
         System.Text.Encoding.UTF8.GetByteCount(item.ActorScope) +
         System.Text.Encoding.UTF8.GetByteCount(item.SafeResult));
+
+    private static string MaximumLogicalOperationKey(int index) =>
+        $"effect-{index:D2}-" + new string('x', 991);
 
     private static (FeatureInstallationState State, FeatureRunClaim Claim) ClaimedState(int inputIndex = 0)
     {

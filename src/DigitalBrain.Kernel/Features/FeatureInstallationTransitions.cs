@@ -529,14 +529,20 @@ internal static class FeatureInstallationTransitions
     {
         ArgumentNullException.ThrowIfNull(resolution);
         ValidateOperationKey(resolution.OperationKey);
-        DemandBoundedText(resolution.DecisionId, 256, nameof(resolution.DecisionId));
+        DemandBoundedUtf8Text(
+            resolution.DecisionId,
+            FeatureLimits.EffectDecisionIdUtf8Bytes,
+            nameof(resolution.DecisionId));
         if (!RuntimeStateKeys.IsScopeHash(resolution.ActorScope))
             throw new ArgumentException("A canonical actor scope digest is required.", nameof(resolution.ActorScope));
         if (!Enum.IsDefined(resolution.TerminalKind) || resolution.TerminalKind == InoEffectTerminalKind.None)
             throw new ArgumentOutOfRangeException(nameof(resolution.TerminalKind));
         if (resolution.ResolvedAt == default || resolution.ResolvedAt.Offset != TimeSpan.Zero)
             throw new ArgumentException("An effect resolution timestamp must be UTC.", nameof(resolution.ResolvedAt));
-        DemandBoundedText(resolution.SafeResult, 512, nameof(resolution.SafeResult));
+        DemandBoundedUtf8Text(
+            resolution.SafeResult,
+            FeatureLimits.EffectSafeResultUtf8Bytes,
+            nameof(resolution.SafeResult));
     }
     private static void ValidateOperationKey(string operationKey)
     {
@@ -570,10 +576,10 @@ internal static class FeatureInstallationTransitions
         Encoding.UTF8.GetByteCount(resolution.DecisionId) +
         Encoding.UTF8.GetByteCount(resolution.ActorScope) +
         Encoding.UTF8.GetByteCount(resolution.SafeResult);
-    private static void DemandBoundedText(string value, int maximumLength, string parameterName)
+    private static void DemandBoundedUtf8Text(string value, int maximumUtf8Bytes, string parameterName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
-        if (value.Length > maximumLength || value.Any(char.IsControl))
+        if (Encoding.UTF8.GetByteCount(value) > maximumUtf8Bytes || value.Any(char.IsControl))
             throw new ArgumentException("Bounded safe text is required.", parameterName);
     }
     private static string PayloadDigest(string payloadJson) =>

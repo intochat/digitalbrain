@@ -45,7 +45,11 @@ internal static class FeatureLimits
     public const int IntentsPerRun = 32;
     public const int EffectResolutionsPerRun = 32;
     public const int IntentOperationKeyUtf8Bytes = 1024;
-    public const int EffectResolutionHistoryUtf8Bytes = 65_536;
+    public const int EffectDecisionIdUtf8Bytes = 768;
+    public const int EffectActorScopeUtf8Bytes = 64;
+    public const int EffectSafeResultUtf8Bytes = 1536;
+    public const int EffectResolutionHistoryUtf8Bytes = EffectResolutionsPerRun *
+        (IntentOperationKeyUtf8Bytes + EffectDecisionIdUtf8Bytes + EffectActorScopeUtf8Bytes + EffectSafeResultUtf8Bytes);
     public const int ReadsPerRun = 20;
     public const int ModelCallsPerRun = 4;
     public const int AttemptsPerInput = 5;
