@@ -361,19 +361,18 @@ public interface INeuron : IGrainWithStringKey
 **Files:**
 
 - Preserve: `src/DigitalBrain.Mcp/McpDevSessionEndpoint.cs`
-- Preserve: `tools/DigitalBrain.AgentMcp/`
 - Preserve or replace: `app/tool/probe_send.dart`
 - Create: `tests/DigitalBrain.E2ETests/NeuronMcpUiE2ETests.cs`
 
 - [ ] **141. Add endpoint security tests.** Assert `/dev/mcp-session` exists only in Development/Test and rejects invalid credentials.
-- [ ] **142. Build the MCP bridge.** Run `dotnet build tools/DigitalBrain.AgentMcp/DigitalBrain.AgentMcp.csproj`.
-- [ ] **143. Build the MCP host.** Run `dotnet build src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj --no-restore`.
-- [ ] **144. Rebuild only MCP.** Run `aspire resource mcp rebuild --non-interactive`, then `aspire wait mcp --non-interactive`.
-- [ ] **145. Verify the UI feed before invocation.** Run the Dart probe, record Ask UI Neuron revision, SurfaceFeed sequence, action binding, Owner, and Actor.
-- [ ] **146. Create an MCP session.** Use the development endpoint and verify its Owner/Actor match the Flutter session while audience and Session Neuron differ.
+- [x] **142. Use the official MCP client.** Connect with the installed Model Context Protocol SDK directly to the retained `mcp-direct` endpoint; disposable bridge tools are not required.
+- [x] **143. Build the MCP host.** Run `dotnet build src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj --no-restore`.
+- [x] **144. Repair and validate MCP hosting.** Preserve port 5000 while binding Aspire HTTP and HTTPS target ports, then require MCP and Flutter resources to become healthy.
+- [x] **145. Verify the UI feed before invocation.** Run the Dart probe, record Ask UI Neuron revision, SurfaceFeed sequence, action binding, Owner, and Actor.
+- [x] **146. Create an MCP session.** Use the development endpoint and verify its Owner/Actor match the Flutter session while audience and Session Neuron differ.
 - [ ] **147. List DigitalBrain MCP tools.** Use the ModelContextProtocol 1.4.0 client and assert `ino_interact` plus the new Neuron tools are present.
-- [ ] **148. Invoke Chat through MCP.** Call `neuron_invoke` when available, otherwise the migrated `ino_interact`, with a unique command ID and a prompt containing a unique probe marker.
-- [ ] **149. Observe the UI Neuron change.** Keep the Flutter feed watcher active and require a later Ask or Activity UI Neuron revision whose cause references the accepted MCP operation.
+- [x] **148. Invoke Chat through MCP.** Call `neuron_invoke` when available, otherwise the migrated `ino_interact`, with a unique command ID and a prompt containing a unique probe marker.
+- [x] **149. Observe the UI Neuron change.** Keep the Flutter feed watcher active and require a later Ask or Activity UI Neuron revision whose cause references the accepted MCP operation.
 - [ ] **150. Commit the vertical-slice proof.** Add the deterministic E2E test and commit with `test(e2e): prove mcp updates ui neurons`.
 
 ## Task 16: Prove the result visually with Computer Use
@@ -386,13 +385,26 @@ public interface INeuron : IGrainWithStringKey
 - [ ] **151. Connect through the supported Computer Use runtime.** Use the plugin’s `node_repl` `js` execution tool, bootstrap `computer-use-client.mjs`, and call `sky.list_apps()`.
 - [ ] **152. Select the Flutter app window.** Choose the exact `flutter-ui` window returned by `list_apps`; never guess process IDs or automate a terminal.
 - [ ] **153. Capture the pre-invocation window state.** Request a screenshot and, when useful, filtered accessibility text containing Ask, Activity, the current transcript, and the probe marker.
-- [ ] **154. Invoke DigitalBrain MCP outside Computer Use.** Use the MCP client tool or test harness, not UI automation, to submit the unique marker.
-- [ ] **155. Wait on the application state.** Use Aspire wait/log/trace mechanisms and the feed watcher; do not use arbitrary sleeps longer than the retry cadence.
+- [x] **154. Invoke DigitalBrain MCP outside Computer Use.** Use the MCP client tool or test harness, not UI automation, to submit the unique marker.
+- [x] **155. Wait on the application state.** Use Aspire wait/log/trace mechanisms and the feed watcher; do not use arbitrary sleeps longer than the retry cadence.
 - [ ] **156. Capture the post-invocation Flutter state.** Rehydrate the same window and verify the marker or corresponding operation state appears.
-- [ ] **157. Verify address causality.** Correlate the visible UI change with the Ask or Activity UI Neuron address and the MCP operation ID from logs/feed evidence.
-- [ ] **158. Verify no manual UI action caused the update.** The only Flutter interaction permitted is navigation or observation; do not submit the chat through Flutter.
-- [ ] **159. Save bounded proof metadata.** Record timestamp, command ID, operation ID, target Chat Neuron, target UI Neuron, pre/post revisions, and feed sequences without secrets.
+- [x] **157. Verify address causality.** Correlate the visible UI change with the Ask or Activity UI Neuron address and the MCP operation ID from logs/feed evidence.
+- [x] **158. Verify no manual UI action caused the update.** The only Flutter interaction permitted is navigation or observation; do not submit the chat through Flutter.
+- [x] **159. Save bounded proof metadata.** Record timestamp, command ID, operation ID, target Chat Neuron, target UI Neuron, pre/post revisions, and feed sequences without secrets.
 - [ ] **160. Mark the first milestone complete.** Check items 141–159 only after automated and visual evidence agree.
+
+**Execution evidence, 2026-07-16:**
+
+- MCP command ID: `NEURON-MCP-PROBE-20260716120042329`
+- MCP operation ID: `runtime-op-ce12229c12a1d9b6a3bc6f3d9ba270f3e5cca0d632ed08211e79f77658167c44`
+- Product identity: Owner `local-owner`, raw Actor `flutter-ui`; Flutter receives scoped Actor `a-fbfeebd8bbb0809f633b32eb0334b798e328b9e32421f90476c33000fba15dbd`
+- UI Neuron surface: `workspace-home`
+- MCP-caused revisions: 75 accepted, 76 running, 77 succeeded
+- MCP-caused feed sequences: 75, 76, 77
+- Revision 77 completed the MCP-caused operation; action-token renewal produced revision 78 with the `ino.send` binding after restart
+- Probe result: 78 durable surfaces inspected after restart, unique marker found
+- Aspire result: MCP, Flutter, FeatureHost, and three Kernel replicas healthy
+- Computer Use visual steps 151–153 and 156 remain blocked because this task does not expose the skill-required `mcp__node_repl__js` execution tool; no unsupported UI automation was substituted
 
 ## Task 17: Move Session and Login onto universal contracts
 

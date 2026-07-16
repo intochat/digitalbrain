@@ -150,6 +150,13 @@ public sealed class AppHostTopologyTests
         Assert.Equal("https", httpsEndpoint.UriScheme);
         Assert.Equal("http2", httpsEndpoint.Transport);
         Assert.True(httpsEndpoint.IsProxied);
+        var directEndpoint = Assert.Single(
+            mcp.Annotations.OfType<EndpointAnnotation>(),
+            endpoint => endpoint.Name == "mcp-direct");
+        Assert.Equal("http", directEndpoint.UriScheme);
+        Assert.Equal(5000, directEndpoint.Port);
+        Assert.Equal(5000, directEndpoint.TargetPort);
+        Assert.False(directEndpoint.IsProxied);
         Assert.Contains(
             mcp.Annotations.OfType<HealthCheckAnnotation>(),
             annotation => annotation.Key == "mcp_https_/health_200_check");
@@ -182,6 +189,11 @@ public sealed class AppHostTopologyTests
         Assert.Equal(DigitalBrain.Kernel.Contracts.Runtime.SessionAudiences.Ui, mcpEnvironment["DigitalBrain__Runtime__Ui__Audience"]);
         Assert.Equal("6291456", mcpEnvironment["DigitalBrain__Runtime__Mcp__MaxBodyBytes"]);
         Assert.Equal("6291456", mcpEnvironment["DigitalBrain__Runtime__Transport__MaxBodyBytes"]);
+        var aspnetCoreUrls = Assert.IsType<ReferenceExpression>(mcpEnvironment["ASPNETCORE_URLS"]);
+        Assert.Contains("http://localhost:", aspnetCoreUrls.ValueExpression, StringComparison.Ordinal);
+        Assert.Contains("https://localhost:", aspnetCoreUrls.ValueExpression, StringComparison.Ordinal);
+        Assert.Contains("http://localhost:5000", aspnetCoreUrls.ValueExpression, StringComparison.Ordinal);
+        Assert.Equal(2, aspnetCoreUrls.ValueProviders.Count);
         Assert.DoesNotContain(
             mcpEnvironment,
             pair => pair.Key.Contains("BootstrapSecret", StringComparison.OrdinalIgnoreCase)
