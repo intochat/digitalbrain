@@ -51,4 +51,40 @@ public class ModelCatalogTests
         var exception = Assert.Throws<BrainException>(() => ModelCatalog.ParseTier("llm/99"));
         Assert.Equal("input.invalid", exception.Code);
     }
+
+    [Fact]
+    public void Configuration_binds_azureopenai_provider_and_balanced_model()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Brain:Ai:Provider"] = "azureopenai",
+                ["Brain:Ai:Balanced"] = "gpt-4o-mini"
+            })
+            .Build();
+
+        var catalog = ModelCatalog.FromConfiguration(config);
+        var binding = catalog.Resolve(ModelTier.Balanced);
+
+        Assert.Equal("azureopenai", binding.Provider);
+        Assert.Equal("gpt-4o-mini", binding.Model);
+    }
+
+    [Fact]
+    public void Configuration_applies_provider_globally_while_model_stays_per_tier()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Brain:Ai:Provider"] = "azureopenai",
+                ["Brain:Ai:Balanced"] = "gpt-4o-mini"
+            })
+            .Build();
+
+        var catalog = ModelCatalog.FromConfiguration(config);
+        var fastBinding = catalog.Resolve(ModelTier.Fast);
+
+        Assert.Equal("azureopenai", fastBinding.Provider);
+        Assert.Equal("llama3.1:8b", fastBinding.Model);
+    }
 }
