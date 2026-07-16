@@ -94,6 +94,8 @@ if (ctx.EnableMcp)
         }
     }
 }
+var brainKernel = builder.AddProject<Projects.Brain_Kernel_Host>("brain-kernel");
+builder.AddProject<Projects.Brain_Mcp>("brain-mcp").WaitFor(brainKernel);
 builder.Build().Run();
 static bool IsLocalUiProfile(string profile) =>
     profile.Equals("Development", StringComparison.OrdinalIgnoreCase) || profile.Equals("Test", StringComparison.OrdinalIgnoreCase);

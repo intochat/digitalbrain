@@ -32,6 +32,7 @@
     <Project Path="hosts/DigitalBrain.FeatureHost/DigitalBrain.FeatureHost.csproj" />
     <Project Path="hosts/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
     <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
+    <Project Path="hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.E2ETests/DigitalBrain.E2ETests.csproj" />
@@ -43,6 +44,9 @@
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
+  </Folder>
+  <Folder Name="/edge/">
+    <Project Path="edge/Brain.Mcp/Brain.Mcp.csproj" />
   </Folder>
   <Folder Name="/features/">
     <Project Path="features/EnrichSalesforce/DigitalBrain.Features.EnrichSalesforce.csproj" />
