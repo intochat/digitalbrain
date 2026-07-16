@@ -64,10 +64,15 @@ if (ctx.EnableMcp)
             .WithEnvironment("DigitalBrain__Runtime__Ui__Audience", DigitalBrain.Kernel.Contracts.Runtime.SessionAudiences.Ui)
             .WithEndpoint(name: "http", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
             .WithHttpsEndpoint(name: "https", env: "ASPNETCORE_HTTPS_PORTS", isProxied: true)
+            .WithHttpEndpoint(port: 5000, targetPort: 5000, name: "mcp-direct", env: "DIGITALBRAIN_MCP_DIRECT_PORT", isProxied: false)
             .AsHttp2Service()
             .WithEndpoint("https", endpoint => endpoint.Transport = "http2")
             .WithHttpHealthCheck(path: "/health", endpointName: "https")
             .WithReplicas(1);
+    mcp.WithEnvironment(
+        "ASPNETCORE_URLS",
+        ReferenceExpression.Create(
+            $"http://localhost:{mcp.GetEndpoint("http").Property(EndpointProperty.TargetPort)};https://localhost:{mcp.GetEndpoint("https").Property(EndpointProperty.TargetPort)};http://localhost:5000"));
     ctx.ConfigureClient(mcp);
     mcp.WithReference(ctx.FeatureArtifacts);
     mcp.WaitFor(ctx.ConversationStateBlobs);

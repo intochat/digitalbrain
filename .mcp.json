@@ -19,6 +19,10 @@
     "dart": {
       "command": "gcf-proxy",
       "args": ["dart", "mcp-server"]
+    },
+    "digitalbrain": {
+      "type": "http",
+      "url": "http://localhost:5000/mcp"
     }
   }
 }

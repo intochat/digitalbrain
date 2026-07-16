@@ -57,6 +57,8 @@ var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseMiddleware<RuntimeTransportBoundary>();
 app.MapUiTransport();
+if (profile is RuntimeProfile.Development or RuntimeProfile.Test)
+    app.MapPost("/dev/mcp-session", McpDevSessionEndpoint.CreateAsync);
 app.Use(async (context, next) =>
 {
     if (!context.Request.Path.StartsWithSegments("/mcp"))
@@ -74,8 +76,11 @@ app.Use(async (context, next) =>
     var guard = context.RequestServices.GetRequiredService<McpRequestGuard>();
     var bodySize = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
     if (bodySize is { IsReadOnly: false }) bodySize.MaxRequestBodySize = guard.MaxBodyBytes;
+    var audience = context.Request.Headers["X-V2-Audience"].ToString();
+    if (string.IsNullOrWhiteSpace(audience))
+        audience = mcpAudience;
     if (!guard.TryBegin(RequestScope.Id(principal), context.Request.Headers.Origin,
-            context.Request.Headers["X-V2-Audience"].ToString(), context.Request.ContentLength, out var lease))
+            audience, context.Request.ContentLength, out var lease))
     {
         context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         return;
