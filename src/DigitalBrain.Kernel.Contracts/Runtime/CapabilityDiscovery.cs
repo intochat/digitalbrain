@@ -120,6 +120,32 @@ public static class CapabilityCatalogProjectionGrainIds
     public const long Singleton = 0;
 }
 
+public enum OwnerConnectionHealthStatus
+{
+    Unspecified = 0,
+    Healthy = 1,
+    NeedsReauth = 2,
+    Disconnected = 3,
+    Misconfigured = 4
+}
+
+[GenerateSerializer, Alias("digitalbrain.owner-connection-snapshot.v1")]
+public sealed record OwnerConnectionSnapshot(
+    [property: Id(0)] string Provider,
+    [property: Id(1)] string ConnectionId,
+    [property: Id(2)] string DisplayName,
+    [property: Id(3)] OwnerConnectionHealthStatus Health,
+    [property: Id(4)] string? HealthDetail,
+    [property: Id(5)] string[] UnlockedCapabilityIds,
+    [property: Id(6)] string? ConnectPath);
+
+[Alias("digitalbrain.owner-connection-catalog-grain.v1")]
+public interface IOwnerConnectionCatalogGrain : IGrainWithStringKey
+{
+    [Alias("read")]
+    Task<OwnerConnectionSnapshot[]> ReadAsync();
+}
+
 public interface ICapabilityDescriptorSource
 {
     IReadOnlyList<CapabilityDescriptor> Descriptors { get; }

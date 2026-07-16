@@ -455,6 +455,24 @@ message FeatureReply {
   int64 revision = 11;
 }
 
+enum ConnectionHealthStatus {
+  CONNECTION_HEALTH_STATUS_UNSPECIFIED = 0;
+  CONNECTION_HEALTH_STATUS_HEALTHY = 1;
+  CONNECTION_HEALTH_STATUS_NEEDS_REAUTH = 2;
+  CONNECTION_HEALTH_STATUS_DISCONNECTED = 3;
+  CONNECTION_HEALTH_STATUS_MISCONFIGURED = 4;
+}
+
+message ConnectionSnapshot {
+  string provider = 1;
+  string connection_id = 2;
+  string display_name = 3;
+  ConnectionHealthStatus health = 4;
+  optional string health_detail = 5;
+  repeated string unlocked_capability_ids = 6;
+  optional string connect_path = 7;
+}
+
 message ListConnectionsRequest {
   reserved 1, 2;
   reserved "owner_id", "actor_id";
@@ -462,6 +480,7 @@ message ListConnectionsRequest {
 
 message ListConnectionsReply {
   reserved "owner_id", "actor_id";
+  repeated ConnectionSnapshot connections = 1;
 }
 
 message GetConnectionRequest {
@@ -472,6 +491,7 @@ message GetConnectionRequest {
 
 message ConnectionReply {
   reserved "owner_id", "actor_id";
+  ConnectionSnapshot connection = 1;
 }
 
 message ListActivityRequest {

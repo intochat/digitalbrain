@@ -29,6 +29,7 @@ public sealed class DigitalBrainUiEndpoints(
     FeatureAuthoringService authoring,
     FeatureSuggestionService suggestions,
     ILogger<DigitalBrainUiEndpoints> logger,
+    IOwnerConnectionCatalogClient connections,
     DigitalBrainQueryService? queries = null)
 {
     private const int MaximumVerificationEvidenceUtf8Bytes = 2 * 1024 * 1024;
@@ -272,6 +273,52 @@ public sealed class DigitalBrainUiEndpoints(
         return Project(() => ProjectFeature(command.DraftId, context.ActorId, detail));
     }
 
+    public async Task<ListConnectionsReply> ListConnectionsAsync(
+        RuntimeRequestContext context,
+        ListConnectionsRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        _ = request;
+        var snapshots = await InvokeConnectionQueryAsync(
+                () => connections.ReadAsync(context.OwnerId, cancellationToken),
+                "Connections could not be loaded.")
+            .ConfigureAwait(false);
+        return ProjectConnectionQuery(() =>
+        {
+            var reply = new ListConnectionsReply();
+            reply.Connections.Add(snapshots.Select(ToConnectionReply));
+            return reply;
+        });
+    }
+
+    public async Task<ConnectionReply> GetConnectionAsync(
+        RuntimeRequestContext context,
+        GetConnectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        string connectionId;
+        try
+        {
+            connectionId = Identifier(request.ConnectionId, 256);
+        }
+        catch (ArgumentException)
+        {
+            throw Status(StatusCode.InvalidArgument, "The Connection request is invalid.");
+        }
+
+        var snapshots = await InvokeConnectionQueryAsync(
+                () => connections.ReadAsync(context.OwnerId, cancellationToken),
+                "Connections could not be loaded.")
+            .ConfigureAwait(false);
+        var match = snapshots.FirstOrDefault(snapshot =>
+            string.Equals(snapshot.ConnectionId, connectionId, StringComparison.Ordinal));
+        if (match is null)
+            throw Status(StatusCode.NotFound, "The requested Connection was not found.");
+        return ProjectConnectionQuery(() => new ConnectionReply { Connection = ToConnectionReply(match) });
+    }
+
     public async Task<ListActivityReply> ListActivityAsync(
         RuntimeRequestContext context,
         ListActivityRequest request,
@@ -454,6 +501,43 @@ public sealed class DigitalBrainUiEndpoints(
         }
     }
 
+    private async Task<T> InvokeConnectionQueryAsync<T>(Func<Task<T>> invocation, string failureDetail)
+    {
+        try
+        {
+            return await invocation().ConfigureAwait(false);
+        }
+        catch (RpcException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (ArgumentException)
+        {
+            throw Status(StatusCode.InvalidArgument, "The Connection request is invalid.");
+        }
+        catch (TimeoutException)
+        {
+            throw Status(StatusCode.Unavailable, "Connections are temporarily unavailable. Retry the same request.");
+        }
+        catch (IOException)
+        {
+            throw Status(StatusCode.Unavailable, "Connections are temporarily unavailable. Retry the same request.");
+        }
+        catch (OrleansException)
+        {
+            throw Status(StatusCode.Unavailable, "Connections are temporarily unavailable. Retry the same request.");
+        }
+        catch (Exception)
+        {
+            logger.LogError("A Connections query failed safely.");
+            throw Status(StatusCode.Internal, failureDetail);
+        }
+    }
+
     private T ProjectQuery<T>(Func<T> projection)
     {
         try
@@ -469,6 +553,49 @@ public sealed class DigitalBrainUiEndpoints(
             logger.LogError("An Activity response projection failed safely.");
             throw Status(StatusCode.Internal, "Activity could not be loaded.");
         }
+    }
+
+    private T ProjectConnectionQuery<T>(Func<T> projection)
+    {
+        try
+        {
+            return projection();
+        }
+        catch (RpcException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            logger.LogError("A Connections response projection failed safely.");
+            throw Status(StatusCode.Internal, "Connections could not be loaded.");
+        }
+    }
+
+    private static ConnectionSnapshot ToConnectionReply(OwnerConnectionSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var reply = new ConnectionSnapshot
+        {
+            Provider = Identifier(snapshot.Provider, 256),
+            ConnectionId = Identifier(snapshot.ConnectionId, 256),
+            DisplayName = Text(snapshot.DisplayName, 256),
+            Health = snapshot.Health switch
+            {
+                OwnerConnectionHealthStatus.Healthy => ConnectionHealthStatus.Healthy,
+                OwnerConnectionHealthStatus.NeedsReauth => ConnectionHealthStatus.NeedsReauth,
+                OwnerConnectionHealthStatus.Disconnected => ConnectionHealthStatus.Disconnected,
+                OwnerConnectionHealthStatus.Misconfigured => ConnectionHealthStatus.Misconfigured,
+                _ => ConnectionHealthStatus.Unspecified
+            }
+        };
+        if (!string.IsNullOrWhiteSpace(snapshot.HealthDetail))
+            reply.HealthDetail = Text(snapshot.HealthDetail, 4096);
+        if (!string.IsNullOrWhiteSpace(snapshot.ConnectPath))
+            reply.ConnectPath = Text(snapshot.ConnectPath, 1024);
+        foreach (var capabilityId in snapshot.UnlockedCapabilityIds ?? [])
+            reply.UnlockedCapabilityIds.Add(Identifier(capabilityId, 256));
+        return reply;
     }
 
     private static GrpcFeatureRunSnapshot ToReply(DigitalBrainRun value)

@@ -269,6 +269,18 @@ public sealed class FeatureAuthoringContractTests
             typeof(ICapabilityCatalogProjectionGrain)
                 .GetMethod(nameof(ICapabilityCatalogProjectionGrain.ReadAsync))!
                 .ReturnType);
+        Assert.Equal(
+            "digitalbrain.owner-connection-catalog-grain.v1",
+            typeof(IOwnerConnectionCatalogGrain).GetCustomAttribute<AliasAttribute>()?.Alias);
+        AssertMethodAlias(
+            typeof(IOwnerConnectionCatalogGrain),
+            nameof(IOwnerConnectionCatalogGrain.ReadAsync),
+            "read");
+        Assert.Equal(
+            typeof(Task<OwnerConnectionSnapshot[]>),
+            typeof(IOwnerConnectionCatalogGrain)
+                .GetMethod(nameof(IOwnerConnectionCatalogGrain.ReadAsync))!
+                .ReturnType);
 
         var suggest = typeof(IFeatureSuggestionModelGrain).GetMethod(nameof(IFeatureSuggestionModelGrain.SuggestAsync))!;
         Assert.Equal(typeof(Task<FeatureDraftPatch>), suggest.ReturnType);

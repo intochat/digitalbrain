@@ -189,6 +189,7 @@ internal static class DigitalBrainOrleansExtensions
         builder.Services.AddSingleton<ICapabilityDispatcher, CapabilityDispatcher>();
         builder.Services.TryAddSingleton<ICapabilityCatalog, BuiltInCapabilityCatalog>();
         builder.Services.TryAddSingleton<IOwnerConnectionHealth, OwnerConnectionHealth>();
+        builder.Services.TryAddSingleton<IOwnerConnectionCatalog, OwnerConnectionCatalog>();
         builder.Services.TryAddSingleton<IFeatureCapabilityProjectionSource, FeatureCapabilityProjectionSource>();
         builder.Services.TryAddSingleton<IOwnerCapabilityCatalog, OwnerCapabilityCatalog>();
         builder.Services.TryAddSingleton<ICapabilityResolver, HybridCapabilityResolver>();

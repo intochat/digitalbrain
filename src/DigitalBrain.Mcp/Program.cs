@@ -33,6 +33,7 @@ builder.Services.AddSingleton<IFeatureLifecycleRail>(services => services.GetReq
 builder.Services.AddSingleton<DigitalBrainQueryService>();
 builder.Services.AddSingleton<FeatureSuggestionService>();
 builder.Services.AddFeatureCapabilityCatalog();
+builder.Services.AddOwnerConnectionCatalogClient();
 builder.Services.AddSingleton<FeatureAuthoringService>();
 builder.Services.AddSingleton(AuthorizationFlowProxyOptions.FromConfiguration(builder.Configuration, profile));
 builder.Services.AddHttpClient<AuthorizationFlowStartProxy>().ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5) });
