@@ -899,6 +899,8 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   GrpcUnaryResponse<wire.AcknowledgeSurfaceFeedReply>? ackResponse;
   wire.GetFeatureDraftRequest? getFeatureDraftRequest;
   CallOptions? getFeatureDraftOptions;
+  wire.ListFeaturesRequest? listFeaturesRequest;
+  CallOptions? listFeaturesOptions;
   wire.ResetFeatureDraftInstallationRequest?
   resetFeatureDraftInstallationRequest;
   CallOptions? resetFeatureDraftInstallationOptions;
@@ -1026,6 +1028,16 @@ class _FakeGrpcClientPort implements GrpcClientPort {
         ),
       ),
     );
+  }
+
+  @override
+  GrpcUnaryResponse<wire.ListFeaturesReply> listFeatures(
+    wire.ListFeaturesRequest request,
+    CallOptions options,
+  ) {
+    listFeaturesRequest = request;
+    listFeaturesOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.ListFeaturesReply()));
   }
 
   @override

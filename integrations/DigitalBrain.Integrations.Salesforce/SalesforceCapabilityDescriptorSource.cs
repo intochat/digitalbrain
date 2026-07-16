@@ -19,6 +19,17 @@ internal sealed class SalesforceCapabilityDescriptorSource : ICapabilityDescript
             CapabilityOperationKind.Query,
             true),
         new CapabilityDescriptor(
+            SalesforceCapabilityIds.AccountSearch,
+            1,
+            "Search Salesforce accounts",
+            "Finds Salesforce accounts whose names contain the requested company name.",
+            ["Find the Salesforce account for Northstar Robotics.", "Search Salesforce accounts for Acme."],
+            [],
+            [SalesforceConnection],
+            CapabilityOrigin.Integration,
+            CapabilityOperationKind.Query,
+            true),
+        new CapabilityDescriptor(
             SalesforceCapabilityIds.RecordUpdatePropose,
             1,
             "Propose a Salesforce record update",

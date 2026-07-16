@@ -5,6 +5,11 @@ import '../../runtime/session_state.dart';
 typedef AuthenticationRequiredCallback = Future<void> Function();
 
 abstract interface class DigitalBrainTransport implements SessionTransport {
+  Future<wire.ListFeaturesReply> listFeatures({
+    required String accessToken,
+    required wire.ListFeaturesRequest request,
+  }) => throw UnimplementedError();
+
   Future<wire.FeatureDraftReply> getFeatureDraft({
     required String accessToken,
     required wire.GetFeatureDraftRequest request,
@@ -76,6 +81,10 @@ abstract interface class DigitalBrainTransport implements SessionTransport {
   });
 }
 
+abstract interface class FeatureCatalogClient {
+  Future<wire.ListFeaturesReply> listFeatures(wire.ListFeaturesRequest request);
+}
+
 abstract interface class FeatureAuthoringClient {
   Future<wire.FeatureDraftReply> getFeatureDraft(
     wire.GetFeatureDraftRequest request,
@@ -122,7 +131,8 @@ abstract interface class ActivityClient {
   Future<wire.RunReply> getRun(wire.GetRunRequest request);
 }
 
-class DigitalBrainClient implements FeatureAuthoringClient, ActivityClient {
+class DigitalBrainClient
+    implements FeatureAuthoringClient, FeatureCatalogClient, ActivityClient {
   const DigitalBrainClient({
     required SessionController session,
     required DigitalBrainTransport transport,
@@ -134,6 +144,14 @@ class DigitalBrainClient implements FeatureAuthoringClient, ActivityClient {
   final SessionController _session;
   final DigitalBrainTransport _transport;
   final AuthenticationRequiredCallback? _onAuthenticationRequired;
+
+  @override
+  Future<wire.ListFeaturesReply> listFeatures(
+    wire.ListFeaturesRequest request,
+  ) => _authorized(
+    (accessToken) =>
+        _transport.listFeatures(accessToken: accessToken, request: request),
+  );
 
   @override
   Future<wire.FeatureDraftReply> getFeatureDraft(

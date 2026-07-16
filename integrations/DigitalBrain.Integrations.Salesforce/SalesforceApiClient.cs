@@ -46,6 +46,27 @@ internal sealed class SalesforceApiClient(ForceClient client) : ISalesforceApiCl
         cancellationToken.ThrowIfCancellationRequested();
         return result.Records.Select(record => JsonConvert.SerializeObject(Normalize(record))).ToArray();
     }
+    public async Task<SalesforceAccountSearchResponse> SearchAccountsAsync(SalesforceAccountSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = await client.QueryAsync<Dictionary<string, object?>>("SELECT Id, Name FROM Account ORDER BY LastModifiedDate DESC LIMIT 50").ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        var accounts = result.Records
+            .Select(static record => (
+                Id: Convert.ToString(record.TryGetValue("Id", out var id) ? Normalize(id) : null, CultureInfo.InvariantCulture),
+                Name: Convert.ToString(record.TryGetValue("Name", out var name) ? Normalize(name) : null, CultureInfo.InvariantCulture)))
+            .Where(account =>
+                account.Id is { Length: 15 or 18 } &&
+                account.Name is { Length: > 0 } &&
+                account.Name.Contains(request.Query, StringComparison.OrdinalIgnoreCase))
+            .Take(request.MaximumResults)
+            .Select(static account => new SalesforceAccountSummary(
+                new SalesforceRecordReference("Account", account.Id!),
+                account.Name!))
+            .ToArray();
+        return new SalesforceAccountSearchResponse(accounts);
+    }
     public async Task<SalesforceMutationPreviewResult> PreviewUpdateAsync(SalesforceUpdatePreviewRequest request, CancellationToken ct)
     {
         try

@@ -7,6 +7,12 @@ enum MainDestination {
     icon: Icons.chat_bubble_outline,
     selectedIcon: Icons.chat_bubble,
   ),
+  features(
+    label: 'Features',
+    location: '/features',
+    icon: Icons.auto_awesome_outlined,
+    selectedIcon: Icons.auto_awesome,
+  ),
   activity(
     label: 'Activity',
     location: '/activity',
@@ -28,6 +34,10 @@ enum MainDestination {
 
   static MainDestination? forLocation(Uri location) {
     for (final destination in values) {
+      if (destination == MainDestination.features &&
+          location.path.startsWith('/features/proposals/')) {
+        continue;
+      }
       if (location.path == destination.location ||
           location.path.startsWith('${destination.location}/')) {
         return destination;

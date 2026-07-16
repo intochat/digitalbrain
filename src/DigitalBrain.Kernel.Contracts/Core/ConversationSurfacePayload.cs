@@ -138,7 +138,7 @@ public static class ConversationSurfacePayload
             nativeKind = "inoConversation",
             data = new
             {
-                intro = "Ask INO about this workspace. I can help you understand what’s here and decide what to do next.",
+                intro = "Ask DigitalBrain about this workspace. I can help you understand what’s here and decide what to do next.",
                 messages,
                 operation
             }

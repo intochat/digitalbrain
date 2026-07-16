@@ -3,6 +3,9 @@ using System.Text.Json;
 using System.Xml.Linq;
 using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Integrations.Salesforce.Contracts;
+using DigitalBrain.Integrations.Web.Contracts;
+using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Runtime;
 using Xunit;
 
 namespace DigitalBrain.IntegrationContractTests;
@@ -12,14 +15,16 @@ public sealed class IntegrationContractBoundaryTests
     private static readonly Assembly[] ContractAssemblies =
     [
         typeof(GoogleCapabilityIds).Assembly,
-        typeof(SalesforceCapabilityIds).Assembly
+        typeof(SalesforceCapabilityIds).Assembly,
+        typeof(WebSearchCapabilityIds).Assembly
     ];
 
     private static readonly IReadOnlyDictionary<string, string[]> AllowedAssemblyReferences =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["DigitalBrain.Integrations.Google.Contracts"] = ["System.Runtime"],
-            ["DigitalBrain.Integrations.Salesforce.Contracts"] = ["System.Collections", "System.Runtime", "System.Text.Json"]
+            ["DigitalBrain.Integrations.Salesforce.Contracts"] = ["System.Collections", "System.Linq", "System.Runtime", "System.Text.Json"],
+            ["DigitalBrain.Integrations.Web.Contracts"] = ["System.Linq", "System.Runtime"]
         };
 
     [Fact]
@@ -124,8 +129,14 @@ public sealed class IntegrationContractBoundaryTests
             typeof(SalesforceRecordReference),
             typeof(SalesforceRecordReadRequest),
             typeof(SalesforceRecord),
+            typeof(SalesforceAccountSearchRequest),
+            typeof(SalesforceAccountSummary),
+            typeof(SalesforceAccountSearchResponse),
             typeof(SalesforceUpdateProposalRequest),
-            typeof(SalesforceUpdateProposal)
+            typeof(SalesforceUpdateProposal),
+            typeof(WebSearchRequest),
+            typeof(WebSearchResult),
+            typeof(WebSearchResponse)
         ];
         Type[] interfaces =
         [
@@ -133,12 +144,15 @@ public sealed class IntegrationContractBoundaryTests
             typeof(IGmailMailboxReader),
             typeof(IGmailSendProposer),
             typeof(ISalesforceRecordReader),
-            typeof(ISalesforceUpdateProposer)
+            typeof(ISalesforceAccountSearcher),
+            typeof(ISalesforceUpdateProposer),
+            typeof(IWebSearchReader)
         ];
         var expectedTypes = dataTransferTypes
             .Concat(interfaces)
             .Append(typeof(GoogleCapabilityIds))
             .Append(typeof(SalesforceCapabilityIds))
+            .Append(typeof(WebSearchCapabilityIds))
             .Select(static type => type.FullName)
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -184,6 +198,14 @@ public sealed class IntegrationContractBoundaryTests
         AssertDto<SalesforceRecord>(
             ("Reference", typeof(SalesforceRecordReference)),
             ("Fields", typeof(IReadOnlyDictionary<string, JsonElement>)));
+        AssertDto<SalesforceAccountSearchRequest>(
+            ("Query", typeof(string)),
+            ("MaximumResults", typeof(int)));
+        AssertDto<SalesforceAccountSummary>(
+            ("Record", typeof(SalesforceRecordReference)),
+            ("Name", typeof(string)));
+        AssertDto<SalesforceAccountSearchResponse>(
+            ("Accounts", typeof(IReadOnlyList<SalesforceAccountSummary>)));
         AssertDto<SalesforceUpdateProposalRequest>(
             ("Record", typeof(SalesforceRecordReference)),
             ("Field", typeof(string)),
@@ -194,12 +216,18 @@ public sealed class IntegrationContractBoundaryTests
             ("Field", typeof(string)),
             ("NewValue", typeof(JsonElement)),
             ("LogicalOperationKey", typeof(string)));
+        AssertDto<WebSearchRequest>(("Query", typeof(string)), ("MaximumResults", typeof(int)));
+        AssertDto<WebSearchResult>(("Title", typeof(string)), ("Url", typeof(string)), ("Snippet", typeof(string)));
+        AssertDto<WebSearchResponse>(("Results", typeof(IReadOnlyList<WebSearchResult>)));
 
         AssertInterface<IGmailMessageReader>("ReadAsync", typeof(Task<GmailMessage>), typeof(GmailMessageReadRequest));
         AssertInterface<IGmailMailboxReader>("ReadAsync", typeof(Task<GmailMailboxPage>), typeof(GmailMailboxReadRequest));
         AssertInterface<IGmailSendProposer>("ProposeAsync", typeof(Task<GmailSendProposal>), typeof(GmailSendProposalRequest));
         AssertInterface<ISalesforceRecordReader>("ReadAsync", typeof(Task<SalesforceRecord>), typeof(SalesforceRecordReadRequest));
+        AssertInterface<ISalesforceAccountSearcher>("SearchAsync", typeof(Task<SalesforceAccountSearchResponse>), typeof(SalesforceAccountSearchRequest));
         AssertInterface<ISalesforceUpdateProposer>("ProposeAsync", typeof(Task<SalesforceUpdateProposal>), typeof(SalesforceUpdateProposalRequest));
+        AssertInterface<IWebSearchReader>("SearchAsync", typeof(Task<WebSearchResponse>), typeof(WebSearchRequest));
+        Assert.Contains(typeof(INeuron), typeof(IWebSearch).GetInterfaces());
     }
 
     private static void AssertDto<T>(params (string Name, Type Type)[] expected)
@@ -237,7 +265,8 @@ public sealed class IntegrationContractBoundaryTests
         return
         [
             Path.Combine(root, "integrations", "DigitalBrain.Integrations.Google.Contracts", "DigitalBrain.Integrations.Google.Contracts.csproj"),
-            Path.Combine(root, "integrations", "DigitalBrain.Integrations.Salesforce.Contracts", "DigitalBrain.Integrations.Salesforce.Contracts.csproj")
+            Path.Combine(root, "integrations", "DigitalBrain.Integrations.Salesforce.Contracts", "DigitalBrain.Integrations.Salesforce.Contracts.csproj"),
+            Path.Combine(root, "integrations", "DigitalBrain.Integrations.Web.Contracts", "DigitalBrain.Integrations.Web.Contracts.csproj")
         ];
     }
 

@@ -87,7 +87,7 @@ void main() {
       );
 
       final payload = envelope.payload as InoConversationSurfacePayload;
-      expect(payload.intro, 'Ask INO about this workspace.');
+      expect(payload.intro, 'Ask DigitalBrain about this workspace.');
       expect(payload.messages, hasLength(2));
       expect(payload.messages.first.turnKey, startsWith('turn-user-'));
       expect(payload.messages.first.role, InoConversationRole.user);

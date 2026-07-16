@@ -23,6 +23,31 @@ namespace DigitalBrain.OrleansTests.Features;
 public sealed class FeatureAuthoringServiceTests(FeatureGrainClusterFixture fixture)
 {
     [Fact]
+    public async Task List_returns_the_owner_drafts_in_creation_order()
+    {
+        var context = Context("owner-authoring-list");
+        var hub = fixture.Grain<IFeatureHubGrain>(FeatureGrainIds.Hub(context.OwnerId));
+        var first = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-authoring-list-first",
+            "First authored Feature",
+            fixture.Time.GetUtcNow(),
+            "conversation-authoring-list"));
+        var second = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-authoring-list-second",
+            "Second authored Feature",
+            fixture.Time.GetUtcNow().AddMinutes(1),
+            "conversation-authoring-list"));
+        var service = Service(new RecordingBuildEndpoint(new FeatureBuildArtifact(
+            Release("a3"),
+            new FeatureScenarioResult(1, 1, 0, 0))));
+
+        var drafts = await service.ListAsync(context);
+
+        Assert.Equal([first.DraftId, second.DraftId], drafts.Select(draft => draft.DraftId));
+        Assert.Equal([first.Goal, second.Goal], drafts.Select(draft => draft.Goal));
+    }
+
+    [Fact]
     public async Task Verification_builds_only_the_stored_Source_and_persists_the_trusted_result()
     {
         var context = Context("owner-authoring-verify");

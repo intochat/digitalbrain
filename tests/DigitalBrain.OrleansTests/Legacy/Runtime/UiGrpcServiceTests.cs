@@ -53,6 +53,7 @@ using GrpcFeatureGrant = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureGrant;
 using GrpcFeatureScenario = McpProject::DigitalBrain.V2.Ui.Grpc.FeatureScenario;
 using InstallFeatureVersionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.InstallFeatureVersionRequest;
 using ListActivityRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ListActivityRequest;
+using ListFeaturesRequest = McpProject::DigitalBrain.V2.Ui.Grpc.ListFeaturesRequest;
 using LogoutSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.LogoutSessionRequest;
 using McpInoCommandHandler = McpProject::DigitalBrain.Mcp.McpInoCommandHandler;
 using RefreshSessionRequest = McpProject::DigitalBrain.V2.Ui.Grpc.RefreshSessionRequest;
@@ -504,6 +505,36 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         Assert.Null(reply.Recovery);
         Assert.Equal(StatusCode.NotFound, crossOwner.StatusCode);
         Assert.Equal(absent.Status, crossOwner.Status);
+    }
+
+    [Fact]
+    public async Task ListFeatures_returns_the_authenticated_Owner_drafts()
+    {
+        var owner = new BrainOwnerId("owner");
+        var hub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(owner));
+        var draft = await hub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-list-features",
+            "List an owner-local Feature Draft",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-list-features"));
+        var otherHub = Cluster.Client.GetGrain<IFeatureHubGrain>(FeatureGrainIds.Hub(new BrainOwnerId("other-owner")));
+        await otherHub.CreateDraftAsync(new CreateFeatureDraft(
+            "operation-ui-list-other-features",
+            "Do not leak another owner's Draft",
+            DateTimeOffset.UtcNow,
+            "conversation-ui-list-other-features"));
+        var (service, _) = CreateService(grants: new HashSet<string>(["brain.read", "ui.action", "feature.manage"], StringComparer.Ordinal));
+        var audience = ("x-v2-audience", SessionAudiences.Ui);
+        var bootstrap = await service.BootstrapSession(
+            new BootstrapSessionRequest { Username = LoginUsername, Password = LoginPassword },
+            TestServerCallContext.WithHeaders(audience));
+        var call = TestServerCallContext.WithHeaders(("x-v2-session", bootstrap.AccessToken), audience);
+
+        var reply = await service.ListFeatures(new ListFeaturesRequest(), call);
+
+        var listed = Assert.Single(reply.Features);
+        Assert.Equal(draft.DraftId.Value, listed.DraftId);
+        Assert.Equal(draft.Goal, listed.Goal);
     }
 
     [Fact]
@@ -1346,7 +1377,7 @@ public sealed class UiGrpcServiceTests : NeuronTestBase
         var composedCatalog = Cluster.Silos.Single().ServiceProvider
             .GetRequiredService<ICapabilityCatalog>()
             .Snapshot();
-        Assert.Equal(8, composedCatalog.Count);
+        Assert.Equal(9, composedCatalog.Count);
         Assert.Contains(composedCatalog, descriptor => descriptor.Id == GoogleCapabilityIds.GmailMessageRead);
         Assert.Contains(composedCatalog, descriptor => descriptor.Id == SalesforceCapabilityIds.RecordRead);
         var conversations = new ConversationStateClient(Cluster.Client, TimeProvider.System);

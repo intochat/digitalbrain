@@ -27,15 +27,35 @@ public sealed record CapabilityParameterRequest
     public string Prompt { get; }
 }
 
-public sealed class CapabilityParameterModel(IChatClient chatClient) : ICapabilityParameterModel
+public sealed class CapabilityParameterModel : ICapabilityParameterModel
 {
     private static readonly JsonElement ExtractionSchema = CreateExtractionSchema();
+    private readonly IChatClient _chatClient;
+    private readonly IFeatureDraftTemplate[] _templates;
+
+    public CapabilityParameterModel(
+        IChatClient chatClient,
+        IEnumerable<IFeatureDraftTemplate> templates)
+    {
+        _chatClient = chatClient;
+        _templates = templates.ToArray();
+    }
+
+    public CapabilityParameterModel(IChatClient chatClient)
+        : this(chatClient, [])
+    {
+    }
 
     public async Task<RetainedInoCapabilityPayload> ExtractAsync(CapabilityParameterRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        foreach (var template in _templates)
+        {
+            if (template.TryCreatePayload(request.Descriptor, request.Prompt, out var payload))
+                return payload;
+        }
 
-        var response = await chatClient.GetResponseAsync(
+        var response = await _chatClient.GetResponseAsync(
             [new ChatMessage(ChatRole.User, BuildExtractionGuidance(request.Descriptor, request.Prompt))],
             new ChatOptions
             {

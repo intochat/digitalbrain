@@ -53,6 +53,14 @@ public sealed class FeatureAuthoringService(
         return await ReadDraftAsync(Hub(context), draftId, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<FeatureDraft>> ListAsync(
+        RuntimeRequestContext context,
+        CancellationToken cancellationToken = default)
+    {
+        FeatureSuggestionService.DemandFeatureAuthor(context);
+        return await Hub(context).ReadDraftsAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<FeatureDraftRecoverySnapshot> ReadWithRecoveryAsync(
         RuntimeRequestContext context,
         FeatureDraftId draftId,

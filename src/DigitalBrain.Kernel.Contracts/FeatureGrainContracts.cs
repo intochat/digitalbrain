@@ -622,6 +622,8 @@ public interface IFeatureHubGrain : IGrainWithStringKey
     Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request);
     [Alias("read-draft")]
     Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId);
+    [Alias("read-drafts")]
+    Task<FeatureDraft[]> ReadDraftsAsync() => Task.FromResult(Array.Empty<FeatureDraft>());
     [Alias("read-installed-draft")]
     Task<FeatureDraft?> ReadInstalledDraftAsync(FeatureInstallationId installationId, ReleaseDigest release);
     [Alias("read-capability-catalog")]

@@ -95,7 +95,7 @@ Map<String, Object?> testInoActionJson({
 );
 
 Map<String, Object?> inoConversationPayload({
-  String intro = 'Ask INO about this workspace.',
+  String intro = 'Ask DigitalBrain about this workspace.',
   List<Map<String, Object?>> messages = const [],
   Map<String, Object?>? operation,
 }) => <String, Object?>{

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
 using DigitalBrain.Kernel.Contracts.Runtime;
@@ -144,6 +145,40 @@ public sealed class CapabilityWorkflowRunnerTests
         Assert.Equal("Open Studio", result.Proposal?.Label);
         Assert.StartsWith("/features/proposals/proposal-", result.Proposal?.Route);
         Assert.Equal(result.Proposal?.ProposalId, result.Proposal?.Route["/features/proposals/".Length..]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_seeds_the_enrich_salesforce_draft_with_real_behavior_and_source()
+    {
+        var hub = new RecordingFeatureHubGrain();
+        var runner = Runner(new RecordingCapabilityResolver(Missing()), new RecordingFeatureGrainResolver(hub));
+
+        await runner.ExecuteAsync(Request("Create a Feature that enriches Salesforce from Gmail.", Owner));
+
+        Assert.Equal("Enrich the single matching Salesforce account", hub.LastDraft?.Behavior.Scenarios[0].Name);
+        Assert.Equal(3, hub.LastDraft?.Behavior.Scenarios.Length);
+        Assert.Contains(
+            hub.LastDraft!.Source.Files,
+            file => file.Path == "features/EnrichSalesforce/EnrichSalesforce.cs" &&
+                    file.Content.Contains("IWebSearchReader", StringComparison.Ordinal));
+        Assert.Equal(2, hub.LastDraft.Revision);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_opens_the_existing_enrich_salesforce_draft_without_creating_a_duplicate()
+    {
+        var hub = new RecordingFeatureHubGrain();
+        var runner = Runner(new RecordingCapabilityResolver(Missing()), new RecordingFeatureGrainResolver(hub));
+        var created = await runner.ExecuteAsync(Request("Create a Feature that enriches Salesforce from Gmail.", Owner));
+
+        var opened = await runner.ExecuteAsync(Request("Open Enrich Salesforce.", Owner) with
+        {
+            OperationId = "operation-open"
+        });
+
+        Assert.Equal(1, hub.CreateDraftCallCount);
+        Assert.Equal(created.Proposal?.ProposalId, opened.Proposal?.ProposalId);
+        Assert.Equal("Open Studio", opened.Proposal?.Label);
     }
 
     [Fact]
@@ -352,6 +387,7 @@ public sealed class CapabilityWorkflowRunnerTests
             .AddSingleton<IChatClient>(_chat)
             .AddSingleton(resolver)
             .AddSingleton<ICapabilityParameterModel>(_parameterModel)
+            .AddSingleton<IFeatureDraftTemplate, SalesforceEnrichmentFeatureTemplate>()
             .AddSingleton<ICapabilityCatalog>(new StubCapabilityCatalog());
         if (featureGrainResolver is not null)
             services.AddSingleton(featureGrainResolver);
@@ -464,6 +500,7 @@ public sealed class CapabilityWorkflowRunnerTests
         public int CreateDraftCallCount { get; private set; }
         public int DraftCount => (_state.Drafts ?? []).Length;
         public CreateFeatureDraft? LastCreateDraftRequest { get; private set; }
+        public FeatureDraft? LastDraft { get; private set; }
 
         public Task<FeatureDraft> CreateDraftAsync(CreateFeatureDraft request)
         {
@@ -471,14 +508,28 @@ public sealed class CapabilityWorkflowRunnerTests
             LastCreateDraftRequest = request;
             var transition = FeatureHubTransitions.CreateDraft(_state, "owner-scope-1", request);
             _state = transition.State;
+            LastDraft = transition.Draft;
             return Task.FromResult(transition.Draft);
         }
 
         public Task RegisterAsync(FeatureInstallationRegistration registration) => throw new NotSupportedException();
+        public Task<FeatureDraft[]> ReadDraftsAsync() => Task.FromResult((_state.Drafts ?? []).ToArray());
         public Task<FeatureDraft?> ReadDraftAsync(FeatureDraftId draftId) => throw new NotSupportedException();
         public Task<FeatureDraft?> ReadInstalledDraftAsync(FeatureInstallationId installationId, ReleaseDigest release) => throw new NotSupportedException();
-        public Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command) => throw new NotSupportedException();
-        public Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command) => throw new NotSupportedException();
+        public Task<FeatureDraft> ReviseBehaviorAsync(ReviseFeatureBehavior command)
+        {
+            var transition = FeatureDraftAuthoringTransitions.ReviseBehavior(_state, command);
+            _state = transition.State;
+            LastDraft = transition.Draft;
+            return Task.FromResult(transition.Draft);
+        }
+        public Task<FeatureDraft> ReviseSourceAsync(ReviseFeatureSource command)
+        {
+            var transition = FeatureDraftAuthoringTransitions.ReviseSource(_state, command);
+            _state = transition.State;
+            LastDraft = transition.Draft;
+            return Task.FromResult(transition.Draft);
+        }
         public Task<FeatureDraft> AcceptSuggestedChangeAsync(AcceptSuggestedChange command) => throw new NotSupportedException();
         public Task<FeatureDraft> RejectSuggestedChangeAsync(RejectSuggestedChange command) => throw new NotSupportedException();
         public Task<FeatureDraft> RecordVerificationAsync(RecordFeatureVerification command) => throw new NotSupportedException();

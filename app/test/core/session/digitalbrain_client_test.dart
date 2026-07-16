@@ -837,11 +837,13 @@ class _RecordingDigitalBrainTransport
   final activityReply = wire.ListActivityReply();
   final runReply = wire.RunReply();
   final contextReply = wire.GetConversationContextReply();
+  final listFeaturesReply = wire.ListFeaturesReply();
   String? accessToken;
   wire.GetFeatureDraftRequest? getRequest;
   final List<String> productAccessTokens = [];
   final List<String> refreshTokens = [];
   final List<wire.GetFeatureDraftRequest> getRequests = [];
+  final List<wire.ListFeaturesRequest> listFeaturesRequests = [];
   final List<wire.ResetFeatureDraftInstallationRequest> resetRequests = [];
   final List<wire.ReviseFeatureDraftRequest> reviseRequests = [];
   final List<wire.VerifyFeatureDraftRequest> verifyRequests = [];
@@ -875,6 +877,16 @@ class _RecordingDigitalBrainTransport
     wire.VerifyFeatureDraftRequest request,
   )?
   onVerify;
+
+  @override
+  Future<wire.ListFeaturesReply> listFeatures({
+    required String accessToken,
+    required wire.ListFeaturesRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    listFeaturesRequests.add(request);
+    return listFeaturesReply;
+  }
 
   @override
   Future<wire.FeatureDraftReply> getFeatureDraft({

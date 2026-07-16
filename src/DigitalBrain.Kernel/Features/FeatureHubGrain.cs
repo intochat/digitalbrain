@@ -309,6 +309,11 @@ internal sealed class FeatureHubGrain(
         using var activity = Start("read-draft");
         return Task.FromResult(Domain(() => FeatureDraftAuthoringTransitions.ReadDraft(State, draftId)));
     }
+    public Task<FeatureDraft[]> ReadDraftsAsync()
+    {
+        using var activity = Start("read-drafts");
+        return Task.FromResult((State.Drafts ?? []).ToArray());
+    }
     public Task<FeatureDraft?> ReadInstalledDraftAsync(FeatureInstallationId installationId, ReleaseDigest release)
     {
         using var activity = Start("read-installed-draft");

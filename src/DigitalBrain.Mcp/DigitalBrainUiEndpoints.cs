@@ -48,6 +48,24 @@ public sealed class DigitalBrainUiEndpoints(
         return Project(() => ProjectDraft(draftId, read));
     }
 
+    public async Task<ListFeaturesReply> ListFeaturesAsync(
+        RuntimeRequestContext context,
+        ListFeaturesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var drafts = await InvokeAsync(() => authoring.ListAsync(context, cancellationToken)).ConfigureAwait(false);
+        return Project(() =>
+        {
+            var reply = new ListFeaturesReply();
+            foreach (var draft in drafts)
+            {
+                ValidateDraftOutput(draft.DraftId, draft);
+                reply.Features.Add(ToReply(draft));
+            }
+            return reply;
+        });
+    }
+
     public async Task<FeatureDraftReply> ResetFeatureDraftInstallationAsync(
         RuntimeRequestContext context,
         ResetFeatureDraftInstallationRequest request,

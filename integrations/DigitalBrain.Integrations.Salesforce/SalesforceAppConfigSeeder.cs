@@ -17,11 +17,15 @@ public static class SalesforceServiceCollectionExtensions
         services.AddSingleton<ISalesforceApiClientFactory, SalesforceApiClientFactory>();
         services.AddSingleton<ISalesforceMutationGateway, SalesforceMutationGateway>();
         services.AddSingleton<ICapabilityHandler, SalesforceRecordReadCapabilityHandler>();
+        services.AddSingleton<ICapabilityHandler, SalesforceAccountSearchCapabilityHandler>();
         services.AddSingleton<ICapabilityHandler, SalesforceUpdateProposalCapabilityHandler>();
         services.AddSingleton<ICapabilityDescriptorSource, SalesforceCapabilityDescriptorSource>();
+        services.AddSingleton<SalesforceFeatureEffectCompletion>();
         services.AddSingleton<IInoEffectHandler, SalesforceUpdateEffectHandler>();
         services.AddSingleton<IExternalAuthorizationResolver, SalesforceAuthorizationResolver>();
         services.AddSingleton<SalesforceFeatureEffectRail>();
+        services.AddSingleton<IFeatureEffectApprovalGateway, SalesforceFeatureEffectApprovalGateway>();
+        services.AddSingleton<IFeatureDraftTemplate, SalesforceEnrichmentFeatureTemplate>();
         services.AddKeyedSingleton<IConnector>("salesforce", (provider, _) => new SalesforceConnector(
             provider.GetRequiredService<ISalesforceApiClientFactory>(),
             provider.GetRequiredService<IIntegrationConfigStore>(),

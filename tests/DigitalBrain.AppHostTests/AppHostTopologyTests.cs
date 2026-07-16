@@ -276,7 +276,7 @@ public sealed class AppHostTopologyTests
         Assert.Equal(oidcIssuer, mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__Issuer"]);
         Assert.Equal(oidcAudience, mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__Audience"]);
         Assert.Equal(
-            "brain.read,ui.action,feature.manage,gmail.read,gmail.send,salesforce.read,salesforce.write",
+            "brain.read,ui.action,feature.manage,gmail.read,gmail.send,salesforce.read,salesforce.write,web.search",
             mcpEnvironment["DigitalBrain__Runtime__Ui__Oidc__AllowedGrants"]);
     }
 

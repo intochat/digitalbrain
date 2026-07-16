@@ -42,6 +42,12 @@ kernel.WithEnvironment("DigitalBrain__Runtime__StorageNamespace",
     builder.Configuration["DigitalBrain:Runtime:StorageNamespace"] ?? DigitalBrainBuilderExtensions.DefaultRuntimeStorageNamespace);
 kernel.WithSalesforceAppConfig(salesforceAppConfig);
 kernel.WithGoogleAppConfig(googleAppConfig);
+var braveSearchApiKey = builder.Configuration["Parameters:brave-search-api-key"];
+if (!string.IsNullOrWhiteSpace(braveSearchApiKey))
+{
+    var braveSearch = builder.AddParameter("brave-search-api-key", secret: true);
+    kernel.WithEnvironment("DigitalBrain__WebSearch__BraveApiKey", braveSearch);
+}
 var featureHost = builder.AddProject<Projects.DigitalBrain_FeatureHost>("feature-host").WithReference(ctx.FeatureArtifacts).WithEnvironment("DigitalBrain__FeatureHost__InternalOrigin", kernel.GetEndpoint("web"))
     .WithEnvironment("DigitalBrain__FeatureHost__InternalToken", featureHostInternalToken)
     .WithReplicas(1);
@@ -80,7 +86,7 @@ if (ctx.EnableMcp)
         {
             mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Issuer", uiOidcIssuer);
             mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__Audience", uiOidcAudience);
-            mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__AllowedGrants", "brain.read,ui.action,feature.manage,gmail.read,gmail.send,salesforce.read,salesforce.write");
+            mcp.WithEnvironment("DigitalBrain__Runtime__Ui__Oidc__AllowedGrants", "brain.read,ui.action,feature.manage,gmail.read,gmail.send,salesforce.read,salesforce.write,web.search");
             var flutterWeb = ctx.AddDefaultDevFlutterWebClient(mcp, uiOidcIssuer, uiOidcAudience, endpointName: "https", port: flutterWebPort)
                 ?? throw new InvalidOperationException("Flutter app path not resolved. Ensure app contains pubspec.yaml or set DIGITALBRAIN_FLUTTER_APP_PATH.");
         }

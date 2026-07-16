@@ -59,7 +59,7 @@ class InoConversationView extends StatefulWidget {
 class _InoConversationViewState extends State<InoConversationView> {
   static final Random _secureRandom = Random.secure();
   final TextEditingController _composer = TextEditingController();
-  final FocusNode _composerFocus = FocusNode(debugLabel: 'INO composer');
+  final FocusNode _composerFocus = FocusNode(debugLabel: 'Chat composer');
   final ScrollController _transcriptScroll = ScrollController();
 
   bool _submitting = false;
@@ -419,7 +419,7 @@ class _InoConversationViewState extends State<InoConversationView> {
         _currentSubmissionAccepted = false;
         _submissionUncertain = true;
         _submissionNotice =
-            'We couldn\'t confirm that INO received this message. '
+            'We couldn\'t confirm that DigitalBrain received this message. '
             'Your conversation will update when the connection recovers.';
       });
       _scheduleComposerFocus();
@@ -657,7 +657,7 @@ class _ConversationTurn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == InoConversationRole.user;
-    final author = isUser ? 'You' : 'INO';
+    final author = isUser ? 'You' : 'DigitalBrain';
     final status = message.uncertain
         ? 'Checking delivery'
         : _turnStatus(message.state);
@@ -790,26 +790,26 @@ class _OperationStatus extends StatelessWidget {
     final isActive = !operation.state.isTerminal;
     final message = switch (operation.phase) {
       InoConversationOperationPhase.approved =>
-        'Approval accepted. INO is preparing the approved action.',
+        'Approval accepted. DigitalBrain is preparing the approved action.',
       InoConversationOperationPhase.applyingEffect =>
-        'INO is applying the approved action.',
+        'DigitalBrain is applying the approved action.',
       _ => switch (operation.state) {
         InoConversationOperationState.queued => 'Your message is queued.',
-        InoConversationOperationState.running => 'INO is working on it.',
+        InoConversationOperationState.running => 'DigitalBrain is working on it.',
         InoConversationOperationState.responding =>
-          'INO is writing a response.',
+          'DigitalBrain is writing a response.',
         InoConversationOperationState.awaitingApproval =>
-          'INO is waiting for your approval.',
+          'DigitalBrain is waiting for your approval.',
         InoConversationOperationState.awaitingAuthorization =>
-          'INO is waiting for you to connect.',
+          'DigitalBrain is waiting for you to connect.',
         InoConversationOperationState.retryScheduled =>
-          'INO will retry this request shortly.',
+          'DigitalBrain will retry this request shortly.',
         InoConversationOperationState.succeeded => 'Response ready.',
         InoConversationOperationState.failed =>
-          operation.safeReason ?? 'INO couldn\'t complete that request.',
+          operation.safeReason ?? 'DigitalBrain couldn\'t complete that request.',
         InoConversationOperationState.outcomeUnknown =>
           operation.safeReason ??
-              'INO couldn\'t confirm the result. Review it before trying again.',
+              'DigitalBrain couldn\'t confirm the result. Review it before trying again.',
         InoConversationOperationState.cancelled =>
           operation.safeReason ?? 'This request was cancelled.',
       },

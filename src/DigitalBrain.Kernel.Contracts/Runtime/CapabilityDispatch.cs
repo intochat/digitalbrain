@@ -187,6 +187,37 @@ public interface ICapabilityDispatcher
 {
     Task<CapabilityDispatchResult> ExecuteAsync(CapabilityRequest request, CancellationToken cancellationToken = default);
 }
+public sealed record FeatureEffectApprovalRequest(
+    CapabilityDescriptor Descriptor,
+    BrainOwnerId OwnerId,
+    ActorId ActorId,
+    FeatureInstallationId InstallationId,
+    string InputId,
+    string CorrelationId,
+    string TraceId);
+public interface IFeatureEffectApprovalGateway
+{
+    bool Supports(CapabilityDescriptor descriptor);
+    Task<InoToolRequest> PrepareAsync(
+        FeatureEffectApprovalRequest request,
+        CancellationToken cancellationToken = default);
+}
+public interface IFeatureDraftTemplate
+{
+    bool SupportsDraft(string prompt);
+    bool SupportsOpen(string prompt);
+    bool MatchesDraft(FeatureDraft draft);
+    string OpenedText { get; }
+    Task<FeatureDraft> SeedAsync(
+        IFeatureHubGrain hub,
+        FeatureDraft draft,
+        string operationId,
+        DateTimeOffset revisedAt);
+    bool TryCreatePayload(
+        CapabilityDescriptor descriptor,
+        string prompt,
+        out RetainedInoCapabilityPayload payload);
+}
 public sealed class CapabilityDeniedException() : InvalidOperationException("Capability authority denied the operation.");
 public sealed record RetainedInoCapabilityPayload
 {

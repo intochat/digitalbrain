@@ -6,6 +6,8 @@ internal interface ISalesforceApiClient
 {
     Task<SalesforceRecord> ReadRecordAsync(DigitalBrain.Integrations.Salesforce.Contracts.SalesforceRecordReadRequest request, CancellationToken cancellationToken = default) =>
         Task.FromException<SalesforceRecord>(new NotSupportedException());
+    Task<SalesforceAccountSearchResponse> SearchAccountsAsync(SalesforceAccountSearchRequest request, CancellationToken cancellationToken = default) =>
+        Task.FromException<SalesforceAccountSearchResponse>(new NotSupportedException());
     Task<string[]> ListAccountsAsync(int maxResults, CancellationToken ct);
     Task<SalesforceMutationPreviewResult> PreviewUpdateAsync(SalesforceUpdatePreviewRequest request, CancellationToken ct) =>
         Task.FromResult(new SalesforceMutationPreviewResult(SalesforceMutationStatus.Unavailable, SafeReason: "Salesforce updates are unavailable right now."));

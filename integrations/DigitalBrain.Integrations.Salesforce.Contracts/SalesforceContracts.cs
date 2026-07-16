@@ -36,6 +36,47 @@ public interface ISalesforceRecordReader
 {
     Task<SalesforceRecord> ReadAsync(SalesforceRecordReadRequest request, CancellationToken cancellationToken = default);
 }
+public sealed class SalesforceAccountSearchRequest
+{
+    public SalesforceAccountSearchRequest(string query, int maximumResults)
+    {
+        Query = ContractGuard.Required(query, nameof(query), 255);
+        if (maximumResults is < 1 or > 20)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumResults), "Maximum results must be between 1 and 20.");
+        }
+        MaximumResults = maximumResults;
+    }
+    public string Query { get; }
+    public int MaximumResults { get; }
+}
+public sealed class SalesforceAccountSummary
+{
+    public SalesforceAccountSummary(SalesforceRecordReference record, string name)
+    {
+        Record = record ?? throw new ArgumentNullException(nameof(record));
+        Name = ContractGuard.Required(name, nameof(name), 255);
+    }
+    public SalesforceRecordReference Record { get; }
+    public string Name { get; }
+}
+public sealed class SalesforceAccountSearchResponse
+{
+    public SalesforceAccountSearchResponse(IReadOnlyList<SalesforceAccountSummary> accounts)
+    {
+        ArgumentNullException.ThrowIfNull(accounts);
+        if (accounts.Count > 20 || accounts.Any(static account => account is null))
+        {
+            throw new ArgumentException("Accounts must contain at most 20 defined items.", nameof(accounts));
+        }
+        Accounts = Array.AsReadOnly(accounts.ToArray());
+    }
+    public IReadOnlyList<SalesforceAccountSummary> Accounts { get; }
+}
+public interface ISalesforceAccountSearcher
+{
+    Task<SalesforceAccountSearchResponse> SearchAsync(SalesforceAccountSearchRequest request, CancellationToken cancellationToken = default);
+}
 public sealed class SalesforceUpdateProposalRequest
 {
     public SalesforceUpdateProposalRequest(SalesforceRecordReference record, string field, JsonElement newValue, string logicalOperationKey)

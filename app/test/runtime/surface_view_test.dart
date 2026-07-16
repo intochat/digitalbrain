@@ -174,7 +174,7 @@ void main() {
 
     expect(find.byKey(inoConversationKey), findsOneWidget);
     expect(find.byKey(inoComposerFieldKey), findsOneWidget);
-    expect(find.text('Ask INO about this workspace.'), findsOneWidget);
+    expect(find.text('Ask DigitalBrain about this workspace.'), findsOneWidget);
     expect(find.byKey(inoEmptyTranscriptKey), findsOneWidget);
 
     await tester.enterText(find.byKey(inoComposerFieldKey), prompt);
@@ -367,7 +367,7 @@ void main() {
         ),
         submit: submit,
       );
-      expect(find.text('INO is working on it.'), findsOneWidget);
+      expect(find.text('DigitalBrain is working on it.'), findsOneWidget);
       expect(
         tester.widget<FilledButton>(find.byKey(inoSendButtonKey)).onPressed,
         isNull,
@@ -385,7 +385,7 @@ void main() {
         ),
         submit: submit,
       );
-      expect(find.text('INO is writing a response.'), findsOneWidget);
+      expect(find.text('DigitalBrain is writing a response.'), findsOneWidget);
       expect(
         tester.widget<FilledButton>(find.byKey(inoSendButtonKey)).onPressed,
         isNull,
@@ -597,7 +597,7 @@ void main() {
     expect(find.byKey(inoRetryDeliveryButtonKey), findsOneWidget);
     expect(
       find.text(
-        'We couldn\'t confirm that INO received this message. '
+        'We couldn\'t confirm that DigitalBrain received this message. '
         'Your conversation will update when the connection recovers.',
       ),
       findsOneWidget,
@@ -942,7 +942,7 @@ void main() {
       ),
     );
 
-    expect(find.text('INO is waiting for you to connect.'), findsOneWidget);
+    expect(find.text('DigitalBrain is waiting for you to connect.'), findsOneWidget);
     expect(find.text('Connection required'), findsOneWidget);
     expect(find.byKey(inoConnectButtonKey), findsOneWidget);
     expect(
@@ -966,7 +966,7 @@ void main() {
     );
 
     expect(
-      find.text('Approval accepted. INO is preparing the approved action.'),
+      find.text('Approval accepted. DigitalBrain is preparing the approved action.'),
       findsOneWidget,
     );
 
@@ -983,7 +983,7 @@ void main() {
       ),
     );
 
-    expect(find.text('INO is applying the approved action.'), findsOneWidget);
+    expect(find.text('DigitalBrain is applying the approved action.'), findsOneWidget);
   });
 
   testWidgets('terminal state is announced as a live status', (tester) async {

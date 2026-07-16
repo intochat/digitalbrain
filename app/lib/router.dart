@@ -8,6 +8,8 @@ import 'core/session/app_session_scope.dart';
 import 'features/activity/activity_gateway.dart';
 import 'features/activity/activity_page.dart';
 import 'features/activity/activity_run_page.dart';
+import 'features/catalog/feature_catalog_gateway.dart';
+import 'features/catalog/feature_catalog_page.dart';
 import 'features/releases/feature_release_gateway.dart';
 import 'features/releases/feature_release_page.dart';
 import 'features/studio/feature_studio_gateway.dart';
@@ -197,6 +199,26 @@ GoRouter createDigitalBrainRouter({
                     automationId: automationId,
                   ),
                 ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/features',
+            name: 'features',
+            builder: (context, state) {
+              final client = AppSessionScope.of(context).digitalBrainClient;
+              if (client == null) {
+                return const Material(
+                  child: Center(child: Text('Features are unavailable.')),
+                );
+              }
+              return FeatureCatalogPage(
+                gateway: GrpcFeatureCatalogGateway(client: client),
+                onOpenFeature: (draftId) => context.goNamed(
+                  'feature-proposal',
+                  pathParameters: {'proposalId': draftId},
+                ),
+                onCreateFeature: () => context.go('/chat'),
               );
             },
           ),

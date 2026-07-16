@@ -12,6 +12,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="..\..\features\EnrichSalesforce\DigitalBrain.Features.EnrichSalesforce.csproj" LogicalName="DigitalBrain.FeatureTemplates.EnrichSalesforce.DigitalBrain.Features.EnrichSalesforce.csproj" />
+    <EmbeddedResource Include="..\..\features\EnrichSalesforce\EnrichSalesforce.cs" LogicalName="DigitalBrain.FeatureTemplates.EnrichSalesforce.EnrichSalesforce.cs" />
+    <EmbeddedResource Include="..\..\features\EnrichSalesforce.Tests\DigitalBrain.Features.EnrichSalesforce.Tests.csproj" LogicalName="DigitalBrain.FeatureTemplates.EnrichSalesforce.DigitalBrain.Features.EnrichSalesforce.Tests.csproj" />
+    <EmbeddedResource Include="..\..\features\EnrichSalesforce.Tests\EnrichSalesforce.feature" LogicalName="DigitalBrain.FeatureTemplates.EnrichSalesforce.EnrichSalesforce.feature" />
+    <EmbeddedResource Include="..\..\features\EnrichSalesforce.Tests\EnrichSalesforceSteps.cs" LogicalName="DigitalBrain.FeatureTemplates.EnrichSalesforce.EnrichSalesforceSteps.cs" />
+    <EmbeddedResource Include="..\..\features\EnrichSalesforce.Tests\reqnroll.json" LogicalName="DigitalBrain.FeatureTemplates.EnrichSalesforce.reqnroll.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="DeveloperForce.Force" />
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>

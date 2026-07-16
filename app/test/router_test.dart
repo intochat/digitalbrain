@@ -2387,6 +2387,12 @@ class _RouterTransport
   }
 
   @override
+  Future<wire.ListFeaturesReply> listFeatures({
+    required String accessToken,
+    required wire.ListFeaturesRequest request,
+  }) async => wire.ListFeaturesReply();
+
+  @override
   Future<wire.FeatureDraftReply> getFeatureDraft({
     required String accessToken,
     required wire.GetFeatureDraftRequest request,

@@ -28,10 +28,11 @@ public sealed class FeatureHostBoundaryTests
 
         Assert.Equal(
             [
-                "DigitalBrain.Features.Sdk",
-                "DigitalBrain.Integrations.Google.Contracts",
-                "DigitalBrain.Integrations.Salesforce.Contracts",
-                "DigitalBrain.Kernel.Contracts"
+            "DigitalBrain.Features.Sdk",
+            "DigitalBrain.Integrations.Google.Contracts",
+            "DigitalBrain.Integrations.Salesforce.Contracts",
+            "DigitalBrain.Integrations.Web.Contracts",
+            "DigitalBrain.Kernel.Contracts"
             ],
             projectReferences);
         Assert.Equal(

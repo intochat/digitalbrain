@@ -176,6 +176,13 @@ public sealed class UiGrpcService(
                 context.CancellationToken)
             .ConfigureAwait(false);
     }
+    public override async Task<ListFeaturesReply> ListFeatures(
+        ListFeaturesRequest request,
+        ServerCallContext context)
+    {
+        var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;
+        return await productEndpoints.ListFeaturesAsync(authenticated, request, context.CancellationToken).ConfigureAwait(false);
+    }
     public override async Task<FeatureReply> GetFeature(GetFeatureRequest request, ServerCallContext context)
     {
         var authenticated = (await AuthenticateAsync(context).ConfigureAwait(false)).Context;

@@ -403,6 +403,7 @@ message ListFeaturesRequest {
 
 message ListFeaturesReply {
   reserved "owner_id", "actor_id";
+  repeated FeatureDraft features = 1;
 }
 
 message GetFeatureRequest {

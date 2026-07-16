@@ -4345,7 +4345,11 @@ class ListFeaturesRequest extends $pb.GeneratedMessage {
 }
 
 class ListFeaturesReply extends $pb.GeneratedMessage {
-  factory ListFeaturesReply() => create();
+  factory ListFeaturesReply({$core.Iterable<FeatureDraft>? features}) {
+    final result = create();
+    if (features != null) result.features.addAll(features);
+    return result;
+  }
 
   ListFeaturesReply._();
 
@@ -4358,13 +4362,20 @@ class ListFeaturesReply extends $pb.GeneratedMessage {
     $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
   ]) => create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'ListFeaturesReply',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ListFeaturesReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..pPM<FeatureDraft>(
+          1,
+          _omitFieldNames ? '' : 'features',
+          subBuilder: FeatureDraft.create,
+        )
+        ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   ListFeaturesReply clone() => deepCopy();
@@ -4384,6 +4395,9 @@ class ListFeaturesReply extends $pb.GeneratedMessage {
   static ListFeaturesReply getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<ListFeaturesReply>(create);
   static ListFeaturesReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<FeatureDraft> get features => $_getList(0);
 }
 
 class GetFeatureRequest extends $pb.GeneratedMessage {

@@ -58,6 +58,8 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
         if (services.GetService<ICapabilityResolver>() is not { } resolver)
             return await RunGeneralAgentAsync(request, workflow, capability: null, cancellationToken).ConfigureAwait(false);
         var normalizedPrompt = NormalizeCapabilityPrompt(request.Prompt);
+        if (await TryOpenFeatureAsync(request, normalizedPrompt, workflow).ConfigureAwait(false) is { } openResult)
+            return openResult;
         var snapshot = await ReadCapabilitySnapshotAsync(request, cancellationToken).ConfigureAwait(false);
         if (snapshot is null)
             return CapabilityCatalogUnavailableResult(workflow);
@@ -151,6 +153,7 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
                 FeatureCapabilityInvocationStatus.Started => new InoWorkflowResult(
                     $"Started {resolution.Receipt.CapabilityName}.",
                     workflow,
+                    ToolRequest: result.ToolRequest,
                     Capability: resolution.Receipt),
                 FeatureCapabilityInvocationStatus.Busy => new InoWorkflowResult(
                     $"{resolution.Receipt.CapabilityName} is busy right now. Try again shortly.",
@@ -183,8 +186,19 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
             return MissingWithoutDraftResult(workflow, receipt);
         try
         {
-            var draft = await resolver.Hub(ownerId).CreateDraftAsync(
+            var hub = resolver.Hub(ownerId);
+            var draft = await hub.CreateDraftAsync(
                 new CreateFeatureDraft(request.OperationId, normalizedPrompt, ResolveNow(), request.ConversationId)).ConfigureAwait(false);
+            var template = services.GetServices<IFeatureDraftTemplate>()
+                .SingleOrDefault(candidate => candidate.SupportsDraft(normalizedPrompt));
+            if (template is not null)
+            {
+                draft = await template.SeedAsync(
+                    hub,
+                    draft,
+                    request.OperationId,
+                    ResolveNow()).ConfigureAwait(false);
+            }
             return new InoWorkflowResult(
                 "I don’t have a trusted capability for that yet. I created a Feature draft. Open Studio to define and verify its behavior?",
                 workflow,
@@ -198,6 +212,34 @@ internal sealed class AgentFrameworkWorkflowRunner(IServiceProvider services) : 
     }
     private static InoWorkflowResult MissingWithoutDraftResult(WorkflowReference workflow, CapabilityResolutionReceipt receipt) =>
         new("I don't have a capability for that request yet.", workflow, Capability: receipt);
+    private async Task<InoWorkflowResult?> TryOpenFeatureAsync(
+        InoWorkflowRequest request,
+        string normalizedPrompt,
+        WorkflowReference workflow)
+    {
+        var prompt = normalizedPrompt.Trim().TrimEnd('.', '!', '?').ToLowerInvariant();
+        if (request.OwnerId is not { } ownerId ||
+            services.GetService<IFeatureGrainResolver>() is not { } grains)
+            return null;
+        var template = services.GetServices<IFeatureDraftTemplate>()
+            .SingleOrDefault(candidate => candidate.SupportsOpen(prompt));
+        if (template is null)
+            return null;
+        var drafts = await grains.Hub(ownerId).ReadDraftsAsync().ConfigureAwait(false);
+        var matches = drafts.Where(template.MatchesDraft)
+            .Take(2)
+            .ToArray();
+        if (matches.Length != 1)
+            return null;
+        var draft = matches[0];
+        return new InoWorkflowResult(
+            template.OpenedText,
+            workflow,
+            Proposal: new FeatureDraftReference(
+                draft.DraftId.Value,
+                "Open Studio",
+                "/features/proposals/" + draft.DraftId.Value));
+    }
     private DateTimeOffset ResolveNow() => services.GetService<TimeProvider>()?.GetUtcNow() ?? DateTimeOffset.UtcNow;
     private static bool IsConversationalPrompt(string prompt)
     {

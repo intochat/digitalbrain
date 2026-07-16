@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Integrations.Google.Contracts;
+using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.Integrations.Salesforce.Contracts;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Runtime;
@@ -73,6 +74,25 @@ public sealed class CapabilityParameterModelTests
         Assert.Contains(descriptor.Description, guidance, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ExtractAsync_maps_the_enrich_salesforce_demo_prompt_to_the_reserved_gmail_input_without_a_model_call()
+    {
+        var chat = new StaticJsonChatClient("{}");
+        var model = new CapabilityParameterModel(chat, [new SalesforceEnrichmentFeatureTemplate()]);
+        var descriptor = Descriptor(
+            "feature.enrich-salesforce",
+            "Create a Feature that enriches Salesforce from Gmail.");
+
+        var payload = await model.ExtractAsync(new CapabilityParameterRequest(
+            descriptor,
+            "Run Enrich Salesforce using the synthetic demo message."));
+
+        Assert.Equal("synthetic-demo-priya-northstar", payload.Arguments.GetProperty("messageId").GetString());
+        Assert.Equal("synthetic-thread-priya-northstar", payload.Arguments.GetProperty("threadId").GetString());
+        Assert.True(payload.Arguments.GetProperty("syntheticDemo").GetBoolean());
+        Assert.Equal(0, chat.CallCount);
+    }
+
     private static CapabilityDescriptor Descriptor(string id, string description) => new(
         id,
         1,
@@ -92,12 +112,14 @@ public sealed class CapabilityParameterModelTests
     {
         public ChatOptions? LastOptions { get; private set; }
         public ChatMessage[]? LastMessages { get; private set; }
+        public int CallCount { get; private set; }
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
+            CallCount++;
             LastMessages = messages.ToArray();
             LastOptions = options;
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, json)));

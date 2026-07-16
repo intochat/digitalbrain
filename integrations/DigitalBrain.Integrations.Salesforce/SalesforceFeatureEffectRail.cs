@@ -69,9 +69,92 @@ internal sealed record SalesforceFeatureEffectProposal(
     string EffectId,
     string ProviderIdempotencyKey,
     string PersistedOperationKey);
+internal sealed record SalesforceFeatureExecutionEnvelope(
+    int Version,
+    string OwnerId,
+    string ActorId,
+    string InstallationId,
+    string InputId,
+    string LogicalOperationKey,
+    string CorrelationId,
+    string TraceId,
+    string PersistedOperationKey,
+    string DecisionId,
+    string PreparedUpdateBase64)
+{
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+    };
+
+    internal static SalesforceFeatureExecutionEnvelope Create(
+        SalesforceFeatureEffectRequest request,
+        string persistedOperationKey,
+        string decisionId,
+        SalesforcePreparedUpdate prepared) => new(
+            1,
+            request.OwnerId.Value,
+            request.ActorId.Value,
+            request.InstallationId.Value,
+            request.InputId,
+            request.LogicalOperationKey,
+            request.CorrelationId,
+            request.TraceId,
+            persistedOperationKey,
+            decisionId,
+            Convert.ToBase64String(prepared.Payload));
+
+    internal byte[] ToBytes() => JsonSerializer.SerializeToUtf8Bytes(this, Json);
+
+    internal SalesforcePreparedUpdate PreparedUpdate()
+    {
+        if (Version != 1)
+            throw new ArgumentException("The Salesforce Feature execution envelope is invalid.");
+        return new SalesforcePreparedUpdate(Convert.FromBase64String(PreparedUpdateBase64));
+    }
+
+    internal static bool TryParse(byte[] payload, out SalesforceFeatureExecutionEnvelope envelope)
+    {
+        try
+        {
+            envelope = JsonSerializer.Deserialize<SalesforceFeatureExecutionEnvelope>(payload, Json)!;
+            _ = envelope.PreparedUpdate();
+            return envelope is not null &&
+                   !string.IsNullOrWhiteSpace(envelope.OwnerId) &&
+                   !string.IsNullOrWhiteSpace(envelope.ActorId) &&
+                   !string.IsNullOrWhiteSpace(envelope.InstallationId) &&
+                   !string.IsNullOrWhiteSpace(envelope.InputId) &&
+                   !string.IsNullOrWhiteSpace(envelope.PersistedOperationKey) &&
+                   !string.IsNullOrWhiteSpace(envelope.DecisionId);
+        }
+        catch (Exception exception) when (exception is JsonException or FormatException or ArgumentException)
+        {
+            envelope = null!;
+            return false;
+        }
+    }
+}
 internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, IInoEffectPlanStore plans, IInoEffectExecutor effects, TimeProvider timeProvider)
 {
     public const string OutcomeKind = "salesforce.record.update.outcome.v1";
+    public async Task<SalesforceFeatureEffectProposal> WaitForProposalAsync(
+        SalesforceFeatureEffectRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var deadline = timeProvider.GetUtcNow().AddSeconds(30);
+        while (timeProvider.GetUtcNow() < deadline)
+        {
+            try
+            {
+                return await ProposeAsync(request, cancellationToken);
+            }
+            catch (KeyNotFoundException)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+            }
+        }
+        throw new TimeoutException("The Salesforce Feature did not produce an approval request in time.");
+    }
     public async Task<SalesforceFeatureEffectProposal> ProposeAsync(SalesforceFeatureEffectRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -90,13 +173,19 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
         var actorScope = RequestScope.Id(request.OwnerId, request.ActorId);
         var identity = Digest(request.OwnerId.Value, request.ActorId.Value, request.InstallationId.Value, request.InputId, request.LogicalOperationKey);
         var operationId = "feature-" + identity;
-        var approval = await plans.PrepareIdempotentAsync(identity, actorScope, operationId, SalesforceTools.UpdateRecord, prepared.Payload, payload.SafeSummary, payload.ExpiresAt, cancellationToken);
+        var decisionId = "decision-" + identity;
+        var execution = SalesforceFeatureExecutionEnvelope.Create(
+            request,
+            persistedOperationKey,
+            decisionId,
+            prepared);
+        var approval = await plans.PrepareIdempotentAsync(identity, actorScope, operationId, SalesforceTools.UpdateRecord, execution.ToBytes(), payload.SafeSummary, payload.ExpiresAt, cancellationToken);
         return new SalesforceFeatureEffectProposal(
             request,
             approval,
             actorScope,
             operationId,
-            "decision-" + identity,
+            decisionId,
             "effect-" + identity,
             "provider-" + identity,
             persistedOperationKey);
@@ -219,4 +308,96 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
             ? payload.GetRawText()
             : intentJson;
     }
+}
+
+internal sealed class SalesforceFeatureEffectApprovalGateway(SalesforceFeatureEffectRail rail)
+    : IFeatureEffectApprovalGateway
+{
+    private const string LogicalOperationKey = "enrich-salesforce-description";
+    public bool Supports(CapabilityDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var feature = descriptor.Name + " " + descriptor.Description;
+        return descriptor.Origin == CapabilityOrigin.Feature &&
+               feature.Contains("enrich", StringComparison.OrdinalIgnoreCase) &&
+               feature.Contains("salesforce", StringComparison.OrdinalIgnoreCase) &&
+               feature.Contains("gmail", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task<InoToolRequest> PrepareAsync(
+        FeatureEffectApprovalRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var proposal = await rail.WaitForProposalAsync(
+            new SalesforceFeatureEffectRequest(
+                request.OwnerId,
+                request.ActorId,
+                request.InstallationId,
+                request.InputId,
+                LogicalOperationKey,
+                request.CorrelationId,
+                request.TraceId),
+            cancellationToken);
+        return proposal.Approval;
+    }
+}
+
+internal sealed class SalesforceFeatureEffectCompletion(
+    IFeatureGrainResolver grains,
+    TimeProvider timeProvider)
+{
+    internal async Task CompleteAsync(
+        SalesforceFeatureExecutionEnvelope execution,
+        string actorScope,
+        InoToolEffectResult result,
+        CancellationToken cancellationToken)
+    {
+        var ownerId = new BrainOwnerId(execution.OwnerId);
+        var actorId = new ActorId(execution.ActorId);
+        if (!string.Equals(RequestScope.Id(ownerId, actorId), actorScope, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("The Salesforce Feature effect actor does not match its approval.");
+        var resolvedAt = timeProvider.GetUtcNow();
+        var terminalKind = result.Disposition switch
+        {
+            InoToolEffectDisposition.Succeeded => InoEffectTerminalKind.Approved,
+            InoToolEffectDisposition.Failed => InoEffectTerminalKind.Failed,
+            _ => InoEffectTerminalKind.OutcomeUnknown
+        };
+        var resolution = new FeatureEffectResolution(
+            execution.PersistedOperationKey,
+            execution.DecisionId,
+            actorScope,
+            terminalKind,
+            resolvedAt,
+            result.SafeResult);
+        await grains.Installation(ownerId, new FeatureInstallationId(execution.InstallationId))
+            .ResolveIntentAsync(resolution)
+            .WaitAsync(cancellationToken);
+        await grains.Hub(ownerId).PublishAsync(new FeatureInput(
+            "salesforce-outcome-" + Digest(execution.DecisionId),
+            SalesforceFeatureEffectRail.OutcomeKind,
+            JsonSerializer.Serialize(new
+            {
+                installationId = execution.InstallationId,
+                inputId = execution.InputId,
+                logicalOperationKey = execution.LogicalOperationKey,
+                operationKey = resolution.OperationKey,
+                decisionId = resolution.DecisionId,
+                actorScope = resolution.ActorScope,
+                terminalKind = resolution.TerminalKind.ToString(),
+                disposition = result.Disposition.ToString(),
+                safeResult = resolution.SafeResult
+            }),
+            resolvedAt,
+            execution.CorrelationId,
+            execution.TraceId,
+            execution.InputId,
+            FeatureRunOrigin.Event,
+            new FeatureRunOriginReference(null, null, SalesforceFeatureEffectRail.OutcomeKind)))
+            .WaitAsync(cancellationToken);
+    }
+
+    private static string Digest(string value) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 }

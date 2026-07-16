@@ -33,7 +33,7 @@ class InoComposer extends StatelessWidget {
           children: [
             Expanded(
               child: Semantics(
-                label: 'Message INO',
+                label: 'Message DigitalBrain',
                 textField: true,
                 child: TextField(
                   key: inoComposerFieldKey,
@@ -58,7 +58,7 @@ class InoComposer extends StatelessWidget {
             const SizedBox(width: 8),
             Semantics(
               button: true,
-              label: 'Send message to INO',
+              label: 'Send message to DigitalBrain',
               child: FilledButton(
                 key: inoSendButtonKey,
                 onPressed: canSend ? onSend : null,

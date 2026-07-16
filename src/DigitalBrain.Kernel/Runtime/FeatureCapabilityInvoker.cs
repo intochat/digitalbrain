@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
+using DigitalBrain.Kernel.Contracts.Runtime;
 
 namespace DigitalBrain.Kernel.Runtime;
 
@@ -15,7 +16,9 @@ public enum FeatureCapabilityInvocationStatus
     Unavailable
 }
 
-public sealed record FeatureCapabilityInvocationResult(FeatureCapabilityInvocationStatus Status);
+public sealed record FeatureCapabilityInvocationResult(
+    FeatureCapabilityInvocationStatus Status,
+    InoToolRequest? ToolRequest = null);
 
 public sealed class FeatureCapabilityOutcomeUnknownException()
     : Exception("The Feature invocation outcome could not be confirmed.");
@@ -57,15 +60,33 @@ internal sealed class FeatureRunGateway(IFeatureGrainResolver grains) : IFeature
     }
 }
 
-internal sealed class FeatureCapabilityInvoker(
-    IFeatureRunGateway gateway,
-    IOwnerConnectionHealth connectionHealth) : IFeatureCapabilityInvoker
+internal sealed class FeatureCapabilityInvoker : IFeatureCapabilityInvoker
 {
     private const int MaximumFacts = 32;
     private const int MaximumFactNameLength = 128;
     private const int MaximumFactValueBytes = 4_096;
     private const int MaximumPayloadBytes = 64 * 1_024;
     private const int MaximumInputKindLength = 128;
+    private readonly IFeatureRunGateway _gateway;
+    private readonly IOwnerConnectionHealth _connectionHealth;
+    private readonly IFeatureEffectApprovalGateway[] _approvalGateways;
+
+    public FeatureCapabilityInvoker(
+        IFeatureRunGateway gateway,
+        IOwnerConnectionHealth connectionHealth,
+        IEnumerable<IFeatureEffectApprovalGateway> approvalGateways)
+    {
+        _gateway = gateway;
+        _connectionHealth = connectionHealth;
+        _approvalGateways = approvalGateways.ToArray();
+    }
+
+    internal FeatureCapabilityInvoker(
+        IFeatureRunGateway gateway,
+        IOwnerConnectionHealth connectionHealth)
+        : this(gateway, connectionHealth, [])
+    {
+    }
 
     public async Task<FeatureCapabilityInvocationResult> InvokeAsync(
         FeatureCapabilityInvocation invocation,
@@ -77,7 +98,7 @@ internal sealed class FeatureCapabilityInvoker(
             .OrderBy(static connection => connection.Provider, StringComparer.Ordinal)
             .ThenBy(static connection => connection.ConnectionId?.Value, StringComparer.Ordinal)
             .ToArray();
-        var healthy = await connectionHealth.ReadHealthyAsync(
+        var healthy = await _connectionHealth.ReadHealthyAsync(
             invocation.OwnerId,
             requiredConnections,
             cancellationToken).ConfigureAwait(false);
@@ -106,11 +127,26 @@ internal sealed class FeatureCapabilityInvoker(
             input);
         try
         {
-            var status = await gateway.StartAsync(command, cancellationToken).ConfigureAwait(false);
+            var status = await _gateway.StartAsync(command, cancellationToken).ConfigureAwait(false);
+            if (status is not (FeatureAppendStatus.Accepted or FeatureAppendStatus.Duplicate))
+                return new FeatureCapabilityInvocationResult(FeatureCapabilityInvocationStatus.Unavailable);
+            var approvalGateway = _approvalGateways.SingleOrDefault(candidate => candidate.Supports(invocation.Descriptor));
+            if (approvalGateway is null)
+                return new FeatureCapabilityInvocationResult(FeatureCapabilityInvocationStatus.Started);
+            var toolRequest = await approvalGateway.PrepareAsync(
+                new FeatureEffectApprovalRequest(
+                    invocation.Descriptor,
+                    invocation.OwnerId,
+                    invocation.ActorId,
+                    invocation.Binding.InstallationId,
+                    input.InputId,
+                    input.CorrelationId,
+                    input.TraceId),
+                cancellationToken).ConfigureAwait(false);
             return status switch
             {
                 FeatureAppendStatus.Accepted or FeatureAppendStatus.Duplicate =>
-                    new FeatureCapabilityInvocationResult(FeatureCapabilityInvocationStatus.Started),
+                    new FeatureCapabilityInvocationResult(FeatureCapabilityInvocationStatus.Started, toolRequest),
                 _ => new FeatureCapabilityInvocationResult(FeatureCapabilityInvocationStatus.Unavailable)
             };
         }

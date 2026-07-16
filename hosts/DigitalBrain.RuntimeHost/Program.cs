@@ -1,5 +1,6 @@
 using DigitalBrain.Integrations.Google;
 using DigitalBrain.Integrations.Salesforce;
+using DigitalBrain.Integrations.Web;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Capabilities;
 using DigitalBrain.Kernel.Contracts;
@@ -36,6 +37,7 @@ namespace DigitalBrain.RuntimeHost
             builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy.WithOrigins(corsOrigins).AllowAnyMethod().AllowAnyHeader()));
             builder.Services.AddDigitalBrainGoogle();
             builder.Services.AddDigitalBrainSalesforce();
+            builder.Services.AddDigitalBrainWebSearch(builder.Configuration);
             builder.Services.AddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<IFeaturePublicationVerifier, BlobFeaturePublicationVerifier>();
             builder.Services.AddHealthChecks().AddAsyncCheck("google-connector", static _ => Task.FromResult(HealthCheckResult.Healthy("Google connector is registered")))

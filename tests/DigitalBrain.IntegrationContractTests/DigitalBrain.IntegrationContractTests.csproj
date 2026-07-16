@@ -9,6 +9,7 @@
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google.Contracts\DigitalBrain.Integrations.Google.Contracts.csproj" />
     <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce.Contracts\DigitalBrain.Integrations.Salesforce.Contracts.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Web.Contracts\DigitalBrain.Integrations.Web.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Features.Sdk\DigitalBrain.Features.Sdk.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Features.Testing\DigitalBrain.Features.Testing.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />

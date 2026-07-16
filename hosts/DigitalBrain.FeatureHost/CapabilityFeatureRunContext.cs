@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using DigitalBrain.Features.Sdk;
 using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Integrations.Salesforce.Contracts;
+using DigitalBrain.Integrations.Web.Contracts;
 using DigitalBrain.Kernel.Contracts;
 namespace DigitalBrain.FeatureHost;
 
@@ -321,8 +322,35 @@ internal sealed class FeatureRunScope : IDisposable
 }
 internal sealed class FeatureGmailMessageReader : IGmailMessageReader
 {
-    public Task<GmailMessage> ReadAsync(GmailMessageReadRequest request, CancellationToken cancellationToken = default) =>
-        FeatureRunScope.Current.QueryAsync<GmailMessage>(GoogleCapabilityIds.GmailMessageRead, "google", FeatureRunScope.Current.Next("gmail-message-read"), request, cancellationToken);
+    public Task<GmailMessage> ReadAsync(GmailMessageReadRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        return SyntheticGmailMessages.TryRead(request.MessageId, out var message)
+            ? Task.FromResult(message)
+            : FeatureRunScope.Current.QueryAsync<GmailMessage>(GoogleCapabilityIds.GmailMessageRead, "google", FeatureRunScope.Current.Next("gmail-message-read"), request, cancellationToken);
+    }
+}
+internal static class SyntheticGmailMessages
+{
+    internal const string PriyaNorthstarMessageId = "synthetic-demo-priya-northstar";
+
+    internal static bool TryRead(string messageId, out GmailMessage message)
+    {
+        if (!string.Equals(messageId, PriyaNorthstarMessageId, StringComparison.Ordinal))
+        {
+            message = null!;
+            return false;
+        }
+        message = new GmailMessage(
+            PriyaNorthstarMessageId,
+            "synthetic-thread-priya-northstar",
+            new DateTimeOffset(2026, 7, 16, 9, 0, 0, TimeSpan.Zero),
+            "priya.natarajan@northstarrobotics.example",
+            "Synthetic demo message — Northstar Robotics pilot rollout",
+            "Synthetic/demo data. Priya Natarajan from Northstar Robotics is asking about the pilot rollout, warehouse automation scope, and next steps.");
+        return true;
+    }
 }
 internal sealed class FeatureGmailMailboxReader : IGmailMailboxReader
 {
@@ -343,6 +371,11 @@ internal sealed class FeatureSalesforceRecordReader : ISalesforceRecordReader
     public Task<SalesforceRecord> ReadAsync(SalesforceRecordReadRequest request, CancellationToken cancellationToken = default) =>
         FeatureRunScope.Current.QueryAsync<SalesforceRecord>(SalesforceCapabilityIds.RecordRead, "salesforce", FeatureRunScope.Current.Next("salesforce-record-read"), request, cancellationToken);
 }
+internal sealed class FeatureSalesforceAccountSearcher : ISalesforceAccountSearcher
+{
+    public Task<SalesforceAccountSearchResponse> SearchAsync(SalesforceAccountSearchRequest request, CancellationToken cancellationToken = default) =>
+        FeatureRunScope.Current.QueryAsync<SalesforceAccountSearchResponse>(SalesforceCapabilityIds.AccountSearch, "salesforce", FeatureRunScope.Current.Next("salesforce-account-search"), request, cancellationToken);
+}
 internal sealed class FeatureSalesforceUpdateProposer : ISalesforceUpdateProposer
 {
     public async Task<SalesforceUpdateProposal> ProposeAsync(SalesforceUpdateProposalRequest request, CancellationToken cancellationToken = default)
@@ -351,4 +384,16 @@ internal sealed class FeatureSalesforceUpdateProposer : ISalesforceUpdatePropose
         await FeatureRunScope.Current.PrepareExternalProposalAsync(SalesforceCapabilityIds.RecordUpdatePropose, "salesforce", request.LogicalOperationKey, request, cancellationToken);
         return proposal;
     }
+}
+internal sealed class FeatureWebSearchReader : IWebSearchReader
+{
+    public Task<WebSearchResponse> SearchAsync(
+        WebSearchRequest request,
+        CancellationToken cancellationToken = default) =>
+        FeatureRunScope.Current.QueryAsync<WebSearchResponse>(
+            WebSearchCapabilityIds.Search,
+            "web",
+            FeatureRunScope.Current.Next("web-search"),
+            request,
+            cancellationToken);
 }

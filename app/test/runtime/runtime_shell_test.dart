@@ -42,7 +42,7 @@ void main() {
 
     expect(find.byKey(runtimeSurfaceKey), findsOneWidget);
     expect(find.byKey(chatActivityContextKey), findsNothing);
-    expect(find.text('Ask INO about this workspace.'), findsOneWidget);
+    expect(find.text('Ask DigitalBrain about this workspace.'), findsOneWidget);
     expect(find.byKey(inoComposerFieldKey), findsOneWidget);
     await runtime.stop();
   });

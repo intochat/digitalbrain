@@ -15,6 +15,7 @@ public sealed class StableCapabilityIdTests
             GoogleCapabilityIds.GmailMailboxRead,
             GoogleCapabilityIds.GmailSendPropose,
             SalesforceCapabilityIds.RecordRead,
+            SalesforceCapabilityIds.AccountSearch,
             SalesforceCapabilityIds.RecordUpdatePropose
         ];
 
@@ -24,6 +25,7 @@ public sealed class StableCapabilityIdTests
                 "google.gmail.mailbox.read.v1",
                 "google.gmail.send.propose.v1",
                 "salesforce.record.read.v1",
+                "salesforce.account.search.v1",
                 "salesforce.record.update.propose.v1"
             ],
             ids);

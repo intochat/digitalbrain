@@ -77,7 +77,7 @@ class _SurfaceViewState extends State<SurfaceView> {
     return Semantics(
       container: true,
       label: widget.surface.payload is InoConversationSurfacePayload
-          ? 'INO conversation'
+          ? 'Chat conversation'
           : 'DigitalBrain workspace',
       child: Stack(
         fit: StackFit.expand,

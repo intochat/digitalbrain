@@ -47,6 +47,11 @@ abstract interface class GrpcClientPort {
     CallOptions options,
   );
 
+  GrpcUnaryResponse<wire.ListFeaturesReply> listFeatures(
+    wire.ListFeaturesRequest request,
+    CallOptions options,
+  );
+
   GrpcUnaryResponse<wire.FeatureDraftReply> getFeatureDraft(
     wire.GetFeatureDraftRequest request,
     CallOptions options,
@@ -337,6 +342,23 @@ class GrpcUiTransport
     try {
       return await _awaitProductUnary(
         _client.getFeatureDraft(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.ListFeaturesReply> listFeatures({
+    required String accessToken,
+    required wire.ListFeaturesRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.listFeatures(
           request,
           _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
         ),
@@ -733,6 +755,14 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
   const _GeneratedGrpcClientPort(this.client);
 
   final DigitalBrainV2UiClient client;
+
+  @override
+  GrpcUnaryResponse<wire.ListFeaturesReply> listFeatures(
+    wire.ListFeaturesRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.listFeatures(request, options: options),
+  );
 
   @override
   GrpcUnaryResponse<wire.SessionReply> bootstrapSession(

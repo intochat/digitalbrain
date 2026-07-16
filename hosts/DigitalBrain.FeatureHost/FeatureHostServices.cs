@@ -3,6 +3,7 @@ using System.Text.Json;
 using Azure.Storage.Blobs;
 using DigitalBrain.Integrations.Google.Contracts;
 using DigitalBrain.Integrations.Salesforce.Contracts;
+using DigitalBrain.Integrations.Web.Contracts;
 using DigitalBrain.Kernel.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,7 +42,9 @@ internal static class FeatureHostServices
         services.TryAddSingleton<IGmailMailboxReader, FeatureGmailMailboxReader>();
         services.TryAddSingleton<IGmailSendProposer, FeatureGmailSendProposer>();
         services.TryAddSingleton<ISalesforceRecordReader, FeatureSalesforceRecordReader>();
+        services.TryAddSingleton<ISalesforceAccountSearcher, FeatureSalesforceAccountSearcher>();
         services.TryAddSingleton<ISalesforceUpdateProposer, FeatureSalesforceUpdateProposer>();
+        services.TryAddSingleton<IWebSearchReader, FeatureWebSearchReader>();
         services.TryAddSingleton<FeatureExecutionWorker>();
         services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<FeatureExecutionWorker>());
         return services;

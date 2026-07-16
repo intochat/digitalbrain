@@ -11,7 +11,9 @@ internal static class FeatureManifestDeriver
         ["DigitalBrain.Integrations.Google.Contracts.IGmailMailboxReader"] = "google.gmail.mailbox.read.v1",
         ["DigitalBrain.Integrations.Google.Contracts.IGmailSendProposer"] = "google.gmail.send.propose.v1",
         ["DigitalBrain.Integrations.Salesforce.Contracts.ISalesforceRecordReader"] = "salesforce.record.read.v1",
-        ["DigitalBrain.Integrations.Salesforce.Contracts.ISalesforceUpdateProposer"] = "salesforce.record.update.propose.v1"
+        ["DigitalBrain.Integrations.Salesforce.Contracts.ISalesforceAccountSearcher"] = "salesforce.account.search.v1",
+        ["DigitalBrain.Integrations.Salesforce.Contracts.ISalesforceUpdateProposer"] = "salesforce.record.update.propose.v1",
+        ["DigitalBrain.Integrations.Web.Contracts.IWebSearchReader"] = "web.search.v1"
     };
     internal static string AssemblyName(FeatureSourceSnapshot snapshot, string projectPath)
     {
