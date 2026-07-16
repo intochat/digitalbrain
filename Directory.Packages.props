@@ -21,6 +21,7 @@
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.4.0" />
 
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />

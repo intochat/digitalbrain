@@ -9,6 +9,9 @@
     <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
   </Folder>
+  <Folder Name="/kernel/">
+    <Project Path="kernel/Brain.Contracts/Brain.Contracts.csproj" />
+  </Folder>
   <Folder Name="/integrations/">
     <Project Path="integrations/DigitalBrain.Integrations.Google/DigitalBrain.Integrations.Google.csproj" />
     <Project Path="integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj" />
@@ -30,6 +33,7 @@
     <Project Path="tests/DigitalBrain.IntegrationContractTests/DigitalBrain.IntegrationContractTests.csproj" />
     <Project Path="tests/DigitalBrain.OrleansTests/DigitalBrain.OrleansTests.csproj" />
     <Project Path="tests/DigitalBrain.UnitTests/DigitalBrain.UnitTests.csproj" />
+    <Project Path="tests/Brain.KernelTests/Brain.KernelTests.csproj" />
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
