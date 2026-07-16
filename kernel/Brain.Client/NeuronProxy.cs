@@ -8,6 +8,7 @@ public class NeuronProxy : DispatchProxy
 {
     private static readonly MethodInfo InvokeContractAsyncMethod =
         typeof(NeuronProxy).GetMethod(nameof(InvokeContractAsync), BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
 
     private IClusterClient _client = null!;
     private string _addressKey = null!;
@@ -41,8 +42,8 @@ public class NeuronProxy : DispatchProxy
 
     private async Task<TResult> InvokeContractAsync<TResult>(string contract, object? argument)
     {
-        var invocation = new NeuronInvocation(contract, JsonSerializer.Serialize(argument), Guid.NewGuid().ToString("N"), _callerKey);
+        var invocation = new NeuronInvocation(contract, JsonSerializer.Serialize(argument, JsonOptions), Guid.NewGuid().ToString("N"), _callerKey);
         var receipt = await _client.GetGrain<INeuron>(_addressKey).InvokeAsync(invocation);
-        return JsonSerializer.Deserialize<TResult>(receipt.OutputJson)!;
+        return JsonSerializer.Deserialize<TResult>(receipt.OutputJson, JsonOptions)!;
     }
 }
