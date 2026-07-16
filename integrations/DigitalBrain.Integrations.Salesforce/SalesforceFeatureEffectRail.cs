@@ -116,10 +116,11 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
                 proposal.ActorScope,
                 cancellationToken);
             var declinedRequest = proposal.Request;
+            var declinedResolution = Resolution(proposal, declined, declinedDecision);
             await grains.Installation(declinedRequest.OwnerId, declinedRequest.InstallationId)
-                .ResolveIntentAsync(Resolution(proposal, declined, declinedDecision))
+                .ResolveIntentAsync(declinedResolution)
                 .WaitAsync(cancellationToken);
-            await PublishOutcomeAsync(proposal, declined, cancellationToken);
+            await PublishOutcomeAsync(proposal, declinedResolution, cancellationToken);
             return declined;
         }
         if (!effects.TryAuthorizeMutation(proposal.Approval, proposal.ActorScope, out var authorized) ||
@@ -131,8 +132,9 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
         var request = proposal.Request;
         var terminalDecision = await plans.ReadDecisionAsync(proposal.Approval, proposal.ActorScope, cancellationToken);
         var installation = grains.Installation(request.OwnerId, request.InstallationId);
-        await installation.ResolveIntentAsync(Resolution(proposal, result, terminalDecision)).WaitAsync(cancellationToken);
-        await PublishOutcomeAsync(proposal, result, cancellationToken);
+        var resolution = Resolution(proposal, result, terminalDecision);
+        await installation.ResolveIntentAsync(resolution).WaitAsync(cancellationToken);
+        await PublishOutcomeAsync(proposal, resolution, cancellationToken);
         return result;
     }
     private static FeatureEffectResolution Resolution(
@@ -142,13 +144,7 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
     {
         if (decision is null || !string.Equals(decision.ActorScope, proposal.ActorScope, StringComparison.Ordinal))
             throw new RuntimeStateIntegrityException("A durable actor-bound Salesforce terminal decision is required.");
-        var expectedDisposition = decision.TerminalKind switch
-        {
-            InoEffectTerminalKind.Approved => InoToolEffectDisposition.Succeeded,
-            InoEffectTerminalKind.Declined or InoEffectTerminalKind.Expired or InoEffectTerminalKind.Failed => InoToolEffectDisposition.Failed,
-            InoEffectTerminalKind.OutcomeUnknown => InoToolEffectDisposition.OutcomeUnknown,
-            _ => throw new RuntimeStateIntegrityException("The Salesforce terminal decision is invalid.")
-        };
+        var expectedDisposition = Disposition(decision.TerminalKind);
         if (result.Disposition != expectedDisposition)
             throw new RuntimeStateIntegrityException("The Salesforce terminal decision does not match its durable safe result.");
         return new FeatureEffectResolution(
@@ -161,7 +157,7 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
     }
     private async Task PublishOutcomeAsync(
         SalesforceFeatureEffectProposal proposal,
-        InoToolEffectResult result,
+        FeatureEffectResolution resolution,
         CancellationToken cancellationToken)
     {
         var request = proposal.Request;
@@ -173,9 +169,14 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
                 installationId = request.InstallationId.Value,
                 inputId = request.InputId,
                 logicalOperationKey = request.LogicalOperationKey,
-                disposition = result.Disposition.ToString()
+                operationKey = resolution.OperationKey,
+                decisionId = resolution.DecisionId,
+                actorScope = resolution.ActorScope,
+                terminalKind = resolution.TerminalKind.ToString(),
+                disposition = Disposition(resolution.TerminalKind).ToString(),
+                safeResult = resolution.SafeResult
             }),
-            timeProvider.GetUtcNow(),
+            resolution.ResolvedAt,
             request.CorrelationId,
             request.TraceId,
             request.InputId,
@@ -183,6 +184,13 @@ internal sealed class SalesforceFeatureEffectRail(IFeatureGrainResolver grains, 
             new FeatureRunOriginReference(null, null, OutcomeKind));
         await grains.Hub(request.OwnerId).PublishAsync(outcomeInput).WaitAsync(cancellationToken);
     }
+    private static InoToolEffectDisposition Disposition(InoEffectTerminalKind terminalKind) => terminalKind switch
+    {
+        InoEffectTerminalKind.Approved => InoToolEffectDisposition.Succeeded,
+        InoEffectTerminalKind.Declined or InoEffectTerminalKind.Expired or InoEffectTerminalKind.Failed => InoToolEffectDisposition.Failed,
+        InoEffectTerminalKind.OutcomeUnknown => InoToolEffectDisposition.OutcomeUnknown,
+        _ => throw new RuntimeStateIntegrityException("The Salesforce terminal decision is invalid.")
+    };
     private static void ValidateRequest(SalesforceFeatureEffectRequest request)
     {
         Validate(request.InstallationId.Value, nameof(request.InstallationId));

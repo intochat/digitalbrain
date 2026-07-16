@@ -1115,15 +1115,28 @@ public sealed class FeatureInstallationTransitionTests
     }
 
     [Fact]
-    public void Hub_rejects_conflicting_content_for_a_persisted_fan_out_input_id()
+    public void Hub_requires_byte_identical_content_for_a_persisted_fan_out_input_id()
     {
         var hub = FeatureHubTransitions.Register(
             FeatureHubState.Empty,
             new FeatureInstallationRegistration(InstallationId, ReleaseOne, ["email.received"]));
-        var begun = FeatureHubTransitions.BeginFanOut(hub, Input("fanout-conflict"));
-        var conflicting = Input("fanout-conflict") with { PayloadJson = "{\"different\":true}" };
+        var input = Input("fanout-conflict");
+        var begun = FeatureHubTransitions.BeginFanOut(hub, input);
+        FeatureInput[] conflicts =
+        [
+            input with { Kind = "email.changed" },
+            input with { PayloadJson = "{\"different\":true}" },
+            input with { OccurredAt = Now.AddTicks(1) },
+            input with { CorrelationId = "correlation-changed" },
+            input with { TraceId = "trace-changed" },
+            input with { CausationId = "causation-changed" },
+            input with { Origin = FeatureRunOrigin.Schedule },
+            input with { OriginReference = new FeatureRunOriginReference(null, null, "origin-reference-changed") }
+        ];
 
-        Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.BeginFanOut(begun, conflicting));
+        Assert.Same(begun, FeatureHubTransitions.BeginFanOut(begun, input));
+        foreach (var conflict in conflicts)
+            Assert.Throws<FeatureConcurrencyException>(() => FeatureHubTransitions.BeginFanOut(begun, conflict));
     }
 
     [Fact]

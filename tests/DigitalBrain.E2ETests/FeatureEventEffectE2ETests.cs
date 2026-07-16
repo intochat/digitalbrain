@@ -154,6 +154,145 @@ public sealed class FeatureEventEffectE2ETests
     }
 
     [Fact]
+    public async Task Salesforce_outcome_replay_after_lost_ack_and_time_advance_is_byte_identical()
+    {
+        var payload = SalesforceFeatureEffectPayload.Create(
+            new SalesforcePreparedUpdate("{\"version\":1}"u8.ToArray()),
+            "update the approved Salesforce field",
+            Now.AddHours(24));
+        var persistedOperationKey = FeatureIntentKeys.Create(InstallationId, "event-replay", "update-account");
+        var installation = new IntentInstallation(new FeatureIntentStatus(
+            persistedOperationKey,
+            FeatureIntentKind.ExternalEffect,
+            payload.ToJson(),
+            null));
+        var hub = new RecordingHub(failFirstAcknowledgement: true);
+        var plans = new RecordingPlanStore();
+        var effects = new RecordingEffectExecutor(plans);
+        var timeProvider = new AdjustableTimeProvider(Now);
+        var rail = new SalesforceFeatureEffectRail(
+            new FeatureGrains(hub, new Dictionary<FeatureInstallationId, IFeatureInstallationGrain>
+            {
+                [InstallationId] = installation
+            }),
+            plans,
+            effects,
+            timeProvider);
+        var proposal = await rail.ProposeAsync(new SalesforceFeatureEffectRequest(
+            Owner,
+            Actor,
+            InstallationId,
+            "event-replay",
+            "update-account",
+            "correlation-replay",
+            "trace-replay"));
+
+        await Assert.ThrowsAsync<IOException>(() => rail.ApplyAsync(proposal, approved: true));
+        timeProvider.Advance(TimeSpan.FromHours(1));
+
+        var replay = await rail.ApplyAsync(proposal, approved: true);
+
+        Assert.Equal(InoToolEffectDisposition.Succeeded, replay.Disposition);
+        Assert.Equal(1, effects.Executions);
+        Assert.Equal(2, hub.Attempts.Count);
+        Assert.Equal(hub.Attempts[0], hub.Attempts[1]);
+        Assert.Equal(Now, hub.Attempts[1].OccurredAt);
+        Assert.Single(hub.Inputs);
+    }
+
+    [Theory]
+    [InlineData(InoEffectTerminalKind.Approved, InoToolEffectDisposition.Succeeded, "verified")]
+    [InlineData(InoEffectTerminalKind.Declined, InoToolEffectDisposition.Failed, "declined")]
+    [InlineData(InoEffectTerminalKind.Failed, InoToolEffectDisposition.Failed, "failed")]
+    [InlineData(InoEffectTerminalKind.Expired, InoToolEffectDisposition.Failed, "expired")]
+    [InlineData(InoEffectTerminalKind.OutcomeUnknown, InoToolEffectDisposition.OutcomeUnknown, "outcome unknown")]
+    public async Task Salesforce_terminal_outcomes_replay_stably_after_lost_ack(
+        InoEffectTerminalKind terminalKind,
+        InoToolEffectDisposition disposition,
+        string safeResult)
+    {
+        var payload = SalesforceFeatureEffectPayload.Create(
+            new SalesforcePreparedUpdate("{\"version\":1}"u8.ToArray()),
+            "update the approved Salesforce field",
+            Now.AddHours(24));
+        var persistedOperationKey = FeatureIntentKeys.Create(InstallationId, "event-terminal", "update-account");
+        var installation = new IntentInstallation(new FeatureIntentStatus(
+            persistedOperationKey,
+            FeatureIntentKind.ExternalEffect,
+            payload.ToJson(),
+            null));
+        var hub = new RecordingHub(failFirstAcknowledgement: true);
+        var plans = new RecordingPlanStore();
+        var timeProvider = new AdjustableTimeProvider(Now);
+        var rail = new SalesforceFeatureEffectRail(
+            new FeatureGrains(hub, new Dictionary<FeatureInstallationId, IFeatureInstallationGrain>
+            {
+                [InstallationId] = installation
+            }),
+            plans,
+            new RecordingEffectExecutor(plans),
+            timeProvider);
+        var proposal = await rail.ProposeAsync(new SalesforceFeatureEffectRequest(
+            Owner,
+            Actor,
+            InstallationId,
+            "event-terminal",
+            "update-account",
+            "correlation-terminal",
+            "trace-terminal"));
+        plans.SetTerminal(proposal.EffectId, proposal.ActorScope, terminalKind, disposition, Now, safeResult);
+
+        await Assert.ThrowsAsync<IOException>(() => rail.ApplyAsync(proposal, approved: true));
+        timeProvider.Advance(TimeSpan.FromHours(1));
+
+        var replay = await rail.ApplyAsync(proposal, approved: true);
+
+        Assert.Equal(disposition, replay.Disposition);
+        Assert.Equal(hub.Attempts[0], hub.Attempts[1]);
+        Assert.Contains($"\"terminalKind\":\"{terminalKind}\"", hub.Attempts[1].PayloadJson, StringComparison.Ordinal);
+        Assert.Contains($"\"decisionId\":\"{proposal.EffectId}\"", hub.Attempts[1].PayloadJson, StringComparison.Ordinal);
+        Assert.Contains($"\"safeResult\":\"{safeResult}\"", hub.Attempts[1].PayloadJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Salesforce_outcome_id_cannot_be_reused_for_a_changed_terminal_resolution()
+    {
+        var payload = SalesforceFeatureEffectPayload.Create(
+            new SalesforcePreparedUpdate("{\"version\":1}"u8.ToArray()),
+            "update the approved Salesforce field",
+            Now.AddHours(24));
+        var persistedOperationKey = FeatureIntentKeys.Create(InstallationId, "event-conflict", "update-account");
+        var installation = new IntentInstallation(new FeatureIntentStatus(
+            persistedOperationKey,
+            FeatureIntentKind.ExternalEffect,
+            payload.ToJson(),
+            null));
+        var hub = new RecordingHub(failFirstAcknowledgement: true);
+        var plans = new RecordingPlanStore();
+        var rail = new SalesforceFeatureEffectRail(
+            new FeatureGrains(hub, new Dictionary<FeatureInstallationId, IFeatureInstallationGrain>
+            {
+                [InstallationId] = installation
+            }),
+            plans,
+            new RecordingEffectExecutor(plans),
+            new FixedTimeProvider(Now));
+        var proposal = await rail.ProposeAsync(new SalesforceFeatureEffectRequest(
+            Owner,
+            Actor,
+            InstallationId,
+            "event-conflict",
+            "update-account",
+            "correlation-conflict",
+            "trace-conflict"));
+        plans.SetTerminal(proposal.EffectId, proposal.ActorScope, InoEffectTerminalKind.Approved, InoToolEffectDisposition.Succeeded, Now, "verified");
+        await Assert.ThrowsAsync<IOException>(() => rail.ApplyAsync(proposal, approved: true));
+        plans.SetTerminal("different-decision", proposal.ActorScope, InoEffectTerminalKind.Approved, InoToolEffectDisposition.Succeeded, Now, "different result");
+
+        await Assert.ThrowsAsync<FeatureConcurrencyException>(() => rail.ApplyAsync(proposal, approved: true));
+    }
+
+    [Fact]
     public async Task Decline_wins_a_later_approval_without_provider_execution()
     {
         var payload = SalesforceFeatureEffectPayload.Create(
@@ -245,14 +384,21 @@ public sealed class FeatureEventEffectE2ETests
                 : throw new KeyNotFoundException();
     }
 
-    private sealed class RecordingHub : IFeatureHubGrain
+    private sealed class RecordingHub(bool failFirstAcknowledgement = false) : IFeatureHubGrain
     {
         private readonly Dictionary<string, FeatureInput> _inputs = new(StringComparer.Ordinal);
+        private int _publications;
+        public List<FeatureInput> Attempts { get; } = [];
         public IReadOnlyCollection<FeatureInput> Inputs => _inputs.Values;
 
         public Task<FeatureFanOutResult> PublishAsync(FeatureInput input)
         {
+            Attempts.Add(input);
+            if (_inputs.TryGetValue(input.InputId, out var existing) && existing != input)
+                throw new FeatureConcurrencyException("The fan-out input id is already bound to different content.");
             _inputs.TryAdd(input.InputId, input);
+            if (failFirstAcknowledgement && ++_publications == 1)
+                throw new IOException("The publication acknowledgement was lost.");
             return Task.FromResult(new FeatureFanOutResult(input.InputId, 1, 0));
         }
 
@@ -414,6 +560,18 @@ public sealed class FeatureEventEffectE2ETests
                 Now);
         }
 
+        public void SetTerminal(
+            string decisionId,
+            string actorScope,
+            InoEffectTerminalKind terminalKind,
+            InoToolEffectDisposition disposition,
+            DateTimeOffset resolvedAt,
+            string safeResult)
+        {
+            TerminalResult = new InoToolEffectResult(disposition, safeResult);
+            TerminalDecision = new InoEffectDecision(decisionId, actorScope, terminalKind, resolvedAt);
+        }
+
         private sealed record PlanBinding(
             string ActorScope,
             string OperationId,
@@ -470,5 +628,11 @@ public sealed class FeatureEventEffectE2ETests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class AdjustableTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+        public void Advance(TimeSpan duration) => now = now.Add(duration);
     }
 }
