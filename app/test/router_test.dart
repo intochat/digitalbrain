@@ -1787,7 +1787,9 @@ void main() {
       expect(transport.contextRequests.single.conversationId, 'conversation-a');
       expect(transport.contextRequests.single.requestId, 'request-a');
       expect(find.byKey(chatActivityContextKey), findsOneWidget);
+      expect(find.text('Opened from Activity'), findsOneWidget);
       expect(find.text('Conversation conversation-a'), findsOneWidget);
+      expect(find.text('Request request-a'), findsOneWidget);
       expect(find.text(exactRequest), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox.shrink());
@@ -1795,6 +1797,308 @@ void main() {
       expect(transport.closeCalls, 1);
     },
   );
+
+  testWidgets('conversation-only historical Chat link hides route provenance', (
+    tester,
+  ) async {
+    final transport = _RouterTransport(_RouterFeedCall());
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(
+      initialLocation: '/chat/untrusted-conversation',
+    );
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.byKey(chatActivityContextKey).evaluate().isNotEmpty,
+    );
+
+    expect(
+      find.text('Historical Chat context is unavailable.'),
+      findsOneWidget,
+    );
+    expect(find.text('Opened from Activity'), findsNothing);
+    expect(find.textContaining('untrusted-conversation'), findsNothing);
+    expect(transport.contextRequests, isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets('request-only historical Chat link hides route provenance', (
+    tester,
+  ) async {
+    final transport = _RouterTransport(_RouterFeedCall());
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(
+      initialLocation: '/chat?requestId=untrusted-request',
+    );
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(
+      tester,
+      () => find.byKey(chatActivityContextKey).evaluate().isNotEmpty,
+    );
+
+    expect(
+      find.text('Historical Chat context is unavailable.'),
+      findsOneWidget,
+    );
+    expect(find.text('Opened from Activity'), findsNothing);
+    expect(find.textContaining('untrusted-request'), findsNothing);
+    expect(transport.contextRequests, isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets(
+    'historical Chat trusts only validated context and bounds a maximum request',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 900);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final feed = _RouterFeedCall();
+      final pendingContext = Completer<wire.GetConversationContextReply>();
+      final transport = _RouterTransport(
+        feed,
+        conversationContextFuture: pendingContext.future,
+      );
+      final owner = RuntimeSessionOwner(
+        configuration: _configuration(),
+        transportFactory: (_) => transport,
+      );
+      final router = createDigitalBrainRouter(
+        initialLocation:
+            '/chat/untrusted-conversation?requestId=untrusted-request',
+      );
+
+      await tester.pumpWidget(
+        DigitalBrainApp(
+          sessionOwnerFactory: () => owner,
+          routerFactory: () => router,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+      );
+      await tester.tap(find.byKey(runtimeSignInButtonKey));
+      await _pumpUntil(tester, () => transport.contextRequests.length == 1);
+
+      expect(find.text('Opened from Activity'), findsNothing);
+      expect(find.textContaining('untrusted-conversation'), findsNothing);
+      expect(find.textContaining('untrusted-request'), findsNothing);
+
+      final exactRequest = List.filled(16000, 'x').join();
+      pendingContext.complete(
+        wire.GetConversationContextReply(
+          conversationId: 'untrusted-conversation',
+          requestId: 'untrusted-request',
+          requestText: exactRequest,
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.text(exactRequest).evaluate().isNotEmpty,
+      );
+      await _pumpUntil(tester, () => transport.watchCalls == 1);
+      feed.add(
+        FeedSurfaceJson(
+          surfaceJsonString(
+            sequence: 1,
+            payload: inoConversationPayload(),
+            actions: [testInoActionJson()],
+          ),
+        ),
+      );
+      await _pumpUntil(
+        tester,
+        () => find.byKey(inoComposerFieldKey).evaluate().isNotEmpty,
+      );
+
+      expect(find.text('Opened from Activity'), findsOneWidget);
+      expect(find.text('Conversation untrusted-conversation'), findsOneWidget);
+      expect(find.text('Request untrusted-request'), findsOneWidget);
+      expect(find.text(exactRequest), findsOneWidget);
+      expect(
+        tester.getSize(find.byKey(chatActivityRequestScrollKey)).height,
+        lessThanOrEqualTo(180),
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.label == 'Originating request',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(find.byKey(runtimeSurfaceKey)).height,
+        greaterThan(400),
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpUntil(tester, () => transport.closeCalls > 0);
+    },
+  );
+
+  testWidgets('failed historical Chat lookup retries only on explicit action', (
+    tester,
+  ) async {
+    final failedContext = Completer<wire.GetConversationContextReply>();
+    final transport = _RouterTransport(
+      _RouterFeedCall(),
+      conversationContextFuture: failedContext.future,
+    );
+    final owner = _RefreshableRouterSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter(
+      initialLocation: '/chat/conversation-a?requestId=request-a',
+    );
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(tester, () => transport.contextRequests.length == 1);
+    failedContext.completeError(StateError('missing'));
+    await _pumpUntil(
+      tester,
+      () => find.byKey(chatActivityContextRetryKey).evaluate().isNotEmpty,
+    );
+    expect(transport.contextRequests, hasLength(1));
+
+    owner.refresh();
+    owner.refresh();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(transport.contextRequests, hasLength(1));
+
+    await tester.tap(find.byKey(chatActivityContextRetryKey));
+    await _pumpUntil(tester, () => transport.contextRequests.length == 2);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
+
+  testWidgets('back from historical Chat restores the focused live Chat', (
+    tester,
+  ) async {
+    final feed = _RouterFeedCall();
+    final transport = _RouterTransport(
+      feed,
+      conversationContextReply: wire.GetConversationContextReply(
+        conversationId: 'conversation-a',
+        requestId: 'request-a',
+        requestText: 'Exact historical request',
+      ),
+    );
+    final owner = RuntimeSessionOwner(
+      configuration: _configuration(),
+      transportFactory: (_) => transport,
+    );
+    final router = createDigitalBrainRouter();
+
+    await tester.pumpWidget(
+      DigitalBrainApp(
+        sessionOwnerFactory: () => owner,
+        routerFactory: () => router,
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(runtimeSignInKey).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(runtimeSignInButtonKey));
+    await _pumpUntil(tester, () => transport.watchCalls == 1);
+    feed.add(
+      FeedSurfaceJson(
+        surfaceJsonString(
+          sequence: 1,
+          payload: inoConversationPayload(),
+          actions: [testInoActionJson()],
+        ),
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.byKey(inoComposerFieldKey).evaluate().isNotEmpty,
+    );
+    final controller = owner.controller!;
+    final surface = controller.latestSurface;
+    await tester.enterText(
+      find.byKey(inoComposerFieldKey),
+      'Retained live draft',
+    );
+    await tester.pump();
+
+    unawaited(router.push('/chat/conversation-a?requestId=request-a'));
+    await _pumpUntil(tester, () => transport.contextRequests.length == 1);
+    await _pumpUntil(
+      tester,
+      () => find.text('Exact historical request').evaluate().isNotEmpty,
+    );
+    router.pop();
+    await _pumpUntil(
+      tester,
+      () => router.routeInformationProvider.value.uri.path == '/chat',
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await _pumpUntil(
+      tester,
+      () => find.byKey(inoComposerFieldKey).hitTestable().evaluate().isNotEmpty,
+    );
+
+    final restoredComposer = tester.widget<TextField>(
+      find.byKey(inoComposerFieldKey).hitTestable(),
+    );
+    expect(restoredComposer.controller?.text, 'Retained live draft');
+    expect(restoredComposer.focusNode?.hasFocus, isTrue);
+    expect(identical(owner.controller, controller), isTrue);
+    expect(identical(controller.latestSurface, surface), isTrue);
+    expect(transport.watchCalls, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUntil(tester, () => transport.closeCalls > 0);
+  });
 
   testWidgets('deep-linked Run has a real Back to Activity fallback', (
     tester,
@@ -1992,6 +2296,7 @@ class _RouterTransport
     this.activityReply,
     this.runReply,
     this.conversationContextReply,
+    this.conversationContextFuture,
   });
 
   final _RouterFeedCall feed;
@@ -2004,6 +2309,7 @@ class _RouterTransport
   final wire.ListActivityReply? activityReply;
   final wire.RunReply? runReply;
   final wire.GetConversationContextReply? conversationContextReply;
+  final Future<wire.GetConversationContextReply>? conversationContextFuture;
   int loginCalls = 0;
   int watchCalls = 0;
   int closeCalls = 0;
@@ -2213,8 +2519,20 @@ class _RouterTransport
     required wire.GetConversationContextRequest request,
   }) async {
     contextRequests.add(request.deepCopy());
+    if (conversationContextFuture case final contextFuture?) {
+      return contextFuture;
+    }
     return conversationContextReply ?? wire.GetConversationContextReply();
   }
+}
+
+class _RefreshableRouterSessionOwner extends RuntimeSessionOwner {
+  _RefreshableRouterSessionOwner({
+    required super.configuration,
+    required super.transportFactory,
+  });
+
+  void refresh() => notifyListeners();
 }
 
 wire.FeatureRunSnapshot _wireActivityRun() => wire.FeatureRunSnapshot(

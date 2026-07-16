@@ -90,16 +90,19 @@ void main() {
       await _pumpUntil(tester, () => runtime.latestSurface != null);
 
       expect(find.byKey(chatActivityContextKey), findsOneWidget);
-      expect(find.text('Opened from Activity'), findsOneWidget);
-      expect(find.textContaining('conversation-42'), findsOneWidget);
-      expect(find.textContaining('request-17'), findsOneWidget);
+      expect(
+        find.text('Historical Chat context is unavailable.'),
+        findsOneWidget,
+      );
+      expect(find.text('Opened from Activity'), findsNothing);
+      expect(find.textContaining('conversation-42'), findsNothing);
+      expect(find.textContaining('request-17'), findsNothing);
       expect(
         find.byWidgetPredicate(
           (widget) =>
               widget is Semantics &&
               widget.properties.label ==
-                  'Opened from Activity. Conversation conversation-42. '
-                      'Request request-17.',
+                  'Historical Chat context is unavailable.',
         ),
         findsOneWidget,
       );
