@@ -319,7 +319,10 @@ public static class SurfaceFeedTransitions
         DemandMutable(state, expectedRevision);
         var surface = state.CurrentSurfaces.FirstOrDefault(candidate =>
             string.Equals(candidate.SurfaceId, ConversationSurfacePayload.HomeSurfaceId, StringComparison.Ordinal));
-        if (surface is null || !TryReadConversationActions(surface, now, out var presentation, out var descriptors))
+        if (surface is null)
+            return state;
+        if (!TryReadConversationActions(surface, now, out var presentation, out var descriptors) &&
+            !TryRecoverConversationActions(surface, now, out presentation, out descriptors))
             return state;
         var currentBindings = state.ActionBindings.Where(binding =>
             string.Equals(binding.SurfaceId, surface.SurfaceId, StringComparison.Ordinal) &&
@@ -345,7 +348,7 @@ public static class SurfaceFeedTransitions
             LastSequence = sequence,
             CurrentSurfaces = state.CurrentSurfaces.Where(candidate => !string.Equals(candidate.SurfaceId, surface.SurfaceId, StringComparison.Ordinal))
                 .Append(record).ToArray(),
-            EventHistory = state.EventHistory.Append(record).ToArray(),
+            EventHistory = (state.EventHistory ?? []).Append(record).ToArray(),
             ActionBindings = state.ActionBindings.Where(binding => !string.Equals(binding.SurfaceId, surface.SurfaceId, StringComparison.Ordinal))
                 .Concat(bindings).ToArray()
         }, now);
@@ -370,32 +373,86 @@ public static class SurfaceFeedTransitions
             !string.Equals(presentation.CauseKind, "conversation", StringComparison.Ordinal) ||
             !IsCanonicalConversationId(presentation.CauseId) ||
             presentation.RequiredClientCapabilities is null ||
-            !presentation.RequiredClientCapabilities.SequenceEqual(ConversationSurfacePayload.RequiredCapabilities, StringComparer.Ordinal) ||
+            !presentation.RequiredClientCapabilities.ToHashSet(StringComparer.Ordinal)
+                .SetEquals(ConversationSurfacePayload.RequiredCapabilities) ||
             !ConversationSurfacePayload.TryActions(presentation.Payload, now, out descriptors))
             return false;
         return true;
     }
+    private static bool TryRecoverConversationActions(SurfaceFeedRecord surface, DateTimeOffset now, out SurfaceFeedPresentation presentation, out IReadOnlyList<StoredActionBinding> descriptors)
+    {
+        presentation = null!;
+        descriptors = [];
+        try
+        {
+            using var document = JsonDocument.Parse(surface.PayloadUtf8);
+            var root = document.RootElement;
+            if (!TryReadPresentationProperty(root, "Payload", "payload", out var payload) ||
+                payload.ValueKind != JsonValueKind.Object ||
+                !ConversationSurfacePayload.TryActions(payload, now, out descriptors))
+                return false;
+            if (descriptors.Count == 0)
+                return false;
+            TryReadPresentationProperty(root, "CorrelationId", "correlationId", out var correlationProperty);
+            TryReadPresentationProperty(root, "CauseKind", "causeKind", out var causeKindProperty);
+            TryReadPresentationProperty(root, "CauseId", "causeId", out var causeIdProperty);
+            var correlationId = correlationProperty.ValueKind == JsonValueKind.String ? correlationProperty.GetString() : null;
+            var causeKind = causeKindProperty.ValueKind == JsonValueKind.String ? causeKindProperty.GetString() : null;
+            var causeId = causeIdProperty.ValueKind == JsonValueKind.String ? causeIdProperty.GetString() : null;
+            if (string.IsNullOrWhiteSpace(correlationId) ||
+                !string.Equals(causeKind, "conversation", StringComparison.Ordinal) ||
+                !IsCanonicalConversationId(causeId))
+                return false;
+            presentation = new SurfaceFeedPresentation(
+                correlationId,
+                causeKind,
+                causeId!,
+                ConversationSurfacePayload.RequiredCapabilities,
+                payload.Clone(),
+                0,
+                SurfaceFeedPresentation.CurrentVersion);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+    private static bool TryReadPresentationProperty(JsonElement root, string pascalName, string camelName, out JsonElement value)
+    {
+        if (root.TryGetProperty(pascalName, out value) || root.TryGetProperty(camelName, out value))
+            return true;
+        value = default;
+        return false;
+    }
     private static bool RequiresActionAuthorityEvent(IReadOnlyList<SurfaceActionBinding> currentBindings, IReadOnlyList<StoredActionBinding> descriptors, DateTimeOffset renewalThreshold)
     {
-        if (currentBindings.Count == 0) return descriptors.Count > 0;
-        if (currentBindings.All(binding => binding.BindingId is LegacyNewConversationBindingId or LegacyDeleteConversationBindingId))
+        if (currentBindings.Count > 0 &&
+            currentBindings.All(binding => binding.BindingId is LegacyNewConversationBindingId or LegacyDeleteConversationBindingId))
             return true;
-        if (currentBindings.Count != descriptors.Count ||
-            currentBindings.Any(binding =>
-                binding.Uses != 0 || binding.LastIdempotencyKey is not null || binding.LastOperationId is not null))
-            return false;
+        var usable = currentBindings.Where(binding =>
+                binding.Uses < binding.MaxUses &&
+                binding.ExpiresAt > renewalThreshold &&
+                binding.LastIdempotencyKey is null &&
+                binding.LastOperationId is null)
+            .ToArray();
+        if (descriptors.Count == 0)
+            return usable.Length > 0;
+        if (usable.Length != descriptors.Count)
+            return true;
         foreach (var descriptor in descriptors)
         {
-            var binding = currentBindings.FirstOrDefault(candidate =>
+            var binding = usable.FirstOrDefault(candidate =>
                 string.Equals(candidate.BindingId, descriptor.BindingId, StringComparison.Ordinal));
-            if (binding is null || !string.Equals(binding.ActionType, descriptor.ActionType, StringComparison.Ordinal) ||
+            if (binding is null ||
+                !string.Equals(binding.ActionType, descriptor.ActionType, StringComparison.Ordinal) ||
                 !string.Equals(binding.InputSchemaRef, descriptor.InputSchemaRef, StringComparison.Ordinal) ||
                 !string.Equals(binding.RequiredGrant, descriptor.RequiredGrant, StringComparison.Ordinal) ||
                 binding.ActionSchemaVersion != descriptor.ActionSchemaVersion ||
                 binding.MaxUses != descriptor.MaxUses)
-                return false;
+                return true;
         }
-        return currentBindings.Any(binding => binding.ExpiresAt <= renewalThreshold);
+        return false;
     }
     private static bool IsCanonicalConversationId(string? value)
     {

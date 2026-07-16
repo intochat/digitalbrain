@@ -13,7 +13,7 @@ public sealed record RuntimeTransportBoundaryOptions(int MaximumBodyBytes, int M
     private static int ReadPositive(IConfiguration configuration, string key, int fallback) =>
         int.TryParse(configuration[key], out var value) && value > 0 ? value : fallback;
 }
-public sealed class RuntimeTransportBoundary(RequestDelegate next, RuntimeTransportBoundaryOptions options, TimeProvider timeProvider, ILogger<RuntimeTransportBoundary> logger)
+public sealed class RuntimeTransportBoundary(RequestDelegate next, RuntimeTransportBoundaryOptions options, TimeProvider timeProvider, IHostEnvironment environment, ILogger<RuntimeTransportBoundary> logger)
 {
     private readonly SemaphoreSlim _concurrency = new(options.MaximumConcurrentRequests, options.MaximumConcurrentRequests);
     private readonly object _rateGate = new();
@@ -26,7 +26,9 @@ public sealed class RuntimeTransportBoundary(RequestDelegate next, RuntimeTransp
             await next(context).ConfigureAwait(false);
             return;
         }
-        if (!context.Request.IsHttps)
+        if (!context.Request.IsHttps &&
+            !context.Request.Path.StartsWithSegments("/mcp") &&
+            environment.IsProduction())
         {
             context.Response.StatusCode = StatusCodes.Status426UpgradeRequired;
             return;

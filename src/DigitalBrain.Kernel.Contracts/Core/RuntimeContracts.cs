@@ -105,8 +105,11 @@ public sealed class SessionTokenService
         if (!IsActionCapabilityInputValid(context, bindingId, surfaceId, surfaceRevision, bindingTokenHash))
             throw new ArgumentException("A bounded action binding and complete request context are required.");
         var now = _timeProvider.GetUtcNow();
-        if (expiresAt <= now || expiresAt > now.Add(UiProtocol.ActionTokenLifetime))
+        if (expiresAt <= now)
             throw new ArgumentOutOfRangeException(nameof(expiresAt));
+        var maximumExpiry = now.Add(UiProtocol.ActionTokenLifetime);
+        if (expiresAt > maximumExpiry)
+            expiresAt = maximumExpiry;
         var claims = new ActionCapabilityClaims(
             1,
             RequestScope.Id(context),
