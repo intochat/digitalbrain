@@ -40,7 +40,15 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
         if (state.Receipts.TryGetValue(invocation.CommandId, out var replay))
             return replay;
 
-        var caller = NeuronAddress.Parse(invocation.CallerKey);
+        NeuronAddress caller;
+        try
+        {
+            caller = NeuronAddress.Parse(invocation.CallerKey);
+        }
+        catch (ArgumentException)
+        {
+            throw new BrainException(BrainErrors.CallerMalformed, invocation.CallerKey);
+        }
         var requiresGrant = caller.OwnerId != _address.OwnerId || caller.SpaceId.StartsWith("behavior/", StringComparison.Ordinal);
         if (requiresGrant && !state.Synapses.Any(s =>
                 s.Relation == SynapseRelation.Grants

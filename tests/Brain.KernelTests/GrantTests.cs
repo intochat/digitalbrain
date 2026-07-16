@@ -24,4 +24,14 @@ public class GrantTests(ClusterFixture fixture) : IClassFixture<ClusterFixture>
             neuron.InvokeAsync(new("test.echo.v1", "{}", "cmd-1", behaviorCaller)));
         Assert.Equal(BrainErrors.GrantMissing, denied.Code);
     }
+
+    [Fact]
+    public async Task Malformed_caller_key_fails_closed_with_stable_code()
+    {
+        var neuron = fixture.Neuron("test", Guid.NewGuid().ToString("N"));
+        var exception = await Assert.ThrowsAsync<BrainException>(() =>
+            neuron.InvokeAsync(new("test.echo.v1", "{}", "cmd-1", "not-a-key")));
+        Assert.Equal(BrainErrors.CallerMalformed, exception.Code);
+        Assert.Empty((await neuron.ReadEventsAsync(0, 10)).Events);
+    }
 }

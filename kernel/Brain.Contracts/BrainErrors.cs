@@ -8,6 +8,7 @@ public static class BrainErrors
     public const string Replayed = "action.replayed";
     public const string GrantMissing = "grant.missing";
     public const string EffectNotApproved = "effect.not-approved";
+    public const string CallerMalformed = "caller.malformed";
 }
 
 [GenerateSerializer, Alias("brain.exception.v2")]
