@@ -4980,6 +4980,138 @@ class FeatureReply extends $pb.GeneratedMessage {
   void clearRevision() => $_clearField(11);
 }
 
+class ConnectionSnapshot extends $pb.GeneratedMessage {
+  factory ConnectionSnapshot({
+    $core.String? provider,
+    $core.String? connectionId,
+    $core.String? displayName,
+    ConnectionHealthStatus? health,
+    $core.String? healthDetail,
+    $core.Iterable<$core.String>? unlockedCapabilityIds,
+    $core.String? connectPath,
+  }) {
+    final result = create();
+    if (provider != null) result.provider = provider;
+    if (connectionId != null) result.connectionId = connectionId;
+    if (displayName != null) result.displayName = displayName;
+    if (health != null) result.health = health;
+    if (healthDetail != null) result.healthDetail = healthDetail;
+    if (unlockedCapabilityIds != null) {
+      result.unlockedCapabilityIds.addAll(unlockedCapabilityIds);
+    }
+    if (connectPath != null) result.connectPath = connectPath;
+    return result;
+  }
+
+  ConnectionSnapshot._();
+
+  factory ConnectionSnapshot.fromBuffer(
+    $core.List<$core.int> data, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromBuffer(data, registry);
+  factory ConnectionSnapshot.fromJson(
+    $core.String json, [
+    $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
+  ]) => create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ConnectionSnapshot',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOS(1, _omitFieldNames ? '' : 'provider')
+        ..aOS(2, _omitFieldNames ? '' : 'connectionId')
+        ..aOS(3, _omitFieldNames ? '' : 'displayName')
+        ..aE<ConnectionHealthStatus>(
+          4,
+          _omitFieldNames ? '' : 'health',
+          enumValues: ConnectionHealthStatus.values,
+        )
+        ..aOS(5, _omitFieldNames ? '' : 'healthDetail')
+        ..pPS(6, _omitFieldNames ? '' : 'unlockedCapabilityIds')
+        ..aOS(7, _omitFieldNames ? '' : 'connectPath')
+        ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectionSnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectionSnapshot copyWith(void Function(ConnectionSnapshot) updates) =>
+      super.copyWith((message) => updates(message as ConnectionSnapshot))
+          as ConnectionSnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ConnectionSnapshot create() => ConnectionSnapshot._();
+  @$core.override
+  ConnectionSnapshot createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ConnectionSnapshot getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ConnectionSnapshot>(create);
+  static ConnectionSnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get provider => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set provider($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProvider() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProvider() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get connectionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set connectionId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasConnectionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearConnectionId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get displayName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set displayName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDisplayName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDisplayName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  ConnectionHealthStatus get health => $_getN(3);
+  @$pb.TagNumber(4)
+  set health(ConnectionHealthStatus value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasHealth() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearHealth() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get healthDetail => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set healthDetail($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasHealthDetail() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearHealthDetail() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<$core.String> get unlockedCapabilityIds => $_getList(5);
+
+  @$pb.TagNumber(7)
+  $core.String get connectPath => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set connectPath($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasConnectPath() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearConnectPath() => $_clearField(7);
+}
+
 class ListConnectionsRequest extends $pb.GeneratedMessage {
   factory ListConnectionsRequest() => create();
 
@@ -5025,7 +5157,13 @@ class ListConnectionsRequest extends $pb.GeneratedMessage {
 }
 
 class ListConnectionsReply extends $pb.GeneratedMessage {
-  factory ListConnectionsReply() => create();
+  factory ListConnectionsReply({
+    $core.Iterable<ConnectionSnapshot>? connections,
+  }) {
+    final result = create();
+    if (connections != null) result.connections.addAll(connections);
+    return result;
+  }
 
   ListConnectionsReply._();
 
@@ -5038,13 +5176,20 @@ class ListConnectionsReply extends $pb.GeneratedMessage {
     $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
   ]) => create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'ListConnectionsReply',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ListConnectionsReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..pPM<ConnectionSnapshot>(
+          1,
+          _omitFieldNames ? '' : 'connections',
+          subBuilder: ConnectionSnapshot.create,
+        )
+        ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   ListConnectionsReply clone() => deepCopy();
@@ -5064,6 +5209,9 @@ class ListConnectionsReply extends $pb.GeneratedMessage {
   static ListConnectionsReply getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<ListConnectionsReply>(create);
   static ListConnectionsReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<ConnectionSnapshot> get connections => $_getList(0);
 }
 
 class GetConnectionRequest extends $pb.GeneratedMessage {
@@ -5125,7 +5273,11 @@ class GetConnectionRequest extends $pb.GeneratedMessage {
 }
 
 class ConnectionReply extends $pb.GeneratedMessage {
-  factory ConnectionReply() => create();
+  factory ConnectionReply({ConnectionSnapshot? connection}) {
+    final result = create();
+    if (connection != null) result.connection = connection;
+    return result;
+  }
 
   ConnectionReply._();
 
@@ -5138,13 +5290,20 @@ class ConnectionReply extends $pb.GeneratedMessage {
     $pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY,
   ]) => create()..mergeFromJson(json, registry);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-    _omitMessageNames ? '' : 'ConnectionReply',
-    package: const $pb.PackageName(
-      _omitMessageNames ? '' : 'digitalbrain.v2.ui',
-    ),
-    createEmptyInstance: create,
-  )..hasRequiredFields = false;
+  static final $pb.BuilderInfo _i =
+      $pb.BuilderInfo(
+          _omitMessageNames ? '' : 'ConnectionReply',
+          package: const $pb.PackageName(
+            _omitMessageNames ? '' : 'digitalbrain.v2.ui',
+          ),
+          createEmptyInstance: create,
+        )
+        ..aOM<ConnectionSnapshot>(
+          1,
+          _omitFieldNames ? '' : 'connection',
+          subBuilder: ConnectionSnapshot.create,
+        )
+        ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   ConnectionReply clone() => deepCopy();
@@ -5164,6 +5323,17 @@ class ConnectionReply extends $pb.GeneratedMessage {
   static ConnectionReply getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<ConnectionReply>(create);
   static ConnectionReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ConnectionSnapshot get connection => $_getN(0);
+  @$pb.TagNumber(1)
+  set connection(ConnectionSnapshot value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasConnection() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearConnection() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ConnectionSnapshot ensureConnection() => $_ensure(0);
 }
 
 class ListActivityRequest extends $pb.GeneratedMessage {

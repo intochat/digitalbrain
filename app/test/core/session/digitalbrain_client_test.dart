@@ -853,9 +853,13 @@ class _RecordingDigitalBrainTransport
   final List<wire.GetFeatureRequest> getFeatureRequests = [];
   final List<wire.GetFeatureReleaseSourceRequest> sourceRequests = [];
   final List<wire.RollbackFeatureVersionRequest> rollbackRequests = [];
+  final List<wire.ListConnectionsRequest> listConnectionsRequests = [];
+  final List<wire.GetConnectionRequest> getConnectionRequests = [];
   final List<wire.ListActivityRequest> listActivityRequests = [];
   final List<wire.GetRunRequest> getRunRequests = [];
   final List<wire.GetConversationContextRequest> contextRequests = [];
+  wire.ListConnectionsReply connectionsReply = wire.ListConnectionsReply();
+  wire.ConnectionReply connectionReply = wire.ConnectionReply();
   Future<SessionBundle>? refreshResult;
   Future<SessionBundle>? loginResult;
   FeedCall? feedCall;
@@ -1000,6 +1004,26 @@ class _RecordingDigitalBrainTransport
     productAccessTokens.add(accessToken);
     rollbackRequests.add(request);
     return featureReply;
+  }
+
+  @override
+  Future<wire.ListConnectionsReply> listConnections({
+    required String accessToken,
+    required wire.ListConnectionsRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    listConnectionsRequests.add(request);
+    return connectionsReply;
+  }
+
+  @override
+  Future<wire.ConnectionReply> getConnection({
+    required String accessToken,
+    required wire.GetConnectionRequest request,
+  }) async {
+    productAccessTokens.add(accessToken);
+    getConnectionRequests.add(request);
+    return connectionReply;
   }
 
   @override

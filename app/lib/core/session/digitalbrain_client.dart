@@ -65,6 +65,16 @@ abstract interface class DigitalBrainTransport implements SessionTransport {
     required wire.RollbackFeatureVersionRequest request,
   });
 
+  Future<wire.ListConnectionsReply> listConnections({
+    required String accessToken,
+    required wire.ListConnectionsRequest request,
+  });
+
+  Future<wire.ConnectionReply> getConnection({
+    required String accessToken,
+    required wire.GetConnectionRequest request,
+  });
+
   Future<wire.ListActivityReply> listActivity({
     required String accessToken,
     required wire.ListActivityRequest request,
@@ -131,8 +141,22 @@ abstract interface class ActivityClient {
   Future<wire.RunReply> getRun(wire.GetRunRequest request);
 }
 
+abstract interface class ConnectionClient {
+  Future<wire.ListConnectionsReply> listConnections(
+    wire.ListConnectionsRequest request,
+  );
+
+  Future<wire.ConnectionReply> getConnection(
+    wire.GetConnectionRequest request,
+  );
+}
+
 class DigitalBrainClient
-    implements FeatureAuthoringClient, FeatureCatalogClient, ActivityClient {
+    implements
+        FeatureAuthoringClient,
+        FeatureCatalogClient,
+        ActivityClient,
+        ConnectionClient {
   const DigitalBrainClient({
     required SessionController session,
     required DigitalBrainTransport transport,
@@ -255,6 +279,22 @@ class DigitalBrainClient
       accessToken: accessToken,
       request: request,
     ),
+  );
+
+  @override
+  Future<wire.ListConnectionsReply> listConnections(
+    wire.ListConnectionsRequest request,
+  ) => _authorized(
+    (accessToken) =>
+        _transport.listConnections(accessToken: accessToken, request: request),
+  );
+
+  @override
+  Future<wire.ConnectionReply> getConnection(
+    wire.GetConnectionRequest request,
+  ) => _authorized(
+    (accessToken) =>
+        _transport.getConnection(accessToken: accessToken, request: request),
   );
 
   @override

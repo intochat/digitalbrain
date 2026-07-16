@@ -2502,6 +2502,18 @@ class _RouterTransport
   }
 
   @override
+  Future<wire.ListConnectionsReply> listConnections({
+    required String accessToken,
+    required wire.ListConnectionsRequest request,
+  }) async => wire.ListConnectionsReply();
+
+  @override
+  Future<wire.ConnectionReply> getConnection({
+    required String accessToken,
+    required wire.GetConnectionRequest request,
+  }) async => wire.ConnectionReply();
+
+  @override
   Future<wire.ListActivityReply> listActivity({
     required String accessToken,
     required wire.ListActivityRequest request,

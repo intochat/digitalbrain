@@ -928,6 +928,10 @@ class _FakeGrpcClientPort implements GrpcClientPort {
   CallOptions? getFeatureReleaseSourceOptions;
   wire.RollbackFeatureVersionRequest? rollbackFeatureVersionRequest;
   CallOptions? rollbackFeatureVersionOptions;
+  wire.ListConnectionsRequest? listConnectionsRequest;
+  CallOptions? listConnectionsOptions;
+  wire.GetConnectionRequest? getConnectionRequest;
+  CallOptions? getConnectionOptions;
   wire.ListActivityRequest? listActivityRequest;
   CallOptions? listActivityOptions;
   wire.GetRunRequest? getRunRequest;
@@ -1172,6 +1176,26 @@ class _FakeGrpcClientPort implements GrpcClientPort {
     rollbackFeatureVersionRequest = request;
     rollbackFeatureVersionOptions = options;
     return _FakeGrpcUnaryResponse(Future.value(wire.FeatureReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.ListConnectionsReply> listConnections(
+    wire.ListConnectionsRequest request,
+    CallOptions options,
+  ) {
+    listConnectionsRequest = request;
+    listConnectionsOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.ListConnectionsReply()));
+  }
+
+  @override
+  GrpcUnaryResponse<wire.ConnectionReply> getConnection(
+    wire.GetConnectionRequest request,
+    CallOptions options,
+  ) {
+    getConnectionRequest = request;
+    getConnectionOptions = options;
+    return _FakeGrpcUnaryResponse(Future.value(wire.ConnectionReply()));
   }
 
   @override

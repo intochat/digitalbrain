@@ -108,6 +108,16 @@ abstract interface class GrpcClientPort {
     CallOptions options,
   );
 
+  GrpcUnaryResponse<wire.ListConnectionsReply> listConnections(
+    wire.ListConnectionsRequest request,
+    CallOptions options,
+  );
+
+  GrpcUnaryResponse<wire.ConnectionReply> getConnection(
+    wire.GetConnectionRequest request,
+    CallOptions options,
+  );
+
   GrpcUnaryResponse<wire.ListActivityReply> listActivity(
     wire.ListActivityRequest request,
     CallOptions options,
@@ -554,6 +564,40 @@ class GrpcUiTransport
   }
 
   @override
+  Future<wire.ListConnectionsReply> listConnections({
+    required String accessToken,
+    required wire.ListConnectionsRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.listConnections(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
+  Future<wire.ConnectionReply> getConnection({
+    required String accessToken,
+    required wire.GetConnectionRequest request,
+  }) async {
+    try {
+      return await _awaitProductUnary(
+        _client.getConnection(
+          request,
+          _authenticatedOptions(accessToken, timeout: unaryRequestTimeout),
+        ),
+      );
+    } catch (error) {
+      throw _safeTransportError(error);
+    }
+  }
+
+  @override
   Future<wire.ListActivityReply> listActivity({
     required String accessToken,
     required wire.ListActivityRequest request,
@@ -898,6 +942,22 @@ class _GeneratedGrpcClientPort implements GrpcClientPort {
     CallOptions options,
   ) => _GeneratedGrpcUnaryResponse(
     client.rollbackFeatureVersion(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.ListConnectionsReply> listConnections(
+    wire.ListConnectionsRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.listConnections(request, options: options),
+  );
+
+  @override
+  GrpcUnaryResponse<wire.ConnectionReply> getConnection(
+    wire.GetConnectionRequest request,
+    CallOptions options,
+  ) => _GeneratedGrpcUnaryResponse(
+    client.getConnection(request, options: options),
   );
 
   @override

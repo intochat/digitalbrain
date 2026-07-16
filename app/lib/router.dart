@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'core/session/app_session_scope.dart';
 import 'features/activity/activity_gateway.dart';
@@ -10,6 +11,8 @@ import 'features/activity/activity_page.dart';
 import 'features/activity/activity_run_page.dart';
 import 'features/catalog/feature_catalog_gateway.dart';
 import 'features/catalog/feature_catalog_page.dart';
+import 'features/connections/connection_gateway.dart';
+import 'features/connections/connections_page.dart';
 import 'features/releases/feature_release_gateway.dart';
 import 'features/releases/feature_release_page.dart';
 import 'features/studio/feature_studio_gateway.dart';
@@ -219,6 +222,26 @@ GoRouter createDigitalBrainRouter({
                   pathParameters: {'proposalId': draftId},
                 ),
                 onCreateFeature: () => context.go('/chat'),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/connections',
+            name: 'connections',
+            builder: (context, state) {
+              final client = AppSessionScope.of(context).digitalBrainClient;
+              if (client == null) {
+                return const Material(
+                  child: Center(child: Text('Connections are unavailable.')),
+                );
+              }
+              return ConnectionsPage(
+                gateway: GrpcConnectionGateway(client: client),
+                onConnect: (uri) {
+                  unawaited(
+                    launchUrl(uri, mode: LaunchMode.externalApplication),
+                  );
+                },
               );
             },
           ),

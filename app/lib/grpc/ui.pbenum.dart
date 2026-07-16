@@ -130,6 +130,50 @@ class FeatureScenarioOutcome extends $pb.ProtobufEnum {
   const FeatureScenarioOutcome._(super.value, super.name);
 }
 
+class ConnectionHealthStatus extends $pb.ProtobufEnum {
+  static const ConnectionHealthStatus CONNECTION_HEALTH_STATUS_UNSPECIFIED =
+      ConnectionHealthStatus._(
+        0,
+        _omitEnumNames ? '' : 'CONNECTION_HEALTH_STATUS_UNSPECIFIED',
+      );
+  static const ConnectionHealthStatus CONNECTION_HEALTH_STATUS_HEALTHY =
+      ConnectionHealthStatus._(
+        1,
+        _omitEnumNames ? '' : 'CONNECTION_HEALTH_STATUS_HEALTHY',
+      );
+  static const ConnectionHealthStatus CONNECTION_HEALTH_STATUS_NEEDS_REAUTH =
+      ConnectionHealthStatus._(
+        2,
+        _omitEnumNames ? '' : 'CONNECTION_HEALTH_STATUS_NEEDS_REAUTH',
+      );
+  static const ConnectionHealthStatus CONNECTION_HEALTH_STATUS_DISCONNECTED =
+      ConnectionHealthStatus._(
+        3,
+        _omitEnumNames ? '' : 'CONNECTION_HEALTH_STATUS_DISCONNECTED',
+      );
+  static const ConnectionHealthStatus CONNECTION_HEALTH_STATUS_MISCONFIGURED =
+      ConnectionHealthStatus._(
+        4,
+        _omitEnumNames ? '' : 'CONNECTION_HEALTH_STATUS_MISCONFIGURED',
+      );
+
+  static const $core.List<ConnectionHealthStatus> values =
+      <ConnectionHealthStatus>[
+        CONNECTION_HEALTH_STATUS_UNSPECIFIED,
+        CONNECTION_HEALTH_STATUS_HEALTHY,
+        CONNECTION_HEALTH_STATUS_NEEDS_REAUTH,
+        CONNECTION_HEALTH_STATUS_DISCONNECTED,
+        CONNECTION_HEALTH_STATUS_MISCONFIGURED,
+      ];
+
+  static final $core.List<ConnectionHealthStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static ConnectionHealthStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ConnectionHealthStatus._(super.value, super.name);
+}
+
 class FeatureRunOrigin extends $pb.ProtobufEnum {
   static const FeatureRunOrigin FEATURE_RUN_ORIGIN_UNSPECIFIED =
       FeatureRunOrigin._(

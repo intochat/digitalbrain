@@ -13,6 +13,12 @@ enum MainDestination {
     icon: Icons.auto_awesome_outlined,
     selectedIcon: Icons.auto_awesome,
   ),
+  connections(
+    label: 'Connections',
+    location: '/connections',
+    icon: Icons.link_outlined,
+    selectedIcon: Icons.link,
+  ),
   activity(
     label: 'Activity',
     location: '/activity',

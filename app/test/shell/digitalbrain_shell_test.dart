@@ -84,7 +84,7 @@ void main() {
     expect(find.byKey(digitalBrainSignOutButtonKey), findsOneWidget);
     expect(find.text('Home'), findsNothing);
     expect(find.text('Features'), findsWidgets);
-    expect(find.text('Connections'), findsNothing);
+    expect(find.text('Connections'), findsWidgets);
     expect(find.text('Activity'), findsWidgets);
     expect(find.text('Memory'), findsNothing);
 
@@ -208,7 +208,7 @@ void _expectProductDestinations() {
   expect(find.text('Chat'), findsWidgets);
   expect(find.text('Home'), findsNothing);
   expect(find.text('Features'), findsWidgets);
-  expect(find.text('Connections'), findsNothing);
+  expect(find.text('Connections'), findsWidgets);
   expect(find.text('Activity'), findsWidgets);
   expect(find.text('Memory'), findsNothing);
 }
