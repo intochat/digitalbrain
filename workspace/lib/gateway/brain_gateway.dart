@@ -38,14 +38,7 @@ class BrainGateway {
       }),
     );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-    if (response.statusCode == 409) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw GatewayException(body['code'] as String, body['detail'] as String);
-    }
-    throw GatewayException('http.error', 'status ${response.statusCode}');
+    return _decodeBody(response);
   }
 
   Future<NeuronSnapshot> read(
@@ -56,9 +49,7 @@ class BrainGateway {
       '$httpBase/ui/read',
     ).replace(queryParameters: {'address': address, 'projection': projection});
     final response = await _client.get(uri);
-    return NeuronSnapshot.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+    return NeuronSnapshot.fromJson(_decodeBody(response));
   }
 
   Future<NeuronDescription> describe(String address) async {
@@ -66,9 +57,18 @@ class BrainGateway {
       '$httpBase/ui/describe',
     ).replace(queryParameters: {'address': address});
     final response = await _client.get(uri);
-    return NeuronDescription.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+    return NeuronDescription.fromJson(_decodeBody(response));
+  }
+
+  Map<String, dynamic> _decodeBody(http.Response response) {
+    if (response.statusCode == 409) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      throw GatewayException(body['code'] as String, body['detail'] as String);
+    }
+    if (response.statusCode != 200) {
+      throw GatewayException('http.error', 'status ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Stream<FeedFrame> watch({
@@ -89,10 +89,19 @@ class BrainGateway {
   }
 
   static FeedFrame? mapFrame(String text) {
-    final decoded = jsonDecode(text) as Map<String, dynamic>;
-    if (decoded['ping'] == true) {
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      if (decoded['ping'] == true) {
+        return null;
+      }
+      return FeedFrame.fromJson(decoded);
+    } on FormatException {
+      return null;
+    } on TypeError {
       return null;
     }
-    return FeedFrame.fromJson(decoded);
   }
 }
