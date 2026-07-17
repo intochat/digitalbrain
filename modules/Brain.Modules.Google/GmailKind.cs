@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Brain.Contracts;
-using Brain.Modules.Connections;
+using Brain.Kernel.Connections;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Brain.Modules.Google;

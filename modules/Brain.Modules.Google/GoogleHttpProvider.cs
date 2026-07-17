@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using Brain.Modules.Connections;
+using Brain.Kernel.Connections;
 
 namespace Brain.Modules.Google;
 

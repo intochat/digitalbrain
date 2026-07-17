@@ -1,4 +1,5 @@
 using Brain.Contracts;
+using Brain.Kernel.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Journaling.Json;
@@ -11,6 +12,7 @@ public static class KernelHosting
     {
         silo.UseJsonJournalFormat(NeuronJournalJsonContext.Default);
         silo.Services.AddSingleton<IAttributeToFactoryMapper<NeuronStateAttribute>, NeuronStateMapper>();
+        silo.AddBrainConnection();
         var catalog = GetOrAddCatalog(silo);
         foreach (var kind in kinds.Append(new EffectKind()))
         {

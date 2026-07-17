@@ -1,5 +1,5 @@
 using Brain.Kernel;
-using Brain.Modules.Connections;
+using Brain.Kernel.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;

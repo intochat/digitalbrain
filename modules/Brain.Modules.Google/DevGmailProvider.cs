@@ -1,4 +1,4 @@
-using Brain.Modules.Connections;
+using Brain.Kernel.Connections;
 
 namespace Brain.Modules.Google;
 
