@@ -19,7 +19,7 @@ public sealed class BehaviorKind(IGrainFactory grainFactory) : INeuronKind
         {
             "behavior.propose.v1" => HandleProposeAsync(invocation.InputJson),
             "behavior.approve.v1" => HandleApproveAsync(context, invocation.InputJson),
-            "behavior.decline.v1" => HandleDeclineAsync(invocation.InputJson),
+            "behavior.decline.v1" => HandleDeclineAsync(context, invocation.InputJson),
             "behavior.rollback.v1" => HandleRollbackAsync(context, invocation),
             _ => throw new BrainException(BrainErrors.UnknownContract, invocation.Contract)
         };
@@ -69,9 +69,10 @@ public sealed class BehaviorKind(IGrainFactory grainFactory) : INeuronKind
         }
 
         var grants = ParseGrants(root);
+        var grantsHash = ComputeGrantsHash(grants);
         var grantsJson = JsonSerializer.Serialize(grants, JsonOptions);
-        var eventPayload = JsonSerializer.Serialize(new { sourceHash, grantsJson, bddPassed = true }, JsonOptions);
-        var output = JsonSerializer.Serialize(new { status = "proposed", sourceHash }, JsonOptions);
+        var eventPayload = JsonSerializer.Serialize(new { sourceHash, grantsJson, grantsHash, bddPassed = true }, JsonOptions);
+        var output = JsonSerializer.Serialize(new { status = "proposed", sourceHash, grantsHash }, JsonOptions);
 
         return ValueTask.FromResult(new KindResult(output, [("behavior.proposed", eventPayload)]));
     }
@@ -80,11 +81,17 @@ public sealed class BehaviorKind(IGrainFactory grainFactory) : INeuronKind
     {
         var root = ParseJson(inputJson);
         var sourceHash = RequireString(root, "sourceHash");
+        var grantsHash = RequireString(root, "grantsHash");
 
         var folded = Fold(context.Journal);
         if (folded.State != "proposed" || folded.ActiveHash != sourceHash)
         {
             throw new BrainException("input.invalid", "no matching proposal for sourceHash");
+        }
+
+        if (!string.Equals(grantsHash, ComputeGrantsHash(folded.Grants), StringComparison.Ordinal))
+        {
+            throw new BrainException("input.invalid", "grants changed since review");
         }
 
         var identity = await IssueGrantsAsync(context, sourceHash, folded.Grants, "grant");
@@ -96,11 +103,17 @@ public sealed class BehaviorKind(IGrainFactory grainFactory) : INeuronKind
         return new KindResult(output, [("behavior.enabled", eventPayload)]);
     }
 
-    private static ValueTask<KindResult> HandleDeclineAsync(string inputJson)
+    private static ValueTask<KindResult> HandleDeclineAsync(NeuronContext context, string inputJson)
     {
         var root = ParseJson(inputJson);
         var sourceHash = RequireString(root, "sourceHash");
         var reason = RequireString(root, "reason");
+
+        var folded = Fold(context.Journal);
+        if (folded.State != "proposed" || folded.ActiveHash != sourceHash)
+        {
+            throw new BrainException("input.invalid", "no matching proposal for sourceHash");
+        }
 
         var eventPayload = JsonSerializer.Serialize(new { sourceHash, reason }, JsonOptions);
         var output = JsonSerializer.Serialize(new { status = "declined" }, JsonOptions);
@@ -132,22 +145,18 @@ public sealed class BehaviorKind(IGrainFactory grainFactory) : INeuronKind
     private async Task<string> IssueGrantsAsync(NeuronContext context, string sourceHash, BehaviorGrant[] grants, string tag)
     {
         var granteeKey = IdentityKey(context.Address.OwnerId, sourceHash);
+        var targetAddresses = new NeuronAddress[grants.Length];
 
         for (var i = 0; i < grants.Length; i++)
         {
-            var grant = grants[i];
-            NeuronAddress targetAddress;
-            try
-            {
-                targetAddress = NeuronAddress.Parse(grant.Address);
-            }
-            catch (ArgumentException)
-            {
-                throw new BrainException("input.invalid", $"malformed grant address '{grant.Address}'");
-            }
+            ValidateGrantContract(grants[i].Contract);
+            targetAddresses[i] = ParseGrantAddress(grants[i].Address);
+        }
 
-            var target = grainFactory.GetGrain<INeuron>(targetAddress.ToGrainKey());
-            var grantInputJson = JsonSerializer.Serialize(new { granteeKey, contract = grant.Contract }, JsonOptions);
+        for (var i = 0; i < grants.Length; i++)
+        {
+            var target = grainFactory.GetGrain<INeuron>(targetAddresses[i].ToGrainKey());
+            var grantInputJson = JsonSerializer.Serialize(new { granteeKey, contract = grants[i].Contract }, JsonOptions);
             var commandId = $"{context.Address.ToGrainKey()}:{tag}:{sourceHash}:{i}";
             _ = await target.InvokeAsync(new NeuronInvocation("neuron.grant.v1", grantInputJson, commandId, context.Address.ToGrainKey()));
         }
@@ -178,11 +187,43 @@ public sealed class BehaviorKind(IGrainFactory grainFactory) : INeuronKind
                 throw new BrainException("input.invalid", "each grant must be an object with address and contract");
             }
 
-            grants.Add(new BehaviorGrant(RequireString(grantElement, "address"), RequireString(grantElement, "contract")));
+            var address = RequireString(grantElement, "address");
+            var contract = RequireString(grantElement, "contract");
+            ValidateGrantContract(contract);
+            ParseGrantAddress(address);
+            grants.Add(new BehaviorGrant(address, contract));
         }
 
         return [.. grants];
     }
+
+    private static NeuronAddress ParseGrantAddress(string address)
+    {
+        try
+        {
+            return NeuronAddress.Parse(address);
+        }
+        catch (ArgumentException)
+        {
+            throw new BrainException("input.invalid", $"malformed grant address '{address}'");
+        }
+    }
+
+    private static void ValidateGrantContract(string contract)
+    {
+        if (contract.StartsWith("behavior.", StringComparison.Ordinal) ||
+            contract.StartsWith("neuron.grant", StringComparison.Ordinal) ||
+            contract.StartsWith("neuron.revoke", StringComparison.Ordinal))
+        {
+            throw new BrainException("input.invalid", "governance contracts are not grantable");
+        }
+    }
+
+    private static string ComputeGrantsHash(BehaviorGrant[] grants) => Sha256Hex(CanonicalGrantsJson(grants));
+
+    private static string CanonicalGrantsJson(BehaviorGrant[] grants) => JsonSerializer.Serialize(
+        grants.OrderBy(g => g.Address, StringComparer.Ordinal).ThenBy(g => g.Contract, StringComparer.Ordinal).ToArray(),
+        JsonOptions);
 
     private readonly record struct HistoryEntry(string Hash, string State);
 

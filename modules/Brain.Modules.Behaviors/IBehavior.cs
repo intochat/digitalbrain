@@ -21,7 +21,7 @@ public interface IBehavior : INeuronContract
 
 public sealed record BehaviorGrant(string Address, string Contract);
 public sealed record BehaviorProposal(string Source, string SourceHash, bool BddPassed, BehaviorGrant[] Grants);
-public sealed record BehaviorApproval(string SourceHash);
+public sealed record BehaviorApproval(string SourceHash, string GrantsHash);
 public sealed record BehaviorDecline(string SourceHash, string Reason);
 public sealed record BehaviorRollback(string SourceHash);
-public sealed record BehaviorReply(string Status, string? SourceHash = null, string? Identity = null);
+public sealed record BehaviorReply(string Status, string? SourceHash = null, string? Identity = null, string? GrantsHash = null);
