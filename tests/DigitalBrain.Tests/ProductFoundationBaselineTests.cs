@@ -1,6 +1,9 @@
 using System.Text.Json;
 using Brain.Contracts;
+using Brain.Kernel.Connections;
 using DigitalBrain.Tests;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Brain.KernelTests;
@@ -107,10 +110,47 @@ public class ProductFoundationBaselineTests(BrainClusterFixture<KernelKindsConfi
         Assert.Contains("connection.start-auth.v1", description.Contracts);
     }
 
+    [Fact]
+    public void Connection_token_remains_readable_across_protectors_sharing_a_key_ring()
+    {
+        var keyDirectory = Directory.CreateTempSubdirectory("digitalbrain-keys-");
+        try
+        {
+            using var first = TokenProtectionServices(keyDirectory);
+            var address = new NeuronAddress("owner", "actor/test", "connection/google-primary");
+            var token = new ConnectionToken(
+                "access-token",
+                "refresh-token",
+                DateTimeOffset.UtcNow.AddHours(1),
+                "https://instance.example");
+            var protectedToken = first.GetRequiredService<IConnectionTokenProtector>().Protect(address, token);
+
+            using var second = TokenProtectionServices(keyDirectory);
+            var unprotected = second.GetRequiredService<IConnectionTokenProtector>().Unprotect(address, protectedToken);
+
+            Assert.Equal(token, unprotected);
+        }
+        finally
+        {
+            keyDirectory.Delete(recursive: true);
+        }
+    }
+
     private static NeuronInvocation Echo(string commandId, string input) =>
         new("test.echo.v1", input, commandId, "owner|actor/test|session/t");
 
     private static string CommandId() => Guid.NewGuid().ToString("N");
+
+    private static ServiceProvider TokenProtectionServices(DirectoryInfo keyDirectory)
+    {
+        var services = new ServiceCollection();
+        services
+            .AddDataProtection()
+            .SetApplicationName("DigitalBrain")
+            .PersistKeysToFileSystem(keyDirectory);
+        services.AddSingleton<IConnectionTokenProtector, DataProtectionConnectionTokenProtector>();
+        return services.BuildServiceProvider();
+    }
 
     private static async Task AssertGrantMissing(INeuron neuron, string caller, string contract)
     {

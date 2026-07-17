@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Brain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +35,7 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
     ];
 
     private TimeProvider Time => services.GetService<TimeProvider>() ?? TimeProvider.System;
+    private IConnectionTokenProtector TokenProtector => services.GetRequiredService<IConnectionTokenProtector>();
 
     public ValueTask<KindResult> InvokeAsync(NeuronContext context, NeuronInvocation invocation) =>
         invocation.Contract switch
@@ -58,7 +61,8 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
             state = StateName(folded),
             health,
             fix,
-            authorizingExpiresAt = folded.AuthorizingExpiresAt,
+            authorizingExpiresAt = folded.Authorization?.ExpiresAt,
+            expiresAt = folded.TokenExpiresAt,
             suspended
         }, JsonOptions);
     }
@@ -68,11 +72,13 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
         EnsureWellFormedJson(inputJson);
         var provider = RequireProvider(context.Address);
         var folded = Fold(context.Journal);
-        var state = Guid.NewGuid().ToString("N");
+        var state = Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
         var authorizationUrl = provider.BuildAuthorizationUrl(state);
         var expiresAt = Time.GetUtcNow() + AuthorizingWindow;
         var eventKind = folded.State == ConnectionState.Connected ? "connection.reauthorizing" : "connection.authorizing";
-        var payload = JsonSerializer.Serialize(new { authorizationUrl, expiresAt }, JsonOptions);
+        var payload = JsonSerializer.Serialize(
+            new ConnectionAuthorizationState(StateDigest(state), expiresAt),
+            JsonOptions);
         var output = JsonSerializer.Serialize(new { authorizationUrl }, JsonOptions);
 
         return ValueTask.FromResult(new KindResult(output, [(eventKind, payload)]));
@@ -81,8 +87,14 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
     private async ValueTask<KindResult> HandleCompleteAuthAsync(NeuronContext context, string inputJson)
     {
         var code = RequireStringField(inputJson, "code");
+        var state = RequireStringField(inputJson, "state");
         var folded = Fold(context.Journal);
-        if (folded.State != ConnectionState.Authorizing || folded.AuthorizingExpiresAt is not { } expiresAt || Time.GetUtcNow() >= expiresAt)
+        if (folded.State != ConnectionState.Authorizing
+            || folded.Authorization is not { } authorization
+            || Time.GetUtcNow() >= authorization.ExpiresAt
+            || !CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(authorization.StateDigest),
+                SHA256.HashData(Encoding.UTF8.GetBytes(state))))
             throw new BrainException(BrainErrors.ConnectionUnhealthy, $"{ConnectionHealth.NotAuthorized}: complete-auth requires an unexpired authorizing state");
 
         var provider = RequireProvider(context.Address);
@@ -96,7 +108,12 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
             throw new BrainException(BrainErrors.ProviderError, ex.Message);
         }
 
-        var payload = JsonSerializer.Serialize(token, JsonOptions);
+        var payload = JsonSerializer.Serialize(
+            new ConnectedPayload(
+                TokenProtector.Protect(context.Address, token),
+                token.ExpiresAt,
+                token.InstanceUrl),
+            JsonOptions);
         var output = JsonSerializer.Serialize(new { status = "connected" }, JsonOptions);
         return new KindResult(output, [("connection.connected", payload)]);
     }
@@ -124,7 +141,8 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
             ProbeResult probeResult;
             try
             {
-                probeResult = await provider.ProbeAsync(folded.Token!, CancellationToken.None);
+                var token = TokenProtector.Unprotect(context.Address, folded.ProtectedToken!);
+                probeResult = await provider.ProbeAsync(token, CancellationToken.None);
             }
             catch (Exception ex) when (ex is not BrainException)
             {
@@ -167,19 +185,24 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
         return ValueTask.FromResult(new KindResult("{}", [("connection.resumed", payload)]));
     }
 
-    private static ValueTask<KindResult> HandleLeaseTokenAsync(NeuronContext context, string inputJson)
+    private ValueTask<KindResult> HandleLeaseTokenAsync(NeuronContext context, string inputJson)
     {
         EnsureWellFormedJson(inputJson);
         var caller = NeuronAddress.Parse(context.CallerKey);
         if (caller.NeuronId.StartsWith("session/", StringComparison.Ordinal)
             || caller.SpaceId != context.Address.SpaceId
-            || caller.OwnerId != context.Address.OwnerId)
+            || caller.OwnerId != context.Address.OwnerId
+            || !context.Synapses.Any(s =>
+                s.Relation == SynapseRelation.Grants
+                && s.TargetKey == context.CallerKey
+                && s.Constraint == "connection.lease-token.v1"))
             throw new BrainException(BrainErrors.GrantMissing, $"{context.CallerKey} cannot lease tokens");
 
         var folded = Fold(context.Journal);
-        if (folded.State != ConnectionState.Connected || folded.Token is not { } token)
+        if (folded.State != ConnectionState.Connected || folded.ProtectedToken is not { } protectedToken)
             throw new BrainException(BrainErrors.ConnectionUnhealthy, $"{ConnectionHealth.NotAuthorized}: connection is not connected");
 
+        var token = TokenProtector.Unprotect(context.Address, protectedToken);
         var output = JsonSerializer.Serialize(token, JsonOptions);
         return ValueTask.FromResult(new KindResult(output, [], TransientReceipt: true));
     }
@@ -221,16 +244,23 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
 
     private sealed record Folded(
         ConnectionState State,
-        ConnectionToken? Token,
-        DateTimeOffset? AuthorizingExpiresAt,
+        string? ProtectedToken,
+        DateTimeOffset? TokenExpiresAt,
+        ConnectionAuthorizationState? Authorization,
         bool WasConnectedBeforeAuth,
         string? LastHealth);
+
+    private sealed record ConnectedPayload(
+        string ProtectedToken,
+        DateTimeOffset ExpiresAt,
+        string? InstanceUrl);
 
     private static Folded Fold(IReadOnlyList<NeuronEvent> journal)
     {
         var state = ConnectionState.NotConnected;
-        ConnectionToken? token = null;
-        DateTimeOffset? authorizingExpiresAt = null;
+        string? protectedToken = null;
+        DateTimeOffset? tokenExpiresAt = null;
+        ConnectionAuthorizationState? authorization = null;
         var wasConnectedBeforeAuth = false;
         string? lastHealth = null;
         var preSuspendState = ConnectionState.NotConnected;
@@ -243,12 +273,14 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
                 case "connection.reauthorizing":
                     wasConnectedBeforeAuth = evt.Kind == "connection.reauthorizing";
                     state = ConnectionState.Authorizing;
-                    authorizingExpiresAt = JsonSerializer.Deserialize<JsonElement>(evt.PayloadJson, JsonOptions).GetProperty("expiresAt").GetDateTimeOffset();
+                    authorization = JsonSerializer.Deserialize<ConnectionAuthorizationState>(evt.PayloadJson, JsonOptions);
                     break;
                 case "connection.connected":
-                    token = JsonSerializer.Deserialize<ConnectionToken>(evt.PayloadJson, JsonOptions);
+                    var connected = JsonSerializer.Deserialize<ConnectedPayload>(evt.PayloadJson, JsonOptions)!;
+                    protectedToken = connected.ProtectedToken;
+                    tokenExpiresAt = connected.ExpiresAt;
                     state = ConnectionState.Connected;
-                    authorizingExpiresAt = null;
+                    authorization = null;
                     break;
                 case "connection.probed":
                     lastHealth = JsonSerializer.Deserialize<JsonElement>(evt.PayloadJson, JsonOptions).GetProperty("health").GetString();
@@ -263,8 +295,14 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
             }
         }
 
-        return new Folded(state, token, authorizingExpiresAt, wasConnectedBeforeAuth, lastHealth);
+        return new Folded(state, protectedToken, tokenExpiresAt, authorization, wasConnectedBeforeAuth, lastHealth);
     }
+
+    private static string StateDigest(string state) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(state)));
+
+    private static string Base64UrlEncode(byte[] bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private static void EnsureWellFormedJson(string inputJson)
     {

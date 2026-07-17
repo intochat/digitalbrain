@@ -13,6 +13,6 @@ public class GmailReadWithoutConnectionTests(BrainClusterFixture<ConnectorsKinds
         var gmail = Neuron("gmail", $"reader-{Guid.NewGuid():N}");
         var exception = await Assert.ThrowsAsync<BrainException>(() =>
             gmail.InvokeAsync(new("gmail.read.v1", "{}", "cmd-read", OwnerSession)));
-        Assert.Equal(BrainErrors.ConnectionUnhealthy, exception.Code);
+        Assert.Equal(BrainErrors.GrantMissing, exception.Code);
     }
 }
