@@ -53,7 +53,7 @@ Prefix all prompts with the ritual. Rely on CodeGraph for architecture understan
   - `aspire__doctor`, `aspire__list_resources`, `aspire__list_console_logs`, `aspire__list_traces`, `aspire__list_structured_logs`, `aspire__execute_resource_command` (restart specific kernel/flutter-ui without full stop).
   - Prefer targeted resource commands + logs/traces over `aspire run` every time.
   - `aspire doctor` before/after changes.
-- **Pre-build for MCP**: Before MCP tasks or starting digitalbrain, run quick `dotnet build src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj --no-restore`. Use `--no-build` in run args. Delete repeated rebuild waste.
+- **Pre-build for MCP**: Before MCP tasks or starting digitalbrain, run quick `dotnet build edge/Brain.Mcp/Brain.Mcp.csproj --no-restore`. Use `--no-build` in run args. Delete repeated rebuild waste.
 - **Minimal/isolated AppHost**: Use `aspire run` with resource filters or isolated mode when full stack not needed. Inject live `aspire__list_resources` + doctor output into context at start (dynamic state over static docs).
 - **Tests**: During TDD, run the smallest owning test project with `dotnet test <project> --logger "console;verbosity=minimal"`. **Never use --filter**. Before every checkpoint or completion claim, run the exact root command `dotnet test --logger "console;verbosity=minimal"`.
   - Launch the full root suite in the background and poll immediately. Focused project tests may run in the foreground.
@@ -85,7 +85,7 @@ To accelerate iteration cycles (using Context7 + Aspire MCP/CLI + 5 steps):
 
 - **CodeGraph for architecture**: Use the `codegraph` MCP (not manual reads/grep) for fast queries on structure, call paths, and blast radius. Prefer `codegraph_explore` over file crawling.
 - **MCP-first inspection**: Before any `aspire run` or manual debug, use `aspire__list_resources`, execute "restart" on specific resource, pull logs/traces. This replaces slow full restarts and log tailing.
-- To start digitalbrain-http server on fixed port: `DIGITALBRAIN_MCP_TRANSPORT=http ASPNETCORE_URLS=http://localhost:5000 dotnet run --project src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj --no-launch-profile --no-build` (then connect via url in .mcp.json). Pre-build first.
+- To start the MCP edge on its fixed port: `dotnet run --project edge/Brain.Mcp/Brain.Mcp.csproj --no-build` (http on :5310 via its launch profile; connect via url in .mcp.json). Start the silo (`hosts/Brain.Kernel.Host`) first.
 - **Context7 + parallel tools**: Lookup APIs in parallel while editing. Never context-switch to docs/search.
 - **Strict delete-first + clean docs**: This CLAUDE.md + README are the *only* living docs. All plan/*.md, archive, superpowers, old specs = trash. Deleting them reduces reading waste and decision fatigue (Step 2 of algorithm).
 - **Resource-level control**: Stop/restart only kernels or flutter via MCP before builds to avoid DLL locks from live replicas. Then test.
