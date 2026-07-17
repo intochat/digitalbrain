@@ -53,7 +53,7 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
         if (invocation.Contract is "neuron.grant.v1" or "neuron.revoke.v1")
             return await InvokeGrantContractAsync(invocation, caller);
 
-        var requiresGrant = caller.OwnerId != _address.OwnerId || caller.SpaceId.StartsWith("behavior/", StringComparison.Ordinal);
+        var requiresGrant = caller.OwnerId != _address.OwnerId || caller.SpaceId.StartsWith("behavior/", StringComparison.OrdinalIgnoreCase);
         if (requiresGrant && !state.Synapses.Any(s =>
                 s.Relation == SynapseRelation.Grants
                 && s.TargetKey == invocation.CallerKey
@@ -107,7 +107,7 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
 
     private async Task<NeuronReceipt> InvokeGrantContractAsync(NeuronInvocation invocation, NeuronAddress caller)
     {
-        if (caller.OwnerId != _address.OwnerId || caller.SpaceId.StartsWith("behavior/", StringComparison.Ordinal))
+        if (caller.OwnerId != _address.OwnerId || caller.SpaceId.StartsWith("behavior/", StringComparison.OrdinalIgnoreCase))
             throw new BrainException(BrainErrors.GrantDenied, $"{invocation.CallerKey} cannot manage grants on {this.GetPrimaryKeyString()}");
 
         var (granteeKey, contract) = ParseGrantInput(invocation.InputJson);

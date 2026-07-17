@@ -90,4 +90,44 @@ public class GrantIssueTests(BrainClusterFixture<WorkspaceKindsConfigurator> fix
             chat.InvokeAsync(new("chat.post.v1", """{"text":"blocked"}""", "cmd-post-2", granteeKey)));
         Assert.Equal(BrainErrors.GrantMissing, revoked.Code);
     }
+
+    [Fact]
+    public async Task Behavior_space_caller_with_capital_prefix_is_denied_grant_issuance()
+    {
+        var chat = Neuron("chat", Guid.NewGuid().ToString("N"));
+        const string behaviorCallerCapital = "owner|Behavior/abc123|Behavior/abc123";
+        const string granteeKey = "someone|actor/y|session/1";
+
+        var denied = await Assert.ThrowsAsync<BrainException>(() =>
+            chat.InvokeAsync(new("neuron.grant.v1",
+                GrantInput(granteeKey, "chat.post.v1"), "cmd-behavior-grant-capital", behaviorCallerCapital)));
+        Assert.Equal(BrainErrors.GrantDenied, denied.Code);
+
+        var stillMissing = await Assert.ThrowsAsync<BrainException>(() =>
+            chat.InvokeAsync(new("chat.post.v1", """{"text":"nope"}""", "cmd-check", granteeKey)));
+        Assert.Equal(BrainErrors.GrantMissing, stillMissing.Code);
+    }
+
+    [Fact]
+    public async Task Grant_with_empty_granteeKey_throws_input_invalid()
+    {
+        var chat = Neuron("chat", Guid.NewGuid().ToString("N"));
+        var inputWithEmpty = JsonSerializer.Serialize(new { granteeKey = "", contract = "chat.post.v1" });
+
+        var invalid = await Assert.ThrowsAsync<BrainException>(() =>
+            chat.InvokeAsync(new("neuron.grant.v1", inputWithEmpty, "cmd-empty-grantee", OwnerSession)));
+        Assert.Equal("input.invalid", invalid.Code);
+    }
+
+    [Fact]
+    public async Task Grant_on_unregistered_kind_succeeds_with_granted_true()
+    {
+        var unregistered = Neuron("unknown-kind", Guid.NewGuid().ToString("N"));
+        const string granteeKey = "someone|actor/y|session/1";
+        var input = GrantInput(granteeKey, "some.contract.v1");
+
+        var grantReceipt = await unregistered.InvokeAsync(new("neuron.grant.v1", input, "cmd-grant-unregistered", OwnerSession));
+        Assert.Equal("accepted", grantReceipt.Status);
+        Assert.Contains("\"granted\":true", grantReceipt.OutputJson);
+    }
 }
