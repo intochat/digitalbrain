@@ -11,6 +11,8 @@ public static class BrainErrors
     public const string CallerMalformed = "caller.malformed";
     public const string ModelUnavailable = "model.unavailable";
     public const string ModelTimeout = "model.timeout";
+    public const string ProviderTimeout = "provider.timeout";
+    public const string ProviderError = "provider.error";
 }
 
 [GenerateSerializer, Alias("brain.exception.v2")]
