@@ -1,5 +1,8 @@
 using Brain.Kernel;
 using Brain.Modules.Ai;
+using Brain.Modules.Connections;
+using Brain.Modules.Google;
+using Brain.Modules.Salesforce;
 using Brain.Modules.Web;
 using Brain.Modules.Workspace;
 using DigitalBrain.ServiceDefaults;
@@ -15,6 +18,9 @@ builder.UseOrleans(silo =>
     silo.AddBrainKernel(new ChatKind(), new WindowKind(), new FeedKind());
     silo.AddBrainAi(builder.Configuration);
     silo.AddBrainWeb();
+    silo.AddBrainConnections(builder.Configuration);
+    silo.AddBrainGoogle(builder.Configuration);
+    silo.AddBrainSalesforce(builder.Configuration);
 });
 var app = builder.Build();
 app.MapDefaultEndpoints();

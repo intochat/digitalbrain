@@ -7,7 +7,7 @@ public interface IConnectionProvider
     Task<ProbeResult> ProbeAsync(ConnectionToken token, CancellationToken ct);
 }
 
-public sealed record ConnectionToken(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt);
+public sealed record ConnectionToken(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt, string? InstanceUrl = null);
 
 public sealed record ProbeResult(string Health, string Detail);
 
