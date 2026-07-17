@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/brain_theme.dart';
 import 'block_action.dart';
 import 'block_document.dart';
 
@@ -204,7 +205,10 @@ class BlockView extends StatelessWidget {
               width: 8,
               height: 8,
               child: DecoratedBox(
-                decoration: BoxDecoration(shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: BrainColors.inkMuted,
+                ),
               ),
             ),
           ),
@@ -279,7 +283,9 @@ class BlockView extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+      decoration: BoxDecoration(
+        border: Border.all(color: BrainColors.hairlineStrong),
+      ),
       child: Text('unsupported block: $kind'),
     );
   }

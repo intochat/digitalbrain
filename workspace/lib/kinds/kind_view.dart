@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../blocks/block_action.dart';
+import '../theme/brain_theme.dart';
 import 'connection_health.dart';
 import 'conversation_view.dart';
 import 'decision_card.dart';
@@ -40,7 +41,9 @@ class KindView extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+      decoration: BoxDecoration(
+        border: Border.all(color: BrainColors.hairlineStrong),
+      ),
       child: Text('unsupported kind: $kind'),
     );
   }
