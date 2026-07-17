@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../kernel/Brain.Contracts/Brain.Contracts.csproj" />
+    <ProjectReference Include="../../kernel/Brain.Kernel/Brain.Kernel.csproj" />
+    <ProjectReference Include="../../kernel/Brain.Client/Brain.Client.csproj" />
+    <ProjectReference Include="../../modules/Brain.Modules.Sdk/Brain.Modules.Sdk.csproj" />
+    <ProjectReference Include="../../modules/Brain.Modules.Workspace/Brain.Modules.Workspace.csproj" />
+    <ProjectReference Include="../../modules/Brain.Modules.Ai/Brain.Modules.Ai.csproj" />
+    <ProjectReference Include="../../modules/Brain.Modules.Web/Brain.Modules.Web.csproj" />
+    <ProjectReference Include="../Brain.KernelTests/Brain.KernelTests.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.TestingHost" />
+  </ItemGroup>
+</Project>

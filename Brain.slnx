@@ -43,6 +43,7 @@
     <Project Path="tests/DigitalBrain.OrleansTests/DigitalBrain.OrleansTests.csproj" />
     <Project Path="tests/DigitalBrain.UnitTests/DigitalBrain.UnitTests.csproj" />
     <Project Path="tests/Brain.KernelTests/Brain.KernelTests.csproj" />
+    <Project Path="tests/Brain.ConformanceTests/Brain.ConformanceTests.csproj" />
   </Folder>
   <Folder Name="/deploy/">
     <Project Path="deploy/DigitalBrain.Deploy.csproj" />
