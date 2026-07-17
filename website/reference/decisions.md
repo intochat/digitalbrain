@@ -1,39 +1,41 @@
 # Architecture decisions
 
-This page tracks choices that must be explicit before the kernel contract becomes stable.
-
 ## Accepted direction
 
-### Neuron identity
+### Universal kernel path
 
-Every durable capability shares one logical address space. Public behavior is expressed through specialized typed contracts.
+Keep one `NeuronGrain` execution path. Domain behavior belongs in registered `INeuronKind` strategies.
 
-### Command versus fact
+### Typed module façade
 
-Commands are typed calls. Durable announcements are fact synapses. Topology and effect relationships have separate schemas.
+Use `INeuronContract` and `[NeuronContract]` for discoverable module APIs. The façade translates to the universal envelope through `NeuronProxy`.
 
-### Effects
+### Commands and relationships
 
-External mutation requires a provider idempotency key and a terminal outcome that includes `OutcomeUnknown`.
+Contracts request work. Synapses record relationships. A future fact model must not become a second command runtime.
 
-### UI granularity
+### Governed effects
 
-Destinations, windows, feeds, and long-lived surfaces may be neurons. UI blocks are immutable values.
+External mutations require an explicit proposal and decision. Provider execution must eventually include deterministic idempotency, reconciliation, and an unknown-outcome state.
 
 ## Open decisions
 
+### Infrastructure contract shape
+
+Choose whether webhook and similar infrastructure entry points directly specialize `INeuron` or use the same typed façade as modules.
+
 ### Module isolation
 
-Choose the first supported boundary for community runtime code: governed in-process loading, isolated process, or another sandbox.
+Choose the first supported boundary for non-first-party runtime code: governed in-process loading, isolated process, or another sandbox.
 
 ### Contract compatibility
 
-Define semantic-version rules for typed neuron contracts and serialized fact schemas.
+Define semantic-version rules for contract names, typed request and response shapes, and future fact schemas.
 
 ### Persistence baseline
 
-Keep stable Orleans persistence behind ports while evaluating where journaled execution provides enough value to justify its maturity cost.
+Select a durable journal provider and define backup, recovery, and migration behavior before claiming production durability.
 
 ### Approval authority
 
-Specify how an authenticated human decision differs from the actor that proposed an external effect.
+Specify authenticated identity and grants for proposal, decision, proof claim, and provider execution.

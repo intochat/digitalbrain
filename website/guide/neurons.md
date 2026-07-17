@@ -1,55 +1,63 @@
 # Neurons
 
-A neuron is an addressable capability with durable identity.
+A neuron is an addressable capability hosted by `NeuronGrain`.
 
-## The rule
+## Address
 
-Create a neuron when a capability needs at least one of:
+The implemented key format is:
 
-- Durable state.
-- Independent lifecycle.
-- Authorization boundary.
-- Concurrent access serialization.
-- Observation over time.
-- Stable address across processes.
+```text
+owner|space|kind/instance
+```
 
-Do not create a neuron for request DTOs, immutable UI blocks, provider response objects, helper services, or temporary calculations.
+The address is a logical identity. `kind` selects an `INeuronKind`; `instance` identifies one capability within that kind.
 
-## Contract shape
+## Kernel contract
 
-`INeuron` is the common identity marker. Useful behavior comes from specialized typed contracts:
+`INeuron` is the universal Orleans contract:
 
 ```csharp
-public interface INeuron : IGrainWithStringKey;
-
-public interface IChatNeuron : INeuron
+public interface INeuron : IGrainWithStringKey
 {
-    Task<PostReceipt> PostAsync(PostMessage command);
-    Task<ChatSnapshot> ReadAsync();
+    Task<NeuronDescription> DescribeAsync();
+    Task<NeuronSnapshot> ReadAsync(string projection);
+    Task<NeuronReceipt> InvokeAsync(NeuronInvocation invocation);
+    Task<NeuronEventPage> ReadEventsAsync(long fromRevision, int max);
 }
 ```
 
-The specialized interface is the public programming model. It gives module authors normal C# types, Orleans serialization checks, discoverable APIs, and compile-time compatibility.
+`NeuronGrain` owns the shared path. It resolves the address, dispatches to an `INeuronKind`, records returned events, and caches command receipts for replay.
 
-## Identity is not user input
+## Typed client façade
 
-Clients do not assert their owner or actor identifier. The edge authenticates a session and injects trusted actor context into the invocation pipeline. Neurons authorize that proven context.
+Module-facing interfaces implement `INeuronContract` instead of inheriting directly from `INeuron`:
 
-## Neuron granularity
+```csharp
+public interface IChat : INeuronContract
+{
+    [NeuronContract("chat.post.v1")]
+    Task<ChatPostReply> PostAsync(ChatPost post);
+}
+```
 
-Good neuron boundaries are domain boundaries:
+`NeuronProxy.Create<T>` turns that interface into a client proxy. Its current supported method shape is exactly one argument returning `Task<TResult>`. The proxy serializes the argument and invokes the universal grain contract.
 
-- One chat thread.
-- One connected Stripe account.
-- One webhook inbox.
-- One long-term memory space.
-- One workspace destination.
-- One external effect plan.
+::: warning Retry boundary
+The current `NeuronProxy` generates a new command identifier for every call. MCP callers can supply a stable `commandId`; typed proxy callers cannot yet control it. Caller-controlled typed idempotency is a **Target**.
+:::
 
-Blocks inside a UI document, individual table rows, and each pixel are values—not neurons.
+## Kind strategy
 
-## State
+An `INeuronKind` declares its kind name and accepted contract names. It receives a `NeuronContext`, returns domain events and output, and projects state for reads.
 
-Stable Orleans persistence is the baseline. Domain state sits behind kernel persistence ports so storage can evolve without leaking provider types into public contracts.
+This split is the implemented model:
 
-Journaled execution may become an optimization or specialized implementation, but modules cannot require preview persistence APIs to participate.
+```text
+NeuronGrain = shared execution rules
+INeuronKind = capability-specific behavior
+INeuronContract + NeuronProxy = typed client façade
+```
+
+## Identity and storage limits
+
+Edges currently inject development callers rather than authenticated sessions. The local host uses volatile journal storage. These are explicit development limits, not properties module authors can assume away.

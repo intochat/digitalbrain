@@ -1,34 +1,31 @@
 # Webhook neurons
 
-Webhooks are ingress, not a shortcut around the neuron model.
+Webhook ingress is an architecture **Target**. The repository does not currently expose a provider webhook endpoint or a durable webhook-inbox kind.
 
-## Contract
+## Target contract
 
-A connector may expose a specialized webhook neuron:
+The intended public shape follows the direct Orleans contract style reserved for infrastructure entry points:
 
 ```csharp
-public interface IWebhookNeuron : INeuron
+public interface IWebHookNeuron : INeuron
 {
-    Task<WebhookReceipt> AcceptAsync(WebhookDelivery delivery);
+    Task<WebHookReceipt> AcceptAsync(WebHookDelivery delivery);
 }
 ```
 
-`AcceptAsync` has one job: authenticate, deduplicate, persist, and acknowledge the delivery quickly.
+This is not the same as the current module façade pattern of `INeuronContract` plus `NeuronProxy`. Whether webhook ingress should remain a direct `INeuron` specialization or become another typed façade is a **Decision**.
 
-## Stripe example
+## Target flow
 
 ```text
-Stripe
+provider
   → connector endpoint
-  → verify signature against raw request body
-  → derive delivery identity from Stripe event id
-  → WebhookInboxNeuron.AcceptAsync
-  → persist accepted fact
-  → return 2xx
-  → process asynchronously through typed neurons
+  → verify signature over exact raw body
+  → derive provider delivery identity
+  → accept and persist delivery
+  → acknowledge quickly
+  → process asynchronously through neuron contracts
 ```
-
-The connector owns the HTTP details and secret material. The webhook neuron owns durable delivery identity and processing state.
 
 ## Required invariants
 
@@ -36,9 +33,7 @@ The connector owns the HTTP details and secret material. The webhook neuron owns
 - Provider event identity is the deduplication key.
 - Duplicate deliveries return the original receipt.
 - Acknowledgement does not wait for long-running domain work.
-- Secrets never enter fact payloads, journals, or UI projections.
-- Inbound facts cannot execute an external mutation directly.
+- Secrets never enter facts, journals, or UI projections.
+- Inbound data cannot approve or execute an external mutation.
 
-## Effects remain governed
-
-A webhook may trigger internal processing or propose a new effect. It cannot approve or execute that effect. External mutation still follows the kernel effect rail.
+None of these webhook-specific invariants should be treated as implemented until an endpoint, kind, and conformance tests exist.

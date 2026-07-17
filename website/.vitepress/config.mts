@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'DigitalBrain',
-  description: 'An operating system built from neurons and synapses',
+  description: 'A small kernel for durable, addressable capabilities',
   cleanUrls: true,
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
@@ -11,15 +11,25 @@ export default defineConfig({
   themeConfig: {
     logo: '/logo.svg',
     nav: [
-      { text: 'Guide', link: '/guide/' },
-      { text: 'Architecture', link: '/guide/architecture' },
-      { text: 'Contributing', link: '/contributing/' },
-      { text: 'Reference', link: '/reference/status' }
+      { text: 'Getting Started', link: '/getting-started/' },
+      { text: 'Concepts', link: '/guide/' },
+      { text: 'Build', link: '/build/first-module' },
+      { text: 'Status', link: '/reference/status' },
+      { text: 'Contributing', link: '/contributing/' }
     ],
     sidebar: {
+      '/getting-started/': [
+        {
+          text: 'Getting Started',
+          items: [
+            { text: 'Run DigitalBrain', link: '/getting-started/' },
+            { text: 'First MCP call', link: '/getting-started/first-call' }
+          ]
+        }
+      ],
       '/guide/': [
         {
-          text: 'Introduction',
+          text: 'Concepts',
           items: [
             { text: 'What is DigitalBrain?', link: '/guide/' },
             { text: 'Architecture', link: '/guide/architecture' }
@@ -33,6 +43,14 @@ export default defineConfig({
             { text: 'Modules', link: '/guide/modules' },
             { text: 'Programming model', link: '/guide/programming-model' },
             { text: 'Webhook neurons', link: '/guide/webhooks' }
+          ]
+        }
+      ],
+      '/build/': [
+        {
+          text: 'Build',
+          items: [
+            { text: 'First module', link: '/build/first-module' }
           ]
         }
       ],
@@ -61,7 +79,7 @@ export default defineConfig({
       provider: 'local'
     },
     footer: {
-      message: 'Built in the open from neurons and synapses.',
+      message: 'Current behavior is documented separately from target architecture.',
       copyright: 'DigitalBrain contributors'
     },
     outline: {

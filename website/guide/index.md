@@ -1,38 +1,37 @@
 # What is DigitalBrain?
 
-DigitalBrain is an open-source operating system for software built from **neurons** and **synapses**.
+DigitalBrain is an open-source capability operating system built from **neurons** and **synapses**.
 
-A neuron is an addressable, stateful capability. A chat, memory, connection, approval, webhook receiver, model, workspace, or long-running behavior can be a neuron when it needs durable identity and lifecycle.
+A neuron is an addressable capability hosted by one universal Orleans grain. Its kind supplies deterministic domain behavior. A synapse is a typed relationship stored with a neuron.
 
-A synapse connects neurons. It can describe durable topology, carry an immutable fact, or bind a governed effect to its decision. Commands remain typed calls; synapses do not become a second RPC system.
-
-::: info Architecture status
-These pages describe the target architecture we are refining from the kernel outward. The [implementation status](/reference/status) page distinguishes running code from planned contracts.
+::: info Read labels literally
+Documentation uses **Implemented**, **Target**, and **Decision** deliberately. The [implementation status](/reference/status) is the evidence ledger for every broad architecture claim.
 :::
+
+## The current model
+
+The v2 path is deliberately small:
+
+```text
+typed contract
+  → typed client proxy
+  → universal neuron envelope
+  → NeuronGrain
+  → registered INeuronKind
+  → journaled events
+```
+
+Create a neuron when a capability needs stable identity, state, serialized access, observation, or an independent lifecycle. Keep DTOs, provider payloads, UI blocks, and transient calculations as values.
 
 ## Why an operating system?
 
-Traditional applications repeatedly rebuild identity, permissions, background work, provider integrations, observability, and user surfaces. DigitalBrain puts those invariants in a small kernel and lets modules focus on capability.
+Applications repeatedly rebuild identity, lifecycle, provider integration, effects, and user surfaces. DigitalBrain concentrates the shared execution rules in a small kernel and lets explicitly composed modules own domain capability.
 
-The goal is not to make every object an actor. The rule is narrower:
+The ambition is larger than the current implementation. Authentication, durable production storage, richer authorization, module packaging, and community isolation are not presented as finished.
 
-> Everything that needs durable identity, state, policy, or lifecycle is a neuron.
+## Follow the evidence
 
-Plain values remain plain values. DTOs, block documents, provider payloads, and transient calculations do not become neurons.
-
-## Start here
-
-- [Architecture](/guide/architecture) explains the layers.
-- [Neurons](/guide/neurons) defines the unit of identity and behavior.
-- [Synapses](/guide/synapses) defines relationships and fact propagation.
-- [Modules](/guide/modules) explains how the ecosystem extends the system.
-- [Programming model](/guide/programming-model) shows typed C# contracts.
-- [Webhook neurons](/guide/webhooks) shows how Stripe-style ingress fits the model.
-
-## Run the repository
-
-```powershell
-aspire run
-```
-
-The Aspire dashboard starts the kernel, edges, model infrastructure, and this documentation website. Open the `brain-docs` resource to browse the live VitePress site.
+1. [Run the Aspire topology](/getting-started/).
+2. [Make the first MCP call](/getting-started/first-call).
+3. [Trace the architecture](/guide/architecture).
+4. [Build a module against the current model](/build/first-module).
