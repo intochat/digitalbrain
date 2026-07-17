@@ -1,5 +1,6 @@
 using Brain.Kernel;
 using Brain.Modules.Ai;
+using Brain.Modules.Behaviors;
 using Brain.Modules.Connections;
 using Brain.Modules.Google;
 using Brain.Modules.Salesforce;
@@ -21,6 +22,7 @@ builder.UseOrleans(silo =>
     silo.AddBrainConnections(builder.Configuration);
     silo.AddBrainGoogle(builder.Configuration);
     silo.AddBrainSalesforce(builder.Configuration);
+    silo.AddBrainBehaviors();
 });
 var app = builder.Build();
 app.MapDefaultEndpoints();
