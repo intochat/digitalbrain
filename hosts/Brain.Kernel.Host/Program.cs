@@ -15,7 +15,7 @@ builder.UseOrleans(silo =>
     silo.AddJournalStorage();
     silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
     silo.AddBrainKernel(new ChatKind(), new WindowKind(), new FeedKind());
-    silo.AddBrainAi(builder.Configuration);
+    silo.AddDigitalBrainAI(builder.Configuration);
     silo.AddBrainWeb();
     silo.AddDigitalBrainGoogle(builder.Configuration, builder.Environment);
     silo.AddBrainBehaviors();

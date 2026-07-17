@@ -12,7 +12,7 @@ namespace Brain.Modules.Ai;
 
 public static class AiHosting
 {
-    public static ISiloBuilder AddBrainAi(this ISiloBuilder silo, IConfiguration config)
+    public static ISiloBuilder AddDigitalBrainAI(this ISiloBuilder silo, IConfiguration config)
     {
         var catalog = ModelCatalog.FromConfiguration(config);
         silo.Services.AddSingleton(catalog);
