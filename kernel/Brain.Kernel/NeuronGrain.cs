@@ -37,7 +37,6 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
 
     public async Task<NeuronReceipt> InvokeAsync(NeuronInvocation invocation)
     {
-        var kind = RequireKind();
         if (state.Receipts.TryGetValue(invocation.CommandId, out var replay))
             return replay;
 
@@ -50,6 +49,10 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
         {
             throw new BrainException(BrainErrors.CallerMalformed, invocation.CallerKey);
         }
+
+        if (invocation.Contract is "neuron.grant.v1" or "neuron.revoke.v1")
+            return await InvokeGrantContractAsync(invocation, caller);
+
         var requiresGrant = caller.OwnerId != _address.OwnerId || caller.SpaceId.StartsWith("behavior/", StringComparison.Ordinal);
         if (requiresGrant && !state.Synapses.Any(s =>
                 s.Relation == SynapseRelation.Grants
@@ -60,6 +63,7 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
         if (invocation.ExpectedRevision is { } expected && expected != Revision)
             throw new BrainException(BrainErrors.RevisionConflict, $"expected {expected}, actual {Revision}");
 
+        var kind = RequireKind();
         var result = await kind.InvokeAsync(Context(invocation.CallerKey), invocation);
 
         string? effectKey = null;
@@ -99,6 +103,68 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
         }
 
         return receipt;
+    }
+
+    private async Task<NeuronReceipt> InvokeGrantContractAsync(NeuronInvocation invocation, NeuronAddress caller)
+    {
+        if (caller.OwnerId != _address.OwnerId || caller.SpaceId.StartsWith("behavior/", StringComparison.Ordinal))
+            throw new BrainException(BrainErrors.GrantDenied, $"{invocation.CallerKey} cannot manage grants on {this.GetPrimaryKeyString()}");
+
+        var (granteeKey, contract) = ParseGrantInput(invocation.InputJson);
+
+        string outputJson;
+        if (invocation.Contract == "neuron.grant.v1")
+        {
+            var alreadyGranted = state.Synapses.Any(s =>
+                s.Relation == SynapseRelation.Grants && s.TargetKey == granteeKey && s.Constraint == contract);
+            if (!alreadyGranted)
+                state.Synapses.Add(new SynapseRecord(SynapseRelation.Grants, granteeKey, contract, Revision));
+            outputJson = """{"granted":true}""";
+        }
+        else
+        {
+            var matches = state.Synapses.Where(s =>
+                s.Relation == SynapseRelation.Grants && s.TargetKey == granteeKey && s.Constraint == contract).ToArray();
+            foreach (var synapse in matches)
+                state.Synapses.Remove(synapse);
+            outputJson = JsonSerializer.Serialize(new { revoked = matches.Length });
+        }
+
+        var receipt = new NeuronReceipt(invocation.CommandId, Revision, "accepted", outputJson, null);
+        state.Receipts[invocation.CommandId] = receipt;
+        await WriteStateAsync();
+        return receipt;
+    }
+
+    private static (string GranteeKey, string Contract) ParseGrantInput(string inputJson)
+    {
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(inputJson);
+        }
+        catch (JsonException)
+        {
+            throw new BrainException("input.invalid", "malformed json");
+        }
+
+        using (doc)
+        {
+            var root = doc.RootElement;
+            return (RequireStringField(root, "granteeKey"), RequireStringField(root, "contract"));
+        }
+    }
+
+    private static string RequireStringField(JsonElement root, string field)
+    {
+        if (!root.TryGetProperty(field, out var element) || element.ValueKind != JsonValueKind.String)
+            throw new BrainException("input.invalid", $"{field} field is required");
+
+        var value = element.GetString();
+        if (string.IsNullOrEmpty(value))
+            throw new BrainException("input.invalid", $"{field} cannot be empty");
+
+        return value;
     }
 
     private INeuronKind RequireKind() =>

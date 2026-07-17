@@ -7,6 +7,7 @@ public static class BrainErrors
     public const string RevisionConflict = "action.revision-stale";
     public const string Replayed = "action.replayed";
     public const string GrantMissing = "grant.missing";
+    public const string GrantDenied = "grant.denied";
     public const string EffectNotApproved = "effect.not-approved";
     public const string CallerMalformed = "caller.malformed";
     public const string ModelUnavailable = "model.unavailable";
