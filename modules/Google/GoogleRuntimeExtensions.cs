@@ -16,6 +16,8 @@ public static class GoogleRuntimeExtensions
     {
         silo.AddBrainKind("gmail", services =>
             new GmailKind(services.GetRequiredService<IGrainFactory>(), services));
+        silo.AddBrainKind("gmail-assistant", services =>
+            new GmailInboxSummaryKind(services.GetRequiredService<IGrainFactory>()));
 
         var options = GoogleOptions.FromConfiguration(configuration, environment);
         if (options is null)
