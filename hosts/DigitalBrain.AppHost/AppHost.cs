@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Brain.Modules.Google;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -11,6 +12,8 @@ ollama.AddModel("llm", "llama3.1:8b");
 var ollamaEndpoint = ollama.GetEndpoint("http");
 
 var brainKernel = builder.AddProject<Projects.Brain_Kernel_Host>("brain-kernel")
+    .WithHttpEndpoint(port: 5311, name: "google-oauth")
+    .WithDigitalBrainGoogle()
     .WithEnvironment("Brain__Ai__OllamaEndpoint", ReferenceExpression.Create(
         $"http://{ollamaEndpoint.Property(EndpointProperty.Host)}:{ollamaEndpoint.Property(EndpointProperty.Port)}"));
 
