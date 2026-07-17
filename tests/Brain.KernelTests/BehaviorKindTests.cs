@@ -202,6 +202,36 @@ public class BehaviorKindTests(BrainClusterFixture<BehaviorsKindsConfigurator> f
     }
 
     [Fact]
+    public async Task Propose_with_grant_targeting_effect_lifecycle_contract_fails_closed()
+    {
+        var behavior = Neuron("behavior", Guid.NewGuid().ToString("N"));
+        const string source = "effect lifecycle escalation source";
+        var sourceHash = Sha256Hex(source);
+        var grants = new[] { new { address = AddressKey("effect", "some-cmd-id"), contract = "effect.approve.v1" } };
+
+        var exception = await Assert.ThrowsAsync<BrainException>(() =>
+            behavior.InvokeAsync(new(
+                "behavior.propose.v1", ProposeInput(source, sourceHash, true, grants), "cmd-propose-effect-approve", OwnerSession)));
+        Assert.Equal("input.invalid", exception.Code);
+        Assert.Empty((await behavior.ReadEventsAsync(0, 10)).Events);
+    }
+
+    [Fact]
+    public async Task Propose_with_grant_targeting_service_propose_effect_contract_succeeds()
+    {
+        var behavior = Neuron("behavior", Guid.NewGuid().ToString("N"));
+        const string source = "service propose effect source";
+        var sourceHash = Sha256Hex(source);
+        var grants = new[] { new { address = AddressKey("gmail", "main"), contract = "gmail.propose-send.v1" } };
+
+        var receipt = await behavior.InvokeAsync(new(
+            "behavior.propose.v1", ProposeInput(source, sourceHash, true, grants), "cmd-propose-service-effect", OwnerSession));
+
+        Assert.Contains("\"status\":\"proposed\"", receipt.OutputJson);
+        Assert.Contains($"\"sourceHash\":\"{sourceHash}\"", receipt.OutputJson);
+    }
+
+    [Fact]
     public async Task Propose_with_malformed_grant_address_fails_closed()
     {
         var behavior = Neuron("behavior", Guid.NewGuid().ToString("N"));

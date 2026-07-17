@@ -213,7 +213,8 @@ public sealed class BehaviorKind(IGrainFactory grainFactory) : INeuronKind
     {
         if (contract.StartsWith("behavior.", StringComparison.Ordinal) ||
             contract.StartsWith("neuron.grant", StringComparison.Ordinal) ||
-            contract.StartsWith("neuron.revoke", StringComparison.Ordinal))
+            contract.StartsWith("neuron.revoke", StringComparison.Ordinal) ||
+            contract.StartsWith("effect.", StringComparison.Ordinal))
         {
             throw new BrainException("input.invalid", "governance contracts are not grantable");
         }
