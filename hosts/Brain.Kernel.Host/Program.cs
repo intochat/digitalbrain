@@ -11,8 +11,9 @@ builder.UseOrleans(silo =>
     silo.UseLocalhostClustering();
     silo.AddJournalStorage();
     silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
-    silo.AddBrainKernel(new ChatKind());
+    silo.AddBrainKernel(new ChatKind(), new WindowKind(), new FeedKind());
     silo.AddBrainAi(builder.Configuration);
+    silo.AddBrainWeb();
 });
 var app = builder.Build();
 app.MapDefaultEndpoints();

@@ -17,3 +17,9 @@ catch (Exception exception)
 {
     Console.WriteLine($"llm skipped: {exception.Message}");
 }
+
+var board = brain.Get<IWindow>("local-owner|actor/mcp-dev|window/inbox-brief");
+var window = await board.RenderAsync(Blocks.Doc(
+    Blocks.Metric("Chat revision", reply.Revision),
+    Blocks.Timeline([Blocks.Entry("smoke", DateTimeOffset.UtcNow.ToString("O"))])));
+Console.WriteLine($"window revision {window.Revision}");
