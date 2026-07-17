@@ -1,6 +1,7 @@
 using Brain.Kernel;
 using Brain.Modules.Ai;
 using Brain.Modules.Behaviors;
+using Brain.Modules.Flutter;
 using Brain.Modules.Google;
 using Brain.Modules.Web;
 using Brain.Modules.Workspace;
@@ -14,14 +15,16 @@ builder.UseOrleans(silo =>
     silo.UseLocalhostClustering();
     silo.AddJournalStorage();
     silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
-    silo.AddBrainKernel(new ChatKind(), new WindowKind(), new FeedKind());
+    silo.AddBrainKernel(new ChatKind());
     silo.AddDigitalBrainAI(builder.Configuration);
+    silo.AddDigitalBrainFlutter();
     silo.AddBrainWeb();
     silo.AddDigitalBrainGoogle(builder.Configuration, builder.Environment);
     silo.AddBrainBehaviors();
 });
 var app = builder.Build();
 app.MapDefaultEndpoints();
+app.MapDigitalBrainFlutter();
 app.MapGet("/oauth/callback/google", async (
     string? code,
     string? state,

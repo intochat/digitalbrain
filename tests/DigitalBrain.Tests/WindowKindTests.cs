@@ -1,7 +1,7 @@
 using Brain.Client;
 using Brain.Contracts;
 using DigitalBrain.Tests;
-using Brain.Modules.Workspace;
+using Flutter.Contracts;
 using Xunit;
 
 namespace Brain.KernelTests;
@@ -12,8 +12,8 @@ public class WindowKindTests(BrainClusterFixture<WorkspaceKindsConfigurator> fix
     [Fact]
     public async Task Render_via_typed_proxy_updates_revision_and_state()
     {
-        var window = NeuronProxy.Create<IWindow>(Cluster.Client, AddressKey("window", "w1"), OwnerSession);
-        var reply = await window.RenderAsync(Blocks.Doc(Blocks.Text("hello")));
+        var window = NeuronProxy.Create<IWindowNeuron>(Cluster.Client, AddressKey("window", "w1"), OwnerSession);
+        var reply = await window.RenderAsync(Document("hello"));
         Assert.Equal(1, reply.Revision);
 
         var snapshot = await Neuron("window", "w1").ReadAsync("document");
@@ -23,9 +23,9 @@ public class WindowKindTests(BrainClusterFixture<WorkspaceKindsConfigurator> fix
     [Fact]
     public async Task Second_render_supersedes_previous_content()
     {
-        var window = NeuronProxy.Create<IWindow>(Cluster.Client, AddressKey("window", "w2"), OwnerSession);
-        await window.RenderAsync(Blocks.Doc(Blocks.Text("first")));
-        await window.RenderAsync(Blocks.Doc(Blocks.Text("second")));
+        var window = NeuronProxy.Create<IWindowNeuron>(Cluster.Client, AddressKey("window", "w2"), OwnerSession);
+        await window.RenderAsync(Document("first"));
+        await window.RenderAsync(Document("second"));
 
         var snapshot = await Neuron("window", "w2").ReadAsync("document");
         Assert.Contains("second", snapshot.StateJson);
@@ -46,11 +46,14 @@ public class WindowKindTests(BrainClusterFixture<WorkspaceKindsConfigurator> fix
     public async Task Duplicate_commandId_records_single_event()
     {
         var window = Neuron("window", "w4");
-        var doc = Blocks.Doc(Blocks.Text("test"));
-        await window.InvokeAsync(new("window.render.v1", doc.Json, "dup-cmd", OwnerSession));
-        await window.InvokeAsync(new("window.render.v1", doc.Json, "dup-cmd", OwnerSession));
+        var json = System.Text.Json.JsonSerializer.Serialize(Document("test"), System.Text.Json.JsonSerializerOptions.Web);
+        await window.InvokeAsync(new("window.render.v1", json, "dup-cmd", OwnerSession));
+        await window.InvokeAsync(new("window.render.v1", json, "dup-cmd", OwnerSession));
 
         var snapshot = await window.ReadAsync("document");
         Assert.Equal(1, snapshot.Revision);
     }
+
+    private static UiDocument Document(string text) =>
+        new(1, [new UiBlock("text", Text: text)]);
 }

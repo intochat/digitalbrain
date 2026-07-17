@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Brain.Contracts;
 
-namespace Brain.Modules.Workspace;
+namespace Brain.Modules.Flutter;
 
 public sealed class FeedKind : INeuronKind
 {

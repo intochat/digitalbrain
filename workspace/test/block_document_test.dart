@@ -1,68 +1,93 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workspace/blocks/block_document.dart';
 
 void main() {
   group('BlockDocument.parse', () {
-    test('parses a metric and timeline block', () {
-      final document = BlockDocument.parse(
-        jsonEncode({
-          'version': 1,
-          'blocks': [
-            {'kind': 'metric', 'label': 'A', 'value': 1},
-            {'kind': 'timeline', 'entries': <dynamic>[]},
-          ],
-        }),
-      );
+    test('parses the canonical v1 fixture', () async {
+      final fixture = await File(
+        'test/fixtures/ui_document_v1/basic.json',
+      ).readAsString();
 
-      expect(document.blocks, hasLength(2));
-      expect(document.blocks[0].kind, 'metric');
-      expect(document.blocks[0].raw['label'], 'A');
-      expect(document.blocks[1].kind, 'timeline');
+      final document = BlockDocument.parse(fixture);
+
+      expect(document.blocks, hasLength(4));
+      expect(document.blocks.first.kind, 'heading');
+      expect(document.blocks[1].children, hasLength(2));
     });
 
-    test('throws FormatException for an unsupported version', () {
-      final json = jsonEncode({'version': 2, 'blocks': <dynamic>[]});
-
-      expect(() => BlockDocument.parse(json), throwsFormatException);
-    });
-
-    test('throws FormatException for garbage input', () {
-      expect(() => BlockDocument.parse('not json'), throwsFormatException);
-    });
-
-    test('throws FormatException for a non-object top level shape', () {
+    test('rejects an unsupported kind', () {
       expect(
-        () => BlockDocument.parse(jsonEncode([1, 2, 3])),
+        () => BlockDocument.parse(
+          '{"version":1,"blocks":[{"kind":"unknown","text":"x"}]}',
+        ),
         throwsFormatException,
       );
     });
 
-    test('throws FormatException when blocks is missing', () {
-      final json = jsonEncode({'version': 1});
-
-      expect(() => BlockDocument.parse(json), throwsFormatException);
+    test('rejects an unsupported version', () {
+      expect(
+        () => BlockDocument.parse('{"version":2,"blocks":[]}'),
+        throwsFormatException,
+      );
     });
 
-    test('throws FormatException for a non-map block entry', () {
-      final json = jsonEncode({
-        'version': 1,
-        'blocks': ['not a block'],
-      });
+    test('rejects excessive nesting', () {
+      dynamic block = {'kind': 'text', 'text': 'leaf'};
+      for (var depth = 0; depth < 9; depth++) {
+        block = {
+          'kind': 'card',
+          'children': [block],
+        };
+      }
 
-      expect(() => BlockDocument.parse(json), throwsFormatException);
+      expect(
+        () => BlockDocument.parse(
+          jsonEncode({
+            'version': 1,
+            'blocks': [block],
+          }),
+        ),
+        throwsFormatException,
+      );
     });
 
-    test('throws FormatException for a block missing kind', () {
-      final json = jsonEncode({
-        'version': 1,
-        'blocks': [
-          {'label': 'no kind here'},
-        ],
-      });
+    test('rejects oversized text', () {
+      expect(
+        () => BlockDocument.parse(
+          jsonEncode({
+            'version': 1,
+            'blocks': [
+              {'kind': 'text', 'text': 'x' * 16385},
+            ],
+          }),
+        ),
+        throwsFormatException,
+      );
+    });
 
-      expect(() => BlockDocument.parse(json), throwsFormatException);
+    test('rejects malformed action input JSON', () {
+      expect(
+        () => BlockDocument.parse(
+          jsonEncode({
+            'version': 1,
+            'blocks': [
+              {
+                'kind': 'button',
+                'label': 'Approve',
+                'action': {
+                  'contract': 'effect.approve.v1',
+                  'target': 'owner|actor/ui|effect/1',
+                  'inputJson': '{',
+                },
+              },
+            ],
+          }),
+        ),
+        throwsFormatException,
+      );
     });
   });
 }

@@ -1,7 +1,8 @@
 using System.Text.Json;
+using System.Security.Claims;
 using Brain.Contracts;
 using DigitalBrain.Tests;
-using Brain.UiGateway;
+using Brain.Modules.Flutter;
 using Xunit;
 
 namespace Brain.KernelTests;
@@ -9,6 +10,14 @@ namespace Brain.KernelTests;
 public class UiGatewayTests(BrainClusterFixture<WorkspaceKindsConfigurator> fixture)
     : BrainTest<WorkspaceKindsConfigurator>(fixture)
 {
+    private static readonly ClaimsPrincipal Principal = new(new ClaimsIdentity(
+        [
+            new Claim("digitalbrain:owner", "local-owner"),
+            new Claim("digitalbrain:space", "actor/ui-dev"),
+            new Claim("digitalbrain:grant", "chat.post.v1")
+        ],
+        "test"));
+
     private static string UiChatAddress(string id) => new NeuronAddress("local-owner", "actor/ui-dev", $"chat/{id}").ToGrainKey();
 
     [Fact]
@@ -16,33 +25,36 @@ public class UiGatewayTests(BrainClusterFixture<WorkspaceKindsConfigurator> fixt
     {
         var address = UiChatAddress(Guid.NewGuid().ToString("N"));
         var receipt = await UiEndpoints.InvokeAsync(
-            Cluster.Client, UiEndpoints.DevCallerKey, address, "chat.post.v1", """{"text":"hello"}""", "cmd-1", null);
+            Cluster.Client, Principal, new FlutterGatewayPolicy(), address, "chat.post.v1", """{"text":"hello"}""", "cmd-1", null);
 
         Assert.Equal(1, receipt.Revision);
         Assert.Equal("cmd-1", receipt.CommandId);
     }
 
     [Fact]
-    public async Task Invoke_replays_same_receipt_for_duplicate_command_id()
+    public async Task Invoke_rejects_duplicate_mutation_command_id()
     {
         var address = UiChatAddress(Guid.NewGuid().ToString("N"));
+        var policy = new FlutterGatewayPolicy();
         var first = await UiEndpoints.InvokeAsync(
-            Cluster.Client, UiEndpoints.DevCallerKey, address, "chat.post.v1", """{"text":"hello"}""", "cmd-dup", null);
-        var replay = await UiEndpoints.InvokeAsync(
-            Cluster.Client, UiEndpoints.DevCallerKey, address, "chat.post.v1", """{"text":"ignored"}""", "cmd-dup", null);
+            Cluster.Client, Principal, policy, address, "chat.post.v1", """{"text":"hello"}""", "cmd-dup", null);
+        var exception = await Assert.ThrowsAsync<BrainException>(() => UiEndpoints.InvokeAsync(
+            Cluster.Client, Principal, policy, address, "chat.post.v1", """{"text":"ignored"}""", "cmd-dup", null));
 
-        Assert.Equal(first, replay);
+        Assert.Equal(1, first.Revision);
+        Assert.Equal("command.replayed", exception.Code);
     }
 
     [Fact]
     public async Task Read_and_describe_pass_through_to_the_neuron()
     {
-        var address = AddressKey("catalog", "main");
+        var address = new NeuronAddress("local-owner", "actor/ui-dev", "catalog/main").ToGrainKey();
+        var policy = new FlutterGatewayPolicy();
 
-        var snapshot = await UiEndpoints.ReadAsync(Cluster.Client, address, "");
+        var snapshot = await UiEndpoints.ReadAsync(Cluster.Client, Principal, policy, address, "");
         Assert.Contains("\"kind\":\"chat\"", snapshot.StateJson);
 
-        var description = await UiEndpoints.DescribeAsync(Cluster.Client, address);
+        var description = await UiEndpoints.DescribeAsync(Cluster.Client, Principal, policy, address);
         Assert.Equal("catalog", description.Kind);
     }
 

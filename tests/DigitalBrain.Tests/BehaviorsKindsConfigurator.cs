@@ -1,4 +1,5 @@
 using Brain.Kernel;
+using Brain.Modules.Flutter;
 using Brain.Modules.Behaviors;
 using Brain.Modules.Workspace;
 using Microsoft.Extensions.DependencyInjection;

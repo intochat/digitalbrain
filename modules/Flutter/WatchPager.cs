@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Brain.Contracts;
 
-namespace Brain.UiGateway;
+namespace Brain.Modules.Flutter;
 
 public static class WatchPager
 {

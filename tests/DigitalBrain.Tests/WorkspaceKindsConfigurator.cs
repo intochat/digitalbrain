@@ -1,4 +1,5 @@
 using Brain.Kernel;
+using Brain.Modules.Flutter;
 using Brain.Modules.Workspace;
 using Orleans.TestingHost;
 

@@ -1,7 +1,8 @@
 using System.Text.Json;
 using Brain.Contracts;
+using Flutter.Contracts;
 
-namespace Brain.Modules.Workspace;
+namespace Brain.Modules.Flutter;
 
 public sealed class WindowKind : INeuronKind
 {
@@ -17,10 +18,10 @@ public sealed class WindowKind : INeuronKind
 
     private ValueTask<KindResult> HandleRenderAsync(NeuronContext context, NeuronInvocation invocation)
     {
-        var doc = BlockDoc.Parse(invocation.InputJson);
+        var document = UiDocument.Parse(invocation.InputJson);
 
-        var output = JsonSerializer.Serialize(new { revision = context.Revision + 1 });
-        var events = new[] { ("window.rendered", doc.Json) };
+        var output = JsonSerializer.Serialize(new WindowReply(context.Revision + 1), JsonSerializerOptions.Web);
+        var events = new[] { ("window.rendered", JsonSerializer.Serialize(document, JsonSerializerOptions.Web)) };
 
         return ValueTask.FromResult(new KindResult(output, events));
     }

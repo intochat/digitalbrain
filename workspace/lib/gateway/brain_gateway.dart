@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../blocks/block_action.dart';
 import 'envelope.dart';
 
 class BrainGateway {
@@ -41,6 +42,18 @@ class BrainGateway {
     return _decodeBody(response);
   }
 
+  Future<Map<String, dynamic>> invokeAction(
+    BlockAction action,
+    String commandId, {
+    int? expectedRevision,
+  }) => invoke(
+    action.target,
+    action.contract,
+    action.inputJson,
+    commandId,
+    expectedRevision: expectedRevision,
+  );
+
   Future<NeuronSnapshot> read(
     String address, {
     String projection = 'default',
@@ -71,13 +84,10 @@ class BrainGateway {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Stream<FeedFrame> watch({
-    int cursor = 0,
-    String space = 'actor/ui-dev',
-  }) async* {
+  Stream<FeedFrame> watch({int cursor = 0}) async* {
     final uri = Uri.parse(
       '$wsBase/ui/watch',
-    ).replace(queryParameters: {'cursor': '$cursor', 'space': space});
+    ).replace(queryParameters: {'cursor': '$cursor'});
     final channel = WebSocketChannel.connect(uri);
     await channel.ready;
     await for (final message in channel.stream) {

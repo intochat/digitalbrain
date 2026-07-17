@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\kernel\Brain.Kernel\Brain.Kernel.csproj" />
     <ProjectReference Include="..\..\modules\AI\AI.csproj" />
+    <ProjectReference Include="..\..\modules\Flutter\Flutter.csproj" />
     <ProjectReference Include="..\..\modules\Brain.Modules.Behaviors\Brain.Modules.Behaviors.csproj" />
     <ProjectReference Include="..\..\modules\Google\Google.csproj" />
     <ProjectReference Include="..\..\modules\Brain.Modules.Web\Brain.Modules.Web.csproj" />

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:workspace/blocks/block_action.dart';
 import 'package:workspace/gateway/brain_gateway.dart';
 import 'package:workspace/gateway/envelope.dart';
 
@@ -131,6 +132,34 @@ void main() {
 
       expect(capturedBody.containsKey('expectedRevision'), isFalse);
     });
+  });
+
+  test('invokeAction sends the validated action target and contract', () async {
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      expect(body['address'], 'owner|actor/flutter|chat/main');
+      expect(body['contract'], 'chat.post.v1');
+      expect(body['inputJson'], '{"text":"hello"}');
+      expect(body['commandId'], 'cmd-action');
+      return http.Response(
+        jsonEncode({
+          'commandId': 'cmd-action',
+          'revision': 1,
+          'status': 'applied',
+          'outputJson': '{}',
+        }),
+        200,
+      );
+    });
+    final gateway = _gateway(client);
+    const action = BlockAction(
+      label: 'Send',
+      contract: 'chat.post.v1',
+      target: 'owner|actor/flutter|chat/main',
+      inputJson: '{"text":"hello"}',
+    );
+
+    await gateway.invokeAction(action, 'cmd-action');
   });
 
   group('BrainGateway.read', () {
