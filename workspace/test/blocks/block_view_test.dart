@@ -43,6 +43,51 @@ void main() {
     expect(find.text('42'), findsOneWidget);
   });
 
+  testWidgets('field renders label and value', (tester) async {
+    await pumpBlockView(tester, {
+      'version': 1,
+      'blocks': [
+        {'kind': 'field', 'label': 'Owner', 'value': 'vlad'},
+      ],
+    });
+
+    expect(find.text('Owner: '), findsOneWidget);
+    expect(find.text('vlad'), findsOneWidget);
+  });
+
+  testWidgets('columns renders each child', (tester) async {
+    await pumpBlockView(tester, {
+      'version': 1,
+      'blocks': [
+        {
+          'kind': 'columns',
+          'children': [
+            {'kind': 'text', 'value': 'Left'},
+            {'kind': 'text', 'value': 'Right'},
+          ],
+        },
+      ],
+    });
+
+    expect(find.text('Left'), findsOneWidget);
+    expect(find.text('Right'), findsOneWidget);
+  });
+
+  testWidgets(
+    'table with no columns renders a fallback tile without throwing',
+    (tester) async {
+      await pumpBlockView(tester, {
+        'version': 1,
+        'blocks': [
+          {'kind': 'table', 'columns': <dynamic>[], 'rows': <dynamic>[]},
+        ],
+      });
+
+      expect(find.text('unsupported block: table'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('list renders each item', (tester) async {
     await pumpBlockView(tester, {
       'version': 1,
