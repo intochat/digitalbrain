@@ -13,7 +13,7 @@ class BrainColors {
 
   static const Color ink = Color(0xFFE8EAF0);
   static const Color inkMuted = Color(0xFF8A90A0);
-  static const Color inkFaint = Color(0xFF565C6B);
+  static const Color inkFaint = Color(0xFF7A8092);
 
   static const Color indigo = Color(0xFF6C7BFF);
 
@@ -63,9 +63,45 @@ class BrainTheme {
           side: const BorderSide(color: BrainColors.hairline),
         ),
       ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: BrainColors.surfaceRaised,
+          foregroundColor: BrainColors.ink,
+          side: const BorderSide(color: BrainColors.hairlineStrong),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: BrainColors.ink,
+          side: const BorderSide(color: BrainColors.hairlineStrong),
+        ),
+      ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: BrainColors.surface,
-        indicatorColor: BrainColors.indigo.withValues(alpha: 0.16),
+        indicatorColor: BrainColors.surfaceRaised,
+        selectedIconTheme: const IconThemeData(color: BrainColors.ink),
+        unselectedIconTheme: const IconThemeData(color: BrainColors.inkMuted),
+        selectedLabelTextStyle: const TextStyle(color: BrainColors.ink),
+        unselectedLabelTextStyle: const TextStyle(color: BrainColors.inkMuted),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: BrainColors.surface,
+        indicatorColor: BrainColors.surfaceRaised,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? BrainColors.ink
+                : BrainColors.inkMuted,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontSize: 12,
+            color: states.contains(WidgetState.selected)
+                ? BrainColors.ink
+                : BrainColors.inkMuted,
+          ),
+        ),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: BrainColors.surface,

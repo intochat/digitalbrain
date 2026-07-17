@@ -49,6 +49,10 @@ class ConnectionHealth extends StatelessWidget {
           if (fixLabel != null) ...[
             const SizedBox(width: 8),
             OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: color,
+                side: BorderSide(color: color),
+              ),
               onPressed: () {
                 final fixContract = data['fixContract']?.toString();
                 if (fixContract == null || fixContract.isEmpty) return;
