@@ -50,6 +50,7 @@
   </Folder>
   <Folder Name="/edge/">
     <Project Path="edge/Brain.Mcp/Brain.Mcp.csproj" />
+    <Project Path="edge/Brain.UiGateway/Brain.UiGateway.csproj" />
   </Folder>
   <Folder Name="/features/">
     <Project Path="features/EnrichSalesforce/DigitalBrain.Features.EnrichSalesforce.csproj" />

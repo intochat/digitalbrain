@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Brain.Kernel.Host\Brain.Kernel.Host.csproj" />
     <ProjectReference Include="..\..\edge\Brain.Mcp\Brain.Mcp.csproj" />
+    <ProjectReference Include="..\..\edge\Brain.UiGateway\Brain.UiGateway.csproj" />
   </ItemGroup>
 
 </Project>
