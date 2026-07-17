@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../kernel/Brain.Contracts/Brain.Contracts.csproj" />
+    <ProjectReference Include="../Brain.Modules.Connections/Brain.Modules.Connections.csproj" />
+  </ItemGroup>
+</Project>
