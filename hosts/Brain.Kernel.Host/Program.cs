@@ -1,5 +1,6 @@
 using Brain.Kernel;
 using Brain.Modules.Ai;
+using Brain.Modules.Web;
 using Brain.Modules.Workspace;
 using DigitalBrain.ServiceDefaults;
 using Orleans.Journaling;
