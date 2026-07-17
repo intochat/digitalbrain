@@ -80,6 +80,23 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
         var receipt = new NeuronReceipt(invocation.CommandId, Revision, "accepted", result.OutputJson, effectKey);
         state.Receipts[invocation.CommandId] = receipt;
         await WriteStateAsync();
+
+        if (_address.Kind != "feed")
+        {
+            try
+            {
+                var feedKey = new NeuronAddress(_address.OwnerId, _address.SpaceId, "feed/main").ToGrainKey();
+                await GrainFactory.GetGrain<INeuron>(feedKey).InvokeAsync(new(
+                    "feed.append.v1",
+                    JsonSerializer.Serialize(new { sourceKey = this.GetPrimaryKeyString(), revision = receipt.Revision, kind = _address.Kind }),
+                    $"{this.GetPrimaryKeyString()}:{receipt.Revision}",
+                    this.GetPrimaryKeyString()));
+            }
+            catch
+            {
+            }
+        }
+
         return receipt;
     }
 

@@ -49,4 +49,14 @@ public class NeuronGrainTests(BrainClusterFixture<KernelKindsConfigurator> fixtu
             () => neuron.InvokeAsync(Echo("cmd-1")));
         Assert.Equal(BrainErrors.UnknownKind, exception.Code);
     }
+
+    [Fact]
+    public async Task Invocation_succeeds_when_feed_kind_is_not_registered()
+    {
+        var neuron = Neuron("test", Guid.NewGuid().ToString("N"));
+        var receipt = await neuron.InvokeAsync(Echo("cmd-swallow"));
+        Assert.Equal(1, receipt.Revision);
+        var events = await neuron.ReadEventsAsync(0, 10);
+        Assert.Single(events.Events);
+    }
 }
