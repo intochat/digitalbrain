@@ -1,5 +1,7 @@
+using Brain.Client;
 using Brain.Contracts;
 using Brain.Modules.Sdk;
+using Brain.Modules.Web;
 using Xunit;
 
 namespace Brain.KernelTests;
@@ -76,5 +78,19 @@ public class WebKindTests(BrainClusterFixture<WebKindsConfigurator> fixture)
         var second = await web.InvokeAsync(new("web.fetch.v1", """{"url":"https://example.com/"}""", "cmd-dup", OwnerSession));
         Assert.Equal(first, second);
         Assert.Equal(callsAfterFirst, WebKindsConfigurator.Handler.Calls);
+    }
+
+    [Fact]
+    public async Task Typed_proxy_fetch_with_default_maxBytes()
+    {
+        WebKindsConfigurator.Handler.Reset();
+        WebKindsConfigurator.Handler.Body = "typed proxy test";
+
+        var web = NeuronProxy.Create<IWeb>(Cluster.Client, AddressKey("web", "typed"), OwnerSession);
+        var reply = await web.FetchAsync(new WebFetch("https://example.com/"));
+
+        Assert.Equal(200, reply.Status);
+        Assert.Equal(1, reply.Revision);
+        Assert.Contains("typed proxy test", reply.Body);
     }
 }

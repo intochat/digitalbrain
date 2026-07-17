@@ -111,13 +111,9 @@ public sealed class WebKind(IHttpClientFactory httpClientFactory) : INeuronKind
                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                 throw new BrainException("input.invalid", "url must be an absolute http or https url");
 
-            int? maxBytes = null;
-            if (root.TryGetProperty("maxBytes", out var maxBytesElement))
-            {
-                if (maxBytesElement.ValueKind != JsonValueKind.Number || !maxBytesElement.TryGetInt32(out var parsedMaxBytes))
-                    throw new BrainException("input.invalid", "maxBytes must be an integer");
-                maxBytes = parsedMaxBytes;
-            }
+            var maxBytes = root.TryGetProperty("maxBytes", out var maxBytesElement) && maxBytesElement.ValueKind == JsonValueKind.Number
+                ? maxBytesElement.GetInt32()
+                : (int?)null;
 
             return (uri, maxBytes);
         }
