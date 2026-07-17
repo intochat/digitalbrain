@@ -67,6 +67,9 @@ public sealed class SalesforceKind(IGrainFactory grainFactory, IServiceProvider 
     private async ValueTask<KindResult> HandleExecuteUpdateAsync(NeuronContext context, string inputJson)
     {
         var effectKey = RequireStringField(inputJson, "effectKey");
+        if (!context.Synapses.Any(s => s.Relation == SynapseRelation.Awaits && s.TargetKey == effectKey))
+            throw new BrainException(BrainErrors.EffectNotApproved, "effect was not proposed by this neuron");
+
         var effect = grainFactory.GetGrain<INeuron>(effectKey);
         var claimReceipt = await effect.InvokeAsync(new NeuronInvocation(
             "effect.claim-proof.v1", "{}", Guid.NewGuid().ToString("N"), context.Address.ToGrainKey()));

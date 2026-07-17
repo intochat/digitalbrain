@@ -75,7 +75,7 @@ public class SalesforceConnectorTests(BrainClusterFixture<ConnectorsKindsConfigu
     }
 
     [Fact]
-    public async Task Digest_mismatch_fails_with_input_invalid()
+    public async Task Execute_with_foreign_effect_key_fails_closed_and_owner_can_still_claim()
     {
         ConnectorsKindsConfigurator.SalesforceProvider.Reset();
         await EnsureConnectedAsync();
@@ -89,9 +89,14 @@ public class SalesforceConnectorTests(BrainClusterFixture<ConnectorsKindsConfigu
         await effectA.InvokeAsync(new("effect.approve.v1", "{}", $"cmd-approve-{uid}", OwnerSession));
 
         var exception = await Assert.ThrowsAsync<BrainException>(() => salesforceB.InvokeAsync(new(
-            "salesforce.execute-update.v1", $$"""{"effectKey":"{{proposeA.EffectKey}}"}""", $"cmd-execute-{uid}", OwnerSession)));
-        Assert.Equal("input.invalid", exception.Code);
+            "salesforce.execute-update.v1", $$"""{"effectKey":"{{proposeA.EffectKey}}"}""", $"cmd-execute-b-{uid}", OwnerSession)));
+        Assert.Equal(BrainErrors.EffectNotApproved, exception.Code);
         Assert.Equal(0, ConnectorsKindsConfigurator.SalesforceProvider.UpdateCalls);
+
+        var execute = await salesforceA.InvokeAsync(new(
+            "salesforce.execute-update.v1", $$"""{"effectKey":"{{proposeA.EffectKey}}"}""", $"cmd-execute-a-{uid}", OwnerSession));
+        Assert.Contains("fake-record-id", execute.OutputJson);
+        Assert.Equal(1, ConnectorsKindsConfigurator.SalesforceProvider.UpdateCalls);
     }
 
     [Fact]

@@ -75,7 +75,7 @@ public class GmailConnectorTests(BrainClusterFixture<ConnectorsKindsConfigurator
     }
 
     [Fact]
-    public async Task Digest_mismatch_fails_with_input_invalid()
+    public async Task Execute_with_foreign_effect_key_fails_closed_and_owner_can_still_claim()
     {
         ConnectorsKindsConfigurator.GmailProvider.Reset();
         await EnsureConnectedAsync();
@@ -89,9 +89,14 @@ public class GmailConnectorTests(BrainClusterFixture<ConnectorsKindsConfigurator
         await effectA.InvokeAsync(new("effect.approve.v1", "{}", $"cmd-approve-{uid}", OwnerSession));
 
         var exception = await Assert.ThrowsAsync<BrainException>(() => gmailB.InvokeAsync(new(
-            "gmail.execute-send.v1", $$"""{"effectKey":"{{proposeA.EffectKey}}"}""", $"cmd-execute-{uid}", OwnerSession)));
-        Assert.Equal("input.invalid", exception.Code);
+            "gmail.execute-send.v1", $$"""{"effectKey":"{{proposeA.EffectKey}}"}""", $"cmd-execute-b-{uid}", OwnerSession)));
+        Assert.Equal(BrainErrors.EffectNotApproved, exception.Code);
         Assert.Equal(0, ConnectorsKindsConfigurator.GmailProvider.SendCalls);
+
+        var execute = await gmailA.InvokeAsync(new(
+            "gmail.execute-send.v1", $$"""{"effectKey":"{{proposeA.EffectKey}}"}""", $"cmd-execute-a-{uid}", OwnerSession));
+        Assert.Contains("fake-message-id", execute.OutputJson);
+        Assert.Equal(1, ConnectorsKindsConfigurator.GmailProvider.SendCalls);
     }
 
     [Fact]
