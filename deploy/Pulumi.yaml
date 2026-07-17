@@ -1,3 +1,0 @@
-name: digitalbrain-deploy
-runtime: dotnet
-description: DigitalBrain / NeuroOS Azure deploy foundation (ACA kernel + MCP, Storage, Azure OpenAI, and monitoring).

@@ -1,6 +1,8 @@
 <Solution>
-  <Folder Name="/clients/">
-    <Project Path="app/Flutter.proj" Type="C#" />
+  <Folder Name="/kernel/">
+    <Project Path="kernel/Brain.Contracts/Brain.Contracts.csproj" />
+    <Project Path="kernel/Brain.Kernel/Brain.Kernel.csproj" />
+    <Project Path="kernel/Brain.Client/Brain.Client.csproj" />
   </Folder>
   <Folder Name="/modules/">
     <Project Path="modules/Brain.Modules.Sdk/Brain.Modules.Sdk.csproj" />
@@ -12,57 +14,20 @@
     <Project Path="modules/Brain.Modules.Salesforce/Brain.Modules.Salesforce.csproj" />
     <Project Path="modules/Brain.Modules.Behaviors/Brain.Modules.Behaviors.csproj" />
   </Folder>
-  <Folder Name="/src/">
-    <Project Path="src/DigitalBrain.Features.Sdk/DigitalBrain.Features.Sdk.csproj" />
-    <Project Path="src/DigitalBrain.Features.Testing/DigitalBrain.Features.Testing.csproj" />
-    <Project Path="src/DigitalBrain.Kernel.Contracts/DigitalBrain.Kernel.Contracts.csproj" />
-    <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-    <Project Path="src/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-  </Folder>
-  <Folder Name="/kernel/">
-    <Project Path="kernel/Brain.Contracts/Brain.Contracts.csproj" />
-    <Project Path="kernel/Brain.Kernel/Brain.Kernel.csproj" />
-    <Project Path="kernel/Brain.Client/Brain.Client.csproj" />
-  </Folder>
-  <Folder Name="/integrations/">
-    <Project Path="integrations/DigitalBrain.Integrations.Google/DigitalBrain.Integrations.Google.csproj" />
-    <Project Path="integrations/DigitalBrain.Integrations.Google.Contracts/DigitalBrain.Integrations.Google.Contracts.csproj" />
-    <Project Path="integrations/DigitalBrain.Integrations.Salesforce.Contracts/DigitalBrain.Integrations.Salesforce.Contracts.csproj" />
-    <Project Path="integrations/DigitalBrain.Integrations.Salesforce/DigitalBrain.Integrations.Salesforce.csproj" />
-    <Project Path="integrations/DigitalBrain.Integrations.Web.Contracts/DigitalBrain.Integrations.Web.Contracts.csproj" />
-    <Project Path="integrations/DigitalBrain.Integrations.Web/DigitalBrain.Integrations.Web.csproj" />
-  </Folder>
-  <Folder Name="/hosts/">
-    <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-    <Project Path="hosts/DigitalBrain.FeatureBuilder/DigitalBrain.FeatureBuilder.csproj" />
-    <Project Path="hosts/DigitalBrain.FeatureHost/DigitalBrain.FeatureHost.csproj" />
-    <Project Path="hosts/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
-    <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
-    <Project Path="hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/DigitalBrain.E2ETests/DigitalBrain.E2ETests.csproj" />
-    <Project Path="tests/DigitalBrain.AppHostTests/DigitalBrain.AppHostTests.csproj" />
-    <Project Path="tests/DigitalBrain.IntegrationContractTests/DigitalBrain.IntegrationContractTests.csproj" />
-    <Project Path="tests/DigitalBrain.OrleansTests/DigitalBrain.OrleansTests.csproj" />
-    <Project Path="tests/DigitalBrain.UnitTests/DigitalBrain.UnitTests.csproj" />
-    <Project Path="tests/Brain.KernelTests/Brain.KernelTests.csproj" />
-    <Project Path="tests/Brain.ConformanceTests/Brain.ConformanceTests.csproj" />
-  </Folder>
-  <Folder Name="/deploy/">
-    <Project Path="deploy/DigitalBrain.Deploy.csproj" />
-  </Folder>
   <Folder Name="/edge/">
     <Project Path="edge/Brain.Mcp/Brain.Mcp.csproj" />
     <Project Path="edge/Brain.UiGateway/Brain.UiGateway.csproj" />
   </Folder>
-  <Folder Name="/features/">
-    <Project Path="features/EnrichSalesforce/DigitalBrain.Features.EnrichSalesforce.csproj" />
-    <Project Path="features/EnrichSalesforce.Tests/DigitalBrain.Features.EnrichSalesforce.Tests.csproj" />
-    <Project Path="features/EmailSummarizer/DigitalBrain.Features.EmailSummarizer.csproj" />
-    <Project Path="features/EmailSummarizer.Tests/DigitalBrain.Features.EmailSummarizer.Tests.csproj" />
+  <Folder Name="/hosts/">
+    <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
+    <Project Path="hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />
+    <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
   </Folder>
   <Folder Name="/behaviors/">
     <Project Path="behaviors/smoke/smoke.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Brain.KernelTests/Brain.KernelTests.csproj" />
+    <Project Path="tests/Brain.ConformanceTests/Brain.ConformanceTests.csproj" />
   </Folder>
 </Solution>
