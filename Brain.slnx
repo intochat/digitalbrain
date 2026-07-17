@@ -8,7 +8,8 @@
     <Project Path="modules/Brain.Modules.Workspace/Brain.Modules.Workspace.csproj" />
     <Project Path="modules/Brain.Modules.Ai/Brain.Modules.Ai.csproj" />
     <Project Path="modules/Brain.Modules.Web/Brain.Modules.Web.csproj" />
-    <Project Path="modules/Brain.Modules.Google/Brain.Modules.Google.csproj" />
+    <Project Path="modules/Google.Contracts/Google.Contracts.csproj" />
+    <Project Path="modules/Google/Google.csproj" />
     <Project Path="modules/Brain.Modules.Behaviors/Brain.Modules.Behaviors.csproj" />
   </Folder>
   <Folder Name="/edge/">
