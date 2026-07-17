@@ -16,6 +16,7 @@
     <ProjectReference Include="../../modules/Brain.Modules.Connections/Brain.Modules.Connections.csproj" />
     <ProjectReference Include="../../modules/Brain.Modules.Google/Brain.Modules.Google.csproj" />
     <ProjectReference Include="../../modules/Brain.Modules.Salesforce/Brain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="../../modules/Brain.Modules.Behaviors/Brain.Modules.Behaviors.csproj" />
     <ProjectReference Include="../../edge/Brain.UiGateway/Brain.UiGateway.csproj" />
   </ItemGroup>
   <ItemGroup>
