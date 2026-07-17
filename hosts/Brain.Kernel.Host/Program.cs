@@ -1,11 +1,8 @@
 using Brain.Kernel;
+using Brain.Kernel.Host;
 using Brain.Modules.Ai;
-using Brain.Modules.Behaviors;
 using Brain.Modules.Flutter;
 using Brain.Modules.Google;
-using Brain.Modules.Web;
-using Brain.Modules.Workspace;
-using DigitalBrain.ServiceDefaults;
 using Orleans.Journaling;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,12 +12,10 @@ builder.UseOrleans(silo =>
     silo.UseLocalhostClustering();
     silo.AddJournalStorage();
     silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
-    silo.AddBrainKernel(new ChatKind());
+    silo.AddBrainKernel();
     silo.AddDigitalBrainAI(builder.Configuration);
     silo.AddDigitalBrainFlutter();
-    silo.AddBrainWeb();
     silo.AddDigitalBrainGoogle(builder.Configuration, builder.Environment);
-    silo.AddBrainBehaviors();
 });
 var app = builder.Build();
 app.MapDefaultEndpoints();

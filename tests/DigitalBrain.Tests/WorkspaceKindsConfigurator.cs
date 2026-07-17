@@ -1,12 +1,14 @@
 using Brain.Kernel;
 using Brain.Modules.Flutter;
-using Brain.Modules.Workspace;
 using Orleans.TestingHost;
 
 namespace Brain.KernelTests;
 
 public sealed class WorkspaceKindsConfigurator : ISiloConfigurator
 {
-    public void Configure(ISiloBuilder siloBuilder) =>
-        siloBuilder.AddBrainKernel(new ChatKind(), new WindowKind(), new FeedKind());
+    public void Configure(ISiloBuilder siloBuilder)
+    {
+        siloBuilder.AddBrainKernel(new TestKind());
+        siloBuilder.AddDigitalBrainFlutter();
+    }
 }

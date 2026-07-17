@@ -5,26 +5,19 @@
     <Project Path="kernel/Brain.Client/Brain.Client.csproj" />
   </Folder>
   <Folder Name="/modules/">
-    <Project Path="modules/Brain.Modules.Workspace/Brain.Modules.Workspace.csproj" />
     <Project Path="modules/AI.Contracts/AI.Contracts.csproj" />
     <Project Path="modules/AI/AI.csproj" />
     <Project Path="modules/Flutter.Contracts/Flutter.Contracts.csproj" />
     <Project Path="modules/Flutter/Flutter.csproj" />
-    <Project Path="modules/Brain.Modules.Web/Brain.Modules.Web.csproj" />
     <Project Path="modules/Google.Contracts/Google.Contracts.csproj" />
     <Project Path="modules/Google/Google.csproj" />
-    <Project Path="modules/Brain.Modules.Behaviors/Brain.Modules.Behaviors.csproj" />
   </Folder>
   <Folder Name="/edge/">
     <Project Path="edge/Brain.Mcp/Brain.Mcp.csproj" />
   </Folder>
   <Folder Name="/hosts/">
-    <Project Path="hosts/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-  </Folder>
-  <Folder Name="/behaviors/">
-    <Project Path="behaviors/smoke/smoke.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />

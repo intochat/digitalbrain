@@ -13,7 +13,7 @@ public class CatalogTests(BrainClusterFixture<WorkspaceKindsConfigurator> fixtur
         var catalog = Neuron("catalog", "main");
         var snapshot = await catalog.ReadAsync("");
 
-        Assert.Contains("\"kind\":\"chat\"", snapshot.StateJson);
+        Assert.Contains("\"kind\":\"test\"", snapshot.StateJson);
         Assert.Contains("\"kind\":\"window\"", snapshot.StateJson);
         Assert.Contains("\"kind\":\"feed\"", snapshot.StateJson);
         Assert.Contains("\"kind\":\"effect\"", snapshot.StateJson);
