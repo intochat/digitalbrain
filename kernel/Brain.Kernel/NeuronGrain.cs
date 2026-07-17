@@ -78,7 +78,8 @@ public sealed class NeuronGrain([NeuronState] NeuronDurableState state, IService
             state.Synapses.Add(synapse with { Revision = Revision });
 
         var receipt = new NeuronReceipt(invocation.CommandId, Revision, "accepted", result.OutputJson, effectKey);
-        state.Receipts[invocation.CommandId] = receipt;
+        if (!result.TransientReceipt)
+            state.Receipts[invocation.CommandId] = receipt;
         await WriteStateAsync();
 
         if (_address.Kind != "feed")

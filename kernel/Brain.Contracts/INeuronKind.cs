@@ -4,7 +4,7 @@ public sealed record NeuronContext(NeuronAddress Address, string CallerKey, long
 
 public sealed record EffectProposal(string Provider, string PayloadJson, string PayloadDigest);
 
-public sealed record KindResult(string OutputJson, IReadOnlyList<(string Kind, string PayloadJson)> Events, EffectProposal? Effect = null, SynapseRecord? Synapse = null);
+public sealed record KindResult(string OutputJson, IReadOnlyList<(string Kind, string PayloadJson)> Events, EffectProposal? Effect = null, SynapseRecord? Synapse = null, bool TransientReceipt = false);
 
 public interface INeuronKind
 {

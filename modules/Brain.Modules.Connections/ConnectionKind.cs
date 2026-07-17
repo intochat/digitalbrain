@@ -9,6 +9,17 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan AuthorizingWindow = TimeSpan.FromMinutes(10);
 
+    private static readonly HashSet<string> KnownHealthValues = new(StringComparer.Ordinal)
+    {
+        ConnectionHealth.Healthy,
+        ConnectionHealth.MissingAppCredentials,
+        ConnectionHealth.NotConfigured,
+        ConnectionHealth.NotAuthorized,
+        ConnectionHealth.TokenExpired,
+        ConnectionHealth.ProviderError,
+        ConnectionHealth.NetworkError
+    };
+
     public string Kind => "connection";
 
     public string[] Contracts =>
@@ -121,6 +132,11 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
             }
             health = probeResult.Health;
             detail = probeResult.Detail;
+            if (!KnownHealthValues.Contains(health))
+            {
+                detail = $"invalid health '{health}': {detail}";
+                health = ConnectionHealth.ProviderError;
+            }
         }
 
         var suspended = folded.State == ConnectionState.Suspended;
@@ -154,12 +170,18 @@ public sealed class ConnectionKind(IServiceProvider services) : INeuronKind
     private static ValueTask<KindResult> HandleLeaseTokenAsync(NeuronContext context, string inputJson)
     {
         EnsureWellFormedJson(inputJson);
+        var caller = NeuronAddress.Parse(context.CallerKey);
+        if (caller.NeuronId.StartsWith("session/", StringComparison.Ordinal)
+            || caller.SpaceId != context.Address.SpaceId
+            || caller.OwnerId != context.Address.OwnerId)
+            throw new BrainException(BrainErrors.GrantMissing, $"{context.CallerKey} cannot lease tokens");
+
         var folded = Fold(context.Journal);
         if (folded.State != ConnectionState.Connected || folded.Token is not { } token)
             throw new BrainException(BrainErrors.ConnectionUnhealthy, $"{ConnectionHealth.NotAuthorized}: connection is not connected");
 
         var output = JsonSerializer.Serialize(token, JsonOptions);
-        return ValueTask.FromResult(new KindResult(output, []));
+        return ValueTask.FromResult(new KindResult(output, [], TransientReceipt: true));
     }
 
     private IConnectionProvider RequireProvider(NeuronAddress address)
