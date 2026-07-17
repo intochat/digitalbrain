@@ -13,6 +13,7 @@ public static class BrainErrors
     public const string ModelTimeout = "model.timeout";
     public const string ProviderTimeout = "provider.timeout";
     public const string ProviderError = "provider.error";
+    public const string ConnectionUnhealthy = "connection.unhealthy";
 }
 
 [GenerateSerializer, Alias("brain.exception.v2")]

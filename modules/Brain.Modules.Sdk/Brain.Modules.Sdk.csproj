@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="../../kernel/Brain.Contracts/Brain.Contracts.csproj" />
     <ProjectReference Include="../../kernel/Brain.Kernel/Brain.Kernel.csproj" />
+    <ProjectReference Include="../Brain.Modules.Connections/Brain.Modules.Connections.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.TestingHost" />

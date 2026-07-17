@@ -7,6 +7,7 @@
     <Project Path="modules/Brain.Modules.Workspace/Brain.Modules.Workspace.csproj" />
     <Project Path="modules/Brain.Modules.Ai/Brain.Modules.Ai.csproj" />
     <Project Path="modules/Brain.Modules.Web/Brain.Modules.Web.csproj" />
+    <Project Path="modules/Brain.Modules.Connections/Brain.Modules.Connections.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/DigitalBrain.Features.Sdk/DigitalBrain.Features.Sdk.csproj" />
