@@ -55,6 +55,10 @@ public sealed class WebKind(IHttpClientFactory httpClientFactory) : INeuronKind
         {
             throw new BrainException(BrainErrors.ProviderError, ex.Message);
         }
+        catch (IOException ex)
+        {
+            throw new BrainException(BrainErrors.ProviderError, ex.Message);
+        }
 
         var body = Encoding.UTF8.GetString(buffer, 0, bytesRead);
         var eventPayload = JsonSerializer.Serialize(new

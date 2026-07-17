@@ -50,6 +50,21 @@ public class WebKindTests(BrainClusterFixture<WebKindsConfigurator> fixture)
     }
 
     [Fact]
+    public async Task Stream_read_failure_maps_to_provider_error()
+    {
+        WebKindsConfigurator.Handler.Reset();
+        WebKindsConfigurator.Handler.StreamThrows = new IOException("connection lost");
+
+        var web = Neuron("web", "stream-error");
+        var exception = await Assert.ThrowsAsync<BrainException>(() =>
+            web.InvokeAsync(new("web.fetch.v1", """{"url":"https://example.com/"}""", "cmd-1", OwnerSession)));
+        Assert.Equal(BrainErrors.ProviderError, exception.Code);
+        Assert.Equal(0, (await web.ReadAsync("recent")).Revision);
+
+        WebKindsConfigurator.Handler.Reset();
+    }
+
+    [Fact]
     public async Task Duplicate_command_id_does_not_refetch()
     {
         WebKindsConfigurator.Handler.Reset();
