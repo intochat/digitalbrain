@@ -31,4 +31,45 @@ public class BehaviorCompilerTests
         Assert.False(result.Success);
         Assert.NotEmpty(result.Diagnostics);
     }
+
+    [Fact]
+    public void Compiles_a_real_behavior_body_against_the_brain_api()
+    {
+        var refs = new[]
+        {
+            typeof(Brain.Client.BrainCluster).Assembly.Location,
+            typeof(Brain.Contracts.INeuronContract).Assembly.Location,
+            typeof(Brain.Modules.Workspace.IChat).Assembly.Location,
+        };
+        var source = """
+            using Brain.Client;
+            using Brain.Modules.Workspace;
+            await using var brain = await BrainCluster.Connect(System.Array.Empty<string>());
+            var chat = brain.Get<IChat>("local-owner|behavior/x|behavior/x");
+            await chat.PostAsync(new ChatPost("hi"));
+            """;
+        var result = BehaviorCompiler.Check(source, refs);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+    }
+
+    [Fact]
+    public void Rejects_a_behavior_calling_a_nonexistent_contract_member()
+    {
+        var refs = new[]
+        {
+            typeof(Brain.Client.BrainCluster).Assembly.Location,
+            typeof(Brain.Contracts.INeuronContract).Assembly.Location,
+            typeof(Brain.Modules.Workspace.IChat).Assembly.Location,
+        };
+        var source = """
+            using Brain.Client;
+            using Brain.Modules.Workspace;
+            await using var brain = await BrainCluster.Connect(System.Array.Empty<string>());
+            var chat = brain.Get<IChat>("local-owner|behavior/x|behavior/x");
+            await chat.NoSuchMethodAsync("hi");
+            """;
+        var result = BehaviorCompiler.Check(source, refs);
+        Assert.False(result.Success);
+        Assert.NotEmpty(result.Diagnostics);
+    }
 }
