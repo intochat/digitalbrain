@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using Brain.Contracts;
@@ -84,22 +85,46 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         throw new TimeoutException($"gmail {instance} did not reactivate");
     }
 
-    private static ActivityListener CaptureActivities(List<Activity> sink)
+    private sealed class ActivityCapture : IDisposable
     {
-        var listener = new ActivityListener
+        private readonly ConcurrentBag<Activity> _captured = [];
+        private readonly ActivityListener _listener;
+        private int _disposed;
+
+        public ActivityCapture()
         {
-            ShouldListenTo = static _ => true,
-            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = sink.Add,
-        };
-        ActivitySource.AddActivityListener(listener);
-        return listener;
+            _listener = new ActivityListener
+            {
+                ShouldListenTo = static _ => true,
+                Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+                ActivityStopped = activity =>
+                {
+                    if (Volatile.Read(ref _disposed) == 0)
+                        _captured.Add(activity);
+                },
+            };
+            ActivitySource.AddActivityListener(_listener);
+        }
+
+        public IReadOnlyList<Activity> SnapshotAndStop()
+        {
+            Dispose();
+            return _captured.ToArray();
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
+            _listener.Dispose();
+        }
     }
 
-    private static void AssertNoSecrets(IEnumerable<Activity> activities, params string[] secrets)
+    private static void AssertNoSecrets(IReadOnlyList<Activity> activities, params string[] secrets)
     {
-        foreach (var activity in activities)
+        for (var i = 0; i < activities.Count; i++)
         {
+            var activity = activities[i];
             foreach (var secret in secrets)
             {
                 Assert.DoesNotContain(secret, activity.DisplayName ?? string.Empty, StringComparison.Ordinal);
@@ -451,8 +476,7 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         const string recipient = "a@example.com";
         const string subject = "HelloSecretSubject";
         const string query = "from:boss SECRET_QUERY";
-        var activities = new List<Activity>();
-        using var listener = CaptureActivities(activities);
+        using var capture = new ActivityCapture();
 
         await gmail.ListMessagesAsync(
             new CommandSynapse<GmailListRequest>(Meta(Guid.NewGuid(), instance), new GmailListRequest(query, 5)));
@@ -462,6 +486,7 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
                 new GmailSendRequest(recipient, subject, body)));
         await control.DrainOutboxAsync();
 
-        AssertNoSecrets(activities, body, recipient, subject, query, "token=abc", "oauth", "password");
+        var snapshot = capture.SnapshotAndStop();
+        AssertNoSecrets(snapshot, body, recipient, subject, query, "token=abc", "oauth", "password");
     }
 }
