@@ -8,11 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Azure.Storage" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Brain.Kernel.Host\Brain.Kernel.Host.csproj" />
+    <ProjectReference Include="..\..\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj"
+                      IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj"
+                      IsAspireProjectResource="false" />
   </ItemGroup>
 
 </Project>

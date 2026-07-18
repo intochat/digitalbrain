@@ -10,6 +10,8 @@
     <ProjectReference Include="../../kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <ProjectReference Include="../../kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="../../hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />
+    <ProjectReference Include="../../hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+    <ProjectReference Include="../../integrations/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit" />
@@ -18,5 +20,6 @@
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
   </ItemGroup>
 </Project>

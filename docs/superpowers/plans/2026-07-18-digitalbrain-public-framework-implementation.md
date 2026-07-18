@@ -241,6 +241,8 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 - `tests/DigitalBrain.Tests/Aspire/**`
 - `tests/DigitalBrain.Tests/Security/**`
 
+**Assigned-path amendment:** `Brain.slnx` and `tests/DigitalBrain.Tests/Architecture/ProjectTopologyTests.cs` are required because the new public hosting integration must participate in the active solution immediately rather than remaining an orphan until the later demolition task. `tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj` is required to reference the hosting integration, the active AppHost, and the official Aspire testing package so the assigned resource-model tests can inspect the exact publish-mode model used by the real host. `tests/DigitalBrain.PackageTests/PackageContentTests.cs` is required because adding the fourth packable public package changes the exact package family and permits Aspire hosting dependencies only in `DigitalBrain.Aspire.Hosting`; the existing application-facing dependency guards remain unchanged. `NuGet.config` is required because its broad `Aspire*` source mapping otherwise excludes the approved stable `Aspire.Hosting.OpenAI` `13.4.6` package from NuGet.org; the amendment maps only that exact package ID to NuGet.org. The AppHost uses a synthetic restricted client container because no approved active client project exists before the package-only quickstart task; this resource exists only to exercise the restricted projection in the required publish gate. Discovery uses a dedicated Azure Storage account so the client-visible clustering credential cannot authorize access to privileged grain state, journals, reminders, streams, or outbox data.
+
 **Red tests:**
 
 - `AddDigitalBrain("brain")` creates a `DigitalBrainResource`.
@@ -252,15 +254,15 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 
 **Implementation:**
 
-- [ ] Compose official Orleans and Azure Storage resources.
-- [ ] Create separate Azurite tables/blobs/queues for clustering, reminders, grain storage, journal storage, streams, and durable outbox needs; do not reuse the journal blob as ordinary grain storage.
-- [ ] Configure official `WithClustering`, `WithReminders`, and `WithStreaming` relationships.
-- [ ] Use stable official Aspire OpenAI hosting resources.
-- [ ] Add a minimal Anthropic connection resource with endpoint, secret parameter, and model property.
-- [ ] Implement privileged and client projections.
-- [ ] Add health dependencies and wait relationships.
-- [ ] Add ATS-compatible exported APIs where supported.
-- [ ] Replace the active AppHost's journal-only composition with `AddDigitalBrain`, typed model/embedding declarations, the privileged kernel reference, and at least one restricted test-client reference so the publish gate exercises the real resource.
+- [x] Compose official Orleans and Azure Storage resources.
+- [x] Create separate Azurite tables/blobs/queues for clustering, reminders, grain storage, journal storage, streams, and durable outbox needs; do not reuse the journal blob as ordinary grain storage.
+- [x] Configure official `WithClustering`, `WithReminders`, and `WithStreaming` relationships.
+- [x] Use stable official Aspire OpenAI hosting resources.
+- [x] Add a minimal Anthropic connection resource with endpoint, secret parameter, and model property.
+- [x] Implement privileged and client projections.
+- [x] Add health dependencies and wait relationships.
+- [x] Add ATS-compatible exported APIs where supported.
+- [x] Replace the active AppHost's journal-only composition with `AddDigitalBrain`, typed model/embedding declarations, the privileged kernel reference, and at least one restricted test-client reference so the publish gate exercises the real resource.
 
 **Gates:**
 
@@ -273,6 +275,8 @@ aspire publish --apphost .\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.cspro
 **Review focus:** secret projection, composite resource ownership, provider-resource correctness, and forbidden architecture.
 
 **Commit:** `feat: add DigitalBrain Aspire hosting resource`
+
+**Execution record (2026-07-18):** Baseline HEAD was `42bc11cf37ae20bdf5be1746fa923b8803450f53` on `master`. Exact official API inspection covered Aspire `13.4.6` Orleans, Azure Storage, OpenAI, resource annotations, connection properties, waits, and publish-mode testing. TDD began with the approved missing-type failures; the first restore also exposed the repository's over-broad Aspire package-source mapping, which was narrowed for the exact stable OpenAI hosting package. The public hosting integration now composes separate discovery and privileged durability accounts, distinct reminder, grain-state, journal, stream, and outbox resources, official Orleans clustering/reminder/stream relationships, stable OpenAI resources, an explicit Anthropic connection resource, typed model declarations, and ATS exports. Its privileged reference projects the complete kernel configuration, while its restricted client projection carries only clustering discovery and safe metadata; generated-environment and transitive-reference tests prove that no privileged storage or provider secret crosses that boundary. The active AppHost now uses the composite resource for its kernel and an explicit-start restricted client, and an official testing-builder test inspects that exact publish-mode graph because the Azure publisher correctly emits storage infrastructure but reports that this AppHost has no configured compute environment. Review reproduced and closed shared-account credential exposure, shared OpenAI endpoint mutation, incomplete transitive waits, missing Anthropic connection properties, insufficient ATS metadata, and dependency-allowlist drift. Two independent final follow-up reviews reported no findings. The exact owning gate passed 202 / 202, package tests passed 12 / 12, and the AppHost Release build passed with zero warnings and errors. `aspire doctor --non-interactive` passed 5 / 5 with no warnings or failures. The required publish command succeeded with only expected unset-secret parameter warnings and the no-compute-environment warning, producing distinct discovery and durability storage modules. The final exact root gate passed DigitalBrain.Tests 202 / 202, DigitalBrain.PackageTests 12 / 12, and Brain.FeasibilityTests 11 / 11; one earlier root run had a known transient two-second cancellation-test timeout and its immediate exact rerun passed. AppHost resource inspection correctly reported no running host. CodeGraph blast-radius inspection, exact package graph, zero-comment, assigned-path, `git diff --check`, and generated-artifact cleanup guards passed.
 
 ## Task 5: Add the Aspire client integration
 

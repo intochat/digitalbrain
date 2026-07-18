@@ -17,6 +17,14 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
 
     private static readonly string[] KernelProviderDependencies = ["Anthropic", "OpenAI"];
 
+    private static readonly string[] HostingDependencies =
+    [
+        "Aspire.Hosting",
+        "Aspire.Hosting.Azure.Storage",
+        "Aspire.Hosting.OpenAI",
+        "Aspire.Hosting.Orleans"
+    ];
+
     private static readonly string[] DevToolMarkers = ["Agents", "DevUI", "Dashboard"];
 
     private static readonly string[] ProviderAndJournalMarkers = ["OpenAI", "Anthropic", "Journaling"];
@@ -25,7 +33,12 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
     public void Packable_projects_are_exactly_the_public_framework_packages()
     {
         Assert.Equal(
-            ["DigitalBrain.Abstractions", "DigitalBrain.Client", "DigitalBrain.Kernel"],
+            [
+                "DigitalBrain.Abstractions",
+                "DigitalBrain.Aspire.Hosting",
+                "DigitalBrain.Client",
+                "DigitalBrain.Kernel"
+            ],
             fixture.PackageIds);
     }
 
@@ -123,6 +136,8 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
                 Assert.True(
                     AllowedDependencyPrefixes.Any(prefix =>
                         dependencyId.StartsWith(prefix, StringComparison.Ordinal)) ||
+                    packageId == "DigitalBrain.Aspire.Hosting" &&
+                    HostingDependencies.Contains(dependencyId, StringComparer.Ordinal) ||
                     packageId == "DigitalBrain.Kernel" &&
                     KernelProviderDependencies.Contains(dependencyId, StringComparer.Ordinal),
                     $"{packageId} depends on unexpected package {dependencyId}.");
@@ -153,6 +168,21 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
         var dependencyIds = DependencyIds(ReadNuspec(package, "DigitalBrain.Client"));
 
         Assert.Contains("DigitalBrain.Abstractions", dependencyIds);
+    }
+
+    [Fact]
+    public void Aspire_hosting_package_depends_only_on_abstractions_inside_the_public_graph()
+    {
+        using var package = ZipFile.OpenRead(fixture.PackagePath("DigitalBrain.Aspire.Hosting"));
+        var dependencyIds = DependencyIds(ReadNuspec(package, "DigitalBrain.Aspire.Hosting"));
+
+        Assert.Equal(
+            ["DigitalBrain.Abstractions"],
+            dependencyIds
+                .Where(dependencyId =>
+                    dependencyId.StartsWith("DigitalBrain.", StringComparison.Ordinal))
+                .Order(StringComparer.Ordinal)
+                .ToArray());
     }
 
     [Fact]

@@ -4,6 +4,9 @@
     <Project Path="kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </Folder>
+  <Folder Name="/integrations/">
+    <Project Path="integrations/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </Folder>
   <Folder Name="/modules/">
     <Project Path="modules/Google.Contracts/Google.Contracts.csproj" />
     <Project Path="modules/Google/Google.csproj" />

@@ -1,12 +1,23 @@
 using Aspire.Hosting;
+using DigitalBrain;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var storage = builder.AddAzureStorage("storage").RunAsEmulator();
-var journal = storage.AddBlobs("journal");
+var brain = builder.AddDigitalBrain("brain")
+    .WithLLM<GptFast>().AsFast()
+    .WithLLM<ClaudeBalanced>().AsBalanced()
+    .WithLLM<GptReasoning>().AsReasoning()
+    .WithEmbedding<TextEmbedding>();
 
-builder.AddProject<Projects.Brain_Kernel_Host>("kernel")
-    .WithReference(journal)
-    .WaitFor(storage);
+var kernel = builder.AddProject<Projects.Brain_Kernel_Host>("kernel")
+    .WithReference(brain);
+
+builder.AddContainer(
+        "restricted-client",
+        "mcr.microsoft.com/dotnet/runtime",
+        "8.0")
+    .WithReference(brain.AsClient())
+    .WaitFor(kernel)
+    .WithExplicitStart();
 
 builder.Build().Run();
