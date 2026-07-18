@@ -77,15 +77,12 @@ public sealed class TypedNeuronTools(ITypedNeuronAccess neurons, ITypedCommandPa
         [Description("Salesforce instance id")] string instanceId,
         [Description("Object type")] string objectType,
         [Description("Record id")] string recordId,
-        [Description("Field map as key=value pairs joined by ;")] string fields)
+        [Description("Typed field map")] IReadOnlyDictionary<string, string> fields)
     {
-        var map = fields
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(part => part.Split('=', 2, StringSplitOptions.TrimEntries))
-            .Where(parts => parts.Length == 2)
-            .ToDictionary(parts => parts[0], parts => parts[1]);
         var source = Source("salesforce.v1", instanceId);
-        var command = commandPath.CreateCommand(new SalesforceUpdateRequest(objectType, recordId, map), source);
+        var command = commandPath.CreateCommand(
+            new SalesforceUpdateRequest(objectType, recordId, fields),
+            source);
         return neurons.UpdateSalesforceRecordAsync(instanceId, command);
     }
 

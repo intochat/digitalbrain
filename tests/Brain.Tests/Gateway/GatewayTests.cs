@@ -11,14 +11,9 @@ public sealed class GatewayTests
     public async Task Ui_action_calls_surface_owner_with_expected_revision()
     {
         var owner = new RecordingSurfaceOwner();
-        var gateway = new UiGatewayService(owner);
-        var source = new NeuronAddress(
-            DevelopmentPrincipal.OrganizationId,
-            DevelopmentPrincipal.SpaceId,
-            "chat.group.v1",
-            "chat-1");
-
-        var receipt = await gateway.ApplyUiActionAsync("approve-reply", expectedRevision: 7, source);
+        var resolver = new FixedSurfaceOwnerResolver(owner);
+        var gateway = new UiGatewayService(resolver);
+        var receipt = await gateway.ApplyUiActionAsync("chat.group.v1", "chat-1", "approve-reply", expectedRevision: 7);
 
         Assert.Equal(CommandReceiptStatus.Accepted, receipt.Status);
         Assert.NotNull(owner.LastAction);
@@ -36,7 +31,7 @@ public sealed class GatewayTests
         var live = new OrderingLiveFeed(calls);
         var durable = new OrderingDurableFeed(calls, []);
         var owner = new RecordingSurfaceOwner();
-        var session = new UiFeedSession(live, durable, owner, lastKnownRevision: 0);
+        await using var session = new UiFeedSession(live, durable, owner, lastKnownRevision: 0);
 
         await session.ReconnectAsync();
 
@@ -54,7 +49,7 @@ public sealed class GatewayTests
         var live = new BufferingLiveFeed([buffered]);
         var durable = new StaticDurableFeed([pagedDuplicate, pagedUnique]);
         var owner = new RecordingSurfaceOwner();
-        var session = new UiFeedSession(live, durable, owner, lastKnownRevision: 1);
+        await using var session = new UiFeedSession(live, durable, owner, lastKnownRevision: 1);
 
         var result = await session.ReconnectAsync();
 
@@ -78,7 +73,7 @@ public sealed class GatewayTests
         {
             Snapshot = new UiSurfaceSnapshot(new UiSurface("group-chat", 10, [new UiBlock("text", "restored", [])]))
         };
-        var session = new UiFeedSession(live, durable, owner, lastKnownRevision: 3);
+        await using var session = new UiFeedSession(live, durable, owner, lastKnownRevision: 3);
 
         var result = await session.ReconnectAsync();
 
@@ -108,6 +103,11 @@ public sealed class GatewayTests
 
     private static UiSurfacePatch Patch(long from, long to) =>
         new("group-chat", from, to, [new UiPatchOperation("replace", "/blocks/0/text", "x")]);
+}
+
+internal sealed class FixedSurfaceOwnerResolver(ISurfaceOwner owner) : ISurfaceOwnerResolver
+{
+    public ISurfaceOwner Resolve(string contractId, string instanceId) => owner;
 }
 
 internal sealed class RecordingSurfaceOwner : ISurfaceOwner
@@ -142,6 +142,8 @@ internal sealed class OrderingLiveFeed(List<string> calls) : ILiveFeedSubscripti
         calls.Add("subscribe");
         return Task.CompletedTask;
     }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 internal sealed class OrderingDurableFeed(List<string> calls, IReadOnlyList<FeedEvent> page) : IDurableFeed
@@ -160,6 +162,8 @@ internal sealed class BufferingLiveFeed(IReadOnlyList<FeedEvent> buffered) : ILi
         foreach (var evt in buffered)
             await onEvent(evt);
     }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 internal sealed class StaticDurableFeed(IReadOnlyList<FeedEvent> page) : IDurableFeed

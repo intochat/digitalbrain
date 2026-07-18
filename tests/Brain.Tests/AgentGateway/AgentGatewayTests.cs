@@ -9,8 +9,8 @@ public sealed class AgentGatewayTests
     [Fact]
     public void AgentGateway_uses_Orleans_client_reference()
     {
-        var adapterType = typeof(TypedNeuronAgentAdapter);
-        var ctor = adapterType.GetConstructors().Single();
+        var chatClientType = typeof(GroupChatNeuronChatClient);
+        var ctor = chatClientType.GetConstructors().Single();
         Assert.Contains(ctor.GetParameters(), parameter => parameter.ParameterType.Name is "IClusterClient");
 
         var sourceRoot = Path.GetFullPath(Path.Combine(
@@ -19,8 +19,10 @@ public sealed class AgentGatewayTests
 
         var sources = Directory.EnumerateFiles(sourceRoot, "*.cs").Select(File.ReadAllText).ToList();
         Assert.Contains(sources, source => source.Contains("IClusterClient", StringComparison.Ordinal));
+        Assert.Contains(sources, source => source.Contains("UseOrleansClient", StringComparison.Ordinal));
         Assert.Contains(sources, source => source.Contains("Microsoft.Agents.AI.DevUI", StringComparison.Ordinal));
         Assert.Contains(sources, source => source.Contains("MapDevUI", StringComparison.Ordinal));
+        Assert.Contains(sources, source => source.Contains("AddAIAgent", StringComparison.Ordinal));
     }
 
     [Fact]

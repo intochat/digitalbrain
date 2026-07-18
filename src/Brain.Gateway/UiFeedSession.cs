@@ -6,14 +6,16 @@ public sealed class UiFeedSession(
     ILiveFeedSubscription liveFeed,
     IDurableFeed durableFeed,
     ISurfaceOwner surfaceOwner,
-    long lastKnownRevision)
+    long lastKnownRevision) : IAsyncDisposable
 {
     private readonly Dictionary<Guid, FeedEvent> _liveBuffer = new();
     private readonly object _gate = new();
     private long _revision = lastKnownRevision;
+    private bool _disposed;
 
     public async Task<ReconnectResult> ReconnectAsync(int pageSize = 100, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         await liveFeed.SubscribeAsync(OnLiveEventAsync, cancellationToken);
         var page = await durableFeed.ReadPageAsync(_revision, pageSize, cancellationToken);
         return await MergeAsync(page);
@@ -34,24 +36,45 @@ public sealed class UiFeedSession(
 
         var merged = new List<FeedEvent>();
         var seen = new HashSet<Guid>();
+        var cursor = _revision;
 
-        foreach (var evt in liveSnapshot.Concat(page).OrderBy(e => e.Revision))
+        foreach (var evt in liveSnapshot.Concat(page).OrderBy(e => e.Revision).ThenBy(e => e.EventId))
         {
             if (!seen.Add(evt.EventId))
                 continue;
 
-            if (evt.Patch is not null && evt.Patch.FromRevision > _revision)
+            if (evt.Revision <= cursor)
+                continue;
+
+            if (evt.Patch is not null)
             {
-                var snapshot = await surfaceOwner.GetSurfaceAsync();
-                _revision = snapshot.Surface.Revision;
-                return new ReconnectResult([], snapshot, _revision);
+                if (evt.Patch.FromRevision < cursor)
+                    continue;
+
+                if (evt.Patch.FromRevision > cursor)
+                {
+                    var snapshot = await surfaceOwner.GetSurfaceAsync();
+                    cursor = snapshot.Surface.Revision;
+                    _revision = cursor;
+                    return new ReconnectResult([], snapshot, cursor);
+                }
             }
 
             merged.Add(evt);
-            _revision = evt.Revision;
+            if (evt.Revision > cursor)
+                cursor = evt.Revision;
         }
 
-        return new ReconnectResult(merged, null, _revision);
+        _revision = cursor;
+        return new ReconnectResult(merged, null, cursor);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        await liveFeed.DisposeAsync();
     }
 }
 
