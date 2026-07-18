@@ -95,11 +95,15 @@ public sealed class AnthropicProviderClientTests
     [Fact]
     public async Task Cancellation_reaches_the_official_HTTP_transport()
     {
+        var transportEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         var observedCancellation = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new ProviderTestHttpHandler(async (_, cancellationToken) =>
         {
-            using var registration = cancellationToken.Register(() => observedCancellation.SetResult());
+            transportEntered.TrySetResult();
+            using var registration = cancellationToken.Register(
+                () => observedCancellation.TrySetResult());
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             throw new InvalidOperationException();
         });
@@ -109,12 +113,14 @@ public sealed class AnthropicProviderClientTests
             "claude-sonnet-4-5",
             NullLoggerFactory.Instance,
             httpClient);
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+        using var cancellation = new CancellationTokenSource();
+        var response = client.GetResponseAsync(
+            [new AIChatMessage(ChatRole.User, "hello")],
+            cancellationToken: cancellation.Token);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            client.GetResponseAsync(
-                [new AIChatMessage(ChatRole.User, "hello")],
-                cancellationToken: cancellation.Token));
+        await transportEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => response);
 
         await observedCancellation.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.Single(handler.Requests);

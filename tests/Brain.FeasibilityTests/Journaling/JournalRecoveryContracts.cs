@@ -11,6 +11,15 @@ public interface IJournalRecoveryGrain : IGrainWithStringKey
 
     [Alias(nameof(CommitIntentThenExternalEffectAsync))]
     Task CommitIntentThenExternalEffectAsync(int nextCounter);
+
+    [Alias(nameof(SchedulePendingWorkAsync))]
+    Task SchedulePendingWorkAsync();
+
+    [Alias(nameof(SchedulePendingWorkAndFailAfterCommitAsync))]
+    Task SchedulePendingWorkAndFailAfterCommitAsync();
+
+    [Alias(nameof(HasPendingWorkReminderAsync))]
+    Task<bool> HasPendingWorkReminderAsync();
 }
 
 [GenerateSerializer]
@@ -19,7 +28,12 @@ public sealed record JournalRecoverySnapshot(
     [property: Id(0)] int Counter,
     [property: Id(1)] Dictionary<Guid, string> Map,
     [property: Id(2)] List<Guid> Queue,
-    [property: Id(3)] List<string> List);
+    [property: Id(3)] List<string> List,
+    [property: Id(4)] bool PendingReminderWork,
+    [property: Id(5)] int ReminderRecoveryCount,
+    [property: Id(6)] string ReminderRecoveryInstanceId);
+
+public sealed record JournalRecoveryClusterInstance(string Id);
 
 public static class JournalRecoveryExternalEffectProbe
 {

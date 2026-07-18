@@ -241,6 +241,65 @@ public sealed class NeuronOutboxTests
     }
 
     [Fact]
+    public async Task Streams_deliver_committed_notifications_but_cannot_mutate_authority()
+    {
+        await using var cluster = await OutboxCluster.CreateAsync();
+        using var owner = OwnerContext.Push("owner-stream-authority");
+        var operationId = Guid.Parse("b6c8bbad-0102-4aca-9fd1-6d89d7756578");
+        var forgedOperationId = Guid.Parse("0ccdc168-b6a4-4961-a28c-1232fc3b5d58");
+        var neuron = cluster.GrainFactory.GetGrain<ITestNeuron>("owner-stream-authority");
+        var received = new ConcurrentBag<NeuronNotification>();
+        var stream = cluster.Client
+            .GetStreamProvider(nameof(NeuronNotification))
+            .GetStream<NeuronNotification>(
+                StreamId.Create(
+                    nameof(NeuronNotification),
+                    "owner-stream-authority"));
+        var handle = await stream.SubscribeAsync((notification, _) =>
+        {
+            received.Add(notification);
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            await neuron.ExecuteTestExternalAsync(
+                operationId,
+                TestExternalMode.Succeed);
+            await WaitUntilAsync(
+                () => received.Any(item => item.OperationId == operationId),
+                TimeSpan.FromSeconds(10));
+
+            var committed = await neuron.ReadOperationAsync(operationId);
+            Assert.NotNull(committed);
+            Assert.Equal(ExternalOperationStatus.Succeeded, committed.Status);
+            Assert.Empty(await neuron.ListOutboxAsync());
+            var statusBeforeForgedDelivery = await neuron.ReadStatusAsync();
+
+            var forged = new NeuronNotification(
+                Guid.Parse("63ad30bd-b4e6-4552-804b-f08bb8a5cc97"),
+                forgedOperationId,
+                NotificationDeliveryStatus.Completed,
+                AttemptCount: 1);
+            await stream.OnNextAsync(forged);
+            await WaitUntilAsync(
+                () => received.Any(
+                    item => item.OperationId == forgedOperationId),
+                TimeSpan.FromSeconds(10));
+
+            Assert.Null(await neuron.ReadOperationAsync(forgedOperationId));
+            Assert.Equal(
+                statusBeforeForgedDelivery,
+                await neuron.ReadStatusAsync());
+            Assert.Empty(await neuron.ListOutboxAsync());
+        }
+        finally
+        {
+            await handle.UnsubscribeAsync();
+        }
+    }
+
+    [Fact]
     public void Stream_provider_name_is_derived_with_nameof_NeuronNotification()
     {
         Assert.Equal(nameof(NeuronNotification), NeuronNotificationPublisher.StreamProviderName);

@@ -8,12 +8,16 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="Microsoft.Orleans.Streaming.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" />

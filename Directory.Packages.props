@@ -19,6 +19,7 @@
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.4.6" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.4.6" />
 
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.4.0" />

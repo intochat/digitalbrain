@@ -325,10 +325,15 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 
 **Assigned paths:**
 
+- `Directory.Packages.props`
+- `nuget.config`
 - `kernel/DigitalBrain.Kernel/**`
 - `hosts/Brain.Kernel.Host/**`
+- `tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj`
 - `tests/DigitalBrain.Tests/Kernel/**`
 - `tests/Brain.FeasibilityTests/Journaling/**`
+- `tests/DigitalBrain.PackageTests/PackageContentTests.cs`
+- `tests/DigitalBrain.Tests/AI/AnthropicProviderClientTests.cs`
 
 **Red tests:**
 
@@ -341,12 +346,12 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 
 **Implementation:**
 
-- [ ] Wire the renamed public kernel package.
-- [ ] Preserve official Orleans journaling and Azure Storage.
-- [ ] Remove `UseLocalhostClustering`, in-memory reminder registration, and any volatile production journal path from production hosts.
-- [ ] Consume the AppHost-projected Orleans clustering, reminder, stream, grain-storage, and distinct journal-storage configuration.
-- [ ] Bind typed model roles to kernel services.
-- [ ] Preserve owner filters, operation ledger, outbox, reminders, and stream semantics.
+- [x] Wire the renamed public kernel package.
+- [x] Preserve official Orleans journaling and Azure Storage.
+- [x] Remove `UseLocalhostClustering`, in-memory reminder registration, and any volatile production journal path from production hosts.
+- [x] Consume the AppHost-projected Orleans clustering, reminder, stream, grain-storage, and distinct journal-storage configuration.
+- [x] Bind typed model roles to kernel services.
+- [x] Preserve owner filters, operation ledger, outbox, reminders, and stream semantics.
 
 **Gates:**
 
@@ -359,6 +364,8 @@ dotnet build .\Brain.slnx -c Release
 **Review focus:** durability authority, recovery, idempotency, stream semantics, and production storage.
 
 **Commit:** `feat: expose the durable DigitalBrain kernel`
+
+**Execution record (2026-07-18):** Baseline HEAD was `ea909c9311bdebd726da50305e99113f1a62069f` on `master`. The assigned paths were amended before commit to include central package/source mapping, the feasibility project, the package dependency allowlist, and the synchronized Anthropic cancellation regression required by the root gate. Current Orleans `10.2.2-rc.2`, Aspire `13.4.6`, Azure SDK metadata, restored assemblies, and official source confirmed that `UseOrleans` applies the projected clustering, reminder, default grain-storage, and named stream providers; the kernel therefore adds only the distinct Azure Blob journal and `PubSubStore` composition explicitly. TDD covered the missing public registration, absent/malformed/ambiently redirected storage, exact and case-insensitive service-key collisions, missing `PubSubStore`, production journal selection, real stream delivery without stream authority, and reminder restart recovery. The public host now consumes only the privileged AppHost projection, registers official keyed Table/Blob/Queue clients, validates SDK-compatible connection strings and secure service URIs without exposing credentials, rejects stale ambient redirects and storage aliases, preserves a journal container/client distinct from grain state, binds typed AI roles, and contains no localhost, in-memory reminder, or volatile journal fallback. Azurite-backed feasibility tests start and stop the complete production kernel with the official Orleans providers, recover journaled values, maps, queues, lists, reminders, and execution identity across silo restarts, prove reminder removal, and prove a post-commit scheduling failure cannot strand durable work; the official cross-process port allocator removes endpoint bind races. Three independent final reviews reported no actionable boundary, durability, startup, or stream-authority findings. The exact gates passed Brain.FeasibilityTests 13 / 13, DigitalBrain.Tests 226 / 226, and the Release solution build with zero warnings or errors. The final exact root checkpoint passed DigitalBrain.Tests 226 / 226, DigitalBrain.PackageTests 13 / 13, and Brain.FeasibilityTests 13 / 13. `aspire doctor` passed 5 / 5 with no warnings or failures, and resource inspection correctly reported that no AppHost was running. Final CodeGraph blast-radius inspection, forbidden-fallback and added-comment scans, `git diff --check`, package-boundary checks, and generated-artifact cleanup checks passed.
 
 ## Task 7: Add optional development tools
 

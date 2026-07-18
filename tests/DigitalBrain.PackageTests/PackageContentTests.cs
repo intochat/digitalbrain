@@ -15,7 +15,14 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
         "Microsoft.Extensions."
     ];
 
-    private static readonly string[] KernelProviderDependencies = ["Anthropic", "OpenAI"];
+    private static readonly string[] KernelExternalDependencies =
+    [
+        "Anthropic",
+        "Aspire.Azure.Data.Tables",
+        "Aspire.Azure.Storage.Blobs",
+        "Aspire.Azure.Storage.Queues",
+        "OpenAI"
+    ];
 
     private static readonly string[] HostingDependencies =
     [
@@ -165,7 +172,7 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
                           packageId == "DigitalBrain.Aspire.Hosting" &&
                           HostingDependencies.Contains(dependencyId, StringComparer.Ordinal) ||
                           packageId == "DigitalBrain.Kernel" &&
-                          KernelProviderDependencies.Contains(dependencyId, StringComparer.Ordinal),
+                          KernelExternalDependencies.Contains(dependencyId, StringComparer.Ordinal),
                     $"{packageId} depends on unexpected package {dependencyId}.");
                 Assert.All(DevToolMarkers, marker =>
                     Assert.DoesNotContain(marker, dependencyId, StringComparison.OrdinalIgnoreCase));
