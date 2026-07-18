@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DigitalBrain</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <Description>Runtime Aspire integration for provider-neutral DigitalBrain Orleans clients, owner sessions, validation, health checks, and telemetry.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../assets/nuget/icon.png" Pack="true" PackagePath="/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+  </ItemGroup>
+</Project>

@@ -282,10 +282,15 @@ aspire publish --apphost .\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.cspro
 
 **Assigned paths:**
 
+- `Brain.slnx`
 - `integrations/DigitalBrain.Aspire/**`
 - `kernel/DigitalBrain.Client/**`
+- `tests/DigitalBrain.PackageTests/DotnetCli.cs`
+- `tests/DigitalBrain.PackageTests/PackageContentTests.cs`
+- `tests/DigitalBrain.Tests/Architecture/ProjectTopologyTests.cs`
 - `tests/DigitalBrain.Tests/Client/**`
 - `tests/DigitalBrain.Tests/Aspire/**`
+- `tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj`
 
 **Red tests:**
 
@@ -299,12 +304,12 @@ aspire publish --apphost .\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.cspro
 
 **Implementation:**
 
-- [ ] Implement the conventional `IHostApplicationBuilder` integration.
-- [ ] Consume `ConnectionStrings:brain` or the official Orleans client configuration emitted by Aspire.
-- [ ] Register typed public Orleans-proxied clients, the owner-session factory, and provider-neutral telemetry.
-- [ ] Implement fast, balanced, and reasoning client types only as non-grain helpers that set `ConversationRole` and call `IConversationNeuron.SubmitTurnAsync`; do not add a second chat/provider path.
-- [ ] Avoid keyed provider DI.
-- [ ] Do not reference OpenAI or Anthropic SDK packages from `DigitalBrain.Aspire` or `DigitalBrain.Client`.
+- [x] Implement the conventional `IHostApplicationBuilder` integration.
+- [x] Consume `ConnectionStrings:brain` or the official Orleans client configuration emitted by Aspire.
+- [x] Register typed public Orleans-proxied clients, the owner-session factory, and provider-neutral telemetry.
+- [x] Implement fast, balanced, and reasoning client types only as non-grain helpers that set `ConversationRole` and call `IConversationNeuron.SubmitTurnAsync`; do not add a second chat/provider path.
+- [x] Avoid keyed provider DI.
+- [x] Do not reference OpenAI or Anthropic SDK packages from `DigitalBrain.Aspire` or `DigitalBrain.Client`.
 
 **Gate:**
 
@@ -313,6 +318,8 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 ```
 
 **Commit:** `feat: add DigitalBrain Aspire client integration`
+
+**Execution record (2026-07-18):** Baseline HEAD was `86343ca528576cd28a4a233208068b3be1a4c120` on `master`. Context7 was attempted first but its monthly quota was exhausted, so exact API work used current Microsoft documentation, Aspire `13.4.6` and Orleans `10.2.2-rc.2` source and XML metadata, and the restored package assemblies. TDD began with missing host integration, options, and role-facade failures. The new runtime package consumes the exact restricted `Orleans` and `DigitalBrain:Client` projection from Task 4, or synthesizes deterministic cluster metadata for a direct `ConnectionStrings:<name>` registration, while using the same official keyed Azure Tables and Orleans provider path for both storage connection strings and HTTP(S) service URIs. Startup validation fails closed for missing, malformed, partial, mismatched, or unsupported configuration without exposing credentials. The client registers owner-bound sessions, provider-neutral role helpers, activity propagation, traces, metrics, Azure Tables health, and a per-host Orleans connection observer without global mutable host state or a public health-control surface. Package and DI tests prove the client graph excludes provider, embedding, kernel, journaling, and reminder services; application-facing packages now have exact direct-dependency allowlists, and `DigitalBrain.Aspire` has only `DigitalBrain.Client` inside the public graph. The package gate exposed an MSBuild node-reuse worker retaining redirected output; disabling node reuse in its local CLI harness removed the leak and reduced the exact gate to a deterministic completion. Two independent follow-up reviews reported no findings after closing service-URI validation, DI-purity coverage, dependency-allowlist breadth, and health-surface findings. The exact owning gate passed 215 / 215, package tests passed 13 / 13 including isolated empty-cache consumer restore, and the final exact root gate passed DigitalBrain.Tests 215 / 215, DigitalBrain.PackageTests 13 / 13, and Brain.FeasibilityTests 11 / 11. `aspire doctor --non-interactive` passed 5 / 5 with no warnings or failures, and AppHost resource inspection correctly reported no running host. CodeGraph blast-radius inspection, zero-comment, assigned-path, `git diff --check`, and generated-artifact cleanup guards passed.
 
 ## Task 6: Integrate the public kernel host with official durability
 

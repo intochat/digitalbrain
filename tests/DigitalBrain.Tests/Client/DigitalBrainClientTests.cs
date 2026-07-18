@@ -23,6 +23,46 @@ public sealed class DigitalBrainClientTests
     }
 
     [Fact]
+    public async Task Session_factory_resolves_from_DI_and_creates_owner_bound_scoped_clients()
+    {
+        await using var cluster = await OwnerBoundClientCluster.CreateAsync();
+        var sessions = cluster.Client.ServiceProvider
+            .GetRequiredService<DigitalBrainSessionFactory>();
+
+        await using (var first = sessions.Create(new BrainOwnerId("owner-a")))
+        {
+            Assert.Equal(
+                "owner-a",
+                first.Client.Get<ITestNeuron>().GetPrimaryKeyString());
+        }
+
+        await using var second = sessions.Create(new BrainOwnerId("owner-b"));
+        Assert.Equal(
+            "owner-b",
+            second.Client.Get<ITestNeuron>().GetPrimaryKeyString());
+    }
+
+    [Fact]
+    public async Task Conversation_and_role_facades_are_backed_by_an_Orleans_proxy()
+    {
+        await using var cluster = await OwnerBoundClientCluster.CreateAsync();
+        var sessions = cluster.Client.ServiceProvider
+            .GetRequiredService<DigitalBrainSessionFactory>();
+        await using var session = sessions.Create(new BrainOwnerId("owner-a"));
+        var conversationId = new ConversationId("conversation-a");
+
+        var conversation = session.Client.Conversations.Open(conversationId);
+
+        Assert.IsAssignableFrom<IAddressable>(conversation);
+        Assert.IsType<FastConversationClient>(
+            session.Client.Conversations.Fast(conversationId));
+        Assert.IsType<BalancedConversationClient>(
+            session.Client.Conversations.Balanced(conversationId));
+        Assert.IsType<ReasoningConversationClient>(
+            session.Client.Conversations.Reasoning(conversationId));
+    }
+
+    [Fact]
     public void Client_source_contains_no_proxy_reflection_json_or_address_routing()
     {
         var clientDirectory = FindRepositoryDirectory("kernel", "DigitalBrain.Client");
@@ -66,6 +106,7 @@ file static class OwnerBoundClientCluster
     {
         var builder = new TestClusterBuilder();
         builder.AddSiloBuilderConfigurator<OwnerBoundSiloConfigurator>();
+        builder.AddClientBuilderConfigurator<OwnerBoundClientConfigurator>();
         var cluster = builder.Build();
         await cluster.DeployAsync();
         return cluster;
@@ -79,5 +120,13 @@ file static class OwnerBoundClientCluster
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
             siloBuilder.AddBrainKernel();
         }
+    }
+
+    private sealed class OwnerBoundClientConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(
+            Microsoft.Extensions.Configuration.IConfiguration configuration,
+            IClientBuilder clientBuilder) =>
+            clientBuilder.AddDigitalBrainClient();
     }
 }

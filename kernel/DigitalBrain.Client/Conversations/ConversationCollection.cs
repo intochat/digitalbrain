@@ -13,4 +13,13 @@ public sealed class ConversationCollection
 
     public IConversationNeuron Open(ConversationId conversationId) =>
         _clusterClient.GetGrain<IConversationNeuron>(ConversationKey.Encode(_owner, conversationId));
+
+    public FastConversationClient Fast(ConversationId conversationId) =>
+        new(Open(conversationId));
+
+    public BalancedConversationClient Balanced(ConversationId conversationId) =>
+        new(Open(conversationId));
+
+    public ReasoningConversationClient Reasoning(ConversationId conversationId) =>
+        new(Open(conversationId));
 }

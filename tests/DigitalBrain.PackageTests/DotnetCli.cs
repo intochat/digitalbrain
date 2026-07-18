@@ -18,6 +18,7 @@ internal static class DotnetCli
         };
         foreach (var argument in arguments)
             startInfo.ArgumentList.Add(argument);
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         if (environment is not null)
             foreach (var (name, value) in environment)
                 startInfo.Environment[name] = value;

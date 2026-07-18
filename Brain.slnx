@@ -5,6 +5,7 @@
     <Project Path="kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </Folder>
   <Folder Name="/integrations/">
+    <Project Path="integrations/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="integrations/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/modules/">

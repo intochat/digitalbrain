@@ -29,12 +29,36 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
 
     private static readonly string[] ProviderAndJournalMarkers = ["OpenAI", "Anthropic", "Journaling"];
 
+    private static readonly IReadOnlyDictionary<string, string[]> ApplicationFacingDependencies =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["DigitalBrain.Abstractions"] =
+            [
+                "Microsoft.Orleans.Core.Abstractions",
+                "Microsoft.Orleans.Sdk"
+            ],
+            ["DigitalBrain.Aspire"] =
+            [
+                "Aspire.Azure.Data.Tables",
+                "DigitalBrain.Client",
+                "Microsoft.Extensions.Diagnostics.HealthChecks",
+                "Microsoft.Orleans.Clustering.AzureStorage",
+                "OpenTelemetry.Extensions.Hosting"
+            ],
+            ["DigitalBrain.Client"] =
+            [
+                "DigitalBrain.Abstractions",
+                "Microsoft.Orleans.Client"
+            ]
+        };
+
     [Fact]
     public void Packable_projects_are_exactly_the_public_framework_packages()
     {
         Assert.Equal(
             [
                 "DigitalBrain.Abstractions",
+                "DigitalBrain.Aspire",
                 "DigitalBrain.Aspire.Hosting",
                 "DigitalBrain.Client",
                 "DigitalBrain.Kernel"
@@ -134,12 +158,14 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
             Assert.All(dependencyIds, dependencyId =>
             {
                 Assert.True(
-                    AllowedDependencyPrefixes.Any(prefix =>
-                        dependencyId.StartsWith(prefix, StringComparison.Ordinal)) ||
-                    packageId == "DigitalBrain.Aspire.Hosting" &&
-                    HostingDependencies.Contains(dependencyId, StringComparer.Ordinal) ||
-                    packageId == "DigitalBrain.Kernel" &&
-                    KernelProviderDependencies.Contains(dependencyId, StringComparer.Ordinal),
+                    ApplicationFacingDependencies.TryGetValue(packageId, out var exactDependencies)
+                        ? exactDependencies.Contains(dependencyId, StringComparer.Ordinal)
+                        : AllowedDependencyPrefixes.Any(prefix =>
+                            dependencyId.StartsWith(prefix, StringComparison.Ordinal)) ||
+                          packageId == "DigitalBrain.Aspire.Hosting" &&
+                          HostingDependencies.Contains(dependencyId, StringComparer.Ordinal) ||
+                          packageId == "DigitalBrain.Kernel" &&
+                          KernelProviderDependencies.Contains(dependencyId, StringComparer.Ordinal),
                     $"{packageId} depends on unexpected package {dependencyId}.");
                 Assert.All(DevToolMarkers, marker =>
                     Assert.DoesNotContain(marker, dependencyId, StringComparison.OrdinalIgnoreCase));
@@ -150,11 +176,14 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
     [Fact]
     public void Application_facing_packages_have_no_provider_or_journal_dependency()
     {
-        foreach (var packageId in new[] { "DigitalBrain.Abstractions", "DigitalBrain.Client" })
+        foreach (var (packageId, exactDependencies) in ApplicationFacingDependencies)
         {
             using var package = ZipFile.OpenRead(fixture.PackagePath(packageId));
             var dependencyIds = DependencyIds(ReadNuspec(package, packageId));
 
+            Assert.Equal(
+                exactDependencies.Order(StringComparer.Ordinal),
+                dependencyIds.Order(StringComparer.Ordinal));
             Assert.All(dependencyIds, dependencyId =>
                 Assert.All(ProviderAndJournalMarkers, marker =>
                     Assert.DoesNotContain(marker, dependencyId, StringComparison.OrdinalIgnoreCase)));
@@ -178,6 +207,21 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
 
         Assert.Equal(
             ["DigitalBrain.Abstractions"],
+            dependencyIds
+                .Where(dependencyId =>
+                    dependencyId.StartsWith("DigitalBrain.", StringComparison.Ordinal))
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+    }
+
+    [Fact]
+    public void Aspire_client_package_depends_only_on_the_client_inside_the_public_graph()
+    {
+        using var package = ZipFile.OpenRead(fixture.PackagePath("DigitalBrain.Aspire"));
+        var dependencyIds = DependencyIds(ReadNuspec(package, "DigitalBrain.Aspire"));
+
+        Assert.Equal(
+            ["DigitalBrain.Client"],
             dependencyIds
                 .Where(dependencyId =>
                     dependencyId.StartsWith("DigitalBrain.", StringComparison.Ordinal))
