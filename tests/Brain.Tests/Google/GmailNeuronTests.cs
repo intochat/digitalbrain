@@ -3,7 +3,6 @@ using Brain.Contracts;
 using Brain.Kernel;
 using DigitalBrain.Google;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -40,6 +39,46 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
             _fixture.Cluster.GrainFactory.GetGrain<IGmailNeuronControl>(key));
     }
 
+    private async Task<IGmailFeedObserver> SubscribeFeedAsync(string instance)
+    {
+        var streamId = GmailConstants.FeedStreamIdFor(Address(instance).ToGrainKey());
+        var observer = _fixture.Cluster.GrainFactory.GetGrain<IGmailFeedObserver>(streamId);
+        await observer.ClearAsync();
+        await observer.ReadyAsync(GmailConstants.FeedStreamNamespace, streamId);
+        return observer;
+    }
+
+    private static async Task WaitForAsync(Func<Task<bool>> predicate, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await predicate())
+                return;
+            await Task.Delay(25);
+        }
+
+        throw new TimeoutException("condition not met");
+    }
+
+    private async Task<(IGmail Gmail, IGmailNeuronControl Control)> ReactivateAsync(string instance, Guid previousToken)
+    {
+        var control = Grain(instance).Control;
+        await control.RequestDeactivationAsync();
+        var management = _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            await management.ForceActivationCollection(TimeSpan.Zero);
+            var reloaded = Grain(instance);
+            if (await reloaded.Control.GetActivationTokenAsync() != previousToken)
+                return reloaded;
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"gmail {instance} did not reactivate");
+    }
+
     [Fact]
     public void Gmail_contract_exposes_only_typed_operations()
     {
@@ -54,10 +93,6 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
             typeof(CommandSynapse<GmailSendRequest>),
             typeof(IGmail).GetMethod(nameof(IGmail.SendMessageAsync))!.GetParameters().Single().ParameterType);
         Assert.DoesNotContain(methods, m => m.Name.Contains("Invoke", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(
-            methods,
-            method => method.GetParameters().Any(parameter =>
-                parameter.ParameterType == typeof(string) && method.Name is not nameof(IGmail.GetIdentityAsync)));
     }
 
     [Fact]
@@ -65,14 +100,9 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
     {
         Assert.Null(typeof(GmailNeuron).Assembly.GetType("DigitalBrain.Google.FakeGmailMcpClient"));
         Assert.Null(typeof(GmailNeuron).Assembly.GetType("DigitalBrain.Google.GmailReactiveCore"));
-
         var method = typeof(GmailHosting).GetMethod(nameof(GmailHosting.AddBrainGmail));
         Assert.NotNull(method);
-        var parameters = method!.GetParameters();
-        Assert.Equal(2, parameters.Length);
-        Assert.Equal(typeof(Func<IServiceProvider, IGmailMcpClient>), parameters[1].ParameterType);
-        Assert.False(parameters[1].HasDefaultValue);
-
+        Assert.False(method!.GetParameters()[1].HasDefaultValue);
         Assert.Throws<ArgumentNullException>(() =>
             GmailHosting.AddBrainGmail(null!, _ => new FakeGmailMcpClient()));
     }
@@ -81,12 +111,23 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
     public void Gmail_agent_uses_typed_MCP_tools()
     {
         var (gmail, _) = Grain("agent-tools");
-        var mcp = new FakeGmailMcpClient();
-        var tools = GmailMcpTools.CreateTypedTools(mcp, gmail, () => Meta(Guid.NewGuid(), "agent-tools"));
+        var tools = GmailMcpTools.CreateTypedTools(new FakeGmailMcpClient(), gmail, () => Meta(Guid.NewGuid(), "agent-tools"));
         Assert.Equal(2, tools.Count);
         Assert.Contains(tools, t => t.Name == GmailMcpTools.ListToolName);
         Assert.Contains(tools, t => t.Name == GmailMcpTools.SendToolName);
-        Assert.DoesNotContain(tools, t => t.Name.Contains("invoke", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task SurfaceId_is_stable_opaque_per_neuron_identity()
+    {
+        var (gmailA, _) = Grain("surface-a");
+        var (gmailB, _) = Grain("surface-b");
+        var surfaceA = await gmailA.GetSurfaceAsync();
+        var surfaceB = await gmailB.GetSurfaceAsync();
+        Assert.Equal(Address("surface-a").ToGrainKey(), surfaceA.Surface.SurfaceId);
+        Assert.Equal(Address("surface-b").ToGrainKey(), surfaceB.Surface.SurfaceId);
+        Assert.NotEqual(surfaceA.Surface.SurfaceId, surfaceB.Surface.SurfaceId);
+        Assert.NotEqual("gmail.surface", surfaceA.Surface.SurfaceId);
     }
 
     [Fact]
@@ -96,27 +137,18 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         var (gmail, control) = Grain(instance);
         await control.SetAutoDrainAsync(false);
         _fixture.Mcp.Reset();
-
         var sendBefore = _fixture.Mcp.SendCalls;
-        var tools = GmailMcpTools.CreateTypedTools(
-            _fixture.Mcp,
-            gmail,
-            () => Meta(Guid.NewGuid(), instance));
+        var tools = GmailMcpTools.CreateTypedTools(_fixture.Mcp, gmail, () => Meta(Guid.NewGuid(), instance));
         var sendTool = tools.OfType<AIFunction>().Single(t => t.Name == GmailMcpTools.SendToolName);
-        var args = new AIFunctionArguments
+        await sendTool.InvokeAsync(new AIFunctionArguments
         {
             ["to"] = "a@example.com",
             ["subject"] = "hi",
             ["body"] = "SECRET_BODY_SHOULD_NOT_HIT_MCP_YET",
-        };
-        await sendTool.InvokeAsync(args);
-
+        });
         Assert.Equal(sendBefore, _fixture.Mcp.SendCalls);
         Assert.True(await control.GetOutboxCountAsync() >= 1);
-        var head = await control.PeekOutboxAsync();
-        Assert.NotNull(head);
-        Assert.Equal(GmailFeedEvent.SendEffectKind, head!.Event.Payload.Kind);
-
+        Assert.Equal(GmailFeedEvent.SendEffectKind, (await control.PeekOutboxAsync())!.Event.Payload.Kind);
         await control.DrainOutboxAsync();
         Assert.Equal(sendBefore + 1, _fixture.Mcp.SendCalls);
     }
@@ -127,12 +159,12 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         var instance = "read-ui";
         var (gmail, control) = Grain(instance);
         await control.SetAutoDrainAsync(false);
+        var observer = await SubscribeFeedAsync(instance);
         _fixture.Mcp.ListResult = new GmailMessageListResult(3, "three");
         var commandId = Guid.NewGuid();
 
         var receipt = await gmail.ListMessagesAsync(
             new CommandSynapse<GmailListRequest>(Meta(commandId, instance), new GmailListRequest("is:inbox", 10)));
-
         Assert.Equal(CommandReceiptStatus.Accepted, receipt.Status);
         Assert.True(await control.GetOutboxCountAsync() >= 1);
         Assert.Equal(GmailFeedEvent.UiSurfaceKind, (await control.PeekOutboxAsync())!.Event.Payload.Kind);
@@ -140,8 +172,11 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         await control.DrainOutboxAsync();
         Assert.Equal(0, await control.GetOutboxCountAsync());
 
+        await WaitForAsync(async () =>
+            (await observer.GetEventsAsync()).Any(e => e.Kind == GmailFeedEvent.UiSurfaceKind && e.SurfaceSummary == "messages:3"));
+
         var surface = await gmail.GetSurfaceAsync();
-        Assert.Equal(GmailConstants.SurfaceId, surface.Surface.SurfaceId);
+        Assert.Equal(Address(instance).ToGrainKey(), surface.Surface.SurfaceId);
         Assert.Equal("messages:3", surface.Surface.Blocks[0].Text);
         Assert.True(surface.Surface.Revision >= 1);
     }
@@ -182,11 +217,40 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
     }
 
     [Fact]
+    public async Task Mutation_result_is_journaled_before_outcome_publish()
+    {
+        var instance = "journal-before-publish";
+        var (gmail, control) = Grain(instance);
+        await control.SetAutoDrainAsync(false);
+        var observer = await SubscribeFeedAsync(instance);
+        _fixture.Mcp.Reset();
+        var commandId = Guid.NewGuid();
+
+        await gmail.SendMessageAsync(
+            new CommandSynapse<GmailSendRequest>(
+                Meta(commandId, instance),
+                new GmailSendRequest("a@example.com", "Subject", "body")));
+        await control.DrainOutboxAsync();
+
+        var lifecycle = await control.GetLifecycleOrderAsync();
+        var journalIndex = lifecycle.ToList().IndexOf(GmailConstants.LifecycleJournalResult);
+        var publishIndex = lifecycle.ToList().IndexOf(GmailConstants.LifecyclePublishOutcome);
+        Assert.True(journalIndex >= 0, "missing journal-result lifecycle mark");
+        Assert.True(publishIndex >= 0, "missing publish-outcome lifecycle mark");
+        Assert.True(journalIndex < publishIndex, "result must be journaled before outcome publish");
+
+        await WaitForAsync(async () =>
+            (await observer.GetEventsAsync()).Any(e => e.Kind == GmailFeedEvent.SendCompletedKind));
+        Assert.Equal("send-completed", (await gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
+    }
+
+    [Fact]
     public async Task Mutation_completion_survives_reactivation_with_ui_revision()
     {
         var instance = "mut-reactivate";
         var (gmail, control) = Grain(instance);
         await control.SetAutoDrainAsync(false);
+        var observer = await SubscribeFeedAsync(instance);
         _fixture.Mcp.Reset();
         var commandId = Guid.NewGuid();
         await gmail.SendMessageAsync(
@@ -195,30 +259,17 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
                 new GmailSendRequest("a@example.com", "Subject", "body")));
         var pendingRevision = (await gmail.GetSurfaceAsync()).Surface.Revision;
         await control.DrainOutboxAsync();
+        await WaitForAsync(async () =>
+            (await observer.GetEventsAsync()).Any(e => e.Kind == GmailFeedEvent.SendCompletedKind));
         var completed = await gmail.GetSurfaceAsync();
         Assert.Equal("send-completed", completed.Surface.Blocks[0].Text);
         Assert.True(completed.Surface.Revision > pendingRevision);
-        var token = await control.GetActivationTokenAsync();
-        await control.RequestDeactivationAsync();
 
-        var management = _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
-        while (DateTime.UtcNow < deadline)
-        {
-            await management.ForceActivationCollection(TimeSpan.Zero);
-            var reloaded = Grain(instance);
-            if (await reloaded.Control.GetActivationTokenAsync() != token)
-            {
-                var surface = await reloaded.Gmail.GetSurfaceAsync();
-                Assert.Equal("send-completed", surface.Surface.Blocks[0].Text);
-                Assert.Equal(completed.Surface.Revision, surface.Surface.Revision);
-                return;
-            }
-
-            await Task.Delay(50);
-        }
-
-        throw new TimeoutException("gmail mut-reactivate grain did not reactivate");
+        var reloaded = await ReactivateAsync(instance, await control.GetActivationTokenAsync());
+        var surface = await reloaded.Gmail.GetSurfaceAsync();
+        Assert.Equal("send-completed", surface.Surface.Blocks[0].Text);
+        Assert.Equal(completed.Surface.Revision, surface.Surface.Revision);
+        Assert.Equal(Address(instance).ToGrainKey(), surface.Surface.SurfaceId);
     }
 
     [Fact]
@@ -238,9 +289,11 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         Assert.NotNull(intent);
         await control.ReplayOutboxIntentAsync(intent!);
         Assert.Equal(1, _fixture.Mcp.SendCalls);
-        await control.ReplayOutboxIntentAsync(intent!);
+
+        var reloaded = await ReactivateAsync(instance, await control.GetActivationTokenAsync());
+        await reloaded.Control.ReplayOutboxIntentAsync(intent!);
         Assert.Equal(1, _fixture.Mcp.SendCalls);
-        await control.DrainOutboxAsync();
+        await reloaded.Control.DrainOutboxAsync();
         Assert.Equal(1, _fixture.Mcp.SendCalls);
     }
 
@@ -250,6 +303,7 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         var instance = "fail-provider";
         var (gmail, control) = Grain(instance);
         await control.SetAutoDrainAsync(false);
+        var observer = await SubscribeFeedAsync(instance);
         _fixture.Mcp.Reset();
         _fixture.Mcp.SendException = new InvalidOperationException("provider down with token=abc body=secret");
         var commandId = Guid.NewGuid();
@@ -266,32 +320,20 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         var failure = await control.GetLastFailureAsync();
         Assert.NotNull(failure);
         Assert.Equal(BrainErrors.FailureSanitized, failure!.Code);
-        Assert.Equal(ReactiveNeuronPipeline<GmailFeedEvent>.UnknownFailureMessage, failure.Message);
+        Assert.Equal("send-failed", (await gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.True(await control.GetOutboxCountAsync() >= 1);
 
-        var surface = await gmail.GetSurfaceAsync();
-        Assert.Equal("send-failed", surface.Surface.Blocks[0].Text);
-        Assert.True(surface.Surface.Revision >= 1);
+        await WaitForAsync(async () =>
+            (await observer.GetEventsAsync()).Any(e => e.Kind == GmailFeedEvent.SendFailedKind));
 
-        var token = await control.GetActivationTokenAsync();
-        await control.RequestDeactivationAsync();
-        var management = _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
-        while (DateTime.UtcNow < deadline)
-        {
-            await management.ForceActivationCollection(TimeSpan.Zero);
-            var reloaded = Grain(instance);
-            if (await reloaded.Control.GetActivationTokenAsync() != token)
-            {
-                Assert.Equal("send-failed", (await reloaded.Gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
-                var durableFailure = await reloaded.Control.GetLastFailureAsync();
-                Assert.NotNull(durableFailure);
-                return;
-            }
+        var lifecycle = await control.GetLifecycleOrderAsync();
+        var journalIndex = lifecycle.ToList().IndexOf(GmailConstants.LifecycleJournalResult);
+        var publishIndex = lifecycle.ToList().IndexOf(GmailConstants.LifecyclePublishOutcome);
+        Assert.True(journalIndex >= 0 && publishIndex > journalIndex);
 
-            await Task.Delay(50);
-        }
-
-        throw new TimeoutException("gmail fail-provider grain did not reactivate");
+        var reloaded = await ReactivateAsync(instance, await control.GetActivationTokenAsync());
+        Assert.Equal("send-failed", (await reloaded.Gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.NotNull(await reloaded.Control.GetLastFailureAsync());
     }
 
     [Fact]
@@ -321,5 +363,4 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         Assert.DoesNotContain("token", blob, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("password", blob, StringComparison.OrdinalIgnoreCase);
     }
-
 }

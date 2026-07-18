@@ -32,8 +32,12 @@ public sealed class GmailNeuron(
     private readonly IGmailMcpClient _mcpClient = mcpClient;
     private readonly IChatClient _chatClient = chatClient;
     private readonly List<string> _telemetry = [];
+    private readonly List<string> _lifecycleOrder = [];
     private Guid _activationToken;
     private int _providerSendCalls;
+
+    private string NeuronSurfaceId => this.GetPrimaryKeyString();
+    private Guid NeuronFeedStreamId => GmailConstants.FeedStreamIdFor(NeuronSurfaceId);
 
     protected override bool AutoDrainAfterCommit =>
         !Flags.TryGetValue(GmailConstants.AutoDrainFlag, out var value) || value != "0";
@@ -53,7 +57,10 @@ public sealed class GmailNeuron(
             var result = await _mcpClient.ListMessagesAsync(payload.Query, payload.MaxResults);
             var surfaceText = $"messages:{result.MessageCount}";
             Flags[GmailConstants.SurfaceTextFlag] = surfaceText;
-            var intent = CreateFeedIntent(command.Metadata, GmailFeedEvent.UiSurface(surfaceText));
+            var intent = CreateFeedIntent(
+                command.Metadata,
+                GmailFeedEvent.UiSurface(surfaceText),
+                GmailConstants.OutcomeEventId(command.Metadata.CommandId, GmailFeedEvent.UiSurfaceKind));
             await commit(new ReactiveCommit<GmailFeedEvent>(surfaceText, UiRevision + 1, [intent]));
             return CommandReceiptStatus.Accepted;
         });
@@ -71,12 +78,13 @@ public sealed class GmailNeuron(
                 return CommandReceiptStatus.Accepted;
             }
 
-            var effectId = Guid.CreateVersion7();
+            var effectId = command.Metadata.CommandId;
             var surfaceText = "send-pending";
             Flags[GmailConstants.SurfaceTextFlag] = surfaceText;
             var intent = CreateFeedIntent(
                 command.Metadata,
-                GmailFeedEvent.SendEffect(effectId, idempotencyKey, payload.To, payload.Subject, payload.Body));
+                GmailFeedEvent.SendEffect(effectId, idempotencyKey, payload.To, payload.Subject, payload.Body),
+                effectId);
             await commit(new ReactiveCommit<GmailFeedEvent>(surfaceText, UiRevision + 1, [intent]));
             return CommandReceiptStatus.Accepted;
         });
@@ -85,7 +93,7 @@ public sealed class GmailNeuron(
     {
         var text = ResolveSurfaceText();
         return Task.FromResult(new UiSurfaceSnapshot(new UiSurface(
-            GmailConstants.SurfaceId,
+            NeuronSurfaceId,
             UiRevision,
             [new UiBlock("text", text, [])])));
     }
@@ -117,6 +125,9 @@ public sealed class GmailNeuron(
     public Task<IReadOnlyList<string>> GetTelemetryAsync() =>
         Task.FromResult<IReadOnlyList<string>>(_telemetry.ToArray());
 
+    public Task<IReadOnlyList<string>> GetLifecycleOrderAsync() =>
+        Task.FromResult<IReadOnlyList<string>>(_lifecycleOrder.ToArray());
+
     public Task<SanitizedFailure?> GetLastFailureAsync() =>
         Task.FromResult(Failures.Count == 0 ? null : Failures[^1]);
 
@@ -129,6 +140,8 @@ public sealed class GmailNeuron(
     }
 
     public Task<int> GetProviderSendCallsAsync() => Task.FromResult(_providerSendCalls);
+
+    public Task<Guid> GetFeedStreamIdAsync() => Task.FromResult(NeuronFeedStreamId);
 
     protected override async Task PublishOutboxIntentAsync(OutboxIntent<GmailFeedEvent> intent)
     {
@@ -148,15 +161,8 @@ public sealed class GmailNeuron(
         }
 
         var doneKey = GmailConstants.EffectDoneFlagPrefix + payload.IdempotencyKey;
-        var failedKey = GmailConstants.EffectDoneFlagPrefix + "failed:" + payload.IdempotencyKey;
         if (Flags.ContainsKey(doneKey))
             return;
-        if (Flags.ContainsKey(failedKey))
-        {
-            throw new BrainException(
-                BrainErrors.FailureSanitized,
-                ReactiveNeuronPipeline<GmailFeedEvent>.UnknownFailureMessage);
-        }
 
         try
         {
@@ -166,20 +172,30 @@ public sealed class GmailNeuron(
                 payload.Subject,
                 payload.Body,
                 payload.IdempotencyKey);
-            Flags[doneKey] = "1";
+
             const string completedSurface = "send-completed";
+            Flags[doneKey] = "1";
             Flags[GmailConstants.SurfaceTextFlag] = completedSurface;
             var nextUi = UiRevision + 1;
             Flags[ReactiveNeuronPipeline<GmailFeedEvent>.UiRevisionKey] = nextUi.ToString();
             Flags[ReactiveNeuronPipeline<GmailFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
-            Outbox.Add(CreateFeedIntent(
+
+            var outcome = CreateFeedIntent(
                 intent.Event.Metadata,
-                GmailFeedEvent.SendCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface)));
+                GmailFeedEvent.SendCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface),
+                GmailConstants.OutcomeEventId(payload.EffectId, GmailFeedEvent.SendCompletedKind));
+            Outbox.Add(outcome);
+            _lifecycleOrder.Add(GmailConstants.LifecycleJournalResult);
+            await WriteStateAsync(CancellationToken.None);
+
+            _lifecycleOrder.Add(GmailConstants.LifecyclePublishOutcome);
+            await base.PublishOutboxIntentAsync(outcome);
+            RemoveOutboxMatching(outcome.Event.Metadata.EventId);
+
             RecordTelemetry($"gmail.send.completed providerMessageIdLength={result.ProviderMessageId.Length}");
         }
         catch (Exception)
         {
-            Flags[failedKey] = "1";
             const string failedSurface = "send-failed";
             Flags[GmailConstants.SurfaceTextFlag] = failedSurface;
             var nextUi = UiRevision + 1;
@@ -192,13 +208,34 @@ public sealed class GmailNeuron(
                 DateTimeOffset.UtcNow,
                 intent.Event.Metadata.CommandId,
                 intent.Event.Metadata.EventId));
-            Outbox.Add(CreateFeedIntent(
+
+            var failedOutcome = CreateFeedIntent(
                 intent.Event.Metadata,
-                GmailFeedEvent.SendFailed(payload.EffectId, payload.IdempotencyKey, failedSurface)));
+                GmailFeedEvent.SendFailed(payload.EffectId, payload.IdempotencyKey, failedSurface),
+                GmailConstants.OutcomeEventId(payload.EffectId, GmailFeedEvent.SendFailedKind));
+
+            _lifecycleOrder.Add(GmailConstants.LifecycleJournalResult);
+            await WriteStateAsync(CancellationToken.None);
+
+            _lifecycleOrder.Add(GmailConstants.LifecyclePublishOutcome);
+            await base.PublishOutboxIntentAsync(failedOutcome);
+
             RecordTelemetry("gmail.send.failed");
             throw new BrainException(
                 BrainErrors.FailureSanitized,
                 ReactiveNeuronPipeline<GmailFeedEvent>.UnknownFailureMessage);
+        }
+    }
+
+    private void RemoveOutboxMatching(Guid eventId)
+    {
+        for (var i = Outbox.Count - 1; i >= 0; i--)
+        {
+            if (Outbox[i].Event.Metadata.EventId == eventId)
+            {
+                Outbox.RemoveAt(i);
+                return;
+            }
         }
     }
 
@@ -209,20 +246,23 @@ public sealed class GmailNeuron(
         return string.IsNullOrEmpty(DomainState) ? "empty" : DomainState;
     }
 
-    private OutboxIntent<GmailFeedEvent> CreateFeedIntent(SynapseMetadata metadata, GmailFeedEvent payload)
+    private OutboxIntent<GmailFeedEvent> CreateFeedIntent(
+        SynapseMetadata metadata,
+        GmailFeedEvent payload,
+        Guid eventId)
     {
         var source = NeuronAddress.Parse(this.GetPrimaryKeyString());
         var @event = new EventSynapse<GmailFeedEvent>(
             metadata with
             {
-                EventId = Guid.CreateVersion7(),
+                EventId = eventId,
                 CausalDepth = metadata.CausalDepth + 1,
                 Source = source,
             },
             payload);
         return OutboxIntent<GmailFeedEvent>.Create(
             GmailConstants.FeedStreamNamespace,
-            metadata.CommandId,
+            NeuronFeedStreamId,
             @event);
     }
 

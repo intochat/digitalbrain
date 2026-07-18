@@ -27,6 +27,9 @@ public interface ISalesforceNeuronControl : IGrainWithStringKey
     [Alias("GetTelemetryAsync")]
     Task<IReadOnlyList<string>> GetTelemetryAsync();
 
+    [Alias("GetLifecycleOrderAsync")]
+    Task<IReadOnlyList<string>> GetLifecycleOrderAsync();
+
     [Alias("GetLastFailureAsync")]
     Task<SanitizedFailure?> GetLastFailureAsync();
 
@@ -38,4 +41,7 @@ public interface ISalesforceNeuronControl : IGrainWithStringKey
 
     [Alias("GetProviderUpdateCallsAsync")]
     Task<int> GetProviderUpdateCallsAsync();
+
+    [Alias("GetFeedStreamIdAsync")]
+    Task<Guid> GetFeedStreamIdAsync();
 }

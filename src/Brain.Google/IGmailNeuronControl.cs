@@ -27,6 +27,9 @@ public interface IGmailNeuronControl : IGrainWithStringKey
     [Alias("GetTelemetryAsync")]
     Task<IReadOnlyList<string>> GetTelemetryAsync();
 
+    [Alias("GetLifecycleOrderAsync")]
+    Task<IReadOnlyList<string>> GetLifecycleOrderAsync();
+
     [Alias("GetLastFailureAsync")]
     Task<SanitizedFailure?> GetLastFailureAsync();
 
@@ -38,4 +41,7 @@ public interface IGmailNeuronControl : IGrainWithStringKey
 
     [Alias("GetProviderSendCallsAsync")]
     Task<int> GetProviderSendCallsAsync();
+
+    [Alias("GetFeedStreamIdAsync")]
+    Task<Guid> GetFeedStreamIdAsync();
 }
