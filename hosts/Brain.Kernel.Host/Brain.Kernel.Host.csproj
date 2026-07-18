@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\kernel\Brain.Kernel\Brain.Kernel.csproj" />
+    <ProjectReference Include="..\..\modules\Google\Google.csproj" />
+    <ProjectReference Include="..\..\modules\Salesforce\Salesforce.csproj" />
   </ItemGroup>
 
   <ItemGroup>

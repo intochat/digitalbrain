@@ -1,6 +1,8 @@
 using Brain.Kernel;
 using Brain.Kernel.Host;
+using Google;
 using Orleans.Journaling;
+using Salesforce;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
@@ -16,6 +18,8 @@ builder.UseOrleans(silo =>
         options.ContainerName = "journals";
     });
     silo.AddBrainKernel();
+    silo.AddGoogle();
+    silo.AddSalesforce();
 });
 var app = builder.Build();
 app.MapDefaultEndpoints();

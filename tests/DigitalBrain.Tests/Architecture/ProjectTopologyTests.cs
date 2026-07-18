@@ -29,6 +29,10 @@ public sealed class ProjectTopologyTests
                 "kernel/Brain.Client/Brain.Client.csproj",
                 "kernel/Brain.Contracts/Brain.Contracts.csproj",
                 "kernel/Brain.Kernel/Brain.Kernel.csproj",
+                "modules/Google.Contracts/Google.Contracts.csproj",
+                "modules/Google/Google.csproj",
+                "modules/Salesforce.Contracts/Salesforce.Contracts.csproj",
+                "modules/Salesforce/Salesforce.csproj",
                 "tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj",
                 "tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj"
             ],
@@ -39,12 +43,14 @@ public sealed class ProjectTopologyTests
             .ToArray();
 
         Assert.Contains(projectNames, name => name.Equals("Brain.Client", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(projectNames, name => name.Equals("Google", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(projectNames, name => name.Equals("Google.Contracts", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(projectNames, name => name.Equals("Salesforce", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(projectNames, name => name.Equals("Salesforce.Contracts", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("AI", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("AI.Contracts", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("Flutter", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("Flutter.Contracts", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(projectNames, name => name.Equals("Google", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(projectNames, name => name.Equals("Google.Contracts", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("Brain.Mcp", StringComparison.OrdinalIgnoreCase));
     }
 

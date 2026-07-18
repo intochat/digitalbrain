@@ -4,6 +4,12 @@
     <Project Path="kernel/Brain.Contracts/Brain.Contracts.csproj" />
     <Project Path="kernel/Brain.Kernel/Brain.Kernel.csproj" />
   </Folder>
+  <Folder Name="/modules/">
+    <Project Path="modules/Google.Contracts/Google.Contracts.csproj" />
+    <Project Path="modules/Google/Google.csproj" />
+    <Project Path="modules/Salesforce.Contracts/Salesforce.Contracts.csproj" />
+    <Project Path="modules/Salesforce/Salesforce.csproj" />
+  </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />

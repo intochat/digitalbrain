@@ -423,8 +423,14 @@ public sealed class QuadrantStartupTask : IStartupTask
 - Modify: `hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj`
 - Modify: `hosts/Brain.Kernel.Host/Program.cs`
 - Modify: `Brain.slnx`
+- Modify: `Directory.Packages.props`
+- Modify: `kernel/Brain.Kernel/OrleansNeuronManifestValidator.cs`
+- Modify: `tests/DigitalBrain.Tests/Architecture/ProjectTopologyTests.cs`
+- Modify: `tests/DigitalBrain.Tests/Quadrant/QuadrantStartupTests.cs`
 - Create: `tests/DigitalBrain.Tests/Providers/ProviderNeuronIdentityTests.cs`
 - Create: `tests/DigitalBrain.Tests/Client/ProviderClientCompilationTests.cs`
+
+Execution scope record: `Directory.Packages.props` is required by this task's explicit package-removal step. Adding the four projects invalidates the existing exact topology test, and the first real provider manifest exposed that Orleans 10.2.2 records the mapping through the grain's well-known implemented-interface properties while omitting the optional interface `DefaultGrainType`; the validator and its owning startup test therefore require the bounded correction above.
 
 **Required shapes:**
 
@@ -441,17 +447,17 @@ public sealed class SalesforceNeuron : Neuron, ISalesforce
 }
 ```
 
-- [ ] Add tests proving both public interfaces declare zero methods, extend `INeuron`, and each has exactly one `Neuron` implementation in Quadrant.
-- [ ] Add tests proving `DigitalBrainClient.Get<IGmail>()` and `.Get<ISalesforce>()` bind the authenticated owner as the complete grain key.
-- [ ] Add project-source guards proving no custom Gmail/Salesforce provider interface, copied provider request/response DTO, `Ask`, `InvokeMcpTool`, MCP tool-name constant, or Google/Salesforce SDK remains in these modules.
-- [ ] Add a compile-time client test containing only `brain.Get<IGmail>()` and `brain.Get<ISalesforce>()`. This is the complete v1 caller cutover because Task 2 removed every legacy caller and the callable MCP surface is intentionally paused.
-- [ ] Run the owning test project and observe red because the new leaf contracts and Salesforce projects do not exist.
-- [ ] Implement the two empty durable neurons and hosting extensions which only make their assemblies available to Orleans.
-- [ ] Add the new projects to the solution and kernel host.
-- [ ] Remove `Google.Apis.*` and `DeveloperForce.Force` package versions when no active project references them.
-- [ ] Run the owning test project; require green.
-- [ ] Run the root checkpoint; require green.
-- [ ] Codex commits as `feat: add typed provider neuron identities`.
+- [x] Add tests proving both public interfaces declare zero methods, extend `INeuron`, and each has exactly one `Neuron` implementation in Quadrant.
+- [x] Add tests proving `DigitalBrainClient.Get<IGmail>()` and `.Get<ISalesforce>()` bind the authenticated owner as the complete grain key.
+- [x] Add project-source guards proving no custom Gmail/Salesforce provider interface, copied provider request/response DTO, `Ask`, `InvokeMcpTool`, MCP tool-name constant, or Google/Salesforce SDK remains in these modules.
+- [x] Add a compile-time client test containing only `brain.Get<IGmail>()` and `brain.Get<ISalesforce>()`. This is the complete v1 caller cutover because Task 2 removed every legacy caller and the callable MCP surface is intentionally paused.
+- [x] Run the owning test project and observe red because the new leaf contracts and Salesforce projects do not exist.
+- [x] Implement the two empty durable neurons and hosting extensions which only make their assemblies available to Orleans.
+- [x] Add the new projects to the solution and kernel host.
+- [x] Remove `Google.Apis.*` and `DeveloperForce.Force` package versions when no active project references them.
+- [x] Run the owning test project; require green.
+- [x] Run the root checkpoint; require green.
+- [x] Codex commits as `feat: add typed provider neuron identities`.
 
 MCP connectivity remains deliberately absent. This task establishes durable ownership and type identity without inventing a callable provider API.
 

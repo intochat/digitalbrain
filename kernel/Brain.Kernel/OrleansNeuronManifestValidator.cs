@@ -47,6 +47,7 @@ public static class OrleansNeuronManifestValidator
             return false;
 
         var grainTypeValue = matchedGrainType.Value.ToString();
+        var grainPropertiesForMatch = manifest.Grains[matchedGrainType.Value];
         var contractName = registration.Contract.Name;
         var contractFullName = registration.Contract.FullName;
 
@@ -66,30 +67,21 @@ public static class OrleansNeuronManifestValidator
             if (!nameMatches)
                 continue;
 
-            if (!interfaceProperties.Properties.TryGetValue(
+            var defaultGrainTypeMatches =
+                interfaceProperties.Properties.TryGetValue(
                     WellKnownGrainInterfaceProperties.DefaultGrainType,
                     out var defaultGrainType)
-                || !string.Equals(defaultGrainType, grainTypeValue, StringComparison.Ordinal))
-            {
-                continue;
-            }
+                && string.Equals(defaultGrainType, grainTypeValue, StringComparison.Ordinal);
 
-            var grainProperties = manifest.Grains[matchedGrainType.Value];
-            if (GrainListsImplementedInterface(grainProperties, interfaceType)
-                || !HasImplementedInterfaceEntries(grainProperties))
-            {
+            var implementedInterfaceMatches =
+                GrainListsImplementedInterface(grainPropertiesForMatch, interfaceType);
+
+            if (defaultGrainTypeMatches || implementedInterfaceMatches)
                 return true;
-            }
         }
 
         return false;
     }
-
-    private static bool HasImplementedInterfaceEntries(GrainProperties grainProperties) =>
-        grainProperties.Properties.Keys.Any(key =>
-            key.StartsWith(
-                WellKnownGrainTypeProperties.ImplementedInterfacePrefix,
-                StringComparison.Ordinal));
 
     private static bool GrainListsImplementedInterface(
         GrainProperties grainProperties,

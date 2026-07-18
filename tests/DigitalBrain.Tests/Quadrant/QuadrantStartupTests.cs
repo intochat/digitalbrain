@@ -84,6 +84,106 @@ public sealed class QuadrantStartupTests
         Assert.DoesNotContain("GetAssemblies", builderSource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Validator_accepts_real_local_manifest_shape_with_TypeName_and_implemented_interface_without_DefaultGrainType()
+    {
+        var registrations = NeuronTypeCatalogBuilder.Build(
+        [
+            typeof(IStartupLeafNeuron),
+            typeof(StartupLeafNeuron),
+        ]);
+
+        var grainType = GrainType.Create("startup-leaf");
+        var interfaceType = GrainInterfaceType.Create(typeof(IStartupLeafNeuron).FullName!);
+        var grainProperties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        grainProperties.Add(WellKnownGrainTypeProperties.FullTypeName, typeof(StartupLeafNeuron).FullName!);
+        grainProperties.Add(
+            WellKnownGrainTypeProperties.ImplementedInterfacePrefix + "0",
+            interfaceType.ToString()!);
+
+        var interfaceProperties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        interfaceProperties.Add(WellKnownGrainInterfaceProperties.TypeName, typeof(IStartupLeafNeuron).Name);
+
+        var manifest = new GrainManifest(
+            ImmutableDictionary<GrainType, GrainProperties>.Empty.Add(
+                grainType,
+                new GrainProperties(grainProperties.ToImmutable())),
+            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty.Add(
+                interfaceType,
+                new GrainInterfaceProperties(interfaceProperties.ToImmutable())));
+
+        OrleansNeuronManifestValidator.Validate(registrations, manifest);
+    }
+
+    [Fact]
+    public void Validator_rejects_mapping_when_neither_DefaultGrainType_nor_implemented_interface_matches()
+    {
+        var registrations = NeuronTypeCatalogBuilder.Build(
+        [
+            typeof(IStartupLeafNeuron),
+            typeof(StartupLeafNeuron),
+        ]);
+
+        var grainType = GrainType.Create("startup-leaf");
+        var interfaceType = GrainInterfaceType.Create(typeof(IStartupLeafNeuron).FullName!);
+        var grainProperties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        grainProperties.Add(WellKnownGrainTypeProperties.FullTypeName, typeof(StartupLeafNeuron).FullName!);
+        grainProperties.Add(
+            WellKnownGrainTypeProperties.ImplementedInterfacePrefix + "0",
+            "unrelated.interface");
+
+        var interfaceProperties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        interfaceProperties.Add(WellKnownGrainInterfaceProperties.TypeName, typeof(IStartupLeafNeuron).Name);
+        interfaceProperties.Add(WellKnownGrainInterfaceProperties.DefaultGrainType, "other-grain");
+
+        var manifest = new GrainManifest(
+            ImmutableDictionary<GrainType, GrainProperties>.Empty.Add(
+                grainType,
+                new GrainProperties(grainProperties.ToImmutable())),
+            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty.Add(
+                interfaceType,
+                new GrainInterfaceProperties(interfaceProperties.ToImmutable())));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            OrleansNeuronManifestValidator.Validate(registrations, manifest));
+
+        Assert.Contains(typeof(IStartupLeafNeuron).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(StartupLeafNeuron).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("manifest", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Validator_accepts_implemented_interface_match_even_when_DefaultGrainType_mismatches()
+    {
+        var registrations = NeuronTypeCatalogBuilder.Build(
+        [
+            typeof(IStartupLeafNeuron),
+            typeof(StartupLeafNeuron),
+        ]);
+
+        var grainType = GrainType.Create("startup-leaf");
+        var interfaceType = GrainInterfaceType.Create(typeof(IStartupLeafNeuron).FullName!);
+        var grainProperties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        grainProperties.Add(WellKnownGrainTypeProperties.FullTypeName, typeof(StartupLeafNeuron).FullName!);
+        grainProperties.Add(
+            WellKnownGrainTypeProperties.ImplementedInterfacePrefix + "0",
+            interfaceType.ToString()!);
+
+        var interfaceProperties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        interfaceProperties.Add(WellKnownGrainInterfaceProperties.TypeName, typeof(IStartupLeafNeuron).Name);
+        interfaceProperties.Add(WellKnownGrainInterfaceProperties.DefaultGrainType, "other-grain");
+
+        var manifest = new GrainManifest(
+            ImmutableDictionary<GrainType, GrainProperties>.Empty.Add(
+                grainType,
+                new GrainProperties(grainProperties.ToImmutable())),
+            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty.Add(
+                interfaceType,
+                new GrainInterfaceProperties(interfaceProperties.ToImmutable())));
+
+        OrleansNeuronManifestValidator.Validate(registrations, manifest);
+    }
+
     private static string ReadKernelSource(string fileName)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
