@@ -121,6 +121,28 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
         }
     }
 
+    private const string SalesforceActivitySourceName = "DigitalBrain.Salesforce";
+
+    private static void AssertProviderActivitiesEmitted(
+        IReadOnlyList<Activity> activities,
+        params string[] requiredOperationNames)
+    {
+        Assert.NotEmpty(activities);
+        var fromSource = activities
+            .Where(activity => activity.Source.Name == SalesforceActivitySourceName)
+            .ToArray();
+        Assert.True(
+            fromSource.Length > 0,
+            $"expected activities from source '{SalesforceActivitySourceName}', snapshot count={activities.Count}");
+
+        foreach (var operationName in requiredOperationNames)
+        {
+            Assert.Contains(
+                fromSource,
+                activity => activity.OperationName == operationName);
+        }
+    }
+
     private static void AssertNoSecrets(IReadOnlyList<Activity> activities, params string[] secrets)
     {
         for (var i = 0; i < activities.Count; i++)
@@ -434,6 +456,11 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
         await control.DrainOutboxAsync();
 
         var snapshot = capture.SnapshotAndStop();
+        AssertProviderActivitiesEmitted(
+            snapshot,
+            "salesforce.query",
+            "salesforce.update",
+            "salesforce.update.completed");
         AssertNoSecrets(snapshot, fieldValue, soql, recordId, "token=abc", "password", "Secret__c");
     }
 }

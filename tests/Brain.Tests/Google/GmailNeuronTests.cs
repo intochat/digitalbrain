@@ -120,6 +120,28 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         }
     }
 
+    private const string GmailActivitySourceName = "DigitalBrain.Google.Gmail";
+
+    private static void AssertProviderActivitiesEmitted(
+        IReadOnlyList<Activity> activities,
+        params string[] requiredOperationNames)
+    {
+        Assert.NotEmpty(activities);
+        var fromSource = activities
+            .Where(activity => activity.Source.Name == GmailActivitySourceName)
+            .ToArray();
+        Assert.True(
+            fromSource.Length > 0,
+            $"expected activities from source '{GmailActivitySourceName}', snapshot count={activities.Count}");
+
+        foreach (var operationName in requiredOperationNames)
+        {
+            Assert.Contains(
+                fromSource,
+                activity => activity.OperationName == operationName);
+        }
+    }
+
     private static void AssertNoSecrets(IReadOnlyList<Activity> activities, params string[] secrets)
     {
         for (var i = 0; i < activities.Count; i++)
@@ -487,6 +509,11 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         await control.DrainOutboxAsync();
 
         var snapshot = capture.SnapshotAndStop();
+        AssertProviderActivitiesEmitted(
+            snapshot,
+            "gmail.list",
+            "gmail.send",
+            "gmail.send.completed");
         AssertNoSecrets(snapshot, body, recipient, subject, query, "token=abc", "oauth", "password");
     }
 }
