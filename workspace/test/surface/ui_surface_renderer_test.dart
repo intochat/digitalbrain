@@ -3,12 +3,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workspace/surface/feed_cursor_store.dart';
 import 'package:workspace/surface/ui_surface_client.dart';
 import 'package:workspace/surface/ui_surface_controller.dart';
 import 'package:workspace/surface/ui_surface_models.dart';
 import 'package:workspace/surface/ui_surface_renderer.dart';
 import 'package:workspace/theme/brain_theme.dart';
+
+import '../helpers/memory_feed_cursor_store.dart';
 
 class _RecordingClient implements UiSurfaceClient {
   final List<Map<String, dynamic>> actions = [];
@@ -73,7 +74,11 @@ Map<String, dynamic> _snapshotJson({
               'kind': 'text',
               'text': 'Hello surface',
               'actions': [
-                {'id': 'approve', 'label': 'Approve', 'expectedRevision': revision},
+                {
+                  'id': 'approve',
+                  'label': 'Approve',
+                  'expectedRevision': revision,
+                },
               ],
             },
             {
@@ -124,7 +129,7 @@ void main() {
       ),
     );
     await controller.start();
-    client.emit(UiFeedMessage.parse(_snapshotJson())!);
+    client.emit(UiFeedMessage.parse(_snapshotJson()));
     await tester.pumpAndSettle();
 
     expect(find.text('Hello surface'), findsOneWidget);
@@ -144,7 +149,7 @@ void main() {
     });
 
     await controller.start();
-    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 1))!);
+    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 1)));
     await Future<void>.delayed(Duration.zero);
 
     client.emit(
@@ -156,7 +161,7 @@ void main() {
             {'op': 'replace', 'path': '/blocks/0/text', 'value': 'Patched body'},
           ],
         ),
-      )!,
+      ),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -190,7 +195,7 @@ void main() {
             },
           ],
         ),
-      )!,
+      ),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -203,7 +208,7 @@ void main() {
             {'op': 'replace', 'path': '/blocks/0/text', 'value': 'Stale'},
           ],
         ),
-      )!,
+      ),
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -225,7 +230,7 @@ void main() {
     });
 
     await controller.start();
-    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 1))!);
+    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 1)));
     await Future<void>.delayed(Duration.zero);
 
     client.emit(
@@ -237,9 +242,9 @@ void main() {
             {'op': 'replace', 'path': '/blocks/0/text', 'value': 'Gap'},
           ],
         ),
-      )!,
+      ),
     );
-    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
 
     expect(client.snapshotRequests, contains('surface-1'));
     final surface = controller.surface('surface-1')!;
@@ -267,7 +272,7 @@ void main() {
       ),
     );
     await controller.start();
-    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 3))!);
+    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 3)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Approve'));
@@ -284,7 +289,7 @@ void main() {
     final client1 = _RecordingClient();
     final first = UiSurfaceController(client: client1, cursorStore: store);
     await first.start();
-    client1.emit(UiFeedMessage.parse(_snapshotJson(revision: 7))!);
+    client1.emit(UiFeedMessage.parse(_snapshotJson(revision: 7)));
     await Future<void>.delayed(Duration.zero);
     expect(store.read(), 7);
     first.dispose();
@@ -314,11 +319,14 @@ void main() {
     });
 
     await controller.start();
-    final message = UiFeedMessage.parse(_snapshotJson(schemaVersion: 99));
-    expect(message, isNull);
-    expect(controller.closedFailure, isNull);
+    expect(
+      () => UiFeedMessage.parse(_snapshotJson(schemaVersion: 99)),
+      throwsFormatException,
+    );
 
-    final rejected = controller.ingestRaw(jsonEncode(_snapshotJson(schemaVersion: 99)));
+    final rejected = controller.ingestRaw(
+      jsonEncode(_snapshotJson(schemaVersion: 99)),
+    );
     expect(rejected, isFalse);
     expect(controller.surface('surface-1'), isNull);
     expect(controller.closedFailure, isNotNull);
@@ -362,7 +370,7 @@ void main() {
             },
           ],
         ),
-      )!,
+      ),
     );
     await tester.pumpAndSettle();
 

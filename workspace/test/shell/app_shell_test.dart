@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workspace/shell/app_shell.dart';
-import 'package:workspace/surface/feed_cursor_store.dart';
 import 'package:workspace/surface/ui_surface_client.dart';
 import 'package:workspace/surface/ui_surface_models.dart';
 import 'package:workspace/theme/brain_theme.dart';
+
+import '../helpers/memory_feed_cursor_store.dart';
 
 class _IdleClient implements UiSurfaceClient {
   final StreamController<UiFeedMessage> _messages =

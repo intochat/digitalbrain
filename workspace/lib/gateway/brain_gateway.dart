@@ -37,14 +37,7 @@ class BrainGateway implements UiSurfaceClient {
     );
     final response = await _client.get(uri);
     final body = _decodeBody(response);
-    final schemaVersion = body['schemaVersion'];
-    if (schemaVersion is int &&
-        schemaVersion != UiFeedMessage.supportedSchemaVersion) {
-      throw GatewayException(
-        'schema.unsupported',
-        'unsupported schema version $schemaVersion',
-      );
-    }
+    _requireSchemaVersion(body);
     return UiSurfaceSnapshot.fromJson(body);
   }
 
@@ -55,7 +48,7 @@ class BrainGateway implements UiSurfaceClient {
     required int expectedRevision,
   }) async {
     final response = await _client.post(
-      Uri.parse('$httpBase/ui/surface/action'),
+      Uri.parse('$httpBase/ui/action'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'surfaceId': surfaceId,
@@ -67,39 +60,147 @@ class BrainGateway implements UiSurfaceClient {
   }
 
   @override
-  Stream<UiFeedMessage> watch({required int cursor}) async* {
-    final uri = Uri.parse('$wsBase/ui/watch').replace(
-      queryParameters: {'cursor': '$cursor'},
-    );
-    final channel = WebSocketChannel.connect(uri);
-    await channel.ready;
-    await for (final message in channel.stream) {
-      if (message is! String) {
-        continue;
+  Stream<UiFeedMessage> watch({required int cursor}) {
+    final controller = StreamController<UiFeedMessage>();
+    WebSocketChannel? channel;
+    StreamSubscription<dynamic>? subscription;
+
+    Future<void> open() async {
+      try {
+        final uri = Uri.parse('$wsBase/ui/watch').replace(
+          queryParameters: {'cursor': '$cursor'},
+        );
+        channel = WebSocketChannel.connect(uri);
+        await channel!.ready;
+        subscription = channel!.stream.listen(
+          (message) {
+            if (controller.isClosed) {
+              return;
+            }
+            if (message is! String) {
+              return;
+            }
+            try {
+              final frame = mapFrame(message);
+              if (frame == null) {
+                return;
+              }
+              lastSequence = frame.sequence;
+              controller.add(frame);
+            } catch (error, stackTrace) {
+              controller.addError(_sanitizeError(error), stackTrace);
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!controller.isClosed) {
+              controller.addError(_sanitizeError(error), stackTrace);
+            }
+          },
+          onDone: () {
+            if (!controller.isClosed) {
+              unawaited(controller.close());
+            }
+          },
+          cancelOnError: false,
+        );
+      } catch (error, stackTrace) {
+        if (!controller.isClosed) {
+          controller.addError(_sanitizeError(error), stackTrace);
+          unawaited(controller.close());
+        }
       }
-      final frame = mapFrame(message);
-      if (frame == null) {
-        continue;
-      }
-      lastSequence = frame.sequence;
-      yield frame;
     }
+
+    controller.onListen = () {
+      unawaited(open());
+    };
+    controller.onCancel = () async {
+      await subscription?.cancel();
+      subscription = null;
+      final active = channel;
+      channel = null;
+      if (active != null) {
+        await active.sink.close().catchError((_) {});
+      }
+    };
+
+    return controller.stream;
   }
 
   static UiFeedMessage? mapFrame(String text) {
+    Map<String, dynamic> decoded;
     try {
-      final decoded = jsonDecode(text);
-      if (decoded is! Map<String, dynamic>) {
-        return null;
+      final value = jsonDecode(text);
+      if (value is! Map<String, dynamic>) {
+        throw GatewayException('frame.invalid', 'feed frame must be an object');
       }
-      if (decoded['ping'] == true) {
-        return null;
-      }
-      return UiFeedMessage.parse(decoded);
+      decoded = value;
     } on FormatException {
-      return null;
+      throw GatewayException('frame.invalid', 'feed frame is not valid json');
     } on TypeError {
+      throw GatewayException('frame.invalid', 'feed frame is not valid json');
+    }
+
+    if (decoded['ping'] == true) {
       return null;
+    }
+
+    final schemaVersion = decoded['schemaVersion'];
+    if (schemaVersion is! int ||
+        schemaVersion != UiFeedMessage.supportedSchemaVersion) {
+      throw GatewayException(
+        'schema.unsupported',
+        'unsupported schema version',
+      );
+    }
+
+    final sequence = decoded['sequence'];
+    if (sequence is! int || sequence < 0) {
+      throw GatewayException('sequence.invalid', 'invalid feed sequence');
+    }
+
+    try {
+      return UiFeedMessage.parse(decoded);
+    } on FormatException catch (error) {
+      final message = error.message;
+      if (message.contains('schema')) {
+        throw GatewayException('schema.unsupported', 'unsupported schema version');
+      }
+      if (message.contains('sequence')) {
+        throw GatewayException('sequence.invalid', 'invalid feed sequence');
+      }
+      throw GatewayException('frame.invalid', 'feed frame rejected');
+    }
+  }
+
+  void _requireSchemaVersion(Map<String, dynamic> body) {
+    final schemaVersion = body['schemaVersion'];
+    if (schemaVersion is! int ||
+        schemaVersion != UiFeedMessage.supportedSchemaVersion) {
+      throw GatewayException(
+        'schema.unsupported',
+        'unsupported schema version',
+      );
+    }
+  }
+
+  Object _sanitizeError(Object error) {
+    if (error is GatewayException) {
+      return GatewayException(error.code, _sanitizedDetail(error.code));
+    }
+    return GatewayException('transport.error', 'connection failure');
+  }
+
+  static String _sanitizedDetail(String code) {
+    switch (code) {
+      case 'schema.unsupported':
+        return 'unsupported schema version';
+      case 'sequence.invalid':
+        return 'invalid feed sequence';
+      case 'frame.invalid':
+        return 'feed frame rejected';
+      default:
+        return 'connection failure';
     }
   }
 

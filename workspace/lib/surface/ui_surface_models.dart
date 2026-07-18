@@ -216,47 +216,50 @@ sealed class UiFeedMessage {
   final int schemaVersion;
   final int sequence;
 
-  static UiFeedMessage? parse(Map<String, dynamic> json) {
+  static UiFeedMessage parse(Map<String, dynamic> json) {
     final schemaVersion = json['schemaVersion'];
-    if (schemaVersion is! int) {
-      return null;
-    }
-    if (schemaVersion != supportedSchemaVersion) {
-      return null;
+    if (schemaVersion is! int || schemaVersion != supportedSchemaVersion) {
+      throw const FormatException('unsupported schema version');
     }
     final type = json['type'];
     if (type is! String) {
-      return null;
+      throw const FormatException('feed frame missing type');
     }
     final sequence = json['sequence'];
-    final resolvedSequence = sequence is int ? sequence : 0;
+    if (sequence is! int || sequence < 0) {
+      throw const FormatException('invalid feed sequence');
+    }
+    switch (type) {
+      case 'snapshot':
+        return UiSnapshotMessage(
+          schemaVersion: schemaVersion,
+          sequence: sequence,
+          snapshot: UiSurfaceSnapshot.fromJson(json),
+        );
+      case 'patch':
+        return UiPatchMessage(
+          schemaVersion: schemaVersion,
+          sequence: sequence,
+          patch: UiSurfacePatch.fromJson(json),
+        );
+      case 'failure':
+        final text = json['text'];
+        if (text is! String) {
+          throw const FormatException('failure frame missing text');
+        }
+        return UiFailureMessage(
+          schemaVersion: schemaVersion,
+          sequence: sequence,
+          text: text,
+        );
+      default:
+        throw FormatException('unsupported feed type $type');
+    }
+  }
+
+  static UiFeedMessage? tryParse(Map<String, dynamic> json) {
     try {
-      switch (type) {
-        case 'snapshot':
-          return UiSnapshotMessage(
-            schemaVersion: schemaVersion,
-            sequence: resolvedSequence,
-            snapshot: UiSurfaceSnapshot.fromJson(json),
-          );
-        case 'patch':
-          return UiPatchMessage(
-            schemaVersion: schemaVersion,
-            sequence: resolvedSequence,
-            patch: UiSurfacePatch.fromJson(json),
-          );
-        case 'failure':
-          final text = json['text'];
-          if (text is! String) {
-            return null;
-          }
-          return UiFailureMessage(
-            schemaVersion: schemaVersion,
-            sequence: resolvedSequence,
-            text: text,
-          );
-        default:
-          return null;
-      }
+      return parse(json);
     } on FormatException {
       return null;
     }

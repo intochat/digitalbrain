@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../gateway/brain_gateway.dart';
 import 'feed_cursor_store.dart';
 import 'ui_surface_client.dart';
 import 'ui_surface_models.dart';
@@ -40,7 +41,16 @@ class UiSurfaceController extends ChangeNotifier {
     _started = true;
     final cursor = cursorStore.read() ?? 0;
     _feedCursor = cursor;
-    _subscription = client.watch(cursor: cursor).listen(_onMessage);
+    _subscription = client
+        .watch(cursor: cursor)
+        .listen(
+          (message) {
+            unawaited(_onMessage(message));
+          },
+          onError: _onTransportError,
+          onDone: _onDone,
+          cancelOnError: false,
+        );
   }
 
   bool ingestRaw(String raw) {
@@ -48,57 +58,81 @@ class UiSurfaceController extends ChangeNotifier {
     try {
       final value = jsonDecode(raw);
       if (value is! Map<String, dynamic>) {
+        _closeProtocol('feed frame rejected');
         return false;
       }
       decoded = value;
     } on FormatException {
+      _closeProtocol('feed frame rejected');
       return false;
     }
 
-    final schemaVersion = decoded['schemaVersion'];
-    if (schemaVersion is int &&
-        schemaVersion != UiFeedMessage.supportedSchemaVersion) {
-      _closedFailure = 'unsupported schema version $schemaVersion';
-      notifyListeners();
+    try {
+      final message = UiFeedMessage.parse(decoded);
+      unawaited(_onMessage(message));
+      return true;
+    } on FormatException catch (error) {
+      if (error.message.contains('schema')) {
+        _closeProtocol('unsupported schema version');
+      } else if (error.message.contains('sequence')) {
+        _closeProtocol('invalid feed sequence');
+      } else {
+        _closeProtocol('feed frame rejected');
+      }
       return false;
     }
-
-    final message = UiFeedMessage.parse(decoded);
-    if (message == null) {
-      return false;
-    }
-    _onMessage(message);
-    return true;
   }
 
   Future<void> sendAction({
     required String surfaceId,
     required String actionId,
+    required int expectedRevision,
   }) async {
     final current = _surfaces[surfaceId];
     if (current == null) {
       return;
     }
-    await client.sendSurfaceAction(
-      surfaceId: surfaceId,
-      actionId: actionId,
-      expectedRevision: current.revision,
-    );
+
+    if (expectedRevision != current.revision) {
+      final recovered = await _recoverSnapshot(surfaceId);
+      if (!recovered) {
+        return;
+      }
+      final refreshed = _surfaces[surfaceId];
+      if (refreshed == null || expectedRevision != refreshed.revision) {
+        _closeProtocol('action revision conflict');
+        return;
+      }
+    }
+
+    try {
+      await client.sendSurfaceAction(
+        surfaceId: surfaceId,
+        actionId: actionId,
+        expectedRevision: expectedRevision,
+      );
+    } catch (error) {
+      _onTransportError(error, StackTrace.current);
+    }
   }
 
-  void _onMessage(UiFeedMessage message) {
-    if (message.sequence > _feedCursor) {
-      _feedCursor = message.sequence;
-      cursorStore.write(_feedCursor);
+  Future<void> _onMessage(UiFeedMessage message) async {
+    if (_closedFailure != null) {
+      return;
+    }
+    if (message.sequence <= _feedCursor) {
+      return;
     }
 
     switch (message) {
       case UiSnapshotMessage(:final snapshot):
         _applySnapshot(snapshot.surface);
+        _commitCursor(message.sequence);
       case UiPatchMessage(:final patch):
-        _applyPatch(patch);
+        await _applyPatch(patch, message.sequence);
       case UiFailureMessage(:final text):
         _sanitizedFailure = text;
+        _commitCursor(message.sequence);
         notifyListeners();
     }
   }
@@ -109,41 +143,80 @@ class UiSurfaceController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _applyPatch(UiSurfacePatch patch) {
+  Future<void> _applyPatch(UiSurfacePatch patch, int sequence) async {
     final current = _surfaces[patch.surfaceId];
-    if (current == null) {
-      unawaited(_requestSnapshot(patch.surfaceId));
+    if (current != null && patch.toRevision <= current.revision) {
+      _commitCursor(sequence);
       return;
     }
 
-    if (patch.toRevision <= current.revision) {
-      return;
+    if (current != null && patch.fromRevision == current.revision) {
+      final updated = UiSurfacePatcher.apply(current, patch);
+      if (updated != null) {
+        _surfaces[patch.surfaceId] = updated;
+        _commitCursor(sequence);
+        notifyListeners();
+        return;
+      }
     }
 
-    if (patch.fromRevision != current.revision) {
-      unawaited(_requestSnapshot(patch.surfaceId));
-      return;
+    final recovered = await _recoverSnapshot(patch.surfaceId);
+    if (recovered) {
+      _commitCursor(sequence);
     }
-
-    final updated = UiSurfacePatcher.apply(current, patch);
-    if (updated == null) {
-      unawaited(_requestSnapshot(patch.surfaceId));
-      return;
-    }
-    _surfaces[patch.surfaceId] = updated;
-    notifyListeners();
   }
 
-  Future<void> _requestSnapshot(String surfaceId) async {
+  Future<bool> _recoverSnapshot(String surfaceId) async {
     if (_snapshotInFlight.contains(surfaceId)) {
-      return;
+      return false;
     }
     _snapshotInFlight.add(surfaceId);
     try {
       final snapshot = await client.fetchSnapshot(surfaceId);
       _applySnapshot(snapshot.surface);
+      return true;
+    } catch (_) {
+      _closeProtocol('connection failure');
+      return false;
     } finally {
       _snapshotInFlight.remove(surfaceId);
+    }
+  }
+
+  void _commitCursor(int sequence) {
+    if (sequence <= _feedCursor) {
+      return;
+    }
+    _feedCursor = sequence;
+    cursorStore.write(_feedCursor);
+  }
+
+  void _onTransportError(Object error, StackTrace stackTrace) {
+    if (error is GatewayException) {
+      _closeProtocol(_sanitizedMessage(error.code));
+      return;
+    }
+    _closeProtocol('connection failure');
+  }
+
+  void _onDone() {}
+
+  void _closeProtocol(String message) {
+    _closedFailure = message;
+    notifyListeners();
+  }
+
+  static String _sanitizedMessage(String code) {
+    switch (code) {
+      case 'schema.unsupported':
+        return 'unsupported schema version';
+      case 'sequence.invalid':
+        return 'invalid feed sequence';
+      case 'action.revision-conflict':
+      case 'action.revision-stale':
+        return 'action revision conflict';
+      default:
+        return 'connection failure';
     }
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../surface/feed_cursor_store.dart';
@@ -9,12 +11,12 @@ class AppShell extends StatefulWidget {
   const AppShell(
     this.client, {
     super.key,
-    this.cursorStore,
+    required this.cursorStore,
     this.controller,
   });
 
   final UiSurfaceClient client;
-  final FeedCursorStore? cursorStore;
+  final FeedCursorStore cursorStore;
   final UiSurfaceController? controller;
 
   @override
@@ -35,11 +37,11 @@ class _AppShellState extends State<AppShell> {
     } else {
       _controller = UiSurfaceController(
         client: widget.client,
-        cursorStore: widget.cursorStore ?? MemoryFeedCursorStore(),
+        cursorStore: widget.cursorStore,
       );
       _ownsController = true;
     }
-    _controller.start();
+    unawaited(_controller.start());
   }
 
   @override

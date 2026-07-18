@@ -70,9 +70,10 @@ void main() {
   group('BrainGateway.sendSurfaceAction', () {
     test('posts opaque action id with expected revision', () async {
       late Map<String, dynamic> capturedBody;
+      late Uri capturedUri;
       final client = MockClient((request) async {
+        capturedUri = request.url;
         expect(request.method, 'POST');
-        expect(request.url.path, '/ui/surface/action');
         capturedBody = jsonDecode(request.body) as Map<String, dynamic>;
         return http.Response(jsonEncode({'status': 'accepted'}), 200);
       });
@@ -84,6 +85,7 @@ void main() {
         expectedRevision: 3,
       );
 
+      expect(capturedUri.path, '/ui/action');
       expect(capturedBody['surfaceId'], 'surface-1');
       expect(capturedBody['actionId'], 'approve');
       expect(capturedBody['expectedRevision'], 3);
@@ -97,8 +99,17 @@ void main() {
       expect(BrainGateway.mapFrame(jsonEncode({'ping': true})), isNull);
     });
 
-    test('returns null for non-JSON text', () {
-      expect(BrainGateway.mapFrame('not json'), isNull);
+    test('throws for non-JSON text', () {
+      expect(
+        () => BrainGateway.mapFrame('not json'),
+        throwsA(
+          isA<GatewayException>().having(
+            (e) => e.code,
+            'code',
+            'frame.invalid',
+          ),
+        ),
+      );
     });
 
     test('maps a surface snapshot frame', () {
@@ -119,9 +130,9 @@ void main() {
       expect(frame!.sequence, 1);
     });
 
-    test('returns null for unknown schema version', () {
+    test('throws for unknown schema version', () {
       expect(
-        BrainGateway.mapFrame(
+        () => BrainGateway.mapFrame(
           jsonEncode({
             'schemaVersion': 99,
             'type': 'snapshot',
@@ -133,7 +144,13 @@ void main() {
             },
           }),
         ),
-        isNull,
+        throwsA(
+          isA<GatewayException>().having(
+            (e) => e.code,
+            'code',
+            'schema.unsupported',
+          ),
+        ),
       );
     });
   });

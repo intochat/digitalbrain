@@ -47,9 +47,10 @@ class UiSurfaceRenderer extends StatelessWidget {
             ...surfaces.map(
               (surface) => _SurfaceCard(
                 surface: surface,
-                onAction: (actionId) => controller.sendAction(
+                onAction: (action) => controller.sendAction(
                   surfaceId: surface.surfaceId,
-                  actionId: actionId,
+                  actionId: action.id,
+                  expectedRevision: action.expectedRevision,
                 ),
               ),
             ),
@@ -64,7 +65,7 @@ class _SurfaceCard extends StatelessWidget {
   const _SurfaceCard({required this.surface, required this.onAction});
 
   final UiSurface surface;
-  final ValueChanged<String> onAction;
+  final ValueChanged<UiAction> onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -102,16 +103,16 @@ class _BlockView extends StatelessWidget {
   const _BlockView({required this.block, required this.onAction});
 
   final UiBlock block;
-  final ValueChanged<String> onAction;
+  final ValueChanged<UiAction> onAction;
 
   @override
   Widget build(BuildContext context) {
     if (!block.isSupported) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
         child: Text(
           'unsupported block',
-          style: const TextStyle(color: BrainColors.inkMuted),
+          style: TextStyle(color: BrainColors.inkMuted),
         ),
       );
     }
@@ -136,7 +137,7 @@ class _BlockView extends StatelessWidget {
               children: block.actions
                   .map(
                     (action) => FilledButton(
-                      onPressed: () => onAction(action.id),
+                      onPressed: () => onAction(action),
                       child: Text(action.label),
                     ),
                   )
