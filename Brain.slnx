@@ -7,6 +7,7 @@
   <Folder Name="/integrations/">
     <Project Path="integrations/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="integrations/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <Project Path="integrations/DigitalBrain.DevTools/DigitalBrain.DevTools.csproj" />
   </Folder>
   <Folder Name="/modules/">
     <Project Path="modules/Google.Contracts/Google.Contracts.csproj" />

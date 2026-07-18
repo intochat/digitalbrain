@@ -28,6 +28,7 @@ public sealed class ProjectTopologyTests
                 "hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
                 "integrations/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj",
                 "integrations/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj",
+                "integrations/DigitalBrain.DevTools/DigitalBrain.DevTools.csproj",
                 "kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj",
                 "kernel/DigitalBrain.Client/DigitalBrain.Client.csproj",
                 "kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj",
@@ -49,6 +50,7 @@ public sealed class ProjectTopologyTests
         Assert.Contains(projectNames, name => name.Equals("DigitalBrain.Aspire", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(projectNames, name => name.Equals("DigitalBrain.Aspire.Hosting", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(projectNames, name => name.Equals("DigitalBrain.Client", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(projectNames, name => name.Equals("DigitalBrain.DevTools", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(projectNames, name => name.Equals("DigitalBrain.Kernel", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(projectNames, name => name.Equals("Google", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(projectNames, name => name.Equals("Google.Contracts", StringComparison.OrdinalIgnoreCase));

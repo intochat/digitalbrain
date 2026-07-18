@@ -13,6 +13,7 @@
     <ProjectReference Include="../../hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <ProjectReference Include="../../integrations/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../../integrations/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../integrations/DigitalBrain.DevTools/DigitalBrain.DevTools.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit" />

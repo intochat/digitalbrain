@@ -32,7 +32,8 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
         "Aspire.Hosting.Orleans"
     ];
 
-    private static readonly string[] DevToolMarkers = ["Agents", "DevUI", "Dashboard"];
+    private static readonly string[] DevToolMarkers =
+        ["Agents", "DevTools", "DevUI", "Dashboard"];
 
     private static readonly string[] ProviderAndJournalMarkers = ["OpenAI", "Anthropic", "Journaling"];
 
@@ -56,6 +57,14 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
             [
                 "DigitalBrain.Abstractions",
                 "Microsoft.Orleans.Client"
+            ],
+            ["DigitalBrain.DevTools"] =
+            [
+                "DigitalBrain.Aspire",
+                "Microsoft.Agents.AI",
+                "Microsoft.Agents.AI.DevUI",
+                "Microsoft.Extensions.AI",
+                "Microsoft.Orleans.Dashboard"
             ]
         };
 
@@ -68,6 +77,7 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
                 "DigitalBrain.Aspire",
                 "DigitalBrain.Aspire.Hosting",
                 "DigitalBrain.Client",
+                "DigitalBrain.DevTools",
                 "DigitalBrain.Kernel"
             ],
             fixture.PackageIds);
@@ -174,10 +184,62 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
                           packageId == "DigitalBrain.Kernel" &&
                           KernelExternalDependencies.Contains(dependencyId, StringComparer.Ordinal),
                     $"{packageId} depends on unexpected package {dependencyId}.");
-                Assert.All(DevToolMarkers, marker =>
-                    Assert.DoesNotContain(marker, dependencyId, StringComparison.OrdinalIgnoreCase));
+                if (packageId != "DigitalBrain.DevTools")
+                {
+                    Assert.All(DevToolMarkers, marker =>
+                        Assert.DoesNotContain(
+                            marker,
+                            dependencyId,
+                            StringComparison.OrdinalIgnoreCase));
+                }
             });
         }
+    }
+
+    [Fact]
+    public void Preview_development_dependencies_are_isolated_to_the_devtools_package()
+    {
+        foreach (var packageId in fixture.PackageIds)
+        {
+            using var package = ZipFile.OpenRead(fixture.PackagePath(packageId));
+            var dependencyIds = DependencyIds(ReadNuspec(package, packageId));
+
+            if (packageId == "DigitalBrain.DevTools")
+            {
+                Assert.Contains("Microsoft.Agents.AI.DevUI", dependencyIds);
+                Assert.Contains("Microsoft.Orleans.Dashboard", dependencyIds);
+                continue;
+            }
+
+            Assert.All(dependencyIds, dependencyId =>
+                Assert.All(DevToolMarkers, marker =>
+                    Assert.DoesNotContain(
+                        marker,
+                        dependencyId,
+                        StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    [Fact]
+    public void Devtools_dependency_versions_match_the_approved_preview_graph()
+    {
+        using var devToolsPackage = ZipFile.OpenRead(
+            fixture.PackagePath("DigitalBrain.DevTools"));
+        var devToolsNuspec = ReadNuspec(devToolsPackage, "DigitalBrain.DevTools");
+        Assert.Equal(
+            "1.13.0-preview.260703.1",
+            DependencyVersion(devToolsNuspec, "Microsoft.Agents.AI.DevUI"));
+        var dashboardVersion = DependencyVersion(
+            devToolsNuspec,
+            "Microsoft.Orleans.Dashboard");
+        Assert.Equal("10.2.2-rc.2", dashboardVersion);
+
+        using var clientPackage = ZipFile.OpenRead(
+            fixture.PackagePath("DigitalBrain.Client"));
+        var clientNuspec = ReadNuspec(clientPackage, "DigitalBrain.Client");
+        Assert.Equal(
+            dashboardVersion,
+            DependencyVersion(clientNuspec, "Microsoft.Orleans.Client"));
     }
 
     [Fact]
@@ -281,4 +343,15 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
             .Cast<string>()
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+
+    private static string? DependencyVersion(XDocument nuspec, string packageId) =>
+        nuspec.Descendants()
+            .Single(element =>
+                element.Name.LocalName == "dependency" &&
+                string.Equals(
+                    element.Attribute("id")?.Value,
+                    packageId,
+                    StringComparison.Ordinal))
+            .Attribute("version")
+            ?.Value;
 }

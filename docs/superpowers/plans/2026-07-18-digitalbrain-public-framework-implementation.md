@@ -374,6 +374,10 @@ dotnet build .\Brain.slnx -c Release
 - `Directory.Packages.props`
 - `integrations/DigitalBrain.DevTools/**`
 - `tests/DigitalBrain.Tests/DevTools/**`
+- `Brain.slnx`
+- `tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj`
+- `tests/DigitalBrain.Tests/Architecture/ProjectTopologyTests.cs`
+- `tests/DigitalBrain.PackageTests/PackageContentTests.cs`
 
 **Red tests:**
 
@@ -386,12 +390,12 @@ dotnet build .\Brain.slnx -c Release
 
 **Implementation:**
 
-- [ ] Pin `Microsoft.Orleans.Dashboard` `10.2.2-rc.2` and prove compatibility with the `10.2.2-rc.2` Orleans client.
-- [ ] Pin `Microsoft.Agents.AI.DevUI` preview only in `DigitalBrain.DevTools`.
-- [ ] Add minimal host registration and endpoint helpers.
-- [ ] Adapt owner-bound DigitalBrain conversation proxies to Agent Framework agents.
-- [ ] Bind the same Development-only `digitalbrain-owner` parameter used by the console and create an owner session before registering DevUI agents.
-- [ ] Add access-control and environment guards.
+- [x] Pin `Microsoft.Orleans.Dashboard` `10.2.2-rc.2` and prove compatibility with the `10.2.2-rc.2` Orleans client.
+- [x] Pin `Microsoft.Agents.AI.DevUI` preview only in `DigitalBrain.DevTools`.
+- [x] Add minimal host registration and endpoint helpers.
+- [x] Adapt owner-bound DigitalBrain conversation proxies to Agent Framework agents.
+- [x] Bind the same Development-only `digitalbrain-owner` parameter used by the console and create an owner session before registering DevUI agents.
+- [x] Add access-control and environment guards.
 
 **Gate:**
 
@@ -402,6 +406,8 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 **Review focus:** preview dependency isolation, credential isolation, local access controls, and accidental production enablement.
 
 **Commit:** `feat: add DigitalBrain development tools`
+
+**Execution record (2026-07-18):** Baseline HEAD was `a7390c8574c2557397014d7e99417a918473a1f2` on `master`. The assigned paths were amended before commit to include the solution entry, test project reference, topology assertion, and package dependency contract required by the new public package. Official NuGet metadata, restored XML documentation and assemblies, and official package source verified the Orleans Dashboard client/silo registration and route APIs, the Agent Framework DevUI, Responses, Conversations, keyed-agent hosting APIs, and the `IChatClient` contract. `DigitalBrain.DevTools` is a net8-only optional package with the exact direct graph `DigitalBrain.Aspire`, `Microsoft.Agents.AI`, `Microsoft.Agents.AI.DevUI`, `Microsoft.Extensions.AI`, and `Microsoft.Orleans.Dashboard`; package tests pin DevUI `1.13.0-preview.260703.1`, align Dashboard and Orleans Client at `10.2.2-rc.2`, and forbid every dev-tool marker from the other public packages. The standalone dashboard uses the restricted DigitalBrain Aspire client and the official dashboard routes; the silo helper adds the official cluster half. DevUI exposes exactly the fast, balanced, and reasoning owner-bound agents, validates and disposes an explicit owner session before discovery, and opens a fresh owner session for every durable turn without retaining a privileged client. Dashboard, UI, discovery, Responses, and Conversations share fail-closed endpoint guards: direct loopback is the Development default, forwarded callers never count as loopback, remote access always requires a bearer token, and production additionally requires explicit opt-in plus a token even when loopback-only. Three read-only reviews covered package isolation, security/owner authority, and exact package API/runtime use; all actionable findings were fixed, and the final API review reported no P0-P2 findings. The exact Task 7 gate passed DigitalBrain.Tests 245 / 245, the additional package gate passed 15 / 15, and the Release solution build completed with zero warnings or errors. The first exact root checkpoint encountered one unchanged timing-sensitive OpenAI cancellation-test timeout while the other 272 tests passed; an unchanged exact rerun passed DigitalBrain.Tests 245 / 245, DigitalBrain.PackageTests 15 / 15, and Brain.FeasibilityTests 13 / 13. `aspire doctor` passed 5 / 5 with no warnings or failures, Aspire inspection confirmed no running AppHost, and comment, dependency-isolation, generated-artifact, and `git diff --check` scans passed.
 
 ## Task 8: Build the package-only quickstart
 
