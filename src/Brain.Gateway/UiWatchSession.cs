@@ -5,12 +5,12 @@ namespace Brain.Gateway;
 public sealed class UiWatchSession
 {
     private readonly Func<Func<UiFeedFrame, Task>, Task> _subscribeLive;
-    private readonly Func<long, int, Task<UiFeedPage>> _readDurable;
+    private readonly Func<long, int, Task<Brain.Contracts.UiFeedPage>> _readDurable;
     private readonly Func<string, Task<UiSurfaceSnapshot>> _fetchSnapshot;
 
     public UiWatchSession(
         Func<Func<UiFeedFrame, Task>, Task> subscribeLive,
-        Func<long, int, Task<UiFeedPage>> readDurable,
+        Func<long, int, Task<Brain.Contracts.UiFeedPage>> readDurable,
         Func<string, Task<UiSurfaceSnapshot>> fetchSnapshot)
     {
         ArgumentNullException.ThrowIfNull(subscribeLive);
@@ -21,7 +21,7 @@ public sealed class UiWatchSession
         _fetchSnapshot = fetchSnapshot;
     }
 
-    public async Task<UiFeedPage> ReconnectAsync(long cursor, int max)
+    public async Task<Brain.Contracts.UiFeedPage> ReconnectAsync(long cursor, int max)
     {
         var liveBuffer = new List<UiFeedFrame>();
         var liveBufferGate = new object();
@@ -99,6 +99,6 @@ public sealed class UiWatchSession
             nextCursor = Math.Max(nextCursor, merged[^1].Sequence);
         }
 
-        return new UiFeedPage(merged, nextCursor);
+        return new Brain.Contracts.UiFeedPage(merged, nextCursor);
     }
 }

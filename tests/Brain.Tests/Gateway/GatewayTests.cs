@@ -19,9 +19,9 @@ public sealed class GatewayTests
         Assert.NotNull(owner.LastAction);
         Assert.Equal("approve-reply", owner.LastAction!.Payload.ActionId);
         Assert.Equal(7, owner.LastAction.Payload.ExpectedRevision);
-        Assert.Equal(DevelopmentPrincipal.OrganizationId, owner.LastAction.Metadata.OrganizationId);
-        Assert.Equal(DevelopmentPrincipal.PrincipalId, owner.LastAction.Metadata.PrincipalId);
-        Assert.Equal(DevelopmentPrincipal.SpaceId, owner.LastAction.Metadata.SpaceId);
+        Assert.Equal(DevelopmentPrincipal.Current.OrganizationId, owner.LastAction.Metadata.OrganizationId);
+        Assert.Equal(DevelopmentPrincipal.Current.PrincipalId, owner.LastAction.Metadata.PrincipalId);
+        Assert.Equal(DevelopmentPrincipal.Current.SpaceId, owner.LastAction.Metadata.SpaceId);
     }
 
     [Fact]
@@ -87,8 +87,8 @@ public sealed class GatewayTests
     public void Development_principal_populates_organization_principal_and_space()
     {
         var source = new NeuronAddress(
-            DevelopmentPrincipal.OrganizationId,
-            DevelopmentPrincipal.SpaceId,
+            DevelopmentPrincipal.Current.OrganizationId,
+            DevelopmentPrincipal.Current.SpaceId,
             "chat.group.v1",
             "chat-1");
         var metadata = GatewayCommandFactory.CreateMetadata(source);
@@ -96,9 +96,9 @@ public sealed class GatewayTests
         Assert.False(string.IsNullOrWhiteSpace(metadata.OrganizationId.Value));
         Assert.False(string.IsNullOrWhiteSpace(metadata.PrincipalId.Value));
         Assert.False(string.IsNullOrWhiteSpace(metadata.SpaceId.Value));
-        Assert.Equal(DevelopmentPrincipal.OrganizationId, metadata.OrganizationId);
-        Assert.Equal(DevelopmentPrincipal.PrincipalId, metadata.PrincipalId);
-        Assert.Equal(DevelopmentPrincipal.SpaceId, metadata.SpaceId);
+        Assert.Equal(DevelopmentPrincipal.Current.OrganizationId, metadata.OrganizationId);
+        Assert.Equal(DevelopmentPrincipal.Current.PrincipalId, metadata.PrincipalId);
+        Assert.Equal(DevelopmentPrincipal.Current.SpaceId, metadata.SpaceId);
     }
 
     private static UiSurfacePatch Patch(long from, long to) =>

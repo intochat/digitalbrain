@@ -9,8 +9,8 @@ public sealed class UiGatewayService(ISurfaceOwnerResolver surfaceOwnerResolver)
     {
         var owner = surfaceOwnerResolver.Resolve(contractId, instanceId);
         var source = new NeuronAddress(
-            DevelopmentPrincipal.OrganizationId,
-            DevelopmentPrincipal.SpaceId,
+            DevelopmentPrincipal.Current.OrganizationId,
+            DevelopmentPrincipal.Current.SpaceId,
             contractId,
             instanceId);
         var command = GatewayCommandFactory.CreateCommand(

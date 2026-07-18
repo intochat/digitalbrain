@@ -16,11 +16,20 @@ public sealed class ClusterTypedNeuronLookup(IClusterClient clusterClient) : ITy
     private Brain.Client.Brain BrainClient => new(clusterClient);
 
     public IGroupChat GetGroupChat(string instanceId) =>
-        BrainClient.Get<IGroupChat>(DevelopmentPrincipal.OrganizationId, DevelopmentPrincipal.SpaceId, instanceId);
+        BrainClient.Get<IGroupChat>(
+            DevelopmentPrincipal.Current.OrganizationId,
+            DevelopmentPrincipal.Current.SpaceId,
+            instanceId);
 
     public IGmail GetGmail(string instanceId) =>
-        BrainClient.Get<IGmail>(DevelopmentPrincipal.OrganizationId, DevelopmentPrincipal.SpaceId, instanceId);
+        BrainClient.Get<IGmail>(
+            DevelopmentPrincipal.Current.OrganizationId,
+            DevelopmentPrincipal.Current.SpaceId,
+            instanceId);
 
     public ISalesforce GetSalesforce(string instanceId) =>
-        BrainClient.Get<ISalesforce>(DevelopmentPrincipal.OrganizationId, DevelopmentPrincipal.SpaceId, instanceId);
+        BrainClient.Get<ISalesforce>(
+            DevelopmentPrincipal.Current.OrganizationId,
+            DevelopmentPrincipal.Current.SpaceId,
+            instanceId);
 }

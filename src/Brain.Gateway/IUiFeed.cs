@@ -17,7 +17,7 @@ public interface IUiFeed : IGrainWithStringKey
 
 
 
-[GenerateSerializer, Alias("brain.ui-feed-page.v1")]
+[GenerateSerializer, Alias("brain.gateway.ui-feed-page.v1")]
 public sealed record UiFeedPage(
     [property: Id(0)] IReadOnlyList<FeedEvent> Events,
     [property: Id(1)] long NextCursor);

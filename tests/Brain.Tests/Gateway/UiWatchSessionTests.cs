@@ -19,7 +19,7 @@ public sealed class UiWatchSessionTests
             async (cursor, max) =>
             {
                 callOrder.Add("read");
-                return new UiFeedPage([], cursor);
+                return new Brain.Contracts.UiFeedPage([], cursor);
             },
             surfaceId => Task.FromResult(
                 new UiSurfaceSnapshot(new UiSurface(surfaceId, 0, []))));
@@ -58,7 +58,7 @@ public sealed class UiWatchSessionTests
             {
                 await onLiveFrame(sharedFrame);
             },
-            async (cursor, max) => new UiFeedPage([earlierFrame, sharedFrame], NextCursor: 2),
+            async (cursor, max) => new Brain.Contracts.UiFeedPage([earlierFrame, sharedFrame], NextCursor: 2),
             surfaceId => Task.FromResult(
                 new UiSurfaceSnapshot(new UiSurface(surfaceId, 0, []))));
 
@@ -100,7 +100,7 @@ public sealed class UiWatchSessionTests
         var fetchedSurfaceIds = new List<string>();
         var session = new UiWatchSession(
             async onLiveFrame => await Task.CompletedTask,
-            async (cursor, max) => new UiFeedPage([snapshotFrame, patchFrame], NextCursor: 2),
+            async (cursor, max) => new Brain.Contracts.UiFeedPage([snapshotFrame, patchFrame], NextCursor: 2),
             surfaceId =>
             {
                 fetchedSurfaceIds.Add(surfaceId);

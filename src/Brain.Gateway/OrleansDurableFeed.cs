@@ -4,7 +4,9 @@ public sealed class OrleansDurableFeed(IUiFeedGrainAccessor feedAccessor) : IDur
 {
     public async Task<IReadOnlyList<FeedEvent>> ReadPageAsync(long afterRevision, int pageSize, CancellationToken cancellationToken = default)
     {
-        var feed = feedAccessor.GetFeed(DevelopmentPrincipal.OrganizationId, DevelopmentPrincipal.SpaceId);
+        var feed = feedAccessor.GetFeed(
+            DevelopmentPrincipal.Current.OrganizationId,
+            DevelopmentPrincipal.Current.SpaceId);
         var page = await feed.ReadPageAsync(afterRevision, pageSize);
         return page.Events;
     }

@@ -65,7 +65,7 @@ public sealed class GatewayCorrectionTests
         Assert.Equal(1L, grain.LastAfterRevision);
         Assert.Equal(10, grain.LastPageSize);
         Assert.Equal(2, page.Count);
-        Assert.Equal(IUiFeed.FeedContractId, grain.RequestedKey.Split('|')[2].Split('/')[0]);
+        Assert.Equal(Brain.Gateway.IUiFeed.FeedContractId, grain.RequestedKey.Split('|')[2].Split('/')[0]);
     }
 
     [Fact]
@@ -142,29 +142,31 @@ internal sealed class DisposableLiveFeed : ILiveFeedSubscription
     }
 }
 
-internal sealed class RecordingUiFeedGrain : IUiFeed
+internal sealed class RecordingUiFeedGrain : Brain.Gateway.IUiFeed
 {
     public Dictionary<long, IReadOnlyList<FeedEvent>> Pages { get; } = new();
     public long LastAfterRevision { get; private set; }
     public int LastPageSize { get; private set; }
-    public string RequestedKey { get; set; } = IUiFeed.CreateGrainKey(DevelopmentPrincipal.OrganizationId, DevelopmentPrincipal.SpaceId);
+    public string RequestedKey { get; set; } = Brain.Gateway.IUiFeed.CreateGrainKey(
+        DevelopmentPrincipal.Current.OrganizationId,
+        DevelopmentPrincipal.Current.SpaceId);
 
-    public Task<UiFeedPage> ReadPageAsync(long afterRevision, int pageSize)
+    public Task<Brain.Gateway.UiFeedPage> ReadPageAsync(long afterRevision, int pageSize)
     {
         LastAfterRevision = afterRevision;
         LastPageSize = pageSize;
         var events = Pages.TryGetValue(afterRevision, out var page) ? page : Array.Empty<FeedEvent>();
         var next = events.Count == 0 ? afterRevision : events[^1].Revision;
-        return Task.FromResult(new UiFeedPage(events, next));
+        return Task.FromResult(new Brain.Gateway.UiFeedPage(events, next));
     }
 }
 
-internal sealed class FixedUiFeedGrainAccessor(IUiFeed grain) : IUiFeedGrainAccessor
+internal sealed class FixedUiFeedGrainAccessor(Brain.Gateway.IUiFeed grain) : IUiFeedGrainAccessor
 {
-    public IUiFeed GetFeed(OrganizationId organizationId, SpaceId spaceId)
+    public Brain.Gateway.IUiFeed GetFeed(OrganizationId organizationId, SpaceId spaceId)
     {
         if (grain is RecordingUiFeedGrain recording)
-            recording.RequestedKey = IUiFeed.CreateGrainKey(organizationId, spaceId);
+            recording.RequestedKey = Brain.Gateway.IUiFeed.CreateGrainKey(organizationId, spaceId);
         return grain;
     }
 }
