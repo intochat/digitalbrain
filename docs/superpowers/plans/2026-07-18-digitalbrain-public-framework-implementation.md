@@ -1,107 +1,48 @@
 # DigitalBrain Public Framework Implementation Plan
 
-> **For Claude Code:** Execute this plan task-by-task using test-driven development. Codex is the sole operator, reviewer, verifier, and committer. Claude Code performs substantive implementation. Grok CLI performs read-only refinement and code review only.
+> **For Claude Code:** Execute this plan task-by-task using test-driven development. One Claude Code session is the sole orchestrator, implementer, verifier, reviewer, and committer. Read-only subagents may be used for review and exploration only; editing is never delegated.
 
 **Goal:** Turn the approved durable neuron foundation into an easy-to-consume public DigitalBrain NuGet framework with separate Aspire hosting and client integrations, real OpenAI and Anthropic role binding, package-only quickstart samples, and development-only Orleans Dashboard and Agent Framework DevUI hosts.
 
 **Architecture:** `DigitalBrainResource` composes official Orleans, Azure Storage, model, embedding, and secret resources. Kernel references receive privileged configuration; `AsClient()` references receive only Orleans client discovery. Public packages target `net8.0`. Samples consume locally packed packages and prove the framework from outside its source graph.
 
-**Primary stack:** Aspire `13.4.6`; Orleans Core/Client/Server `10.2.2-rc.2`; `Microsoft.Orleans.Journaling` and `.AzureStorage` `10.2.2-rc.2.alpha.1`; Microsoft.Extensions.AI `10.8.0`; stable `Aspire.Hosting.OpenAI`; Anthropic official C# SDK `12.36.0`; `Microsoft.Orleans.Dashboard` `10.2.2-rc.1` with an explicit rc.2-client compatibility gate; Microsoft Agent Framework DevUI `1.13.0-preview.260703.1` isolated as development-only; Azure Storage/Azurite; xUnit; NuGet pack; SourceLink.
+**Primary stack:** Aspire `13.4.6`; Orleans Core/Client/Server `10.2.2-rc.2`; `Microsoft.Orleans.Journaling` and `.AzureStorage` `10.2.2-rc.2.alpha.1`; Microsoft.Extensions.AI `10.8.0`; stable `Aspire.Hosting.OpenAI` `13.4.6`; Anthropic official C# SDK `12.36.0`; OpenAI official SDK `2.12.0`; `Microsoft.Orleans.Dashboard` `10.2.2-rc.2` aligned with the Orleans client, keeping the explicit live compatibility gate; Microsoft Agent Framework DevUI `1.13.0-preview.260703.1` isolated as development-only; Azure Storage/Azurite; xUnit; NuGet pack; SourceLink.
 
 **TFM strategy:** Every public DigitalBrain package and package-only quickstart project targets `net8.0`. Existing repository hosts/tests may remain `net11.0` and consume those packages. The official Orleans journaling packages contain both `net8.0` and `net10.0` assets; the plan does not claim that the selected Orleans or DevUI packages are stable.
 
 ## Operator model
 
-- Codex reads repository instructions, performs research, prepares task prompts, inspects all diffs, runs independent verification, and commits.
-- Exactly one editing Claude Code session runs at a time against `E:\brain`.
-- Claude must not spawn subagents, stage, commit, push, merge, rebase, create a branch, create a worktree, or edit this plan.
-- Claude receives only one task, assigned paths, the observed red test, constraints, and expected outcome.
-- If Claude produces a defect, Codex resumes the same Claude session with an exact correction order.
-- Grok CLI never edits. It reviews the design, plan, task diffs, and final result with write tools disabled by prompt and scope.
+- One Claude Code session in `E:\brain` on local branch `master` is the sole orchestrator, implementer, verifier, reviewer, and committer.
+- All edits happen in the main session. Read-only subagents are allowed for review and exploration only; editing is never delegated.
+- No branches, no worktrees, never push. Each task is committed with the plan's exact commit message once its gates are green.
+- The plan checkboxes are updated by the same session as tasks complete.
+- The user's documentation override applies: verify every package/framework API with Microsoft Learn, official Aspire/Orleans/OpenAI/Anthropic documentation, and official NuGet metadata (api.nuget.org) before writing code against it.
+- Use CodeGraph before reading or changing indexed source and for blast radius before and after each task.
+- Any external publish (NuGet test service or nuget.org) requires explicit in-chat user approval first.
 - `sources/**` is read-only historical evidence and is never copied as authority.
 
-## Claude Code launch protocol
-
-Codex launches Claude Code `2.1.214` or the currently installed compatible version in non-interactive structured-output mode:
-
-```powershell
-$beforeHead = git rev-parse HEAD
-$beforeStatus = git status --porcelain=v1
-if ($beforeStatus) { throw "Claude implementation sessions require a clean task boundary." }
-
-$schema = '{"type":"object","additionalProperties":false,"properties":{"summary":{"type":"string"},"changedPaths":{"type":"array","items":{"type":"string"}},"redCommand":{"type":"string"},"redResult":{"type":"string"},"greenCommands":{"type":"array","items":{"type":"string"}},"greenResults":{"type":"array","items":{"type":"string"}},"risks":{"type":"array","items":{"type":"string"}}},"required":["summary","changedPaths","redCommand","redResult","greenCommands","greenResults","risks"]}'
-
-$claudeJson = claude `
-  --model opus `
-  --effort max `
-  --permission-mode bypassPermissions `
-  --disallowedTools Agent `
-  --output-format json `
-  --json-schema $schema `
-  --name "digitalbrain-task-$taskNumber" `
-  --print `
-  $prompt
-
-$claudeResult = $claudeJson | ConvertFrom-Json
-$sessionId = $claudeResult.session_id
-if (-not $sessionId) { throw "Claude Code did not return a session ID." }
-```
-
-Correction:
-
-```powershell
-$claudeJson = claude `
-  --resume $sessionId `
-  --model opus `
-  --effort max `
-  --permission-mode bypassPermissions `
-  --disallowedTools Agent `
-  --output-format json `
-  --json-schema $schema `
-  --print `
-  $correctionPrompt
-```
-
-Each Claude prompt includes:
-
-```text
-You are the bounded implementation worker for one task in the approved DigitalBrain public framework plan.
-
-Read E:\brain\AGENTS.md and E:\brain\CLAUDE.md completely. The user overrides the Context7 rule for this work. Use Microsoft Learn, official Aspire documentation, official provider documentation, official NuGet metadata, and dotnet-inspect. Use CodeGraph before reading or changing indexed source.
-
-Work directly in E:\brain on the current master worktree. Touch only the assigned paths. Preserve unrelated changes. Never touch sources/**.
-
-Use test-driven development: add the specified failing test, run it and report the actual failure, implement the smallest supported solution, rerun the owning tests, and refactor only while green.
-
-Do not spawn subagents. Do not stage, commit, push, merge, rebase, create a branch, create a worktree, or edit the plan. Codex owns orchestration, review, verification, and commits.
-
-Do not introduce Kind routing, DispatchProxy, generic JSON invocation, keyed provider DI, copied provider APIs, Ask, InvokeMcpTool, a custom journal provider, volatile production durability, streams as truth, production fake AI clients, secret leakage through AsClient(), or sample ProjectReference shortcuts.
-
-Before returning, run the owning tests and git diff --check. Return changed paths, exact red and green commands, results, risks, and anything not proven.
-```
-
-## Codex task gate
+## Per-task loop
 
 Before every task:
 
-1. Confirm clean worktree and record HEAD/status.
-2. Query CodeGraph for assigned symbols and blast radius.
-3. Re-check any used API with official documentation, official NuGet metadata, or dotnet-inspect.
-4. Run the task's red test independently.
-5. Launch one bounded Claude session.
+1. Confirm a clean worktree; record HEAD.
+2. Query CodeGraph for the task's assigned symbols and blast radius.
+3. Run the official API/NuGet preflight for every API the task touches.
+
+During every task, strict TDD:
+
+1. Add the assigned failing test; run the owning project and record the real failure.
+2. Implement the minimum supported behavior; rerun the owning project to green; refactor only while green.
+3. Never use `dotnet test --filter`.
+4. Stay within the task's assigned paths; restore any out-of-scope edit before proceeding.
 
 After every task:
 
-1. Confirm HEAD is unchanged and compare status with the pre-session snapshot.
-2. Inspect every changed path and the complete diff.
-3. Reject and have Claude restore every out-of-scope path.
-4. Run `git diff --check`.
-5. Query CodeGraph for the final blast radius.
-6. Run the owning test project and every task gate.
-7. For AppHost/integration changes, run `aspire doctor --non-interactive`, inspect `aspire ps --non-interactive`, and validate the publish manifest.
-8. Run a read-only Grok review of security-sensitive, package-boundary, or Aspire-resource tasks.
-9. Commit only when evidence is green.
-10. Mark the task checkbox and continue without routine pauses.
+1. Run the task's gates exactly as listed, plus the exact root suite (`dotnet test`) at integration points and the aspire doctor/publish gates where specified.
+2. At review checkpoints — security-sensitive, durability, Aspire-resource, package-boundary, dev-tools, demolition, and final tasks — run a code review of the task diff with a read-only reviewer at high effort; fix every actionable finding in the same session and re-run the owning gates.
+3. Run `git diff --check`.
+4. Commit with the plan's exact message; tick the plan checkboxes.
+5. Continue immediately to the next task without routine pauses.
 
 ## Task 0: Archive and remove the failed Task 7 attempt; record baseline
 
@@ -116,16 +57,19 @@ After every task:
 
 **Operator actions:**
 
-- [ ] Confirm these are the only dirty paths.
-- [ ] Save a binary patch outside the repository at `E:\brain-recovery\2026-07-18-failed-task7.patch`.
-- [ ] Record HEAD, SDKs, workloads, package sources, Claude version/auth health, Grok version/auth health, Aspire doctor, and current test totals.
-- [ ] Have a bounded Claude session restore only the listed failed Task 7 paths to HEAD and remove only the listed untracked Task 7 directories.
-- [ ] Confirm the worktree is clean.
-- [ ] Run `git diff --check`.
-- [ ] Run the existing DigitalBrain tests and root solution build.
-- [ ] Commit no code for the cleanup unless a tracked recovery record is deliberately added.
+- [x] Confirm these are the only dirty paths.
+- [x] Save a binary patch outside the repository at `E:\brain-recovery\2026-07-18-failed-task7.patch`.
+- [x] Record HEAD, SDKs, package pins, Aspire doctor, and current test totals.
+- [x] Restore only the listed failed Task 7 paths to HEAD and remove only the listed untracked Task 7 directories.
+- [x] Confirm the worktree is clean.
+- [x] Run `git diff --check`.
+- [x] Run the existing DigitalBrain tests and root solution build.
+- [x] Commit no code for the cleanup unless a tracked recovery record is deliberately added.
+- [x] Adapt this plan for direct single-actor execution and record the dependency verification below.
 
 **Kill condition:** Stop if any dirty path is not part of the known failed Task 7 output.
+
+**Execution record (2026-07-18):** Baseline HEAD `59bd14a25e30233c48cc7fc3a45b30af4ffe9e07` on `master`. The dirty paths matched the six known failed Task 7 paths exactly; the binary patch captures all ten files including untracked content. After restore and deletion the worktree is clean and `git diff --check` passes. SDKs: dotnet `11.0.100-preview.6.26359.118`, aspire CLI `13.4.6`. `aspire doctor --non-interactive`: 5 passed, 0 warnings, 0 failed. Root build: 0 errors. Root test suite: DigitalBrain.Tests 51 passed / 0 failed / 0 skipped; Brain.FeasibilityTests 11 passed / 0 failed / 0 skipped. Live api.nuget.org flat-container verification: Orleans Core family latest is `10.2.2-rc.2` with no stable `10.2.2`; `Microsoft.Orleans.Journaling` and `.AzureStorage` latest are `10.2.2-rc.2.alpha.1` with no stable journaling release; `Microsoft.Orleans.Dashboard` latest is `10.2.2-rc.2`, so the pin moves from `10.2.2-rc.1` to `10.2.2-rc.2` while keeping the live compatibility gate; `Microsoft.Extensions.AI` and `.OpenAI` latest stable `10.8.0`; `Anthropic` latest `12.36.0`; `OpenAI` latest stable `2.12.0`; `Microsoft.Agents.AI.DevUI` latest `1.13.0-preview.260703.1`; `Aspire.Hosting` and `Aspire.Hosting.OpenAI` latest stable `13.4.6`.
 
 ## Task 1: Establish public package identity and packaging quality
 
@@ -307,7 +251,7 @@ aspire doctor --non-interactive
 aspire publish --apphost .\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj --output-path .\artifacts\aspire-host --non-interactive
 ```
 
-**Read-only Grok focus:** secret projection, composite resource ownership, provider-resource correctness, and forbidden architecture.
+**Review focus:** secret projection, composite resource ownership, provider-resource correctness, and forbidden architecture.
 
 **Commit:** `feat: add DigitalBrain Aspire hosting resource`
 
@@ -382,7 +326,7 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 dotnet build .\Brain.slnx -c Release
 ```
 
-**Read-only Grok focus:** durability authority, recovery, idempotency, stream semantics, and production storage.
+**Review focus:** durability authority, recovery, idempotency, stream semantics, and production storage.
 
 **Commit:** `feat: expose the durable DigitalBrain kernel`
 
@@ -405,7 +349,7 @@ dotnet build .\Brain.slnx -c Release
 
 **Implementation:**
 
-- [ ] Pin `Microsoft.Orleans.Dashboard` `10.2.2-rc.1` and prove compatibility with the `10.2.2-rc.2` Orleans client.
+- [ ] Pin `Microsoft.Orleans.Dashboard` `10.2.2-rc.2` and prove compatibility with the `10.2.2-rc.2` Orleans client.
 - [ ] Pin `Microsoft.Agents.AI.DevUI` preview only in `DigitalBrain.DevTools`.
 - [ ] Add minimal host registration and endpoint helpers.
 - [ ] Adapt owner-bound DigitalBrain conversation proxies to Agent Framework agents.
@@ -418,7 +362,7 @@ dotnet build .\Brain.slnx -c Release
 dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 ```
 
-**Read-only Grok focus:** preview dependency isolation, credential isolation, local access controls, and accidental production enablement.
+**Review focus:** preview dependency isolation, credential isolation, local access controls, and accidental production enablement.
 
 **Commit:** `feat: add DigitalBrain development tools`
 
@@ -470,7 +414,7 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 aspire publish --apphost .\samples\DigitalBrain.Quickstart\DigitalBrain.Quickstart.AppHost\DigitalBrain.Quickstart.AppHost.csproj --output-path .\artifacts\quickstart-publish --non-interactive
 ```
 
-**Read-only Grok focus:** true package consumption, setup simplicity, secret flow, and direct provider bypasses.
+**Review focus:** true package consumption, setup simplicity, secret flow, and direct provider bypasses.
 
 **Commit:** `samples: add DigitalBrain package quickstart`
 
@@ -546,7 +490,7 @@ rg -n "DispatchProxy|InvokeMcpTool|\\bAsk\\b|Kind routing|JsonElement" kernel in
 git diff --check
 ```
 
-**Read-only Grok focus:** deletion completeness, hidden compatibility paths, duplicate package identity, generic routing, and MCP duplication.
+**Review focus:** deletion completeness, hidden compatibility paths, duplicate package identity, generic routing, and MCP duplication.
 
 **Commit:** `refactor: remove superseded DigitalBrain architecture`
 
@@ -604,9 +548,9 @@ git diff --check
 - [ ] Verify Orleans Dashboard and DevUI.
 - [ ] Run `git diff --check`.
 - [ ] Query CodeGraph for the final architecture and blast radius.
-- [ ] Run a fresh read-only Grok architecture review.
-- [ ] Run a second read-only Grok review focused on NuGet usability, samples, secret boundaries, durability, and forbidden shortcuts.
-- [ ] Send every actionable finding to a bounded Claude correction session and repeat owning gates.
+- [ ] Run a fresh read-only architecture review.
+- [ ] Run a second read-only review focused on NuGet usability, samples, secret boundaries, durability, and forbidden shortcuts.
+- [ ] Fix every actionable finding in this session and repeat the owning gates.
 - [ ] Confirm clean worktree.
 - [ ] Prepare prerelease packages and checksums.
 - [ ] Stop before public NuGet push unless the operator has explicit API-key authority.
