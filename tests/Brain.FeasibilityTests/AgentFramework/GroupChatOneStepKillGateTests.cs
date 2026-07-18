@@ -32,8 +32,16 @@ public sealed class GroupChatOneStepKillGateTests
         Assert.NotNull(result.Checkpoint);
         Assert.False(string.IsNullOrWhiteSpace(result.Checkpoint.CheckpointId));
         Assert.False(string.IsNullOrWhiteSpace(result.Checkpoint.SessionId));
-        Assert.True(result.SuperStepCompletions >= 1);
-        Assert.NotEmpty(await harness.Store.RetrieveIndexAsync(result.Checkpoint.SessionId));
+        Assert.Equal(1, result.ResponseBearingCheckpointCount);
+        Assert.Single(result.ParticipantResponses);
+
+        var storedCheckpoints = (await harness.Store.RetrieveIndexAsync(result.Checkpoint.SessionId)).ToArray();
+        Assert.Contains(
+            storedCheckpoints,
+            checkpoint =>
+                checkpoint.CheckpointId == result.Checkpoint.CheckpointId &&
+                checkpoint.SessionId == result.Checkpoint.SessionId);
+
         var payload = await harness.Store.RetrieveCheckpointAsync(result.Checkpoint.SessionId, result.Checkpoint);
         Assert.Equal(JsonValueKind.Object, payload.ValueKind);
     }
@@ -77,7 +85,6 @@ public sealed class GroupChatOneStepKillGateTests
         Assert.True(
             result.StatusAtStop is RunStatus.Idle or RunStatus.Ended or RunStatus.PendingRequests,
             $"Unexpected run status after stop: {result.StatusAtStop}");
-        Assert.Equal(RunStatus.Ended, result.StatusAfterDispose);
     }
 
     [Fact]
@@ -202,9 +209,8 @@ internal sealed class GroupChatOneStepHarness
         return new AdvanceResult(
             drained.ParticipantResponses,
             drained.Checkpoint ?? LastCheckpoint,
-            drained.SuperStepCompletions,
+            drained.ResponseBearingCheckpointCount,
             drained.StatusAtStop,
-            RunStatus.Ended,
             UsedCheckpointResume: true,
             UsedRebuildFallback: false);
     }
@@ -237,9 +243,8 @@ internal sealed class GroupChatOneStepHarness
         return new AdvanceResult(
             drained.ParticipantResponses,
             drained.Checkpoint ?? LastCheckpoint,
-            drained.SuperStepCompletions,
+            drained.ResponseBearingCheckpointCount,
             drained.StatusAtStop,
-            RunStatus.Ended,
             UsedCheckpointResume: false,
             UsedRebuildFallback: false);
     }
@@ -247,9 +252,9 @@ internal sealed class GroupChatOneStepHarness
     private async Task<DrainedStep> DrainOneParticipantStepAsync(StreamingRun run)
     {
         var participantResponses = new List<ChatMessage>();
-        CheckpointInfo? stepCheckpoint = null;
+        CheckpointInfo? selectedResponseBearingCheckpoint = null;
         List<ChatMessage>? terminalTranscript = null;
-        var superStepCompletions = 0;
+        var responseBearingCheckpointCount = 0;
 
         await foreach (WorkflowEvent workflowEvent in run.WatchStreamAsync().ConfigureAwait(false))
         {
@@ -277,20 +282,22 @@ internal sealed class GroupChatOneStepHarness
                     break;
 
                 case SuperStepCompletedEvent superStepCompleted:
-                    superStepCompletions++;
-                    if (superStepCompleted.CompletionInfo?.Checkpoint is { } checkpoint)
+                    if (superStepCompleted.CompletionInfo?.Checkpoint is { } checkpoint &&
+                        DeduplicateResponses(participantResponses).Count >= 1)
                     {
-                        stepCheckpoint = checkpoint;
+                        responseBearingCheckpointCount++;
+                        selectedResponseBearingCheckpoint = checkpoint;
                         LastCheckpoint = checkpoint;
                     }
                     break;
 
-                case WorkflowOutputEvent output when output.Is<List<ChatMessage>>():
+                case WorkflowOutputEvent output when output.Is<List<ChatMessage>>() && !output.IsIntermediate():
                     terminalTranscript = output.As<List<ChatMessage>>();
                     break;
             }
 
-            if (DeduplicateResponses(participantResponses).Count >= 1 && stepCheckpoint is not null)
+            if (DeduplicateResponses(participantResponses).Count >= 1 &&
+                selectedResponseBearingCheckpoint is not null)
             {
                 break;
             }
@@ -301,8 +308,8 @@ internal sealed class GroupChatOneStepHarness
 
         return new DrainedStep(
             DeduplicateResponses(participantResponses),
-            stepCheckpoint,
-            superStepCompletions,
+            selectedResponseBearingCheckpoint,
+            responseBearingCheckpointCount,
             statusAtStop,
             terminalTranscript);
     }
@@ -310,7 +317,7 @@ internal sealed class GroupChatOneStepHarness
     private sealed record DrainedStep(
         IReadOnlyList<ChatMessage> ParticipantResponses,
         CheckpointInfo? Checkpoint,
-        int SuperStepCompletions,
+        int ResponseBearingCheckpointCount,
         RunStatus StatusAtStop,
         List<ChatMessage>? TerminalTranscript);
 
@@ -352,7 +359,6 @@ internal sealed class GroupChatOneStepHarness
         {
             Transcript.Clear();
             Transcript.AddRange(terminalTranscript);
-            return;
         }
 
         foreach (var message in DeduplicateResponses(participantResponses))
@@ -386,9 +392,8 @@ internal sealed class GroupChatOneStepHarness
 internal sealed record AdvanceResult(
     IReadOnlyList<ChatMessage> ParticipantResponses,
     CheckpointInfo? Checkpoint,
-    int SuperStepCompletions,
+    int ResponseBearingCheckpointCount,
     RunStatus StatusAtStop,
-    RunStatus StatusAfterDispose,
     bool UsedCheckpointResume,
     bool UsedRebuildFallback);
 
