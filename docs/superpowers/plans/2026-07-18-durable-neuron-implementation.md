@@ -390,19 +390,19 @@ public sealed class QuadrantStartupTask : IStartupTask
 }
 ```
 
-- [ ] Add discovery tests proving a public non-generic leaf interface assignable to `INeuron` maps to one non-abstract implementation deriving from `Neuron`.
-- [ ] Add fail-fast tests for a missing implementation, duplicate implementations, a non-`Neuron` implementation, a generic leaf interface, and a mapping absent from the Orleans local grain manifest.
-- [ ] Add a test proving base capability interfaces are excluded when a more-derived `INeuron` interface exists.
-- [ ] Add a test proving the resulting dictionary is keyed by `Type` and immutable after startup.
-- [ ] Run the owning test project and observe red because Quadrant does not exist.
-- [ ] Implement `NeuronTypeCatalogBuilder` as a pure function over an explicit `IEnumerable<Type>` so discovery rules are deterministic in unit tests.
-- [ ] Let `QuadrantStartupTask` supply types from loaded application assemblies, following the IAW startup pattern.
-- [ ] Validate activation metadata through `IClusterManifestProvider.LocalGrainManifest`, using Orleans `WellKnownGrainInterfaceProperties` and `WellKnownGrainTypeProperties` constants rather than handwritten manifest keys.
-- [ ] Register `Quadrant` as a singleton and `silo.AddStartupTask<QuadrantStartupTask>()`.
-- [ ] Allow every validation exception to escape so Orleans stops silo startup.
-- [ ] Run the owning test project; require green.
-- [ ] Run the root checkpoint; require green.
-- [ ] Codex commits as `feat: discover neuron types into quadrant`.
+- [x] Add discovery tests proving a public non-generic leaf interface assignable to `INeuron` maps to one non-abstract implementation deriving from `Neuron`.
+- [x] Add fail-fast tests for a missing implementation, duplicate implementations, a non-`Neuron` implementation, a generic leaf interface, and a mapping absent from the Orleans local grain manifest.
+- [x] Add a test proving base capability interfaces are excluded when a more-derived `INeuron` interface exists.
+- [x] Add a test proving the resulting dictionary is keyed by `Type` and immutable after startup.
+- [x] Run the owning test project and observe red because Quadrant does not exist.
+- [x] Implement `NeuronTypeCatalogBuilder` as a pure function over an explicit `IEnumerable<Type>` so discovery rules are deterministic in unit tests.
+- [x] Let `QuadrantStartupTask` supply types from loaded application assemblies, following the IAW startup pattern.
+- [x] Validate activation metadata through `IClusterManifestProvider.LocalGrainManifest`, using Orleans `WellKnownGrainInterfaceProperties` and `WellKnownGrainTypeProperties` constants rather than handwritten manifest keys.
+- [x] Register `Quadrant` as a singleton and `silo.AddStartupTask<QuadrantStartupTask>()`.
+- [x] Allow every validation exception to escape so Orleans stops silo startup.
+- [x] Run the owning test project; require green.
+- [x] Run the root checkpoint; require green.
+- [x] Codex commits as `feat: discover neuron types into quadrant`.
 
 ---
 

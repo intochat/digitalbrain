@@ -11,6 +11,8 @@ public static class KernelHosting
         silo.UseJsonJournalFormat(NeuronJournalJsonContext.Default);
         silo.Services.AddSingleton<IAttributeToFactoryMapper<NeuronStateAttribute>, NeuronStateMapper>();
         silo.AddIncomingGrainCallFilter<BrainOwnerIncomingCallFilter>();
+        silo.Services.AddSingleton<Quadrant>();
+        silo.AddStartupTask<QuadrantStartupTask>();
         return silo;
     }
 }
