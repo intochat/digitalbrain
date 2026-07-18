@@ -8,6 +8,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/Brain.Kernel.Host/JournalStorage/**/*.cs" Link="JournalStorage/%(RecursiveDir)%(Filename)%(Extension)" />
     <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
