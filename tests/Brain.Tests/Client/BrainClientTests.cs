@@ -2,7 +2,11 @@ using System.Reflection;
 using Brain.Client;
 using Brain.Contracts;
 using DigitalBrain.AI;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
@@ -98,6 +102,7 @@ public sealed class BrainClientClusterFixture : IDisposable
     {
         var builder = new TestClusterBuilder();
         builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        builder.AddClientBuilderConfigurator<ClientConfigurator>();
         Cluster = builder.Build();
         Cluster.Deploy();
     }
@@ -108,19 +113,46 @@ public sealed class BrainClientClusterFixture : IDisposable
         Cluster.Dispose();
     }
 
+    private static void SelectFixtureGrainImplementations(GrainTypeOptions options)
+    {
+        options.Classes.Remove(typeof(Gpt56Neuron));
+        options.Classes.Remove(typeof(Grok45Neuron));
+        options.Classes.Remove(typeof(GroupChatNeuron));
+        options.Classes.Add(typeof(Gpt56TestGrain));
+        options.Classes.Add(typeof(Grok45TestGrain));
+        options.Classes.Add(typeof(GroupChatTestGrain));
+    }
+
     private sealed class SiloConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
+            siloBuilder.Services.AddSingleton<IPostConfigureOptions<GrainTypeOptions>, FixtureGrainTypeSelection>();
         }
+    }
+
+    private sealed class ClientConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+        {
+            clientBuilder.Services.AddSingleton<IPostConfigureOptions<GrainTypeOptions>, FixtureGrainTypeSelection>();
+        }
+    }
+
+    private sealed class FixtureGrainTypeSelection : IPostConfigureOptions<GrainTypeOptions>
+    {
+        public void PostConfigure(string? name, GrainTypeOptions options) =>
+            SelectFixtureGrainImplementations(options);
     }
 }
 
+[GrainType("client-fixture.gpt56")]
 public sealed class Gpt56TestGrain : Grain, IGpt56
 {
     public Task<string> GetIdentityAsync() => Task.FromResult(this.GetPrimaryKeyString());
 }
 
+[GrainType("client-fixture.grok45")]
 public sealed class Grok45TestGrain : Grain, IGrok45
 {
     public Task<string> GetIdentityAsync() => Task.FromResult(this.GetPrimaryKeyString());
@@ -148,6 +180,7 @@ public interface IGroupChatTestProbe : IGroupChat
     Task<string?> GetLastPrincipalIdAsync();
 }
 
+[GrainType("client-fixture.groupchat")]
 public sealed class GroupChatTestGrain : Grain, IGroupChatTestProbe
 {
     private string? _topic;
