@@ -114,6 +114,37 @@ public sealed class ContractSurfaceTests
     }
 
     [Fact]
+    public void Provider_contracts_expose_only_typed_command_operations()
+    {
+        Assert.Equal(
+            typeof(Task<CommandReceipt>),
+            typeof(IGmail).GetMethod(nameof(IGmail.ListMessagesAsync))!.ReturnType);
+        Assert.Equal(
+            typeof(CommandSynapse<GmailListRequest>),
+            typeof(IGmail).GetMethod(nameof(IGmail.ListMessagesAsync))!.GetParameters().Single().ParameterType);
+        Assert.Equal(
+            typeof(CommandSynapse<GmailSendRequest>),
+            typeof(IGmail).GetMethod(nameof(IGmail.SendMessageAsync))!.GetParameters().Single().ParameterType);
+        Assert.Equal(
+            typeof(UiSurfaceSnapshot),
+            typeof(IGmail).GetMethod(nameof(IGmail.GetSurfaceAsync))!.ReturnType.GenericTypeArguments.Single());
+
+        Assert.Equal(
+            typeof(CommandSynapse<SalesforceQueryRequest>),
+            typeof(ISalesforce).GetMethod(nameof(ISalesforce.QueryRecordsAsync))!.GetParameters().Single().ParameterType);
+        Assert.Equal(
+            typeof(CommandSynapse<SalesforceUpdateRequest>),
+            typeof(ISalesforce).GetMethod(nameof(ISalesforce.UpdateRecordAsync))!.GetParameters().Single().ParameterType);
+        Assert.Equal(
+            typeof(UiSurfaceSnapshot),
+            typeof(ISalesforce).GetMethod(nameof(ISalesforce.GetSurfaceAsync))!.ReturnType.GenericTypeArguments.Single());
+
+        Assert.DoesNotContain(
+            typeof(IGmail).GetMethods().Concat(typeof(ISalesforce).GetMethods()),
+            method => method.GetParameters().Any(parameter => parameter.ParameterType == typeof(string)));
+    }
+
+    [Fact]
     public void Contracts_serialize_with_Orleans()
     {
         var services = new ServiceCollection()
