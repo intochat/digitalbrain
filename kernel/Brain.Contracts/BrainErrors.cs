@@ -1,25 +1,32 @@
 namespace Brain.Contracts;
 
-public static class BrainErrors
+public enum NeuronFailureKind
 {
-    public const string UnknownKind = "kind.unknown";
-    public const string UnknownContract = "contract.unknown";
-    public const string RevisionConflict = "action.revision-stale";
-    public const string Replayed = "action.replayed";
-    public const string GrantMissing = "grant.missing";
-    public const string GrantDenied = "grant.denied";
-    public const string EffectNotApproved = "effect.not-approved";
-    public const string CallerMalformed = "caller.malformed";
-    public const string ModelUnavailable = "model.unavailable";
-    public const string ModelTimeout = "model.timeout";
-    public const string ProviderTimeout = "provider.timeout";
-    public const string ProviderError = "provider.error";
-    public const string ConnectionUnhealthy = "connection.unhealthy";
+    AuthenticationRequired,
+    AuthorizationDenied,
+    ProviderUnavailable,
+    OperationFailed,
+    OperationUnknown,
+    StorageUnavailable
 }
 
-[GenerateSerializer, Alias("brain.exception.v2")]
-public sealed class BrainException(string code, string detail) : Exception($"{code}: {detail}")
+public enum NeuronStatus
 {
+    Idle,
+    Active,
+    Degraded
+}
+
+[GenerateSerializer]
+[Alias(nameof(BrainException))]
+public sealed class BrainException : Exception
+{
+    public BrainException(NeuronFailureKind failureKind, string detail)
+        : base($"{failureKind}: {detail}")
+    {
+        FailureKind = failureKind;
+    }
+
     [Id(0)]
-    public string Code { get; } = code;
+    public NeuronFailureKind FailureKind { get; }
 }

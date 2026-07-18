@@ -2,18 +2,6 @@
   <Folder Name="/kernel/">
     <Project Path="kernel/Brain.Contracts/Brain.Contracts.csproj" />
     <Project Path="kernel/Brain.Kernel/Brain.Kernel.csproj" />
-    <Project Path="kernel/Brain.Client/Brain.Client.csproj" />
-  </Folder>
-  <Folder Name="/modules/">
-    <Project Path="modules/AI.Contracts/AI.Contracts.csproj" />
-    <Project Path="modules/AI/AI.csproj" />
-    <Project Path="modules/Flutter.Contracts/Flutter.Contracts.csproj" />
-    <Project Path="modules/Flutter/Flutter.csproj" />
-    <Project Path="modules/Google.Contracts/Google.Contracts.csproj" />
-    <Project Path="modules/Google/Google.csproj" />
-  </Folder>
-  <Folder Name="/edge/">
-    <Project Path="edge/Brain.Mcp/Brain.Mcp.csproj" />
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />

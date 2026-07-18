@@ -9,7 +9,6 @@
     <ProjectReference Include="../Brain.Contracts/Brain.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" />
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
   </ItemGroup>

@@ -11,7 +11,7 @@ namespace DigitalBrain.Tests.Architecture;
 public sealed class ProjectTopologyTests
 {
     [Fact]
-    public void Active_solution_contains_only_the_product_foundation_projects()
+    public void Active_solution_contains_exactly_the_durable_neuron_foundation_projects()
     {
         var solutionPath = FindRepositoryFile("Brain.slnx");
         var projectPaths = XDocument.Load(solutionPath)
@@ -19,49 +19,32 @@ public sealed class ProjectTopologyTests
             .Select(element => element.Attribute("Path")?.Value)
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Cast<string>()
+            .Order(StringComparer.Ordinal)
             .ToArray();
+
+        Assert.Equal(
+            [
+                "hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj",
+                "hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
+                "kernel/Brain.Contracts/Brain.Contracts.csproj",
+                "kernel/Brain.Kernel/Brain.Kernel.csproj",
+                "tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj",
+                "tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj"
+            ],
+            projectPaths);
+
         var projectNames = projectPaths
             .Select(path => Path.GetFileNameWithoutExtension(path)!)
             .ToArray();
 
-        Assert.Equal(
-            ["Google", "Google.Contracts"],
-            ProductProjects(projectNames, "Google"));
-        Assert.Equal(
-            ["AI", "AI.Contracts"],
-            ProductProjects(projectNames, "AI"));
-        Assert.Equal(
-            ["Flutter", "Flutter.Contracts"],
-            ProductProjects(projectNames, "Flutter"));
-        Assert.Equal(
-            ["Brain.FeasibilityTests", "DigitalBrain.Tests"],
-            projectPaths
-                .Where(path => path.StartsWith("tests/", StringComparison.OrdinalIgnoreCase))
-                .Select(path => Path.GetFileNameWithoutExtension(path)!)
-                .Order(StringComparer.Ordinal)
-                .ToArray());
-
-        var forbiddenFragments = new[]
-        {
-            "Modules.Sdk",
-            "Modules.Connections",
-            "UiGateway",
-            "ServiceDefaults"
-        };
-        Assert.DoesNotContain(
-            projectNames,
-            name => forbiddenFragments.Any(
-                fragment => name.Contains(fragment, StringComparison.OrdinalIgnoreCase)));
-
-        var supersededProjects = new[]
-        {
-            "Brain.Modules.Workspace",
-            "Brain.Modules.Web",
-            "Brain.Modules.Behaviors"
-        };
-        Assert.DoesNotContain(
-            projectNames,
-            name => supersededProjects.Contains(name, StringComparer.OrdinalIgnoreCase));
+        Assert.DoesNotContain(projectNames, name => name.Equals("AI", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(projectNames, name => name.Equals("AI.Contracts", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(projectNames, name => name.Equals("Flutter", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(projectNames, name => name.Equals("Flutter.Contracts", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(projectNames, name => name.Equals("Google", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(projectNames, name => name.Equals("Google.Contracts", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(projectNames, name => name.Equals("Brain.Mcp", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(projectNames, name => name.Equals("Brain.Client", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -82,14 +65,6 @@ public sealed class ProjectTopologyTests
         Assert.Contains("/health", routes);
         Assert.Contains("/alive", routes);
     }
-
-    private static string[] ProductProjects(IEnumerable<string> projectNames, string prefix) =>
-        projectNames
-            .Where(name =>
-                name.Equals(prefix, StringComparison.OrdinalIgnoreCase) ||
-                name.StartsWith(prefix + ".", StringComparison.OrdinalIgnoreCase))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
 
     private static string FindRepositoryFile(string fileName)
     {

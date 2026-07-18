@@ -4,12 +4,19 @@ using Orleans.Journaling;
 
 namespace Brain.Kernel;
 
-public sealed class NeuronDurableState(
-    [FromKeyedServices("neuron-journal")] IDurableList<NeuronEvent> journal,
-    [FromKeyedServices("neuron-receipts")] IDurableDictionary<string, NeuronReceipt> receipts,
-    [FromKeyedServices("neuron-synapses")] IDurableList<SynapseRecord> synapses)
+public sealed class NeuronDurableState
 {
-    public IDurableList<NeuronEvent> Journal { get; } = journal;
-    public IDurableDictionary<string, NeuronReceipt> Receipts { get; } = receipts;
-    public IDurableList<SynapseRecord> Synapses { get; } = synapses;
+    public NeuronDurableState(
+        [FromKeyedServices(nameof(Status))] IDurableValue<NeuronStatus> status,
+        [FromKeyedServices(nameof(Operations))] IDurableDictionary<Guid, ExternalOperation> operations,
+        [FromKeyedServices(nameof(Outbox))] IDurableDictionary<Guid, NeuronNotification> outbox)
+    {
+        Status = status;
+        Operations = operations;
+        Outbox = outbox;
+    }
+
+    public IDurableValue<NeuronStatus> Status { get; }
+    public IDurableDictionary<Guid, ExternalOperation> Operations { get; }
+    public IDurableDictionary<Guid, NeuronNotification> Outbox { get; }
 }

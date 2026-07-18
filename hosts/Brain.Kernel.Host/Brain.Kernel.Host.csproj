@@ -9,9 +9,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\kernel\Brain.Kernel\Brain.Kernel.csproj" />
-    <ProjectReference Include="..\..\modules\AI\AI.csproj" />
-    <ProjectReference Include="..\..\modules\Flutter\Flutter.csproj" />
-    <ProjectReference Include="..\..\modules\Google\Google.csproj" />
   </ItemGroup>
 
   <ItemGroup>

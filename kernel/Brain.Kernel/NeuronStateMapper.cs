@@ -13,15 +13,15 @@ public sealed class NeuronStateMapper : IAttributeToFactoryMapper<NeuronStateAtt
     {
         if (parameter.ParameterType != typeof(NeuronDurableState))
             throw new InvalidOperationException(
-                $"Parameter '{parameter.Name}' must be of type NeuronDurableState.");
+                $"Parameter '{parameter.Name}' must be of type {nameof(NeuronDurableState)}.");
 
         return context =>
         {
             var services = context.ActivationServices;
             return new NeuronDurableState(
-                services.GetRequiredKeyedService<IDurableList<NeuronEvent>>("neuron-journal"),
-                services.GetRequiredKeyedService<IDurableDictionary<string, NeuronReceipt>>("neuron-receipts"),
-                services.GetRequiredKeyedService<IDurableList<SynapseRecord>>("neuron-synapses"));
+                services.GetRequiredKeyedService<IDurableValue<NeuronStatus>>(nameof(NeuronDurableState.Status)),
+                services.GetRequiredKeyedService<IDurableDictionary<Guid, ExternalOperation>>(nameof(NeuronDurableState.Operations)),
+                services.GetRequiredKeyedService<IDurableDictionary<Guid, NeuronNotification>>(nameof(NeuronDurableState.Outbox)));
         };
     }
 }

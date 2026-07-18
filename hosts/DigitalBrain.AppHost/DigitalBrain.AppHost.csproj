@@ -9,15 +9,10 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Azure.Storage" />
-    <PackageReference Include="Aspire.Hosting.JavaScript" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Brain.Kernel.Host\Brain.Kernel.Host.csproj" />
-    <ProjectReference Include="..\..\modules\AI\AI.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\modules\Flutter\Flutter.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\modules\Google\Google.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\edge\Brain.Mcp\Brain.Mcp.csproj" />
   </ItemGroup>
 
 </Project>

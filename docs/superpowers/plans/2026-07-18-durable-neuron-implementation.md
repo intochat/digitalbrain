@@ -286,24 +286,26 @@ public enum NeuronFailureKind
 
 Each `[FromKeyedServices]` state name is `nameof` a corresponding property. No handwritten state key is accepted.
 
-- [ ] Add architecture tests proving `INeuron` declares zero methods and extends `IGrainWithStringKey`.
-- [ ] Add tests proving `Neuron` derives from the official `DurableGrain`.
-- [ ] Add tests proving `NeuronDurableState` uses only the three approved universal durable members and every keyed state name is produced by `nameof`.
-- [ ] Add a test-only `ITestNeuron : INeuron` with direct typed methods for writing and reading durable state.
-- [ ] Run the owning test project and observe compile-time red because the minimal contracts/base do not exist.
-- [ ] Delete the generic contracts and generic kernel before implementing their replacements.
-- [ ] Remove the generic AI, Flutter, Google, and MCP projects from `Brain.slnx`, the kernel host, the AppHost, and the test project before changing `INeuron`; their rejected tracked remnants are deleted here or in Task 9.
-- [ ] Reduce the active test project to the new kernel/client architecture tests. Do not preserve tests which specify the rejected architecture.
-- [ ] Recreate the solution topology test immediately, listing the feasibility project plus the remaining active kernel, host, AppHost, and test projects.
-- [ ] Implement the minimal records with Orleans `[GenerateSerializer]`, `[Id]`, and `[Alias(nameof(...))]` metadata.
-- [ ] Keep raw credentials and arbitrary provider payloads out of `ExternalOperation`.
-- [ ] Implement `Neuron` with protected access to the injected `NeuronDurableState` and no public business methods.
-- [ ] Implement the test neuron with typed methods and explicit `WriteStateAsync()` calls.
-- [ ] Preserve the Task 1 interim hosting blueprint exactly: AppHost `kernel` -> Azurite journal blob reference; kernel host `UseLocalhostClustering` plus official `AddJournalStorage` and `AddAzureBlobJournalStorage`; no volatile provider. Remove only the deleted module extension calls and project references.
-- [ ] Run the owning test project; require green.
-- [ ] Run the root checkpoint; require green.
-- [ ] Run `rg -n "INeuronKind|KindCatalog|NeuronAddress|NeuronInvocation|NeuronReceipt|NeuronEvent|SynapseRecord" kernel tests/DigitalBrain.Tests -g '*.cs'`; require no match.
-- [ ] Codex commits as `refactor: replace generic kernel with durable neurons`.
+- [x] Add architecture tests proving `INeuron` declares zero methods and extends `IGrainWithStringKey`.
+- [x] Add tests proving `Neuron` derives from the official `DurableGrain`.
+- [x] Add tests proving `NeuronDurableState` uses only the three approved universal durable members and every keyed state name is produced by `nameof`.
+- [x] Add a test-only `ITestNeuron : INeuron` with direct typed methods for writing and reading durable state.
+- [x] Run the owning test project and observe compile-time red because the minimal contracts/base do not exist.
+- [x] Delete the generic contracts and generic kernel before implementing their replacements.
+- [x] Remove the generic AI, Flutter, Google, and MCP projects from `Brain.slnx`, the kernel host, the AppHost, and the test project before changing `INeuron`; their rejected tracked remnants are deleted here or in Task 9.
+- [x] Reduce the active test project to the new kernel/client architecture tests. Do not preserve tests which specify the rejected architecture.
+- [x] Recreate the solution topology test immediately, listing the feasibility project plus the remaining active kernel, host, AppHost, and test projects.
+- [x] Implement the minimal records with Orleans `[GenerateSerializer]`, `[Id]`, and `[Alias(nameof(...))]` metadata.
+- [x] Keep raw credentials and arbitrary provider payloads out of `ExternalOperation`.
+- [x] Implement `Neuron` with protected access to the injected `NeuronDurableState` and no public business methods.
+- [x] Implement the test neuron with typed methods and explicit `WriteStateAsync()` calls.
+- [x] Preserve the Task 1 interim hosting blueprint exactly: AppHost `kernel` -> Azurite journal blob reference; kernel host `UseLocalhostClustering` plus official `AddJournalStorage` and `AddAzureBlobJournalStorage`; no volatile provider. Remove only the deleted module extension calls and project references.
+- [x] Run the owning test project; require green.
+- [x] Run the root checkpoint; require green.
+- [x] Run `rg -n "INeuronKind|KindCatalog|NeuronAddress|NeuronInvocation|NeuronReceipt|NeuronEvent|SynapseRecord" kernel tests/DigitalBrain.Tests -g '*.cs'`; require no match.
+- [x] Codex commits as `refactor: replace generic kernel with durable neurons`.
+
+Execution record (2026-07-18): the exact scan had zero matches in the active Task 2 projects. Two matches remained only in the inactive `kernel/Brain.Client/NeuronProxy.cs`, whose deletion is assigned to Task 3. The user approved continuing with that deletion deferred to Task 3 and restoring the rewritten client to the active topology there.
 
 ---
 
@@ -319,6 +321,9 @@ Each `[FromKeyedServices]` state name is `nameof` a corresponding property. No h
 - Create: `kernel/Brain.Client/BrainOwnerOutgoingCallFilter.cs`
 - Create: `kernel/Brain.Kernel/BrainOwnerIncomingCallFilter.cs`
 - Modify: `kernel/Brain.Kernel/KernelHosting.cs`
+- Modify: `Brain.slnx`
+- Modify: `tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj`
+- Modify: `tests/DigitalBrain.Tests/Architecture/ProjectTopologyTests.cs`
 - Delete: `tests/DigitalBrain.Tests/BrainClusterCallerKeyTests.cs`
 - Delete: `tests/DigitalBrain.Tests/Kernel/TypedProxyTests.cs`
 - Create: `tests/DigitalBrain.Tests/Client/DigitalBrainClientTests.cs`
